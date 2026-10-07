@@ -6,11 +6,15 @@ import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -170,5 +174,29 @@ class SortPropagatorTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `a sorted bound cites only the values that rank below it`() {
+        // ys = sorted(xs): with x0 <= 2 and x1 <= 3, the second smallest is at most 3; x2's hole plays no part.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = Array(6) { IntDomain(0, 9) },
+            factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 2) && state.tightenIntMax(1, 3) && state.excludeIntValue(2, 5))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.intMaxAntecedents[4])!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(setOf(Triple(0, AtomKind.LE, 2L), Triple(1, AtomKind.LE, 3L)), cited.toSet())
     }
 }
