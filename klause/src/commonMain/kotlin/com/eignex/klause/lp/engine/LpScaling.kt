@@ -379,6 +379,7 @@ private fun scaledVectors(model: LpModel, rowExponents: IntArray, columnExponent
 }
 
 private fun projectionLostNonzero(model: LpModel): Boolean {
+    model.exactState?.projectionLostNonzero(model)?.let { return it }
     val exact = model.exactState?.model ?: return false
     for (i in 0 until model.m) if (!exact.rhs(i).value.isZero && model.rhsD(i) == 0.0) return true
     for (j in 0 until model.numVars) {

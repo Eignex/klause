@@ -171,7 +171,7 @@ internal class LpScopedSolver(
     ): CertifiedLpResult? {
         val attempt = solveFloat(warm, token) ?: return null
         val certified = certifyLpResult(
-            requireNotNull(state.toWorkingModel()),
+            requireNotNull(state.ownerWorkingModel()),
             attempt.first,
             attempt.second,
             token,
@@ -503,8 +503,8 @@ internal class LpScopedSolver(
             )
             var constructionBound = 0L
             val working = try {
-                next.toWorkingModel(projection)?.also {
-                    // The new numerical owner projects vectors again while adopting this state.
+                next.ownerWorkingModel(projection)?.also {
+                    // The numerical owner refreshes its scaled vectors while adopting this state.
                     projection.reserveVectors(next.model)
                     // Building it scales the matrix. Preparation caps take precedence, so the bound is reserved from
                     // this preparation's allowance and charged as spent; the ledger records the reported work.

@@ -14,6 +14,235 @@ import kotlin.test.assertTrue
 
 class LpExactStateTest {
     @Test
+    fun `editing a caller projection cannot change later projections of its source`() {
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(one)), origin = one, tag = 7),
+                ExactLpColumn(ExactLpBounds()),
+            ),
+            listOf(ExactLpRow(global = true)),
+            ExactLpObjective(listOf(one, one), constant = one),
+        )
+        val state = LpExactState(source)
+        val caller = assertNotNull(state.toWorkingModel())
+        val input = assertNotNull(caller.doubleView)
+        input.rhs[0] = 0.0
+        input.cost[0] = 0.0
+        input.upper[0] = 0.0
+        input.hasUpper[0] = false
+        input.loShift[0] = 0.0
+        input.objConstant = 0.0
+        caller.tag[0] = 9
+        caller.rowGlobal[0] = false
+        caller.probeClampedLo[0] = true
+        caller.probeClampedHi[0] = true
+        caller.rowPremises[0] = LpRowPremises(intArrayOf(7), booleanArrayOf(true), longArrayOf(1L))
+
+        val projected = assertNotNull(state.toWorkingModel())
+
+        assertEquals(1.0, projected.rhsD(0))
+        assertEquals(1.0, projected.costD(0))
+        assertEquals(1.0, projected.upperD(0))
+        assertTrue(assertNotNull(projected.doubleView).hasUpper[0])
+        assertEquals(1.0, projected.loShiftD(0))
+        assertEquals(1.0, projected.objConstantD)
+        assertEquals(7, projected.tag[0])
+        assertTrue(projected.rowGlobal[0])
+        assertFalse(projected.probeClampedLo[0])
+        assertFalse(projected.probeClampedHi[0])
+        assertNull(projected.rowPremises[0])
+        assertSame(state, projected.exactState)
+    }
+
+    @Test
+    fun `incremental and fresh projections agree after bound and structural edits`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, third))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow()),
+            ExactLpObjective(listOf(third, zero)),
+        )
+        val trail = LpBoundTrail(source)
+        assertNotNull(trail.state.ownerWorkingModel())
+        val edits = listOf<(LpBoundTrail) -> Boolean>(
+            { it.push() },
+            { it.assertBound(0, true, ExactLpSide(ExactLpNumber.of(7L)), 0L) },
+            { it.push() },
+            { it.assertBound(0, false, ExactLpSide(one, strict = true), 1L) },
+            { it.pop(1) },
+            { it.pop(0) },
+            { it.recenter(listOf(third)) },
+            { it.replaceObjective(ExactLpObjective(listOf(one, zero), constant = third)) },
+            { it.push() },
+            { it.append(LpScopedRow(10L, listOf(0 to one), one, ExactLpColumn(ExactLpBounds())), scoped = true) },
+            { it.assertBound(2, true, ExactLpSide(third), 2L) },
+            { it.pop(0) },
+            { it.compact() },
+        )
+        for (edit in edits) {
+            assertTrue(edit(trail))
+            val state = trail.state
+
+            val incremental = assertNotNull(state.ownerWorkingModel())
+            val fresh = assertNotNull(
+                LpExactState(state.baseModel, state.assertions, state.scopes, rows = state.rows).toWorkingModel(),
+            )
+
+            assertEquals(fresh.n, incremental.n)
+            assertEquals(fresh.m, incremental.m)
+            for (i in 0 until fresh.m) {
+                assertEquals(fresh.rhsD(i).toRawBits(), incremental.rhsD(i).toRawBits())
+                assertEquals(fresh.rowStrict[i], incremental.rowStrict[i])
+                assertEquals(fresh.rowGlobal[i], incremental.rowGlobal[i])
+            }
+            for (j in 0 until fresh.numVars) {
+                assertEquals(fresh.costD(j).toRawBits(), incremental.costD(j).toRawBits())
+                assertEquals(fresh.lowerD(j).toRawBits(), incremental.lowerD(j).toRawBits())
+                assertEquals(fresh.upperD(j).toRawBits(), incremental.upperD(j).toRawBits())
+                assertEquals(fresh.hasFiniteUpper(j), incremental.hasFiniteUpper(j))
+            }
+            assertSame(state, incremental.exactState)
+        }
+    }
+
+    @Test
+    fun `a bound edit projects within a budget too small for unchanged vectors`() {
+        val zero = ExactLpNumber.of(0L)
+        val ten = ExactLpNumber.of(10L)
+        val source = ExactLpModel(
+            List(128) { emptyList() },
+            emptyList(),
+            List(128) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ten))) },
+            emptyList(),
+            ExactLpObjective(List(128) { zero }),
+        )
+        val trail = LpBoundTrail(source)
+        val original = assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.assertBound(7, true, ExactLpSide(ExactLpNumber.of(3L)), 0L))
+        val budget = LpProjectionMeter(workLimit = 140L, allocationLimit = 1800L)
+
+        val changed = assertNotNull(trail.state.ownerWorkingModel(budget))
+
+        assertEquals(3.0, changed.upperD(7))
+        assertEquals(10.0, original.upperD(7))
+        assertEquals(10.0, changed.upperD(8))
+        assertSame(trail.state, changed.exactState)
+        assertEquals(0L, budget.matrixWork)
+    }
+
+    @Test
+    fun `repeated projection keeps its exact owner without projecting vectors again`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            List(128) { emptyList() },
+            emptyList(),
+            List(128) { ExactLpColumn(ExactLpBounds()) },
+            emptyList(),
+            ExactLpObjective(List(128) { zero }),
+        )
+        val trail = LpBoundTrail(source)
+        assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.push())
+
+        val repeated = assertNotNull(trail.state.ownerWorkingModel(LpProjectionMeter(workLimit = 1L)))
+
+        assertSame(trail.state, repeated.exactState)
+        assertEquals(1, repeated.exactState?.depth)
+    }
+
+    @Test
+    fun `a declined incremental projection leaves its predecessor and retry intact`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val trail = LpBoundTrail(source)
+        val original = assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(3L)), 0L))
+
+        assertNull(trail.state.toWorkingModel(LpProjectionMeter(allocationLimit = 0L)))
+
+        assertEquals(10.0, original.upperD(0))
+        val retry = assertNotNull(trail.state.toWorkingModel())
+        assertEquals(3.0, retry.upperD(0))
+        assertSame(trail.state, retry.exactState)
+    }
+
+    @Test
+    fun `bound underflow status follows tightening and rollback on either side`() {
+        val zero = ExactLpNumber.of(0L)
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2048))
+        for (upper in listOf(false, true)) {
+            val source = ExactLpModel(
+                listOf(emptyList()),
+                emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L))))),
+                emptyList(),
+                ExactLpObjective(listOf(zero)),
+            )
+            val trail = LpBoundTrail(source)
+            val root = assertNotNull(trail.state.toWorkingModel())
+            assertTrue(trail.push())
+            assertTrue(trail.assertBound(0, upper, ExactLpSide(tiny), 0L))
+            val underflowed = assertNotNull(trail.state.toWorkingModel())
+            assertTrue(trail.assertBound(0, upper, ExactLpSide(if (upper) zero else ExactLpNumber.of(1L)), 1L))
+            val recovered = assertNotNull(trail.state.toWorkingModel())
+
+            assertEquals(false, trail.state.projectionLostNonzero(recovered))
+            assertEquals(true, underflowed.exactState?.projectionLostNonzero(underflowed))
+            assertTrue(trail.pop(0))
+            val restored = assertNotNull(trail.state.toWorkingModel())
+            assertEquals(false, trail.state.projectionLostNonzero(restored))
+            assertEquals(false, root.exactState?.projectionLostNonzero(root))
+        }
+    }
+
+    @Test
+    fun `nested bound projections restore absent upper bounds without changing sibling snapshots`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val trail = LpBoundTrail(source)
+        val root = assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(3L)), 0L))
+        val parent = assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(1L)), 1L))
+        val child = assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.pop(1))
+        val restored = assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.pop(0))
+        val open = assertNotNull(trail.state.toWorkingModel())
+
+        assertFalse(root.hasFiniteUpper(0))
+        assertFalse(open.hasFiniteUpper(0))
+        assertEquals(3.0, parent.upperD(0))
+        assertEquals(1.0, child.upperD(0))
+        assertEquals(3.0, restored.upperD(0))
+        assertFalse(assertNotNull(open.doubleView).hasUpper[0])
+    }
+
+    @Test
     fun `equal and weaker assertions retain declared source while strict assertion selects its premise`() {
         val zero = ExactLpNumber.of(0L)
         val ieeeZero = ExactLpNumber.ofIeee(-0.0)

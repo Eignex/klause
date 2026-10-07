@@ -78,6 +78,9 @@ internal class LpExactState internal constructor(
     private val inconsistent: BooleanArray
     private var projection: LpMatrixProjection? = null
     private var projectionAttempted = false
+    private var vectors: LpVectorProjection? = null
+    private var inheritedVectors: LpVectorProjection? = null
+    private var projectionColumns = intArrayOf()
 
     // Whether every right-hand side, cost, bound and origin projects to a finite double; null until checked.
     private var scalarsProjectable: Boolean? = null
@@ -126,6 +129,12 @@ internal class LpExactState internal constructor(
             }
             inconsistent = source.inconsistent.copyOf()
             for (j in touched) inconsistent[j] = !model.column(j).bounds.consistent
+            if (touched.isEmpty()) {
+                vectors = source.vectors
+            } else {
+                inheritedVectors = source.vectors
+                projectionColumns = touched.toIntArray()
+            }
             // Right-hand sides, costs and origins are the base model's, so only the touched bounds can change it.
             if (source.scalarsProjectable == true) scalarsProjectable = touched.all { boundsProject(it) }
         }
@@ -243,9 +252,18 @@ internal class LpExactState internal constructor(
 
     val matrixProjectionStatus: LpMatrixProjectionStatus? get() = projection?.status
     val matrixProjectionDeclined: Boolean get() = projectionAttempted && projection == null
+    fun projectionLostNonzero(working: LpModel): Boolean? = vectors?.lostNonzero(working)
 
     fun toWorkingModel(meter: LpProjectionMeter = LpProjectionMeter()): LpModel? = try {
-        projectWorkingModel(meter)
+        projectWorkingModel(meter, copyVectors = true)
+    } catch (_: LpProjectionStop) {
+        null
+    }
+
+    // Numerical owners only read projected inputs. Caller-owned views copy the vectors because their arrays
+    // may be edited independently of source authority and of any retained owner.
+    fun ownerWorkingModel(meter: LpProjectionMeter = LpProjectionMeter()): LpModel? = try {
+        projectWorkingModel(meter, copyVectors = false)
     } catch (_: LpProjectionStop) {
         null
     }
@@ -260,9 +278,50 @@ internal class LpExactState internal constructor(
         false
     }
 
-    private fun projectWorkingModel(meter: LpProjectionMeter): LpModel? {
+    private fun projectWorkingModel(meter: LpProjectionMeter, copyVectors: Boolean): LpModel? {
         if (!ensureMatrixProjection(meter)) return null
         val matrix = projection ?: return null
+        val projected = projectVectors(meter) ?: return null
+        val scalars = if (copyVectors) projected.ownedCopy(model, meter) else projected
+        val layout = scalars.layout
+        meter.reserve(1L, 512L, matrix = false)
+        return LpModel(
+            n = model.n,
+            m = model.m,
+            csc = matrix.csc,
+            rhs = layout.rhs,
+            cost = layout.cost,
+            upper = layout.upper,
+            hasUpper = scalars.hasUpper,
+            loShift = layout.origins,
+            objConstant = 0L,
+            sense = model.objective.sense,
+            tag = layout.tag,
+            rowGlobal = layout.rowGlobal,
+            rowStrict = layout.rowStrict,
+            rowPremises = layout.rowPremises,
+            probeClampedLo = layout.probeClampedLo,
+            probeClampedHi = layout.probeClampedHi,
+            colContinuous = layout.continuous,
+            doubleView = LpDoubleView(
+                matrix.colPtr, matrix.rowIdx, matrix.values, scalars.rhs, scalars.cost,
+                scalars.upper, scalars.hasUpper, scalars.constant, scalars.origins,
+            ),
+            exactState = this,
+        )
+    }
+
+    private fun projectVectors(meter: LpProjectionMeter): LpVectorProjection? {
+        meter.poll()
+        vectors?.let { return it }
+        inheritedVectors?.let { previous ->
+            val next = previous.withBounds(model, projectionColumns, meter) ?: return null
+            meter.poll()
+            vectors = next
+            scalarsProjectable = true
+            inheritedVectors = null
+            return next
+        }
         meter.reserveVectors(model)
         val rhs = DoubleArray(model.m)
         val costs = DoubleArray(model.numVars)
@@ -270,26 +329,21 @@ internal class LpExactState internal constructor(
         val hasUpper = BooleanArray(model.numVars)
         val origins = DoubleArray(model.n)
         val constant = projectScalars(meter, rhs, costs, uppers, hasUpper, origins) ?: return null
-        return LpModel(
-            n = model.n,
-            m = model.m,
-            csc = matrix.csc,
-            rhs = LongArray(model.m),
-            cost = LongArray(model.numVars),
-            upper = LongArray(model.numVars),
-            hasUpper = hasUpper.copyOf(),
-            loShift = LongArray(model.n),
-            objConstant = 0L,
-            sense = model.objective.sense,
-            tag = IntArray(model.n) { model.column(it).tag },
-            rowGlobal = BooleanArray(model.m) { model.row(it).global },
-            rowStrict = BooleanArray(model.m) { model.row(it).strict },
-            colContinuous = BooleanArray(model.n) { !model.column(it).integral },
-            doubleView = LpDoubleView(
-                matrix.colPtr, matrix.rowIdx, matrix.values, rhs, costs, uppers, hasUpper, constant, origins,
-            ),
-            exactState = this,
-        )
+        val nonzero = LpProjectionNonzero(model)
+        meter.poll()
+        return LpVectorProjection(
+            rhs,
+            costs,
+            uppers,
+            hasUpper,
+            constant,
+            origins,
+            LpProjectionLayout(model),
+            nonzero,
+        ).also {
+            vectors = it
+            scalarsProjectable = true
+        }
     }
 
     private fun ensureMatrixProjection(meter: LpProjectionMeter): Boolean {
@@ -351,6 +405,130 @@ private fun LpBoundAssertion.strongerThan(other: LpBoundAssertion): Boolean {
 private fun ExactLpNumber.project(nonzeroRequired: Boolean = false): Double? {
     val result = approximation
     return result.takeIf { it.isFinite() && (!nonzeroRequired || it != 0.0 || value.isZero) }
+}
+
+private class LpProjectionLayout(model: ExactLpModel) {
+    val rhs = LongArray(model.m)
+    val cost = LongArray(model.numVars)
+    val upper = LongArray(model.numVars)
+    val origins = LongArray(model.n)
+    val tag = IntArray(model.n) { model.column(it).tag }
+    val rowGlobal = BooleanArray(model.m) { model.row(it).global }
+    val rowStrict = BooleanArray(model.m) { model.row(it).strict }
+    val rowPremises = arrayOfNulls<LpRowPremises>(model.m)
+    val probeClampedLo = BooleanArray(model.n)
+    val probeClampedHi = BooleanArray(model.n)
+    val continuous = BooleanArray(model.n) { !model.column(it).integral }
+}
+
+private class LpProjectionNonzero(
+    val rhs: IntArray,
+    val costs: IntArray,
+    val origins: IntArray,
+    val bounds: IntArray,
+) {
+    constructor(model: ExactLpModel) : this(
+        (0 until model.m).filter { !model.rhs(it).value.isZero }.toIntArray(),
+        (0 until model.numVars).filter { !model.objective.cost(it).value.isZero }.toIntArray(),
+        (0 until model.n).filter { !model.column(it).origin.value.isZero }.toIntArray(),
+        IntArray(model.numVars) { boundMask(model.column(it).bounds) },
+    )
+
+    fun withBounds(model: ExactLpModel, columns: IntArray, meter: LpProjectionMeter): LpProjectionNonzero {
+        var next = bounds
+        for (column in columns) {
+            meter.poll()
+            val mask = boundMask(model.column(column).bounds)
+            if (mask == bounds[column]) continue
+            if (next === bounds) {
+                meter.reserve(bounds.size.toLong(), bounds.size * 4L, matrix = false)
+                next = bounds.copyOf()
+            }
+            next[column] = mask
+        }
+        return LpProjectionNonzero(rhs, costs, origins, next)
+    }
+
+    private companion object {
+        fun boundMask(bounds: ExactLpBounds): Int = (if (bounds.lower?.number?.value?.isZero == false) 1 else 0) or
+            (if (bounds.upper?.number?.value?.isZero == false) 2 else 0)
+    }
+}
+
+// Snapshots share immutable projected vectors, copying only arrays with changed values. No projection retains
+// its predecessor's exact state, so the numerical cache cannot keep the search trail alive.
+private class LpVectorProjection(
+    val rhs: DoubleArray,
+    val cost: DoubleArray,
+    val upper: DoubleArray,
+    val hasUpper: BooleanArray,
+    val constant: Double,
+    val origins: DoubleArray,
+    val layout: LpProjectionLayout,
+    private val nonzero: LpProjectionNonzero,
+) {
+    fun lostNonzero(model: LpModel): Boolean {
+        for (i in nonzero.rhs) if (model.rhsD(i) == 0.0) return true
+        for (j in nonzero.costs) if (model.costD(j) == 0.0) return true
+        for (j in nonzero.origins) if (model.loShiftD(j) == 0.0) return true
+        for (j in nonzero.bounds.indices) {
+            val mask = nonzero.bounds[j]
+            if (mask and 1 != 0 && model.lowerD(j) == 0.0) return true
+            if (mask and 2 != 0 && model.upperD(j) == 0.0) return true
+        }
+        return false
+    }
+
+    fun ownedCopy(model: ExactLpModel, meter: LpProjectionMeter): LpVectorProjection {
+        meter.reserveVectors(model)
+        return LpVectorProjection(
+            rhs.copyOf(),
+            cost.copyOf(),
+            upper.copyOf(),
+            hasUpper.copyOf(),
+            constant,
+            origins.copyOf(),
+            LpProjectionLayout(model),
+            nonzero,
+        )
+    }
+
+    fun withBounds(model: ExactLpModel, columns: IntArray, meter: LpProjectionMeter): LpVectorProjection? {
+        meter.reserve(columns.size * 4L + 1L, 0L, matrix = false)
+        var nextUpper = upper
+        var nextHasUpper = hasUpper
+        for (column in columns) {
+            meter.poll()
+            val bounds = model.column(column).bounds
+            bounds.lower?.let { if (it.number.project() == null) return null }
+            val value = bounds.upper?.number?.project() ?: if (bounds.upper == null) 0.0 else return null
+            if (upper[column].toRawBits() != value.toRawBits()) {
+                if (nextUpper === upper) {
+                    meter.reserve(upper.size.toLong(), upper.size * 8L, matrix = false)
+                    nextUpper = upper.copyOf()
+                }
+                nextUpper[column] = value
+            }
+            if (hasUpper[column] != (bounds.upper != null)) {
+                if (nextHasUpper === hasUpper) {
+                    meter.reserve(hasUpper.size.toLong(), hasUpper.size.toLong(), matrix = false)
+                    nextHasUpper = hasUpper.copyOf()
+                }
+                nextHasUpper[column] = bounds.upper != null
+            }
+        }
+        meter.poll()
+        return LpVectorProjection(
+            rhs,
+            cost,
+            nextUpper,
+            nextHasUpper,
+            constant,
+            origins,
+            layout,
+            nonzero.withBounds(model, columns, meter),
+        )
+    }
 }
 
 private class LpMatrixProjection(
