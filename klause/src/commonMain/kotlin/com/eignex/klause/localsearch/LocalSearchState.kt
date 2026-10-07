@@ -12,6 +12,7 @@ import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Assignment
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
@@ -203,6 +204,15 @@ class LocalSearchState(
         for (r in 0 until problem.numRealVars) assignment.setReal(r, startingReal(r))
         resetStepCounters()
         recompute()
+    }
+
+    /** Set the continuous columns to [sample]'s values when it carries one per column, else to their starting
+     *  values. */
+    internal fun seedReals(sample: Sample) {
+        val carried = sample.numRealVars == problem.numRealVars
+        for (r in 0 until problem.numRealVars) {
+            assignment.setReal(r, if (carried) sample.approximateRealValue(r) else startingReal(r))
+        }
     }
 
     // The value of real column [r] nearest zero within its bounds.

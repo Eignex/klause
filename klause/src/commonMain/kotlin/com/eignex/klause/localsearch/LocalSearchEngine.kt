@@ -654,10 +654,12 @@ internal class LocalSearchEngine(
         // ScheduleBundle leaves restart reset to the engine; reset the underlying policy, not
         // the `restarts` wrapper (whose reset is the interface no-op).
         configuredRestart.reset()
+        // A caller-supplied starting point stands in for the first random restart; later restarts are the policy's.
         // Streaming has no notion of "best so far" to anchor an adaptive restart
         // around — pass null so policies that need a sample fall back to a fresh
         // random restart.
-        restarts.restart(state, bestSoFar = null)
+        val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
+        if (!seeded) restarts.restart(state, bestSoFar = null)
         return state
     }
 
@@ -716,6 +718,7 @@ internal class LocalSearchEngine(
             if (state.assignment.boolValue(id) != value) state.assignment.flipBool(id)
         }
         state.assumptions.forEachInt { id, value -> state.assignment.setInt(id, value) }
+        state.seedReals(sample)
         state.resetStepCounters()
         state.recompute()
         return true
