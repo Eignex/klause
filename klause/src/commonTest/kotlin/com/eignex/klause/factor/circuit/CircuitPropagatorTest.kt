@@ -11,11 +11,15 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.boundEstablishment
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -92,6 +96,56 @@ class CircuitPropagatorTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `circuit deductions under bound narrowing are implied by their reasons`() {
+        val rng = Random(0x5EA6)
+        repeat(300) { iter ->
+            val n = 5
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, n - 1L) },
+                factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it })),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "circuit-bounds#$iter") { state ->
+                (0 until 4).all {
+                    val v = rng.nextInt(n)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(n).toLong())
+                        1 -> state.tightenIntMin(v, rng.nextInt(n).toLong())
+                        else -> state.tightenIntMax(v, rng.nextInt(n).toLong())
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a chain blocks its own closing citing only its fixed edges`() {
+        // 0 -> 1 -> 2 is fixed, so 2 cannot return to 0 short of all five nodes; node 4's hole at 3 plays no part.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(Circuit(succ = IntArray(5) { it })),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 1) && state.tightenIntMax(0, 1))
+        check(state.tightenIntMin(1, 2) && state.tightenIntMax(1, 2))
+        check(state.excludeIntValue(4, 3))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.boundEstablishment(2, 1, lower = true)!!.reason)!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(setOf(Triple(0, AtomKind.EQ, 1L), Triple(1, AtomKind.EQ, 2L)), cited.toSet())
     }
 
     @Test
