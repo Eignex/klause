@@ -1,10 +1,14 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.RevInt
+import com.eignex.klause.propagation.exclusionLiteral
+import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.util.IntArrayList
 
 /** CP propagation logic for `value_precede`. */
 internal class ValuePrecedePropagator(
@@ -34,8 +38,32 @@ internal class ValuePrecedePropagator(
 
     override val consumesIntEventDelta: Boolean = true
 
+    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
+    private var failure: IntArray? = null
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, xs)
+        failure ?: collectHoleAndBoundAntecedents(state, xs)
+
+    // A t at position payload(0) would precede every s: s had left each earlier position.
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
+        sBefore(state, payload[0], -1, atTrail).toIntArray()
+
+    // The literals saying s had left every position before [end] but [skip], as of [atTrail].
+    private fun sBefore(state: PropagationState, end: Int, skip: Int, atTrail: Int): IntArrayList {
+        val out = IntArrayList()
+        for (k in 0 until end) {
+            if (k == skip) continue
+            val lit = if (state.undoLogging) {
+                state.exclusionLiteral(xs[k], s, atTrail)
+            } else if (s in state.rootDomains[xs[k]]) {
+                Lit.make(state.atomVarEq(xs[k], s), true)
+            } else {
+                Lit.NONE
+            }
+            if (lit != Lit.NONE && !out.contains(lit)) out.add(lit)
+        }
+        return out
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val n = xs.size
@@ -45,16 +73,13 @@ internal class ValuePrecedePropagator(
             state.refPayload[factorId] = fresh
             fresh
         }
+        failure = null
         val dirty = state.drainIntEventDirtyVars(factorId)
         if (st.started && dirty.isEmpty()) return true
-        var reason: IntArray? = null
-        var reasonReady = false
-        fun reason(): IntArray? {
-            if (!reasonReady) {
-                reason = collectHoleAndBoundAntecedents(state, xs)
-                reasonReady = true
-            }
-            return reason
+        fun noT(j: Int): IntArray? = when {
+            state.currentLevel == 0 -> null
+            state.undoLogging -> state.lazyReason(intArrayOf(j))
+            else -> sBefore(state, j, -1, state.undo.size).toIntArray()
         }
         var alpha = st.alpha.value
         while (alpha < n && s !in state.intDomains[xs[alpha]]) alpha++
@@ -62,7 +87,11 @@ internal class ValuePrecedePropagator(
         val upTo = if (alpha == n) n - 1 else alpha
         for (j in st.prunedUpTo.value..upTo) {
             val v = xs[j]
-            if (t in state.intDomains[v] && !state.excludeIntValue(v, t, reason())) return false
+            if (t in state.intDomains[v] && !state.excludeIntValue(v, t, noT(j))) {
+                failure = sBefore(state, j, -1, state.undo.size).toIntArray() +
+                    (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
+                return false
+            }
         }
         if (upTo + 1 > st.prunedUpTo.value) st.prunedUpTo.set(upTo + 1)
         var firstForcedT = -1
@@ -83,11 +112,23 @@ internal class ValuePrecedePropagator(
                     if (count > 1) break
                 }
             }
-            if (count == 0) return false
+            // A t at position firstForcedT needs an s before it.
+            val pinnedT = Lit.make(state.atomVarEq(xs[firstForcedT], t), false)
+            if (count == 0) {
+                failure = sBefore(state, firstForcedT, -1, state.undo.size).also { it.add(pinnedT) }.toIntArray()
+                return false
+            }
             if (count == 1) {
                 val v = xs[candidate]
-                if (!state.tightenIntMin(v, s, reason())) return false
-                if (!state.tightenIntMax(v, s, reason())) return false
+                val ant = if (state.currentLevel == 0) {
+                    null
+                } else {
+                    sBefore(state, firstForcedT, candidate, state.undo.size).also { it.add(pinnedT) }.toIntArray()
+                }
+                if (!state.tightenIntMin(v, s, ant) || !state.tightenIntMax(v, s, ant)) {
+                    failure = (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
+                    return false
+                }
             }
         }
         st.started = true
