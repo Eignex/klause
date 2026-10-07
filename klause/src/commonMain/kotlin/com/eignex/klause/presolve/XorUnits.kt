@@ -8,11 +8,14 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.rem
 
 internal object XorUnits {
 
@@ -196,8 +199,8 @@ internal object XorUnits {
     }
 }
 
-private fun BigInteger.isOdd(): Boolean = !rem(TWO).isZero()
+private fun BigInt.isOdd(): Boolean = !rem(TWO).isZero()
 
 private fun Long.isOdd(): Boolean = this and 1L != 0L
 
-private val TWO = BigInteger.fromInt(2)
+private val TWO = bigIntOf(2)

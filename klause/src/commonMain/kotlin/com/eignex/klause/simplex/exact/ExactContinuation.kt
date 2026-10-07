@@ -1,7 +1,16 @@
 package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.shr
+import com.eignex.klause.util.toLong
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 import kotlin.time.TimeSource.Monotonic
 
 internal enum class ContinuationStatus { BASIC, LOWER, UPPER, FIXED, FREE }
@@ -118,15 +127,15 @@ internal class ContinuationBudget(val limits: ExactContinuationLimits, val token
 
     fun fraction(value: BigFraction): BigFraction {
         step()
-        val bits = maxOf(value.num.bitLength(), value.den.bitLength())
+        val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         if (bits > limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
         step(bytes = 64L + (bits.toLong() + 7L) / 4L)
         return value
     }
 
     fun preflight(a: BigFraction, b: BigFraction) {
-        val bits = maxOf(a.num.bitLength(), a.den.bitLength()).toLong() +
-            maxOf(b.num.bitLength(), b.den.bitLength()) + 2L
+        val bits = maxOf(a.num.magnitudeBitLength(), a.den.magnitudeBitLength()).toLong() +
+            maxOf(b.num.magnitudeBitLength(), b.den.magnitudeBitLength()) + 2L
         if (bits > limits.maxBits * 2L + 2L) throw ContinuationStop(ContinuationDecline.BITS)
         // Multiplying and gcd-normalising a fraction costs about the square of its word length, so a charge linear
         // in bits lets the work limit admit far more wall time on wide values than on narrow ones.
@@ -245,9 +254,9 @@ internal class ExactContinuation(private val input: ExactContinuationInput) {
         if (normalizedScalarPeak > budget.limits.maxBits) throw ContinuationStop(ContinuationDecline.BITS)
         var oversized = false
         fun visit(value: BigFraction): BigFraction {
-            if (value.num.bitLength() > 127 || value.den.bitLength() > 127) oversized = true
+            if (value.num.magnitudeBitLength() > 127 || value.den.magnitudeBitLength() > 127) oversized = true
             return budget.fraction(value).also {
-                admitScalarPeak(maxOf(it.num.bitLength(), it.den.bitLength()))
+                admitScalarPeak(maxOf(it.num.magnitudeBitLength(), it.den.magnitudeBitLength()))
             }
         }
         budget.step()
@@ -539,7 +548,7 @@ private class RationalContinuationLane<F>(
         if (ops.overflowed()) throw ContinuationOverflow()
         if (value is BigFraction) {
             budget.fraction(value)
-            scalarPeak = maxOf(scalarPeak, value.num.bitLength(), value.den.bitLength())
+            scalarPeak = maxOf(scalarPeak, value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         } else {
             value as Frac128
             val negative = value.nHi < 0L
@@ -582,18 +591,18 @@ private class RationalContinuationLane<F>(
     @Suppress("UNCHECKED_CAST")
     private fun fromBig(value: BigFraction, budget: ContinuationBudget): F {
         budget.fraction(value)
-        scalarPeak = maxOf(scalarPeak, value.num.bitLength(), value.den.bitLength())
+        scalarPeak = maxOf(scalarPeak, value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         if (ops === BigFracOps) return value as F
         val negative = value.signum() < 0
-        if (value.num.bitLength() > 127 || value.den.bitLength() > 127) throw ContinuationOverflow()
+        if (value.num.magnitudeBitLength() > 127 || value.den.magnitudeBitLength() > 127) throw ContinuationOverflow()
         val magnitude = value.num.abs()
-        val low = magnitude.longValue(exactRequired = false)
-        val high = (magnitude shr 64).longValue(exactRequired = false)
+        val low = magnitude.toLong()
+        val high = (magnitude shr 64).toLong()
         return Frac128(
             if (negative) high.inv() + if (low == 0L) 1L else 0L else high,
             if (negative) -low else low,
-            (value.den shr 64).longValue(),
-            value.den.longValue(exactRequired = false),
+            (value.den shr 64).toLongExact(),
+            value.den.toLong(),
         ) as F
     }
 
@@ -604,11 +613,11 @@ private class RationalContinuationLane<F>(
         val low = if (negative) 0uL - value.nLo.toULong() else value.nLo.toULong()
         val high = if (negative) value.nHi.toULong().inv() + if (value.nLo == 0L) 1uL else 0uL else value.nHi.toULong()
         budget.step(256, 256)
-        val magnitude = (BigInteger.fromULong(high) shl 64) + BigInteger.fromULong(low)
+        val magnitude = (bigIntOf(high) shl 64) + bigIntOf(low)
         return budget.fraction(
             BigFraction.of(
                 if (negative) -magnitude else magnitude,
-                (BigInteger.fromLong(value.dHi) shl 64) + BigInteger.fromULong(value.dLo.toULong()),
+                (bigIntOf(value.dHi) shl 64) + bigIntOf(value.dLo.toULong()),
             ),
         )
     }

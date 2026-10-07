@@ -6,8 +6,14 @@ import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.times
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -242,7 +248,7 @@ internal class RefinementMeter(
     }
 
     fun number(value: BigFraction): BigFraction {
-        val bits = maxOf(value.num.bitLength(), value.den.bitLength())
+        val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         if (bits > limits.maxBits) stop(LpRefinementDecline.BITS)
         charge(bytes = 64L + (bits.toLong() + 7L) / 4L)
         return value
@@ -277,7 +283,7 @@ internal class RefinementMeter(
     }
 
     fun pointVisit(value: BigFraction) {
-        if (maxOf(value.num.bitLength(), value.den.bitLength()) > limits.maxBits) {
+        if (maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength()) > limits.maxBits) {
             stop(LpRefinementDecline.BITS)
         }
         charge()
@@ -289,8 +295,8 @@ internal class RefinementMeter(
         if (a.den == b.den) return a.num.compareTo(b.num)
         if (a.signum() != b.signum()) return a.signum().compareTo(b.signum())
         val bits = maxOf(
-            a.num.bitLength() + b.den.bitLength(),
-            b.num.bitLength() + a.den.bitLength(),
+            a.num.magnitudeBitLength() + b.den.magnitudeBitLength(),
+            b.num.magnitudeBitLength() + a.den.magnitudeBitLength(),
         )
         if (bits > limits.maxBits) stop(LpRefinementDecline.BITS)
         val limbs = (bits.toLong() + 63L) / 64L
@@ -335,8 +341,8 @@ internal class RefinementMeter(
     private fun operands(a: BigFraction, b: BigFraction) {
         number(a)
         number(b)
-        val bits = maxOf(a.num.bitLength(), a.den.bitLength()).toLong() +
-            maxOf(b.num.bitLength(), b.den.bitLength()) + 1L
+        val bits = maxOf(a.num.magnitudeBitLength(), a.den.magnitudeBitLength()).toLong() +
+            maxOf(b.num.magnitudeBitLength(), b.den.magnitudeBitLength()) + 1L
         if (bits > limits.maxBits) stop(LpRefinementDecline.BITS)
         val limbs = (bits + 63L) / 64L
         charge(limbs * limbs, 128L + 4L * bits)
@@ -557,8 +563,8 @@ internal class RefinementAuthority(val state: LpExactState, val meter: Refinemen
         }
         val exponent = scaleExponent(primalViolation, previousPrimal, meter)
         val dualExponent = minOf(exponent, scaleExponent(dualViolation, previousDual, meter))
-        val sp = meter.number(BigFraction.of(BigInteger.ONE shl exponent, BigInteger.ONE))
-        val sd = meter.number(BigFraction.of(BigInteger.ONE shl dualExponent, BigInteger.ONE))
+        val sp = meter.number(BigFraction.of(BIG_ONE shl exponent, BIG_ONE))
+        val sd = meter.number(BigFraction.of(BIG_ONE shl dualExponent, BIG_ONE))
         val columns = List(source.numVars) { j ->
             fun side(value: ExactLpSide?): ExactLpSide? = value?.let {
                 ExactLpSide(ExactLpNumber.of(meter.multiply(sp, meter.add(it.number.value, x[j].negated()))))
@@ -583,12 +589,13 @@ private fun BigFraction.absolute(): BigFraction = if (signum() < 0) negated() el
 private fun scaleExponent(violation: BigFraction, previous: Int, meter: RefinementMeter): Int {
     if (violation.isZero) return previous
     meter.number(violation)
-    var exponent = (violation.den.bitLength() - violation.num.bitLength()).coerceIn(0, minOf(512, previous + 80))
+    var exponent = (violation.den.magnitudeBitLength() - violation.num.magnitudeBitLength())
+        .coerceIn(0, minOf(512, previous + 80))
     while (exponent > 0 && meter.multiply(
             violation,
             BigFraction.of(
-                BigInteger.ONE shl exponent,
-                BigInteger.ONE,
+                BIG_ONE shl exponent,
+                BIG_ONE,
             ),
         ) > BigFraction.ONE
     ) {
@@ -1261,22 +1268,22 @@ private fun exactRecession(
     meter.record(checked)
     val point = checked.witness ?: return null
     val full = a.fullPoint(point.primal)
-    var denominator = BigInteger.ONE
+    var denominator = BIG_ONE
     for (j in full.indices) {
         if (a.source.column(j).integral) {
             val coordinate = if (j < a.source.n) point.primal[j] else full[j]
-            if (coordinate.den != BigInteger.ONE) return null
+            if (coordinate.den != BIG_ONE) return null
             meter.number(ray[j])
-            meter.number(BigFraction.of(denominator, BigInteger.ONE))
+            meter.number(BigFraction.of(denominator, BIG_ONE))
             meter.charge()
             denominator = denominator / denominator.gcd(ray[j].den) * ray[j].den
-            meter.number(BigFraction.of(denominator, BigInteger.ONE))
+            meter.number(BigFraction.of(denominator, BIG_ONE))
         }
     }
-    val scale = meter.number(BigFraction.of(denominator, BigInteger.ONE))
+    val scale = meter.number(BigFraction.of(denominator, BIG_ONE))
     val integralRay = ray.map { meter.multiply(it, scale) }
     if (!validDirection(a, integralRay, meter)) return null
-    if (integralRay.indices.any { a.source.column(it).integral && integralRay[it].den != BigInteger.ONE }) return null
+    if (integralRay.indices.any { a.source.column(it).integral && integralRay[it].den != BIG_ONE }) return null
     return ExactLpUnboundedness(point, integralRay.take(a.source.n))
 }
 

@@ -1,7 +1,8 @@
 package com.eignex.klause.ir
 
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Bits
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 
 /**
  * Integer bounds that may be open on either side.
@@ -9,7 +10,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * A finite CP domain is deliberately finite: it is the value set the search can branch on. This table
  * instead describes the model-level range a theory or relaxation sees. Endpoints are stored in primitive
  * arrays and open sides are packed into two bitsets, so a million-variable problem does not allocate a
- * bound object or a [BigInteger] per column.
+ * bound object or a [BigInt] per column.
  * Exact consumers can call [lowerAsBigInteger] or [upperAsBigInteger] only for the columns they inspect.
  */
 class IntBounds internal constructor(
@@ -46,10 +47,10 @@ class IntBounds internal constructor(
     }
 
     /** Lower bound of column [v], widened on demand, or `null` when open. */
-    fun lowerAsBigInteger(v: Int): BigInteger? = if (hasLower(v)) BigInteger.fromLong(lower(v)) else null
+    fun lowerAsBigInteger(v: Int): BigInt? = if (hasLower(v)) bigIntOf(lower(v)) else null
 
     /** Upper bound of column [v], widened on demand, or `null` when open. */
-    fun upperAsBigInteger(v: Int): BigInteger? = if (hasUpper(v)) BigInteger.fromLong(upper(v)) else null
+    fun upperAsBigInteger(v: Int): BigInt? = if (hasUpper(v)) bigIntOf(upper(v)) else null
 
     internal val openLowerBits: Bits? get() = openLo
 

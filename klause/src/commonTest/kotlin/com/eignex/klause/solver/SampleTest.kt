@@ -1,7 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -60,7 +60,7 @@ class SampleTest {
 
     @Test
     fun `exact authority survives a nonfinite double projection`() {
-        val exact = BigFraction.of(BigInteger.ONE shl 1024, BigInteger.ONE)
+        val exact = BigFraction.of(BIG_ONE shl 1024, BIG_ONE)
 
         val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(Double.POSITIVE_INFINITY), listOf(exact))
 

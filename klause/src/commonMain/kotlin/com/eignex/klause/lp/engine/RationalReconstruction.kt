@@ -1,8 +1,26 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Int128
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.maxOf
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.shr
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 import kotlin.math.abs
 import kotlin.math.floor
 
@@ -127,12 +145,12 @@ internal fun reconstructionDenominator(
     violation: BigFraction,
     correction: BigFraction,
     meter: ReconstructionMeter,
-): BigInteger {
+): BigInt {
     require(violation.signum() > 0 && correction.signum() > 0)
     val product = meter.fraction(violation * correction)
     val square = meter.integer(product.den / product.num)
-    if (square <= BigInteger.ONE) return RECONSTRUCTION_FLOOR
-    var root = meter.integer(BigInteger.ONE shl ((square.bitLength() + 1) / 2))
+    if (square <= BIG_ONE) return RECONSTRUCTION_FLOOR
+    var root = meter.integer(BIG_ONE shl ((square.magnitudeBitLength() + 1) / 2))
     while (true) {
         val next = meter.integer((root + square / root) shr 1)
         if (next >= root) return maxOf(RECONSTRUCTION_FLOOR, root)
@@ -143,11 +161,11 @@ internal fun reconstructionDenominator(
 internal fun nextReconstructionRound(round: Int): Int = (round.toLong() * 6L / 5L + 1L)
     .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-internal val RECONSTRUCTION_FLOOR: BigInteger = BigInteger.ONE shl 24
+internal val RECONSTRUCTION_FLOOR: BigInt = BIG_ONE shl 24
 
 internal fun reconstructExactVector(
     values: List<BigFraction>,
-    denominator: BigInteger,
+    denominator: BigInt,
     meter: ReconstructionMeter,
 ): List<BigFraction>? {
     require(denominator.signum() > 0)
@@ -163,19 +181,19 @@ internal fun reconstructExactVector(
 @Suppress("ThrowsCount")
 private fun reconstructLongVector(
     values: List<BigFraction>,
-    denominator: BigInteger,
+    denominator: BigInt,
     meter: ReconstructionMeter,
 ): List<BigFraction>? {
-    if (denominator.bitLength() > 63) throw ReconstructionOverflow()
-    val limit = denominator.longValue(exactRequired = true)
+    if (denominator.magnitudeBitLength() > 63) throw ReconstructionOverflow()
+    val limit = denominator.toLongExact()
     meter.storage(values.size.toLong() * 16L)
     val parts = ArrayList<BigFraction>(values.size)
     var common = 1L
     for (value in values) {
         meter.fraction(value)
-        if (value.num.bitLength() > 63 || value.den.bitLength() > 63) throw ReconstructionOverflow()
-        var n = value.num.abs().longValue(exactRequired = true)
-        var d = value.den.longValue(exactRequired = true)
+        if (value.num.magnitudeBitLength() > 63 || value.den.magnitudeBitLength() > 63) throw ReconstructionOverflow()
+        var n = value.num.abs().toLongExact()
+        var d = value.den.toLongExact()
         var p0 = 0L
         var p1 = 1L
         var q0 = 1L
@@ -197,7 +215,7 @@ private fun reconstructLongVector(
         common = lcm(common, q1) ?: throw ReconstructionOverflow()
         if (common > limit) return null
         parts += meter.fraction(
-            BigFraction.of(BigInteger.fromLong(if (value.signum() < 0) -p1 else p1), BigInteger.fromLong(q1)),
+            BigFraction.of(bigIntOf(if (value.signum() < 0) -p1 else p1), bigIntOf(q1)),
         )
     }
     return parts.toList()
@@ -205,21 +223,21 @@ private fun reconstructLongVector(
 
 private fun reconstructBigVector(
     values: List<BigFraction>,
-    denominator: BigInteger,
+    denominator: BigInt,
     meter: ReconstructionMeter,
 ): List<BigFraction>? {
     meter.integer(denominator)
     meter.storage(values.size.toLong() * 16L)
     val parts = ArrayList<BigFraction>(values.size)
-    var common = BigInteger.ONE
+    var common = BIG_ONE
     for (value in values) {
         meter.fraction(value)
         var n = value.num.abs()
         var d = value.den
-        var p0 = BigInteger.ZERO
-        var p1 = BigInteger.ONE
-        var q0 = BigInteger.ONE
-        var q1 = BigInteger.ZERO
+        var p0 = BIG_ZERO
+        var p1 = BIG_ONE
+        var q0 = BIG_ONE
+        var q1 = BIG_ZERO
         while (!d.isZero()) {
             val a = meter.integer(n / d)
             val p = meter.integer(a * p1 + p0)

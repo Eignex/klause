@@ -11,7 +11,8 @@ import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -256,12 +257,12 @@ class LinearSubSumAggregationTest {
         val assign = mins.copyOf()
         fun holds(): Boolean = factors.all { f ->
             f as Linear
-            var sum = BigInteger.ZERO
+            var sum = BIG_ZERO
             for (j in f.vars.indices) {
-                sum += BigInteger.fromLong(checkNotNull(f.integerConstants).coeffs[j]) *
-                    BigInteger.fromLong(assign[f.vars[j]])
+                sum += bigIntOf(checkNotNull(f.integerConstants).coeffs[j]) *
+                    bigIntOf(assign[f.vars[j]])
             }
-            val bound = BigInteger.fromLong(checkNotNull(f.integerConstants).bound)
+            val bound = bigIntOf(checkNotNull(f.integerConstants).bound)
             when (f.op) {
                 LinearOp.LE -> sum <= bound
                 LinearOp.EQ -> sum == bound

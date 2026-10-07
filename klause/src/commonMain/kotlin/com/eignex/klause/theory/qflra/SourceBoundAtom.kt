@@ -7,7 +7,13 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchTheoryAtom
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SearchValueKey
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.rem
 
 /** One exact coefficient over an existing source integer or real variable id. */
 data class SourceBoundTerm(
@@ -72,16 +78,16 @@ class SourceBoundAtom private constructor(
             constant: BigFraction = BigFraction.ZERO,
             limits: SourceBoundLimits = SourceBoundLimits(),
         ): SearchTheoryAtom? {
-            if (!value.fits(limits) || !constant.fits(limits) || constant.den != BigInteger.ONE) return null
+            if (!value.fits(limits) || !constant.fits(limits) || constant.den != BIG_ONE) return null
             val normalized = normalize(terms, limits) ?: return null
-            if (normalized.any { it.source !is SearchIntValue || it.coefficient.den != BigInteger.ONE }) return null
+            if (normalized.any { it.source !is SearchIntValue || it.coefficient.den != BIG_ONE }) return null
             val quotient = value.num / value.den
-            val floor = if (value.num < BigInteger.ZERO && value.num % value.den != BigInteger.ZERO) {
-                quotient - BigInteger.ONE
+            val floor = if (value.num < BIG_ZERO && value.num % value.den != BIG_ZERO) {
+                quotient - BIG_ONE
             } else {
                 quotient
             }
-            val upper = BigFraction.of(floor, BigInteger.ONE) - constant
+            val upper = BigFraction.of(floor, BIG_ONE) - constant
             val lower = upper + BigFraction.ONE
             if (!upper.fits(limits) || !lower.fits(limits)) return null
             return context.registerAtom(
@@ -135,6 +141,6 @@ class SourceBoundAtom private constructor(
         }
 
         private fun BigFraction.fits(limits: SourceBoundLimits): Boolean =
-            num.bitLength() <= limits.maxBits && den.bitLength() <= limits.maxBits
+            num.magnitudeBitLength() <= limits.maxBits && den.magnitudeBitLength() <= limits.maxBits
     }
 }

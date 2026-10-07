@@ -1,8 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -18,7 +19,7 @@ class LpCaptureTest {
     fun `row capture resumes complete state after compaction and preserves every append field`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val ieee = ExactLpNumber.ofIeee(-0.0)
         val premises = ExactLpPremises(listOf(ExactLpPremise(8, true, third)), listOf(11))
         val source = ExactLpModel(
@@ -118,7 +119,7 @@ class LpCaptureTest {
 
     @Test
     fun `exact capture preserves all numeric and source authority`() {
-        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val negativeZero = ExactLpNumber.ofIeee(-0.0)
         val premises = ExactLpPremises(listOf(ExactLpPremise(7, true, third)), listOf(11, -13))
         val model = ExactLpModel(
@@ -218,7 +219,7 @@ class LpCaptureTest {
 
     @Test
     fun `exact state key declines oversized rational bytes below value budget`() {
-        val large = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 4096, BigInteger.ONE))
+        val large = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 4096, BIG_ONE))
         val model = ExactLpModel(
             List(40) { emptyList() },
             emptyList(),

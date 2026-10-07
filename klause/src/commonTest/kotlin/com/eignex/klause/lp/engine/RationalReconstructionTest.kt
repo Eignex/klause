@@ -1,7 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -82,9 +83,9 @@ class RationalReconstructionTest {
 
     @Test
     fun `unchanged coprime denominators still obey the whole vector limit`() {
-        val values = listOf(3, 5).map { BigFraction.of(BigInteger.ONE, BigInteger.fromInt(it)) }
+        val values = listOf(3, 5).map { BigFraction.of(BIG_ONE, bigIntOf(it)) }
 
-        val result = reconstructExactVector(values, BigInteger.fromInt(10), ReconstructionMeter())
+        val result = reconstructExactVector(values, bigIntOf(10), ReconstructionMeter())
 
         assertNull(result)
     }
@@ -94,10 +95,10 @@ class RationalReconstructionTest {
         val values = listOf(
             4_294_967_291L,
             4_294_967_279L,
-        ).map { BigFraction.of(BigInteger.ONE, BigInteger.fromLong(it)) }
+        ).map { BigFraction.of(BIG_ONE, bigIntOf(it)) }
         val meter = ReconstructionMeter()
 
-        val result = reconstructExactVector(values, BigInteger.ONE shl 80, meter)
+        val result = reconstructExactVector(values, BIG_ONE shl 80, meter)
 
         assertEquals(values, result)
         assertEquals(1, meter.vectorRestarts)
@@ -106,17 +107,17 @@ class RationalReconstructionTest {
     @Test
     fun `signed exact continued fractions retain the last admissible convergent`() {
         for (sign in listOf(-1L, 1L)) {
-            val value = BigFraction.of(BigInteger.fromLong(31L * sign), BigInteger.fromInt(100))
-            val result = reconstructExactVector(listOf(value), BigInteger.fromInt(10), ReconstructionMeter())
-            assertEquals(listOf(BigFraction.of(BigInteger.fromLong(sign), BigInteger.fromInt(3))), result)
+            val value = BigFraction.of(bigIntOf(31L * sign), bigIntOf(100))
+            val result = reconstructExactVector(listOf(value), bigIntOf(10), ReconstructionMeter())
+            assertEquals(listOf(BigFraction.of(bigIntOf(sign), bigIntOf(3))), result)
         }
     }
 
     @Test
     fun `error correction makes the denominator bound nonincreasing`() {
-        val violation = BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 100)
+        val violation = BigFraction.of(BIG_ONE, BIG_ONE shl 100)
         val correction = BigFraction.ofLong(2L)
-        val next = BigFraction.of(BigInteger.fromInt(22), BigInteger.fromInt(10))
+        val next = BigFraction.of(bigIntOf(22), bigIntOf(10))
 
         val first = reconstructionDenominator(violation, correction, ReconstructionMeter())
         val second = reconstructionDenominator(violation, next, ReconstructionMeter())
@@ -137,10 +138,10 @@ class RationalReconstructionTest {
         val values = listOf(
             4_294_967_291L,
             4_294_967_279L,
-        ).map { BigFraction.of(BigInteger.ONE, BigInteger.fromLong(it)) }
+        ).map { BigFraction.of(BIG_ONE, bigIntOf(it)) }
         val meter = ReconstructionMeter()
 
-        val result = reconstructExactVector(values, BigInteger.fromLong(Long.MAX_VALUE), meter)
+        val result = reconstructExactVector(values, bigIntOf(Long.MAX_VALUE), meter)
 
         assertNull(result)
         assertEquals(1, meter.vectorRestarts)

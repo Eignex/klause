@@ -11,8 +11,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,11 +24,11 @@ import kotlin.test.assertTrue
 class ExactLpInputAdapterTest {
     @Test
     fun `theory adapter retains wide rows and IEEE source bounds`() {
-        val wide = BigInteger.ONE shl 80
+        val wide = BIG_ONE shl 80
         val model = Problem(
             numBoolVars = 0,
             intBounds = openBounds(1),
-            factors = arrayOf(Linear(intArrayOf(0), arrayOf(wide), LinearOp.LE, wide + BigInteger.ONE)),
+            factors = arrayOf(Linear(intArrayOf(0), arrayOf(wide), LinearOp.LE, wide + BIG_ONE)),
             numRealVars = 1,
             realLower = doubleArrayOf(-0.0),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
@@ -39,7 +40,7 @@ class ExactLpInputAdapterTest {
         assertFalse(exact.column(0).integral)
         assertTrue(exact.column(1).integral)
         assertEquals(wide.toString(), exact.entries(1).single().number.value.toString())
-        assertEquals((wide + BigInteger.ONE).toString(), exact.rhs(0).value.toString())
+        assertEquals((wide + BIG_ONE).toString(), exact.rhs(0).value.toString())
         assertNull(exact.toLegacy())
     }
 
@@ -74,9 +75,9 @@ class ExactLpInputAdapterTest {
 
     @Test
     fun `native exact adapter retains one third and projected equal bounds`() {
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val one = ExactLpSourceNumber(BigFraction.ONE)
-        val next = ExactLpSourceNumber(BigFraction.ONE + BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 54))
+        val next = ExactLpSourceNumber(BigFraction.ONE + BigFraction.of(BIG_ONE, BIG_ONE shl 54))
         val model = exactLpModel(
             listOf(
                 ExactLpSourceColumn(one, next, ExactLpSourceNumber(BigFraction.ZERO), integral = false, tag = 4),

@@ -3,8 +3,8 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -473,7 +473,7 @@ class LpReplayTest {
             emptyList(),
             ExactLpObjective(listOf(zero)),
         )
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
         val capture = LpExactCapture.capture(
             model,
             persistentSettings("unsupported projection"),

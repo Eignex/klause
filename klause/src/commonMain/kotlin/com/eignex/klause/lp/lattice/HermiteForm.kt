@@ -1,7 +1,17 @@
 package com.eignex.klause.lp.lattice
 
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
+import com.eignex.klause.util.unaryMinus
 
 /**
  * Kannan and Bachem, *Polynomial Algorithms for Computing the Smith and Hermite Normal Forms of an
@@ -26,7 +36,7 @@ internal class HermiteForm(val h: List<SparseIntRow>, val v: UnimodularTransform
  *
  * Computed by integer column operations only — swap, negate, and add an integer multiple of one column to
  * another — each of which is unimodular, so their product [HermiteForm.v] is too. Entries are
- * [BigInteger] because the intermediate coefficients of an integer elimination grow well past `Long` even
+ * [BigInt] because the intermediate coefficients of an integer elimination grow well past `Long` even
  * when the input and the result both fit comfortably.
  *
  * A partial reduction is not usable: its `H` is not yet triangular, so forward substitution over it would
@@ -52,7 +62,7 @@ internal fun hermiteNormalForm(
             if (cancellation()) return null
             cancellation.charge(LATTICE_WORK_WEIGHT * (1L + h.rowSupport[row].size))
             var minCol = -1
-            var minAbs = BigInteger.ZERO
+            var minAbs = BIG_ZERO
             var nonZero = 0
             // The row view holds exactly the columns this row is non-zero in, so the search costs the
             // row's own support rather than the column count. Ties go to the lower column so that the
@@ -87,7 +97,7 @@ internal fun hermiteNormalForm(
         for (j in ascendingSupport(h, row)) {
             if (j >= pivot) continue
             var q = h[row, j] / d
-            if (h[row, j] - q * d < BigInteger.ZERO) q -= BigInteger.ONE // floor, so the residue is >= 0
+            if (h[row, j] - q * d < BIG_ZERO) q -= BIG_ONE // floor, so the residue is >= 0
             if (!q.isZero()) addMultipleOfColumn(h, v, target = j, source = pivot, factor = -q)
         }
         pivot++
@@ -118,7 +128,7 @@ private fun addMultipleOfColumn(
     v: UnimodularTransform,
     target: Int,
     source: Int,
-    factor: BigInteger,
+    factor: BigInt,
 ) {
     h.addMultiple(target, source, factor)
     v.addMultiple(target, source, factor)

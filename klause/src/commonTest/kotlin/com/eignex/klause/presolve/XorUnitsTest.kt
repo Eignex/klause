@@ -11,8 +11,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -103,15 +104,15 @@ class XorUnitsTest {
 
     @Test
     fun `an equality's parity forces its 0-1 column whatever form its coefficients take`() {
-        val wideOdd = BigInteger.parseString("18446744073709551617")
-        val wideEven = BigInteger.parseString("36893488147419103232")
+        val wideOdd = parseBigInt("18446744073709551617")
+        val wideEven = parseBigInt("36893488147419103232")
         val cases = listOf(
             // -x - 2y = -1: negative coefficients and bound.
             listOf(IntDomain(0, 1), IntDomain(-10, 10)) to
                 Linear(longArrayOf(-1L, -2L), intArrayOf(0, 1), LinearOp.EQ, -1L),
             // (2^64 + 1)x + 2^65·y = 1: a row past 64 bits.
             listOf(IntDomain(0, 1), IntDomain(-10, 10)) to
-                Linear(intArrayOf(0, 1), arrayOf(wideOdd, wideEven), LinearOp.EQ, BigInteger.ONE),
+                Linear(intArrayOf(0, 1), arrayOf(wideOdd, wideEven), LinearOp.EQ, BIG_ONE),
             // f + x + 2y = 1 with f fixed at 1, so x is even.
             listOf(IntDomain(0, 1), IntDomain(-10, 10), IntDomain(1, 1)) to
                 Linear(longArrayOf(1L, 2L, 1L), intArrayOf(0, 1, 2), LinearOp.EQ, 1L),

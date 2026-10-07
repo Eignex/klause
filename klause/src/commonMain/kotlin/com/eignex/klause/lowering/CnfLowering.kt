@@ -5,7 +5,9 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.compareTo
 
 /** Shared CNF-lowering hooks for schema compilation and textual front-ends. */
 internal interface CnfLowering {
@@ -78,13 +80,13 @@ internal fun CnfLowering.reifyLinear(coeffs: LongArray, vars: IntArray, op: Line
 
 /** [reifyLinear] over arbitrary-precision coefficients/bound — a reified relation from the SMT-LIB
  *  front-end whose coefficients or bound exceed the 64-bit range, enforced by a wide [ReifiedLinear]. */
-internal fun CnfLowering.reifyLinear(coeffs: Array<BigInteger>, vars: IntArray, op: LinearOp, bound: BigInteger): Int {
+internal fun CnfLowering.reifyLinear(coeffs: Array<BigInt>, vars: IntArray, op: LinearOp, bound: BigInt): Int {
     if (vars.isEmpty()) {
         val holds = when (op) {
-            LinearOp.LE -> BigInteger.ZERO <= bound
-            LinearOp.GE -> BigInteger.ZERO >= bound
-            LinearOp.EQ -> bound == BigInteger.ZERO
-            LinearOp.NE -> bound != BigInteger.ZERO
+            LinearOp.LE -> BIG_ZERO <= bound
+            LinearOp.GE -> BIG_ZERO >= bound
+            LinearOp.EQ -> bound == BIG_ZERO
+            LinearOp.NE -> bound != BIG_ZERO
         }
         return if (holds) trueLit() else Lit.negate(trueLit())
     }

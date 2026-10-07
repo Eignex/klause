@@ -1,7 +1,8 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,14 +10,14 @@ import kotlin.test.assertFalse
 class RealCombTest {
     @Test
     fun `rational scaling retains one third exactly`() {
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val source = RealComb(mapOf(0 to BigFraction.ONE), mapOf(0 to third), third)
 
         val scaled = source.scaled(third)
 
         assertEquals(third, scaled.intCoeffs.getValue(0))
-        assertEquals(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(9)), scaled.realCoeffs.getValue(0))
-        assertEquals(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(9)), scaled.constant)
+        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(9)), scaled.realCoeffs.getValue(0))
+        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(9)), scaled.constant)
     }
 
     @Test

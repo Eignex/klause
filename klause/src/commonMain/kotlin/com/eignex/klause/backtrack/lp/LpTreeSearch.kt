@@ -32,9 +32,9 @@ import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
-import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** A leaf the best-bound dive found: its completed [sample], and the checked [direction] when the reals there
  *  descend without limit. */
@@ -113,7 +113,7 @@ internal fun LpEngine.lbTreeSearch(
                 for (column in relaxation.colVarId.indices) {
                     val variable = relaxation.colVarId[column]
                     val value = witness.primal[column]
-                    if (variable < 0 || value.den == BigInteger.ONE) continue
+                    if (variable < 0 || value.den == BIG_ONE) continue
                     split = LpFractionalBranch(variable, value, relaxation.colIsBool[column], registered = false)
                     break
                 }

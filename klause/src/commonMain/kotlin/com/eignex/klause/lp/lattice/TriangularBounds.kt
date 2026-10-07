@@ -1,6 +1,14 @@
 package com.eignex.klause.lp.lattice
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 
 /**
  * Per-variable bounds derived from a lower-triangular system by forward substitution.
@@ -17,9 +25,9 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  */
 internal class TriangularBounds(
     /** Lower bound per column, `null` where the sweep derives none. */
-    val lo: Array<BigInteger?>,
+    val lo: Array<BigInt?>,
     /** Upper bound per column, `null` where the sweep derives none. */
-    val hi: Array<BigInteger?>,
+    val hi: Array<BigInt?>,
 )
 
 /**
@@ -41,11 +49,11 @@ internal class TriangularBounds(
 internal fun triangularBounds(
     h: List<SparseIntRow>,
     cols: Int,
-    rowLo: Array<BigInteger?>,
-    rowHi: Array<BigInteger?>,
+    rowLo: Array<BigInt?>,
+    rowHi: Array<BigInt?>,
 ): TriangularBounds {
-    val lo = arrayOfNulls<BigInteger>(cols)
-    val hi = arrayOfNulls<BigInteger>(cols)
+    val lo = arrayOfNulls<BigInt>(cols)
+    val hi = arrayOfNulls<BigInt>(cols)
     for (i in h.indices) {
         val row = h[i]
         val pivot = row.trail
@@ -53,14 +61,14 @@ internal fun triangularBounds(
         if (lo[pivot] != null || hi[pivot] != null) continue // a later row must not overwrite the bound
 
         // The rest-interval of the columns before the pivot; either side goes null once a term is open.
-        var restLo: BigInteger? = BigInteger.ZERO
-        var restHi: BigInteger? = BigInteger.ZERO
+        var restLo: BigInt? = BIG_ZERO
+        var restHi: BigInt? = BIG_ZERO
         for (k in row.index.indices) {
             val j = row.index[k]
             if (j >= pivot) break
             val a = row.value[k]
-            val termLo = if (a > BigInteger.ZERO) lo[j]?.times(a) else hi[j]?.times(a)
-            val termHi = if (a > BigInteger.ZERO) hi[j]?.times(a) else lo[j]?.times(a)
+            val termLo = if (a > BIG_ZERO) lo[j]?.times(a) else hi[j]?.times(a)
+            val termHi = if (a > BIG_ZERO) hi[j]?.times(a) else lo[j]?.times(a)
             restLo = if (termLo == null || restLo == null) null else restLo + termLo
             restHi = if (termHi == null || restHi == null) null else restHi + termHi
         }
@@ -71,7 +79,7 @@ internal fun triangularBounds(
         val prodLo = if (lowSide == null || restHi == null) null else lowSide - restHi
         val prodHi = if (highSide == null || restLo == null) null else highSide - restLo
         val c = row.value[row.index.size - 1]
-        if (c > BigInteger.ZERO) {
+        if (c > BIG_ZERO) {
             lo[pivot] = prodLo?.let { ceilDiv(it, c) }
             hi[pivot] = prodHi?.let { floorDiv(it, c) }
         } else {
@@ -84,15 +92,15 @@ internal fun triangularBounds(
 }
 
 /** `⌊a / b⌋`; the bignum division truncates toward zero, so a negative exact quotient adjusts down. */
-private fun floorDiv(a: BigInteger, b: BigInteger): BigInteger {
+private fun floorDiv(a: BigInt, b: BigInt): BigInt {
     val q = a / b
     val r = a - q * b
-    return if (!r.isZero() && (r < BigInteger.ZERO) != (b < BigInteger.ZERO)) q - BigInteger.ONE else q
+    return if (!r.isZero() && (r < BIG_ZERO) != (b < BIG_ZERO)) q - BIG_ONE else q
 }
 
 /** `⌈a / b⌉`; a positive exact quotient with a remainder adjusts up. */
-private fun ceilDiv(a: BigInteger, b: BigInteger): BigInteger {
+private fun ceilDiv(a: BigInt, b: BigInt): BigInt {
     val q = a / b
     val r = a - q * b
-    return if (!r.isZero() && (r < BigInteger.ZERO) == (b < BigInteger.ZERO)) q + BigInteger.ONE else q
+    return if (!r.isZero() && (r < BIG_ZERO) == (b < BIG_ZERO)) q + BIG_ONE else q
 }

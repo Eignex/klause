@@ -1,6 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.negate
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
 import kotlin.math.abs
 import kotlin.math.max
 

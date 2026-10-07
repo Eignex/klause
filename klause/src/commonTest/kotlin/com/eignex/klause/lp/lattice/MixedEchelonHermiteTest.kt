@@ -3,7 +3,11 @@ package com.eignex.klause.lp.lattice
 import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.mixedEchelonHermite
 import com.eignex.klause.lp.lattice.originalBounds
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.isZero
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -15,16 +19,16 @@ import kotlin.test.assertTrue
  */
 class MixedEchelonHermiteTest {
 
-    private fun vec(vararg v: Long) = Array(v.size) { BigInteger.fromLong(v[it]) }
+    private fun vec(vararg v: Long) = Array(v.size) { bigIntOf(v[it]) }
 
-    private fun dot(row: SparseIntRow, x: Array<BigInteger>): BigInteger {
-        var acc = BigInteger.ZERO
+    private fun dot(row: SparseIntRow, x: Array<BigInt>): BigInt {
+        var acc = BIG_ZERO
         for (k in row.index.indices) acc += row.value[k] * x[row.index[k]]
         return acc
     }
 
-    private fun apply(transform: UnimodularTransform, point: Array<BigInteger>): Array<BigInteger> {
-        val result = Array(point.size) { BigInteger.ZERO }
+    private fun apply(transform: UnimodularTransform, point: Array<BigInt>): Array<BigInt> {
+        val result = Array(point.size) { BIG_ZERO }
         transform.forEachEntry { row, column, value -> result[row] += value * point[column] }
         return result
     }
@@ -34,7 +38,7 @@ class MixedEchelonHermiteTest {
         val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
         val v = r.transform
         val d = v[0, 0] * v[1, 1] - v[0, 1] * v[1, 0]
-        assertTrue(d == BigInteger.ONE || d == BigInteger.ONE.negate(), "det V must be +-1, was $d")
+        assertTrue(d == BIG_ONE || d == BIG_ONE.negate(), "det V must be +-1, was $d")
     }
 
     @Test
@@ -43,7 +47,7 @@ class MixedEchelonHermiteTest {
         val source = apply(transform, vec(5, -7))
 
         assertEquals(
-            listOf(BigInteger.fromLong(5), BigInteger.fromLong(-7)),
+            listOf(bigIntOf(5), bigIntOf(-7)),
             apply(transform.inverse(), source).toList(),
         )
     }
@@ -74,8 +78,8 @@ class MixedEchelonHermiteTest {
     @Test
     fun `a system with no equalities is left in its own variables`() {
         val r = mixedEchelonHermite(emptyList(), sparseRows(longArrayOf(5, 7)), 2)
-        assertEquals(BigInteger.fromLong(5), r.inequalities[0][0])
-        assertEquals(BigInteger.fromLong(7), r.inequalities[0][1])
+        assertEquals(bigIntOf(5), r.inequalities[0][0])
+        assertEquals(bigIntOf(7), r.inequalities[0][1])
         assertTrue(r.equalities.isEmpty())
     }
 
@@ -87,17 +91,17 @@ class MixedEchelonHermiteTest {
         // The pivot is column 0, so y0 = 0 satisfies the transformed row for every y1.
         for (t in -3L..3L) {
             val x = r.recover(vec(0, t))
-            assertEquals(BigInteger.ZERO, dot(original[0], x), "x = V*y must satisfy the original row")
+            assertEquals(BIG_ZERO, dot(original[0], x), "x = V*y must satisfy the original row")
         }
     }
 
     @Test
     fun `bounded rewritten variables bound the original ones`() {
         val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
-        val b = r.originalBounds(arrayOf(BigInteger.ZERO, BigInteger.ZERO), arrayOf(BigInteger.ZERO, BigInteger.ZERO))
+        val b = r.originalBounds(arrayOf(BIG_ZERO, BIG_ZERO), arrayOf(BIG_ZERO, BIG_ZERO))
         // y pinned to the origin pins x to the origin, whatever V is.
-        assertEquals(BigInteger.ZERO, b.lo[0])
-        assertEquals(BigInteger.ZERO, b.hi[0])
+        assertEquals(BIG_ZERO, b.lo[0])
+        assertEquals(BIG_ZERO, b.hi[0])
     }
 
     @Test
@@ -115,15 +119,15 @@ class MixedEchelonHermiteTest {
         val original = sparseRows(longArrayOf(2, -2)) // 2*x0 - 2*x1 = 0, i.e. x0 == x1
         val r = mixedEchelonHermite(original, emptyList(), 2)
         val span = 6L
-        val yLo = arrayOf<BigInteger?>(BigInteger.fromLong(-span), BigInteger.fromLong(-span))
-        val yHi = arrayOf<BigInteger?>(BigInteger.fromLong(span), BigInteger.fromLong(span))
+        val yLo = arrayOf<BigInt?>(bigIntOf(-span), bigIntOf(-span))
+        val yHi = arrayOf<BigInt?>(bigIntOf(span), bigIntOf(span))
         val b = r.originalBounds(yLo, yHi)
         for (y0 in -span..span) {
             for (y1 in -span..span) {
                 val y = vec(y0, y1)
                 if (!dot(r.equalities[0], y).isZero()) continue // not a solution of the rewritten row
                 val x = r.recover(y)
-                assertEquals(BigInteger.ZERO, dot(original[0], x), "recovered x must solve the original")
+                assertEquals(BIG_ZERO, dot(original[0], x), "recovered x must solve the original")
                 for (i in x.indices) {
                     val lo = b.lo[i]
                     val hi = b.hi[i]

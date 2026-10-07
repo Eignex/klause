@@ -34,14 +34,17 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 
 /**
  * Exact feasibility for the supported open QF_LIRA and QF_LIA fragments.
  *
  * The Boolean skeleton is fixed first. At a Boolean leaf the rational simplex sees both integer and
- * real columns. A fractional integer witness is split at its exact [BigInteger] floor, so the child
+ * real columns. A fractional integer witness is split at its exact [BigInt] floor, so the child
  * boxes are disjoint and cover every integer value. This deliberately lives beside QF_LRA rather than
  * entering finite CP: the only branching here is theory-local integrality branching.
  */
@@ -152,7 +155,7 @@ private class ColdExactIntegerSearch(
                 is ColdExactReducedSearchResult.Split -> {
                     stack.addLast(
                         bounded.node.withReducedBranch(
-                            ColdIntegerBranch(bounded.integer, lower = bounded.floor + BigInteger.ONE),
+                            ColdIntegerBranch(bounded.integer, lower = bounded.floor + BIG_ONE),
                         ),
                     )
                     stack.addLast(
@@ -428,7 +431,7 @@ private class ColdExactReducedLiraSystem(private val reduction: ColdExactLiraRed
                     ExactRationalInequality(
                         intArrayOf(column),
                         listOf(BigFraction.MINUS_ONE),
-                        BigFraction.of(lower.negate(), BigInteger.ONE),
+                        BigFraction.of(lower.negate(), BIG_ONE),
                     ),
                 )
             }
@@ -437,7 +440,7 @@ private class ColdExactReducedLiraSystem(private val reduction: ColdExactLiraRed
                     ExactRationalInequality(
                         intArrayOf(column),
                         listOf(BigFraction.ONE),
-                        BigFraction.of(upper, BigInteger.ONE),
+                        BigFraction.of(upper, BIG_ONE),
                     ),
                 )
             }
@@ -483,7 +486,7 @@ private class ColdExactReducedLiraSystem(private val reduction: ColdExactLiraRed
 
 private sealed interface ColdExactReducedSearchResult {
     data class Found(val sourceValues: List<BigFraction>) : ColdExactReducedSearchResult
-    data class Split(val node: ColdSearchNode, val integer: Int, val floor: BigInteger) : ColdExactReducedSearchResult
+    data class Split(val node: ColdSearchNode, val integer: Int, val floor: BigInt) : ColdExactReducedSearchResult
     data object Infeasible : ColdExactReducedSearchResult
     data object Interrupted : ColdExactReducedSearchResult
 }
@@ -566,22 +569,22 @@ private fun List<BigFraction>.satisfiesExactRows(rows: List<ExactRationalInequal
 
 // Source integer values beyond the largest exactly representable double are a useful diagnostic for
 // model conversions that would otherwise silently lose an integer unit.
-private val WIDE_INTEGER_LIMIT = BigInteger.fromLong(1L shl 53)
+private val WIDE_INTEGER_LIMIT = bigIntOf(1L shl 53)
 
 private fun List<ExactRationalInequality>.hasWideIntegerData(): Boolean = any { row ->
-    (row.rhs.den == BigInteger.ONE && row.rhs.num.abs() > WIDE_INTEGER_LIMIT) ||
+    (row.rhs.den == BIG_ONE && row.rhs.num.abs() > WIDE_INTEGER_LIMIT) ||
         row.coefficients.any { coefficient ->
-            coefficient.den == BigInteger.ONE && coefficient.num.abs() > WIDE_INTEGER_LIMIT
+            coefficient.den == BIG_ONE && coefficient.num.abs() > WIDE_INTEGER_LIMIT
         }
 }
 
-private data class ColdIntegerBranch(val variable: Int, val lower: BigInteger? = null, val upper: BigInteger? = null)
+private data class ColdIntegerBranch(val variable: Int, val lower: BigInt? = null, val upper: BigInt? = null)
 
 private data class ColdIntegerLinearBranch(
     val variables: IntArray,
-    val coefficients: Array<BigInteger>,
-    val lower: BigInteger? = null,
-    val upper: BigInteger? = null,
+    val coefficients: Array<BigInt>,
+    val lower: BigInt? = null,
+    val upper: BigInt? = null,
 ) {
     fun sameShape(other: ColdIntegerLinearBranch): Boolean =
         variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
@@ -630,8 +633,8 @@ private data class ColdSearchNode(
 
     fun withTransformedSplit(
         branch: ColdIntegerLinearBranch,
-        lower: BigInteger? = null,
-        upper: BigInteger? = null,
+        lower: BigInt? = null,
+        upper: BigInt? = null,
     ): ColdSearchNode = copy(
         transformedBranches = transformedBranches.map { existing ->
             if (!existing.sameShape(branch)) {
@@ -700,8 +703,8 @@ private fun ColdSearchNode.withPublishedBounds(
 ): ColdSearchNode {
     var bounded = this
     for (integer in 0 until numIntVars) {
-        val lower = lowerBound(integer)?.let(BigInteger::fromLong)
-        val upper = upperBound(integer)?.let(BigInteger::fromLong)
+        val lower = lowerBound(integer)?.let(::bigIntOf)
+        val upper = upperBound(integer)?.let(::bigIntOf)
         if (lower != null || upper != null) {
             bounded = bounded.withBranch(ColdIntegerBranch(integer, lower, upper))
         }
@@ -728,11 +731,11 @@ private fun SourceBoundAtom.sourceRows(realColumns: Int): List<ExactRationalIneq
     )
 }
 
-private fun BigFraction.isInteger(): Boolean = den == BigInteger.ONE
+private fun BigFraction.isInteger(): Boolean = den == BIG_ONE
 
-private fun BigFraction.floor(): BigInteger {
+private fun BigFraction.floor(): BigInt {
     val quotient = num / den
-    return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
+    return if (num < BIG_ZERO && num % den != BIG_ZERO) quotient - BIG_ONE else quotient
 }
 
 private const val SOURCE_EPOCH_MAX_NS = 100_000_000L

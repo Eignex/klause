@@ -7,7 +7,11 @@ import com.eignex.klause.lp.lattice.mixedEchelonHermite
 import com.eignex.klause.lp.lattice.originalBounds
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.lp.lattice.triangularBounds
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.isZero
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,14 +30,14 @@ import kotlin.test.assertTrue
 class SparseIntMatrixTest {
 
     private fun matrix(random: Random, rows: Int, cols: Int): List<SparseIntRow> = List(rows) {
-        val entries = HashMap<Int, BigInteger>()
+        val entries = HashMap<Int, BigInt>()
         for (j in 0 until cols) {
-            if (random.nextInt(cols) < 3) entries[j] = BigInteger.fromInt(random.nextInt(-4, 5))
+            if (random.nextInt(cols) < 3) entries[j] = bigIntOf(random.nextInt(-4, 5))
         }
         sparseIntRow(entries)
     }
 
-    private fun dense(a: List<SparseIntRow>, cols: Int): Array<Array<BigInteger>> =
+    private fun dense(a: List<SparseIntRow>, cols: Int): Array<Array<BigInt>> =
         Array(a.size) { i -> Array(cols) { j -> a[i][j] } }
 
     /** The reduction the sparse chain replaces: dense fraction-free elimination, pivot columns only. */
@@ -41,7 +45,7 @@ class SparseIntMatrixTest {
         val w = dense(a, cols)
         val m = w.size
         val pivots = ArrayList<Int>()
-        var prev = BigInteger.ONE
+        var prev = BIG_ONE
         var r = 0
         for (c in 0 until cols) {
             if (r >= m) break
@@ -62,14 +66,14 @@ class SparseIntMatrixTest {
     }
 
     /** `det` by fraction-free elimination, only ever asked whether the answer is `±1`. */
-    private fun determinant(m: Array<Array<BigInteger>>): BigInteger {
+    private fun determinant(m: Array<Array<BigInt>>): BigInt {
         val n = m.size
         val a = Array(n) { i -> Array(n) { j -> m[i][j] } }
         var sign = 1
-        var prev = BigInteger.ONE
+        var prev = BIG_ONE
         for (k in 0 until n - 1) {
             if (a[k][k].isZero()) {
-                val swap = (k + 1 until n).firstOrNull { !a[it][k].isZero() } ?: return BigInteger.ZERO
+                val swap = (k + 1 until n).firstOrNull { !a[it][k].isZero() } ?: return BIG_ZERO
                 val t = a[k]
                 a[k] = a[swap]
                 a[swap] = t
@@ -114,7 +118,7 @@ class SparseIntMatrixTest {
             assertNotNull(f)
             for (i in a.indices) {
                 for (j in 0 until COLS) {
-                    var acc = BigInteger.ZERO
+                    var acc = BIG_ZERO
                     for (k in 0 until COLS) acc += a[i][k] * f.v[k, j]
                     assertEquals(acc, f.h[i][j], "H must equal A*V at row $i column $j")
                 }
@@ -131,7 +135,7 @@ class SparseIntMatrixTest {
             val f = hermiteNormalForm(a, COLS)
             assertNotNull(f)
             val det = determinant(Array(COLS) { i -> Array(COLS) { j -> f.v[i, j] } })
-            assertTrue(det == BigInteger.ONE || det == -BigInteger.ONE, "det V was $det")
+            assertTrue(det == BIG_ONE || det == -BIG_ONE, "det V was $det")
         }
     }
 
@@ -162,15 +166,15 @@ class SparseIntMatrixTest {
         val random = Random(555)
         repeat(REPEATS) {
             val a = matrix(random, ROWS, COLS)
-            val witness = Array(COLS) { BigInteger.fromInt(random.nextInt(-6, 7)) }
+            val witness = Array(COLS) { bigIntOf(random.nextInt(-6, 7)) }
             val rhs = Array(a.size) { i ->
-                var acc = BigInteger.ZERO
+                var acc = BIG_ZERO
                 for (k in a[i].index.indices) acc += a[i].value[k] * witness[a[i].index[k]]
                 acc
             }
             val mixed = mixedEchelonHermite(a, emptyList(), COLS, rhs)
             if (mixed.equalities.isEmpty()) return@repeat
-            val reduced = Array<BigInteger?>(mixed.equalities.size) { mixed.equalityRhs[it] }
+            val reduced = Array<BigInt?>(mixed.equalities.size) { mixed.equalityRhs[it] }
             val y = triangularBounds(mixed.equalities, COLS, reduced, reduced)
             val bounds = mixed.originalBounds(y.lo, y.hi)
             for (i in 0 until COLS) {

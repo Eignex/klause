@@ -2,10 +2,14 @@
 
 package com.eignex.klause.simplex.exact
 
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TWO
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.time.TimeSource.Monotonic
 
 /**
@@ -299,16 +303,16 @@ internal fun exactMixedUnitCubeSolution(
             value
         } else {
             (value + BigFracOps.half).floorExact().let {
-                BigFraction.of(it, BigInteger.ONE)
+                BigFraction.of(it, BIG_ONE)
             }
         }
     }
     return candidate.takeIf { candidate -> candidate.satisfiesExactRows(rows) }
 }
 
-private fun BigFraction.floorExact(): BigInteger {
+private fun BigFraction.floorExact(): BigInt {
     val quotient = num / den
-    return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
+    return if (num < BIG_ZERO && num % den != BIG_ZERO) quotient - BIG_ONE else quotient
 }
 
 private fun List<BigFraction>.satisfiesExactRows(rows: List<ExactRationalInequality>): Boolean = rows.all { row ->
@@ -1147,8 +1151,8 @@ private fun <F> exactWitnessFraction(value: F): BigFraction = when (value) {
     is BigFraction -> value
 
     is Frac128 -> BigFraction.of(
-        (BigInteger.fromLong(value.nHi) shl 64) + BigInteger.fromULong(value.nLo.toULong()),
-        (BigInteger.fromLong(value.dHi) shl 64) + BigInteger.fromULong(value.dLo.toULong()),
+        (bigIntOf(value.nHi) shl 64) + bigIntOf(value.nLo.toULong()),
+        (bigIntOf(value.dHi) shl 64) + bigIntOf(value.dLo.toULong()),
     )
 
     else -> error("unsupported exact witness arithmetic")
@@ -1208,7 +1212,7 @@ private fun bigWitnessDelta(st: SimplexState<BigFraction>): BigFraction {
             if (cap < delta) delta = cap
         }
     }
-    return delta * BigFraction.of(BigInteger.ONE, BigInteger.TWO)
+    return delta * BigFraction.of(BIG_ONE, BIG_TWO)
 }
 
 /** Pivot cap: generous for the small leaf models the fallback targets, tiny relative to a search. */

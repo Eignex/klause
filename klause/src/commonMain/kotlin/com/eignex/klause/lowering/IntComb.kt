@@ -1,13 +1,23 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.ir.LinearOp
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 /**
  * A folded integer linear combination that is either 64-bit ([Narrow], the common fast path) or
  * arbitrary-precision ([Wide]). Integer folds stay [Narrow] until a coefficient or constant overflows
  * `Long`, then promote to [Wide] — an over-Int64 literal lowers to a wide factor instead of being rejected.
- * The narrow arithmetic is unchanged (no per-op `BigInteger` allocation), so only the rare wide fold pays
+ * The narrow arithmetic is unchanged (no per-op `BigInt` allocation), so only the rare wide fold pays
  * for arbitrary precision.
  */
 internal sealed interface IntComb {
@@ -15,19 +25,18 @@ internal sealed interface IntComb {
     class Wide(val lin: WideLinComb) : IntComb
 }
 
-/** The `BigInteger` analogue of [LinComb]: `Σ coeffs·vars + constant` with arbitrary-precision values. */
-internal data class WideLinComb(val coeffs: Map<Int, BigInteger>, val constant: BigInteger) {
+/** The `BigInt` analogue of [LinComb]: `Σ coeffs·vars + constant` with arbitrary-precision values. */
+internal data class WideLinComb(val coeffs: Map<Int, BigInt>, val constant: BigInt) {
     fun plus(other: WideLinComb): WideLinComb {
         val m = HashMap(coeffs)
-        for ((v, c) in other.coeffs) m[v] = (m[v] ?: BigInteger.ZERO) + c
+        for ((v, c) in other.coeffs) m[v] = (m[v] ?: BIG_ZERO) + c
         return WideLinComb(m, constant + other.constant)
     }
 
-    fun scaled(k: BigInteger): WideLinComb = WideLinComb(coeffs.mapValues { it.value * k }, constant * k)
+    fun scaled(k: BigInt): WideLinComb = WideLinComb(coeffs.mapValues { it.value * k }, constant * k)
 }
 
-internal fun LinComb.toWide(): WideLinComb =
-    WideLinComb(coeffs.mapValues { BigInteger.fromLong(it.value) }, BigInteger.fromLong(constant))
+internal fun LinComb.toWide(): WideLinComb = WideLinComb(coeffs.mapValues { bigIntOf(it.value) }, bigIntOf(constant))
 
 internal fun IntComb.toWide(): WideLinComb = when (this) {
     is IntComb.Narrow -> lin.toWide()
@@ -60,12 +69,12 @@ internal fun sumIntCombs(combs: List<IntComb>, negateTail: Boolean = false): Int
             return IntComb.Narrow(LinComb(m, constant))
         }.getOrElse { if (it !is ArithmeticException) throw it }
     }
-    val m = HashMap<Int, BigInteger>()
-    var constant = BigInteger.ZERO
+    val m = HashMap<Int, BigInt>()
+    var constant = BIG_ZERO
     for (idx in combs.indices) {
         val w = combs[idx].toWide()
         val neg = negateTail && idx > 0
-        for ((v, c) in w.coeffs) m[v] = (m[v] ?: BigInteger.ZERO) + (if (neg) -c else c)
+        for ((v, c) in w.coeffs) m[v] = (m[v] ?: BIG_ZERO) + (if (neg) -c else c)
         constant += if (neg) -w.constant else w.constant
     }
     return IntComb.Wide(WideLinComb(m, constant))
@@ -76,11 +85,11 @@ internal fun scaleIntComb(a: IntComb, k: Long): IntComb {
     if (a is IntComb.Narrow) {
         runCatching { return IntComb.Narrow(a.lin.scaled(k)) }.getOrElse { if (it !is ArithmeticException) throw it }
     }
-    return IntComb.Wide(a.toWide().scaled(BigInteger.fromLong(k)))
+    return IntComb.Wide(a.toWide().scaled(bigIntOf(k)))
 }
 
 /** This combination scaled by an arbitrary-precision constant (always [IntComb.Wide]). */
-internal fun scaleIntCombWide(a: IntComb, k: BigInteger): IntComb = IntComb.Wide(a.toWide().scaled(k))
+internal fun scaleIntCombWide(a: IntComb, k: BigInt): IntComb = IntComb.Wide(a.toWide().scaled(k))
 
 /**
  * The relation `a ⟨op⟩ b` reduced to `(vars, coeffs, bound)` as `Σ coeffs·vars ⟨op⟩ bound`, either 64-bit
@@ -89,7 +98,7 @@ internal fun scaleIntCombWide(a: IntComb, k: BigInteger): IntComb = IntComb.Wide
  */
 internal sealed interface LinRelation {
     class LongRel(val vars: IntArray, val coeffs: LongArray, val bound: Long) : LinRelation
-    class WideRel(val vars: IntArray, val coeffs: Array<BigInteger>, val bound: BigInteger) : LinRelation
+    class WideRel(val vars: IntArray, val coeffs: Array<BigInt>, val bound: BigInt) : LinRelation
 }
 
 internal fun intCombDiff(a: IntComb, b: IntComb, delta: Long): LinRelation {
@@ -102,14 +111,14 @@ internal fun intCombDiff(a: IntComb, b: IntComb, delta: Long): LinRelation {
     val aw = a.toWide()
     val bw = b.toWide()
     val combined = HashMap(aw.coeffs)
-    for ((v, c) in bw.coeffs) combined[v] = (combined[v] ?: BigInteger.ZERO) - c
-    combined.entries.removeAll { it.value == BigInteger.ZERO }
-    val bound = bw.constant - aw.constant + BigInteger.fromLong(delta)
+    for ((v, c) in bw.coeffs) combined[v] = (combined[v] ?: BIG_ZERO) - c
+    combined.entries.removeAll { it.value == BIG_ZERO }
+    val bound = bw.constant - aw.constant + bigIntOf(delta)
     val vars = combined.keys.toIntArray()
     val coeffs = Array(vars.size) { combined.getValue(vars[it]) }
     // A wide fold whose values all fit Long stays a cheap Long row (only intermediate steps overflowed).
     if (bound.fitsLong() && coeffs.all { it.fitsLong() }) {
-        return LinRelation.LongRel(vars, LongArray(vars.size) { coeffs[it].longValue() }, bound.longValue())
+        return LinRelation.LongRel(vars, LongArray(vars.size) { coeffs[it].toLongExact() }, bound.toLongExact())
     }
     return LinRelation.WideRel(vars, coeffs, bound)
 }
@@ -123,10 +132,10 @@ internal fun constProduct(consts: List<IntComb>): IntComb {
             return IntComb.Narrow(LinComb(emptyMap(), p))
         }.getOrElse { if (it !is ArithmeticException) throw it }
     }
-    var p = BigInteger.ONE
+    var p = BIG_ONE
     for (c in consts) p *= c.toWide().constant
     return if (p.fitsLong()) {
-        IntComb.Narrow(LinComb(emptyMap(), p.longValue()))
+        IntComb.Narrow(LinComb(emptyMap(), p.toLongExact()))
     } else {
         IntComb.Wide(WideLinComb(emptyMap(), p))
     }
@@ -139,13 +148,9 @@ internal fun scaleByConst(term: IntComb, k: IntComb): IntComb = when (k) {
 }
 
 /** Whether the variable-free relation `0 ⟨op⟩ bound` holds (a wide row whose terms all cancelled). */
-internal fun wideConstHolds(op: LinearOp, bound: BigInteger): Boolean = when (op) {
-    LinearOp.LE -> BigInteger.ZERO <= bound
-    LinearOp.GE -> BigInteger.ZERO >= bound
-    LinearOp.EQ -> bound == BigInteger.ZERO
-    LinearOp.NE -> bound != BigInteger.ZERO
+internal fun wideConstHolds(op: LinearOp, bound: BigInt): Boolean = when (op) {
+    LinearOp.LE -> BIG_ZERO <= bound
+    LinearOp.GE -> BIG_ZERO >= bound
+    LinearOp.EQ -> bound == BIG_ZERO
+    LinearOp.NE -> bound != BIG_ZERO
 }
-
-private val LONG_MAX = BigInteger.fromLong(Long.MAX_VALUE)
-private val LONG_MIN = BigInteger.fromLong(Long.MIN_VALUE)
-private fun BigInteger.fitsLong(): Boolean = this in LONG_MIN..LONG_MAX

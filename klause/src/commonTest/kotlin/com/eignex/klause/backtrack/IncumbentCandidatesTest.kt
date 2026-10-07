@@ -13,7 +13,7 @@ import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -154,8 +154,8 @@ class IncumbentCandidatesTest {
     @Test
     fun `exact incumbent bound encloses a rational beyond one floating point step`() {
         val exact = BigFraction.of(
-            BigInteger.fromLong(16_003_601_413_338_437L),
-            BigInteger.fromLong(17_309_130_200_826_847L),
+            bigIntOf(16_003_601_413_338_437L),
+            bigIntOf(17_309_130_200_826_847L),
         )
         val score = SourceObjectiveScore(exact.toDouble(), exact)
 

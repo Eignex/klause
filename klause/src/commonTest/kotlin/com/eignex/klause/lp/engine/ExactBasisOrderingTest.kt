@@ -7,8 +7,8 @@ import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -805,7 +805,7 @@ class ExactBasisOrderingTest {
     @Test
     fun `hinted fixed width overflow restarts the whole exact factor operation`() {
         val zero = ExactLpNumber.of(0L)
-        val wide = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 140, BigInteger.ONE))
+        val wide = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 140, BIG_ONE))
         val source = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, wide))),
             listOf(wide),

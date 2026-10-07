@@ -14,7 +14,8 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.qflra.SourceBoundAtom
 import com.eignex.klause.theory.qflra.SourceBoundTerm
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -85,17 +86,17 @@ class LpSourcePremisesTest {
     @Test
     fun `source integer splits preserve arbitrary precision and finite adapters decline overflow`() {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(4))
-        val threshold = BigInteger.fromLong(Long.MAX_VALUE) + BigInteger.ONE
-        val value = BigFraction.of(threshold, BigInteger.ONE) + BigFraction.ofLong(2).reciprocal()
+        val threshold = bigIntOf(Long.MAX_VALUE) + BIG_ONE
+        val value = BigFraction.of(threshold, BIG_ONE) + BigFraction.ofLong(2).reciprocal()
 
         val alternatives = assertNotNull(lpIntegerBranch(9, value, session, registered = true))
 
         val left = assertIs<RegisteredTheoryDecision>(assertIs<SearchDecision.Theory>(alternatives[0]).decision)
         val right = assertIs<RegisteredTheoryDecision>(assertIs<SearchDecision.Theory>(alternatives[1]).decision)
         assertEquals(8, left.literal)
-        assertEquals(BigFraction.of(threshold, BigInteger.ONE), assertIs<SourceBoundAtom>(left.payload).threshold)
+        assertEquals(BigFraction.of(threshold, BIG_ONE), assertIs<SourceBoundAtom>(left.payload).threshold)
         assertEquals(
-            BigFraction.of(threshold + BigInteger.ONE, BigInteger.ONE),
+            BigFraction.of(threshold + BIG_ONE, BIG_ONE),
             assertIs<SourceBoundAtom>(right.payload).threshold,
         )
         assertNull(lpIntegerBranch(9, value, session, registered = false))

@@ -1,6 +1,21 @@
 package com.eignex.klause.simplex.exact
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TWO
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toDouble
+import com.eignex.klause.util.unaryMinus
 
 // Multipliers orient the equality so its RHS is below the minimum selected by the cited bounds.
 // Strict rows contribute -multiplier to the infinitesimal RHS; a negative delta breaks an exact tie.
@@ -52,7 +67,7 @@ internal object BigFracOps : FracOps<BigFraction> {
     override val zero: BigFraction = BigFraction.ZERO
     override val one: BigFraction = BigFraction.ONE
     override val minusOne: BigFraction = BigFraction.MINUS_ONE
-    override val half: BigFraction = BigFraction.of(BigInteger.ONE, BigInteger.TWO)
+    override val half: BigFraction = BigFraction.of(BIG_ONE, BIG_TWO)
 
     override fun ofLong(v: Long): BigFraction = BigFraction.ofLong(v)
 
@@ -155,9 +170,9 @@ internal sealed interface ExactDoubleBoundedSplit {
  *  fixed-width level ([Frac128Ops]) handles the common case and escalates here on overflow. */
 class BigFraction private constructor(
     /** The reduced signed numerator. */
-    val num: BigInteger,
+    val num: BigInt,
     /** The reduced positive denominator. */
-    val den: BigInteger,
+    val den: BigInt,
 ) {
 
     /** Whether this fraction is zero. */
@@ -170,7 +185,7 @@ class BigFraction private constructor(
     fun negated(): BigFraction = if (isZero) this else BigFraction(-num, den)
 
     /** Returns this fraction converted to a [Double]. */
-    fun toDouble(): Double = num.doubleValue(exactRequired = false) / den.doubleValue(exactRequired = false)
+    fun toDouble(): Double = num.toDouble() / den.toDouble()
 
     /** Returns the sum of this fraction and [other]. */
     operator fun plus(other: BigFraction): BigFraction = sum(other.num, other.den)
@@ -181,7 +196,7 @@ class BigFraction private constructor(
     // `num/den + n/d` for a reduced `n/d`, normalized by Knuth's method (TAOCP 4.5.1): the gcds run on the
     // denominators and their quotient instead of on the full cross products, and vanish when a denominator is 1
     // or the denominators are coprime, since a reduced sum over coprime denominators is already reduced.
-    private fun sum(n: BigInteger, d: BigInteger): BigFraction {
+    private fun sum(n: BigInt, d: BigInt): BigFraction {
         if (n.isZero()) return this
         if (isZero) return BigFraction(n, d)
         if (d.isOne) return BigFraction(num + n * den, den)
@@ -200,8 +215,8 @@ class BigFraction private constructor(
         if (isZero || other.isZero) return ZERO
         if (den.isOne && num.isUnit) return if (num.isOne) other else other.negated()
         if (other.den.isOne && other.num.isUnit) return if (other.num.isOne) this else negated()
-        val g1 = if (den.isOne || other.num.isUnit) BigInteger.ONE else other.num.gcd(den)
-        val g2 = if (other.den.isOne || num.isUnit) BigInteger.ONE else num.gcd(other.den)
+        val g1 = if (den.isOne || other.num.isUnit) BIG_ONE else other.num.gcd(den)
+        val g2 = if (other.den.isOne || num.isUnit) BIG_ONE else num.gcd(other.den)
         val n1 = if (g2.isOne) num else num / g2
         val d2 = if (g2.isOne) other.den else other.den / g2
         val n2 = if (g1.isOne) other.num else other.num / g1
@@ -224,33 +239,33 @@ class BigFraction private constructor(
         return (num * other.den).compareTo(other.num * den)
     }
 
-    // ionspin's equals goes through a generic comparison, which costs more than the arithmetic it would skip.
-    private val BigInteger.isUnit: Boolean get() = bitLength() == 1
+    // Native BigInt equality goes through a generic comparison, which costs more than the arithmetic it would skip.
+    private val BigInt.isUnit: Boolean get() = magnitudeBitLength() == 1
 
-    private val BigInteger.isOne: Boolean get() = signum() > 0 && bitLength() == 1
+    private val BigInt.isOne: Boolean get() = signum() > 0 && magnitudeBitLength() == 1
 
     override fun equals(other: Any?): Boolean = other is BigFraction && num == other.num && den == other.den
 
     override fun hashCode(): Int = num.hashCode() * 31 + den.hashCode()
 
-    override fun toString(): String = if (den == BigInteger.ONE) "$num" else "$num/$den"
+    override fun toString(): String = if (den == BIG_ONE) "$num" else "$num/$den"
 
     /** Factories and constants for exact rational values. */
     companion object {
         /** The additive identity. */
-        val ZERO = BigFraction(BigInteger.ZERO, BigInteger.ONE)
+        val ZERO = BigFraction(BIG_ZERO, BIG_ONE)
 
         /** The multiplicative identity. */
-        val ONE = BigFraction(BigInteger.ONE, BigInteger.ONE)
+        val ONE = BigFraction(BIG_ONE, BIG_ONE)
 
         /** The additive inverse of [ONE]. */
-        val MINUS_ONE = BigFraction(-BigInteger.ONE, BigInteger.ONE)
+        val MINUS_ONE = BigFraction(-BIG_ONE, BIG_ONE)
 
         /** Returns the integer fraction represented by [v]. */
-        fun ofLong(v: Long): BigFraction = if (v == 0L) ZERO else BigFraction(BigInteger.fromLong(v), BigInteger.ONE)
+        fun ofLong(v: Long): BigFraction = if (v == 0L) ZERO else BigFraction(bigIntOf(v), BIG_ONE)
 
         /** Returns the normalized fraction [num] / [den]. */
-        fun of(num: BigInteger, den: BigInteger): BigFraction {
+        fun of(num: BigInt, den: BigInt): BigFraction {
             require(!den.isZero()) { "zero denominator" }
             if (num.isZero()) return ZERO
             val negative = den.signum() < 0
@@ -277,8 +292,8 @@ class BigFraction private constructor(
             val tz = m.countTrailingZeroBits()
             m = m shr tz
             e += tz
-            val mag = BigInteger.fromLong(if (bits < 0L) -m else m)
-            return if (e >= 0) of(mag shl e, BigInteger.ONE) else of(mag, BigInteger.ONE shl -e)
+            val mag = bigIntOf(if (bits < 0L) -m else m)
+            return if (e >= 0) of(mag shl e, BIG_ONE) else of(mag, BIG_ONE shl -e)
         }
     }
 }

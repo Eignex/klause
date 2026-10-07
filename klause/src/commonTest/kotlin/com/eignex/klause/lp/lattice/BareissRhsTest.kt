@@ -2,7 +2,7 @@ package com.eignex.klause.lp.lattice
 
 import com.eignex.klause.lp.lattice.bareissEchelon
 import com.eignex.klause.lp.lattice.mixedEchelonHermite
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,14 +15,14 @@ import kotlin.test.assertTrue
  */
 class BareissRhsTest {
 
-    private fun vec(vararg v: Long) = Array(v.size) { BigInteger.fromLong(v[it]) }
+    private fun vec(vararg v: Long) = Array(v.size) { bigIntOf(v[it]) }
 
     @Test
     fun `a row swap carries its right-hand side along`() {
         // Column 0 is zero in the first row, so elimination swaps the rows; the bounds must swap too.
         val e = bareissEchelon(sparseRows(longArrayOf(0, 1), longArrayOf(1, 0)), 2, vec(3, 5))
-        assertEquals(BigInteger.fromLong(5), e.rhs[0], "row now holding `x = 5` must carry 5, not 3")
-        assertEquals(BigInteger.fromLong(3), e.rhs[1])
+        assertEquals(bigIntOf(5), e.rhs[0], "row now holding `x = 5` must carry 5, not 3")
+        assertEquals(bigIntOf(3), e.rhs[1])
     }
 
     @Test
@@ -30,7 +30,7 @@ class BareissRhsTest {
         // x + y = 4 and 2x + 2y = 8 are dependent; the second reduces to 0 = 0.
         val e = bareissEchelon(sparseRows(longArrayOf(1, 1), longArrayOf(2, 2)), 2, vec(4, 8))
         assertEquals(1, e.rows.size, "the dependent row drops out")
-        assertEquals(BigInteger.fromLong(4), e.rhs[0])
+        assertEquals(bigIntOf(4), e.rhs[0])
         assertFalse(e.inconsistent, "8 = 2*4, so the pair is consistent")
     }
 

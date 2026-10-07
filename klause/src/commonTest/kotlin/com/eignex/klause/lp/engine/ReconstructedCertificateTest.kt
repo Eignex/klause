@@ -1,8 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -63,7 +64,7 @@ class ReconstructedCertificateTest {
             addVar(0L, 1L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
         }.build(Sense.MINIMIZE)
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
 
         val result = reconstructCertificate(model, doubleArrayOf(1.0 / 3.0), doubleArrayOf(1.0 / 3.0))
 
@@ -81,7 +82,7 @@ class ReconstructedCertificateTest {
             addVar(0L, 1L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
         }.build(Sense.MINIMIZE)
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
 
         val result = reconstructCertificate(model, duals = doubleArrayOf(1.0 / 3.0))
 
@@ -92,7 +93,7 @@ class ReconstructedCertificateTest {
 
     @Test
     fun `exact source endpoints beyond the denominator floor are seated without guessing`() {
-        val endpoint = BigFraction.of(BigInteger.ONE, (BigInteger.ONE shl 60) + BigInteger.ONE)
+        val endpoint = BigFraction.of(BIG_ONE, (BIG_ONE shl 60) + BIG_ONE)
         val zero = ExactLpNumber.of(0L)
         val side = ExactLpSide(ExactLpNumber.of(endpoint))
         val source = ExactLpModel(
@@ -196,7 +197,7 @@ class ReconstructedCertificateTest {
 
     @Test
     fun `fixed arithmetic overflow restarts the full point from rational authority`() {
-        val huge = BigFraction.of(BigInteger.ONE shl 100, BigInteger.ONE)
+        val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val one = ExactLpNumber.of(1L)
         val h = ExactLpNumber.of(huge)
         val source = ExactLpModel(
@@ -219,7 +220,7 @@ class ReconstructedCertificateTest {
 
     @Test
     fun `rational data beyond fixed arithmetic remains authoritative`() {
-        val huge = BigFraction.of((BigInteger.ONE shl 150) + BigInteger.ONE, BigInteger.fromInt(3))
+        val huge = BigFraction.of((BIG_ONE shl 150) + BIG_ONE, bigIntOf(3))
         val h = ExactLpNumber.of(huge)
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
@@ -474,7 +475,7 @@ class ReconstructedCertificateTest {
                 limits = ReconstructionLimits(maxWork = 0),
             ),
         )
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         assertEquals(third, results[0].second.witness?.primal?.single())
         assertEquals(third, results[0].second.bound?.value)
         assertTrue(results[0].second.complementary)
@@ -534,7 +535,7 @@ class ReconstructedCertificateTest {
 
     @Test
     fun `rational factor handoff verifies source coordinates without a double roundtrip`() {
-        val exact = BigFraction.of(BigInteger.ONE, (BigInteger.ONE shl 70) + BigInteger.ONE)
+        val exact = BigFraction.of(BIG_ONE, (BIG_ONE shl 70) + BIG_ONE)
         val value = ExactLpNumber.of(exact)
         val one = ExactLpNumber.of(1L)
         val origin = ExactLpNumber.of(10L)

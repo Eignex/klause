@@ -9,7 +9,9 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.linearRows
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -34,7 +36,7 @@ class LinearConstantsTest {
 
     @Test
     fun `an over-64-bit row has no integer reading`() {
-        val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
 
         val row = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
 
@@ -72,7 +74,7 @@ class LinearConstantsTest {
 
     @Test
     fun `canonicalising a wide greater-equal row negates its exact constants`() {
-        val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
 
         val row = Linear(intArrayOf(0), arrayOf(huge), LinearOp.GE, huge)
 
@@ -94,7 +96,7 @@ class LinearConstantsTest {
 
     @Test
     fun `a wide row declares its exact linear row`() {
-        val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
 
         val row = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
 
@@ -103,7 +105,7 @@ class LinearConstantsTest {
 
     @Test
     fun `a reified row carries the same constant shapes`() {
-        val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
 
         val plain = ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.LE, 7)
         val wide = ReifiedLinear(0, intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
@@ -140,7 +142,7 @@ class LinearConstantsTest {
             bound = 2.5,
             strict = true,
         )
-        val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
         val wide = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
 
         val realRow = strictReal.linearRows.single()
@@ -195,7 +197,7 @@ class LinearConstantsTest {
 
     @Test
     fun `a wide row requires distinct variables`() {
-        val coefficient = BigInteger.ONE
+        val coefficient = BIG_ONE
 
         assertFailsWith<IllegalArgumentException> {
             Linear(intArrayOf(0, 0), arrayOf(coefficient, coefficient), LinearOp.LE, coefficient)
@@ -207,26 +209,26 @@ class LinearConstantsTest {
 
     @Test
     fun `a collapsing wide remap retains a constant row`() {
-        val coefficient = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val coefficient = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
         val map = VarRemap(intArrayOf(0), intArrayOf(0, 0))
         val linear = Linear(
             intArrayOf(0, 1),
             arrayOf(coefficient, -coefficient),
             LinearOp.EQ,
-            BigInteger.ZERO,
+            BIG_ZERO,
         )
         val reified = ReifiedLinear(
             0,
             intArrayOf(0, 1),
             arrayOf(coefficient, -coefficient),
             LinearOp.EQ,
-            BigInteger.ZERO,
+            BIG_ZERO,
         )
 
         val remappedLinear = assertIs<Linear>(linear.remap(map))
         val remappedReified = assertIs<ReifiedLinear>(reified.remap(map))
 
-        assertEquals(BigInteger.ZERO, checkNotNull(remappedLinear.wideConstants).coefficients.at(0))
-        assertEquals(BigInteger.ZERO, checkNotNull(remappedReified.wideConstants).coefficients.at(0))
+        assertEquals(BIG_ZERO, checkNotNull(remappedLinear.wideConstants).coefficients.at(0))
+        assertEquals(BIG_ZERO, checkNotNull(remappedReified.wideConstants).coefficients.at(0))
     }
 }

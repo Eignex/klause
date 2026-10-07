@@ -1,7 +1,16 @@
 package com.eignex.klause.lp.lattice
 
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.div
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.rem
+import com.eignex.klause.util.times
+import com.eignex.klause.util.unaryMinus
 
 /**
  * Bareiss, *Sylvester's Identity and Multistep Integer-Preserving Gaussian Elimination* (Mathematics of
@@ -20,7 +29,7 @@ internal class BareissEchelon(
     val pivots: IntArray,
     /** The right-hand sides carried through the same row operations, when the caller supplied them.
      *  Index-aligned with [rows]; empty when the elimination was run on coefficients alone. */
-    val rhs: Array<BigInteger> = emptyArray(),
+    val rhs: Array<BigInt> = emptyArray(),
     /** True when a row reduced to `0 = c` with `c` non-zero: the equalities alone are unsatisfiable.
      *  Only ever set when right-hand sides were supplied, since without them it cannot be seen. */
     val inconsistent: Boolean = false,
@@ -55,7 +64,7 @@ internal class BareissEchelon(
 internal fun bareissEchelon(
     a: List<SparseIntRow>,
     cols: Int,
-    rhsIn: Array<BigInteger>? = null,
+    rhsIn: Array<BigInt>? = null,
     cancellation: Cancellation = Cancellation.Never,
 ): BareissEchelon {
     val m = a.size
@@ -80,7 +89,7 @@ internal fun bareissEchelon(
 
     val pivots = ArrayList<Int>()
     val kept = ArrayList<SparseIntRow>()
-    val keptRhs = ArrayList<BigInteger>()
+    val keptRhs = ArrayList<BigInt>()
     for (c in 0 until cols) {
         val bucket = byLead.remove(c) ?: continue
         // Entries grow with the elimination and the row supports fill in, so a large equality block runs
@@ -97,11 +106,11 @@ internal fun bareissEchelon(
             val scaleQ = pivotValue / g
             val scaleP = factor / g
             val combined = combine(w[q], scaleQ, w[p], scaleP)
-            var combinedRhs = if (rhs == null) BigInteger.ZERO else scaleQ * rhs[q] - scaleP * rhs[p]
+            var combinedRhs = if (rhs == null) BIG_ZERO else scaleQ * rhs[q] - scaleP * rhs[p]
             val content = content(combined, if (rhs == null) null else combinedRhs)
-            val reduced = if (content == BigInteger.ONE) combined else divide(combined, content)
+            val reduced = if (content == BIG_ONE) combined else divide(combined, content)
             if (rhs != null) {
-                if (content != BigInteger.ONE) combinedRhs /= content
+                if (content != BIG_ONE) combinedRhs /= content
                 rhs[q] = combinedRhs
             }
             w[q] = reduced
@@ -130,14 +139,14 @@ private fun sparsestRow(bucket: List<Int>, w: List<SparseIntRow>): Int {
 /** `scaleTarget·target − scaleSource·source`, as a merge over the two supports. */
 private fun combine(
     target: SparseIntRow,
-    scaleTarget: BigInteger,
+    scaleTarget: BigInt,
     source: SparseIntRow,
-    scaleSource: BigInteger,
+    scaleSource: BigInt,
 ): SparseIntRow {
     val ti = target.index
     val si = source.index
     val index = IntArray(ti.size + si.size)
-    val value = arrayOfNulls<BigInteger>(ti.size + si.size)
+    val value = arrayOfNulls<BigInt>(ti.size + si.size)
     var t = 0
     var s = 0
     var n = 0
@@ -145,7 +154,7 @@ private fun combine(
         val tc = if (t < ti.size) ti[t] else Int.MAX_VALUE
         val sc = if (s < si.size) si[s] else Int.MAX_VALUE
         val col: Int
-        val v: BigInteger
+        val v: BigInt
         when {
             tc < sc -> {
                 col = tc
@@ -177,19 +186,19 @@ private fun combine(
 }
 
 /** The gcd of the row's entries and [extra], or one as soon as nothing more can be divided out. */
-private fun content(row: SparseIntRow, extra: BigInteger?): BigInteger {
-    var g = extra?.abs() ?: BigInteger.ZERO
+private fun content(row: SparseIntRow, extra: BigInt?): BigInt {
+    var g = extra?.abs() ?: BIG_ZERO
     for (v in row.value) {
         g = gcdOf(g, v)
-        if (g == BigInteger.ONE) return BigInteger.ONE
+        if (g == BIG_ONE) return BIG_ONE
     }
-    return if (g.isZero()) BigInteger.ONE else g
+    return if (g.isZero()) BIG_ONE else g
 }
 
-private fun divide(row: SparseIntRow, by: BigInteger): SparseIntRow =
+private fun divide(row: SparseIntRow, by: BigInt): SparseIntRow =
     SparseIntRow(row.index, Array(row.index.size) { row.value[it] / by })
 
-private tailrec fun gcdOf(a: BigInteger, b: BigInteger): BigInteger = if (b.isZero()) a.abs() else gcdOf(b, a % b)
+private tailrec fun gcdOf(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a.abs() else gcdOf(b, a % b)
 
 // Work units per big-integer entry an elimination step touches, against one simplex op: routing time per unit
 // over the calibration sample's models that reached the reduction (QF_LIA), ~4e-3 ms.

@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.model.PbOp
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BigInt
 
 /** Parsed OPB statements before lowering to a solver model. */
 data class OpbDocument(
@@ -37,7 +37,7 @@ sealed interface OpbStatement {
 /** A coefficient multiplied by a conjunction of literals. */
 data class OpbTerm(
     /** Integer coefficient. */
-    val coefficient: BigInteger,
+    val coefficient: BigInt,
     /** Conjoined DIMACS-encoded literals. */
     val literals: IntArray,
 )
@@ -49,5 +49,5 @@ data class OpbRelation(
     /** Relation operator. */
     val op: PbOp,
     /** Right-hand-side bound. */
-    val bound: BigInteger,
+    val bound: BigInt,
 )

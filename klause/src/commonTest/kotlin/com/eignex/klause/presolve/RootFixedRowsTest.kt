@@ -6,6 +6,8 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -82,8 +84,8 @@ class RootFixedRowsTest {
     fun `a negation beyond long range retains its exact bound`() {
         val r = rows(unit(0, false), ReifiedLinear(0, longArrayOf(1L), intArrayOf(0), LinearOp.LE, Long.MAX_VALUE))
         assertEquals(
-            -com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(Long.MAX_VALUE) -
-                com.ionspin.kotlin.bignum.integer.BigInteger.ONE,
+            -bigIntOf(Long.MAX_VALUE) -
+                BIG_ONE,
             checkNotNull(r.single().integralConstants).exactBound,
         )
     }
@@ -101,7 +103,7 @@ class RootFixedRowsTest {
         )
 
         assertEquals(
-            -com.ionspin.kotlin.bignum.integer.BigInteger.fromLong(Long.MIN_VALUE),
+            -bigIntOf(Long.MIN_VALUE),
             checkNotNull(result.single().wideConstants).bound,
         )
     }

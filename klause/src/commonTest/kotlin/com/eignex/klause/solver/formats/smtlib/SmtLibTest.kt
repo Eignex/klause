@@ -26,7 +26,12 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qflra.supportsExactLra
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.toLongExact
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,7 +81,7 @@ class SmtLibTest {
         val witness = assertIs<OpenTheoryResult.Sat>(openSolve(model)).assignment
         return ExactLiraAssignment(
             bools = BooleanArray(model.numBoolVars) { witness.boolValue(it) },
-            ints = Array(model.numIntVars) { BigInteger.parseString(witness.intValue(it)) },
+            ints = Array(model.numIntVars) { parseBigInt(witness.intValue(it)) },
             reals = emptyList(),
         )
     }
@@ -91,7 +96,7 @@ class SmtLibTest {
         if (parsed.model.sourceRoute() == ProblemPipeline.EXACT_LIRA) {
             val assignment = liaSat(parsed.model)
             return LongArray(parsed.intVarNames.values.maxOrNull()?.plus(1) ?: 0) { v ->
-                assignment.ints[v].longValue()
+                assignment.ints[v].toLongExact()
             }
         }
         if (parsed.model.sourceRoute() == ProblemPipeline.DIFFERENCE_THEORY) {
@@ -120,7 +125,7 @@ class SmtLibTest {
 
         val x = result.ints[parsed.intVarNames.getValue("x")]
         val y = result.reals[parsed.realVarNames.getValue("y")]
-        assertEquals("1/3", (y - BigFraction.of(x, BigInteger.ONE)).toString())
+        assertEquals("1/3", (y - BigFraction.of(x, BIG_ONE)).toString())
     }
 
     @Test
@@ -154,7 +159,7 @@ class SmtLibTest {
     }
 
     @Test
-    fun `open QF LIRA retains a BigInteger branch bound`() {
+    fun `open QF LIRA retains a BigInt branch bound`() {
         val parsed = SmtLib.parse(
             """
                 (set-logic QF_LIRA)
@@ -183,7 +188,7 @@ class SmtLibTest {
 
         val result = liraSat(parsed.model, TheoryParams(maxLeaves = 2))
 
-        assertEquals(BigInteger.ONE shl 70, result.ints[parsed.intVarNames.getValue("x")])
+        assertEquals(BIG_ONE shl 70, result.ints[parsed.intVarNames.getValue("x")])
     }
 
     @Test
@@ -201,7 +206,7 @@ class SmtLibTest {
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         val result = liraSat(parsed.model)
 
-        assertEquals(BigInteger.ONE, result.ints[parsed.intVarNames.getValue("x")])
+        assertEquals(BIG_ONE, result.ints[parsed.intVarNames.getValue("x")])
     }
 
     @Test
@@ -218,7 +223,7 @@ class SmtLibTest {
 
         val result = liraSat(parsed.model)
 
-        assertTrue(result.ints[parsed.intVarNames.getValue("x")] >= BigInteger.fromInt(5))
+        assertTrue(result.ints[parsed.intVarNames.getValue("x")] >= bigIntOf(5))
     }
 
     @Test
@@ -236,7 +241,7 @@ class SmtLibTest {
 
         val result = liraSat(parsed.model)
 
-        assertTrue(result.ints[parsed.intVarNames.getValue("x")] >= BigInteger.ONE)
+        assertTrue(result.ints[parsed.intVarNames.getValue("x")] >= BIG_ONE)
     }
 
     @Test
@@ -254,7 +259,7 @@ class SmtLibTest {
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         val result = liraSat(parsed.model)
 
-        assertTrue(result.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
+        assertTrue(result.ints[parsed.intVarNames.getValue("x")] != BIG_ZERO)
     }
 
     @Test
@@ -291,7 +296,7 @@ class SmtLibTest {
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         val result = liraSat(parsed.model)
 
-        assertTrue(result.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
+        assertTrue(result.ints[parsed.intVarNames.getValue("x")] != BIG_ZERO)
     }
 
     @Test
@@ -387,7 +392,7 @@ class SmtLibTest {
     fun `an over-Int64 coefficient solves to a witness satisfying it exactly`() {
         // 2^64·x + y = 2^64 + 1 with x, y in [0, 3] forces x = 1, y = 1 (y is too small to carry a 2^64
         // unit). The 2^64 coefficient can only live in a wide row, so this exercises the wide lowering.
-        val w = BigInteger.parseString("18446744073709551616") // 2^64
+        val w = parseBigInt("18446744073709551616") // 2^64
         val text = """
             (set-logic QF_LIA)
             (declare-const x Int) (declare-const y Int)
@@ -396,8 +401,8 @@ class SmtLibTest {
             (check-sat)
         """.trimIndent()
         val ints = solve(text)
-        val lhs = w * BigInteger.fromLong(ints[0]) + BigInteger.fromLong(ints[1])
-        assertEquals(w + BigInteger.ONE, lhs, "witness (x=${ints[0]}, y=${ints[1]}) must satisfy the wide row")
+        val lhs = w * bigIntOf(ints[0]) + bigIntOf(ints[1])
+        assertEquals(w + BIG_ONE, lhs, "witness (x=${ints[0]}, y=${ints[1]}) must satisfy the wide row")
     }
 
     @Test
@@ -1062,7 +1067,7 @@ class SmtLibTest {
         // (never silently wrapped to Long.MIN). x = 2^63 has no Long domain to live in, so x is lowered
         // onto digit columns and the witness reads back exactly 2^63.
         val text = "(declare-const x Int) (assert (= x (+ 9223372036854775807 1))) (check-sat)"
-        assertEquals(BigInteger.parseString("9223372036854775808"), soleIntValue(text))
+        assertEquals(parseBigInt("9223372036854775808"), soleIntValue(text))
     }
 
     @Test
@@ -1070,18 +1075,18 @@ class SmtLibTest {
         // 3037000500^2 = 9223372037000250000 overflows Long; it is carried wide (not rejected or wrapped)
         // and x holds it on digit columns.
         val text = "(declare-const x Int) (assert (= x (* 3037000500 3037000500))) (check-sat)"
-        assertEquals(BigInteger.parseString("9223372037000250000"), soleIntValue(text))
+        assertEquals(parseBigInt("9223372037000250000"), soleIntValue(text))
     }
 
     /** The value of the single declared int in [text], read off its digit columns when it has them. */
-    private fun soleIntValue(text: String): BigInteger {
+    private fun soleIntValue(text: String): BigInt {
         val parsed = SmtLib.parse(text)
         if (parsed.model.sourceRoute() == ProblemPipeline.EXACT_LIRA) {
             return liaSat(parsed.model).ints[parsed.intVarNames.values.first()]
         }
         val r = BacktrackSolver(parsed.model.bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
-        return BigInteger.fromLong(r.assignment.ints[parsed.intVarNames.values.first()])
+        return bigIntOf(r.assignment.ints[parsed.intVarNames.values.first()])
     }
 
     @Test
@@ -1116,7 +1121,7 @@ class SmtLibTest {
     @Test
     fun `a declared integer the model drives past Long stays in exact LIA`() {
         // b = 2^32·a and c = 2^32·b with a > 2^32 force both b past 2^64 and c past 2^96. Exact LIA
-        // keeps its wide rows and witness in BigInteger rather than rewriting a declared column onto
+        // keeps its wide rows and witness in BigInt rather than rewriting a declared column onto
         // finite Long digits.
         val text = """
             (set-logic QF_LIA)
@@ -1128,10 +1133,10 @@ class SmtLibTest {
         val parsed = SmtLib.parse(text)
         val result = liaSat(parsed.model)
         val values = parsed.intVarNames.mapValues { (_, id) -> result.ints[id] }
-        val twoToThirtyTwo = BigInteger.fromLong(4294967296)
+        val twoToThirtyTwo = bigIntOf(4294967296)
         assertEquals(values.getValue("b"), values.getValue("a") * twoToThirtyTwo, "b = 2^32·a")
         assertEquals(values.getValue("c"), values.getValue("b") * twoToThirtyTwo, "c = 2^32·b")
-        assertTrue(values.getValue("a") >= BigInteger.parseString("4294967297"), "a keeps its bound")
+        assertTrue(values.getValue("a") >= parseBigInt("4294967297"), "a keeps its bound")
     }
 
     @Test

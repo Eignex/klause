@@ -13,15 +13,31 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.integralLinear
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.abs
 import com.eignex.klause.util.addExact
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.maxOf
+import com.eignex.klause.util.minOf
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
 import com.eignex.klause.util.subExact
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 internal object LinearBoundFusion {
     private class Group(val terms: Terms) {
-        var upper: BigInteger? = null
-        var lower: BigInteger? = null
+        var upper: BigInt? = null
+        var lower: BigInt? = null
         var hasEquality = false
         val droppable = ArrayList<Int>()
     }
@@ -64,13 +80,13 @@ internal object LinearBoundFusion {
     private class Terms(
         val vars: IntArray,
         private val coefficients: LongArray?,
-        private val wideCoefficients: Array<BigInteger>? = null,
+        private val wideCoefficients: Array<BigInt>? = null,
     ) {
         private val hash =
             31 * vars.contentHashCode() + (coefficients?.contentHashCode() ?: wideCoefficients.contentHashCode())
 
-        fun exactCoefficients(): Array<BigInteger> = wideCoefficients ?: Array(vars.size) {
-            BigInteger.fromLong(checkNotNull(coefficients)[it])
+        fun exactCoefficients(): Array<BigInt> = wideCoefficients ?: Array(vars.size) {
+            bigIntOf(checkNotNull(coefficients)[it])
         }
 
         override fun hashCode(): Int = hash
@@ -79,7 +95,7 @@ internal object LinearBoundFusion {
             coefficients.contentEquals(other.coefficients) && wideCoefficients.contentEquals(other.wideCoefficients)
     }
 
-    private class Canonical(val terms: Terms, val bound: BigInteger, val upper: Boolean)
+    private class Canonical(val terms: Terms, val bound: BigInt, val upper: Boolean)
 
     private fun canonicalize(row: LinearRow): Canonical? {
         val constants = row.constants as? IntegralConstants ?: return null
@@ -134,40 +150,38 @@ internal object LinearBoundFusion {
         }
         return Canonical(
             Terms(vars.copyOf(nonzero), compact),
-            BigInteger.fromLong(if (flip) subExact(0L, reducedBound) else reducedBound),
+            bigIntOf(if (flip) subExact(0L, reducedBound) else reducedBound),
             upper = !flip,
         )
     }
 
     private fun canonicalizeWide(row: LinearRow, constants: IntegralConstants): Canonical? {
-        val terms = HashMap<Int, BigInteger>()
+        val terms = HashMap<Int, BigInt>()
         for (k in 0 until row.size) {
             val variable = Term.intVar(row.ref(k))
-            terms[variable] = (terms[variable] ?: BigInteger.ZERO) + constants.exactCoeff(k)
+            terms[variable] = (terms[variable] ?: BIG_ZERO) + constants.exactCoeff(k)
         }
-        val ordered = terms.entries.filter { it.value != BigInteger.ZERO }.sortedBy { it.key }
+        val ordered = terms.entries.filter { it.value != BIG_ZERO }.sortedBy { it.key }
         if (ordered.isEmpty()) return null
-        val gcd = ordered.fold(BigInteger.ZERO) { value, term -> value.gcd(term.value.abs()) }
+        val gcd = ordered.fold(BIG_ZERO) { value, term -> value.gcd(term.value.abs()) }
         var bound = constants.exactBound
-        if (row.strict && row.relation == LinearOp.LE) bound -= BigInteger.ONE
-        if (row.strict && row.relation == LinearOp.GE) bound += BigInteger.ONE
-        val sign = if (row.relation == LinearOp.GE) -BigInteger.ONE else BigInteger.ONE
+        if (row.strict && row.relation == LinearOp.LE) bound -= BIG_ONE
+        if (row.strict && row.relation == LinearOp.GE) bound += BIG_ONE
+        val sign = if (row.relation == LinearOp.GE) -BIG_ONE else BIG_ONE
         bound *= sign
-        if (row.relation == LinearOp.EQ && bound % gcd != BigInteger.ZERO) return null
+        if (row.relation == LinearOp.EQ && bound % gcd != BIG_ZERO) return null
         val quotient = bound / gcd
-        val reducedBound = if (bound < BigInteger.ZERO && bound % gcd != BigInteger.ZERO) {
-            quotient - BigInteger.ONE
+        val reducedBound = if (bound < BIG_ZERO && bound % gcd != BIG_ZERO) {
+            quotient - BIG_ONE
         } else {
             quotient
         }
-        val flip = ordered.first().value * sign < BigInteger.ZERO
+        val flip = ordered.first().value * sign < BIG_ZERO
         val orientation = if (flip) -sign else sign
         val coefficients = ordered.map { it.value / gcd * orientation }.toTypedArray()
         val vars = ordered.map { it.key }.toIntArray()
-        val min = BigInteger.fromLong(Long.MIN_VALUE)
-        val max = BigInteger.fromLong(Long.MAX_VALUE)
-        val key = if (coefficients.all { it in min..max }) {
-            Terms(vars, LongArray(coefficients.size) { coefficients[it].longValue() })
+        val key = if (coefficients.all { it.fitsLong() }) {
+            Terms(vars, LongArray(coefficients.size) { coefficients[it].toLongExact() })
         } else {
             Terms(vars, null, coefficients)
         }

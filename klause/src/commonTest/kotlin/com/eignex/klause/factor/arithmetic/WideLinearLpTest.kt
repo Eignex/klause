@@ -5,7 +5,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.emitLpRelaxation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.floorBigInt
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -84,7 +86,7 @@ class WideLinearLpTest {
     }
 
     // 2^64 + 1 — beyond Int64 and not exactly representable as a Double, so rounding direction matters.
-    private val w = BigInteger.parseString("18446744073709551617")
+    private val w = parseBigInt("18446744073709551617")
 
     @Test
     fun `a wide at-most row over a nonnegative variable is an outward relaxation`() {
@@ -95,8 +97,8 @@ class WideLinearLpTest {
         val r = b.realRows[0]
         assertEquals(LinearOp.LE, r.op)
         // Weakened: a nonnegative variable's coefficient rounds down (<= the true value), the bound up.
-        assertTrue(BigInteger.tryFromDouble(r.coeffs[0], exactRequired = false) <= w, "coeff rounded down")
-        assertTrue(BigInteger.tryFromDouble(r.rhs, exactRequired = false) >= w, "bound rounded up")
+        assertTrue(floorBigInt(r.coeffs[0]) <= w, "coeff rounded down")
+        assertTrue(floorBigInt(r.rhs) >= w, "bound rounded up")
     }
 
     @Test
@@ -114,9 +116,9 @@ class WideLinearLpTest {
         val outer = b.realRows.first { it.op == LinearOp.LE }
         assertEquals(2, outer.cols.size, "the straddling term becomes two nonnegative terms")
         // x⁺ coefficient rounds down (≤ w); x⁻ coefficient is −w rounded down (so its negation ≥ w).
-        assertTrue(BigInteger.tryFromDouble(outer.coeffs[0], exactRequired = false) <= w, "x⁺ coeff rounded down")
-        assertTrue(BigInteger.tryFromDouble(-outer.coeffs[1], exactRequired = false) >= w, "x⁻ coeff rounded up")
-        assertTrue(BigInteger.tryFromDouble(outer.rhs, exactRequired = false) >= w, "bound rounded up")
+        assertTrue(floorBigInt(outer.coeffs[0]) <= w, "x⁺ coeff rounded down")
+        assertTrue(floorBigInt(-outer.coeffs[1]) >= w, "x⁻ coeff rounded up")
+        assertTrue(floorBigInt(outer.rhs) >= w, "bound rounded up")
     }
 
     @Test
@@ -145,14 +147,14 @@ class WideLinearLpTest {
         row.emitLpRelaxation(b)
         assertEquals(1, b.realRows.size)
         assertTrue(b.auxBounds.isEmpty(), "a sign-known column needs no split")
-        assertTrue(BigInteger.tryFromDouble(b.realRows[0].coeffs[0], exactRequired = false) <= w, "coeff rounded down")
+        assertTrue(floorBigInt(b.realRows[0].coeffs[0]) <= w, "coeff rounded down")
     }
 
     @Test
     fun `a coefficient past the Double range emits no relaxation row instead of an infinite one`() {
         // 2^2000 has no finite Double to round outward to, so the row stays CP-only; rounding it anyway
         // would put an infinity in the LP.
-        val huge = BigInteger.ONE.shl(2000)
+        val huge = BIG_ONE.shl(2000)
         val row = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
         row.emitLpRelaxation(b)
@@ -163,7 +165,7 @@ class WideLinearLpTest {
     fun `a coefficient in the top Double exponent band still emits a row when it is finite`() {
         // 2^1023 shares its bit length with values that overflow, so the finiteness test cannot stop at
         // the exponent — this one converts and must be relaxed like any other wide coefficient.
-        val big = BigInteger.ONE.shl(1023)
+        val big = BIG_ONE.shl(1023)
         val row = Linear(intArrayOf(0), arrayOf(big), LinearOp.LE, big)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
         row.emitLpRelaxation(b)
@@ -175,7 +177,7 @@ class WideLinearLpTest {
     fun `a coefficient in the top Double exponent band emits no row when it rounds to infinity`() {
         // 2^1024 − 2^969 is past the largest finite Double 2^1024 − 2^971 yet has the same bit length as
         // it, so only the conversion separates the two.
-        val overflowing = BigInteger.ONE.shl(1024) - BigInteger.ONE.shl(969)
+        val overflowing = BIG_ONE.shl(1024) - BIG_ONE.shl(969)
         val row = Linear(intArrayOf(0), arrayOf(overflowing), LinearOp.LE, overflowing)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
         row.emitLpRelaxation(b)

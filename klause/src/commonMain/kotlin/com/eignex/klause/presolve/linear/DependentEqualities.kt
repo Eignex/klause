@@ -6,10 +6,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.bareissEchelon
 import com.eignex.klause.presolve.SourceDelta
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.addExact
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 
 /**
  * Drop every integer equality that the other equalities already imply, and refute a system of
@@ -30,14 +31,14 @@ internal object DependentEqualities {
     fun dropImplied(problem: Problem, cancellation: Cancellation): SourceDelta {
         val factorOf = ArrayList<Int>()
         val rows = ArrayList<SparseIntRow>()
-        val rhs = ArrayList<BigInteger>()
+        val rhs = ArrayList<BigInt>()
         problem.factors.forEachIndexed { i, factor ->
             if (factor !is Linear || factor.op != LinearOp.EQ) return@forEachIndexed
             val constants = factor.integerConstants ?: return@forEachIndexed
             val row = sparseRow(factor, constants::coeff) ?: return@forEachIndexed
             factorOf.add(i)
             rows.add(row)
-            rhs.add(BigInteger.fromLong(constants.bound))
+            rhs.add(bigIntOf(constants.bound))
         }
         // One equality cannot be implied by the others, and an empty system has nothing to imply.
         if (rows.size < 2) return SourceDelta()
@@ -66,7 +67,7 @@ internal object DependentEqualities {
         if (columns.isEmpty()) return null
         return SparseIntRow(
             columns.toIntArray(),
-            Array(columns.size) { BigInteger.fromLong(merged.getValue(columns[it])) },
+            Array(columns.size) { bigIntOf(merged.getValue(columns[it])) },
         )
     }
 }

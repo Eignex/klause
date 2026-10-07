@@ -21,7 +21,8 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.maxOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.math.abs
 
 /**
@@ -595,7 +596,7 @@ private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (s
         n != null -> narrowRes(LinComb(emptyMap(), n))
 
         // An integer literal beyond Long is carried as a wide combination and lowered to a wide factor.
-        isIntegerLiteral(node.text) -> Res.I(IntComb.Wide(WideLinComb(emptyMap(), BigInteger.parseString(node.text))))
+        isIntegerLiteral(node.text) -> Res.I(IntComb.Wide(WideLinComb(emptyMap(), parseBigInt(node.text))))
 
         isRealLiteral(node.text) ->
             smtUnsupported("real literal '${node.text}' (integer context)")

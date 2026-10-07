@@ -14,15 +14,13 @@ import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
-import com.ionspin.kotlin.bignum.integer.BigInteger
-
-private val longMinBig = BigInteger.fromLong(Long.MIN_VALUE)
-private val longMaxBig = BigInteger.fromLong(Long.MAX_VALUE)
-private fun BigInteger.fitsLong(): Boolean = this in longMinBig..longMaxBig
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.toLongExact
 
 /** An OPB source document lowered to a solver problem. */
 data class OpbProblem(
@@ -154,7 +152,7 @@ internal object OpbDecoder {
     }
 
     private fun lowerRelation(builder: Builder, relation: OpbRelation): Relation {
-        val weights = ArrayList<BigInteger>(relation.terms.size)
+        val weights = ArrayList<BigInt>(relation.terms.size)
         val literals = IntArrayList()
         for (term in relation.terms) {
             weights += term.coefficient
@@ -163,15 +161,10 @@ internal object OpbDecoder {
         return Relation(weights.toTypedArray(), literals.toIntArray(), relation.op, relation.bound)
     }
 
-    private class Relation(
-        val weights: Array<BigInteger>,
-        val literals: IntArray,
-        val op: PbOp,
-        val bound: BigInteger,
-    ) {
+    private class Relation(val weights: Array<BigInt>, val literals: IntArray, val op: PbOp, val bound: BigInt) {
         val wide: Boolean get() = !bound.fitsLong() || weights.any { !it.fitsLong() }
-        fun longWeights(): LongArray = LongArray(weights.size) { weights[it].longValue() }
-        fun longBound(): Long = bound.longValue()
+        fun longWeights(): LongArray = LongArray(weights.size) { weights[it].toLongExact() }
+        fun longBound(): Long = bound.toLongExact()
     }
 
     private class Builder(numDeclaredVars: Int) : CnfLowering {
@@ -229,11 +222,11 @@ internal object OpbDecoder {
         }
     }
 
-    private fun requireLong(value: BigInteger, role: String): Long {
+    private fun requireLong(value: BigInt, role: String): Long {
         if (!value.fitsLong()) {
             throw OpbLoweringException("OPB $role exceeds the supported 64-bit range: '$value'")
         }
-        return value.longValue()
+        return value.toLongExact()
     }
 
     private fun toLinearOp(op: PbOp): LinearOp = when (op) {

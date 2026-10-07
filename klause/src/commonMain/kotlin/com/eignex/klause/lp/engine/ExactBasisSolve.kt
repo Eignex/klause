@@ -5,6 +5,8 @@ import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.PollStride
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.magnitudeBitLength
 import kotlin.time.TimeSource
 
 internal class ExactBasisStop(val reason: ExactBasisDecline) : RuntimeException()
@@ -51,7 +53,7 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     }
 
     fun fraction(value: BigFraction): BigFraction {
-        val bits = maxOf(value.num.bitLength(), value.den.bitLength())
+        val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         maxBits = maxOf(maxBits, bits)
         if (bits > limits.factor.bits) throw ExactBasisStop(ExactBasisDecline.BITS)
         charge(bytes = 64L + (bits.toLong() + 7L) / 4L)
@@ -61,8 +63,8 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     private fun arithmetic(a: BigFraction, b: BigFraction) {
         fraction(a)
         fraction(b)
-        val bits = maxOf(a.num.bitLength(), a.den.bitLength()).toLong() +
-            maxOf(b.num.bitLength(), b.den.bitLength()) + 1L
+        val bits = maxOf(a.num.magnitudeBitLength(), a.den.magnitudeBitLength()).toLong() +
+            maxOf(b.num.magnitudeBitLength(), b.den.magnitudeBitLength()) + 1L
         val limbs = (bits + 63L) / 64L
         charge(limbs * limbs, 1024L + 64L * bits)
     }

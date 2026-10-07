@@ -2,8 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -91,7 +91,7 @@ class ExactBasisVerifyTest {
 
     @Test
     fun `near singular beyond Long source restarts without rounded coefficients`() {
-        val large = BigFraction.of(BigInteger.ONE shl 140, BigInteger.ONE)
+        val large = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
         val one = BigFraction.ONE
         val zero = ExactLpNumber.of(0L)
         val fixed = ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
@@ -423,7 +423,7 @@ class ExactBasisVerifyTest {
 
     @Test
     fun `overflowing solve rhs restarts from authoritative input`() {
-        val huge = BigFraction.of(BigInteger.ONE shl 140, BigInteger.ONE)
+        val huge = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
@@ -448,7 +448,7 @@ class ExactBasisVerifyTest {
 
     @Test
     fun `full rational conflict survives nonrepresentable integer projection in live ladder`() {
-        val large = BigFraction.of(BigInteger.ONE shl 70, BigInteger.ONE)
+        val large = BigFraction.of(BIG_ONE shl 70, BIG_ONE)
         val zero = ExactLpNumber.of(0L)
         val fixed = ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
         val source = ExactLpModel(

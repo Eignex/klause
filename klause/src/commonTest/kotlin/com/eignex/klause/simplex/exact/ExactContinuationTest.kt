@@ -1,7 +1,7 @@
 package com.eignex.klause.simplex.exact
 
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -101,7 +101,7 @@ class ExactContinuationTest {
 
     @Test
     fun `oversized rational import uses exact source values`() {
-        val large = BigFraction.of(BigInteger.ONE shl 180, BigInteger.ONE)
+        val large = BigFraction.of(BIG_ONE shl 180, BIG_ONE)
         val input = ExactContinuationInput(
             listOf(listOf(0 to large)),
             listOf(BigFraction.ONE),
@@ -167,7 +167,7 @@ class ExactContinuationTest {
 
     @Test
     fun `overflow during a pivot discards partial import and charges both builds`() {
-        val huge = BigFraction.of(BigInteger.ONE shl 100, BigInteger.ONE)
+        val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val input = ExactContinuationInput(
             listOf(listOf(0 to huge, 1 to BigFraction.ONE), listOf(0 to BigFraction.ONE, 1 to huge)),
             List(2) { BigFraction.ONE },

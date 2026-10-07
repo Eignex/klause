@@ -6,11 +6,11 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BigInt
 
 /**
  * CP propagator for a [Linear] row whose coefficients or bound exceed the 64-bit range (the wide form).
- * All arithmetic is exact arbitrary precision ([BigInteger]) — see
+ * All arithmetic is exact arbitrary precision ([BigInt]) — see
  * [com.eignex.klause.factor.arithmetic.internals.wideEnforceRow] — so there is no overflow to guard against
  * and no `unknown` degrade: the row is enforced exactly, including at a fully pinned leaf.
  *
@@ -21,9 +21,9 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 internal class WideLinearPropagator(
     val intVars: IntArray,
     private val vars: IntArray,
-    private val coeffs: Array<BigInteger>,
+    private val coeffs: Array<BigInt>,
     private val op: LinearOp,
-    private val bound: BigInteger,
+    private val bound: BigInt,
 ) : Propagator {
 
     /** Interval reasoning reads only `min`/`max` (see [LinearPropagator]); subscribe to bound moves. */

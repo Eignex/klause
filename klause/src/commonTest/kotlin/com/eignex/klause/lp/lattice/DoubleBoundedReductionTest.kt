@@ -1,7 +1,9 @@
 package com.eignex.klause.lp.lattice
 
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -17,7 +19,7 @@ class DoubleBoundedReductionTest {
             row(longArrayOf(1, -1), -100, 100),
         )
         val reduced = assertNotNull(doubleBoundedReduction(original, 2))
-        val y = arrayOf(BigInteger.fromInt(-3), BigInteger.fromInt(4))
+        val y = arrayOf(bigIntOf(-3), bigIntOf(4))
         val x = reduced.recover(y)
 
         for (index in original.indices) {
@@ -34,13 +36,13 @@ class DoubleBoundedReductionTest {
     }
 
     private fun row(coefficients: LongArray, lower: Long, upper: Long): DoubleBoundedRow = DoubleBoundedRow(
-        sparseIntRow(coefficients.indices.associateWith { BigInteger.fromLong(coefficients[it]) }),
-        BigInteger.fromLong(lower),
-        BigInteger.fromLong(upper),
+        sparseIntRow(coefficients.indices.associateWith { bigIntOf(coefficients[it]) }),
+        bigIntOf(lower),
+        bigIntOf(upper),
     )
 
-    private fun activity(row: SparseIntRow, values: Array<BigInteger>): BigInteger {
-        var sum = BigInteger.ZERO
+    private fun activity(row: SparseIntRow, values: Array<BigInt>): BigInt {
+        var sum = BIG_ZERO
         for (index in row.index.indices) sum += row.value[index] * values[row.index[index]]
         return sum
     }

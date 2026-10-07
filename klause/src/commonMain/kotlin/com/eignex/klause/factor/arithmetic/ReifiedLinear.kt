@@ -23,7 +23,7 @@ import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.LocalSearchState
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BigInt
 
 /**
  * `auxBoolVar ↔ (Σ coeffs[i] * intVars[i] ⟨op⟩ bound)`. Created by the compiler when a
@@ -38,8 +38,8 @@ class ReifiedLinear private constructor(
     val op: LinearOp,
     rawBound: Long,
     // Over-64-bit integer coefficients and bound, carried exactly. Null for the plain integer form.
-    wideCoeffsIn: Array<BigInteger>? = null,
-    wideBoundIn: BigInteger? = null,
+    wideCoeffsIn: Array<BigInt>? = null,
+    wideBoundIn: BigInt? = null,
 ) : ReifiedFactor {
 
     val vars: IntArray = terms.vars
@@ -69,7 +69,7 @@ class ReifiedLinear private constructor(
 
     /** Wide form: `auxBoolVar ↔ (Σ wideCoeffs·vars ⟨op⟩ wideBound)` with coefficients or a bound beyond the
      *  64-bit range. Enforced exactly by [WideReifiedLinearPropagator]; kept out of the LP relaxation. */
-    constructor(auxBoolVar: Int, vars: IntArray, wideCoeffs: Array<BigInteger>, op: LinearOp, wideBound: BigInteger) :
+    constructor(auxBoolVar: Int, vars: IntArray, wideCoeffs: Array<BigInt>, op: LinearOp, wideBound: BigInt) :
         this(
             auxBoolVar,
             wideLinearTerms(vars, wideCoeffs),

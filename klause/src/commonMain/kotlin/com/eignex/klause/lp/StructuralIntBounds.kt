@@ -7,8 +7,12 @@ import com.eignex.klause.lp.lattice.mixedEchelonHermite
 import com.eignex.klause.lp.lattice.originalBounds
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.lp.lattice.triangularBounds
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.toLong
 
 /**
  * Bounds a model's own equality structure implies, for the sides a relaxation leaves open.
@@ -38,10 +42,10 @@ internal fun structuralIntBounds(
     // thousands of columns, and the dense form of it does not fit in memory at all.
     val eq = eqRows.map { f ->
         val constants = f.integralConstants ?: return null
-        val entries = HashMap<Int, BigInteger>(f.vars.size)
+        val entries = HashMap<Int, BigInt>(f.vars.size)
         for (k in f.vars.indices) {
             val v = f.vars[k]
-            if (v < numVars) entries[v] = (entries[v] ?: BigInteger.ZERO) + constants.exactCoeff(k)
+            if (v < numVars) entries[v] = (entries[v] ?: BIG_ZERO) + constants.exactCoeff(k)
         }
         sparseIntRow(entries)
     }
@@ -50,15 +54,11 @@ internal fun structuralIntBounds(
     if (mixed.equalities.isEmpty() || mixed.equalityRhs.size != mixed.equalities.size) return null
     // The reduced rows carry the reduced right-hand sides: pairing them with the *input* rows' bounds
     // would attach a bound to whichever row a swap happened to move into that slot.
-    val rhs = Array<BigInteger?>(mixed.equalities.size) { mixed.equalityRhs[it] }
+    val rhs = Array<BigInt?>(mixed.equalities.size) { mixed.equalityRhs[it] }
     val y = triangularBounds(mixed.equalities, numVars, rhs, rhs)
     return mixed.originalBounds(y.lo, y.hi)
 }
 
 /** [this] as a `Long`, or null where it does not fit — the column then stays open rather than taking a
  *  wrapped bound. */
-internal fun BigInteger.longOrNull(): Long? =
-    if (this in LONG_MIN_EXACT..LONG_MAX_EXACT) longValue(exactRequired = false) else null
-
-private val LONG_MIN_EXACT = BigInteger.fromLong(Long.MIN_VALUE)
-private val LONG_MAX_EXACT = BigInteger.fromLong(Long.MAX_VALUE)
+internal fun BigInt.longOrNull(): Long? = if (fitsLong()) toLong() else null

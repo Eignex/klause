@@ -1,6 +1,7 @@
 package com.eignex.klause.ir
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
 
 /** Coefficients and right-hand side of a [LinearRow], at their declared exact width. */
 sealed interface LinearConstants
@@ -8,10 +9,10 @@ sealed interface LinearConstants
 /** Integral constants, including values outside the 64-bit range. */
 sealed interface IntegralConstants : LinearConstants {
     /** Exact coefficient of term [k]. */
-    fun exactCoeff(k: Int): BigInteger
+    fun exactCoeff(k: Int): BigInt
 
     /** Exact right-hand side. */
-    val exactBound: BigInteger
+    val exactBound: BigInt
 }
 
 /** Constants representable in 64-bit integer arithmetic. */
@@ -30,8 +31,8 @@ class IntegerConstants(
     /** Largest absolute coefficient, saturating at [Long.MAX_VALUE]. */
     val maxAbsCoeff: Long get() = coefficients.maxAbs
 
-    override fun exactCoeff(k: Int): BigInteger = BigInteger.fromLong(coeff(k))
-    override val exactBound: BigInteger get() = BigInteger.fromLong(bound)
+    override fun exactCoeff(k: Int): BigInt = bigIntOf(coeff(k))
+    override val exactBound: BigInt get() = bigIntOf(bound)
 }
 
 /** Integral constants requiring arbitrary precision. */
@@ -39,10 +40,10 @@ class WideConstants(
     /** Coefficients in row order. */
     val coefficients: WideConsts,
     /** Exact right-hand side. */
-    val bound: BigInteger,
+    val bound: BigInt,
 ) : IntegralConstants {
-    override fun exactCoeff(k: Int): BigInteger = coefficients.at(k)
-    override val exactBound: BigInteger get() = bound
+    override fun exactCoeff(k: Int): BigInt = coefficients.at(k)
+    override val exactBound: BigInt get() = bound
 
     /**
      * The decimal digits of [bound], then of each coefficient, as the character codes a structural key
@@ -54,7 +55,7 @@ class WideConstants(
     }
 }
 
-private fun digitCodes(value: BigInteger): LongArray {
+private fun digitCodes(value: BigInt): LongArray {
     val digits = value.toString()
     return LongArray(digits.length) { digits[it].code.toLong() }
 }

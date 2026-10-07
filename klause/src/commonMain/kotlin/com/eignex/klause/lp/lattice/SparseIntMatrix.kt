@@ -1,6 +1,13 @@
 package com.eignex.klause.lp.lattice
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.negate
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.unaryMinus
 
 /**
  * One row of an exact integer matrix, held as its non-zero entries alone.
@@ -12,7 +19,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  *
  * [index] is strictly ascending and [value] is index-aligned; no stored value is zero.
  */
-internal class SparseIntRow(val index: IntArray, val value: Array<BigInteger>) {
+internal class SparseIntRow(val index: IntArray, val value: Array<BigInt>) {
 
     /** The lowest column the row mentions, or [Int.MAX_VALUE] when the row is zero. */
     val lead: Int get() = if (index.isEmpty()) Int.MAX_VALUE else index[0]
@@ -22,7 +29,7 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInteger>) {
 
     val isZero: Boolean get() = index.isEmpty()
 
-    operator fun get(column: Int): BigInteger {
+    operator fun get(column: Int): BigInt {
         var lo = 0
         var hi = index.size - 1
         while (lo <= hi) {
@@ -34,7 +41,7 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInteger>) {
                 else -> return value[mid]
             }
         }
-        return BigInteger.ZERO
+        return BIG_ZERO
     }
 
     companion object {
@@ -43,7 +50,7 @@ internal class SparseIntRow(val index: IntArray, val value: Array<BigInteger>) {
 }
 
 /** The row over [entries] `column -> coefficient`, dropping the zeros and sorting what is left. */
-internal fun sparseIntRow(entries: Map<Int, BigInteger>): SparseIntRow {
+internal fun sparseIntRow(entries: Map<Int, BigInt>): SparseIntRow {
     val kept = entries.entries.filter { !it.value.isZero() }.sortedBy { it.key }
     if (kept.isEmpty()) return SparseIntRow.Zero
     return SparseIntRow(IntArray(kept.size) { kept[it].key }, Array(kept.size) { kept[it].value })
@@ -59,17 +66,17 @@ internal fun sparseIntRow(entries: Map<Int, BigInteger>): SparseIntRow {
  * transform over a hundred thousand columns of which a few thousand move costs only what moved.
  */
 internal class UnimodularTransform(val size: Int) {
-    private val columns = arrayOfNulls<MutableMap<Int, BigInteger>>(size)
+    private val columns = arrayOfNulls<MutableMap<Int, BigInt>>(size)
     private val operations = ArrayList<UnimodularColumnOperation>()
 
-    private fun column(j: Int): MutableMap<Int, BigInteger> = columns[j] ?: HashMap<Int, BigInteger>(2)
+    private fun column(j: Int): MutableMap<Int, BigInt> = columns[j] ?: HashMap<Int, BigInt>(2)
         .also {
-            it[j] = BigInteger.ONE
+            it[j] = BIG_ONE
             columns[j] = it
         }
 
     /** Entry `V(i, j)`. */
-    operator fun get(i: Int, j: Int): BigInteger = column(j)[i] ?: BigInteger.ZERO
+    operator fun get(i: Int, j: Int): BigInt = column(j)[i] ?: BIG_ZERO
 
     fun swap(x: Int, y: Int) {
         if (x == y) return
@@ -87,12 +94,12 @@ internal class UnimodularTransform(val size: Int) {
     }
 
     /** `column(target) += factor · column(source)`. */
-    fun addMultiple(target: Int, source: Int, factor: BigInteger) {
+    fun addMultiple(target: Int, source: Int, factor: BigInt) {
         if (target == source || factor.isZero()) return
         val src = column(source)
         val dst = column(target)
         for ((row, v) in src) {
-            val next = (dst[row] ?: BigInteger.ZERO) + factor * v
+            val next = (dst[row] ?: BIG_ZERO) + factor * v
             if (next.isZero()) dst.remove(row) else dst[row] = next
         }
         operations.add(UnimodularColumnOperation.AddMultiple(target, source, factor))
@@ -116,16 +123,16 @@ internal class UnimodularTransform(val size: Int) {
     }
 
     /** Visit every non-zero `V(row, col)` once, without materialising the untouched identity columns. */
-    inline fun forEachEntry(action: (row: Int, col: Int, value: BigInteger) -> Unit) {
+    inline fun forEachEntry(action: (row: Int, col: Int, value: BigInt) -> Unit) {
         for (j in 0 until size) {
             val c = columnOrNull(j)
-            if (c == null) action(j, j, BigInteger.ONE) else for ((i, v) in c) action(i, j, v)
+            if (c == null) action(j, j, BIG_ONE) else for ((i, v) in c) action(i, j, v)
         }
     }
 
     /** The stored column, or null where it is still the untouched identity column. */
     @PublishedApi
-    internal fun columnOrNull(j: Int): Map<Int, BigInteger>? = columns[j]
+    internal fun columnOrNull(j: Int): Map<Int, BigInt>? = columns[j]
 
     /** Stored non-zeros, counting an untouched identity column as the one entry it stands for. */
     val nonZeroCount: Int get() = (0 until size).sumOf { columns[it]?.size ?: 1 }
@@ -136,7 +143,7 @@ private sealed interface UnimodularColumnOperation {
 
     data class Negate(val column: Int) : UnimodularColumnOperation
 
-    data class AddMultiple(val target: Int, val source: Int, val factor: BigInteger) : UnimodularColumnOperation
+    data class AddMultiple(val target: Int, val source: Int, val factor: BigInt) : UnimodularColumnOperation
 }
 
 /**
@@ -148,7 +155,7 @@ private sealed interface UnimodularColumnOperation {
  * each costs the entries it actually changes and nothing more.
  */
 internal class SparseIntColumns(val rows: Int, val cols: Int, source: List<SparseIntRow>) {
-    private val columns = arrayOfNulls<MutableMap<Int, BigInteger>>(cols)
+    private val columns = arrayOfNulls<MutableMap<Int, BigInt>>(cols)
 
     /** Per row, the columns it holds a non-zero in. */
     val rowSupport = Array(rows) { HashSet<Int>() }
@@ -165,10 +172,9 @@ internal class SparseIntColumns(val rows: Int, val cols: Int, source: List<Spars
         }
     }
 
-    private fun cell(j: Int): MutableMap<Int, BigInteger> =
-        columns[j] ?: HashMap<Int, BigInteger>().also { columns[j] = it }
+    private fun cell(j: Int): MutableMap<Int, BigInt> = columns[j] ?: HashMap<Int, BigInt>().also { columns[j] = it }
 
-    operator fun get(i: Int, j: Int): BigInteger = columns[j]?.get(i) ?: BigInteger.ZERO
+    operator fun get(i: Int, j: Int): BigInt = columns[j]?.get(i) ?: BIG_ZERO
 
     fun swap(x: Int, y: Int) {
         if (x == y) return
@@ -198,12 +204,12 @@ internal class SparseIntColumns(val rows: Int, val cols: Int, source: List<Spars
     }
 
     /** `column(target) += factor · column(source)`. */
-    fun addMultiple(target: Int, source: Int, factor: BigInteger) {
+    fun addMultiple(target: Int, source: Int, factor: BigInt) {
         if (target == source || factor.isZero()) return
         val src = columns[source] ?: return
         val dst = cell(target)
         for ((i, v) in src) {
-            val next = (dst[i] ?: BigInteger.ZERO) + factor * v
+            val next = (dst[i] ?: BIG_ZERO) + factor * v
             if (next.isZero()) {
                 dst.remove(i)
                 rowSupport[i].remove(target)

@@ -51,9 +51,13 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TWO
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -259,14 +263,14 @@ class LiveLpTheoryTest {
             }
             val result = assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars))
             val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
-            assertEquals(BigInteger.ONE, values[0] - values[1])
-            assertTrue(values[0] + values[1] >= BigInteger.ONE)
+            assertEquals(BIG_ONE, values[0] - values[1])
+            assertTrue(values[0] + values[1] >= BIG_ONE)
             for (excluded in listOf(transformed, free)) {
                 val atom = assertIs<SourceBoundAtom>(excluded.payload)
                 val activity = atom.terms.fold(BigFraction.ZERO) { sum, term ->
                     sum + term.coefficient * BigFraction.of(
                         values[assertIs<SearchIntValue>(term.source).variable],
-                        BigInteger.ONE,
+                        BIG_ONE,
                     )
                 }
                 assertTrue(if (atom.upper) activity > atom.threshold else activity < atom.threshold)
@@ -345,7 +349,7 @@ class LiveLpTheoryTest {
                 session.push(SearchDecision.Bool(Lit.make(0, truth)))
                 val result = assertIs<SearchResult.Satisfied>(session.solve(1))
                 val value = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints.single()
-                assertEquals(if (truth) BigInteger.ZERO else -BigInteger.ONE, value)
+                assertEquals(if (truth) BIG_ZERO else -BIG_ONE, value)
                 session.popTo(0)
             }
         }
@@ -504,7 +508,7 @@ class LiveLpTheoryTest {
 
     @Test
     fun `registered integers beyond Long retain exact thresholds and witnesses`() {
-        val limit = BigInteger.parseString("18446744073709551617")
+        val limit = parseBigInt("18446744073709551617")
         val source = Problem(
             0,
             intBounds = IntBounds.fromModelBounds(
@@ -522,7 +526,7 @@ class LiveLpTheoryTest {
                 SourceBoundAtom.integerSplit(
                     session,
                     listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
-                    BigFraction.of(limit, BigInteger.ONE),
+                    BigFraction.of(limit, BIG_ONE),
                 ),
             )
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
@@ -561,8 +565,8 @@ class LiveLpTheoryTest {
             assertEquals(2, assertIs<SourceBoundAtom>(atom.payload).terms.size)
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
             val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
-            assertEquals(BigInteger.ONE, values[0] - values[1])
-            assertTrue(values[0] + values[1] >= BigInteger.ONE)
+            assertEquals(BIG_ONE, values[0] - values[1])
+            assertTrue(values[0] + values[1] >= BIG_ONE)
         }
     }
 
@@ -640,8 +644,8 @@ class LiveLpTheoryTest {
                 assertEquals(feasible, result is SearchResult.Satisfied)
                 if (result is SearchResult.Satisfied) {
                     val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
-                    assertEquals(BigInteger.fromLong(rhs), values[0] * BigInteger.TWO + values[1])
-                    assertTrue(values.all { it >= BigInteger.ZERO && it <= BigInteger.ONE })
+                    assertEquals(bigIntOf(rhs), values[0] * BIG_TWO + values[1])
+                    assertTrue(values.all { it >= BIG_ZERO && it <= BIG_ONE })
                 } else {
                     assertIs<SearchResult.Exhausted>(result)
                 }
@@ -950,8 +954,8 @@ class LiveLpTheoryTest {
             }
             assertIs<ComponentCheck.Feasible>(component.check(session))
             val point = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component)).ints
-            assertEquals(BigInteger.ONE, point[0] - point[1])
-            assertTrue(point[0] + point[1] >= BigInteger.fromLong(3))
+            assertEquals(BIG_ONE, point[0] - point[1])
+            assertTrue(point[0] + point[1] >= bigIntOf(3))
         }
     }
 }

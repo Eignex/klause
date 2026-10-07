@@ -1,8 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -13,7 +14,7 @@ import kotlin.test.assertTrue
 class LpProjectionTest {
     @Test
     fun `matrix underflow preserves structural support and exact authority`() {
-        val tiny = BigFraction.of(BigInteger.ONE, BigInteger.TEN.pow(400))
+        val tiny = BigFraction.of(BIG_ONE, parseBigInt("1" + "0".repeat(400)))
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(tiny)))),
@@ -96,8 +97,8 @@ class LpProjectionTest {
     fun `admission and materialization agree across scalar roles`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
-        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2048))
         val roles = listOf(
             "valid", "matrix", "rhs", "cost", "lower", "upper", "origin", "constant", "scale", "external",
         )

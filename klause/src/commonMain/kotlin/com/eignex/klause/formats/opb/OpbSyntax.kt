@@ -2,10 +2,12 @@ package com.eignex.klause.formats.opb
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.lineSequence
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.parseBigInt
 
 /** Syntax parser for OPB/WBO. It only validates and represents the input; lowering is format-neutral. */
 internal object OpbSyntax {
@@ -103,12 +105,12 @@ internal object OpbSyntax {
             opbError("OPB $role not an integer: '${tokens.slice(from, to)}'")
         }
 
-    private fun parseBigInteger(tokens: TokenArena, t: Int, role: String): BigInteger {
+    private fun parseBigInteger(tokens: TokenArena, t: Int, role: String): BigInt {
         val from = tokens.startOf(t)
         val to = tokens.endOf(t)
-        tokens.longOrNull(from, to)?.let { return BigInteger.fromLong(it) }
+        tokens.longOrNull(from, to)?.let { return bigIntOf(it) }
         opbRequire(tokens.isIntegerText(from, to)) { "OPB $role not an integer: '${tokens.slice(from, to)}'" }
-        return BigInteger.parseString(tokens.slice(from, to).removePrefix("+"))
+        return parseBigInt(tokens.slice(from, to).removePrefix("+"))
     }
 
     private fun isVarToken(tokens: TokenArena, t: Int): Boolean {

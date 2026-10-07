@@ -4,6 +4,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 /** Exact checks that may decline a float candidate.  This is deliberately engine-local: consumers
  * adapt it into their own statistics rather than making the kernel depend on solver results. */
@@ -45,7 +46,7 @@ internal class LpScanCount(private val model: LpModel) {
 
 /** Bit length of the widest numerator or denominator in [values], the operand width of a pass over them. */
 internal fun exactBits(values: Iterable<BigFraction>): Int =
-    values.fold(1) { widest, value -> maxOf(widest, value.num.bitLength(), value.den.bitLength()) }
+    values.fold(1) { widest, value -> maxOf(widest, value.num.magnitudeBitLength(), value.den.magnitudeBitLength()) }
 
 /** Why a simplex solve rebuilt its factors.  The reasons are emitted by the engine, not inferred from
  * aggregate counts by a consumer. */

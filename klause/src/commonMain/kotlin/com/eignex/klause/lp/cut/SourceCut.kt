@@ -17,7 +17,18 @@ import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 
 internal enum class CutMappingDecline {
     MISSING_SOURCE,
@@ -70,7 +81,8 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
     init {
         require(terms > 0 && bits > 0)
     }
-    fun accepts(value: BigFraction): Boolean = value.num.bitLength() <= bits && value.den.bitLength() <= bits
+    fun accepts(value: BigFraction): Boolean =
+        value.num.magnitudeBitLength() <= bits && value.den.magnitudeBitLength() <= bits
 
     fun accepts(proof: CutProvenance): Boolean {
         var remaining = terms
@@ -182,21 +194,21 @@ internal class SourceCut(
         }
         val values = coefficients.filterValues { !it.isZero }
         val all = values.values.toList() + bound
-        var scale = BigInteger.ONE
+        var scale = BIG_ONE
         for (value in all) {
             scale = scale / scale.gcd(value.den) * value.den
-            if (scale.bitLength() > limits.bits) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
+            if (scale.magnitudeBitLength() > limits.bits) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         }
         val scaledIntegers = all.map { it.num * (scale / it.den) }
-        val min = BigInteger.fromLong(Long.MIN_VALUE)
-        val max = BigInteger.fromLong(Long.MAX_VALUE)
-        fun representable(value: BigInteger): Boolean =
+        val min = bigIntOf(Long.MIN_VALUE)
+        val max = bigIntOf(Long.MAX_VALUE)
+        fun representable(value: BigInt): Boolean =
             value >= min && value <= max && (relation != Relation.GE || value != min)
         // Absolute slack drives pool aging, so retain representable input scaling.
         val integers = if (scaledIntegers.all { representable(it) }) {
             scaledIntegers
         } else {
-            val divisor = scaledIntegers.fold(BigInteger.ZERO) { gcd, value -> gcd.gcd(value.abs()) }
+            val divisor = scaledIntegers.fold(BIG_ZERO) { gcd, value -> gcd.gcd(value.abs()) }
             if (divisor.isZero()) scaledIntegers else scaledIntegers.map { it / divisor }
         }
         if (integers.any { !representable(it) }) {
@@ -215,9 +227,9 @@ internal class SourceCut(
         return CutMapping.Mapped(
             Cut(
                 values.keys.toIntArray(),
-                integers.dropLast(1).map { it.longValue() }.toLongArray(),
+                integers.dropLast(1).map { it.toLongExact() }.toLongArray(),
                 relation,
-                integers.last().longValue(),
+                integers.last().toLongExact(),
                 global = proof.global,
                 provenance = proof,
             ),

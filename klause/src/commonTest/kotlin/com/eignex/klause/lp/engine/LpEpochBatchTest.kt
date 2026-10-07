@@ -4,8 +4,8 @@ import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -62,7 +62,7 @@ class LpEpochBatchTest {
     @Test
     fun `unprojectable donors must be repaired by the first accepted assertion`() {
         val zero = ExactLpNumber.of(0L)
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
         val source = ExactLpModel(
             List(2) { emptyList() },
             emptyList(),
@@ -97,7 +97,7 @@ class LpEpochBatchTest {
             LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).authoritativeModel(),
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
         val invalid = LpExactState(
             source.copy(
                 columns = listOf(
@@ -172,7 +172,7 @@ class LpEpochBatchTest {
     @Test
     fun `projection is checked at the first active prefix rather than only final bounds`() {
         val zero = ExactLpNumber.of(0L)
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
         val source = ExactLpModel(
             listOf(emptyList()),
             emptyList(),

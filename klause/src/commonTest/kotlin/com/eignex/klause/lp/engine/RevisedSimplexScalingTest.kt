@@ -5,8 +5,8 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -279,7 +279,7 @@ class RevisedSimplexScalingTest {
         val solver = RevisedSimplex(assertNotNull(trail.state.toWorkingModel()))
         assertNotNull(solver.solve())
         assertTrue(solver.scalingMetrics.applied)
-        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2000))
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2000))
 
         assertTrue(trail.assertBound(0, false, ExactLpSide(tiny), 7L))
         assertTrue(solver.adopt(trail.state, Cancellation.Never))
@@ -300,7 +300,7 @@ class RevisedSimplexScalingTest {
             basisSolverFactory = { matrix -> FallbackCleanupSolver(KotlinBasisSolver(matrix), tracker) },
         )
         assertNotNull(solver.solve())
-        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2000))
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2000))
         assertTrue(trail.assertBound(0, false, ExactLpSide(tiny), 7L))
 
         val failure = assertFailsWith<IllegalStateException> {

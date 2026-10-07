@@ -6,7 +6,10 @@ import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -82,21 +85,21 @@ class OpenTheoryRebuildTest {
     fun `an eliminated integer column is recovered at arbitrary precision`() {
         // The value an open route answers in does not fit a Long, which is the whole reason the step is a
         // record the lane evaluates rather than a lift closed over one width.
-        val huge = BigInteger.fromLong(2L).pow(70)
+        val huge = BIG_ONE shl 70
         val rebuild = SourceRebuilds(
             listOf(RebuildStep.AffineValue(0, 1L, intArrayOf(1), longArrayOf(2L), divisor = 1L)),
         )
         val base = OpenTheoryAssignment.ExactLira(
             ExactLiraAssignment(
                 bools = booleanArrayOf(),
-                ints = arrayOf(BigInteger.ZERO, huge),
+                ints = arrayOf(BIG_ZERO, huge),
                 reals = emptyList(),
             ),
         )
 
         val lifted = rebuild.lift(base, numBoolVars = 0, numIntVars = 2)
 
-        assertEquals((huge * BigInteger.fromLong(2L) + BigInteger.ONE).toString(), lifted.intValue(0))
+        assertEquals((huge * bigIntOf(2L) + BIG_ONE).toString(), lifted.intValue(0))
         assertEquals(huge.toString(), lifted.intValue(1), "a column no step names is carried through")
     }
 

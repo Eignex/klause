@@ -17,7 +17,7 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.theory.qflra.SourceBoundAtom
 import com.eignex.klause.theory.qflra.SourceBoundTerm
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
 
 internal class LpSourcePremises(private val root: Any) {
     private val names = LinkedHashMap<CutPremise, SearchDecision>()
@@ -103,7 +103,7 @@ internal fun lpIntegerBranch(
     context: SearchContext,
     registered: Boolean,
 ): List<SearchDecision>? {
-    if (value.den == BigInteger.ONE) return null
+    if (value.den == BIG_ONE) return null
     if (registered) {
         return SourceBoundAtom.integerSplit(
             context,

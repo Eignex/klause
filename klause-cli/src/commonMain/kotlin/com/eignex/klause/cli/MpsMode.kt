@@ -12,7 +12,8 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.TimeSource
@@ -248,13 +249,13 @@ private fun exactMpsNumber(value: BigFraction): String {
     val magnitude = if (negative) -value.num else value.num
     val whole = magnitude / value.den
     var remainder = magnitude % value.den
-    if (remainder == BigInteger.ZERO) return "${if (negative) "-" else ""}$whole"
+    if (remainder == BIG_ZERO) return "${if (negative) "-" else ""}$whole"
     val fractional = StringBuilder()
     repeat(64) {
-        remainder *= BigInteger.fromLong(10L)
+        remainder *= bigIntOf(10L)
         fractional.append(remainder / value.den)
         remainder %= value.den
-        if (remainder == BigInteger.ZERO) {
+        if (remainder == BIG_ZERO) {
             return "${if (negative) "-" else ""}$whole.$fractional"
         }
     }

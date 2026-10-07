@@ -1,7 +1,10 @@
 package com.eignex.klause.lp.lattice
 
 import com.eignex.klause.lp.lattice.triangularBounds
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -13,10 +16,10 @@ import kotlin.test.assertNull
  */
 class TriangularBoundsTest {
 
-    private fun big(v: Long) = BigInteger.fromLong(v)
+    private fun big(v: Long) = bigIntOf(v)
 
     @Suppress("ArrayPrimitive")
-    private fun sides(vararg v: Long?): Array<BigInteger?> = Array(v.size) { i -> v[i]?.let { big(it) } }
+    private fun sides(vararg v: Long?): Array<BigInt?> = Array(v.size) { i -> v[i]?.let { big(it) } }
 
     @Test
     fun `a diagonal row bounds its own column`() {
@@ -78,9 +81,9 @@ class TriangularBoundsTest {
     @Test
     fun `bounds past Long are derived exactly`() {
         // 8·y0 <= 2^70, whose bound no Long domain could hold.
-        val huge = BigInteger.fromLong(2).pow(70)
+        val huge = BIG_ONE shl 70
         val b = triangularBounds(sparseRows(longArrayOf(8)), 1, sides(0), arrayOf(huge))
-        assertEquals(BigInteger.fromLong(2).pow(67), b.hi[0])
+        assertEquals(BIG_ONE shl 67, b.hi[0])
     }
 
     @Test

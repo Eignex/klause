@@ -13,9 +13,16 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.addExact
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 // Replacement kernels require the whole factor, rather than one of its implied rows.
 internal fun Factor.equivalentLinear(): Linear? {
@@ -61,7 +68,7 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
     return when (val c = constants) {
         is IntegralConstants -> {
             var rhs = c.exactBound
-            val coefficients = ArrayList<BigInteger>()
+            val coefficients = ArrayList<BigInt>()
             for (k in 0 until size) {
                 val reference = ref(k)
                 if (Term.isBool(reference)) {
@@ -75,8 +82,8 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
                 }
             }
             if (variables.isEmpty()) return null
-            if (isStrict && op == LinearOp.LE) rhs -= BigInteger.ONE
-            if (isStrict && op == LinearOp.GE) rhs += BigInteger.ONE
+            if (isStrict && op == LinearOp.LE) rhs -= BIG_ONE
+            if (isStrict && op == LinearOp.GE) rhs += BIG_ONE
             integralLinear(variables.toIntArray(), coefficients.toTypedArray(), op, rhs)
         }
 
@@ -128,18 +135,16 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
     }
 }
 
-internal fun integralLinear(vars: IntArray, coefficients: Array<BigInteger>, op: LinearOp, bound: BigInteger): Linear {
-    val terms = LinkedHashMap<Int, BigInteger>()
-    for (k in vars.indices) terms[vars[k]] = (terms[vars[k]] ?: BigInteger.ZERO) + coefficients[k]
+internal fun integralLinear(vars: IntArray, coefficients: Array<BigInt>, op: LinearOp, bound: BigInt): Linear {
+    val terms = LinkedHashMap<Int, BigInt>()
+    for (k in vars.indices) terms[vars[k]] = (terms[vars[k]] ?: BIG_ZERO) + coefficients[k]
     val negate = op == LinearOp.GE
     val normalized = terms.values.map { if (negate) -it else it }.toTypedArray()
     val rhs = if (negate) -bound else bound
     val relation = if (negate) LinearOp.LE else op
     val variables = terms.keys.toIntArray()
-    val min = BigInteger.fromLong(Long.MIN_VALUE)
-    val max = BigInteger.fromLong(Long.MAX_VALUE)
-    return if (rhs in min..max && normalized.all { it in min..max }) {
-        Linear(LongArray(normalized.size) { normalized[it].longValue() }, variables, relation, rhs.longValue())
+    return if (rhs.fitsLong() && normalized.all { it.fitsLong() }) {
+        Linear(LongArray(normalized.size) { normalized[it].toLongExact() }, variables, relation, rhs.toLongExact())
     } else {
         Linear(variables, normalized, relation, rhs)
     }

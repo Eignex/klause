@@ -18,6 +18,9 @@ eignexPublish {
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
 kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
     jvm()
     linuxX64()
     if (fullTargets) {
@@ -33,7 +36,10 @@ kotlin {
             implementation("com.eignex:koblas:0.1.1-20260918.215912-232")
             implementation("com.eignex:kumulant:0.3.3")
             implementation("com.eignex:kpermute:1.2.0")
-            implementation("com.ionspin.kotlin:bignum:0.3.10")
+        }
+        // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
+        nativeMain.dependencies {
+            api("com.ionspin.kotlin:bignum:0.3.10")
         }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")

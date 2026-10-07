@@ -11,8 +11,9 @@ import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.portfolio.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.parseBigInt
 import kotlin.math.ceil
 
 /**
@@ -68,8 +69,8 @@ internal class TheoryCompletion(private val model: Problem, private val params: 
         // An exact witness value as the theory prints it: an integer or `numerator/denominator`.
         fun parseRational(text: String): BigFraction {
             val parts = text.split('/')
-            val numerator = BigInteger.parseString(parts[0])
-            val denominator = if (parts.size > 1) BigInteger.parseString(parts[1]) else BigInteger.ONE
+            val numerator = parseBigInt(parts[0])
+            val denominator = if (parts.size > 1) parseBigInt(parts[1]) else BIG_ONE
             return BigFraction.of(numerator, denominator)
         }
     }

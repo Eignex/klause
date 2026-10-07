@@ -1,8 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -225,7 +226,7 @@ class ExactPointFeasibleTest {
 
         val point = assertNotNull(exactPointWitness(model, doubleArrayOf(0.5)))
 
-        assertEquals(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(2)), point.primal.single())
+        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(2)), point.primal.single())
     }
 
     @Test
@@ -341,7 +342,7 @@ class ExactPointFeasibleTest {
             )
 
             val point = assertNotNull(result.witness)
-            val expected = BigFraction.of(BigInteger.fromInt(7), BigInteger.fromInt(2))
+            val expected = BigFraction.of(bigIntOf(7), bigIntOf(2))
             assertEquals(expected, point.objective)
             val checked = assertNotNull(checkedLpWitness(model, point.primal))
             assertEquals(point.primal, checked.primal)
@@ -506,7 +507,7 @@ class ExactPointFeasibleTest {
             val x = addRealVar(0.0, 1.0)
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.1)
         }.build(Sense.MINIMIZE)
-        val decimal = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(10))
+        val decimal = BigFraction.of(BIG_ONE, bigIntOf(10))
 
         val witness = assertNotNull(exactPointWitness(model, doubleArrayOf(0.1)))
 

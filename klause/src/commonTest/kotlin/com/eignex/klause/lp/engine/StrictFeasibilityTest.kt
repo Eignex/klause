@@ -1,8 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -119,7 +120,7 @@ class StrictFeasibilityTest {
             )
 
             assertEquals(
-                BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)),
+                BigFraction.of(BIG_ONE, bigIntOf(3)),
                 assertNotNull(result.witness).primal.single(),
             )
             assertTrue(result.metrics.observedPivots > 0)
@@ -131,7 +132,7 @@ class StrictFeasibilityTest {
     @Test
     fun `strict rational admission respects the source bit budget`() {
         val zero = ExactLpNumber.of(0L)
-        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 40))
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 40))
         val source = ExactLpModel(
             listOf(emptyList()),
             emptyList(),
@@ -347,7 +348,7 @@ class StrictFeasibilityTest {
     @Test
     fun `a closure endpoint moves inside exact open intervals`() {
         for (denominator in listOf(1L, 1_000_000_000_000L)) {
-            val upper = BigFraction.of(BigInteger.ONE, BigInteger.fromLong(denominator))
+            val upper = BigFraction.of(BIG_ONE, bigIntOf(denominator))
             val model = ExactLpModel(
                 listOf(emptyList()),
                 emptyList(),

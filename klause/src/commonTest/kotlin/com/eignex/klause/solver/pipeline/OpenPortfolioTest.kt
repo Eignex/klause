@@ -9,7 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -93,7 +93,7 @@ class OpenPortfolioTest {
 
         val result = optimum(OpenTheoryPipeline.executePortfolio(request, params()))
 
-        assertEquals(BigInteger.fromLong(12), assertIs<OpenTheoryOptimum.Optimal>(result).value)
+        assertEquals(bigIntOf(12), assertIs<OpenTheoryOptimum.Optimal>(result).value)
     }
 
     @Test
@@ -109,6 +109,6 @@ class OpenPortfolioTest {
 
         val result = optimum(OpenTheoryPipeline.searchWithoutTheory(model, params, objective))
 
-        assertEquals(BigInteger.fromLong(12), assertIs<OpenTheoryOptimum.Bounded>(result).value)
+        assertEquals(bigIntOf(12), assertIs<OpenTheoryOptimum.Bounded>(result).value)
     }
 }

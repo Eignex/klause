@@ -2,7 +2,10 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -55,11 +58,11 @@ class SourceRebuildTest {
 
     @Test
     fun `a quotient rounds the same way at arbitrary precision`() {
-        val ints = arrayOf(BigInteger.ZERO, BigInteger.fromLong(6))
+        val ints = arrayOf(BIG_ZERO, bigIntOf(6))
 
         quotient(divisor = 2, roundDown = true).rebuildInto(BooleanArray(0), ints)
 
-        assertEquals(BigInteger.fromLong(-2), ints[0])
+        assertEquals(bigIntOf(-2), ints[0])
     }
 
     @Test
@@ -210,7 +213,7 @@ class SourceRebuildTest {
             ),
         )
         val long = longArrayOf(0L, 5L, 6L, 0L)
-        val big = Array(4) { BigInteger.fromLong(long[it]) }
+        val big = Array(4) { bigIntOf(long[it]) }
 
         rebuild.rebuildInto(booleanArrayOf(), long)
         rebuild.rebuildInto(booleanArrayOf(), big)
@@ -221,13 +224,13 @@ class SourceRebuildTest {
     @Test
     fun `the wide evaluator carries a value past the Long range`() {
         // 2^70 is the shape an open route answers in and the finite lane cannot hold at all.
-        val huge = BigInteger.fromLong(2L).pow(70)
+        val huge = BIG_ONE shl 70
         val rebuild = SourceRebuilds(listOf(affine(0, 0L, intArrayOf(1), longArrayOf(3L))))
-        val ints = arrayOf(BigInteger.ZERO, huge)
+        val ints = arrayOf(BIG_ZERO, huge)
 
         rebuild.rebuildInto(booleanArrayOf(), ints)
 
-        assertEquals(huge * BigInteger.fromLong(3L), ints[0], "the accumulation widens, the coefficient does not")
+        assertEquals(huge * bigIntOf(3L), ints[0], "the accumulation widens, the coefficient does not")
     }
 
     @Test

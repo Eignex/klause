@@ -7,14 +7,15 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.bake
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertIs
 
 class ExactLinearInvariantTest {
 
-    private val w = BigInteger.parseString("18446744073709551616")
+    private val w = parseBigInt("18446744073709551616")
 
     private fun problem(factor: Factor, numBoolVars: Int = 0): Problem =
         Problem(numBoolVars, 2, arrayOf(IntDomain(-4, 4), IntDomain(-4, 4)), arrayOf(factor))
@@ -22,7 +23,7 @@ class ExactLinearInvariantTest {
     @Test
     fun `a wide row keeps its degree and deltas consistent`() {
         for (op in LinearOp.entries) {
-            val row = Linear(intArrayOf(0, 1), arrayOf(w, -w * BigInteger.fromLong(3)), op, w * BigInteger.fromLong(2))
+            val row = Linear(intArrayOf(0, 1), arrayOf(w, -w * bigIntOf(3)), op, w * bigIntOf(2))
             DegreeConsistencyOracle.assertConsistent(problem(row), label = "wide $op", exactProbe = true)
         }
     }
