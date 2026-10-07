@@ -13,6 +13,9 @@ import com.eignex.klause.ir.Lit
 private const val LAZY_MARKER = -2
 private const val HEADER = 4
 
+/** Where a lazy reason's payload starts in the array [lazyReasonSlots] returns. */
+internal const val LAZY_PAYLOAD = HEADER
+
 // The factor slot of a lazy reason extended by literals ([extendReason]): no propagator builds it; it is its
 // base, embedded after the literals, plus those literals.
 private const val EXTENDED = -1
@@ -26,13 +29,22 @@ internal fun isLazyReason(reason: IntArray?): Boolean =
  * for its [Propagator.explain].
  */
 internal fun PropagationState.lazyReason(payload: IntArray, factorId: Int = currentFactor): IntArray {
+    val out = lazyReasonSlots(payload.size, factorId)
+    payload.copyInto(out, LAZY_PAYLOAD)
+    return out
+}
+
+/**
+ * [lazyReason] with [size] payload slots, from [LAZY_PAYLOAD], for the caller to fill in place: a deduction made on
+ * every propagation then allocates its marker alone, not a payload copied into it.
+ */
+internal fun PropagationState.lazyReasonSlots(size: Int, factorId: Int = currentFactor): IntArray {
     check(factorId >= 0) { "a lazy reason needs the factor that explains it" }
-    val out = IntArray(HEADER + payload.size)
+    val out = IntArray(HEADER + size)
     out[0] = LAZY_MARKER
     out[1] = factorId
     out[2] = undo.size
     out[3] = currentLevel
-    payload.copyInto(out, HEADER)
     return out
 }
 

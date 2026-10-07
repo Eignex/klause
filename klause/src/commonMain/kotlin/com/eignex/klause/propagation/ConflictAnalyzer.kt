@@ -202,8 +202,10 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         state.lazyReasonMemo.clear()
         val atomCount = state.atoms.intVar.size
         if (atomLevelStamp.size < atomCount) {
-            atomLevelStamp = IntArray(atomCount)
-            atomLevelMemo = IntArray(atomCount)
+            // Atoms keep materialising during search, so grow ahead of them rather than on every new one.
+            val capacity = maxOf(atomCount, atomLevelStamp.size * 2)
+            atomLevelStamp = IntArray(capacity)
+            atomLevelMemo = IntArray(capacity)
             atomLevelEpoch = 0 // fresh arrays read as epoch 0, so don't start at 0
         }
         atomLevelEpoch++
