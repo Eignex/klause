@@ -174,6 +174,8 @@ internal object SolveMetric {
         search: KlauseSearch = KlauseSearch(),
         label: String? = null,
         outDir: File? = null,
+        /** For a reference solve, which of the format's reference solvers runs; null for its default. */
+        referenceSolver: String? = null,
     ): SolveRecord {
         val settings = settings(solverId, search)
         if (solverId == SolverInvocation.KLAUSE) {
@@ -185,7 +187,7 @@ internal object SolveMetric {
         val sha = Reports.readGitSha()
         val name = ref.name.replace('/', '_')
         val (rec, raw) = if (solverId == REFERENCE) {
-            referenceRecord(ref, settings, budget, timestamp, sha)
+            referenceRecord(ref, settings, budget, timestamp, sha, referenceSolver)
         } else {
             runCatching { Runners.resolve(ref, settings.exact) }.fold(
                 { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha) },
@@ -208,8 +210,9 @@ internal object SolveMetric {
         budget: Budget,
         timestamp: String,
         sha: String?,
+        solver: String?,
     ): Pair<SolveRecord, String?> = runCatching {
-        val run = ReferenceSolve.run(ref, REFERENCE_MINIZINC_BACKEND, s, budget)
+        val run = ReferenceSolve.run(ref, REFERENCE_MINIZINC_BACKEND, s, budget, solver)
         val r = run.result
         SolveRecord(
             problem = ref.name,
@@ -235,7 +238,7 @@ internal object SolveMetric {
         println("?? [${ref.name}] reference ERROR: ${failure.message ?: failure::class.simpleName}")
         loadFailureRecord(
             ref,
-            ReferenceSolve.solverIdFor(ref, REFERENCE_MINIZINC_BACKEND),
+            solver ?: ReferenceSolve.solverIdFor(ref, REFERENCE_MINIZINC_BACKEND),
             s,
             budget,
             timestamp,
