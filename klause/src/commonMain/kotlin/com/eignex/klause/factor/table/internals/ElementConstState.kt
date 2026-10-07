@@ -1,8 +1,8 @@
 package com.eignex.klause.factor.table.internals
 
 import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
-import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.propagation.restrictIntToSurvivors
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.toSortedLongArray
@@ -33,8 +34,8 @@ import com.eignex.klause.util.toSortedLongArray
  *
  * Each fire reaches the GAC fixpoint in ONE pass via an internal cascade worklist (an idx removal can
  * zero a result value's support → prune it → which kills idx positions holding that constant → …),
- * instead of relying on repeated re-fires. Reasons are identical to the full path
- * (collectHoleAndBoundAntecedents on idx / result). Soundness is gated by the brute-force assertGac
+ * instead of relying on repeated re-fires. A pruned result value cites the idx positions that held it,
+ * a pruned idx position the result value it held. Soundness is gated by the brute-force assertGac
  * oracle (AllFactorsOracle) and ElementTest across deep backtracking.
  */
 
@@ -222,12 +223,12 @@ internal class ElementConstState(
     /** Apply the seed exclusions (rebuild path), then cascade their removals to the GAC fixpoint. */
     private fun applyThenCascade(state: PropagationState, idxSeed: LongArrayList, resSeed: LongArrayList): Boolean {
         if (idxSeed.size > 0) {
-            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result))
-            if (!state.excludeIntValues(idx, sortedDistinct(idxSeed), ant)) return false
+            val ex = sortedDistinct(idxSeed)
+            if (!state.excludeIntValues(idx, ex, indexReason(state, ex))) return false
         }
         if (resSeed.size > 0) {
-            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx))
-            if (!state.excludeIntValues(result, sortedDistinct(resSeed), ant)) return false
+            val ex = sortedDistinct(resSeed)
+            if (!state.excludeIntValues(result, ex, resultReason(state, ex))) return false
         }
         return cascade(state, idxSeed, resSeed)
     }
@@ -269,13 +270,13 @@ internal class ElementConstState(
             var nextIdx = EMPTY
             var nextRes = EMPTY
             if (resultToExclude.size > 0) {
-                val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx))
-                if (!state.excludeIntValues(result, sortedDistinct(resultToExclude), ant)) return false
+                val ex = sortedDistinct(resultToExclude)
+                if (!state.excludeIntValues(result, ex, resultReason(state, ex))) return false
                 nextRes = resultToExclude
             }
             if (idxToExclude.size > 0) {
-                val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result))
-                if (!state.excludeIntValues(idx, sortedDistinct(idxToExclude), ant)) return false
+                val ex = sortedDistinct(idxToExclude)
+                if (!state.excludeIntValues(idx, ex, indexReason(state, ex))) return false
                 nextIdx = idxToExclude
             }
             idxRem = nextIdx
@@ -285,6 +286,46 @@ internal class ElementConstState(
     }
 
     private fun sortedDistinct(list: LongArrayList): LongArray = list.toSortedLongArray()
+
+    // A result value leaves because every position holding it left idx, so its reason is those positions'
+    // `[idx = i]`, false now; one batch shares the union over its values.
+    private fun resultReason(state: PropagationState, values: LongArray): IntArray? {
+        val out = LitSet()
+        val root = state.rootDomains[idx]
+        for (r in values) {
+            val id = idFor(r)
+            if (id < 0) continue
+            for (pos in positionsOfId[id]) {
+                val iv = indexOffset + pos.toLong()
+                if (iv in root) out.add(Lit.make(state.atomVarEq(idx, iv), true))
+            }
+        }
+        return out.toArrayOrNull()
+    }
+
+    // A position leaves because its constant left result: `[result = arr(i)]`, false now.
+    private fun indexReason(state: PropagationState, positions: LongArray): IntArray? {
+        val out = LitSet()
+        val root = state.rootDomains[result]
+        for (iv in positions) {
+            val pos = iv - indexOffset
+            if (pos !in 0 until len) continue
+            val r = arr[pos.toInt()]
+            if (r in root) out.add(Lit.make(state.atomVarEq(result, r), true))
+        }
+        return out.toArrayOrNull()
+    }
+
+    private class LitSet {
+        private val seen = IntHashSet()
+        private val lits = IntArrayList()
+
+        fun add(lit: Int) {
+            if (seen.add(lit)) lits.add(lit)
+        }
+
+        fun toArrayOrNull(): IntArray? = if (lits.size == 0) null else lits.toIntArray()
+    }
 
     private companion object {
         val EMPTY = LongArrayList()

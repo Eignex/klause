@@ -6,10 +6,12 @@ import com.eignex.klause.factor.table.internals.ElementCache
 import com.eignex.klause.factor.table.internals.ElementConstState
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
@@ -30,7 +32,34 @@ internal class ElementPropagator(
     override val consumesIntEventDelta: Boolean = arrIsVars
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, intVars)
+        (if (arrIsVars) null else constantConflictReason(state)) ?: collectHoleAndBoundAntecedents(state, intVars)
+
+    // Some position must be live in idx with its constant live in result, so the conflict cites, per position,
+    // why it is not: idx's bound past it, its own hole, or its constant's absence from result. Null when a
+    // position is still fully live, so the conflict lies elsewhere.
+    private fun constantConflictReason(state: PropagationState): IntArray? {
+        val idxDom = state.intDomains[idx]
+        val resDom = state.intDomains[result]
+        val idxRoot = state.rootDomains[idx]
+        val resRoot = state.rootDomains[result]
+        val seen = IntHashSet()
+        val out = IntArrayList()
+        fun cite(lit: Int) {
+            if (seen.add(lit)) out.add(lit)
+        }
+        for (pos in arr.indices) {
+            val iv = indexOffset + pos.toLong()
+            when {
+                iv !in idxRoot -> Unit
+                iv < idxDom.min -> cite(Lit.make(state.atomVarGe(idx, idxDom.min), false))
+                iv > idxDom.max -> cite(Lit.make(state.atomVarLe(idx, idxDom.max), false))
+                iv !in idxDom -> cite(Lit.make(state.atomVarEq(idx, iv), true))
+                arr[pos] in resDom -> return null
+                arr[pos] in resRoot -> cite(Lit.make(state.atomVarEq(result, arr[pos]), true))
+            }
+        }
+        return out.toIntArray()
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val len = arr.size
