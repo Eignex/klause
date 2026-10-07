@@ -21,6 +21,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
@@ -173,6 +175,82 @@ class CumulativePropagatorTest {
         }
     }
 
+    @Test
+    fun `cumulative deductions over variable demands and capacity are implied by their reasons`() {
+        val rng = Random(0xC0C)
+        repeat(200) { iter ->
+            val n = 3
+            // Starts 0..2, durations 3..5, heights 6..8, capacity 9.
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 3 * n + 1,
+                intDomains = Array(3 * n + 1) {
+                    when {
+                        it < n -> IntDomain(0, 4)
+                        it < 2 * n -> IntDomain(1, 3)
+                        it < 3 * n -> IntDomain(1, 2)
+                        else -> IntDomain(1, 3)
+                    }
+                },
+                factors = arrayOf<Factor>(
+                    Cumulative(
+                        starts = IntArray(n) { it },
+                        durations = LongArray(n) { 1L },
+                        resources = LongArray(n) { 1L },
+                        capacity = 3,
+                        durationVars = IntArray(n) { n + it },
+                        resourceVars = IntArray(n) { 2 * n + it },
+                        capacityVar = 3 * n,
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "cumulative-vars#$iter") { state ->
+                (0 until 5).all {
+                    val v = rng.nextInt(3 * n + 1)
+                    val d = state.intDomains[v]
+                    when (rng.nextInt(3)) {
+                        0 -> state.tightenIntMin(v, d.min + rng.nextInt(2))
+                        1 -> state.tightenIntMax(v, d.max - rng.nextInt(2))
+                        else -> state.excludeIntValue(v, d.min + rng.nextInt((d.max - d.min + 1).toInt()))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a height bound cites only the compulsory parts stacked on its peak`() {
+        // Task 0 spans [0, 4) with variable height; tasks 1 and 2 stack height 3 at time 0, and task 3, at time 6,
+        // plays no part. Capacity 5 leaves task 0 at most 2: the reason is task 0 covering time 0, both stacked
+        // starts, and task 1's height (task 2's is the root's).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 8,
+            intDomains = Array(8) { if (it < 4) IntDomain(0, 9) else IntDomain(1, 5) },
+            factors = arrayOf<Factor>(
+                Cumulative(
+                    starts = intArrayOf(0, 1, 2, 3),
+                    durations = longArrayOf(4, 1, 1, 1),
+                    resources = longArrayOf(1, 1, 1, 1),
+                    capacity = 5,
+                    resourceVars = intArrayOf(4, 5, 6, 7),
+                ),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 0) && state.tightenIntMax(1, 0) && state.tightenIntMax(2, 0))
+        check(state.tightenIntMin(5, 2) && state.tightenIntMin(6, 1) && state.tightenIntMin(3, 6))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        assertEquals(2, state.intDomains[4].max)
+        val cited = state.reasonOf(state.intMaxAntecedents[4])!!.map { state.atoms.intVar[Lit.variable(it)] }.toSet()
+        assertEquals(setOf(0, 1, 2, 5), cited)
+    }
+
     // --- Conflict reasons ---
 
     @Test
@@ -196,12 +274,13 @@ class CumulativePropagatorTest {
         state.undoLogging = true
         state.currentLevel = 1
         assertTrue(state.setInt(0, 0) && state.setInt(1, 0) && state.setInt(2, 8), "pin the three starts")
+        state.currentFactor = 0
         assertFalse(
-            problem.propagators[0].propagate(state, 0),
+            state.factorAt(0).propagate(state, 0),
             "tasks 0 and 1 double-book capacity at t=0 → infeasible",
         )
 
-        val reason = problem.propagators[0].conflictReason(state, 0)
+        val reason = state.factorAt(0).conflictReason(state, 0)
         assertTrue(reason != null && reason.isNotEmpty(), "must yield a non-empty clause-form reason")
         for (lit in reason) {
             assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")
