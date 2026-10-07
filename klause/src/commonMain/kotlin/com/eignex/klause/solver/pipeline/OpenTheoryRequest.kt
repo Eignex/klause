@@ -85,10 +85,6 @@ class OpenTheoryRequest internal constructor(
     )
 }
 
-/** The engine [OpenTheoryPipeline.execute] decides this satisfaction request on. */
-internal fun OpenTheoryRequest.engine(): OpenTheoryEngine =
-    OpenTheoryEngine(model, route, presolveConfig, solutionSetSensitive, presolveCancellation, presolveBudget)
-
 /** The common execution result for a complete open-model request. */
 sealed interface OpenTheoryExecution {
     /** Satisfiability result for a request without an objective. */
