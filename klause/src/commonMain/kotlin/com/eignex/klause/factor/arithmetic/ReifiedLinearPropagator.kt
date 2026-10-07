@@ -160,7 +160,7 @@ internal class ReifiedLinearPropagator(
                 }
             },
             propagateTrue = { a ->
-                propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = a, includeExtraLit = true, factorId = factorId)
+                propagateLinearBounds(state, coeffs, vars, op, bnd, a, includeExtraLit = true, factorId = factorId)
             },
             propagateFalse = { a ->
                 when (op) {
