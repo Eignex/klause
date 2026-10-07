@@ -193,7 +193,8 @@ bench solve-one suite=<id> problem=<name> [solve args…] [out=<dir>]
                                      stats.unsupported when klause declines the model, stats.loadError when it does
                                      not compile or parse. backend=reference runs the format's reference
                                      solver (clasp, the XCSP3 cp-sat image, z3, SCIP, or cp-sat for MiniZinc), as
-                                     `bench reference` does, on the instance as it is
+                                     `bench reference` does, on the instance as it is; solver=<id> picks a second one:
+                                     kissat for CNF, cvc5 for SMT-LIB, highs for MPS, any MiniZinc solver (chuffed)
 bench list [<suite>]                 list suites, or the problems in one suite
 ```
 
@@ -365,6 +366,11 @@ The reference path depends on the instance's format:
 
 Running references end-to-end via `minizinc --solver` is deliberate: an in-process adapter would re-derive the reference from klause's **already-decomposed** `Problem` and inherit klause's lowering (e.g. a `subcircuit` turned into clauses, or an internal `GaussianXor`) instead of the solver's native global — distorting the baseline.
 
+
+Some formats have a second reference solver, which `solve-one backend=reference solver=<id>` runs, so a problem can
+carry two verdicts: kissat beside clasp for DIMACS CNF, cvc5 beside z3 for SMT-LIB, HiGHS beside SCIP for MPS, and any
+MiniZinc solver (Chuffed beside cp-sat) for MiniZinc. All run single-threaded; kissat, cvc5 and HiGHS are native
+binaries found on `PATH`, or at `-Dklause.bench.<name>=<path>`.
 ## Running the parity sweep
 
 The parity sweep measures klause against the reference solvers on the MiniZinc Challenge corpus. The method is fixed so every run is comparable:

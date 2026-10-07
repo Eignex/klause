@@ -316,6 +316,7 @@ object BenchCli {
             parseKlauseSearch(f, params) ?: KlauseSearch(),
             label = f["label"],
             outDir = f["out"]?.let(::File),
+            referenceSolver = f["solver"],
         )
         println("${record.problem}: feasible=${record.feasible} objective=${record.objective} proven=${record.proven}")
     }
