@@ -9,12 +9,13 @@ import com.eignex.klause.bench.catalog.ProblemRef
  */
 object Runners {
     private val miniZinc = MiniZincRunner()
+    private val exactMiniZinc = MiniZincRunner(exactFloats = true)
 
-    internal fun runnerFor(ref: ProblemRef): Runner = when {
-        miniZinc.supports(ref) -> miniZinc
+    internal fun runnerFor(ref: ProblemRef, exact: Boolean = false): Runner = when {
+        miniZinc.supports(ref) -> if (exact) exactMiniZinc else miniZinc
         InProcessRunner.supports(ref) -> InProcessRunner
         else -> error("${ref.name}: no runner supports format ${ref.format}")
     }
 
-    internal fun resolve(ref: ProblemRef): ResolvedProblem = runnerFor(ref).resolve(ref)
+    internal fun resolve(ref: ProblemRef, exact: Boolean = false): ResolvedProblem = runnerFor(ref, exact).resolve(ref)
 }

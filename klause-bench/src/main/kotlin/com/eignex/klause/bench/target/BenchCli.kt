@@ -245,7 +245,7 @@ object BenchCli {
         val search = parseKlauseSearch(f, params)
         println("=== solve over ${refs.size} instance(s) ===")
         SolveMetric.run(
-            BenchLoad.resolveLazily(refs),
+            BenchLoad.resolveLazily(refs, exact = backend == null && search?.exact == true),
             budget,
             backend ?: SolverInvocation.KLAUSE,
             search ?: KlauseSearch(),
@@ -471,8 +471,8 @@ object BenchCli {
      *  to the cli `-e`/`--param`; `fixed=true` is the reference (`-f`) toggle. The cli owns the engine
      *  model; the bench just forwards. */
     private fun parseKlauseSearch(f: Map<String, String>, params: List<String>): KlauseSearch? {
-        val anySet = listOf("engine", "processors", "fixed", "lp", "presolve", "solver-seed").any { f[it] != null } ||
-            params.isNotEmpty()
+        val anySet = listOf("engine", "processors", "fixed", "lp", "presolve", "solver-seed", "exact")
+            .any { f[it] != null } || params.isNotEmpty()
         if (!anySet) return null
         return KlauseSearch(
             engine = f["engine"]?.let(::parseEngine),
@@ -482,6 +482,7 @@ object BenchCli {
             lp = f["lp"],
             presolve = f["presolve"],
             seed = f["solver-seed"]?.toLongOrNull(),
+            exact = f["exact"]?.toBooleanStrict() ?: false,
         )
     }
 
@@ -637,6 +638,7 @@ object BenchCli {
             |         lp=off|conservative|default|aggressive[±id] (klause-cli --lp LP emphasis)
             |         presolve=off|conservative|default|aggressive[,±pass] (klause-cli --presolve)
             |         fixed=true (reference -f toggle)  param=key=value (klause-cli --param; var-/val-selector edit the cp pool)
+            |         exact=true (klause-cli --exact; continuous FlatZinc floats and exact MPS certificates)
             |         label=<name> (tag the run, e.g. a klause version, so re-runs coexist as distinct dirs)
             |         profile=cpu|wall|alloc profile-scope=solve|all profile-top=N
             |

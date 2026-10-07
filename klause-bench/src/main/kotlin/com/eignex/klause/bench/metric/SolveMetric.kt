@@ -62,6 +62,7 @@ internal data class KlauseSearch(
     /** The solver's random seed (`-r` / `--random-seed`); null = the bench's fixed seed, so repeated runs of
      *  one config are comparable unless seeds are swept on purpose. */
     val seed: Long? = null,
+    val exact: Boolean = false,
 )
 
 /** One problem's result for one solver+settings+budget — the durable per-problem record. */
@@ -186,7 +187,7 @@ internal object SolveMetric {
         val (rec, raw) = if (solverId == REFERENCE) {
             referenceRecord(ref, settings, budget, timestamp, sha)
         } else {
-            runCatching { Runners.resolve(ref) }.fold(
+            runCatching { Runners.resolve(ref, settings.exact) }.fold(
                 { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha) },
                 { failure -> loadFailureRecord(ref, solverId, settings, budget, timestamp, sha, failure) to null },
             )
@@ -290,6 +291,7 @@ internal object SolveMetric {
         params = if (solverId == SolverInvocation.KLAUSE) search.params else emptyList(),
         lp = if (solverId == SolverInvocation.KLAUSE) search.lp else null,
         presolve = if (solverId == SolverInvocation.KLAUSE) search.presolve else null,
+        exact = solverId == SolverInvocation.KLAUSE && search.exact,
     )
 
     /** One problem's record, from the cache or a fresh subprocess solve, with the raw solver output when the
@@ -346,7 +348,7 @@ internal object SolveMetric {
      *  cache key (via [BenchCache.keyFor], which additionally hashes the per-instance model+data), so
      *  a cache hit requires byte-identical settings. Two runs differing in any of these get distinct
      *  dirs/keys (so `param=var-selector=vsids` and `param=var-selector=chb` never clobber). */
-    private fun configTag(
+    internal fun configTag(
         solverId: String,
         s: SolverInvocation.Settings,
         budget: Budget,
@@ -354,6 +356,7 @@ internal object SolveMetric {
     ): String = buildString {
         append(solverId)
         s.engine?.let { append('-').append(it) }
+        if (s.exact) append("-exact")
         append("-p").append(s.processors ?: 1) // unset ⇒ the solver default (single-core)
         // free/fixed only for references (their `-f` toggle); klause carries it in the engine value,
         // and a null klause engine just means "the cli's default engine" (no suffix).

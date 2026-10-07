@@ -20,13 +20,14 @@ import java.util.concurrent.TimeUnit
  */
 internal class MiniZincRunner(
     private val timeoutSec: Int = System.getProperty("klause.bench.mzn.timeoutSec")?.toIntOrNull() ?: 60,
+    private val exactFloats: Boolean = false,
 ) : Runner {
     override val id = "minizinc"
 
     override fun supports(ref: ProblemRef): Boolean = ref.format == Format.MINIZINC
 
     override fun resolve(ref: ProblemRef): ResolvedProblem {
-        val executionProgram = parseFlatZincExecution(compileFzn(ref).readText())
+        val executionProgram = parseFlatZincExecution(compileFzn(ref).readText(), exactFloats = exactFloats)
         val program = executionProgram.program
         val objective = program.linearObjective()
         return ResolvedProblem(

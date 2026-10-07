@@ -13,9 +13,10 @@ internal object BenchLoad {
      *  unsupported front-end feature — common on in-progress competition corpora like XCSP3) is **skipped
      *  with a warning** rather than aborting the whole selection, so a bulk run covers everything that
      *  compiles today. */
-    fun resolveLazily(refs: List<ProblemRef>): Sequence<ResolvedProblem> = refs.asSequence().mapNotNull { ref ->
-        runCatching { Runners.resolve(ref) }
-            .onFailure { println("[load] skipped ${ref.name}: ${it.message.orEmpty().take(100)}") }
-            .getOrNull()
-    }
+    fun resolveLazily(refs: List<ProblemRef>, exact: Boolean = false): Sequence<ResolvedProblem> =
+        refs.asSequence().mapNotNull { ref ->
+            runCatching { Runners.resolve(ref, exact) }
+                .onFailure { println("[load] skipped ${ref.name}: ${it.message.orEmpty().take(100)}") }
+                .getOrNull()
+        }
 }
