@@ -1054,5 +1054,4 @@ class PortfolioTest {
 
         assertEquals(handle.work, result.stats.portfolio.arms.single().work)
     }
-
 }

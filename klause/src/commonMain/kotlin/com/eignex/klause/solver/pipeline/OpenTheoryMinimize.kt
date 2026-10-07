@@ -142,6 +142,7 @@ class OpenTheoryMinimizer internal constructor(
     private val terms: IntArray
     private val coefficients: LongArray
     private val source: Problem
+
     // The route the descent plans under, which the objective row may leave outside every complete open theory.
     private val plannedRoute: ProblemPipeline by lazy { source.boundedForPlanning().componentPlan().theoryPipeline }
 

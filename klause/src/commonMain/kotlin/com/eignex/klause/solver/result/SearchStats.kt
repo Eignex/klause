@@ -22,14 +22,6 @@ data class SearchStats(
     val restarts: SumResult = ZERO_COUNT,
     /** Propagation events. */
     val propagations: SumResult = ZERO_COUNT,
-    /** Propagation dispatches, watcher/level visits, and linear term inspections, including reasons. */
-    val propagationWork: SumResult = ZERO_COUNT,
-    /** Work in the session constructor's root fixpoint. */
-    val rootPropagationWork: SumResult = ZERO_COUNT,
-    /** Nanoseconds in propagation fixpoints, including the constructor's root fixpoint. */
-    val propagationNanos: SumResult = ZERO_COUNT,
-    /** Nanoseconds in the session constructor's root fixpoint. */
-    val rootPropagationNanos: SumResult = ZERO_COUNT,
     /** Clauses learned by conflict analysis. */
     val learnedClauses: SumResult = ZERO_COUNT,
     /** Literals across [learnedClauses]; their mean size shows whether the explanations behind them are sharp. */
@@ -50,6 +42,14 @@ data class SearchStats(
     val inprocessVisits: SumResult = ZERO_COUNT,
     /** Learned clauses with a literal block distance of at most two: the short, reusable ones. */
     val glueClauses: SumResult = ZERO_COUNT,
+    /** Propagation dispatches, watcher/level visits, and linear term inspections, including reasons. */
+    val propagationWork: SumResult = ZERO_COUNT,
+    /** Work in the session constructor's root fixpoint. */
+    val rootPropagationWork: SumResult = ZERO_COUNT,
+    /** Nanoseconds in propagation fixpoints, including the constructor's root fixpoint. */
+    val propagationNanos: SumResult = ZERO_COUNT,
+    /** Nanoseconds in the session constructor's root fixpoint. */
+    val rootPropagationNanos: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers' search stats: counters add, peak depth maxes, depth means weight-combine. */
     fun mergedWith(o: SearchStats): SearchStats = SearchStats(

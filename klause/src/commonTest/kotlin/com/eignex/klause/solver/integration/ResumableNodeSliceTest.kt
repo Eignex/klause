@@ -180,12 +180,14 @@ class ResumableNodeSliceTest {
             terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
         }
 
-        assertEquals(assertIs<MinimizeResult.Optimal>(expected).objective, assertIs<MinimizeResult.Optimal>(terminal).objective)
+        assertEquals(
+            assertIs<MinimizeResult.Optimal>(expected).objective,
+            assertIs<MinimizeResult.Optimal>(terminal).objective,
+        )
         assertEquals(whole.stats.search.nodes, search.stats.search.nodes)
         assertEquals(whole.stats.search.propagationWork, search.stats.search.propagationWork)
         assertTrue(search.stats.search.propagationWork.sum > 0.0)
     }
-
 
     @Test
     fun `leaf LP completions spend work even without a node LP arm`() {
@@ -212,5 +214,4 @@ class ResumableNodeSliceTest {
         assertTrue(leafWork > 0L)
         assertTrue(search.work >= search.stats.search.nodes.sum.toLong() + leafWork)
     }
-
 }

@@ -356,9 +356,8 @@ private class CpSatisfactionTraversalPolicy(
     override val pauseBeforeDecision: () -> Boolean = slice?.beforeBranch ?: { false }
     override val nodePolicy: SearchNodePolicy = slice?.let { s ->
         object : SearchNodePolicy {
-            override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
-                return if (s.beforeBranch()) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
-            }
+            override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                if (s.beforeBranch()) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
         }
     } ?: SearchNodePolicy.ExpandAll
     override val lifecycle: SearchRunLifecycle get() = this

@@ -66,8 +66,8 @@ internal class SliceBudget(
     fun workExpired(): Boolean = workBounded && nodeCount() >= nodeEnd
 
     /**
-     * Spend the LP and propagation work done since the last charge from the slice's budget. The charge lands at a node boundary
-     * and only moves the slice end, so the slice pauses at its next poll exactly as if it had explored that many
+     * Spend the LP and propagation work done since the last charge from the slice's budget. The charge lands at a
+     * node boundary and only moves the slice end, so the slice pauses at its next poll as if it had explored that many
      * nodes; it stays a function of the search, and runs remain reproducible.
      */
     fun charge() {

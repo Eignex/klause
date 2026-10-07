@@ -933,7 +933,6 @@ class SearchSessionTest {
         assertIs<SearchRunEvent.Exhausted>(run.next())
     }
 
-
     @Test
     fun `reset discards a pending decision from a paused traversal`() {
         val session = SearchSession(emptyList())
@@ -948,5 +947,4 @@ class SearchSessionTest {
 
         assertIs<SearchRunEvent.Satisfied>(run.next())
     }
-
 }

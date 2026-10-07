@@ -88,5 +88,4 @@ class SliceBudgetTest {
 
         assertTrue(slice.expired())
     }
-
 }

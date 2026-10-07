@@ -227,5 +227,4 @@ class PropagationSessionTest {
         assertEquals(null, session.boolValue(1))
         assertEquals(root, session.rootWork)
     }
-
 }

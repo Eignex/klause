@@ -153,8 +153,12 @@ internal class ResumableMinimize(
     // which is the solve start for that path.
     private val startMark = TimeSource.Monotonic.markNow()
 
-    // Where the current slice pauses. Its work bound counts the LP work this search charges per node.
-    private val slice = SliceBudget({ sink.search.searchWork }, { lpEngine.totalSolveWork() + sink.lp.standaloneWork }, { session.work })
+    // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
+    private val slice = SliceBudget(
+        { sink.search.searchWork },
+        { lpEngine.totalSolveWork() + sink.lp.standaloneWork },
+        { session.work },
+    )
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
