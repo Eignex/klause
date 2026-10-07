@@ -51,14 +51,14 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
     // on its [AtomStore.lvl] slot (a crossing/clause at level L is the level its truth was decided).
     val stored = atoms.lvl[atomId]
     if (stored >= 0) return stored
-    // Lazy-materialized determined atom (materialized after its bound crossed): its level is the
-    // establishment level of the live endpoint that fixes its truth. Exact for a threshold the endpoint
-    // sits on, and that is the only case [atomAntecedentsDerived] explains; for one the endpoint has
-    // overshot this over-states the level (the truth was really fixed by an earlier move), which keeps the
-    // backjump shallow and the literal in the clause — sound, just weaker.
+    // Lazy-materialized determined atom (materialized after its bound crossed): a bound atom takes the level
+    // of the move that first reached its threshold ([boundAtomEstablishment]); without the undo log, the
+    // live endpoint's level, which over-states it once a later move overshoots the threshold (sound, just
+    // weaker).
     val v = atoms.intVar[atomId]
     val k = atoms.threshold[atomId]
     val truth = atomCurrentTruth(atomId) ?: return levelToDecisionVar.size
+    boundAtomEstablishment(atomId, truth)?.let { return it.level }
     return when (atoms.kind[atomId]) {
         AtomKind.GE -> endpointLevel(v, viaMax = !truth)
 
@@ -204,18 +204,11 @@ internal fun PropagationState.flushPendingChanneling() {
 
 /**
  * Antecedents of atom [atomId]: the reason on its trail slot ([AtomStore.ant]) for an atom established on
- * the current path, else derived on demand. The derived cases: a bound atom sitting exactly *at* the live
- * endpoint cites that endpoint's own premises ([endpointReason], over other variables); a true eq atom
- * cites both endpoint bounds; an interior-hole eq atom resolves to the carve's recorded reason
- * ([holeReasonFor]). `null` marks a root/bake fact, an undetermined atom, or an atom whose threshold the
- * live endpoint has since overshot — the analyzer keeps such literals instead of resolving through them.
- *
- * A threshold the endpoint has overshot deliberately gets no reason. Its truth was established by the
- * *earlier* move that first crossed the threshold, and only the live endpoint is on record, so any reason
- * built here would explain the atom by premises established after it — a back edge in the reason graph,
- * which makes the reverse-establishment resolution order 1UIP relies on unsatisfiable and lets an
- * already-resolved premise recur. Keeping the literal loses learning strength on that atom and nothing
- * else.
+ * the current path, else derived on demand. A bound atom cites the move that first took its bound to the
+ * threshold ([boundAtomEstablishment]), never a later one that overshot it, which would explain the atom by
+ * premises established after it, a back edge in the reason graph; a true eq atom cites both endpoint bounds;
+ * an interior-hole eq atom resolves to the carve's recorded reason ([holeReasonFor]). `null` marks a
+ * root/bake fact, a decision, or an undetermined atom.
  */
 internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     // Trail-resident: an atom assigned on the current path (a bound move crossed it — [wakeAtom] —
@@ -226,6 +219,7 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     val k = atoms.threshold[atomId]
     val d = intDomains[v]
     val truth = atomCurrentTruth(atomId) ?: return null
+    boundAtomEstablishment(atomId, truth)?.let { return it.reason }
     // Only a threshold the live endpoint sits exactly on can be explained: that endpoint move is the
     // one that established this atom's truth, so its premises ([endpointReason], over other
     // variables) are all established before it, and before anything that cites the atom. A true eq
@@ -638,4 +632,65 @@ internal fun PropagationState.installLitWatch(lit: Int, fid: Int, blocker: Int =
         list.add(fid)
         markAtomWatched(atomIdOf(v))
     }
+}
+
+/** The level and reason of the bound move that established a bound atom's truth; see [boundEstablishment]. */
+internal class BoundEstablishment(val level: Int, val reason: IntArray?)
+
+/**
+ * Where bound atom [atomId], currently [truth], became so on the current path, or null for an equality atom or
+ * with the undo log off. A `[v ≥ k]` that holds was established by the first move that took `v`'s lower bound
+ * to `k` or past it, and a false one by the first that took its upper bound below `k`; `[v ≤ k]` mirrors that.
+ */
+internal fun PropagationState.boundAtomEstablishment(atomId: Int, truth: Boolean): BoundEstablishment? {
+    val v = atoms.intVar[atomId]
+    val k = atoms.threshold[atomId]
+    return when (atoms.kind[atomId]) {
+        AtomKind.GE -> boundEstablishment(v, if (truth) k else k - 1, lower = truth)
+        AtomKind.LE -> boundEstablishment(v, if (truth) k else k + 1, lower = !truth)
+        AtomKind.EQ -> null
+    }
+}
+
+/**
+ * The level and reason of the move that first took [v]'s lower bound to [k] or past it ([lower]), or its upper
+ * bound to [k] or below, read back from the undo log, which keeps each bound move's prior state. The live bound
+ * may have moved further since, and citing that later move instead would date the atom after literals that cite
+ * it, a back edge that leaves 1UIP stranded on an unexplained literal. A bound that reached [k] before any logged
+ * move is a root fact: level 0, no reason. Null with the undo log off.
+ */
+internal fun PropagationState.boundEstablishment(v: Int, k: Long, lower: Boolean): BoundEstablishment? {
+    if (!undoLogging) return null
+    var postLevel = if (lower) intMinLevel[v] else intMaxLevel[v]
+    var postReason = if (lower) intMinAntecedents[v] else intMaxAntecedents[v]
+    var postBound = if (lower) intDomains[v].min else intDomains[v].max
+    var i = undo.size - 1
+    while (i >= 0) {
+        if (undo.tag[i] == 1 && undo.varId[i] == v) {
+            val prior = requireNotNull(undo.domain[i])
+            val reached = if (lower) prior.min >= k else prior.max <= k
+            if (!reached) return established(v, k, lower, postLevel.coerceAtLeast(0), postReason, postBound)
+            postLevel = if (lower) undo.minLvl[i] else undo.maxLvl[i]
+            postReason = if (lower) undo.minAnt[i] else undo.maxAnt[i]
+            postBound = if (lower) prior.min else prior.max
+        }
+        i--
+    }
+    return BoundEstablishment(0, null)
+}
+
+// A move with no reason is a decision. The decided bound itself has none either, but a weaker one follows from
+// it, `[v ≥ bound] → [v ≥ k]` (likewise `≤`), so its reason is the decision's literal; without one it would sit
+// at the decision's level as a second unexplained literal.
+private fun PropagationState.established(
+    v: Int,
+    k: Long,
+    lower: Boolean,
+    level: Int,
+    reason: IntArray?,
+    bound: Long,
+): BoundEstablishment {
+    if (reason != null || level == 0 || bound == k) return BoundEstablishment(level, reason)
+    val decided = if (lower) atomVarGe(v, bound) else atomVarLe(v, bound)
+    return BoundEstablishment(level, intArrayOf(Lit.make(decided, false)))
 }
