@@ -267,7 +267,7 @@ class FlatZincParseTest {
             constraint float_lin_le([1.0, 1.0], [x, y], 5.0);
             solve satisfy;
         """.trimIndent()
-        val program = parseFlatZinc(src, floatBuckets = 100)
+        val program = parseFlatZinc(src, floatBuckets = 100, exactFloats = true)
         assertEquals(2, program.floatVarsByName.size)
         // A purely-linear float model lowers to LP-only continuous columns (issue #1232), solved exactly.
         assertEquals(2, program.problem.numRealVars)

@@ -2,6 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.formats.flatzinc.*
@@ -11,6 +13,9 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
 import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.minimizeBool
+import com.eignex.klause.solver.objective.minimizeInt
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -30,6 +35,20 @@ data class FlatZincExecutionProgram(
     val definitionalSweep: DefinitionalSweep?,
 )
 
+/** Build the minimize-oriented objective for a FlatZinc solve directive. */
+fun FlatZincProgram.linearObjective(): LinearObjective? {
+    val (name, maximize) = when (val directive = solve) {
+        is SolveDirective.Minimize -> directive.objVar to false
+        is SolveDirective.Maximize -> directive.objVar to true
+        SolveDirective.Satisfy -> return null
+    }
+    val objective = floatVarsByName[name]?.takeIf { it.lpOnly }?.let { real ->
+        LinearObjective(realCoefficients = DoubleArray(problem.numRealVars).also { it[real.varId] = 1.0 })
+    } ?: boolVarsByName[name]?.let { problem.minimizeBool(it) }
+        ?: problem.minimizeInt(intVarsByName.getValue(name))
+    return if (maximize) objective.negated() else objective
+}
+
 private data class FlatZincExecutionMetadata(
     val localSearchObjective: IncrementalObjective?,
     val definitionalSweep: DefinitionalSweep?,
@@ -43,6 +62,9 @@ fun parseFlatZincExecution(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
+    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
+    exactFloats: Boolean = false,
 ): FlatZincExecutionProgram = parseFlatZincExecution(
     StringCharSource(source),
     floatBuckets,
@@ -50,6 +72,9 @@ fun parseFlatZincExecution(
     forLocalSearch,
     unboundedIntLo,
     unboundedIntHi,
+    unboundedFloatLo,
+    unboundedFloatHi,
+    exactFloats,
 )
 
 /** Parse a streamed FlatZinc source and build its finite-execution metadata. */
@@ -60,6 +85,9 @@ fun parseFlatZincExecution(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
+    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
+    exactFloats: Boolean = false,
 ): FlatZincExecutionProgram {
     var metadata: FlatZincExecutionMetadata? = null
     val program = parseFlatZincWithMetadata(
@@ -69,6 +97,9 @@ fun parseFlatZincExecution(
         forLocalSearch,
         unboundedIntLo,
         unboundedIntHi,
+        unboundedFloatLo,
+        unboundedFloatHi,
+        exactFloats,
     ) { compiler, solve ->
         metadata = compiler.buildExecutionMetadata(solve)
     }

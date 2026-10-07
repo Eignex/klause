@@ -41,6 +41,7 @@ internal object MpsMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val compiled = Mps.parse(openFileSource(path)).toProblem()
+            if (common.exact) requireExactMpsSource(compiled)
             objectiveScale = compiled.objectiveScale
             toleranceDifference = compiled.toleranceDifference
             sourceExact = compiled.sourceExact
@@ -76,6 +77,7 @@ internal object MpsMode : CliMode {
                 // Finite solving minimizes; the open route negates a maximized objective itself.
                 is SourceProblemRoute.Finite -> mpsLinearSolvable(
                     compiled,
+                    common.exact,
                     linearSolvable(
                         route.problem,
                         if (compiled.maximize) objective?.negated() else objective,
@@ -126,8 +128,19 @@ private fun unsupportedOpenMpsModel(): Nothing =
     throw MpsLoweringException("open MPS models require a supported theory pipeline")
 
 // MPS results use tolerance semantics: a float leaf stands when the source rows hold within MPS_TOLERANCE.
-private fun mpsLinearSolvable(compiled: MpsCompiled, solvable: Solvable): Solvable =
-    solvable.withToleranceCheck { sample -> compiled.withinTolerance(sample.ints, sample.reals) }
+private fun mpsLinearSolvable(compiled: MpsCompiled, exact: Boolean, solvable: Solvable): Solvable = if (exact) {
+    solvable
+} else {
+    solvable.withToleranceCheck { sample ->
+        compiled.withinTolerance(sample.ints, sample.reals)
+    }
+}
+
+private fun requireExactMpsSource(compiled: MpsCompiled) {
+    if (!compiled.sourceExact) {
+        throw MpsLoweringException("exact MPS lowering differs from the source at ${compiled.sourceDifference}")
+    }
+}
 
 /** Render a float solution: integer columns exactly, continuous columns as the shortest decimal of their double. */
 private fun renderMpsFloat(compiled: MpsCompiled, sample: Sample): String = buildString {

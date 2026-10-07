@@ -112,6 +112,10 @@ Solver-control flags are common to **every** mode:
     `sources=`/`strategy=bare` it builds a composable recipe over the LS axes — `sources` (e.g.
     `violated,argmin`), `scoring` (`weighted|raw`), `acceptance` (`greedy|walksat|probsat|skew|sa`) —
     edited across the pool, for A/B-testing each axis.
+- `--exact` — preserve continuous FlatZinc floats and their open bounds; use the shared LRA/LIRA
+  route for supported linear satisfaction models and exact LP certification for continuous objectives.
+  Float constraints without exact lowering are declined. For MPS, require exact certificates instead
+  of accepting continuous leaves by source tolerance, and decline a lowering that differs from its source.
 - `--format <name>` / `--mode <name>` — force a mode regardless of file extension.
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):
@@ -149,7 +153,7 @@ corpus, so it is opt-in.
 `--param open-bound-proof=false` declines the routing bound proof, so a model whose open sides the
 relaxation would have closed goes to the open theory instead of the finite lane. That is what runs one
 instance down both lanes; shrinking `-t` does not substitute, since it starves the solve along with the
-proof. Read by the front-ends that route open models — MPS and SMT-LIB — and rejected by the others.
+proof. Read by the front-ends that route open models — MPS, SMT-LIB and exact FlatZinc — and rejected by the others.
 
 MiniZinc-mode-only flags:
 
@@ -157,6 +161,21 @@ MiniZinc-mode-only flags:
   `solns2out`.
 - `--unbounded-int-lo N` / `--unbounded-int-hi N` — default domain for unbounded `var int`
   declarations.
+- `--unbounded-float-lo N` / `--unbounded-float-hi N` — search bounds for bucketed `var float`
+  declarations without a range, including array elements. Defaults are `-1000000.0` and `1000000.0`;
+  `--exact` preserves open float bounds instead.
+
+FlatZinc floats are bucketed by default, with the configured bucket count and fixed-point scale.
+Float arrays accept variable references, literals and numeric parameters. A bucketed search decides
+this finite grid; it can miss real solutions between grid points. Rounding can also produce an
+assignment that violates the original float constraints, so grid feasibility and optimality need
+source-level validation before being interpreted as results for the original model. An arithmetic overflow in the
+lowering is declined with a diagnostic suggesting `--exact` or smaller bounds or scale.
+
+Exact float lowering supports linear comparisons (including strict and reified comparisons),
+absolute values, minimum/maximum, constant-array selection, and multiplication or division by
+constants. These become linear rows with Boolean structure where needed. Products of two
+continuous variables are outside LRA/LIRA and are declined.
 
 ## Environment knobs
 
@@ -171,7 +190,7 @@ twice.
 - `klause.lp` — default LP relaxation ceiling spec, parsed like `--lp` (`--lp` overrides).
 - Core compiler/solver knobs from `KlauseConfigSchema`: `klause.pin.absent.opt.vars`,
   `klause.unbounded.int.lo` / `.hi` (the default int range for unbounded FlatZinc *and* SMT-LIB
-  vars), `klause.float.buckets`, `klause.float.scale`, `klause.lp.max.tableau.cells`,
+  vars), `klause.unbounded.float.lo` / `.hi`, `klause.float.buckets`, `klause.float.scale`, `klause.lp.max.tableau.cells`,
   `klause.lp.ceiling.tableau.cells`, `klause.bitset.threshold`.
 
 Presolve is *not* an env knob — set it per run with `--presolve`.

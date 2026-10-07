@@ -2,11 +2,13 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.flatzinc.SolveDirective
+import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.objective.maximizeInt
-import com.eignex.klause.solver.objective.minimizeInt
 import com.eignex.klause.solver.pipeline.OznApplier
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.linearObjective
 import com.eignex.klause.solver.pipeline.parseFlatZincExecution
+import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import com.eignex.klause.solver.result.SolveStats
 
@@ -26,6 +28,8 @@ internal object MiniZincMode : CliMode {
         private var unboundedIntLo: Long? = null
         private var unboundedIntHi: Long? = null
         private var outputObjective = false
+        private var unboundedFloatLo: Double? = null
+        private var unboundedFloatHi: Double? = null
 
         override fun flags(): List<FlagSpec> = listOf(
             FlagSpec(
@@ -43,6 +47,20 @@ internal object MiniZincMode : CliMode {
             // when the objective var is not in the model's `output` section. Off by default — the
             // standard MiniZinc flow renders objectives through solns2out, not this binary.
             FlagSpec(listOf("--output-objective"), false) { outputObjective = true },
+            FlagSpec(
+                listOf("--unbounded-float-lo"),
+                true,
+                FlagGroup.MODE,
+                valueLabel = "number",
+                help = "Lower bound for bucketed floats without a declared range",
+            ) { unboundedFloatLo = parseFloatBound(requireNotNull(it)) },
+            FlagSpec(
+                listOf("--unbounded-float-hi"),
+                true,
+                FlagGroup.MODE,
+                valueLabel = "number",
+                help = "Upper bound for bucketed floats without a declared range",
+            ) { unboundedFloatHi = parseFloatBound(requireNotNull(it)) },
         )
 
         override fun load(path: String, common: CommonOptions): Solvable {
@@ -52,12 +70,18 @@ internal object MiniZincMode : CliMode {
             // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
             // whole source is never held as one String. Parsing only reads; the base bake runs as
             // presolve step 0, bounded by the presolve deadline.
+            val floatLo = unboundedFloatLo ?: config.unboundedFloatLo
+            val floatHi = unboundedFloatHi ?: config.unboundedFloatHi
+            if (!common.exact && floatLo > floatHi) usageError("unbounded float lower bound exceeds upper bound")
             val executionProgram = parseFlatZincExecution(
                 source = openFileSource(path),
                 floatBuckets = config.floatBuckets,
                 floatScale = config.floatScale,
                 unboundedIntLo = unboundedIntLo ?: config.unboundedIntLo,
                 unboundedIntHi = unboundedIntHi ?: config.unboundedIntHi,
+                unboundedFloatLo = floatLo,
+                unboundedFloatHi = floatHi,
+                exactFloats = common.exact,
             )
             val program = executionProgram.program
             cliLogger(common.verbose).v {
@@ -67,6 +91,41 @@ internal object MiniZincMode : CliMode {
             val applier = oznPath?.let { OznApplier(readTextFile(it)) }
             val render: (Sample) -> String =
                 { s -> applier?.render(program, s) ?: writeFlatZincSolution(program, s, outputObjective) }
+
+            if (common.exact) {
+                val maximize = program.solve is SolveDirective.Maximize
+                val minimized = program.linearObjective()
+                val sourceObjective = if (maximize) minimized?.negated() else minimized
+                val integralObjective = sourceObjective == null ||
+                    (
+                        sourceObjective.realCoefficients.none { it != 0.0 } &&
+                            sourceObjective.boolWeights.all { it == 0L }
+                        )
+                val route = program.problem.pipelineRoute(
+                    sourceObjective,
+                    maximize,
+                    boundCancellation = common.routingCancellation(),
+                    routeLinearToTheory = integralObjective,
+                )
+                return when (route) {
+                    is SourceProblemRoute.Finite -> linearSolvable(route.problem, minimized, maximize, render)
+
+                    is SourceProblemRoute.OpenTheory -> openTheorySolvable(route.request, { assignment ->
+                        applier?.render(
+                            program,
+                            assignment,
+                        ) ?: writeFlatZincSolution(program, assignment, outputObjective)
+                    })
+
+                    is SourceProblemRoute.UnsupportedOpen -> throw UnsupportedFlatZincException(
+                        "exact FlatZinc requires a supported arithmetic theory",
+                        0,
+                        0,
+                    )
+
+                    SourceProblemRoute.Refuted -> refutedSolvable()
+                }
+            }
 
             return when (val solve = program.solve) {
                 is SolveDirective.Satisfy -> Solvable(
@@ -88,14 +147,7 @@ internal object MiniZincMode : CliMode {
                         is SolveDirective.Maximize -> solve.objVar to true
                     }
                     val objVarId = program.intVarsByName[objName]
-                        ?: error("objective variable '$objName' not found in int var map")
-                    // The complete backends bound on the LinearObjective; LS workers descend the
-                    // functional (defines_var cone) objective when the model provides one.
-                    val linear = if (maximize) {
-                        program.problem.maximizeInt(objVarId)
-                    } else {
-                        program.problem.minimizeInt(objVarId)
-                    }
+                    val linear = requireNotNull(program.linearObjective())
                     Solvable(
                         problem = program.problem,
                         optimize = true,
@@ -111,11 +163,19 @@ internal object MiniZincMode : CliMode {
                         // CliMode) feeds arm attribution and the LS incumbent statistic, which the engine
                         // produces in its internal minimise frame. Reuse one lambda for all three.
                         objectiveValue = { s -> linear.evaluateLong(s).let { if (maximize) -it else it } },
+                        continuousObjectiveValue = if (linear.realCoefficients.any { it != 0.0 }) {
+                            { s -> linear.evaluate(s).let { if (maximize) -it else it } }
+                        } else {
+                            null
+                        },
                         searchHints = program.searchHints,
                     )
                 }
             }
         }
+
+        private fun parseFloatBound(raw: String): Double = raw.toDoubleOrNull()?.takeIf { it.isFinite() }
+            ?: usageError("unbounded float bounds must be finite numbers, got `$raw`")
 
         override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput()
     }

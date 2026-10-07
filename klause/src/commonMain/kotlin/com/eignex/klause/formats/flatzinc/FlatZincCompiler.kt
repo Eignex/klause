@@ -2,6 +2,8 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
@@ -20,12 +22,6 @@ import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.binarySearchInt
 import com.eignex.klause.util.toSortedIntArray
 
-/** Float-constraint names that are non-strict, linear-in-reals and non-reified — a float whose whole
- *  constraint-connected component uses only these is coloured LP-only (see `classifyLpOnlyFloats`) and
- *  lowered to real [com.eignex.klause.factor.arithmetic.Linear] rows. Any other float constraint
- *  (products, abs, element, min/max, strict `<`, `ne`, reified) taints its component back to bucketing. */
-private val FLOAT_LP_ONLY_NAMES = setOf("float_lin_le", "float_lin_eq", "int2float", "float_eq", "float_le")
-
 /** Compile parsed FlatZinc AST into solver data structures. */
 internal class FlatZincCompiler(
     internal val model: FznModel,
@@ -36,7 +32,20 @@ internal class FlatZincCompiler(
     /** Default domain for unbounded `var int` declarations. */
     internal val unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     internal val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    internal val unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
+    internal val unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
+    internal val exactFloats: Boolean = false,
 ) : CnfLowering {
+    init {
+        require(floatBuckets > 0) { "floatBuckets must be positive" }
+        require(floatScale > 0) { "floatScale must be positive" }
+        if (!exactFloats) {
+            require(
+                unboundedFloatLo.isFinite() && unboundedFloatHi.isFinite() && unboundedFloatLo <= unboundedFloatHi,
+            ) { "unbounded float search bounds must be finite and ordered" }
+        }
+    }
+
     internal val params = HashMap<String, ParamValue>()
     internal val boolVars = HashMap<String, Int>()
     internal val intVars = HashMap<String, Int>()
@@ -49,9 +58,6 @@ internal class FlatZincCompiler(
     override fun newBool(): Int = numBoolVars++
     override var trueLitCache: Int = -1
 
-    // LP-only continuous columns: the scalar float var names a prepass ([classifyLpOnlyFloats])
-    // colours LP-only — each is lowered as a real variable rather than a bucket-index int, and the linear
-    // float handlers emit real [Linear] rows the simplex resolves. Parallel real bounds by real var id.
     internal var lpOnlyFloats: Set<String> = emptySet()
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
@@ -71,7 +77,7 @@ internal class FlatZincCompiler(
                 (c.args[1] as? FznExpr.Ident)?.let { int2floatSource[it.name] = c.args[0] }
             }
         }
-        lpOnlyFloats = classifyLpOnlyFloats()
+        lpOnlyFloats = if (exactFloats) exactFloatNames() else emptySet()
         for (decl in model.varDecls) {
             currentLine = decl.line
             currentCol = decl.col
@@ -154,7 +160,7 @@ internal class FlatZincCompiler(
 
             is FznType.IntSet -> allocIntSet(d.name, t)
 
-            FznType.FloatAny -> unsupportedHere("variable `${d.name}`: unbounded `float` not supported; need a range")
+            FznType.FloatAny -> allocOpenFloat(d.name)
 
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
 
@@ -179,10 +185,8 @@ internal class FlatZincCompiler(
             }
 
             is FznType.FloatRange, FznType.FloatAny -> {
-                val src = (rhs as? FznExpr.Ident)?.name
-                    ?: failHere("float var `$name`: alias initializer must be a variable reference")
-                val fb = floatVars[src] ?: failHere("float var `$name`: undefined float alias target `$src`")
-                intVars[name] = fb.varId
+                val fb = resolveFloatElement(rhs, name)
+                if (!fb.lpOnly) intVars[name] = fb.varId
                 floatVars[name] = fb
             }
 
@@ -283,14 +287,12 @@ internal class FlatZincCompiler(
                 failHere("array `$name`: initializer length ${value.elements.size} != declared $length")
             }
             for ((i, e) in value.elements.withIndex()) {
-                varIds[i] = resolveVarRef(e, type.element).also { _ ->
-                    if (bucketings != null) {
-                        val bn = nameOfBoundVar(e)
-                        bucketings.add(
-                            floatVars[bn]
-                                ?: failHere("array `$name`[${i + 1}]: float element must reference a float var"),
-                        )
-                    }
+                if (bucketings != null) {
+                    val fb = resolveFloatElement(e, "$name[${i + 1}]")
+                    varIds[i] = fb.varId
+                    bucketings.add(fb)
+                } else {
+                    varIds[i] = resolveVarRef(e, type.element)
                 }
             }
             val kind = arrayElementKind(type.element)
@@ -312,7 +314,12 @@ internal class FlatZincCompiler(
                     requireNotNull(bucketings).add(floatVars.getValue(elemName))
                 }
 
-                FznType.IntAny, FznType.FloatAny -> unsupportedHere("array `$name`: unbounded element type")
+                FznType.FloatAny -> {
+                    varIds[i] = allocOpenFloat(elemName)
+                    requireNotNull(bucketings).add(floatVars.getValue(elemName))
+                }
+
+                FznType.IntAny -> unsupportedHere("array `$name`: unbounded element type")
 
                 is FznType.SetOfInt -> unsupportedHere("array `$name`: array of set-of-int not supported")
 
@@ -423,8 +430,14 @@ internal class FlatZincCompiler(
         else -> failHere("set `$ownerName`: universe must be an int range or int set, got ${elem::class.simpleName}")
     }
 
-    internal fun allocFloat(name: String, lo: Double, hi: Double): Int {
-        if (name in lpOnlyFloats) {
+    internal fun allocOpenFloat(name: String): Int = if (exactFloats) {
+        allocFloat(name, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
+    } else {
+        allocFloat(name, unboundedFloatLo, unboundedFloatHi)
+    }
+
+    internal fun allocFloat(name: String, lo: Double, hi: Double, lpOnly: Boolean = name in lpOnlyFloats): Int {
+        if (lpOnly) {
             // LP-only continuous column: a real variable, absent from CP search. The linear
             // float handlers emit real rows over it; the returned id is a real var id (not an int var).
             val rid = realLo.size
@@ -433,97 +446,18 @@ internal class FlatZincCompiler(
             floatVars[name] = FloatBucketing(rid, lo, hi, floatBuckets, lpOnly = true)
             return rid
         }
+        if (exactFloats) {
+            unsupportedHere("float variable `$name`: its constraints are unsupported by exact float lowering")
+        }
+        if (!lo.isFinite() || !hi.isFinite()) {
+            unsupportedHere("float variable `$name`: a bucketed constraint or objective requires a finite range")
+        }
+        val buckets = if (lo == hi) 1 else floatBuckets
         val id = intDomains.size
-        intDomains.add(IntDomain(0L, (floatBuckets - 1).toLong()))
+        intDomains.add(IntDomain(0L, (buckets - 1).toLong()))
         intVars[name] = id
-        floatVars[name] = FloatBucketing(id, lo, hi, floatBuckets)
+        floatVars[name] = FloatBucketing(id, lo, hi, buckets)
         return id
-    }
-
-    // Whether [c] is a `float_times(a, b, result)` with exactly one operand an `int2float` image (an
-    // integer's continuous shadow) and the other operand and result plain float vars — an int·real
-    // product that lowers exactly rather than by bucketing (see [int2floatSource] / emitFloatTimes).
-    private fun isIntFloatProduct(c: FznConstraint, scalarFloats: Set<String>): Boolean {
-        if (c.name != "float_times" || c.args.size != 3) return false
-        val a = (c.args[0] as? FznExpr.Ident)?.name ?: return false
-        val b = (c.args[1] as? FznExpr.Ident)?.name ?: return false
-        val r = (c.args[2] as? FznExpr.Ident)?.name ?: return false
-        if (r !in scalarFloats) return false
-        val aInt = a in int2floatSource
-        val bInt = b in int2floatSource
-        if (aInt == bInt) return false // need exactly one integer-backed operand
-        return (if (aInt) b else a) in scalarFloats
-    }
-
-    // Colour each scalar float variable name LP-only or bucketed. A scalar float is LP-only
-    // iff its constraint-connected component is purely linear-in-reals: floats that share a constraint are
-    // unioned (a single row is emitted over all of them, so they must share a representation), and a
-    // component is tainted — kept bucketed — if any of its constraints is non-linear / strict / `ne` /
-    // reified, touches a var float array (whose elements need an integer-var-id array), or is the objective
-    // (a float objective needs a real objective through the Long-typed machinery, not yet built). This
-    // per-variable colouring lets a linear-float component be LP-only even beside an unrelated non-linear one.
-    private fun classifyLpOnlyFloats(): Set<String> {
-        val scalarFloats = HashSet<String>()
-        val floatArrays = HashSet<String>()
-        for (d in model.varDecls) {
-            if (!d.isVar) continue
-            val t = d.type
-            if (t is FznType.FloatRange || t is FznType.FloatAny) scalarFloats.add(d.name)
-            if (t is FznType.Array && (t.element is FznType.FloatRange || t.element is FznType.FloatAny)) {
-                floatArrays.add(d.name)
-            }
-        }
-        if (scalarFloats.isEmpty()) return emptySet()
-        val parent = HashMap<String, String>().apply { scalarFloats.forEach { put(it, it) } }
-        fun find(x: String): String {
-            var r = x
-            while (parent[r] != r) r = parent.getValue(r)
-            var c = x
-            while (parent[c] != r) {
-                val next = parent.getValue(c)
-                parent[c] = r
-                c = next
-            }
-            return r
-        }
-        fun union(a: String, b: String) {
-            parent[find(a)] = find(b)
-        }
-        val tainted = HashSet<String>()
-        val objName = when (val s = model.solve) {
-            is FznSolve.Minimize -> (s.obj as? FznExpr.Ident)?.name
-            is FznSolve.Maximize -> (s.obj as? FznExpr.Ident)?.name
-            else -> null
-        }
-        if (objName != null && objName in scalarFloats) tainted.add(objName)
-        for (c in model.constraints) {
-            val here = ArrayList<String>()
-            var touchesFloatArray = false
-            fun walk(e: FznExpr) {
-                when (e) {
-                    is FznExpr.Ident -> if (e.name in scalarFloats) {
-                        here.add(
-                            e.name,
-                        )
-                    } else if (e.name in floatArrays) {
-                        touchesFloatArray = true
-                    }
-
-                    is FznExpr.ArrayAccess -> if (e.name in floatArrays) touchesFloatArray = true
-
-                    is FznExpr.ArrayLit -> e.elements.forEach(::walk)
-
-                    else -> Unit
-                }
-            }
-            c.args.forEach(::walk)
-            if (here.isEmpty() && !touchesFloatArray) continue
-            for (k in 1 until here.size) union(here[0], here[k])
-            val eligible = c.name in FLOAT_LP_ONLY_NAMES || isIntFloatProduct(c, scalarFloats)
-            if (!eligible || touchesFloatArray) here.forEach { tainted.add(it) }
-        }
-        val taintedRoots = tainted.map { find(it) }.toHashSet()
-        return scalarFloats.filterTo(HashSet()) { find(it) !in taintedRoots }
     }
 
     internal sealed interface ParamValue {
@@ -683,6 +617,9 @@ fun parseFlatZinc(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
+    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
+    exactFloats: Boolean = false,
 ): FlatZincProgram = parseFlatZinc(
     StringCharSource(source),
     floatBuckets = floatBuckets,
@@ -690,6 +627,9 @@ fun parseFlatZinc(
     forLocalSearch = forLocalSearch,
     unboundedIntLo = unboundedIntLo,
     unboundedIntHi = unboundedIntHi,
+    unboundedFloatLo = unboundedFloatLo,
+    unboundedFloatHi = unboundedFloatHi,
+    exactFloats = exactFloats,
 )
 
 /** Parse and compile FlatZinc from a streamed [source], pulling one token at a time so the whole file
@@ -702,6 +642,9 @@ fun parseFlatZinc(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
+    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
+    exactFloats: Boolean = false,
 ): FlatZincProgram = parseFlatZincWithMetadata(
     source,
     floatBuckets,
@@ -709,6 +652,9 @@ fun parseFlatZinc(
     forLocalSearch,
     unboundedIntLo,
     unboundedIntHi,
+    unboundedFloatLo,
+    unboundedFloatHi,
+    exactFloats,
 ) { _, _ -> }
 
 internal fun parseFlatZincWithMetadata(
@@ -718,6 +664,9 @@ internal fun parseFlatZincWithMetadata(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
+    unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
+    exactFloats: Boolean = false,
     onLowered: (FlatZincCompiler, SolveDirective) -> Unit,
 ): FlatZincProgram {
     val model = FlatZincParser(FlatZincLexer(CharReader(source))).parse()
@@ -728,5 +677,8 @@ internal fun parseFlatZincWithMetadata(
         forLocalSearch = forLocalSearch,
         unboundedIntLo = unboundedIntLo,
         unboundedIntHi = unboundedIntHi,
+        unboundedFloatLo = unboundedFloatLo,
+        unboundedFloatHi = unboundedFloatHi,
+        exactFloats = exactFloats,
     ).compile(onLowered)
 }

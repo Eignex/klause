@@ -15,24 +15,26 @@ class OznApplier(oznSource: String) {
 
     /** Render one solution block ending with `----------\n`. */
     fun render(program: FlatZincProgram, sample: Sample): String {
-        val bindings = extractBindings(program, sample)
+        val bindings = extractBindings(program, FlatZincValues(sample))
         return evaluator.render(bindings)
     }
 
-    private fun extractBindings(program: FlatZincProgram, sample: Sample): Map<String, OznValue> {
+    /** Render an open-theory witness through the output model. */
+    fun render(program: FlatZincProgram, assignment: OpenTheoryAssignment): String =
+        evaluator.render(extractBindings(program, FlatZincValues(assignment)))
+
+    private fun extractBindings(program: FlatZincProgram, sample: FlatZincValues): Map<String, OznValue> {
         val out = HashMap<String, OznValue>()
         for ((name, id) in program.boolVarsByName) {
-            out[name] = OznValue.BoolV(sample.bools[id])
+            out[name] = OznValue.BoolV(sample.boolValue(id))
         }
         // Float-backed int vars are rendered under their float names.
         for ((name, id) in program.intVarsByName) {
             if (program.floatVarsByName.containsKey(name)) continue
-            out[name] = OznValue.IntV(sample.ints[id])
+            out[name] = OznValue.IntV(sample.intValue(id).toLong())
         }
         for ((name, b) in program.floatVarsByName) {
-            // An LP-only continuous float carries its value on the sample's reals; a bucketed one via its
-            // bucket index.
-            val value = if (b.lpOnly) sample.approximateRealValue(b.varId) else b.valueOf(sample.ints[b.varId].toInt())
+            val value = sample.floatValue(b)
             out[name] = OznValue.FloatV(value)
         }
         for ((name, layout) in program.setVarsByName) {
@@ -44,15 +46,15 @@ class OznApplier(oznSource: String) {
         return out
     }
 
-    private fun setBindingFrom(layout: SetVarLayout, sample: Sample): OznValue.SetV {
+    private fun setBindingFrom(layout: SetVarLayout, sample: FlatZincValues): OznValue.SetV {
         val present = IntArrayList()
         for (i in layout.elements.indices) {
-            if (sample.bools[layout.indicatorBoolIds[i]]) present.add(layout.elements[i])
+            if (sample.boolValue(layout.indicatorBoolIds[i])) present.add(layout.elements[i])
         }
         return OznValue.SetV(present.toIntArray())
     }
 
-    private fun arrayBindingFrom(arr: FlatZincArray, sample: Sample): OznValue = when (arr) {
+    private fun arrayBindingFrom(arr: FlatZincArray, sample: FlatZincValues): OznValue = when (arr) {
         is FlatZincArray.BoolParam -> OznValue.ArrayV(arr.values.map { OznValue.BoolV(it) })
 
         is FlatZincArray.IntParam -> OznValue.ArrayV(arr.values.map { OznValue.IntV(it) })
@@ -66,13 +68,13 @@ class OznApplier(oznSource: String) {
         is FlatZincArray.Vars -> OznValue.ArrayV(
             arr.varIds.mapIndexed { idx, v ->
                 when (arr.elementKind) {
-                    FlatZincArray.Vars.ElementKind.Bool -> OznValue.BoolV(sample.bools[v])
+                    FlatZincArray.Vars.ElementKind.Bool -> OznValue.BoolV(sample.boolValue(v))
 
-                    FlatZincArray.Vars.ElementKind.Int -> OznValue.IntV(sample.ints[v])
+                    FlatZincArray.Vars.ElementKind.Int -> OznValue.IntV(sample.intValue(v).toLong())
 
                     FlatZincArray.Vars.ElementKind.Float -> {
                         val b = requireNotNull(arr.floatBucketings)[idx]
-                        OznValue.FloatV(b.valueOf(sample.ints[v].toInt()))
+                        OznValue.FloatV(sample.floatValue(b))
                     }
                 }
             },

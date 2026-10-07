@@ -5,9 +5,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.formats.flatzinc.SolveDirective
-import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.objective.maximizeInt
-import com.eignex.klause.solver.objective.minimizeInt
+import com.eignex.klause.solver.pipeline.linearObjective
 import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import java.io.File
 import java.nio.file.Files
@@ -22,19 +20,16 @@ import java.util.concurrent.TimeUnit
  */
 internal class MiniZincRunner(
     private val timeoutSec: Int = System.getProperty("klause.bench.mzn.timeoutSec")?.toIntOrNull() ?: 60,
+    private val exactFloats: Boolean = false,
 ) : Runner {
     override val id = "minizinc"
 
     override fun supports(ref: ProblemRef): Boolean = ref.format == Format.MINIZINC
 
     override fun resolve(ref: ProblemRef): ResolvedProblem {
-        val executionProgram = parseFlatZincExecution(compileFzn(ref).readText())
+        val executionProgram = parseFlatZincExecution(compileFzn(ref).readText(), exactFloats = exactFloats)
         val program = executionProgram.program
-        val objective: LinearObjective? = when (val s = program.solve) {
-            is SolveDirective.Minimize -> program.intVarsByName[s.objVar]?.let { program.problem.minimizeInt(it) }
-            is SolveDirective.Maximize -> program.intVarsByName[s.objVar]?.let { program.problem.maximizeInt(it) }
-            is SolveDirective.Satisfy -> null
-        }
+        val objective = program.linearObjective()
         return ResolvedProblem(
             ref,
             lazyOf(program.problem),

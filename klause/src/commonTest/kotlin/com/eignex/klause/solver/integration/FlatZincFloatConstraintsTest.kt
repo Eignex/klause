@@ -98,6 +98,7 @@ class FlatZincFloatConstraintsTest {
             constraint float_lin_le([2.0], [x], 6.0);
             solve satisfy;
             """.trimIndent(),
+            exactFloats = true,
         )
         // No nonlinear/strict/reified float constraint ⇒ the float is an LP-only real column, not a bucket.
         assertEquals(1, program.problem.numRealVars)
@@ -110,7 +111,7 @@ class FlatZincFloatConstraintsTest {
     }
 
     @Test
-    fun `per-variable colouring makes a linear float LP-only while a separate nonlinear float buckets`() {
+    fun `default float lowering buckets linear and nonlinear components`() {
         val program = parseFlatZinc(
             """
             var 0.0..10.0: x;
@@ -121,10 +122,8 @@ class FlatZincFloatConstraintsTest {
             solve satisfy;
             """.trimIndent(),
         )
-        // x's component is purely linear ⇒ one LP-only real column; z and w are tied to float_abs
-        // (nonlinear) ⇒ they stay bucketed as integer columns.
-        assertEquals(1, program.problem.numRealVars)
-        assertTrue(program.problem.numIntVars >= 2, "z and w should remain bucketed int columns")
+        assertEquals(0, program.problem.numRealVars)
+        assertEquals(3, program.problem.numIntVars)
     }
 
     @Test
@@ -184,6 +183,7 @@ class FlatZincFloatConstraintsTest {
             constraint float_lin_eq([1.0], [w], 9.0);
             solve satisfy;
             """.trimIndent(),
+            exactFloats = true,
         )
         // nf (int image), y and w are a purely-linear-plus-int·real component ⇒ LP-only real columns;
         // only n stays an integer search variable. The product w = n·y with y = 3, w = 9 forces n = 3.

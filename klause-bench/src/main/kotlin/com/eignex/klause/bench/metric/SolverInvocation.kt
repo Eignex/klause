@@ -53,6 +53,7 @@ internal object SolverInvocation {
         val lp: String? = null,
         /** klause-cli `--presolve` (presolve emphasis + per-pass deltas); klause only, null = unset. */
         val presolve: String? = null,
+        val exact: Boolean = false,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -167,6 +168,7 @@ internal object SolverInvocation {
             add("-r")
             add(s.seed.toString())
             add("-s")
+            if (s.exact) add("--exact")
             if (optimize) {
                 add("-a")
                 // Emit `_objective = <value>;` per solution (parity with the reference path's

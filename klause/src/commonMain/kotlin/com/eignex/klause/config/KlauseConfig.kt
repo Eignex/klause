@@ -19,6 +19,12 @@ const val DEFAULT_UNBOUNDED_INT_HI: Long = Long.MAX_VALUE
  *  adopts it and an `unsat` within it is a sound `unsat`. */
 const val MINIZINC_UNBOUNDED_DEFAULT: Long = 1_000_000
 
+/** Default lower search bound for a bucketed FlatZinc float with no declared range. */
+const val DEFAULT_UNBOUNDED_FLOAT_LO: Double = -1_000_000.0
+
+/** Default upper search bound for a bucketed FlatZinc float with no declared range. */
+const val DEFAULT_UNBOUNDED_FLOAT_HI: Double = 1_000_000.0
+
 /** Default integer-domain span above which the span-gated LP presolve steps engage. A model whose
  *  widest integer domain spans no more than this stays on the pure (cheap) presolve + bake path; only a
  *  genuinely wide domain — where the root bake's bound propagation would grind O(span) — pays for the LP
@@ -122,6 +128,12 @@ data class KlauseConfig(
     /** Fixed-point scale used by the FlatZinc float-linear lowering (real coefficients and
      *  bounds are multiplied by this and rounded to integers). */
     val floatScale: Long = DEFAULT_FLOAT_SCALE,
+
+    /** Lower search bound for bucketed FlatZinc floats without a declared range. */
+    val unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
+
+    /** Upper search bound for bucketed FlatZinc floats without a declared range. */
+    val unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
 
     /** Base relaxation-size cap (see [DEFAULT_LP_MAX_TABLEAU_CELLS]): a model whose base relaxation
      *  fits it budgets its gated hulls against it. A pure cost guard — the bound is always sound. */
