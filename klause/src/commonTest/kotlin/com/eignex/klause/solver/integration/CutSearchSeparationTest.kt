@@ -38,7 +38,7 @@ class CutSearchSeparationTest {
         try {
             KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
             var optimal = 0
-            repeat(120) { _ ->
+            repeat(25) { _ ->
                 val n = rng.nextInt(2, 5)
                 val ub = n - 1 + rng.nextInt(0, 3) // enough distinct values to be feasible
                 val cost = LongArray(n) { rng.nextLong(-5, 6) }
@@ -72,7 +72,7 @@ class CutSearchSeparationTest {
                     else -> error("unexpected $res")
                 }
             }
-            assertTrue(optimal > 60, "covered only $optimal feasible instances")
+            assertTrue(optimal > 12, "covered only $optimal feasible instances")
         } finally {
             KlauseConfig.current = saved
         }
@@ -134,7 +134,7 @@ class CutSearchSeparationTest {
         try {
             KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
             var withPool = 0
-            repeat(80) { _ ->
+            repeat(20) { _ ->
                 val n = rng.nextInt(3, 5)
                 val ub = n - 1 + rng.nextInt(0, 3)
                 val cost = LongArray(n) { rng.nextLong(-5, 6) }

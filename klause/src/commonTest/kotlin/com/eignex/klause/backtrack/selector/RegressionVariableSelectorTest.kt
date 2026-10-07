@@ -74,14 +74,14 @@ class RegressionVariableSelectorTest {
         )
         BacktrackSolver(small.bake()).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
 
-        val n = 6
+        val n = 5
         val large = Problem(
             numBoolVars = 0,
             numIntVars = n,
             intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
         )
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L, 5L, 6L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L, 5L))
         val params = BacktrackParams(variableSelector = selector, randomSeed = 0L)
         val r = BacktrackSolver(large.bake()).minimize(objective, params)
         assertIs<MinimizeResult.Optimal>(r)

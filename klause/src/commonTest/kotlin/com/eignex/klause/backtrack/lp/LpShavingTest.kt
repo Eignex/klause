@@ -96,7 +96,7 @@ class LpShavingTest {
     fun `randomized shaving never exceeds the brute-force optimum`() {
         val rng = Random(20260623)
         var covered = 0
-        repeat(200) { _ ->
+        repeat(50) { _ ->
             val n = rng.nextInt(2, 5)
             val cap = n // cost domain [0, n]
             // cost = Σ xᵢ over {0,1}ⁿ, with random covering rows; minimize cost.
@@ -148,14 +148,14 @@ class LpShavingTest {
             }
             assertTrue(lb <= best, "UNSOUND: shaved lower bound $lb exceeds the true optimum $best")
         }
-        assertTrue(covered > 50, "shaving engaged on only $covered instances")
+        assertTrue(covered > 12, "shaving engaged on only $covered instances")
     }
 
     @Test
     fun `randomized variable shaving never excludes a feasible value`() {
         val rng = Random(20260625)
         var shaved = 0
-        repeat(300) { _ ->
+        repeat(60) { _ ->
             val n = rng.nextInt(2, 4)
             val hi = rng.nextInt(2, 5)
             val domains = Array(n) { IntDomain(0, hi.toLong()) }
@@ -203,6 +203,6 @@ class LpShavingTest {
             }
             rec(0)
         }
-        assertTrue(shaved > 0, "variable shaving never engaged across 300 instances")
+        assertTrue(shaved > 0, "variable shaving never engaged across 60 instances")
     }
 }

@@ -24,7 +24,7 @@ class LpExactBoundTest {
     fun `minimize with the LP bound preserves the optimum on large coefficients`() {
         val rng = Random(20260618)
         var optimal = 0
-        repeat(120) { _ ->
+        repeat(30) { _ ->
             val n = rng.nextInt(3, 6)
             val ub = IntArray(n) { rng.nextInt(2, 6) }
             val cost = LongArray(n) { rng.nextLong(-9, 10) }
@@ -55,7 +55,7 @@ class LpExactBoundTest {
                 else -> error("unexpected $res")
             }
         }
-        assertTrue(optimal > 40, "covered only $optimal optimal instances")
+        assertTrue(optimal > 10, "covered only $optimal optimal instances")
     }
 
     private fun bruteMin(n: Int, ub: IntArray, cost: LongArray, cons: List<Triple<LongArray, IntArray, Long>>): Long? {

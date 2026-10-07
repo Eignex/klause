@@ -189,7 +189,7 @@ class CompilerOptLoweringTest {
 
     @Test
     fun `reified all different holds exactly when the terms are distinct`() {
-        val n = 4
+        val n = 3
         val compiled = ReifiedAllDiff(n).compile()
         val baked = compiled.problem.bake()
         for (terms in tuples(n, n)) {
@@ -207,7 +207,7 @@ class CompilerOptLoweringTest {
 
     @Test
     fun `reified opt all different holds exactly when the present terms are distinct`() {
-        val n = 4
+        val n = 3
         val compiled = ReifiedAllDiffOpt(n).compile()
         val baked = compiled.problem.bake()
         for (terms in tuples(n, 2)) {

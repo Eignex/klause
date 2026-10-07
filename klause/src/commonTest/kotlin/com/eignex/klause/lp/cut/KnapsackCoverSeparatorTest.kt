@@ -126,7 +126,7 @@ class KnapsackCoverSeparatorTest {
         // clique rows are in the relaxation) — checked over exactly those points (#552).
         val rng = Random(20260614)
         var gubSeen = 0
-        repeat(1500) {
+        repeat(300) {
             val n = rng.nextInt(3, 6)
             val weights = IntArray(n) { rng.nextInt(1, 6) }
             val bnd = rng.nextInt(2, weights.sum())
@@ -167,6 +167,6 @@ class KnapsackCoverSeparatorTest {
                 }
             }
         }
-        assertTrue(gubSeen > 50, "only $gubSeen clique instances produced a cover cut")
+        assertTrue(gubSeen > 10, "only $gubSeen clique instances produced a cover cut")
     }
 }

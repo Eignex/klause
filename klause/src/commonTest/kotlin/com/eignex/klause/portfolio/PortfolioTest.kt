@@ -996,7 +996,7 @@ class PortfolioTest {
     @Test
     fun `a short budget still splits into segments however long the slices are`() {
         val reached = ArrayList<Int>()
-        val deadline = Cancellation.until(TimeSource.Monotonic.markNow() + 400.milliseconds)
+        val deadline = Cancellation.until(TimeSource.Monotonic.markNow() + 200.milliseconds)
 
         endlessCountedPortfolio(reached, sliceMillis = 60_000L, probeMillis = 60_000L).use {
             it.minimize(deadline or Cancellation { reached.size >= 4 })

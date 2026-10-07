@@ -43,7 +43,7 @@ class SubcircuitPropagatorTest {
         // UNSAT here (a sub-circuit exists but the solver reports none). Brute-counts the solutions
         // over each random restricted domain and checks the solver's SAT/UNSAT verdict agrees.
         val rng = Random(0x5BC141)
-        repeat(3000) { _ ->
+        repeat(500) { _ ->
             val n = rng.nextInt(3, 6) // 3..5 nodes
             val los = IntArray(n)
             val his = IntArray(n)

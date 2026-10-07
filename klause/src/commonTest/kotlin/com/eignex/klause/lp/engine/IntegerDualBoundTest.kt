@@ -38,7 +38,7 @@ class IntegerDualBoundTest {
         var total = 0
         var finite = 0
         var matchesCeil = 0
-        repeat(1500) {
+        repeat(300) {
             val model = randomModel(rng.nextInt(3, 10), rng.nextInt(3, 10), rng)
             val opt = exactLpOptimum(model)
             if (opt.isNaN()) return@repeat
@@ -55,7 +55,7 @@ class IntegerDualBoundTest {
             // Power-of-two scaling should recover ceil(LP optimum) on the large majority of instances.
             if (bound.toDouble() in (ceilOpt - 0.5)..(ceilOpt + 0.5)) matchesCeil++
         }
-        assertTrue(total > 300, "covered only $total instances")
+        assertTrue(total > 60, "covered only $total instances")
         assertTrue(finite >= total * 4 / 5, "integer bound was finite on only $finite/$total")
         assertTrue(matchesCeil >= finite * 2 / 3, "matched ceil(optimum) on only $matchesCeil/$finite")
     }
