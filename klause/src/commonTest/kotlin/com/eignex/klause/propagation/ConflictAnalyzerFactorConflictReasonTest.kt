@@ -209,7 +209,7 @@ class ConflictAnalyzerFactorConflictReasonTest {
 
         check(state.factorAt(0).propagate(state, 0))
 
-        val atom = Lit.variable(state.intMaxAntecedents[1]!!.single()) - problem.numBoolVars
+        val atom = Lit.variable(state.reasonOf(state.intMaxAntecedents[1])!!.single()) - problem.numBoolVars
         assertEquals(0 to 3L, state.atoms.intVar[atom] to state.atoms.threshold[atom])
     }
 

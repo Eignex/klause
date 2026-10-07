@@ -223,7 +223,7 @@ internal fun collectLinearLiftedAntecedents(
 
 /**
  * The reason [collectLinearLiftedAntecedents] would have built for a deduction made at undo-log position
- * [atTrail] and level [atLevel], from the bounds as they stood then. A deduction on a wide sum records
+ * [atTrail] and level [atLevel], from the bounds as they stood then. A deduction on a sum records
  * [linearLazyPayload] instead of building it, and its propagator's [com.eignex.klause.propagation.Propagator.explain]
  * lands here. Each term's bound then and the move that established it are read once.
  */
@@ -258,7 +258,7 @@ internal fun explainLinearBound(
         level[j] = l
         aboveRoot[j] = l > 0
         // As [liftable], against the deduction's level: below it any weaker atom serves; at it, only a decision.
-        val decided = est?.reason == null && l <= decisions.size && decisions[l - 1] == numBools + v
+        val decided = l in 1..decisions.size && est?.reason == null && decisions[l - 1] == numBools + v
         lift[j] = l > 0 && (l < atLevel || decided)
     }
     return liftedAntecedents(
@@ -404,8 +404,6 @@ internal fun collectLinearTightenAntecedents(
     return out.toIntArray()
 }
 
-private const val LINEAR_LAZY_REASON_ARITY = 32
-
 /**
  * Exact 128-bit feasibility check for a linear row whose 64-bit bound arithmetic overflowed.
  * Detects definite violation only — no tightening — so wide-domain (and fully pinned) states are
@@ -501,6 +499,7 @@ internal fun propagateLinearBounds(
     bound: Long,
     extraLit: Int = 0,
     includeExtraLit: Boolean = false,
+    factorId: Int = -1,
 ): Boolean {
     val n = vars.size
     var sumLo = 0L
@@ -569,12 +568,13 @@ internal fun propagateLinearBounds(
         }
         return true
     }
-    // A wide sum's reason costs O(arity) to build and most are never read, so it is recorded lazily and built
-    // only if conflict analysis reaches it; the bounds it rests on are recovered from the undo log then.
-    val lazy = vars.size > LINEAR_LAZY_REASON_ARITY && state.undoLogging
+    // A sum's reason costs O(arity) to build, and lifting it materializes order atoms that every later bound move
+    // must wake; most are never read, so it is recorded lazily and built only if conflict analysis reaches it,
+    // from the bounds the undo log recovers.
+    val lazy = state.undoLogging && factorId >= 0
     fun reason(i: Int, useLo: Boolean, budget: Long): IntArray? = when {
         rootFact -> null
-        lazy -> state.lazyReason(linearLazyPayload(i, useLo, budget, extraLit, includeExtraLit))
+        lazy -> state.lazyReason(linearLazyPayload(i, useLo, budget, extraLit, includeExtraLit), factorId)
         else -> collectLinearLiftedAntecedents(
             state,
             coeffs,

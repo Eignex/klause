@@ -21,11 +21,15 @@ private const val EXTENDED = -1
 internal fun isLazyReason(reason: IntArray?): Boolean =
     reason != null && reason.isNotEmpty() && reason[0] == LAZY_MARKER
 
-/** A lazy reason for a deduction the current factor makes now, carrying [payload] for its [Propagator.explain]. */
-internal fun PropagationState.lazyReason(payload: IntArray): IntArray {
+/**
+ * A lazy reason for a deduction factor [factorId] (by default the one propagating) makes now, carrying [payload]
+ * for its [Propagator.explain].
+ */
+internal fun PropagationState.lazyReason(payload: IntArray, factorId: Int = currentFactor): IntArray {
+    check(factorId >= 0) { "a lazy reason needs the factor that explains it" }
     val out = IntArray(HEADER + payload.size)
     out[0] = LAZY_MARKER
-    out[1] = currentFactor
+    out[1] = factorId
     out[2] = undo.size
     out[3] = currentLevel
     payload.copyInto(out, HEADER)

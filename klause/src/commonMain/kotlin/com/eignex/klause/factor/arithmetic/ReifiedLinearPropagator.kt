@@ -160,21 +160,21 @@ internal class ReifiedLinearPropagator(
                 }
             },
             propagateTrue = { a ->
-                propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = a, includeExtraLit = true)
+                propagateLinearBounds(state, coeffs, vars, op, bnd, extraLit = a, includeExtraLit = true, factorId = factorId)
             },
             propagateFalse = { a ->
                 when (op) {
                     LinearOp.LE -> successorOrNull(bnd)?.let {
-                        propagateLinearBounds(state, coeffs, vars, LinearOp.GE, it, a, true)
+                        propagateLinearBounds(state, coeffs, vars, LinearOp.GE, it, a, true, factorId)
                     } ?: false
 
                     LinearOp.GE -> predecessorOrNull(bnd)?.let {
-                        propagateLinearBounds(state, coeffs, vars, LinearOp.LE, it, a, true)
+                        propagateLinearBounds(state, coeffs, vars, LinearOp.LE, it, a, true, factorId)
                     } ?: false
 
-                    LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, a, true)
+                    LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, a, true, factorId)
 
-                    LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd, a, true)
+                    LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd, a, true, factorId)
                 }
             },
         )

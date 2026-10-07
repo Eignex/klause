@@ -36,7 +36,7 @@ internal class LinearPropagator(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
-        propagateLinearBounds(state, coeffs, vars, op, bound)
+        propagateLinearBounds(state, coeffs, vars, op, bound, factorId = factorId)
 
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
         explainLinearBound(state, coeffs, vars, payload, atTrail, atLevel)
