@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.factor.arithmetic.internals.collectLinearLiftedAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
@@ -43,8 +44,23 @@ internal class ReifiedLinearPropagator(
         // failure paths are bound-driven (the sum range is computed from bounds; a hole crossed by a
         // body tighten is already chained through that bound atom's own reason), so they stay on the
         // tighter bounds-only collector.
-        return if (op == LinearOp.EQ && vars.size == 1) {
-            collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit, includeExtraLit = includeExtraLit)
+        if (op == LinearOp.EQ && vars.size == 1) {
+            return collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit, includeExtraLit = includeExtraLit)
+        }
+        // With the indicator set, the conflict is the body (indicator true) or its negation (false) failing on
+        // one side of the sum, which [settlingSide] names for the bounds as they stand.
+        val range = linearSumRange(state, coeffs, vars)
+        val side = auxValue?.let { settlingSide(range[0], range[1], holds = !it) }
+        return if (side != null) {
+            collectLinearLiftedAntecedents(
+                state,
+                coeffs,
+                vars,
+                useLo = side.useLo,
+                slack = side.slack,
+                extraLit = extraLit,
+                includeExtraLit = true,
+            )
         } else {
             collectLinearTightenAntecedents(
                 state,
@@ -53,6 +69,42 @@ internal class ReifiedLinearPropagator(
                 extraLit = extraLit,
                 includeExtraLit = includeExtraLit,
             )
+        }
+    }
+
+    /** The side of the sum that settles the body and how far it may loosen; see [settlingSide]. */
+    private class Side(val useLo: Boolean, val slack: Long)
+
+    /**
+     * The one side of the sum that makes the body always hold ([holds]) or never hold for [sumLo]..[sumHi], with
+     * the slack it has to spare, or null when the body is not settled that way or needs both sides (an equality
+     * always holding, a disequality never holding, or an overflowed range).
+     */
+    private fun settlingSide(sumLo: Long, sumHi: Long, holds: Boolean): Side? {
+        if (sumLo == Long.MIN_VALUE && sumHi == Long.MAX_VALUE) return null
+        val b = bound
+        return if (holds) {
+            when (op) {
+                LinearOp.LE -> if (sumHi <= b) Side(useLo = false, slack = b - sumHi) else null
+                LinearOp.GE -> if (sumLo >= b) Side(useLo = true, slack = sumLo - b) else null
+                LinearOp.NE -> when {
+                    sumHi < b -> Side(useLo = false, slack = b - 1 - sumHi)
+                    sumLo > b -> Side(useLo = true, slack = sumLo - b - 1)
+                    else -> null
+                }
+                LinearOp.EQ -> null
+            }
+        } else {
+            when (op) {
+                LinearOp.LE -> if (sumLo > b) Side(useLo = true, slack = sumLo - b - 1) else null
+                LinearOp.GE -> if (sumHi < b) Side(useLo = false, slack = b - sumHi - 1) else null
+                LinearOp.EQ -> when {
+                    sumLo > b -> Side(useLo = true, slack = sumLo - b - 1)
+                    sumHi < b -> Side(useLo = false, slack = b - sumHi - 1)
+                    else -> null
+                }
+                LinearOp.NE -> null
+            }
         }
     }
 
@@ -84,7 +136,12 @@ internal class ReifiedLinearPropagator(
             auxBoolVar,
             alwaysHolds,
             neverHolds,
-            pinAntecedent = { state.composeIntVarAtomAntecedents(vars) },
+            // Pinning the indicator rests on the side of the sum that settles the body, lifted by its slack.
+            pinAntecedent = {
+                settlingSide(sumLo, sumHi, holds = alwaysHolds)?.let {
+                    collectLinearLiftedAntecedents(state, coeffs, vars, useLo = it.useLo, slack = it.slack)
+                } ?: state.composeIntVarAtomAntecedents(vars)
+            },
             // Bounds alone miss the case where a single-term EQ targets a value that is unreachable
             // *inside* the bound interval — an interior domain hole, or a bound not divisible by the
             // coefficient. The equality can then never hold, so pin the aux false now with a
