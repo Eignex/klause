@@ -17,15 +17,21 @@ fun interface CandidateCompletion {
     fun complete(candidate: Sample): Completion
 }
 
-/** What a [CandidateCompletion] made of one candidate. Refutes the candidate alone, never the model. */
+/**
+ * What a [CandidateCompletion] made of one candidate. Refutes the candidate alone, never the model. [work] is what
+ * deciding it cost, in local-search moves, which the search charges against its own budget.
+ */
 sealed interface Completion {
+    /** What deciding the candidate cost, in local-search moves. */
+    val work: Long
+
     /** [sample] is a solution of the model; it carries the candidate's discrete values and any completed reals. */
-    class Witness(val sample: Sample) : Completion
+    class Witness(val sample: Sample, override val work: Long = 0L) : Completion
 
     /** The candidate is no solution. [factors] names the model rows that show it, when the check knows them;
      *  local search raises their weights so the next descent steers away from the same failure. */
-    class Refuted(val factors: IntArray = EmptyIntArray) : Completion
+    class Refuted(val factors: IntArray = EmptyIntArray, override val work: Long = 0L) : Completion
 
     /** The check could neither confirm nor refute the candidate within its budget. */
-    data object Undecided : Completion
+    class Undecided(override val work: Long = 0L) : Completion
 }

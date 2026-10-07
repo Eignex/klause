@@ -61,4 +61,16 @@ class LocalSearchEngineTest {
         assertIs<SolveResult.Sat>(result)
         assertEquals(2, calls)
     }
+
+    @Test
+    fun `the work a completion reports is charged to the search budget`() {
+        var calls = 0
+        val result = engine { _ ->
+            calls++
+            Completion.Refuted(work = 2_000L)
+        }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
+
+        assertIs<SolveResult.Unknown>(result)
+        assertTrue(calls in 1..3, "calls=$calls")
+    }
 }
