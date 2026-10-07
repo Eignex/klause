@@ -9234,11 +9234,13 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;
 	public final fun canMinimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Z
 	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun executePortfolio (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun executePortfolio$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun prepare (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Lcom/eignex/klause/solver/pipeline/OpenPreparation;
 	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun searchWithoutTheory$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 }
 
