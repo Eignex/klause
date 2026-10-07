@@ -115,7 +115,7 @@ class Portfolio(
      * opens a fresh one under the tighter bound; `0` disables re-seeding. Local-search and ALNS arms already run
      * a fresh warm-started segment each time.
      */
-    private val reseedStaleThreshold: Int = 3,
+    private val reseedStaleThreshold: Int = 0,
     /**
      * Share of the bandit's evidence that survives the first incumbent. Finding a solution and improving one are
      * different jobs, so the scheduler starts the second with only a weak memory of who did well at the first:
@@ -697,7 +697,7 @@ class Portfolio(
             baseSliceMillis: Long = 2_000,
             maxSliceMillis: Long = 60_000,
             sliceGrowth: Double = 1.5,
-            reseedStaleThreshold: Int = 3,
+            reseedStaleThreshold: Int = 0,
             baseSliceWork: Long = 5_000,
             probeSliceMillis: Long = 1_000,
             phaseRetention: Double = DEFAULT_PHASE_RETENTION,
