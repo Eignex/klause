@@ -3,6 +3,7 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearLiftedAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.factor.arithmetic.internals.explainLinearBound
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
@@ -31,6 +32,9 @@ internal class ReifiedLinearPropagator(
      * [auxBoolVar] keeps its separate Boolean wakeup.
      */
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
+        explainLinearBound(state, coeffs, vars, payload, atTrail, atLevel)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val auxValue = state.boolValues[auxBoolVar]

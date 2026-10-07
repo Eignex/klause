@@ -214,7 +214,7 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     // Trail-resident: an atom assigned on the current path (a bound move crossed it — [wakeAtom] —
     // or a channeling / learned clause forced it — [pinAtomLit]) carries its forcing clause on the
     // [AtomStore.ant] slot; return it directly. A `null` slot at a stamped level is a decision/leaf.
-    if (atoms.lvl[atomId] >= 0) return atoms.ant[atomId]
+    if (atoms.lvl[atomId] >= 0) return reasonOf(atoms.ant[atomId])
     val v = atoms.intVar[atomId]
     val k = atoms.threshold[atomId]
     val d = intDomains[v]
@@ -275,7 +275,7 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
  * the level tight but reintroduce a fatal reason cycle; avoiding the cycle wins.
  */
 internal fun PropagationState.endpointReason(v: Int, viaMax: Boolean): IntArray? =
-    if (viaMax) intMaxAntecedents[v] else intMinAntecedents[v]
+    reasonOf(if (viaMax) intMaxAntecedents[v] else intMinAntecedents[v])
 
 /** Establishment level of the live endpoint that fixes a determined bound atom's truth — the
  *  per-side [PropagationState.intMaxLevel] (when [viaMax]) or [PropagationState.intMinLevel],
@@ -685,12 +685,12 @@ internal fun PropagationState.boundEstablishment(v: Int, k: Long, lower: Boolean
     if (next < count) {
         val i = requireNotNull(moves)[next]
         postLevel = if (lower) undo.minLvl[i] else undo.maxLvl[i]
-        postReason = if (lower) undo.minAnt[i] else undo.maxAnt[i]
+        postReason = reasonOf(if (lower) undo.minAnt[i] else undo.maxAnt[i])
         val prior = requireNotNull(undo.domain[i])
         postBound = if (lower) prior.min else prior.max
     } else {
         postLevel = if (lower) intMinLevel[v] else intMaxLevel[v]
-        postReason = if (lower) intMinAntecedents[v] else intMaxAntecedents[v]
+        postReason = reasonOf(if (lower) intMinAntecedents[v] else intMaxAntecedents[v])
         postBound = if (lower) intDomains[v].min else intDomains[v].max
     }
     return established(v, k, lower, postLevel.coerceAtLeast(0), postReason, postBound)

@@ -137,9 +137,10 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
  *  itself search-derived ([cite]); a root-level bound is a global fact and needs none. */
 internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, base: IntArray?): IntArray? {
     if (!cite) return base
-    if (base != null && base.contains(priorLit)) return base
-    val out = IntArray((base?.size ?: 0) + 1)
-    base?.copyInto(out)
+    val lits = reasonOf(base)
+    if (lits != null && lits.contains(priorLit)) return lits
+    val out = IntArray((lits?.size ?: 0) + 1)
+    lits?.copyInto(out)
     out[out.size - 1] = priorLit
     return out
 }
@@ -151,7 +152,7 @@ private const val MAX_HOLE_CITATIONS = 4096
  *  bound atoms, negated. See [antecedentsAcrossHoles]'s over-wide fallback. */
 private fun PropagationState.decisionCutAntecedents(base: IntArray?): IntArray {
     val lits = IntArrayList()
-    base?.forEach { lits.add(it) }
+    reasonOf(base)?.forEach { lits.add(it) }
     val numBools = problem.numBoolVars
     for (i in 0 until levelToDecisionVar.size) {
         val dv = levelToDecisionVar[i]
@@ -184,7 +185,7 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
     fun cite(value: Long) {
         val o = out ?: IntArrayList().also { fresh ->
             out = fresh
-            base?.forEach { fresh.add(it) }
+            reasonOf(base)?.forEach { fresh.add(it) }
         }
         o.add(Lit.make(atomVarEq(v, value), true))
     }
