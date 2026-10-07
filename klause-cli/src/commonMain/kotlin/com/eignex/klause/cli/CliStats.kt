@@ -285,6 +285,10 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "failures" to "${stats.search.fails.sum.toLong()}"
     out += "restarts" to "${stats.search.restarts.sum.toLong()}"
     out += "propagations" to "${stats.search.propagations.sum.toLong()}"
+    out += "propagationWork" to "${stats.search.propagationWork.sum.toLong()}"
+    out += "rootPropagationWork" to "${stats.search.rootPropagationWork.sum.toLong()}"
+    out += "propagationMs" to "${stats.search.propagationNanos.sum.toLong() / 1_000_000L}"
+    out += "rootPropagationMs" to "${stats.search.rootPropagationNanos.sum.toLong() / 1_000_000L}"
     val learned = stats.search.learnedClauses.sum
     out += "learned" to "${learned.toLong()}"
     if (learned > 0.0) {
@@ -308,7 +312,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> =
     val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
     "arm.${arm.label}" to
         "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
-        "failures=${arm.failures} faults=${arm.faults}$credit"
+        "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} initMs=${arm.initializationMillis}$credit"
 }
 
 /** Exact deterministic open-theory accounting pairs for `-s`. */

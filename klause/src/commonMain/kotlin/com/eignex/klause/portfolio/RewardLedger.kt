@@ -186,6 +186,8 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
     private val segments = LongArray(workers.size)
     private val work = LongArray(workers.size)
     private val millis = LongArray(workers.size)
+    private val maxMillis = LongArray(workers.size)
+    private val initializationMillis = LongArray(workers.size)
     private val rewards = DoubleArray(workers.size)
     private val failures = LongArray(workers.size)
     private val faults = LongArray(workers.size)
@@ -196,8 +198,13 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
         segments[arm]++
         work[arm] += spent
         millis[arm] += elapsed
+        maxMillis[arm] = maxOf(maxMillis[arm], elapsed)
         rewards[arm] += reward
         if (failed) failures[arm]++
+    }
+
+    fun initialized(arm: Int, elapsed: Long) {
+        initializationMillis[arm] += elapsed
     }
 
     /** Count a refuted claim against [arm]. */
@@ -219,6 +226,8 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                     segments = segments[arm],
                     work = work[arm],
                     millis = millis[arm],
+                    maxMillis = maxMillis[arm],
+                    initializationMillis = initializationMillis[arm],
                     meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
                     failures = failures[arm],
                     faults = faults[arm],

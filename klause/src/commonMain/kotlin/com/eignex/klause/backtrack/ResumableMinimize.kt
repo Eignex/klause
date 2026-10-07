@@ -154,7 +154,7 @@ internal class ResumableMinimize(
     private val startMark = TimeSource.Monotonic.markNow()
 
     // Where the current slice pauses. Its work bound counts the LP work this search charges per node.
-    private val slice = SliceBudget({ sink.search.searchWork }, { lpEngine.totalSolveWork() })
+    private val slice = SliceBudget({ sink.search.searchWork }, { lpEngine.totalSolveWork() }, { session.work })
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
@@ -241,7 +241,13 @@ internal class ResumableMinimize(
             pbLearning = params.pbLearning ?: true,
         ),
         branching = CpBranching.None,
-    ).also { it.conflictStats = sink.ca }
+    ).also {
+        it.conflictStats = sink.ca
+        sink.search.propagationWork = { it.session.work }
+        sink.search.rootPropagationWork = { it.session.rootWork }
+        sink.search.propagationNanos = { it.session.propagationNanos }
+        sink.search.rootPropagationNanos = { it.session.rootPropagationNanos }
+    }
     private val session: PropagationSession get() = cp.session
     private val restart = RestartSchedule.from(params)
     private var decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
@@ -890,6 +896,7 @@ internal class ResumableMinimize(
     private inner class LpNodePolicy : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
             slice.charge()
+            if (pausable && slice.workExpired()) return SearchNodeDisposition.Pause
             val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {

@@ -43,6 +43,7 @@ internal fun PropagationState.maxLevelForVars(boolVars: IntArray, intVars: IntAr
     // same clamp the per-var short-circuit applies, hoisted ahead of the loop.
     if (max >= cap) return cap
     for (v in boolVars) {
+        work++
         // boolVars may include atom-var ids when a Clause has atom-lits; dispatch.
         val l = if (v < problem.numBoolVars) {
             boolLevel[v]
@@ -55,6 +56,7 @@ internal fun PropagationState.maxLevelForVars(boolVars: IntArray, intVars: IntAr
         }
     }
     for (v in intVars) {
+        work++
         val l = intLevel[v]
         if (l > max) {
             max = l
@@ -73,6 +75,7 @@ internal fun PropagationState.maxLevelForClause(literals: IntArray): Int {
     var max = 0
     if (max >= cap) return cap // no decisions pushed → result pinned to cap; skip the scan (see maxLevelForVars)
     for (lit in literals) {
+        work++
         val v = Lit.variable(lit)
         val l = if (v < problem.numBoolVars) boolLevel[v] else atomLevelForConflict(v - problem.numBoolVars)
         if (l > max) {
@@ -97,10 +100,12 @@ internal fun PropagationState.collectLevelsForVars(boolVars: IntArray, intVars: 
     levelScratch.clear()
     val numBool = problem.numBoolVars
     for (v in boolVars) {
+        work++
         val l = if (v < numBool) boolLevel[v] else atomLevelForConflict(v - numBool)
         if (l > 0) levelScratch.add(l)
     }
     for (v in intVars) {
+        work++
         val l = intLevel[v]
         if (l > 0) levelScratch.add(l)
     }

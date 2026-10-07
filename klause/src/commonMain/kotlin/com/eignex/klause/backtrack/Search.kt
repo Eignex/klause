@@ -123,7 +123,7 @@ internal fun BacktrackSolver.driveSearch(
  * How a pausable [CpSatisfactionTraversal] meets its slice boundary: whether a fired cancellation is the slice
  * ending rather than the run, and the hook each node runs before it branches.
  */
-internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () -> Unit)
+internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () -> Boolean)
 
 /**
  * Satisfaction path for a CP/theory search, advanced one outcome at a time.
@@ -153,7 +153,15 @@ internal class CpSatisfactionTraversal(
             pbLearning = params.pbLearning ?: true,
         ),
         branching = CpBranching.None,
-    ).also { it.conflictStats = sink?.ca }
+    ).also {
+        it.conflictStats = sink?.ca
+        sink?.search?.let { search ->
+            search.propagationWork = { it.session.work }
+            search.rootPropagationWork = { it.session.rootWork }
+            search.propagationNanos = { it.session.propagationNanos }
+            search.rootPropagationNanos = { it.session.rootPropagationNanos }
+        }
+    }
     private val traversal = CpSatisfactionTraversalPolicy(
         cp.session,
         params,
@@ -220,6 +228,8 @@ internal class CpSatisfactionTraversal(
 
     /** LP work the traversal's relaxations have done, for a slice that charges it against its budget. */
     fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() }
+
+    fun propagationWork(): Long = cp.session.work
 
     /**
      * Advance to the next outcome, or null when a pausable traversal reached its slice boundary with search still
@@ -346,8 +356,7 @@ private class CpSatisfactionTraversalPolicy(
     override val nodePolicy: SearchNodePolicy = slice?.let { s ->
         object : SearchNodePolicy {
             override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
-                s.beforeBranch()
-                return SearchNodeDisposition.Expand
+                return if (s.beforeBranch()) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
             }
         }
     } ?: SearchNodePolicy.ExpandAll

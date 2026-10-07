@@ -17,6 +17,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableIntObjectMap
+import kotlin.time.TimeSource
 
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
 internal const val NO_CARVE: Long = Long.MIN_VALUE
@@ -301,6 +302,9 @@ class PropagationState(
      *  `propagations` stat; monotonic for the life of the state. */
     internal var propagations: Long = 0L
 
+    internal var work: Long = 0L
+    internal var propagationNanos: Long = 0L
+
     /** Set once [runToFixpoint]'s cancellation poll fires — the deadline passed mid-fixpoint, so the
      *  state is at a partial (only-tightened, never over-pruned) fixpoint. Sticky: the deadline is
      *  monotone, so once tripped the whole solve is aborting. The engine reads it through
@@ -477,6 +481,7 @@ class PropagationState(
      *  when undetermined. Pair with [Lit.evaluate] / explicit polarity branching to
      *  reason about literal truth. */
     fun litTruth(lit: Int): Boolean? {
+        work++
         val v = Lit.variable(lit)
         val raw: Boolean? = if (v < problem.numBoolVars) {
             boolValues[v]
@@ -494,6 +499,7 @@ class PropagationState(
      *  assigned and the stored value matches the literal's polarity. Atom literals fall back to
      *  the general path. */
     fun litTrue(lit: Int): Boolean {
+        work++
         val v = Lit.variable(lit)
         if (v < problem.numBoolVars) {
             return boolAssigned.get(v) && (boolValueBits.get(v) == Lit.isPositive(lit))
@@ -504,6 +510,7 @@ class PropagationState(
     /** True iff [lit] is currently `false` (returns false when undetermined). Bool-literal fast
      *  path mirrors [litTrue]; assigned with the value opposing the literal's polarity. */
     fun litFalse(lit: Int): Boolean {
+        work++
         val v = Lit.variable(lit)
         if (v < problem.numBoolVars) {
             return boolAssigned.get(v) && (boolValueBits.get(v) != Lit.isPositive(lit))
@@ -914,6 +921,21 @@ class PropagationState(
         cancellation: Cancellation = Cancellation.Never,
         skipExpensiveBake: Boolean = false,
     ): IntArray? {
+        val start = TimeSource.Monotonic.markNow()
+        try {
+            return drainFixpoint(allFactors, initialFactor, initialFactors, cancellation, skipExpensiveBake)
+        } finally {
+            propagationNanos += start.elapsedNow().inWholeNanoseconds
+        }
+    }
+
+    private fun drainFixpoint(
+        allFactors: Boolean,
+        initialFactor: Int,
+        initialFactors: IntArray,
+        cancellation: Cancellation,
+        skipExpensiveBake: Boolean,
+    ): IntArray? {
         // The native-SAT lane runs its own arena-packed two-watched-literal BCP; the atom store,
         // channeling flush, factor queue, and dirty-var drains below are all inert when there are no
         // integer variables, so it bypasses them entirely.
@@ -968,6 +990,7 @@ class PropagationState(
             // Cheap bake: defer an expensive factor's first fire (heavy state build + sweep) to the
             // first search fire. It re-enqueues if a cheap factor later wakes it, and is skipped again.
             if (skipExpensiveBake && f.expensiveBake) continue
+            work++
             currentLevel = effectiveLevelFor(f, fid)
             currentFactor = fid
             conflictLevels = null
@@ -1045,10 +1068,12 @@ class PropagationState(
      * literals satisfy the clause, no propagation needed.
      */
     private fun enqueueForBoolChange(v: Int) {
+        work += nonBoolWatcherOcc[v].size
         for (fid in nonBoolWatcherOcc[v]) propEnq(fid)
         // Mid-life presolve factors waking via occurrence lists; null (no overlay) otherwise.
         midlife.boolOccurrences?.let {
             val list = it[v]
+            work += list.size
             for (i in 0 until list.size) propEnq(list[i])
         }
         // The literal that just became false is the one whose polarity opposes the pin.
@@ -1057,6 +1082,7 @@ class PropagationState(
         val falseLit = Lit.make(v, !boolValueBits.get(v))
         val watchers = watches.byLit[falseLit]
         val blockers = watches.blockersByLit[falseLit]
+        work += watchers.size
         for (i in 0 until watchers.size) {
             // Blocking-literal short-cut: if the cached blocker for this watch is
             // already true, the factor is satisfied and waking it would be a no-op — skip
@@ -1093,10 +1119,12 @@ class PropagationState(
      * occurrence-list walk over [PropagationProblem.intOccurrences].
      */
     private fun enqueueForIntChange(v: Int) {
+        work += nonIntEventWatcherOcc[v].size
         for (fid in nonIntEventWatcherOcc[v]) propEnq(fid)
         // Mid-life presolve factors waking via occurrence lists; null (no overlay) otherwise.
         midlife.intOccurrences?.let {
             val list = it[v]
+            work += list.size
             for (i in 0 until list.size) propEnq(list[i])
         }
         if (intEvents.dirtyKinds.isEmpty()) return
@@ -1107,6 +1135,7 @@ class PropagationState(
         while (kind < IntEvent.COUNT) {
             if (mask and (1 shl kind) != 0) {
                 intEvents.forEachWatcher(IntEvent.pack(v, kind)) { fid ->
+                    work++
                     propEnq(fid)
                     accumulateDirtyVar(fid, v)
                 }

@@ -206,4 +206,26 @@ class PropagationSessionTest {
         s.pinBool(0, true)
         assertTrue(s.fixpointCancelled, "a targeted fixpoint stopped by the deadline must flag cancellation")
     }
+
+    @Test
+    fun `undo preserves work already spent while restoring the propagated state`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+        )
+        val session = PropagationSession(problem)
+        val root = session.work
+        session.pinBool(0, true)
+        val pushed = session.work
+
+        session.popLast()
+
+        assertTrue(pushed > root)
+        assertTrue(session.work >= pushed)
+        assertEquals(null, session.boolValue(1))
+        assertEquals(root, session.rootWork)
+    }
+
 }

@@ -145,6 +145,11 @@ class PropagationSession(
      *  All session operations short-circuit to this result. */
     private var bakedUnsat: PropagationResult.Unsat? = null
 
+    internal val rootWork: Long
+    internal val rootPropagationNanos: Long
+    internal val work: Long get() = state.work
+    internal val propagationNanos: Long get() = state.propagationNanos
+
     init {
         val conflict = state.runToFixpoint(allFactors = true, cancellation = cancellation)
         if (conflict != null) {
@@ -155,6 +160,8 @@ class PropagationSession(
                 state.extractConflictFactors(),
             )
         }
+        rootWork = state.work
+        rootPropagationNanos = state.propagationNanos
         // Bake-time fixpoint above ran with logging off (it never backtracks). Enable undo
         // logging now, before the first push; the level-0 mark therefore has undoSize 0,
         // and undoing to it rewinds every search mutation back to this post-bake baseline.

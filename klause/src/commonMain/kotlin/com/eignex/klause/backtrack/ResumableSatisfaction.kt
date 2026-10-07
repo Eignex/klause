@@ -21,7 +21,7 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
     private val sink = SolveStatsSink(backend = "backtrack").also { it.start() }
 
     // Its LP reading waits for the traversal below; nothing arms the slice before the first [runSlice].
-    private val slice: SliceBudget = SliceBudget({ sink.search.searchWork }, { traversal.lpWork() })
+    private val slice: SliceBudget = SliceBudget({ sink.search.searchWork }, { traversal.lpWork() }, { traversal.propagationWork() })
     private val params = params0.copy(cancellation = Cancellation { globalToken() || slice.expired() })
     private val assumptions = params0.assumptions
     private val traversal: CpSatisfactionTraversal = CpSatisfactionTraversal(
@@ -30,7 +30,10 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
         sink,
         solver.lpSolveContext,
         propagationCancellation = Cancellation { globalToken() },
-        slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = { slice.charge() }),
+        slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = {
+            slice.charge()
+            slice.workExpired()
+        }),
     )
 
     private var done: SolveResult? = null

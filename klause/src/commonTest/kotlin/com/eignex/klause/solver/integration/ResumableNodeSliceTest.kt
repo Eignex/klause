@@ -166,4 +166,23 @@ class ResumableNodeSliceTest {
 
         assertTrue(idle > 0, "every one-node slice explored a node")
     }
+
+    @Test
+    fun `propagation charged slices preserve the optimum and decision count`() {
+        val whole = handle()
+        val expected = whole.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        val search = handle()
+        var terminal: MinimizeResult? = null
+        var slices = 0
+
+        while (terminal == null && slices++ < 1_000) {
+            terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+        }
+
+        assertEquals(assertIs<MinimizeResult.Optimal>(expected).objective, assertIs<MinimizeResult.Optimal>(terminal).objective)
+        assertEquals(whole.stats.search.nodes, search.stats.search.nodes)
+        assertEquals(whole.stats.search.propagationWork, search.stats.search.propagationWork)
+        assertTrue(search.stats.search.propagationWork.sum > 0.0)
+    }
+
 }
