@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 
 // Lazy reasons. A deduction may record, in place of its literal array, a marker array naming the propagator,
 // the trail position and level it was made at, and a propagator-specific payload. Conflict analysis reads every
@@ -62,4 +63,27 @@ internal fun PropagationState.domainAt(v: Int, atTrail: Int): IntDomain {
 internal fun PropagationState.boundAt(v: Int, lower: Boolean, atTrail: Int): Long {
     val d = domainAt(v, atTrail)
     return if (lower) d.min else d.max
+}
+
+/** Whether `k` was in [v]'s domain at undo-log position [atTrail]. */
+internal fun PropagationState.inDomainAt(v: Int, k: Long, atTrail: Int): Boolean {
+    val d = domainAt(v, atTrail)
+    return k in d || k in d.min..d.max && carvedAt(v, k) > atTrail
+}
+
+/**
+ * The literal, false at undo-log position [atTrail], that says `k` was out of [v]'s domain then: the bound it lay
+ * past, or its own carve. [Lit.NONE] when nothing on the path removed it: a root hole or a survivor restriction,
+ * both unconditional. Only for a `k` that was out then (not [inDomainAt]).
+ */
+internal fun PropagationState.exclusionLiteral(v: Int, k: Long, atTrail: Int): Int {
+    val d = domainAt(v, atTrail)
+    val root = rootDomains[v]
+    return when {
+        k !in root -> Lit.NONE
+        k < d.min -> Lit.make(atomVarGe(v, d.min), false)
+        k > d.max -> Lit.make(atomVarLe(v, d.max), false)
+        carvedAt(v, k) >= 0 -> Lit.make(atomVarEq(v, k), true)
+        else -> Lit.NONE
+    }
 }
