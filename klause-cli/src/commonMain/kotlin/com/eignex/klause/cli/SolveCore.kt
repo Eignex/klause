@@ -32,8 +32,10 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.toLongExact
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -884,10 +886,10 @@ private fun reportOpenTheoryOptimum(
     budgetExhausted: (Boolean) -> Boolean,
 ) {
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
-    val reported: (BigInteger) -> Long? = { value ->
+    val reported: (BigInt) -> Long? = { value ->
         val signed = if (maximize) -value else value
         // An objective past 64 bits is reported as absent rather than as a wrapped number.
-        if (signed >= LONG_MIN_BIG && signed <= LONG_MAX_BIG) signed.longValue() else null
+        if (signed >= LONG_MIN_BIG && signed <= LONG_MAX_BIG) signed.toLongExact() else null
     }
     output.onVerdictContext(
         VerdictContext(
@@ -931,5 +933,5 @@ private fun reportOpenTheoryOptimum(
     }
 }
 
-private val LONG_MIN_BIG = BigInteger.fromLong(Long.MIN_VALUE)
-private val LONG_MAX_BIG = BigInteger.fromLong(Long.MAX_VALUE)
+private val LONG_MIN_BIG = bigIntOf(Long.MIN_VALUE)
+private val LONG_MAX_BIG = bigIntOf(Long.MAX_VALUE)

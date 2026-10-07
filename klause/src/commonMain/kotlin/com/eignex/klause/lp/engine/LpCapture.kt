@@ -1,7 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.signum
 
 internal const val LP_CAPTURE_VERSION: Int = 2
 internal const val LP_EVENT_VERSION: Int = 1
@@ -592,7 +594,7 @@ private class CaptureWriter(private val valueLimit: Int = Int.MAX_VALUE, private
     private var data = ByteArray(256)
     private var size = 0
     private var values = 0
-    private val rationalStrings = HashMap<BigInteger, String>()
+    private val rationalStrings = HashMap<BigInt, String>()
 
     fun toByteArray(): ByteArray = data.copyOf(size)
     fun bytes(value: ByteArray) = value.forEach { byte(it.toInt()) }
@@ -622,7 +624,7 @@ private class CaptureWriter(private val valueLimit: Int = Int.MAX_VALUE, private
         bytes(bytes)
     }
 
-    fun rationalPart(value: BigInteger) {
+    fun rationalPart(value: BigInt) {
         string(rationalStrings.getOrPut(value) { value.toString() })
     }
 
@@ -1178,8 +1180,8 @@ private fun CaptureWriter.fraction(value: BigFraction) {
 }
 
 private fun CaptureReader.fraction(): BigFraction {
-    val numerator = BigInteger.parseString(string())
-    val denominator = BigInteger.parseString(string())
+    val numerator = parseBigInt(string())
+    val denominator = parseBigInt(string())
     require(denominator.signum() > 0) { "exact LP denominator must be positive" }
     return BigFraction.of(numerator, denominator)
 }

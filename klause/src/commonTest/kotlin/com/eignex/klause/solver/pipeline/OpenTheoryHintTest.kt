@@ -15,7 +15,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -289,7 +289,7 @@ class OpenTheoryHintTest {
             assertIs<OpenTheoryResult.Sat>(result).assignment,
         ).assignment.ints
         assertEquals(ints[parsed.intVarNames.getValue("y")], ints[parsed.intVarNames.getValue("x")])
-        assertTrue(ints[parsed.intVarNames.getValue("y")] >= BigInteger.parseString("100000000000000000000"))
+        assertTrue(ints[parsed.intVarNames.getValue("y")] >= parseBigInt("100000000000000000000"))
     }
 
     @Test

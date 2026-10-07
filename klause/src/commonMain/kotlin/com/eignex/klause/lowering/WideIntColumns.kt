@@ -1,6 +1,9 @@
 package com.eignex.klause.lowering
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.toLongExact
 
 /**
  * A wide integer quantity rewritten as digit columns.
@@ -17,7 +20,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  */
 internal class WideIntColumns(val columns: IntArray, val width: Int) {
     /** `2^(width·i)` per digit position, the coefficient a rewritten row multiplies each digit by. */
-    fun weights(): Array<BigInteger> = Array(columns.size) { WideIntDigits.pow2(width * it) }
+    fun weights(): Array<BigInt> = Array(columns.size) { WideIntDigits.pow2(width * it) }
 }
 
 /**
@@ -34,13 +37,13 @@ internal class WideIntColumns(val columns: IntArray, val width: Int) {
  * propagator that overflows multiplying a coefficient by a domain bound stops deriving the bound and the
  * row silently loses its refutation strength while still admitting solutions.
  */
-internal fun wideIntColumns(magnitude: BigInteger, maxCoeff: BigInteger, fresh: (Long, Long) -> Int): WideIntColumns? {
+internal fun wideIntColumns(magnitude: BigInt, maxCoeff: BigInt, fresh: (Long, Long) -> Int): WideIntColumns? {
     val width = WideIntDigits.widthFor(maxCoeff)
     if (width == WideIntDigits.NO_ROOM) return null
     // One position beyond the magnitude's own digits, so the leading signed digit has room for the sign
     // without borrowing range from the value.
     val count = WideIntDigits.digitCount(magnitude, width) + 1
-    val max = (WideIntDigits.pow2(width) - BigInteger.ONE).longValue()
+    val max = (WideIntDigits.pow2(width) - BIG_ONE).toLongExact()
     val cols = IntArray(count) { i -> if (i == count - 1) fresh(-max - 1, max) else fresh(0L, max) }
     return WideIntColumns(cols, width)
 }

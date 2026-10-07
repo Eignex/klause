@@ -3,7 +3,8 @@ package com.eignex.klause.lp.lattice
 import com.eignex.klause.lp.lattice.BareissEchelon
 import com.eignex.klause.lp.lattice.bareissEchelon
 import com.eignex.klause.lp.lattice.sparseIntRow
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.isZero
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -81,7 +82,7 @@ class BareissEchelonTest {
         val n = 6
         val base = longArrayOf(100003, 99991, 100019, 99989, 100043, 99961)
         val m = List(n) { i ->
-            sparseIntRow((0 until n).associateWith { j -> BigInteger.fromLong(base[(i * 2 + j * 3) % n] + i + j) })
+            sparseIntRow((0 until n).associateWith { j -> bigIntOf(base[(i * 2 + j * 3) % n] + i + j) })
         }
         val e = bareissEchelon(m, n)
         var widest = 0

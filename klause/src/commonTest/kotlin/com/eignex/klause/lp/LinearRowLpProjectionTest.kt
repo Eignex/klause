@@ -11,7 +11,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.linearRows
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -175,7 +176,7 @@ class LinearRowLpProjectionTest {
 
     @Test
     fun `a wide row rounds outward while an unsupported factor emits no row`() {
-        val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
         val wideBuilder = RecordingBuilder()
         val unsupportedBuilder = RecordingBuilder()
 
@@ -189,7 +190,7 @@ class LinearRowLpProjectionTest {
 
     @Test
     fun `a wide row reuses its rounding across emissions`() {
-        val huge = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
         val builder = RecordingBuilder()
         val projection = LinearLpProjection()
         val factor = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
@@ -203,9 +204,9 @@ class LinearRowLpProjectionTest {
 
     @Test
     fun `multiple wide rows in one declaration cache their own rounding`() {
-        val huge = BigInteger.ONE shl 100
+        val huge = BIG_ONE shl 100
         val first = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
-        val second = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge * 2)
+        val second = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge * bigIntOf(2))
         val factor = object : Factor by first {
             override val linearForm: LinearForm = LinearForm.Conjunction(first.linearRows + second.linearRows)
         }

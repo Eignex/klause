@@ -2,8 +2,9 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -253,7 +254,7 @@ class RefinementTest {
         val x = builder.addRealVar(0.0, 2.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         LpScopedSolver(state).use { owner ->
             val result = refineLp(
                 assertNotNull(state.toWorkingModel()),
@@ -335,7 +336,7 @@ class RefinementTest {
             )
 
             val point = assertNotNull(result.witness)
-            assertEquals(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)), point.primal.single())
+            assertEquals(BigFraction.of(BIG_ONE, bigIntOf(3)), point.primal.single())
             assertEquals(BigFraction.ONE, point.primal.single() * BigFraction.ofLong(3L))
             assertEquals(BigFraction.ZERO, point.objective)
             assertEquals(point.objective, assertNotNull(result.bound).value)
@@ -348,8 +349,8 @@ class RefinementTest {
 
     @Test
     fun `exact seeds preserve constants beyond double integer precision`() {
-        val origin = BigFraction.of(BigInteger.ONE shl 80, BigInteger.ONE)
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val origin = BigFraction.of(BIG_ONE shl 80, BIG_ONE)
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val zero = ExactLpNumber.of(0L)
         val state = LpExactState(
             ExactLpModel(
@@ -419,7 +420,7 @@ class RefinementTest {
 
     @Test
     fun `large precision inputs decline before creating a numerical child`() {
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 160, BigInteger.ONE))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 160, BIG_ONE))
         val state = LpExactState(
             ExactLpModel(
                 listOf(emptyList()),

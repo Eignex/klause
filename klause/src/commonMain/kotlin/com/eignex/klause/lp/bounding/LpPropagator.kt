@@ -33,8 +33,8 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 
 internal data class LpEffortProfile(
     val iterations: Int = 0,
@@ -364,7 +364,7 @@ internal class LpPropagator(
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         if (closed || context.cancelled()) return null
         val candidate = policy.fractionalBranch(context)
-        if (candidate != null && candidate.value.den != BigInteger.ONE) {
+        if (candidate != null && candidate.value.den != BIG_ONE) {
             if (candidate.boolean && candidate.value > BigFraction.ZERO && candidate.value < BigFraction.ONE) {
                 return listOf(
                     SearchDecision.Bool((candidate.variable shl 1) or 1),

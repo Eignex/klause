@@ -8,8 +8,9 @@ import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -376,7 +377,7 @@ class LpSolveTest {
 
     @Test
     fun `exact objective units and source origins survive certification`() {
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val model = ExactLpModel(
             listOf(emptyList()),
             emptyList(),
@@ -429,7 +430,7 @@ class LpSolveTest {
 
     @Test
     fun `binary and parsed equations retain different acceptance authority`() {
-        val tenth = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(10)))
+        val tenth = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(10)))
         val zero = ExactLpNumber.of(0L)
         for (rhs in listOf(tenth, ExactLpNumber.ofIeee(0.1))) {
             val model = ExactLpModel(
@@ -457,7 +458,7 @@ class LpSolveTest {
 
     @Test
     fun `unrepresentable exact costs decline before engine creation`() {
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 4096, BigInteger.ONE))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 4096, BIG_ONE))
         val model = ExactLpModel(
             listOf(emptyList()),
             emptyList(),
@@ -576,8 +577,8 @@ class LpSolveTest {
         )
         val nextBound = ExactLpNumber.of(
             BigFraction.ONE + BigFraction.of(
-                BigInteger.ONE,
-                BigInteger.ONE shl 54,
+                BIG_ONE,
+                BIG_ONE shl 54,
             ),
         )
         val next = model.copy(

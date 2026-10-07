@@ -5,8 +5,16 @@ import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.shr
+import com.eignex.klause.util.toLong
+import com.eignex.klause.util.toLongExact
 
 internal data class ReconstructionLimits(
     val maxCoordinates: Int = 4096,
@@ -95,9 +103,9 @@ internal class ReconstructionMeter(
         allocation += bytes
     }
 
-    fun integer(value: BigInteger): BigInteger {
+    fun integer(value: BigInt): BigInt {
         step()
-        val bits = value.bitLength()
+        val bits = value.magnitudeBitLength()
         maxBits = maxOf(maxBits, bits)
         if (bits > limits.maxBits) throw ReconstructionStop(ReconstructionDecline.BITS)
         storage(32L + (bits.toLong() + 7L) / 8L)
@@ -243,25 +251,25 @@ private class FixedReconstructionVerifier(
 
     private fun from(value: BigFraction): Frac128 {
         meter.fraction(value)
-        if (value.num.bitLength() > 127 || value.den.bitLength() > 127) throw ReconstructionOverflow()
+        if (value.num.magnitudeBitLength() > 127 || value.den.magnitudeBitLength() > 127) throw ReconstructionOverflow()
         val magnitude = value.num.abs()
-        val low = magnitude.longValue(exactRequired = false)
-        val high = (magnitude shr 64).longValue(exactRequired = false)
+        val low = magnitude.toLong()
+        val high = (magnitude shr 64).toLong()
         val negative = value.signum() < 0
         return checked(
             Frac128(
                 if (negative) high.inv() + if (low == 0L) 1L else 0L else high,
                 if (negative) -low else low,
-                (value.den shr 64).longValue(exactRequired = true),
-                value.den.longValue(exactRequired = false),
+                (value.den shr 64).toLongExact(),
+                value.den.toLong(),
             ),
         )
     }
 
     private fun big(value: Frac128): BigFraction = meter.fraction(
         BigFraction.of(
-            (BigInteger.fromLong(value.nHi) shl 64) + BigInteger.fromULong(value.nLo.toULong()),
-            (BigInteger.fromLong(value.dHi) shl 64) + BigInteger.fromULong(value.dLo.toULong()),
+            (bigIntOf(value.nHi) shl 64) + bigIntOf(value.nLo.toULong()),
+            (bigIntOf(value.dHi) shl 64) + bigIntOf(value.dLo.toULong()),
         ),
     )
 
@@ -479,7 +487,7 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         }
     }
 
-    fun reconstructedSeated(candidate: List<BigFraction>, basis: Basis?, denominator: BigInteger): List<BigFraction>? {
+    fun reconstructedSeated(candidate: List<BigFraction>, basis: Basis?, denominator: BigInt): List<BigFraction>? {
         val seated = seated(candidate, basis) ?: return null
         meter.storage(a.n.toLong() * 32L)
         val basics = (0 until a.n).filter { requireNotNull(basis).status[it] == VarStatus.BASIC }
@@ -609,7 +617,7 @@ private fun reconstructCandidates(
         if (!current.attained() && current.conflict == null) {
             val violation = reconstructionViolation(authority, x, y ?: rho, ray = y == null && rho != null, meter)
             var correction = BigFraction.ofLong(2L)
-            var previous: BigInteger? = null
+            var previous: BigInt? = null
             var round = 0
             for (attempt in 0 until limits.maxAttempts) {
                 meter.phase = ReconstructionPhase.SCHEDULE
@@ -647,7 +655,7 @@ private fun reconstructCandidates(
                     next - round,
                 ) {
                     correction = meter.fraction(
-                        correction * BigFraction.of(BigInteger.fromInt(11), BigInteger.fromInt(10)),
+                        correction * BigFraction.of(bigIntOf(11), bigIntOf(10)),
                     )
                 }
                 round = next

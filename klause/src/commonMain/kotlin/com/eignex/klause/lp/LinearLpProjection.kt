@@ -4,7 +4,11 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.linearRows
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.floorBigInt
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.toDouble
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 
@@ -164,21 +168,21 @@ private fun computeWideRounding(row: LinearRow): WideRounding? {
 
 private const val DOUBLE_CERTAIN_FINITE_BITS = 1023
 
-private fun fitsDouble(x: BigInteger): Boolean {
-    val bits = x.bitLength()
+private fun fitsDouble(x: BigInt): Boolean {
+    val bits = x.magnitudeBitLength()
     return when {
         bits <= DOUBLE_CERTAIN_FINITE_BITS -> true
         bits > DOUBLE_CERTAIN_FINITE_BITS + 1 -> false
-        else -> x.doubleValue(exactRequired = false).isFinite()
+        else -> x.toDouble().isFinite()
     }
 }
 
-private fun floorToDouble(x: BigInteger): Double {
-    val d = x.doubleValue(exactRequired = false)
-    return if (BigInteger.tryFromDouble(d, exactRequired = false) > x) d.nextDown() else d
+private fun floorToDouble(x: BigInt): Double {
+    val d = x.toDouble()
+    return if (floorBigInt(d) > x) d.nextDown() else d
 }
 
-private fun ceilToDouble(x: BigInteger): Double {
-    val d = x.doubleValue(exactRequired = false)
-    return if (BigInteger.tryFromDouble(d, exactRequired = false) < x) d.nextUp() else d
+private fun ceilToDouble(x: BigInt): Double {
+    val d = x.toDouble()
+    return if (floorBigInt(d) < x) d.nextUp() else d
 }

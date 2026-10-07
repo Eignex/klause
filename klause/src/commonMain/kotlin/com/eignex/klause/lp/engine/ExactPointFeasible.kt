@@ -1,8 +1,13 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.times
 import kotlin.time.Duration
 
 internal fun exactPointWitness(
@@ -15,14 +20,14 @@ internal fun exactPointWitness(
         val direct = primal.map { checkNotNull(BigFraction.ofDouble(it)) }
         scans.scan(exactBits(direct))
         checkedLpWitness(model, direct) ?: run {
-            var common = BigInteger.ONE
-            val limit = BigInteger.fromLong(MAX_POINT_DENOMINATOR)
+            var common = BIG_ONE
+            val limit = bigIntOf(MAX_POINT_DENOMINATOR)
             val candidate = primal.map { value ->
                 val part = reconstructRational(value, maxDenominator = MAX_POINT_DENOMINATOR) ?: return@run null
-                val denominator = BigInteger.fromLong(part.denominator)
+                val denominator = bigIntOf(part.denominator)
                 common = common / common.gcd(denominator) * denominator
                 if (common > limit) return@run null
-                BigFraction.of(BigInteger.fromLong(part.numerator), denominator)
+                BigFraction.of(bigIntOf(part.numerator), denominator)
             }
             scans.scan(exactBits(candidate))
             checkedLpWitness(model, candidate)
@@ -71,8 +76,8 @@ internal fun recoverExactPointWitness(
                 ?: meter.stop(LpRefinementDecline.CANDIDATE)
             candidate += meter.number(
                 BigFraction.of(
-                    BigInteger.fromLong(part.numerator),
-                    BigInteger.fromLong(part.denominator),
+                    bigIntOf(part.numerator),
+                    bigIntOf(part.denominator),
                 ),
             )
         }

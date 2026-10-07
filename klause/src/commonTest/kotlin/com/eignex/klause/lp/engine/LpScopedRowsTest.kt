@@ -1,8 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,7 +16,7 @@ class LpScopedRowsTest {
     @Test
     fun `persistent rows survive interleaved scopes and compaction preserves exact source maps`() {
         val zero = ExactLpNumber.of(0L)
-        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val ieee = ExactLpNumber.ofIeee(-0.0)
         val premises = ExactLpPremises(listOf(ExactLpPremise(42, false, third)), listOf(17))
         val source = ExactLpModel(
@@ -214,8 +215,8 @@ class LpScopedRowsTest {
             ExactLpObjective(listOf(one)),
         )
         val logical = ExactLpColumn(ExactLpBounds())
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 2048, BigInteger.ONE))
-        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2048))
         val cases = listOf(
             LpScopedRow(-1, emptyList(), zero, logical),
             LpScopedRow(0, listOf(1 to one), zero, logical),

@@ -22,9 +22,16 @@ import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -47,7 +54,7 @@ sealed interface OpenTheoryOptimum {
         /** The optimal assignment. */
         val assignment: OpenTheoryAssignment,
         /** Its objective value. */
-        val value: BigInteger,
+        val value: BigInt,
         override val stats: SolveStats,
     ) : OpenTheoryOptimum
 
@@ -65,7 +72,7 @@ sealed interface OpenTheoryOptimum {
         /** An assignment proving the model feasible. */
         val witness: OpenTheoryAssignment,
         /** The objective value at [witness]; every value below it is attained as well. */
-        val value: BigInteger,
+        val value: BigInt,
         override val stats: SolveStats,
     ) : OpenTheoryOptimum
 
@@ -78,7 +85,7 @@ sealed interface OpenTheoryOptimum {
         /** Best assignment proved feasible, or null when none was. */
         val incumbent: OpenTheoryAssignment?,
         /** Objective value of [incumbent], or null when there is none. */
-        val value: BigInteger?,
+        val value: BigInt?,
         /** Why the descent stopped before an optimum proof. */
         val reason: TerminationReason,
         override val stats: SolveStats,
@@ -198,11 +205,11 @@ class OpenTheoryMinimizer internal constructor(
      * has covered. A round that refutes a bound read there proves only that nothing beats that arm's value, which
      * the descent reports as [OpenTheoryOptimum.Bounded] by [TerminationReason.SearchExhausted].
      */
-    internal fun descent(params: TheoryParams, externalBound: () -> BigInteger? = { null }): Descent =
+    internal fun descent(params: TheoryParams, externalBound: () -> BigInt? = { null }): Descent =
         Descent(params, externalBound)
 
     /** The exact objective value of [assignment]. */
-    internal fun valueOf(assignment: OpenTheoryAssignment): BigInteger = objective.valueOf(assignment)
+    internal fun valueOf(assignment: OpenTheoryAssignment): BigInt = objective.valueOf(assignment)
 
     /**
      * One descent, its preparation done once and each round a [ResumableOpenTheory] kept across slices.
@@ -210,7 +217,7 @@ class OpenTheoryMinimizer internal constructor(
      * Preparation and each round's setup run whole in the slice that reaches them; a slice ends only inside a
      * round's search, or between rounds once its share is spent.
      */
-    internal inner class Descent(private val params: TheoryParams, private val externalBound: () -> BigInteger?) :
+    internal inner class Descent(private val params: TheoryParams, private val externalBound: () -> BigInt?) :
         AutoCloseable {
         private val sink = SolveStatsSink(backend = "")
         private val state = OpenTheorySolveState(params)
@@ -245,7 +252,7 @@ class OpenTheoryMinimizer internal constructor(
             global: Cancellation,
             sliceMillis: Long,
             sliceWork: Long,
-            onIncumbent: (OpenTheoryAssignment, BigInteger) -> Unit,
+            onIncumbent: (OpenTheoryAssignment, BigInt) -> Unit,
         ): OpenTheoryOptimum? {
             verdict?.let { return it }
             val endWork = if (sliceWork >= 0L) state.work.spent + sliceWork else -1L
@@ -337,7 +344,7 @@ class OpenTheoryMinimizer internal constructor(
             val (spec, plan) = when {
                 terms.isEmpty() -> opened.base to opened.boundedPlan
                 bound == null -> opened.base to opened.boundedPlan.withoutAppendedFactor(opened.base)
-                else -> opened.base.boundedBy(bound - BigInteger.ONE) to opened.boundedPlan
+                else -> opened.base.boundedBy(bound - BIG_ONE) to opened.boundedPlan
             }
             val engine = OpenTheoryEngine(
                 OpenSourcePreparation.Planned(opened.prepared, spec, plan),
@@ -352,7 +359,7 @@ class OpenTheoryMinimizer internal constructor(
         private fun endRound(
             opened: Opening,
             result: OpenTheoryResult,
-            onIncumbent: (OpenTheoryAssignment, BigInteger) -> Unit,
+            onIncumbent: (OpenTheoryAssignment, BigInt) -> Unit,
         ): OpenTheoryOptimum? = when (result) {
             is OpenTheoryResult.Sat -> {
                 val value = objective.valueOf(result.assignment)
@@ -482,12 +489,12 @@ class OpenTheoryMinimizer internal constructor(
      * be sound and is not free: a wide row routes the exact core through its digit-chain encoder, which
      * on a model with thousands of rows costs more than deciding it.
      */
-    private fun boundRow(bound: BigInteger): Factor {
-        val rhs = bound - BigInteger.fromLong(objective.constant)
+    private fun boundRow(bound: BigInt): Factor {
+        val rhs = bound - bigIntOf(objective.constant)
         if (rhs >= LONG_MIN && rhs <= LONG_MAX) {
-            return Linear(coefficients.copyOf(), terms.copyOf(), LinearOp.LE, rhs.longValue())
+            return Linear(coefficients.copyOf(), terms.copyOf(), LinearOp.LE, rhs.toLongExact())
         }
-        val wideCoeffs = Array(coefficients.size) { BigInteger.fromLong(coefficients[it]) }
+        val wideCoeffs = Array(coefficients.size) { bigIntOf(coefficients[it]) }
         return Linear(terms, wideCoeffs, LinearOp.LE, rhs)
     }
 
@@ -503,7 +510,7 @@ class OpenTheoryMinimizer internal constructor(
         withObjectiveRow { Linear(coefficients.copyOf(), terms.copyOf(), LinearOp.LE, PLANNING_RHS) }
 
     /** This model plus the row holding the objective at or below [bound]. */
-    private fun Problem.boundedBy(bound: BigInteger): Problem = withObjectiveRow { boundRow(bound) }
+    private fun Problem.boundedBy(bound: BigInt): Problem = withObjectiveRow { boundRow(bound) }
 
     /**
      * This model plus [row], or itself when the objective weights no column.
@@ -521,21 +528,21 @@ class OpenTheoryMinimizer internal constructor(
     private fun Problem.withRow(row: Factor): Problem =
         withFactors(factors + row, impliedFactorMask?.let { it + false })
 
-    private fun LinearObjective.valueOf(assignment: OpenTheoryAssignment): BigInteger {
-        var total = BigInteger.fromLong(constant)
+    private fun LinearObjective.valueOf(assignment: OpenTheoryAssignment): BigInt {
+        var total = bigIntOf(constant)
         when (assignment) {
             is OpenTheoryAssignment.Difference -> for (i in terms.indices) {
-                total += BigInteger.fromLong(coefficients[i]) * BigInteger.fromLong(assignment.sample.ints[terms[i]])
+                total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.ints[terms[i]])
             }
 
             is OpenTheoryAssignment.Sampled -> for (i in terms.indices) {
-                total += BigInteger.fromLong(coefficients[i]) * BigInteger.fromLong(assignment.sample.ints[terms[i]])
+                total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.ints[terms[i]])
             }
 
             // A mixed model carries continuous columns the objective does not weight, so its value is
             // still the integer sum; the reals are decided alongside and contribute nothing to it.
             is OpenTheoryAssignment.ExactLira -> for (i in terms.indices) {
-                total += BigInteger.fromLong(coefficients[i]) * assignment.assignment.ints[terms[i]]
+                total += bigIntOf(coefficients[i]) * assignment.assignment.ints[terms[i]]
             }
 
             // A real-only route has no integer column to read, which only a constant objective may ask of
@@ -549,7 +556,7 @@ class OpenTheoryMinimizer internal constructor(
             is OpenTheoryAssignment.Rebuilt -> {
                 val recovered = assignment.ints ?: return valueOf(assignment.base)
                 for (i in terms.indices) {
-                    total += BigInteger.fromLong(coefficients[i]) * recovered[terms[i]]
+                    total += bigIntOf(coefficients[i]) * recovered[terms[i]]
                 }
             }
         }
@@ -566,8 +573,8 @@ class OpenTheoryMinimizer internal constructor(
          * invalidated mid-descent.
          */
         const val PLANNING_RHS: Long = Long.MAX_VALUE
-        val LONG_MIN: BigInteger = BigInteger.fromLong(Long.MIN_VALUE)
-        val LONG_MAX: BigInteger = BigInteger.fromLong(Long.MAX_VALUE)
+        val LONG_MIN: BigInt = bigIntOf(Long.MIN_VALUE)
+        val LONG_MAX: BigInt = bigIntOf(Long.MAX_VALUE)
     }
 }
 
@@ -635,11 +642,11 @@ private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = 
 }
 
 /** This witness reading its integer columns off [ints] instead, with [realColumns] reals ahead of them. */
-private fun ExactWitness.withInts(realColumns: Int, ints: Array<BigInteger>): ExactWitness = object : ExactWitness {
+private fun ExactWitness.withInts(realColumns: Int, ints: Array<BigInt>): ExactWitness = object : ExactWitness {
     override fun at(column: Int): BigFraction = if (column < realColumns) {
         this@withInts.at(column)
     } else {
-        BigFraction.of(ints[column - realColumns], BigInteger.ONE)
+        BigFraction.of(ints[column - realColumns], BIG_ONE)
     }
 
     override fun truth(boolVar: Int): Boolean = this@withInts.truth(boolVar)

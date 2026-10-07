@@ -36,7 +36,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -874,8 +875,8 @@ class SymmetryBreakingTest {
 
     @Test
     fun `a wide row hashes like its remapped structural key on every keying`() {
-        val wide = BigInteger.parseString("18446744073709551616")
-        val row = ReifiedLinear(0, intArrayOf(0, 1, 2), arrayOf(wide, -wide, BigInteger.ONE), LinearOp.LE, wide)
+        val wide = parseBigInt("18446744073709551616")
+        val row = ReifiedLinear(0, intArrayOf(0, 1, 2), arrayOf(wide, -wide, BIG_ONE), LinearOp.LE, wide)
         val mapping = VarRemap(intArrayOf(1, 0), intArrayOf(2, 0, 1))
 
         val hashes = List(3) { row.remapStructuralHash(mapping) }

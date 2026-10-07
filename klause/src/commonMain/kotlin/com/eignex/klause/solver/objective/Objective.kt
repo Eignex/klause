@@ -5,7 +5,10 @@ import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyLongArray
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toDouble
 
 /**
  * Anything the local-search internals can score an assignment by; "lower is better".
@@ -131,14 +134,14 @@ data class LinearObjective(
     }
 
     private fun wideDiscreteSum(sample: Sample): Double {
-        var total = BigInteger.fromLong(constant)
+        var total = bigIntOf(constant)
         for (b in 0 until minOf(sample.bools.size, boolWeights.size)) {
-            if (sample.bools[b]) total += BigInteger.fromLong(boolWeights[b])
+            if (sample.bools[b]) total += bigIntOf(boolWeights[b])
         }
         for (i in 0 until minOf(sample.ints.size, intCoefficients.size)) {
-            total += BigInteger.fromLong(intCoefficients[i]) * BigInteger.fromLong(sample.ints[i])
+            total += bigIntOf(intCoefficients[i]) * bigIntOf(sample.ints[i])
         }
-        return total.doubleValue(exactRequired = false)
+        return total.toDouble()
     }
 
     /** Exact integer objective value of the live [assignment]; lower is better. Reads variables in

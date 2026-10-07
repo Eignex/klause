@@ -1,8 +1,8 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -469,7 +469,7 @@ class RationalBasisFactorsTest {
         rows.map { row -> row.map { BigFraction.ofLong(it.toLong()) } }
 
     private fun identityOrder(n: Int) = RationalBasisOrder(IntArray(n) { it }, IntArray(n) { it })
-    private fun power(bits: Int) = BigFraction.of(BigInteger.ONE shl bits, BigInteger.ONE)
+    private fun power(bits: Int) = BigFraction.of(BIG_ONE shl bits, BIG_ONE)
 
     companion object {
         private val emptyFactors = assertIs<RationalBasisBuild.Ready>(

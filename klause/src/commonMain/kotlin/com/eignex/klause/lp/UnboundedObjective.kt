@@ -11,7 +11,9 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 /**
  * Whether `Σ coefficients(i)·x(terms(i))` descends without limit over this model, proved at [witness].
@@ -43,7 +45,7 @@ internal fun Problem.objectiveUnboundedBelow(
         if (terms.isEmpty() || descentSidesClosed(terms, coefficients)) return@run false
         val point = List(numRealVars + numIntVars, witness::at)
         if (!point.admittedSourcePoint() ||
-            (numRealVars until point.size).any { point[it].den != com.ionspin.kotlin.bignum.integer.BigInteger.ONE }
+            (numRealVars until point.size).any { point[it].den != BIG_ONE }
         ) {
             return@run null
         }
@@ -72,15 +74,15 @@ private fun Problem.admitsDirectionPreparation(token: Cancellation): Boolean {
     var rows = 0L
     var bits = 0L
     fun admit(value: BigFraction): Boolean {
-        if (token() || value.num.bitLength() > 4096 || value.den.bitLength() > 4096) return false
-        bits += value.num.bitLength().toLong() + value.den.bitLength()
+        if (token() || value.num.magnitudeBitLength() > 4096 || value.den.magnitudeBitLength() > 4096) return false
+        bits += value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
         return bits <= 8192L
     }
     for (integer in 0 until numIntVars) {
         val lower = intBounds.lowerAsBigInteger(integer)
         val upper = intBounds.upperAsBigInteger(integer)
-        if (lower != null && (lower.bitLength() > 4096 || !admit(lower.asFraction()))) return false
-        if (upper != null && (upper.bitLength() > 4096 || !admit(upper.asFraction()))) return false
+        if (lower != null && (lower.magnitudeBitLength() > 4096 || !admit(lower.asFraction()))) return false
+        if (upper != null && (upper.magnitudeBitLength() > 4096 || !admit(upper.asFraction()))) return false
     }
     for (real in 0 until numRealVars) {
         if (realLower[real].isFinite() && !admit(realLower[real].asFraction())) return false
@@ -96,7 +98,7 @@ private fun Problem.admitsDirectionPreparation(token: Cancellation): Boolean {
             if (rows > 128L || terms > 512L) return false
             when (val constants = row.constants) {
                 is IntegralConstants -> {
-                    if (constants.exactBound.bitLength() > 4096 || !admit(
+                    if (constants.exactBound.magnitudeBitLength() > 4096 || !admit(
                             constants.exactBound.asFraction(),
                         )
                     ) {
@@ -104,7 +106,7 @@ private fun Problem.admitsDirectionPreparation(token: Cancellation): Boolean {
                     }
                     for (index in 0 until row.size) {
                         val coefficient = constants.exactCoeff(index)
-                        if (coefficient.bitLength() > 4096 || !admit(coefficient.asFraction())) return false
+                        if (coefficient.magnitudeBitLength() > 4096 || !admit(coefficient.asFraction())) return false
                     }
                 }
 

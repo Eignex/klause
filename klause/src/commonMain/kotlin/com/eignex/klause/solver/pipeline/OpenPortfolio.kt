@@ -19,8 +19,14 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toDouble
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.Duration
@@ -130,11 +136,12 @@ internal class OpenPortfolio(
         is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
     }
 
-    private fun best(sample: Sample, objective: LinearObjective): Pair<OpenTheoryAssignment, BigInteger> {
+    private fun best(sample: Sample, objective: LinearObjective): Pair<OpenTheoryAssignment, BigInt> {
         val pooled = theoryWitnesses.firstOrNull { it.sample === sample }
         val pool = (pooled?.assignment ?: OpenTheoryAssignment.Sampled(sample)) to
             (pooled?.value ?: objective.exactValue(sample))
-        val descent = theoryWitnesses.mapNotNull { w -> w.value?.let { w.assignment to it } }.minByOrNull { it.second }
+        val descent = theoryWitnesses.mapNotNull { w -> w.value?.let { w.assignment to it } }
+            .reduceOrNull { best, next -> if (next.second < best.second) next else best }
         return if (descent != null && descent.second < pool.second) descent else pool
     }
 
@@ -175,7 +182,7 @@ internal class OpenPortfolio(
     }
 
     // The pool's stand-in for a theory witness, remembered so the exact witness can be read back.
-    private fun pooled(assignment: OpenTheoryAssignment, value: BigInteger?): TheoryWitness =
+    private fun pooled(assignment: OpenTheoryAssignment, value: BigInt?): TheoryWitness =
         TheoryWitness(assignment.toSampleOrPlaceholder(model), assignment, value)
             .also { theoryWitnesses += it }
 
@@ -202,14 +209,14 @@ internal class OpenPortfolio(
             ): MinimizeResult? {
                 val verdict = descent.runSlice(global, sliceMillis, sliceNodes) { assignment, value ->
                     val witness = pooled(assignment, value)
-                    val objective = value.doubleValue(exactRequired = false)
+                    val objective = value.toDouble()
                     onIncumbent(MinimizeResult.BestFound(witness.sample, objective, TerminationReason.BudgetExhausted))
                 } ?: return null
                 descentVerdict = verdict
                 return when (verdict) {
                     is OpenTheoryOptimum.Optimal -> MinimizeResult.Optimal(
                         standIn(verdict.assignment, verdict.value),
-                        verdict.value.doubleValue(exactRequired = false),
+                        verdict.value.toDouble(),
                         verdict.stats,
                     )
 
@@ -217,7 +224,7 @@ internal class OpenPortfolio(
 
                     is OpenTheoryOptimum.Unbounded -> MinimizeResult.Unbounded(
                         standIn(verdict.witness, verdict.value),
-                        verdict.value.doubleValue(exactRequired = false),
+                        verdict.value.toDouble(),
                         direction = emptyList(),
                         stats = verdict.stats,
                     )
@@ -229,7 +236,7 @@ internal class OpenPortfolio(
             }
 
             // The descent reports a verdict on a witness it installed, so the pool already holds its stand-in.
-            private fun standIn(assignment: OpenTheoryAssignment, value: BigInteger): Sample =
+            private fun standIn(assignment: OpenTheoryAssignment, value: BigInt): Sample =
                 (theoryWitnesses.firstOrNull { it.assignment === assignment } ?: pooled(assignment, value)).sample
 
             override fun close() = descent.close()
@@ -287,12 +294,12 @@ internal class OpenPortfolio(
         refuteOpenWitness(model, sample)?.let { return@WitnessCheck it }
         if (objective == null || claimed == null) return@WitnessCheck null
         val exact = objective.exactValue(sample)
-        val stated = exact.abs() <= BigInteger.fromLong(EXACT_DOUBLE_INTEGER)
-        if (!stated || exact.doubleValue(exactRequired = false) == claimed) return@WitnessCheck null
+        val stated = exact.abs() <= bigIntOf(EXACT_DOUBLE_INTEGER)
+        if (!stated || exact.toDouble() == claimed) return@WitnessCheck null
         "objective $claimed, but the assignment scores $exact"
     }
 
-    private class TheoryWitness(val sample: Sample, val assignment: OpenTheoryAssignment, val value: BigInteger?)
+    private class TheoryWitness(val sample: Sample, val assignment: OpenTheoryAssignment, val value: BigInt?)
 
     private companion object {
         const val DEFAULT_LS_ARMS: Int = 3
@@ -309,9 +316,9 @@ internal class OpenPortfolio(
 private const val EXACT_DOUBLE_INTEGER: Long = 1L shl 53
 
 // [bound] as an exact integer, or null where a Double does not state one exactly.
-private fun exactInteger(bound: Double): BigInteger? {
+private fun exactInteger(bound: Double): BigInt? {
     if (abs(bound) > EXACT_DOUBLE_INTEGER.toDouble() || bound != floor(bound)) return null
-    return BigInteger.fromLong(bound.toLong())
+    return bigIntOf(bound.toLong())
 }
 
 // [sample] moved into [searchModel]'s windows, so it seeds a search whose invariants were sized for them.
@@ -323,14 +330,14 @@ private fun inWindows(sample: Sample, searchModel: LocalSearchModel): Sample {
 }
 
 // The exact value of this objective at [sample], over the integer and Boolean terms an open optimum weights.
-private fun LinearObjective.exactValue(sample: Sample): BigInteger {
-    var total = BigInteger.fromLong(constant)
+private fun LinearObjective.exactValue(sample: Sample): BigInt {
+    var total = bigIntOf(constant)
     for (v in intCoefficients.indices) {
         if (intCoefficients[v] == 0L) continue
-        total += BigInteger.fromLong(intCoefficients[v]) * BigInteger.fromLong(sample.ints[v])
+        total += bigIntOf(intCoefficients[v]) * bigIntOf(sample.ints[v])
     }
     for (b in boolWeights.indices) {
-        if (boolWeights[b] != 0L && sample.bools[b]) total += BigInteger.fromLong(boolWeights[b])
+        if (boolWeights[b] != 0L && sample.bools[b]) total += bigIntOf(boolWeights[b])
     }
     return total
 }

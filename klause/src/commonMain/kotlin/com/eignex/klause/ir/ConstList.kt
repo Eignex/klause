@@ -1,6 +1,7 @@
 package com.eignex.klause.ir
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.unaryMinus
 
 /**
  * The constants one factor holds — the coefficients of a weighted sum, the weights of an objective.
@@ -82,14 +83,14 @@ class LongConsts(private val values: LongArray) : LongConstList {
 
 /** Integral constants beyond the 64-bit range, carried exactly. Never narrows to [LongConstList], so a
  *  64-bit consumer cannot read one by accident. */
-class WideConsts(private val values: Array<BigInteger>) : ConstList {
+class WideConsts(private val values: Array<BigInt>) : ConstList {
     override val size: Int get() = values.size
 
     /** The constant at [index]. */
-    fun at(index: Int): BigInteger = values[index]
+    fun at(index: Int): BigInt = values[index]
 
     /** A fresh array of every constant. */
-    fun toTypedArray(): Array<BigInteger> = values.copyOf()
+    fun toTypedArray(): Array<BigInt> = values.copyOf()
 
     /** The same constants with every sign flipped. */
     fun negated(): WideConsts = WideConsts(Array(values.size) { -values[it] })

@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
 
 // Stored normalized Long/IEEE data is authoritative; probe sides are absent, origins stay finite.
 internal fun LpModel.authoritativeModel(): ExactLpModel? {
@@ -12,12 +12,12 @@ internal fun LpModel.authoritativeModel(): ExactLpModel? {
     for (column in 0 until n) {
         forEachRationalColumn(column) { row, value ->
             if (!value.isZero) {
-                if (colContinuous[column] || value.den != BigInteger.ONE) integralRows[row] = false
+                if (colContinuous[column] || value.den != BIG_ONE) integralRows[row] = false
                 rowOrigins[row] += value * exactShift(column)
             }
         }
     }
-    for (row in 0 until m) integralRows[row] = integralRows[row] && (rowOrigins[row].den == BigInteger.ONE)
+    for (row in 0 until m) integralRows[row] = integralRows[row] && (rowOrigins[row].den == BIG_ONE)
     return ExactLpModel(
         List(n) { column ->
             buildList {

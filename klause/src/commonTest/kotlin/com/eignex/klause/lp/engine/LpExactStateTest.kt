@@ -1,7 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -109,7 +110,7 @@ class LpExactStateTest {
     @Test
     fun `working projections preserve rational authority and source metadata`() {
         val zero = ExactLpNumber.of(0L)
-        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val premises = ExactLpPremises(listOf(ExactLpPremise(8, true, third)))
         val model = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, third))),
@@ -145,7 +146,7 @@ class LpExactStateTest {
     @Test
     fun `matrix underflow preserves source authority while cost underflow declines`() {
         val zero = ExactLpNumber.of(0L)
-        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2048))
         for (matrixUnderflow in listOf(false, true)) {
             val model = ExactLpModel(
                 listOf(listOf(ExactLpEntry(0, if (matrixUnderflow) tiny else zero))),
@@ -268,7 +269,7 @@ class LpExactStateTest {
     fun `an underflowed bound cannot authorize cost or scale underflow`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
-        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 2048))
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2048))
         val boundModel = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, one))),
             listOf(one),
@@ -306,16 +307,16 @@ class LpExactStateTest {
     @Test
     fun `repeated scalar projection preserves raw values and exact identity`() {
         val zero = ExactLpNumber.of(0L)
-        val huge = BigInteger.ONE shl 2048
+        val huge = BIG_ONE shl 2048
         val values = listOf(
             ExactLpNumber.of(Long.MIN_VALUE),
             ExactLpNumber.of(Long.MAX_VALUE),
-            ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))),
+            ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3))),
             ExactLpNumber.ofIeee(-0.0),
             ExactLpNumber.ofIeee(Double.MIN_VALUE),
-            ExactLpNumber.of(BigFraction.of(-BigInteger.ONE, huge)),
-            ExactLpNumber.of(BigFraction.of(huge, BigInteger.ONE)),
-            ExactLpNumber.of(BigFraction.of(huge + BigInteger.ONE, huge - BigInteger.ONE)),
+            ExactLpNumber.of(BigFraction.of(-BIG_ONE, huge)),
+            ExactLpNumber.of(BigFraction.of(huge, BIG_ONE)),
+            ExactLpNumber.of(BigFraction.of(huge + BIG_ONE, huge - BIG_ONE)),
         )
         for (number in values) {
             val copy = number.ieeeBits?.let {
@@ -388,7 +389,7 @@ class LpExactStateTest {
     @Test
     fun `objective projections preserve input bits and arithmetic order`() {
         val zero = ExactLpNumber.of(0L)
-        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         for (scale in listOf(third, ExactLpNumber.ofIeee(Double.MIN_VALUE), ExactLpNumber.ofIeee(2.0))) {
             for (constant in listOf(third, ExactLpNumber.ofIeee(-0.0), ExactLpNumber.ofIeee(Double.MIN_VALUE))) {
                 val model = ExactLpModel(

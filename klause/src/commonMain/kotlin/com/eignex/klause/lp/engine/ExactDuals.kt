@@ -3,10 +3,27 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.PollStride
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.shr
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toDouble
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 import com.eignex.koblas.SparseMatrix
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.max
@@ -35,13 +52,13 @@ internal enum class ExactDualDecline { SHAPE, NOT_DYADIC, SINGULAR, NONFINITE, S
  * Bᵀy* = c_B exactly. [approximations] are the doubles nearest y* within one ulp, [magnitudes] |y*| rounded up.
  */
 internal class ExactDuals(
-    val denominator: BigInteger,
-    val scaled: Array<BigInteger>,
+    val denominator: BigInt,
+    val scaled: Array<BigInt>,
     val approximations: DoubleArray,
     val magnitudes: DoubleArray,
 ) {
     /** D·d(j) as a numerator over a positive denominator, where d(j) = c(j) − a(j)ᵀy* and D = [denominator]. */
-    fun reducedTimesDenominator(exact: ExactLpModel, j: Int): Pair<BigInteger, BigInteger> {
+    fun reducedTimesDenominator(exact: ExactLpModel, j: Int): Pair<BigInt, BigInt> {
         val cost = exact.objective.cost(j).value
         val column = if (j < exact.n) {
             exact.entries(j).map { it.row to it.number.value }
@@ -58,7 +75,7 @@ internal class ExactDuals(
         }
         if (dyadic != null) return dyadic.fraction()
         var sum = BigFraction.of(cost.num * denominator, cost.den)
-        for ((row, value) in column) sum -= value * BigFraction.of(scaled[row], BigInteger.ONE)
+        for ((row, value) in column) sum -= value * BigFraction.of(scaled[row], BIG_ONE)
         return sum.num to sum.den
     }
 }
@@ -128,8 +145,8 @@ private class ExactDualMeter(val limits: ExactDualLimits, private val cancellati
         return value
     }
 
-    fun integer(value: BigInteger): BigInteger {
-        charge(value.bitLength())
+    fun integer(value: BigInt): BigInt {
+        charge(value.magnitudeBitLength())
         return value
     }
 }
@@ -274,44 +291,44 @@ private class ExactDualRefinement(
     }
 
     // A dyadic y already solves the system exactly: its shared denominator is a power of two.
-    private fun exactOf(y: Array<Dyadic>): Pair<BigInteger, Array<BigInteger>> {
+    private fun exactOf(y: Array<Dyadic>): Pair<BigInt, Array<BigInt>> {
         val low = y.filter { !it.isZero }.minOfOrNull { it.exp } ?: 0
         val shift = maxOf(0, -low)
         val scaled = Array(m) { i ->
             val v = y[i]
-            meter.integer(if (v.isZero) BigInteger.ZERO else v.man shl (v.exp + shift))
+            meter.integer(if (v.isZero) BIG_ZERO else v.man shl (v.exp + shift))
         }
-        return (BigInteger.ONE shl shift) to scaled
+        return (BIG_ONE shl shift) to scaled
     }
 
     // Continued fractions on D·y(i), D the product of the denominators found so far, so a later component needs
     // only the bits its own new factor costs; each convergent's denominator stays within half the precision left
     // after the value's size and D. Null when the precision runs out first or the result fails to verify.
-    private fun reconstruct(y: Array<Dyadic>, precision: Int): Pair<BigInteger, Array<BigInteger>>? {
+    private fun reconstruct(y: Array<Dyadic>, precision: Int): Pair<BigInt, Array<BigInt>>? {
         val top = y.filter { !it.isZero }.maxOfOrNull { it.top } ?: 0
-        var common = BigInteger.ONE
-        val numerators = Array(m) { BigInteger.ZERO }
-        val commonAt = Array(m) { BigInteger.ONE }
+        var common = BIG_ONE
+        val numerators = Array(m) { BIG_ZERO }
+        val commonAt = Array(m) { BIG_ONE }
         for (i in 0 until m) {
             val v = y[i]
             if (v.isZero) {
-                numerators[i] = BigInteger.ZERO
+                numerators[i] = BIG_ZERO
                 commonAt[i] = common
                 continue
             }
-            val limitBits = (precision - maxOf(top, 0) - common.bitLength()) / 2 - 2
+            val limitBits = (precision - maxOf(top, 0) - common.magnitudeBitLength()) / 2 - 2
             if (limitBits < 1) return null
-            val limit = BigInteger.ONE shl limitBits
+            val limit = BIG_ONE shl limitBits
             var a = meter.integer(v.man.abs() * common)
-            var b = BigInteger.ONE
+            var b = BIG_ONE
             if (v.exp >= 0) a = meter.integer(a shl v.exp) else b = b shl -v.exp
-            var p0 = BigInteger.ZERO
-            var p1 = BigInteger.ONE
-            var q0 = BigInteger.ONE
-            var q1 = BigInteger.ZERO
+            var p0 = BIG_ZERO
+            var p1 = BIG_ONE
+            var q0 = BIG_ONE
+            var q1 = BIG_ZERO
             while (!b.isZero()) {
-                val division = a.divrem(b)
-                val quotient = meter.integer(division.quotient)
+                val quotient = meter.integer(a / b)
+                val remainder = a - quotient * b
                 val q = meter.integer(quotient * q1 + q0)
                 if (q > limit) break
                 val p = meter.integer(quotient * p1 + p0)
@@ -320,7 +337,7 @@ private class ExactDualRefinement(
                 q0 = q1
                 q1 = q
                 a = b
-                b = meter.integer(division.remainder)
+                b = meter.integer(remainder)
             }
             common = meter.integer(common * q1)
             numerators[i] = if (v.man.signum() < 0) -p1 else p1
@@ -331,7 +348,7 @@ private class ExactDualRefinement(
     }
 
     // Bᵀ(D·y*) = D·c_B, exactly.
-    private fun solves(denominator: BigInteger, scaled: Array<BigInteger>): Boolean {
+    private fun solves(denominator: BigInt, scaled: Array<BigInt>): Boolean {
         val d = Dyadic(denominator, 0)
         for (k in 0 until m) {
             var sum = meter.dyadic(costs[k] * d)
@@ -347,7 +364,7 @@ private class ExactDualRefinement(
     }
 
     @Suppress("ThrowsCount")
-    private fun verified(candidate: Pair<BigInteger, Array<BigInteger>>): ExactDualsOutcome {
+    private fun verified(candidate: Pair<BigInt, Array<BigInt>>): ExactDualsOutcome {
         val (denominator, scaled) = candidate
         if (!solves(denominator, scaled)) throw ExactDualStop(ExactDualDecline.STALLED)
         val approximations = DoubleArray(m)
@@ -366,20 +383,20 @@ private class ExactDualRefinement(
             ExactDuals(denominator, scaled, approximations, magnitudes),
             null,
             meter.steps,
-            denominator.bitLength(),
+            denominator.magnitudeBitLength(),
         )
     }
 }
 
 // An exact dyadic rational man·2^exp. Sums align to the lower exponent, so a mantissa spans only the bits its value
 // carries and needs no normalizing.
-private class Dyadic(val man: BigInteger, val exp: Int) {
+private class Dyadic(val man: BigInt, val exp: Int) {
     val isZero: Boolean get() = man.isZero()
 
     // 2^(top − 1) ≤ |value| < 2^top.
-    val top: Int get() = man.abs().bitLength() + exp
+    val top: Int get() = man.abs().magnitudeBitLength() + exp
 
-    val width: Int get() = man.abs().bitLength()
+    val width: Int get() = man.abs().magnitudeBitLength()
 
     operator fun plus(other: Dyadic): Dyadic {
         if (isZero) return other
@@ -397,18 +414,17 @@ private class Dyadic(val man: BigInteger, val exp: Int) {
     fun toDouble(shift: Int): Double {
         if (isZero) return 0.0
         val magnitude = man.abs()
-        val drop = maxOf(0, magnitude.bitLength() - LEADING_BITS)
-        val leading = (magnitude shr drop).longValue(exactRequired = true).toDouble()
+        val drop = maxOf(0, magnitude.magnitudeBitLength() - LEADING_BITS)
+        val leading = (magnitude shr drop).toLongExact().toDouble()
         val value = timesPowerOfTwo(leading, exp.toLong() + drop + shift)
         return if (man.signum() < 0) -value else value
     }
 
-    fun fraction(): Pair<BigInteger, BigInteger> =
-        if (exp >= 0) (man shl exp) to BigInteger.ONE else man to (BigInteger.ONE shl -exp)
+    fun fraction(): Pair<BigInt, BigInt> = if (exp >= 0) (man shl exp) to BIG_ONE else man to (BIG_ONE shl -exp)
 
     companion object {
-        val ZERO = Dyadic(BigInteger.ZERO, 0)
-        val ONE = Dyadic(BigInteger.ONE, 0)
+        val ZERO = Dyadic(BIG_ZERO, 0)
+        val ONE = Dyadic(BIG_ONE, 0)
 
         fun of(value: Double): Dyadic? {
             if (value == 0.0) return ZERO
@@ -425,25 +441,25 @@ private class Dyadic(val man: BigInteger, val exp: Int) {
             val zeros = mantissa.countTrailingZeroBits()
             mantissa = mantissa shr zeros
             exponent += zeros
-            return Dyadic(BigInteger.fromLong(if (bits < 0L) -mantissa else mantissa), exponent)
+            return Dyadic(bigIntOf(if (bits < 0L) -mantissa else mantissa), exponent)
         }
 
         // Null when the denominator is not a power of two.
         fun of(value: BigFraction): Dyadic? {
             val den = value.den
-            if (den != BigInteger.ONE shl (den.bitLength() - 1)) return null
-            return Dyadic(value.num, 1 - den.bitLength())
+            if (den != BIG_ONE shl (den.magnitudeBitLength() - 1)) return null
+            return Dyadic(value.num, 1 - den.magnitudeBitLength())
         }
     }
 }
 
 /** [numerator] / [denominator] for positive integers, rounded up to a double; null past the double range. */
-internal fun quotientAbove(numerator: BigInteger, denominator: BigInteger): Double? {
+internal fun quotientAbove(numerator: BigInt, denominator: BigInt): Double? {
     if (numerator.isZero()) return 0.0
-    val shift = numerator.bitLength() - denominator.bitLength() - QUOTIENT_BITS
+    val shift = numerator.magnitudeBitLength() - denominator.magnitudeBitLength() - QUOTIENT_BITS
     val quotient = if (shift >= 0) numerator / (denominator shl shift) else (numerator shl -shift) / denominator
     // The floored quotient plus one bounds the true one; its double and every power-of-two step round up.
-    var bound = (quotient + BigInteger.ONE).doubleValue(exactRequired = false).nextUp()
+    var bound = (quotient + BIG_ONE).toDouble().nextUp()
     var exponent = shift
     while (exponent > 0) {
         val step = minOf(exponent, POW2_STEP)
@@ -460,13 +476,13 @@ internal fun quotientAbove(numerator: BigInteger, denominator: BigInteger): Doub
 
 // [numerator] / [denominator] for positive integers within one ulp while normal: a 62-bit floored quotient rounded
 // once to a double, then scaled exactly by powers of two.
-private fun quotientNearest(numerator: BigInteger, denominator: BigInteger): Double {
-    val shift = numerator.bitLength() - denominator.bitLength() - LEADING_BITS
+private fun quotientNearest(numerator: BigInt, denominator: BigInt): Double {
+    val shift = numerator.magnitudeBitLength() - denominator.magnitudeBitLength() - LEADING_BITS
     val quotient = if (shift >= 0) numerator / (denominator shl shift) else (numerator shl -shift) / denominator
-    val leading = if (quotient.bitLength() > LEADING_BITS) {
-        (quotient shr 1).longValue(exactRequired = true).toDouble() * 2.0
+    val leading = if (quotient.magnitudeBitLength() > LEADING_BITS) {
+        (quotient shr 1).toLongExact().toDouble() * 2.0
     } else {
-        quotient.longValue(exactRequired = true).toDouble()
+        quotient.toLongExact().toDouble()
     }
     return timesPowerOfTwo(leading, shift.toLong())
 }

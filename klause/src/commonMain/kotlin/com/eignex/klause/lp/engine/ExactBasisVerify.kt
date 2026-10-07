@@ -7,8 +7,16 @@ import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 internal data class ExactBasisLimits(
     val factor: RationalBasisLimits = RationalBasisLimits(),
@@ -309,27 +317,27 @@ private fun verifyBasisCandidates(
 // The Long ray is a live integer-consumer projection; the rational conflict survives projection decline.
 private fun projectBasisConflict(rows: Int, conflict: BigRationalConflict, meter: ExactBasisMeter): LongArray {
     meter.phase = ExactBasisPhase.PROJECTION
-    var denominator = BigInteger.ONE
+    var denominator = BIG_ONE
     for (value in conflict.multipliers) {
-        meter.fraction(BigFraction.of(denominator, BigInteger.ONE))
+        meter.fraction(BigFraction.of(denominator, BIG_ONE))
         meter.fraction(value)
-        val bits = denominator.bitLength().toLong() + value.den.bitLength()
+        val bits = denominator.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
         meter.charge((bits + 63L) / 64L, 1024L + bits * 64L)
         denominator = denominator / denominator.gcd(value.den) * value.den
-        meter.fraction(BigFraction.of(denominator, BigInteger.ONE))
+        meter.fraction(BigFraction.of(denominator, BIG_ONE))
     }
     meter.charge(rows.toLong(), rows * 16L)
     val result = LongArray(rows)
-    val lower = BigInteger.fromLong(Long.MIN_VALUE)
-    val upper = BigInteger.fromLong(Long.MAX_VALUE)
+    val lower = bigIntOf(Long.MIN_VALUE)
+    val upper = bigIntOf(Long.MAX_VALUE)
     for (i in conflict.rows.indices) {
         val value = conflict.multipliers[i]
-        val bits = denominator.bitLength().toLong() + value.num.bitLength()
+        val bits = denominator.magnitudeBitLength().toLong() + value.num.magnitudeBitLength()
         meter.charge((bits + 63L) / 64L, 1024L + bits * 64L)
         val scaled = -(denominator / value.den * value.num)
-        meter.fraction(BigFraction.of(scaled, BigInteger.ONE))
+        meter.fraction(BigFraction.of(scaled, BIG_ONE))
         if (scaled < lower || scaled > upper) throw ExactBasisStop(ExactBasisDecline.PROJECTION)
-        result[conflict.rows[i]] = scaled.longValue(exactRequired = true)
+        result[conflict.rows[i]] = scaled.toLongExact()
     }
     return result
 }

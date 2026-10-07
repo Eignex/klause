@@ -1054,7 +1054,7 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZ)V
 	public synthetic fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> ([I[ILcom/eignex/klause/ir/LinearOp;I)V
-	public fun <init> ([I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/ir/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public fun <init> ([I[Ljava/math/BigInteger;Lcom/eignex/klause/ir/LinearOp;Ljava/math/BigInteger;)V
 	public fun <init> ([J[ILcom/eignex/klause/ir/LinearOp;J)V
 	public fun <init> ([J[I[D[ILcom/eignex/klause/ir/LinearOp;J)V
 	public fun canSubstituteAffine (IIII)Z
@@ -1156,7 +1156,7 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/
 
 public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eignex/klause/factor/ReifiedFactor {
 	public fun <init> (I[I[ILcom/eignex/klause/ir/LinearOp;I)V
-	public fun <init> (I[I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/ir/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public fun <init> (I[I[Ljava/math/BigInteger;Lcom/eignex/klause/ir/LinearOp;Ljava/math/BigInteger;)V
 	public fun <init> (I[J[ILcom/eignex/klause/ir/LinearOp;J)V
 	public fun canSubstituteAffine (IIII)Z
 	public fun getAuxBoolVar ()I
@@ -2436,14 +2436,14 @@ public final class com/eignex/klause/formats/opb/OpbProblem {
 }
 
 public final class com/eignex/klause/formats/opb/OpbRelation {
-	public fun <init> (Ljava/util/List;Lcom/eignex/klause/model/PbOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/model/PbOp;Ljava/math/BigInteger;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()Lcom/eignex/klause/model/PbOp;
-	public final fun component3 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public final fun copy (Ljava/util/List;Lcom/eignex/klause/model/PbOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/formats/opb/OpbRelation;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/opb/OpbRelation;Ljava/util/List;Lcom/eignex/klause/model/PbOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;ILjava/lang/Object;)Lcom/eignex/klause/formats/opb/OpbRelation;
+	public final fun component3 ()Ljava/math/BigInteger;
+	public final fun copy (Ljava/util/List;Lcom/eignex/klause/model/PbOp;Ljava/math/BigInteger;)Lcom/eignex/klause/formats/opb/OpbRelation;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/opb/OpbRelation;Ljava/util/List;Lcom/eignex/klause/model/PbOp;Ljava/math/BigInteger;ILjava/lang/Object;)Lcom/eignex/klause/formats/opb/OpbRelation;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getBound ()Ljava/math/BigInteger;
 	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
 	public final fun getTerms ()Ljava/util/List;
 	public fun hashCode ()I
@@ -2489,13 +2489,13 @@ public final class com/eignex/klause/formats/opb/OpbStatement$SoftHeader : com/e
 }
 
 public final class com/eignex/klause/formats/opb/OpbTerm {
-	public fun <init> (Lcom/ionspin/kotlin/bignum/integer/BigInteger;[I)V
-	public final fun component1 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun <init> (Ljava/math/BigInteger;[I)V
+	public final fun component1 ()Ljava/math/BigInteger;
 	public final fun component2 ()[I
-	public final fun copy (Lcom/ionspin/kotlin/bignum/integer/BigInteger;[I)Lcom/eignex/klause/formats/opb/OpbTerm;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/opb/OpbTerm;Lcom/ionspin/kotlin/bignum/integer/BigInteger;[IILjava/lang/Object;)Lcom/eignex/klause/formats/opb/OpbTerm;
+	public final fun copy (Ljava/math/BigInteger;[I)Lcom/eignex/klause/formats/opb/OpbTerm;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/opb/OpbTerm;Ljava/math/BigInteger;[IILjava/lang/Object;)Lcom/eignex/klause/formats/opb/OpbTerm;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCoefficient ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getCoefficient ()Ljava/math/BigInteger;
 	public final fun getLiterals ()[I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -2749,9 +2749,9 @@ public final class com/eignex/klause/ir/IntBounds {
 	public final fun isOpenLower (I)Z
 	public final fun isOpenUpper (I)Z
 	public final fun lower (I)J
-	public final fun lowerAsBigInteger (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun lowerAsBigInteger (I)Ljava/math/BigInteger;
 	public final fun upper (I)J
-	public final fun upperAsBigInteger (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun upperAsBigInteger (I)Ljava/math/BigInteger;
 }
 
 public final class com/eignex/klause/ir/IntBounds$Companion {
@@ -2829,17 +2829,17 @@ public final class com/eignex/klause/ir/IntVars : com/eignex/klause/ir/VarList {
 public final class com/eignex/klause/ir/IntegerConstants : com/eignex/klause/ir/IntegralConstants {
 	public fun <init> (Lcom/eignex/klause/ir/LongConstList;J)V
 	public final fun coeff (I)J
-	public fun exactCoeff (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun exactCoeff (I)Ljava/math/BigInteger;
 	public final fun getBound ()J
 	public final fun getCoefficients ()Lcom/eignex/klause/ir/LongConstList;
 	public final fun getCoeffs ()[J
-	public fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun getExactBound ()Ljava/math/BigInteger;
 	public final fun getMaxAbsCoeff ()J
 }
 
 public abstract interface class com/eignex/klause/ir/IntegralConstants : com/eignex/klause/ir/LinearConstants {
-	public abstract fun exactCoeff (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public abstract fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public abstract fun exactCoeff (I)Ljava/math/BigInteger;
+	public abstract fun getExactBound ()Ljava/math/BigInteger;
 }
 
 public abstract interface class com/eignex/klause/ir/LinearConstants {
@@ -3136,19 +3136,19 @@ public final class com/eignex/klause/ir/VarRemap {
 }
 
 public final class com/eignex/klause/ir/WideConstants : com/eignex/klause/ir/IntegralConstants {
-	public fun <init> (Lcom/eignex/klause/ir/WideConsts;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
-	public fun exactCoeff (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public final fun getBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun <init> (Lcom/eignex/klause/ir/WideConsts;Ljava/math/BigInteger;)V
+	public fun exactCoeff (I)Ljava/math/BigInteger;
+	public final fun getBound ()Ljava/math/BigInteger;
 	public final fun getCoefficients ()Lcom/eignex/klause/ir/WideConsts;
-	public fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun getExactBound ()Ljava/math/BigInteger;
 }
 
 public final class com/eignex/klause/ir/WideConsts : com/eignex/klause/ir/ConstList {
-	public fun <init> ([Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
-	public final fun at (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun <init> ([Ljava/math/BigInteger;)V
+	public final fun at (I)Ljava/math/BigInteger;
 	public fun getSize ()I
 	public final fun negated ()Lcom/eignex/klause/ir/WideConsts;
-	public final fun toTypedArray ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun toTypedArray ()[Ljava/math/BigInteger;
 }
 
 public abstract interface class com/eignex/klause/localsearch/AcceptanceCriterion {
@@ -8273,8 +8273,8 @@ public final class com/eignex/klause/simplex/exact/BigFraction {
 	public static final field Companion Lcom/eignex/klause/simplex/exact/BigFraction$Companion;
 	public final fun compareTo (Lcom/eignex/klause/simplex/exact/BigFraction;)I
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDen ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public final fun getNum ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getDen ()Ljava/math/BigInteger;
+	public final fun getNum ()Ljava/math/BigInteger;
 	public fun hashCode ()I
 	public final fun isZero ()Z
 	public final fun minus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
@@ -8291,7 +8291,7 @@ public final class com/eignex/klause/simplex/exact/BigFraction$Companion {
 	public final fun getMINUS_ONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun getONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun getZERO ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun of (Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun of (Ljava/math/BigInteger;Ljava/math/BigInteger;)Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun ofDouble (D)Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun ofLong (J)Lcom/eignex/klause/simplex/exact/BigFraction;
 }
@@ -9104,11 +9104,11 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactL
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Rebuilt : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;[Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;[Z[Ljava/math/BigInteger;)V
 	public fun boolValue (I)Z
 	public final fun getBase ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public final fun getBools ()[Z
-	public final fun getInts ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getInts ()[Ljava/math/BigInteger;
 	public fun intValue (I)Ljava/lang/String;
 	public fun realValue (I)Ljava/lang/String;
 }
@@ -9170,18 +9170,18 @@ public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryOpti
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
-	public final fun component2 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun component2 ()Ljava/math/BigInteger;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getIncumbent ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun getValue ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getValue ()Ljava/math/BigInteger;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -9198,30 +9198,30 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasibl
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
-	public final fun component2 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun component2 ()Ljava/math/BigInteger;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun getValue ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getValue ()Ljava/math/BigInteger;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
-	public final fun component2 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun component2 ()Ljava/math/BigInteger;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Ljava/math/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun getValue ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getValue ()Ljava/math/BigInteger;
 	public final fun getWitness ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -11673,15 +11673,15 @@ public final class com/eignex/klause/theory/qflra/ExactLinearFragmentKt {
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
-	public fun <init> ([Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Ljava/util/List;)V
+	public fun <init> ([Z[Ljava/math/BigInteger;Ljava/util/List;)V
 	public final fun component1 ()[Z
-	public final fun component2 ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun component2 ()[Ljava/math/BigInteger;
 	public final fun component3 ()Ljava/util/List;
-	public final fun copy ([Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Ljava/util/List;)Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;
-	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;[Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;
+	public final fun copy ([Z[Ljava/math/BigInteger;Ljava/util/List;)Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;[Z[Ljava/math/BigInteger;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBools ()[Z
-	public final fun getInts ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getInts ()[Ljava/math/BigInteger;
 	public final fun getReals ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -11759,6 +11759,42 @@ public final class com/eignex/klause/theory/qflra/SourceBoundTerm {
 	public final fun getSource ()Lcom/eignex/klause/solver/search/SearchValueKey;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/util/BigIntKt {
+	public static final fun maxOf (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun minOf (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+}
+
+public final class com/eignex/klause/util/BigInt_jvmKt {
+	public static final fun abs (Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun bigIntOf (I)Ljava/math/BigInteger;
+	public static final fun bigIntOf (J)Ljava/math/BigInteger;
+	public static final fun bigIntOf-VKZWuLQ (J)Ljava/math/BigInteger;
+	public static final fun compareTo (Ljava/math/BigInteger;Ljava/math/BigInteger;)I
+	public static final fun div (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun fitsLong (Ljava/math/BigInteger;)Z
+	public static final fun floorBigInt (D)Ljava/math/BigInteger;
+	public static final fun gcd (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun getBIG_ONE ()Ljava/math/BigInteger;
+	public static final fun getBIG_TEN ()Ljava/math/BigInteger;
+	public static final fun getBIG_TWO ()Ljava/math/BigInteger;
+	public static final fun getBIG_ZERO ()Ljava/math/BigInteger;
+	public static final fun isZero (Ljava/math/BigInteger;)Z
+	public static final fun magnitudeBitLength (Ljava/math/BigInteger;)I
+	public static final fun minus (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun negate (Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun parseBigInt (Ljava/lang/String;)Ljava/math/BigInteger;
+	public static final fun plus (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun rem (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun shl (Ljava/math/BigInteger;I)Ljava/math/BigInteger;
+	public static final fun shr (Ljava/math/BigInteger;I)Ljava/math/BigInteger;
+	public static final fun signum (Ljava/math/BigInteger;)I
+	public static final fun times (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun toDouble (Ljava/math/BigInteger;)D
+	public static final fun toLong (Ljava/math/BigInteger;)J
+	public static final fun toLongExact (Ljava/math/BigInteger;)J
+	public static final fun unaryMinus (Ljava/math/BigInteger;)Ljava/math/BigInteger;
 }
 
 public final class com/eignex/klause/util/Bits {

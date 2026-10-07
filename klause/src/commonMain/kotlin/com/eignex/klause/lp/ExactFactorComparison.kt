@@ -9,7 +9,8 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
 
 /** Exact values of the mixed columns an [ExactComparison] states its terms over. */
 internal interface ExactColumnValues {
@@ -240,7 +241,7 @@ internal fun exactColumnUpper(column: Int, bound: BigFraction): ExactRationalIne
     exactRow(mapOf(column to BigFraction.ONE), bound)
 
 /** This integer as the exact fraction it is. */
-internal fun BigInteger.asFraction(): BigFraction = BigFraction.of(this, BigInteger.ONE)
+internal fun BigInt.asFraction(): BigFraction = BigFraction.of(this, BIG_ONE)
 
 /** This finite double as the exact fraction it is: every finite double is one exactly. */
 internal fun Double.asFraction(): BigFraction = requireNotNull(BigFraction.ofDouble(this))

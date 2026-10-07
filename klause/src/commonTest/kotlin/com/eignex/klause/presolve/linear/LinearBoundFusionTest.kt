@@ -15,8 +15,9 @@ import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -132,10 +133,10 @@ class LinearBoundFusionTest {
 
     @Test
     fun `wide proportional bounds fuse without narrowing their constants`() {
-        val huge = BigInteger.ONE shl 100
+        val huge = BIG_ONE shl 100
         val model = problem(
-            Linear(intArrayOf(0, 1), arrayOf(huge, huge), LinearOp.LE, huge * 3),
-            Linear(intArrayOf(0, 1), arrayOf(huge, huge), LinearOp.GE, huge * 3),
+            Linear(intArrayOf(0, 1), arrayOf(huge, huge), LinearOp.LE, huge * bigIntOf(3)),
+            Linear(intArrayOf(0, 1), arrayOf(huge, huge), LinearOp.GE, huge * bigIntOf(3)),
         )
 
         val delta = Presolve.fuseLinearBounds(model)
@@ -179,9 +180,9 @@ class LinearBoundFusionTest {
 
     @Test
     fun `wide and long rows share the same normalized bound group`() {
-        val huge = BigInteger.ONE shl 100
+        val huge = BIG_ONE shl 100
         val model = problem(
-            Linear(intArrayOf(0, 1), arrayOf(huge, huge), LinearOp.LE, huge * 3),
+            Linear(intArrayOf(0, 1), arrayOf(huge, huge), LinearOp.LE, huge * bigIntOf(3)),
             ge(intArrayOf(1, 1), intArrayOf(0, 1), 3),
         )
 

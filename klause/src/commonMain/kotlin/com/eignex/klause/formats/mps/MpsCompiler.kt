@@ -26,10 +26,23 @@ import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyLongArray
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.div
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 import kotlin.math.abs
 import kotlin.math.absoluteValue
 import kotlin.math.ceil
@@ -359,7 +372,7 @@ data class MpsSourceWitness(
 /** Primal feasibility tolerance of MPS results under tolerance semantics, the HiGHS default. */
 const val MPS_TOLERANCE: Double = 1e-7
 
-private val MPS_TOLERANCE_EXACT = BigFraction.of(BigInteger.ONE, BigInteger.fromLong(10_000_000L))
+private val MPS_TOLERANCE_EXACT = BigFraction.of(BIG_ONE, bigIntOf(10_000_000L))
 
 /** Bounds at or beyond this magnitude are the MPS "infinity" convention (`1e30`), not a literal bound. */
 private const val MPS_INFINITY = 1e20
@@ -377,7 +390,7 @@ private const val MPS_INFINITY = 1e20
  *    a purely-integer row with a fractional coefficient is multiplied onto the least common denominator
  *    of the decimals it is written with, so the integer row restates the source rather than rounding it.
  *    A row no power of ten restates exactly on [Long] is rebuilt from its exact source numbers, over
- *    [BigInteger] coefficients when they outgrow [Long].
+ *    [BigInt] coefficients when they outgrow [Long].
  *  - an objective too wide for one power of ten is restated as an auxiliary continuous column `z` with
  *    the real row `z = Σ cᵢxᵢ + constant`, and `z` is optimized; [MpsCompiled.columns] omits `z`.
  */
@@ -645,8 +658,8 @@ private fun MpsModel.exactAdapterSnapshot(): MpsModel = MpsModel(
 ).withSourceNumbers(sourceNumbers())
 
 private val MPS_INFINITY_EXACT = BigFraction.of(
-    BigInteger.parseString("100000000000000000000", 10),
-    BigInteger.ONE,
+    parseBigInt("100000000000000000000"),
+    BIG_ONE,
 )
 
 private fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
@@ -656,8 +669,7 @@ private fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
 private fun MpsSourceNumber.shiftedBy(origin: ExactLpNumber): ExactLpNumber =
     if (origin.value.isZero) toExactLpNumber() else ExactLpNumber.of(fraction - origin.value)
 
-private fun com.ionspin.kotlin.bignum.integer.BigInteger.isOne(): Boolean =
-    this == com.ionspin.kotlin.bignum.integer.BigInteger.ONE
+private fun BigInt.isOne(): Boolean = this == BIG_ONE
 
 /**
  * Emit a purely-integer row over integer-variable ids, multiplied onto the scale that carries its coefficients and
@@ -682,7 +694,7 @@ private inline fun emitIntRow(
             val narrow = row.narrowCoefficients
             factors.add(
                 if (narrow != null && side.bound.fitsLong()) {
-                    Linear(narrow, row.vars, side.op, side.bound.longValue())
+                    Linear(narrow, row.vars, side.op, side.bound.toLongExact())
                 } else {
                     Linear(row.vars, row.coefficients, side.op, side.bound)
                 },
@@ -710,7 +722,7 @@ private fun MpsConstraint.integerRowScale(): RowScale {
 }
 
 /** One side `Σ coefficients·vars ⟨op⟩ bound` of an [ExactIntegerRow]. */
-private class ExactIntegerSide(val op: LinearOp, val bound: BigInteger) {
+private class ExactIntegerSide(val op: LinearOp, val bound: BigInt) {
     fun holdsWithoutTerms(): Boolean = when (op) {
         LinearOp.LE -> bound.signum() >= 0
         LinearOp.GE -> bound.signum() <= 0
@@ -720,14 +732,14 @@ private class ExactIntegerSide(val op: LinearOp, val bound: BigInteger) {
 }
 
 /** A purely-integer source row over distinct integer-variable ids with coprime whole coefficients. */
-private class ExactIntegerRow(
-    val vars: IntArray,
-    val coefficients: Array<BigInteger>,
-    val sides: List<ExactIntegerSide>,
-) {
+private class ExactIntegerRow(val vars: IntArray, val coefficients: Array<BigInt>, val sides: List<ExactIntegerSide>) {
     /** The coefficients as [Long], or null when one does not fit. */
     val narrowCoefficients: LongArray? =
-        if (coefficients.all { it.fitsLong() }) LongArray(coefficients.size) { coefficients[it].longValue() } else null
+        if (coefficients.all { it.fitsLong() }) {
+            LongArray(coefficients.size) { coefficients[it].toLongExact() }
+        } else {
+            null
+        }
 }
 
 /**
@@ -749,12 +761,12 @@ private fun exactIntegerRow(
         sums[variable] = (sums[variable] ?: BigFraction.ZERO) + numbers[entry].fraction
     }
     val terms = sums.entries.filter { !it.value.isZero }
-    var denominator = BigInteger.ONE
+    var denominator = BIG_ONE
     for ((_, value) in terms) denominator = denominator / denominator.gcd(value.den) * value.den
     val scaled = terms.map { (_, value) -> value.num * (denominator / value.den) }
-    var divisor: BigInteger? = null
+    var divisor: BigInt? = null
     for (value in scaled) divisor = divisor?.gcd(value.abs()) ?: value.abs()
-    val multiplier = BigFraction.of(denominator, divisor ?: BigInteger.ONE)
+    val multiplier = BigFraction.of(denominator, divisor ?: BIG_ONE)
     val (lower, upper) = source.constraintBounds[rowIndex]
     val low = lower.finiteMps()?.fraction?.times(multiplier)
     val high = upper.finiteMps()?.fraction?.times(multiplier)
@@ -768,22 +780,17 @@ private fun exactIntegerRow(
     }
     return ExactIntegerRow(
         IntArray(terms.size) { terms[it].key },
-        Array(scaled.size) { scaled[it] / (divisor ?: BigInteger.ONE) },
+        Array(scaled.size) { scaled[it] / (divisor ?: BIG_ONE) },
         sides,
     )
 }
 
-private fun BigFraction.floor(): BigInteger {
+private fun BigFraction.floor(): BigInt {
     val quotient = num / den
-    return if (num.signum() < 0 && quotient * den != num) quotient - BigInteger.ONE else quotient
+    return if (num.signum() < 0 && quotient * den != num) quotient - BIG_ONE else quotient
 }
 
-private fun BigFraction.ceil(): BigInteger = -negated().floor()
-
-private val LONG_MIN = BigInteger.fromLong(Long.MIN_VALUE)
-private val LONG_MAX = BigInteger.fromLong(Long.MAX_VALUE)
-
-private fun BigInteger.fitsLong(): Boolean = this in LONG_MIN..LONG_MAX
+private fun BigFraction.ceil(): BigInt = -negated().floor()
 
 /** A row's terms split into its integer and its continuous part, each variable-id/coefficient parallel. */
 private class RealRowParts(
@@ -887,7 +894,7 @@ private fun MpsModel.sourceMismatch(
         fun retained(value: Double): BigFraction? = if (scale == null) {
             BigFraction.ofDouble(value)
         } else {
-            BigFraction.of(BigInteger.fromLong(scale.scale(value)), BigInteger.fromLong(scale.multiplier))
+            BigFraction.of(bigIntOf(scale.scale(value)), bigIntOf(scale.multiplier))
         }
         for (entry in objective.indices.indices) {
             if (retained(objectiveRow.coeffs[entry]) != source.objectiveCoefficients[entry].fraction.negated()) {
@@ -1111,7 +1118,7 @@ private inline fun emitIndicatedIntRow(
             val narrow = row.narrowCoefficients
             factors.add(
                 if (narrow != null && side.bound.fitsLong()) {
-                    ReifiedLinear(cond, narrow, row.vars, side.op, side.bound.longValue())
+                    ReifiedLinear(cond, narrow, row.vars, side.op, side.bound.toLongExact())
                 } else {
                     ReifiedLinear(cond, row.vars, row.coefficients, side.op, side.bound)
                 },

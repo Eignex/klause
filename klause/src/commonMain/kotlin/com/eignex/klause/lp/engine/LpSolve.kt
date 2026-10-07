@@ -7,8 +7,17 @@ import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactSimplexBound
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.toLongExact
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -697,8 +706,8 @@ internal fun certifyLpBound(
         val numerator = certificate.objectiveNumerator()
         return CertifiedLpBound(
             BigFraction.of(
-                (BigInteger.fromLong(numerator.hi) shl 64) + BigInteger.fromULong(numerator.lo.toULong()),
-                BigInteger.ONE shl certificate.objectiveScaleBits,
+                (bigIntOf(numerator.hi) shl 64) + bigIntOf(numerator.lo.toULong()),
+                BIG_ONE shl certificate.objectiveScaleBits,
             ),
             certificate,
         )
@@ -968,7 +977,7 @@ internal fun checkedLpUnboundedness(
     val point = checkedLpWitness(model, witness.primal) ?: return null
     val state = model.exactState
     if (state != null && point.primal.indices.any {
-            state.model.column(it).integral && point.primal[it].den != BigInteger.ONE
+            state.model.column(it).integral && point.primal[it].den != BIG_ONE
         }
     ) {
         return null
@@ -977,7 +986,7 @@ internal fun checkedLpUnboundedness(
     if (state != null && ray.indices.any {
             state.model.column(
                 it,
-            ).integral && ray[it].den != BigInteger.ONE
+            ).integral && ray[it].den != BIG_ONE
         }
     ) {
         return null
@@ -998,14 +1007,14 @@ internal fun checkedLpUnboundedness(
     if (state != null) {
         for (row in slackRay.indices) {
             if (!state.model.column(model.n + row).integral) continue
-            if (slackRay[row].den != BigInteger.ONE) return null
+            if (slackRay[row].den != BIG_ONE) return null
             var slackPoint = model.exactRhs(row)
             for (j in point.primal.indices) {
                 model.forEachRationalColumn(j) { i, a ->
                     if (i == row) slackPoint -= a * (point.primal[j] - model.exactShift(j))
                 }
             }
-            if (slackPoint.den != BigInteger.ONE) return null
+            if (slackPoint.den != BIG_ONE) return null
         }
     }
     return if (improvement.signum() < 0) ExactLpUnboundedness(point, ray) else null
@@ -1133,27 +1142,27 @@ internal fun LpModel.hasIntegralObjective(): Boolean {
         for (j in 0 until numVars) {
             val c = source.objective.cost(j).value * scale
             if (c.isZero) continue
-            if (j >= n || !source.column(j).integral || c.den != BigInteger.ONE) return false
+            if (j >= n || !source.column(j).integral || c.den != BIG_ONE) return false
             constant -= c * source.column(j).origin.value
         }
-        return constant.den == BigInteger.ONE
+        return constant.den == BIG_ONE
     }
     if (doubleView == null) return cost.indices.all { cost[it] == 0L || (it < n && !colContinuous[it]) }
     var sourceConstant = exactConstant()
     for (j in 0 until numVars) {
         val c = exactCost(j)
         if (c.isZero) continue
-        if (j >= n || colContinuous[j] || c.den != BigInteger.ONE) return false
+        if (j >= n || colContinuous[j] || c.den != BIG_ONE) return false
         sourceConstant -= c * exactShift(j)
     }
-    return sourceConstant.den == BigInteger.ONE
+    return sourceConstant.den == BIG_ONE
 }
 
 internal fun BigFraction.ceilLong(): Long? {
     var ceiling = num / den
-    if (num.signum() > 0 && !(num % den).isZero()) ceiling += BigInteger.ONE
-    if (ceiling < BigInteger.fromLong(Long.MIN_VALUE) || ceiling > BigInteger.fromLong(Long.MAX_VALUE)) return null
-    return ceiling.longValue(exactRequired = true)
+    if (num.signum() > 0 && !(num % den).isZero()) ceiling += BIG_ONE
+    if (ceiling < bigIntOf(Long.MIN_VALUE) || ceiling > bigIntOf(Long.MAX_VALUE)) return null
+    return ceiling.toLongExact()
 }
 
 // A bounded value snapshot prevents sibling, objective and premise changes from reusing counters.

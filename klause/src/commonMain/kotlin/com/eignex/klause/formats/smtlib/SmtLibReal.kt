@@ -12,7 +12,22 @@ import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TEN
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.rem
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLong
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 // Real-arithmetic lowering for the SMT-LIB front-end (LRA / the real half of LIRA): real variables
 // become LP-only continuous columns and top-level linear real constraints become real Linear rows —
@@ -43,9 +58,9 @@ internal fun LinComb.toRealComb(): RealComb = RealComb(
 /** Embed an arbitrary-precision integer combination into the reals; [RealComb] is exact rational
  *  already, so a magnitude past 64 bits needs no approximation on the way in. */
 internal fun WideLinComb.toRealComb(): RealComb = RealComb(
-    coeffs.mapValues { BigFraction.of(it.value, BigInteger.ONE) },
+    coeffs.mapValues { BigFraction.of(it.value, BIG_ONE) },
     emptyMap(),
-    BigFraction.of(constant, BigInteger.ONE),
+    BigFraction.of(constant, BIG_ONE),
 )
 
 /** Syntactic real classifier, worklist-driven like [Compiler.Builder.isBoolExpr] so a deeply
@@ -100,10 +115,10 @@ internal fun parseRealLiteral(s: String): BigFraction? {
     val dot = body.indexOf('.')
     val digits = if (dot < 0) body else body.substring(0, dot) + body.substring(dot + 1)
     if (digits.isEmpty() || digits.any { it !in '0'..'9' }) return null
-    var num = BigInteger.parseString(digits, 10)
+    var num = parseBigInt(digits)
     if (negative) num = -num
-    var den = BigInteger.ONE
-    val ten = BigInteger.TEN
+    var den = BIG_ONE
+    val ten = BIG_TEN
     if (dot >= 0) repeat(body.length - dot - 1) { den *= ten }
     return BigFraction.of(num, den)
 }
@@ -161,7 +176,7 @@ private fun Compiler.Builder.assertRealRelation(op: String, a: RealComb, b: Real
 internal fun Compiler.Builder.integerRow(d: RealComb): Triple<IntArray, LongArray, Long>? {
     var lcm = d.constant.den
     for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
-    val scale = BigFraction.of(lcm, BigInteger.ONE)
+    val scale = BigFraction.of(lcm, BIG_ONE)
     val vars = IntArray(d.intCoeffs.size)
     val coeffs = LongArray(d.intCoeffs.size)
     var i = 0
@@ -181,13 +196,13 @@ internal fun Compiler.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean
     var lcm = d.constant.den
     for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
     for (c in d.realCoeffs.values) lcm = lcmOf(lcm, c.den)
-    val scale = BigFraction.of(lcm, BigInteger.ONE)
-    fun scaled(c: BigFraction): BigInteger = (c * scale).num
+    val scale = BigFraction.of(lcm, BIG_ONE)
+    fun scaled(c: BigFraction): BigInt = (c * scale).num
     fun wide(c: BigFraction): Boolean = scaled(c).abs() > MAX_EXACT_ROW_BIG
     if (d.intCoeffs.values.any { wide(it) } || d.realCoeffs.values.any { wide(it) } || wide(d.constant)) {
         return wideRealRow(d, scale, op, strict)
     }
-    fun exact(c: BigFraction): Double = scaled(c).longValue().toDouble()
+    fun exact(c: BigFraction): Double = scaled(c).toLongExact().toDouble()
     val intVars = IntArray(d.intCoeffs.size)
     val intCoeffs = DoubleArray(d.intCoeffs.size)
     var i = 0
@@ -219,13 +234,13 @@ private fun Compiler.Builder.wideRealRow(d: RealComb, scale: BigFraction, op: Li
     val realCoeffsL = ArrayList<Double>()
     val intVarsL = ArrayList<Int>()
     val intCoeffsL = ArrayList<Double>()
-    fun emit(varId: Int, isInt: Boolean, c: BigInteger) {
+    fun emit(varId: Int, isInt: Boolean, c: BigInt) {
         val neg = c.signum() < 0
         var mag = c.abs()
         var k = 0
         while (mag.signum() != 0) {
             if (k >= WIDE_MAX_DIGITS) smtUnsupported("real coefficient exceeds the exactly-representable range")
-            val digit = (mag % WIDE_BASE_BIG).longValue()
+            val digit = (mag % WIDE_BASE_BIG).toLongExact()
             mag /= WIDE_BASE_BIG
             if (digit != 0L) {
                 val coeff = (if (neg) -digit else digit).toDouble()
@@ -245,7 +260,7 @@ private fun Compiler.Builder.wideRealRow(d: RealComb, scale: BigFraction, op: Li
     val rhs = (d.constant.negated() * scale).num
     val bound: Double
     if (rhs.abs() <= MAX_EXACT_ROW_BIG) {
-        bound = rhs.longValue().toDouble()
+        bound = rhs.toLongExact().toDouble()
     } else {
         emit(oneVar(), false, -rhs)
         bound = 0.0
@@ -288,7 +303,7 @@ private fun Compiler.Builder.oneVar(): Int {
     return fresh
 }
 
-private fun lcmOf(a: BigInteger, b: BigInteger): BigInteger = ((a * b) / a.gcd(b)).abs()
+private fun lcmOf(a: BigInt, b: BigInt): BigInt = ((a * b) / a.gcd(b)).abs()
 
 /**
  * Reify a real relation `(op a b)` as a Boolean literal: an inequality atom becomes one
@@ -404,7 +419,7 @@ internal fun Compiler.Builder.realObjective(t: SExpr, negate: Boolean): LinearOb
 }
 
 internal fun BigFraction.toExactLongOrNull(): Long? =
-    if (den == BigInteger.ONE && num.bitLength() <= 63) num.longValue(exactRequired = false) else null
+    if (den == BIG_ONE && num.magnitudeBitLength() <= 63) num.toLong() else null
 
 private fun BigFraction.toExactDoubleOrNull(): Double? {
     val v = toDouble()
@@ -415,12 +430,12 @@ private fun BigFraction.toExactDoubleOrNull(): Double? {
 // Coefficient magnitude cap for an emitted row: integers up to 2^53 are exact doubles.
 private const val MAX_EXACT_ROW = 1L shl 53
 
-private val MAX_EXACT_ROW_BIG = BigInteger.fromLong(MAX_EXACT_ROW)
+private val MAX_EXACT_ROW_BIG = bigIntOf(MAX_EXACT_ROW)
 
 // Chain-encoding digit base: digits stay far under the exact-double cap.
 private const val WIDE_BASE = 1L shl 40
 
-private val WIDE_BASE_BIG = BigInteger.fromLong(WIDE_BASE)
+private val WIDE_BASE_BIG = bigIntOf(WIDE_BASE)
 
 // Digit cap for the chain encoding (`B⁴ = 2¹⁶⁰` covers any realistic decimal literal).
 private const val WIDE_MAX_DIGITS = 4

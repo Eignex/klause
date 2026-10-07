@@ -9,7 +9,8 @@ import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 
 /** Render one solved sample in FlatZinc output format. */
 fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObjective: Boolean = false): String =
@@ -39,8 +40,8 @@ internal class FlatZincValues(
         { id ->
             val parts = assignment.realValue(id).split('/')
             BigFraction.of(
-                BigInteger.parseString(parts[0]),
-                if (parts.size == 1) BigInteger.ONE else BigInteger.parseString(parts[1]),
+                parseBigInt(parts[0]),
+                if (parts.size == 1) BIG_ONE else parseBigInt(parts[1]),
             ).toDouble()
         },
     )

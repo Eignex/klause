@@ -1,7 +1,7 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -51,7 +51,7 @@ class ExactMixedEchelonHermiteTest {
         for (integer in 0 until 2) {
             val value = reduced.transformedIntegerCoefficients(integer).let { row ->
                 row.index.indices.fold(BigFraction.ZERO) { sum, index ->
-                    sum + BigFraction.of(row.value[index], BigInteger.ONE) * recovered[row.index[index]]
+                    sum + BigFraction.of(row.value[index], BIG_ONE) * recovered[row.index[index]]
                 }
             }
             assertEquals(transformed[integer], value)
@@ -69,7 +69,7 @@ class ExactMixedEchelonHermiteTest {
         val bounds = exactMixedTriangularBounds(reduced)
 
         assertTrue(bounds.inconsistent)
-        assertEquals(BigInteger.ONE, bounds.realLower[0]?.num)
+        assertEquals(BIG_ONE, bounds.realLower[0]?.num)
     }
 
     private fun row(coefficients: Map<Int, Long>, lower: Long, upper: Long): ExactMixedBoundedRow =

@@ -55,17 +55,30 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TWO
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.cancelledWhen
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.maxOf
+import com.eignex.klause.util.minOf
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.negate
+import com.eignex.klause.util.rem
 
 /** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
 data class ExactLiraAssignment(
     /** Boolean values indexed by model Boolean variable id. */
     val bools: BooleanArray,
     /** Arbitrary-precision integer values indexed by model integer variable id. */
-    val ints: Array<BigInteger>,
+    val ints: Array<BigInt>,
     /** Rational real values indexed by model real variable id. */
     val reals: List<BigFraction>,
 )
@@ -246,7 +259,7 @@ class ExactLiraSearchComponent(
         // An integral activity has no value strictly between consecutive integers, so the row and its
         // complement are both non-strict and share their names with source integer branching.
         val integral = !comparison.strict && comparison.terms.all { (column, coefficient) ->
-            column >= model.numRealVars && coefficient.den == BigInteger.ONE
+            column >= model.numRealVars && coefficient.den == BIG_ONE
         }
         return when (comparison.op) {
             LinearOp.LE -> {
@@ -261,7 +274,7 @@ class ExactLiraSearchComponent(
             LinearOp.GE -> {
                 val split = if (integral) {
                     val ceiling = comparison.bound.negated().floor().negate()
-                    SourceBoundAtom.integerSplit(context, terms, (ceiling - BigInteger.ONE).asFraction())
+                    SourceBoundAtom.integerSplit(context, terms, (ceiling - BIG_ONE).asFraction())
                 } else {
                     SourceBoundAtom.rationalSplit(context, terms, comparison.bound, !comparison.strict)
                 }
@@ -762,8 +775,8 @@ private class ExactLiraReductionCache(
                 if (rows > 128L || terms > 512L) return false
                 val constants = row.constants
                 if (constants is IntegralConstants && (
-                        constants.exactBound.bitLength() > 4096 ||
-                            (0 until row.size).any { constants.exactCoeff(it).bitLength() > 4096 }
+                        constants.exactBound.magnitudeBitLength() > 4096 ||
+                            (0 until row.size).any { constants.exactCoeff(it).magnitudeBitLength() > 4096 }
                         )
                 ) {
                     return false
@@ -771,16 +784,16 @@ private class ExactLiraReductionCache(
             }
         }
         for (integer in 0 until model.numIntVars) {
-            if (model.intBounds.lowerAsBigInteger(integer)?.bitLength()?.let { it > 4096 } == true ||
-                model.intBounds.upperAsBigInteger(integer)?.bitLength()?.let { it > 4096 } == true
+            if (model.intBounds.lowerAsBigInteger(integer)?.magnitudeBitLength()?.let { it > 4096 } == true ||
+                model.intBounds.upperAsBigInteger(integer)?.magnitudeBitLength()?.let { it > 4096 } == true
             ) {
                 return false
             }
         }
         if (node.branches.any { branch ->
                 branch.variable !in 0 until model.numIntVars ||
-                    branch.lower?.bitLength()?.let { it > 4096 } == true ||
-                    branch.upper?.bitLength()?.let { it > 4096 } == true
+                    branch.lower?.magnitudeBitLength()?.let { it > 4096 } == true ||
+                    branch.upper?.magnitudeBitLength()?.let { it > 4096 } == true
             }
         ) {
             return false
@@ -897,10 +910,10 @@ private class ExactLiraReductionCache(
             if (cancellation()) return null
             val column = model.numRealVars + integer
             val branch = published[integer]
-            listOfNotNull(model.intBounds.lowerAsBigInteger(integer), branch?.lower).maxOrNull()?.let {
+            maxOfNullable(model.intBounds.lowerAsBigInteger(integer), branch?.lower)?.let {
                 rows += exactColumnLower(column, it.asFraction())
             }
-            listOfNotNull(model.intBounds.upperAsBigInteger(integer), branch?.upper).minOrNull()?.let {
+            minOfNullable(model.intBounds.upperAsBigInteger(integer), branch?.upper)?.let {
                 rows += exactColumnUpper(column, it.asFraction())
             }
         }
@@ -984,7 +997,7 @@ private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.B
                     ExactRationalInequality(
                         intArrayOf(column),
                         listOf(BigFraction.MINUS_ONE),
-                        BigFraction.of(lower.negate(), BigInteger.ONE),
+                        BigFraction.of(lower.negate(), BIG_ONE),
                     ),
                 )
             }
@@ -993,7 +1006,7 @@ private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.B
                     ExactRationalInequality(
                         intArrayOf(column),
                         listOf(BigFraction.ONE),
-                        BigFraction.of(upper, BigInteger.ONE),
+                        BigFraction.of(upper, BIG_ONE),
                     ),
                 )
             }
@@ -1049,7 +1062,7 @@ private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.B
 
 private sealed interface ExactReducedSearchResult {
     data class Found(val sourceValues: List<BigFraction>) : ExactReducedSearchResult
-    data class Split(val node: SearchNode, val integer: Int, val floor: BigInteger) : ExactReducedSearchResult
+    data class Split(val node: SearchNode, val integer: Int, val floor: BigInt) : ExactReducedSearchResult
     data object Infeasible : ExactReducedSearchResult
     data object Interrupted : ExactReducedSearchResult
 }
@@ -1094,7 +1107,7 @@ private fun ExactLiraReduction.Bounded.extend(
                 transformedRow.strict,
             )
         }
-        val half = BigFraction.of(BigInteger.ONE, BigInteger.TWO)
+        val half = BigFraction.of(BIG_ONE, BIG_TWO)
         val shifted = extensionRows.map { row ->
             if (token()) return@run null
             var norm = BigFraction.ZERO
@@ -1138,22 +1151,22 @@ private fun ExactMixedBoundedRow.asLower(): ExactRationalInequality {
 
 // Source integer values beyond the largest exactly representable double are a useful diagnostic for
 // model conversions that would otherwise silently lose an integer unit.
-private val WIDE_INTEGER_LIMIT = BigInteger.fromLong(1L shl 53)
+private val WIDE_INTEGER_LIMIT = bigIntOf(1L shl 53)
 
 private fun List<ExactRationalInequality>.hasWideIntegerData(): Boolean = any { row ->
-    (row.rhs.den == BigInteger.ONE && row.rhs.num.abs() > WIDE_INTEGER_LIMIT) ||
+    (row.rhs.den == BIG_ONE && row.rhs.num.abs() > WIDE_INTEGER_LIMIT) ||
         row.coefficients.any { coefficient ->
-            coefficient.den == BigInteger.ONE && coefficient.num.abs() > WIDE_INTEGER_LIMIT
+            coefficient.den == BIG_ONE && coefficient.num.abs() > WIDE_INTEGER_LIMIT
         }
 }
 
-private data class IntegerBranch(val variable: Int, val lower: BigInteger? = null, val upper: BigInteger? = null)
+private data class IntegerBranch(val variable: Int, val lower: BigInt? = null, val upper: BigInt? = null)
 
 private data class IntegerLinearBranch(
     val variables: IntArray,
-    val coefficients: Array<BigInteger>,
-    val lower: BigInteger? = null,
-    val upper: BigInteger? = null,
+    val coefficients: Array<BigInt>,
+    val lower: BigInt? = null,
+    val upper: BigInt? = null,
 ) {
     fun sameShape(other: IntegerLinearBranch): Boolean =
         variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
@@ -1176,8 +1189,8 @@ private data class SearchNode(
         val existing = branches.indexOfFirst { it.variable == branch.variable }
         if (existing < 0) return copy(branches = branches + branch)
         val merged = branches[existing].copy(
-            lower = listOfNotNull(branches[existing].lower, branch.lower).maxOrNull(),
-            upper = listOfNotNull(branches[existing].upper, branch.upper).minOrNull(),
+            lower = maxOfNullable(branches[existing].lower, branch.lower),
+            upper = minOfNullable(branches[existing].upper, branch.upper),
         )
         return copy(branches = branches.toMutableList().also { it[existing] = merged })
     }
@@ -1186,8 +1199,8 @@ private data class SearchNode(
         val existing = reducedBranches.indexOfFirst { it.variable == branch.variable }
         if (existing < 0) return copy(reducedBranches = reducedBranches + branch)
         val merged = reducedBranches[existing].copy(
-            lower = listOfNotNull(reducedBranches[existing].lower, branch.lower).maxOrNull(),
-            upper = listOfNotNull(reducedBranches[existing].upper, branch.upper).minOrNull(),
+            lower = maxOfNullable(reducedBranches[existing].lower, branch.lower),
+            upper = minOfNullable(reducedBranches[existing].upper, branch.upper),
         )
         return copy(reducedBranches = reducedBranches.toMutableList().also { it[existing] = merged })
     }
@@ -1195,22 +1208,19 @@ private data class SearchNode(
     fun withTransformedBranch(branch: IntegerLinearBranch): SearchNode =
         copy(transformedBranches = transformedBranches + branch)
 
-    fun withTransformedSplit(
-        branch: IntegerLinearBranch,
-        lower: BigInteger? = null,
-        upper: BigInteger? = null,
-    ): SearchNode = copy(
-        transformedBranches = transformedBranches.map { existing ->
-            if (!existing.sameShape(branch)) {
-                existing
-            } else {
-                existing.copy(
-                    lower = listOfNotNull(existing.lower, lower).maxOrNull(),
-                    upper = listOfNotNull(existing.upper, upper).minOrNull(),
-                )
-            }
-        },
-    )
+    fun withTransformedSplit(branch: IntegerLinearBranch, lower: BigInt? = null, upper: BigInt? = null): SearchNode =
+        copy(
+            transformedBranches = transformedBranches.map { existing ->
+                if (!existing.sameShape(branch)) {
+                    existing
+                } else {
+                    existing.copy(
+                        lower = maxOfNullable(existing.lower, lower),
+                        upper = minOfNullable(existing.upper, upper),
+                    )
+                }
+            },
+        )
 
     fun withComparison(factor: RowAddress, literal: Int): SearchNode =
         copy(comparisonChoices = comparisonChoices + (factor to literal))
@@ -1273,8 +1283,8 @@ private fun SearchNode.withPublishedBounds(
 ): SearchNode {
     var bounded = this
     for (integer in 0 until numIntVars) {
-        val lower = lowerBound(integer)?.let(BigInteger::fromLong)
-        val upper = upperBound(integer)?.let(BigInteger::fromLong)
+        val lower = lowerBound(integer)?.let(::bigIntOf)
+        val upper = upperBound(integer)?.let(::bigIntOf)
         if (lower != null || upper != null) {
             bounded = bounded.withBranch(IntegerBranch(integer, lower, upper))
         }
@@ -1326,9 +1336,13 @@ private fun SourceBoundAtom.sourceRows(realColumns: Int): List<ExactRationalIneq
     )
 }
 
-private fun BigFraction.isInteger(): Boolean = den == BigInteger.ONE
+private fun BigFraction.isInteger(): Boolean = den == BIG_ONE
 
-private fun BigFraction.floor(): BigInteger {
+private fun BigFraction.floor(): BigInt {
     val quotient = num / den
-    return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
+    return if (num < BIG_ZERO && num % den != BIG_ZERO) quotient - BIG_ONE else quotient
 }
+
+private fun maxOfNullable(a: BigInt?, b: BigInt?): BigInt? = if (a == null || b == null) a ?: b else maxOf(a, b)
+
+private fun minOfNullable(a: BigInt?, b: BigInt?): BigInt? = if (a == null || b == null) a ?: b else minOf(a, b)

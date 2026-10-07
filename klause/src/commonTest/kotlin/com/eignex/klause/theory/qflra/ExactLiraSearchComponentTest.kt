@@ -38,9 +38,11 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -142,7 +144,7 @@ class ExactLiraSearchComponentTest {
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
             val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertEquals(BigInteger.ONE, assignment.ints[0])
+            assertEquals(BIG_ONE, assignment.ints[0])
             assertTrue(stats.snapshot().sourceLp.operations > 0L)
             assertEquals(0L, stats.snapshot().reductionRequests)
         }
@@ -316,7 +318,7 @@ class ExactLiraSearchComponentTest {
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
             val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertEquals(listOf(BigInteger.ONE, BigInteger.ZERO), assignment.ints.toList())
+            assertEquals(listOf(BIG_ONE, BIG_ZERO), assignment.ints.toList())
         }
     }
 
@@ -412,7 +414,7 @@ class ExactLiraSearchComponentTest {
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
             val point = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertEquals(BigInteger.ONE, point.ints.single())
+            assertEquals(BIG_ONE, point.ints.single())
             assertEquals(BigFraction.ONE, point.reals.single())
             assertTrue(stats.snapshot().sourceLp.operations > 0L)
         }
@@ -760,7 +762,7 @@ class ExactLiraSearchComponentTest {
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
             val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertEquals(listOf(BigInteger.fromInt(4), BigInteger.fromInt(-3)), assignment.ints.toList())
+            assertEquals(listOf(bigIntOf(4), bigIntOf(-3)), assignment.ints.toList())
         }
     }
 
@@ -787,7 +789,7 @@ class ExactLiraSearchComponentTest {
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
             val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertTrue(assignment.ints[1] <= BigInteger.fromInt(-3))
+            assertTrue(assignment.ints[1] <= bigIntOf(-3))
         }
     }
 
@@ -833,7 +835,7 @@ class ExactLiraSearchComponentTest {
                 if (sat) {
                     val model = assertIs<SearchResult.Satisfied>(result).model
                     val witness = assertNotNull(model.valueOf<ExactLraAssignment>(component))
-                    val half = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(2))
+                    val half = BigFraction.of(BIG_ONE, bigIntOf(2))
                     assertTrue(witness.reals.single() > half, "upper $upper")
                 } else {
                     assertIs<SearchResult.Exhausted>(result, "upper $upper")

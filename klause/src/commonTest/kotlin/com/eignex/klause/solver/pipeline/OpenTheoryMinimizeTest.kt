@@ -12,8 +12,8 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -120,7 +120,7 @@ class OpenTheoryMinimizeTest {
         val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
         val minimizer = OpenTheoryMinimizer(parsed.model, objective)
 
-        val result = minimizer.descent(TheoryParams()) { BigInteger.ZERO }.use { descent ->
+        val result = minimizer.descent(TheoryParams()) { BIG_ZERO }.use { descent ->
             descent.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork = -1L) { _, _ -> }
         }
 

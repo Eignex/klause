@@ -11,7 +11,10 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -20,7 +23,7 @@ import kotlin.test.assertTrue
 class WideLinearPropagatorTest {
 
     // 2^64 — one past the signed 64-bit range, so it can only live in the wide coefficient lane.
-    private val w = BigInteger.parseString("18446744073709551616")
+    private val w = parseBigInt("18446744073709551616")
 
     private fun problem(factor: Factor, xHi: Long = 5, yHi: Long = 5) = Problem(
         numBoolVars = 0,
@@ -30,7 +33,7 @@ class WideLinearPropagatorTest {
     )
 
     /** `x ≤ y`, expressed with a wide coefficient on both terms. */
-    private fun xLeY() = Linear(intArrayOf(0, 1), arrayOf(w, -w), LinearOp.LE, BigInteger.ZERO)
+    private fun xLeY() = Linear(intArrayOf(0, 1), arrayOf(w, -w), LinearOp.LE, BIG_ZERO)
 
     @Test
     fun `an assignment violating a wide row is rejected exactly`() {
@@ -50,7 +53,7 @@ class WideLinearPropagatorTest {
     @Test
     fun `a wide coefficient tightens a variable domain`() {
         // 2^64·x + 2^64·y ≤ 2·2^64  ⇔  x + y ≤ 2. Pinning y = 1 forces x ≤ 1.
-        val row = Linear(intArrayOf(0, 1), arrayOf(w, w), LinearOp.LE, w * BigInteger.fromLong(2))
+        val row = Linear(intArrayOf(0, 1), arrayOf(w, w), LinearOp.LE, w * bigIntOf(2))
         val s = PropagationSession(problem(row))
         assertTrue(s.pinInt(1, 1) !is PropagationResult.Unsat)
         assertEquals(1L, s.intDomain(0).max, "x's max must be tightened to 1 through the wide coefficient")
@@ -58,7 +61,7 @@ class WideLinearPropagatorTest {
 
     @Test
     fun `a collapsed wide coefficient bakes and propagates`() {
-        val original = Linear(intArrayOf(0, 1), arrayOf(w, -w), LinearOp.EQ, BigInteger.ZERO)
+        val original = Linear(intArrayOf(0, 1), arrayOf(w, -w), LinearOp.EQ, BIG_ZERO)
         val remapped = original.remap(VarRemap(IntArray(0), intArrayOf(0, 0)))
         val p = Problem(
             numBoolVars = 0,
@@ -75,13 +78,13 @@ class WideLinearPropagatorTest {
     @Test
     fun `solver finds a witness satisfying a wide-coefficient row`() {
         // 2^64·x + y = 2·2^64 + 1 with y ∈ [0,3] forces x = 2, y = 1 (y is too small to carry a 2^64 unit).
-        val bound = w * BigInteger.fromLong(2) + BigInteger.ONE
-        val row = Linear(intArrayOf(0, 1), arrayOf(w, BigInteger.ONE), LinearOp.EQ, bound)
+        val bound = w * bigIntOf(2) + BIG_ONE
+        val row = Linear(intArrayOf(0, 1), arrayOf(w, BIG_ONE), LinearOp.EQ, bound)
         val r = BacktrackSolver(problem(row, xHi = 3, yHi = 3).bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val x = sat.assignment.ints[0]
         val y = sat.assignment.ints[1]
-        val lhs = w * BigInteger.fromLong(x) + BigInteger.fromLong(y)
+        val lhs = w * bigIntOf(x) + bigIntOf(y)
         assertEquals(bound, lhs, "witness (x=$x, y=$y) must satisfy the wide row exactly")
     }
 
@@ -89,7 +92,7 @@ class WideLinearPropagatorTest {
     fun `solver handles a wide row over a sign-straddling variable`() {
         // 2^64·x = 2^64·(−2) with x ∈ [−3, 3] (straddling zero) forces x = −2. Drives the LP x⁺/x⁻ split
         // for the wide row and checks the whole path stays sound (no false UNSAT, correct witness).
-        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w * BigInteger.fromLong(-2))
+        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w * bigIntOf(-2))
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -103,7 +106,7 @@ class WideLinearPropagatorTest {
     @Test
     fun `solver proves unsat when a wide row has no integer solution`() {
         // 2^64·x = 2·2^64 + 1 has no integer x (remainder 1): the propagator derives x ≤ 2 ∧ x ≥ 3.
-        val bound = w * BigInteger.fromLong(2) + BigInteger.ONE
+        val bound = w * bigIntOf(2) + BIG_ONE
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, bound)
         val p = Problem(
             numBoolVars = 0,

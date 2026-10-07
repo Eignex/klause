@@ -1,7 +1,8 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -130,8 +131,8 @@ class LpModelTest {
     @Test
     fun `nonintegral values in each numeric slot decline the legacy bridge`() {
         val zero = ExactLpNumber.of(0L)
-        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 80, BigInteger.ONE))
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 80, BIG_ONE))
         for (value in listOf(third, huge, ExactLpNumber.ofIeee(0.1))) {
             for (slot in 0..5) {
                 val model = ExactLpModel(
@@ -253,10 +254,10 @@ class LpModelTest {
     @Test
     fun `exact authority retains rationals and large integers across copies`() {
         val values = listOf(
-            BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)),
+            BigFraction.of(BIG_ONE, bigIntOf(3)),
             BigFraction.ofLong(9007199254740992L),
             BigFraction.ofLong(9007199254740993L),
-            BigFraction.of(BigInteger.ONE shl 80, BigInteger.ONE),
+            BigFraction.of(BIG_ONE shl 80, BIG_ONE),
         )
         for (value in values) {
             val number = ExactLpNumber.of(value)
@@ -282,7 +283,7 @@ class LpModelTest {
     @Test
     fun `binary input retains its raw bits and differs from decimal authority`() {
         val binary = ExactLpNumber.ofIeee(0.1)
-        val decimal = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(10)))
+        val decimal = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(10)))
         val negativeZero = ExactLpNumber.ofIeee(-0.0)
 
         assertFalse(binary.value == decimal.value)
@@ -298,7 +299,7 @@ class LpModelTest {
     @Test
     fun `bounds sharing a double are not exactly fixed`() {
         val one = ExactLpNumber.of(1L)
-        val next = ExactLpNumber.of(BigFraction.ONE + BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 54))
+        val next = ExactLpNumber.of(BigFraction.ONE + BigFraction.of(BIG_ONE, BIG_ONE shl 54))
         val bounds = ExactLpBounds(ExactLpSide(one), ExactLpSide(next))
 
         assertEquals(one.value.toDouble(), next.value.toDouble())
@@ -309,7 +310,7 @@ class LpModelTest {
     @Test
     fun `recenter preserves source equations and both objective constants`() {
         val zero = ExactLpNumber.of(0L)
-        val third = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3)))
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
         val model = ExactLpModel(
             listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(2L)))),
             listOf(ExactLpNumber.of(10L)),

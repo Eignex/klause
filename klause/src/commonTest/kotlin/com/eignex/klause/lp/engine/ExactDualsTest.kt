@@ -1,7 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.isZero
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -56,8 +58,8 @@ class ExactDualsTest {
         val duals = assertNotNull(exactBasisDuals(model, basis, doubleArrayOf(0.2, 0.4)).duals)
 
         val expected = listOf(
-            BigFraction.of(BigInteger.ONE, BigInteger(5)),
-            BigFraction.of(BigInteger(2), BigInteger(5)),
+            BigFraction.of(BIG_ONE, bigIntOf(5)),
+            BigFraction.of(bigIntOf(2), bigIntOf(5)),
         )
         assertEquals(expected, duals.scaled.map { BigFraction.of(it, duals.denominator) })
         assertEquals(listOf(0.2, 0.4), duals.approximations.toList())

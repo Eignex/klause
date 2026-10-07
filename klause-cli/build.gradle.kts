@@ -68,8 +68,6 @@ kotlin {
             // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to
             // render them as %%%mzn-stat lines.
             implementation("com.eignex:kumulant:0.3.3")
-            // Exact LIA renders arbitrary-precision integer witnesses directly.
-            implementation("com.ionspin.kotlin:bignum:0.3.10")
         }
     }
 }

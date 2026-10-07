@@ -7,7 +7,7 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.longsOrNull
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -55,10 +55,10 @@ class ConstListTest {
 
     @Test
     fun `constants beyond 64 bits do not read as integers`() {
-        val wide = WideConsts(arrayOf(BigInteger.fromLong(Long.MAX_VALUE) * 4))
+        val wide = WideConsts(arrayOf(bigIntOf(Long.MAX_VALUE) * bigIntOf(4)))
 
         assertNull(wide.longsOrNull(), "an over-64-bit constant has no Long reading")
-        assertEquals(BigInteger.fromLong(Long.MAX_VALUE) * 4, wide.at(0))
+        assertEquals(bigIntOf(Long.MAX_VALUE) * bigIntOf(4), wide.at(0))
     }
 
     @Test

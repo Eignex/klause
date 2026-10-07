@@ -4,10 +4,16 @@ import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TEN
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.lineSequence
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.times
+import com.eignex.klause.util.unaryMinus
 
 /** Raised when an MPS file is malformed or uses a construct outside the supported subset. */
 class MpsFormatException(msg: String) : FormatException("MPS", msg)
@@ -443,9 +449,9 @@ object Mps {
         if (digits.isEmpty() || digits.any { it !in '0'..'9' }) {
             invalidNumber(role, token)
         }
-        var numerator = BigInteger.parseString(digits, 10)
+        var numerator = parseBigInt(digits)
         if (negative) numerator = -numerator
-        if (numerator == BigInteger.ZERO) return MpsSourceNumber.parsed(BigFraction.ZERO, finite)
+        if (numerator == BIG_ZERO) return MpsSourceNumber.parsed(BigFraction.ZERO, finite)
         val decimalPlaces = if (dot < 0) 0L else (unsigned.length - dot - 1).toLong()
         if (exponent < Long.MIN_VALUE + decimalPlaces) invalidNumber(role, token)
         val scale = exponent - decimalPlaces
@@ -454,7 +460,7 @@ object Mps {
         }
         val power = decimalPower(kotlin.math.abs(scale).toInt())
         val fraction = if (scale >= 0) {
-            BigFraction.of(numerator * power, BigInteger.ONE)
+            BigFraction.of(numerator * power, BIG_ONE)
         } else {
             BigFraction.of(numerator, power)
         }
@@ -464,10 +470,10 @@ object Mps {
     private fun invalidNumber(role: String, token: String): Nothing =
         throw MpsFormatException("$role must be a finite number: '$token'")
 
-    private fun decimalPower(exponent: Int): BigInteger {
+    private fun decimalPower(exponent: Int): BigInt {
         var remaining = exponent
-        var factor = BigInteger.TEN
-        var result = BigInteger.ONE
+        var factor = BIG_TEN
+        var result = BIG_ONE
         while (remaining > 0) {
             if (remaining and 1 == 1) result *= factor
             remaining = remaining ushr 1

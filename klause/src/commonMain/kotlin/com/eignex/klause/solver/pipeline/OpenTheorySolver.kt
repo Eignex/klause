@@ -31,8 +31,9 @@ import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.parseBigInt
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
@@ -98,7 +99,7 @@ sealed interface OpenTheoryAssignment {
         /** Boolean values of the model before the elimination. */
         val bools: BooleanArray,
         /** Integer values of the model before the elimination, or null when no column was eliminated. */
-        val ints: Array<BigInteger>?,
+        val ints: Array<BigInt>?,
     ) : OpenTheoryAssignment {
         override fun boolValue(id: Int): Boolean = bools[id]
         override fun intValue(id: Int): String = ints?.get(id)?.toString() ?: base.intValue(id)
@@ -131,7 +132,7 @@ internal fun SourceRebuilds.lift(
         rebuildInto(bools)
         return OpenTheoryAssignment.Rebuilt(assignment, bools, ints = null)
     }
-    val ints = Array(numIntVars) { BigInteger.parseString(assignment.intValue(it)) }
+    val ints = Array(numIntVars) { parseBigInt(assignment.intValue(it)) }
     rebuildInto(bools, ints)
     return OpenTheoryAssignment.Rebuilt(assignment, bools, ints)
 }

@@ -6,8 +6,18 @@ import com.eignex.klause.lp.lattice.hermiteNormalForm
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.gcd
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
+import com.eignex.klause.util.times
 
 /** One exact double-bounded row over real columns followed by integer columns. */
 internal class ExactMixedBoundedRow(
@@ -78,8 +88,8 @@ internal class ExactMixedEchelonHermite(
 internal class ExactMixedTriangularBounds(
     val realLower: Array<BigFraction?>,
     val realUpper: Array<BigFraction?>,
-    val integerLower: Array<BigInteger?>,
-    val integerUpper: Array<BigInteger?>,
+    val integerLower: Array<BigInt?>,
+    val integerUpper: Array<BigInt?>,
 ) {
     val inconsistent: Boolean = integerLower.indices.any { index ->
         val lower = integerLower[index]
@@ -98,8 +108,8 @@ internal class ExactMixedTriangularBounds(
 internal fun exactMixedTriangularBounds(system: ExactMixedEchelonHermite): ExactMixedTriangularBounds {
     val realLower = arrayOfNulls<BigFraction>(system.realColumns)
     val realUpper = arrayOfNulls<BigFraction>(system.realColumns)
-    val integerLower = arrayOfNulls<BigInteger>(system.integerColumns)
-    val integerUpper = arrayOfNulls<BigInteger>(system.integerColumns)
+    val integerLower = arrayOfNulls<BigInt>(system.integerColumns)
+    val integerUpper = arrayOfNulls<BigInt>(system.integerColumns)
     for (row in system.rows) {
         val pivot = row.coefficients.keys.maxOrNull() ?: continue
         var restLower: BigFraction? = BigFraction.ZERO
@@ -110,8 +120,8 @@ internal fun exactMixedTriangularBounds(system: ExactMixedEchelonHermite): Exact
                 realLower[column] to realUpper[column]
             } else {
                 val integer = column - system.realColumns
-                integerLower[integer]?.let { BigFraction.of(it, BigInteger.ONE) } to
-                    integerUpper[integer]?.let { BigFraction.of(it, BigInteger.ONE) }
+                integerLower[integer]?.let { BigFraction.of(it, BIG_ONE) } to
+                    integerUpper[integer]?.let { BigFraction.of(it, BIG_ONE) }
             }
             val termLower = if (coefficient > BigFraction.ZERO) lower?.times(coefficient) else upper?.times(coefficient)
             val termUpper = if (coefficient > BigFraction.ZERO) upper?.times(coefficient) else lower?.times(coefficient)
@@ -145,14 +155,14 @@ private fun divideRange(
     upper?.times(coefficient.reciprocal()) to lower?.times(coefficient.reciprocal())
 }
 
-private fun BigFraction.floor(): BigInteger {
+private fun BigFraction.floor(): BigInt {
     val quotient = num / den
-    return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
+    return if (num < BIG_ZERO && num % den != BIG_ZERO) quotient - BIG_ONE else quotient
 }
 
-private fun BigFraction.ceil(): BigInteger {
+private fun BigFraction.ceil(): BigInt {
     val quotient = num / den
-    return if (num > BigInteger.ZERO && num % den != BigInteger.ZERO) quotient + BigInteger.ONE else quotient
+    return if (num > BIG_ZERO && num % den != BIG_ZERO) quotient + BIG_ONE else quotient
 }
 
 /**
@@ -227,23 +237,23 @@ private class MutableMixedRow(
     }
 
     fun integerize(realColumns: Int, integerColumns: Int) {
-        var denominator = BigInteger.ONE
+        var denominator = BIG_ONE
         for (column in realColumns until realColumns + integerColumns) {
             val value = this[column]
             denominator = (denominator * value.den) / denominator.gcd(value.den)
         }
-        if (denominator == BigInteger.ONE) return
-        val factor = BigFraction.of(denominator, BigInteger.ONE)
+        if (denominator == BIG_ONE) return
+        val factor = BigFraction.of(denominator, BIG_ONE)
         for ((column, value) in coefficients.toMap()) this[column] = value * factor
         lower *= factor
         upper *= factor
     }
 
     fun integerRow(realColumns: Int, integerColumns: Int): SparseIntRow {
-        val entries = HashMap<Int, BigInteger>()
+        val entries = HashMap<Int, BigInt>()
         for (column in 0 until integerColumns) {
             val value = this[realColumns + column]
-            check(value.den == BigInteger.ONE) { "integer Hermite tail still has a rational coefficient" }
+            check(value.den == BIG_ONE) { "integer Hermite tail still has a rational coefficient" }
             if (!value.isZero) entries[column] = value.num
         }
         return sparseIntRow(entries)
@@ -252,7 +262,7 @@ private class MutableMixedRow(
     fun replaceIntegerTail(row: SparseIntRow, realColumns: Int) {
         coefficients.keys.filter { it >= realColumns }.forEach(coefficients::remove)
         for (index in row.index.indices) {
-            coefficients[realColumns + row.index[index]] = BigFraction.of(row.value[index], BigInteger.ONE)
+            coefficients[realColumns + row.index[index]] = BigFraction.of(row.value[index], BIG_ONE)
         }
     }
 }
@@ -338,7 +348,7 @@ private fun composeIntegerTransform(
         for (source in 0 until integerColumns) {
             val factor = integer[source, column]
             if (factor.isZero()) continue
-            val rational = BigFraction.of(factor, BigInteger.ONE)
+            val rational = BigFraction.of(factor, BIG_ONE)
             for ((row, value) in old[source]) {
                 val next = (combined[row] ?: BigFraction.ZERO) + value * rational
                 if (next.isZero) combined.remove(row) else combined[row] = next

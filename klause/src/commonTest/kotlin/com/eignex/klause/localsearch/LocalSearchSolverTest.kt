@@ -16,7 +16,8 @@ import com.eignex.klause.solver.*
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -42,7 +43,7 @@ class LocalSearchSolverTest {
     @Test
     fun `minimize keeps a wide-coefficient row exact`() {
         // 2^65·x ≤ 2^65·3 + 1 caps x at 3; minimizing -x drives x to that cap and no further.
-        val wideCoefficient = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val wideCoefficient = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
         val problem = Problem(
             0,
             1,
@@ -52,7 +53,7 @@ class LocalSearchSolverTest {
                     intArrayOf(0),
                     arrayOf(wideCoefficient),
                     LinearOp.LE,
-                    wideCoefficient * BigInteger.fromLong(3) + BigInteger.ONE,
+                    wideCoefficient * bigIntOf(3) + BIG_ONE,
                 ),
             ),
         )

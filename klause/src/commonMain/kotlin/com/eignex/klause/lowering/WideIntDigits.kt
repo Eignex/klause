@@ -1,6 +1,18 @@
 package com.eignex.klause.lowering
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 
 /**
  * Positional encoding of an integer too large for a [Long] domain, as digits over ordinary `Long`
@@ -37,17 +49,17 @@ internal object WideIntDigits {
      * A coefficient so large that even a one-bit digit overflows yields [NO_ROOM]: decomposing the
      * variable cannot help there, because the coefficient itself is what leaves range.
      */
-    fun widthFor(maxCoeff: BigInteger): Int {
+    fun widthFor(maxCoeff: BigInt): Int {
         val c = maxCoeff.abs()
-        if (c <= BigInteger.ONE) return MAX_WIDTH
-        val limit = BigInteger.fromLong(Long.MAX_VALUE)
+        if (c <= BIG_ONE) return MAX_WIDTH
+        val limit = bigIntOf(Long.MAX_VALUE)
         var k = MAX_WIDTH
         while (k >= MIN_WIDTH && c * pow2(k) > limit) k--
         return if (k >= MIN_WIDTH) k else NO_ROOM
     }
 
     /** Number of [width]-bit digits needed to represent every value in `[-magnitude, magnitude]`. */
-    fun digitCount(magnitude: BigInteger, width: Int): Int {
+    fun digitCount(magnitude: BigInt, width: Int): Int {
         val m = magnitude.abs()
         var n = 1
         var covered = pow2(width)
@@ -65,24 +77,24 @@ internal object WideIntDigits {
      * non-negative digit vectors, which keeps every digit's domain a plain `[0, 2^width)` and leaves the
      * sign to the linear row rather than to the encoding.
      */
-    fun digitsOf(value: BigInteger, width: Int, count: Int): LongArray {
+    fun digitsOf(value: BigInt, width: Int, count: Int): LongArray {
         require(value.signum() >= 0) { "digitsOf takes a non-negative value" }
         val radix = pow2(width)
         var rest = value
         return LongArray(count) {
             val d = rest % radix
             rest /= radix
-            d.longValue()
+            d.toLongExact()
         }
     }
 
     /** The value [digits] encode at [width] — the inverse of [digitsOf]. */
-    fun recompose(digits: LongArray, width: Int): BigInteger {
-        var acc = BigInteger.ZERO
-        for (i in digits.indices.reversed()) acc = acc * pow2(width) + BigInteger.fromLong(digits[i])
+    fun recompose(digits: LongArray, width: Int): BigInt {
+        var acc = BIG_ZERO
+        for (i in digits.indices.reversed()) acc = acc * pow2(width) + bigIntOf(digits[i])
         return acc
     }
 
     /** `2^k`, which the bignum library expresses as a shift of one. */
-    fun pow2(k: Int): BigInteger = BigInteger.ONE.shl(k)
+    fun pow2(k: Int): BigInt = BIG_ONE.shl(k)
 }

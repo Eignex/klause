@@ -12,12 +12,20 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.div
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 
 /**
  * CP propagator for a wide [ReifiedLinear]: `auxBoolVar ↔ (Σ wideCoeffs·vars ⟨op⟩ bound)`, where the
  * coefficients or bound exceed the 64-bit range. Mirrors [ReifiedLinearPropagator]'s reification structure
- * but does every interval/feasibility computation in exact [BigInteger] via
+ * but does every interval/feasibility computation in exact [BigInt] via
  * [com.eignex.klause.factor.arithmetic.internals.wideEnforceRow], so there is no overflow, degrade, or
  * `unknown` — the row is enforced exactly, including at a fully pinned leaf, and the wide value never
  * reaches the domains, the trail, or the LP.
@@ -26,10 +34,10 @@ internal class WideReifiedLinearPropagator(
     private val auxBoolVar: Int,
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val coeffs: Array<BigInteger>,
+    private val coeffs: Array<BigInt>,
     private val vars: IntArray,
     private val op: LinearOp,
-    private val bound: BigInteger,
+    private val bound: BigInt,
 ) : Propagator {
 
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
@@ -72,8 +80,8 @@ internal class WideReifiedLinearPropagator(
             propagateTrue = { a -> wideEnforceRow(state, vars, coeffs, op, bound, a) },
             propagateFalse = { a ->
                 when (op) {
-                    LinearOp.LE -> wideEnforceRow(state, vars, coeffs, LinearOp.GE, bound + BigInteger.ONE, a)
-                    LinearOp.GE -> wideEnforceRow(state, vars, coeffs, LinearOp.LE, bound - BigInteger.ONE, a)
+                    LinearOp.LE -> wideEnforceRow(state, vars, coeffs, LinearOp.GE, bound + BIG_ONE, a)
+                    LinearOp.GE -> wideEnforceRow(state, vars, coeffs, LinearOp.LE, bound - BIG_ONE, a)
                     LinearOp.EQ -> wideEnforceRow(state, vars, coeffs, LinearOp.NE, bound, a)
                     LinearOp.NE -> wideEnforceRow(state, vars, coeffs, LinearOp.EQ, bound, a)
                 }
@@ -85,21 +93,21 @@ internal class WideReifiedLinearPropagator(
      *  (an interior hole or a non-divisible bound), so the equality can never hold. */
     private fun eqTargetUnreachable(state: PropagationState): Boolean {
         val c = coeffs[0]
-        if (c == BigInteger.ZERO) return bound != BigInteger.ZERO
-        if (bound - bound / c * c != BigInteger.ZERO) return true
+        if (c == BIG_ZERO) return bound != BIG_ZERO
+        if (bound - bound / c * c != BIG_ZERO) return true
         val value = bound / c
         if (!value.fitsLong()) return true
-        return value.longValue() !in state.intDomains[vars[0]]
+        return value.toLongExact() !in state.intDomains[vars[0]]
     }
 
     /** Reason for pinning the indicator false on an unreachable single-term `c·x == bound` (see
      *  [ReifiedLinearPropagator.eqUnreachableReason] for the original-vs-current distinction). */
     private fun eqUnreachableReason(state: PropagationState): IntArray? {
         val c = coeffs[0]
-        if (c == BigInteger.ZERO || bound - bound / c * c != BigInteger.ZERO) return null
+        if (c == BIG_ZERO || bound - bound / c * c != BIG_ZERO) return null
         val k = bound / c
         if (!k.fitsLong()) return null
-        val kl = k.longValue()
+        val kl = k.toLongExact()
         val v = vars[0]
         val d = state.intDomains[v]
         val orig = state.rootDomains[v]
@@ -109,11 +117,5 @@ internal class WideReifiedLinearPropagator(
             kl > d.max -> intArrayOf(Lit.make(state.atomVarLe(v, d.max), false))
             else -> intArrayOf(Lit.make(state.atomVarEq(v, kl), true))
         }
-    }
-
-    private companion object {
-        val LONG_MAX = BigInteger.fromLong(Long.MAX_VALUE)
-        val LONG_MIN = BigInteger.fromLong(Long.MIN_VALUE)
-        fun BigInteger.fitsLong(): Boolean = this in LONG_MIN..LONG_MAX
     }
 }

@@ -1,10 +1,14 @@
 package com.eignex.klause.lp.lattice
 
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 
 /** One exact row whose activity is bounded on both sides. */
-internal class DoubleBoundedRow(val coefficients: SparseIntRow, val lower: BigInteger, val upper: BigInteger) {
+internal class DoubleBoundedRow(val coefficients: SparseIntRow, val lower: BigInt, val upper: BigInt) {
     init {
         require(lower <= upper) { "double-bounded row has crossed bounds: $lower > $upper" }
     }
@@ -21,8 +25,8 @@ internal class DoubleBoundedRow(val coefficients: SparseIntRow, val lower: BigIn
  */
 internal class DoubleBoundedReduction(val rows: List<DoubleBoundedRow>, val transform: UnimodularTransform) {
     /** Recover the source integer point `x = V·y`. */
-    fun recover(y: Array<BigInteger>): Array<BigInteger> {
-        val x = Array(transform.size) { BigInteger.ZERO }
+    fun recover(y: Array<BigInt>): Array<BigInt> {
+        val x = Array(transform.size) { BIG_ZERO }
         transform.forEachEntry { row, col, value -> x[row] += value * y[col] }
         return x
     }

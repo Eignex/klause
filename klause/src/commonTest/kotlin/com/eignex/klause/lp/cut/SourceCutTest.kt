@@ -43,7 +43,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -90,7 +91,7 @@ class SourceCutTest {
 
     @Test
     fun `rational real and term coordinates remap exactly into source units`() {
-        val half = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(2))
+        val half = BigFraction.of(BIG_ONE, bigIntOf(2))
         val proof = CutProvenance(modelToken, 3, emptyList())
         val source = SourceCut(
             CutExpression(mapOf(y to half, term to BigFraction.ofLong(3))),
@@ -262,7 +263,7 @@ class SourceCutTest {
 
     @Test
     fun `rational scaling and proof expansion budgets decline with typed reasons`() {
-        val huge = BigFraction.of(BigInteger.ONE, BigInteger.ONE.shl(80))
+        val huge = BigFraction.of(BIG_ONE, BIG_ONE.shl(80))
         val proof = CutProvenance(modelToken, 0, emptyList())
         val source = SourceCut(
             CutExpression(mapOf(x to huge, y to BigFraction.ONE)),
@@ -370,7 +371,7 @@ class SourceCutTest {
 
     @Test
     fun `rational slack expansion uses exact authority rather than its float projection`() {
-        val third = BigFraction.of(BigInteger.ONE, BigInteger.fromInt(3))
+        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val number = ExactLpNumber.of(third)
         val zero = ExactLpNumber.of(0L)
         val exact = ExactLpModel(
@@ -642,8 +643,8 @@ class SourceCutTest {
         val source = SourceCut(
             CutExpression(
                 mapOf(
-                    x to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(17)),
-                    y to BigFraction.of(BigInteger.ONE, BigInteger.fromLong(19)),
+                    x to BigFraction.of(BIG_ONE, bigIntOf(17)),
+                    y to BigFraction.of(BIG_ONE, bigIntOf(19)),
                 ),
             ),
             Relation.LE,

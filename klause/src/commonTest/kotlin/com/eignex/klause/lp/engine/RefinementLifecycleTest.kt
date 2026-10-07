@@ -2,8 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -351,7 +351,7 @@ class RefinementLifecycleTest {
     @Test
     fun `dual scaling growth is bounded independently of primal scaling`() {
         val zero = ExactLpNumber.of(0L)
-        val tiny = ExactLpNumber.of(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 200))
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 200))
         val state = LpExactState(
             ExactLpModel(
                 listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
@@ -425,7 +425,7 @@ class RefinementLifecycleTest {
         }
 
         assertEquals(3, costs.size)
-        assertEquals(BigFraction.of(BigInteger.ONE, BigInteger.ONE shl 120), costs.last())
+        assertEquals(BigFraction.of(BIG_ONE, BIG_ONE shl 120), costs.last())
     }
 
     @Test

@@ -1,6 +1,10 @@
 package com.eignex.klause.lowering
 
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -12,7 +16,7 @@ import kotlin.test.assertTrue
  */
 class WideIntDigitsTest {
 
-    private fun big(s: String) = BigInteger.parseString(s)
+    private fun big(s: String) = parseBigInt(s)
 
     @Test
     fun `digits round-trip a value past Long and the digit count covers its magnitude`() {
@@ -28,7 +32,7 @@ class WideIntDigitsTest {
         val v = big("123456789012345678901234567890")
         val w = 20
         val n = WideIntDigits.digitCount(v, w)
-        val radix = WideIntDigits.pow2(w).longValue()
+        val radix = WideIntDigits.pow2(w).toLongExact()
         for (d in WideIntDigits.digitsOf(v, w, n)) {
             assertTrue(d in 0 until radix, "digit $d escaped [0, $radix)")
         }
@@ -37,7 +41,7 @@ class WideIntDigitsTest {
     @Test
     fun `the width keeps a coefficient times a digit bound inside Long`() {
         // The rule that preserves refutation: max|coeff| * 2^width must not overflow.
-        val limit = BigInteger.fromLong(Long.MAX_VALUE)
+        val limit = bigIntOf(Long.MAX_VALUE)
         for (c in listOf("1", "4096", "1000003", "1073741824")) {
             val coeff = big(c)
             val w = WideIntDigits.widthFor(coeff)
@@ -55,7 +59,7 @@ class WideIntDigitsTest {
 
     @Test
     fun `a unit coefficient gets the widest digits`() {
-        assertEquals(62, WideIntDigits.widthFor(BigInteger.ONE), "nothing to multiply against")
+        assertEquals(62, WideIntDigits.widthFor(BIG_ONE), "nothing to multiply against")
     }
 
     @Test
@@ -67,6 +71,6 @@ class WideIntDigitsTest {
 
     @Test
     fun `zero encodes as a single zero digit`() {
-        assertEquals(BigInteger.ZERO, WideIntDigits.recompose(WideIntDigits.digitsOf(BigInteger.ZERO, 16, 1), 16))
+        assertEquals(BIG_ZERO, WideIntDigits.recompose(WideIntDigits.digitsOf(BIG_ZERO, 16, 1), 16))
     }
 }

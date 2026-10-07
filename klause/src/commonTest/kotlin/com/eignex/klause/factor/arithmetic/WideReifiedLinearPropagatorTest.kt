@@ -12,7 +12,10 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -22,7 +25,7 @@ import kotlin.test.assertTrue
 class WideReifiedLinearPropagatorTest {
 
     // 2^64 — one past the signed 64-bit range, so it can only live in the wide coefficient lane.
-    private val w = BigInteger.parseString("18446744073709551616")
+    private val w = parseBigInt("18446744073709551616")
 
     // bool 0 = aux; int 0 = x, int 1 = y.
     private fun problem(factor: Factor, xHi: Long = 5, yHi: Long = 5) = Problem(
@@ -33,7 +36,7 @@ class WideReifiedLinearPropagatorTest {
     )
 
     /** `aux ↔ (x ≤ y)`, expressed with a wide coefficient on both terms. */
-    private fun auxIffXLeY() = ReifiedLinear(0, intArrayOf(0, 1), arrayOf(w, -w), LinearOp.LE, BigInteger.ZERO)
+    private fun auxIffXLeY() = ReifiedLinear(0, intArrayOf(0, 1), arrayOf(w, -w), LinearOp.LE, BIG_ZERO)
 
     @Test
     fun `aux true forces the wide reified row`() {
@@ -76,7 +79,7 @@ class WideReifiedLinearPropagatorTest {
         val aux = sat.assignment.bools[0]
         val x = sat.assignment.ints[0]
         val y = sat.assignment.ints[1]
-        val bodyHolds = w * BigInteger.fromLong(x) - w * BigInteger.fromLong(y) <= BigInteger.ZERO
+        val bodyHolds = w * bigIntOf(x) - w * bigIntOf(y) <= BIG_ZERO
         assertEquals(aux, bodyHolds, "witness must satisfy aux ↔ (x ≤ y) exactly (aux=$aux, x=$x, y=$y)")
     }
 
@@ -84,7 +87,7 @@ class WideReifiedLinearPropagatorTest {
     fun `local search never reports a solution a wide factor refutes`() {
         // A bare wide Linear with no integer solution (2^64·x = 2·2^64 + 1): its exact invariant never reads as
         // satisfied, so no assignment is reported.
-        val bound = w * BigInteger.fromLong(2) + BigInteger.ONE
+        val bound = w * bigIntOf(2) + BIG_ONE
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, bound)
         val p = Problem(
             numBoolVars = 0,
@@ -99,7 +102,7 @@ class WideReifiedLinearPropagatorTest {
     @Test
     fun `local search satisfies a wide factor exactly`() {
         // 2^64·x = 3·2^64 holds only at x = 3.
-        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w * BigInteger.fromLong(3))
+        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w * bigIntOf(3))
         val p = Problem(0, 1, arrayOf(IntDomain(0, 5)), arrayOf<Factor>(row))
         val r = LocalSearchSolver(p.bake()).solve(LocalSearchParams(maxFlips = 1_000, randomSeed = 1))
         assertEquals(3L, assertIs<SolveResult.Sat>(r).assignment.ints[0])

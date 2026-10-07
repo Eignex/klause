@@ -32,7 +32,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.PbOp
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -69,12 +70,12 @@ class FactorRemapKeySinkInvariantTest {
         "Linear(wide)" to Linear(
             intArrayOf(5, 0, 7),
             arrayOf(
-                BigInteger.parseString("170141183460469231731687303715884105727"),
-                BigInteger.fromLong(-3),
-                BigInteger.fromLong(2),
+                parseBigInt("170141183460469231731687303715884105727"),
+                bigIntOf(-3),
+                bigIntOf(2),
             ),
             LinearOp.LE,
-            BigInteger.parseString("340282366920938463463374607431768211455"),
+            parseBigInt("340282366920938463463374607431768211455"),
         ),
         "Linear(real)" to Linear(
             intVars = intArrayOf(5, 0),

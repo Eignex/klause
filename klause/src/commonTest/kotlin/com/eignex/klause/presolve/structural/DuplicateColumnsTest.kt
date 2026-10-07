@@ -20,8 +20,9 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -147,11 +148,11 @@ class DuplicateColumnsTest {
         val free = booleanArrayOf(true, true, false)
         val model = sourceModel(IntDomain(0, 9), IntDomain(0, 9), openLo = free, openHi = free)
         val delta = Presolve.mergeSourceDuplicateColumns(model, emptySet(), Cancellation.Never)
-        val ints = arrayOf(BigInteger.fromLong(-3), BigInteger.ZERO, BigInteger.ZERO)
+        val ints = arrayOf(bigIntOf(-3), BIG_ZERO, BIG_ZERO)
 
         delta.rebuild.rebuildInto(BooleanArray(0), ints)
 
-        assertEquals(listOf(BigInteger.fromLong(-3), BigInteger.ZERO), ints.take(2))
+        assertEquals(listOf(bigIntOf(-3), BIG_ZERO), ints.take(2))
     }
 
     @Test

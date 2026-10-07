@@ -6,7 +6,10 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchValueKey
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TWO
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -26,8 +29,8 @@ class SourceBoundAtomTest {
         )
         for ((numerator, floorText) in cases) {
             val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
-            val value = BigFraction.of(BigInteger.parseString(numerator), BigInteger.TWO)
-            val floor = BigInteger.parseString(floorText)
+            val value = BigFraction.of(parseBigInt(numerator), BIG_TWO)
+            val floor = parseBigInt(floorText)
             val atom = assertNotNull(
                 SourceBoundAtom.integerSplit(
                     session,
@@ -38,10 +41,10 @@ class SourceBoundAtomTest {
             val upper = atom.positive.payload as SourceBoundAtom
             val lower = atom.negative.payload as SourceBoundAtom
 
-            assertEquals(BigFraction.of(floor, BigInteger.ONE), upper.threshold)
-            assertEquals(BigFraction.of(floor + BigInteger.ONE, BigInteger.ONE), lower.threshold)
+            assertEquals(BigFraction.of(floor, BIG_ONE), upper.threshold)
+            assertEquals(BigFraction.of(floor + BIG_ONE, BIG_ONE), lower.threshold)
             for (offset in -2L..3L) {
-                val point = BigFraction.of(floor + BigInteger.fromLong(offset), BigInteger.ONE)
+                val point = BigFraction.of(floor + bigIntOf(offset), BIG_ONE)
                 assertEquals(1, listOf(upper, lower).count { holds(it, mapOf(SearchIntValue(0) to point)) })
             }
         }
@@ -51,7 +54,7 @@ class SourceBoundAtomTest {
     fun `rational complements retain strictness at and around a transformed threshold`() {
         for (strict in listOf(false, true)) {
             val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
-            val half = BigFraction.of(BigInteger.ONE, BigInteger.TWO)
+            val half = BigFraction.of(BIG_ONE, BIG_TWO)
             val atom = assertNotNull(
                 SourceBoundAtom.rationalSplit(
                     session,
@@ -112,7 +115,7 @@ class SourceBoundAtomTest {
         val cases = listOf(
             listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)) to SourceBoundLimits(),
             listOf(
-                SourceBoundTerm(SearchIntValue(0), BigFraction.of(BigInteger.ONE, BigInteger.TWO)),
+                SourceBoundTerm(SearchIntValue(0), BigFraction.of(BIG_ONE, BIG_TWO)),
             ) to SourceBoundLimits(),
             listOf(SourceBoundTerm(unsupported, BigFraction.ONE)) to SourceBoundLimits(),
             listOf(SourceBoundTerm(SearchIntValue(-1), BigFraction.ONE)) to SourceBoundLimits(),
@@ -145,7 +148,7 @@ class SourceBoundAtomTest {
                 session,
                 emptyList(),
                 BigFraction.ONE,
-                constant = BigFraction.of(BigInteger.ONE, BigInteger.TWO),
+                constant = BigFraction.of(BIG_ONE, BIG_TWO),
             ),
         )
         assertNull(
@@ -166,7 +169,7 @@ class SourceBoundAtomTest {
     @Test
     fun `integer normalization cancels nonintegral terms before checking the lattice`() {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
-        val half = BigFraction.of(BigInteger.ONE, BigInteger.TWO)
+        val half = BigFraction.of(BIG_ONE, BIG_TWO)
         val atom = SourceBoundAtom.integerSplit(
             session,
             listOf(SourceBoundTerm(SearchIntValue(0), half), SourceBoundTerm(SearchIntValue(0), half)),

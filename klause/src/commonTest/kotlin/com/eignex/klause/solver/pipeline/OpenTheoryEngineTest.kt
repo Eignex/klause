@@ -21,9 +21,12 @@ import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSolver
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -225,8 +228,8 @@ class OpenTheoryEngineTest {
         val ints = assertIs<OpenTheoryAssignment.ExactLira>(
             assertIs<OpenTheoryResult.Sat>(result).assignment,
         ).assignment.ints
-        val x = ints[parsed.intVarNames.getValue("x")].longValue()
-        val y = ints[parsed.intVarNames.getValue("y")].longValue()
+        val x = ints[parsed.intVarNames.getValue("x")].toLongExact()
+        val y = ints[parsed.intVarNames.getValue("y")].toLongExact()
         assertTrue(3 * x + 5 * y <= 100, "the witness satisfies the first row")
         assertTrue(2 * x + y >= 7, "the witness satisfies the second row")
     }
@@ -246,10 +249,10 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve()
 
         val witness = assertIs<OpenTheoryResult.Sat>(result).assignment
-        val x = BigInteger.parseString(witness.intValue(parsed.intVarNames.getValue("x")))
-        val y = BigInteger.parseString(witness.intValue(parsed.intVarNames.getValue("y")))
+        val x = parseBigInt(witness.intValue(parsed.intVarNames.getValue("x")))
+        val y = parseBigInt(witness.intValue(parsed.intVarNames.getValue("y")))
         assertEquals(y, x)
-        assertTrue(y >= BigInteger.parseString("100000000000000000000"))
+        assertTrue(y >= parseBigInt("100000000000000000000"))
     }
 
     @Test
@@ -474,8 +477,8 @@ class OpenTheoryEngineTest {
             ),
         ).assignment
 
-        assertEquals(BigInteger.ZERO, assignment.ints[0])
-        assertEquals(BigInteger.ZERO, assignment.ints[1])
+        assertEquals(BIG_ZERO, assignment.ints[0])
+        assertEquals(BIG_ZERO, assignment.ints[1])
     }
 
     @Test
@@ -538,7 +541,7 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve()
 
         val assignment = assertIs<OpenTheoryAssignment.ExactLira>(assertIs<OpenTheoryResult.Sat>(result).assignment)
-        assertEquals(listOf(BigInteger.fromInt(4), BigInteger.fromInt(-3)), assignment.assignment.ints.toList())
+        assertEquals(listOf(bigIntOf(4), bigIntOf(-3)), assignment.assignment.ints.toList())
     }
 
     @Test

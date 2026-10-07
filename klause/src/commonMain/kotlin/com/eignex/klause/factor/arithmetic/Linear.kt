@@ -27,11 +27,13 @@ import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.NoPropagator
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntHashSet
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.unaryMinus
 
 /**
  * `Σ coeffs(i) * intVars(i) ⟨op⟩ bound`. Payload at `intPayload(factorId)` is the current
@@ -55,8 +57,8 @@ class Linear private constructor(
     strictRealIn: Boolean = false,
     // Over-64-bit integer coefficients and bound, carried exactly. Null for the integer core and for real
     // rows.
-    wideCoeffsIn: Array<BigInteger>? = null,
-    wideBoundIn: BigInteger? = null,
+    wideCoeffsIn: Array<BigInt>? = null,
+    wideBoundIn: BigInt? = null,
 ) : Factor,
     LinearRow {
 
@@ -170,10 +172,10 @@ class Linear private constructor(
 
     /**
      * Over-64-bit integer form: coefficients and/or bound beyond the [Long] range, carried exactly as
-     * [BigInteger]. The row propagates via [WideLinearPropagator] and is excluded from the LP relaxation;
+     * [BigInt]. The row propagates via [WideLinearPropagator] and is excluded from the LP relaxation;
      * [vars] must be distinct — this form does not coalesce duplicates.
      */
-    constructor(vars: IntArray, wideCoeffs: Array<BigInteger>, op: LinearOp, wideBound: BigInteger) : this(
+    constructor(vars: IntArray, wideCoeffs: Array<BigInt>, op: LinearOp, wideBound: BigInt) : this(
         wideLinearTerms(vars, wideCoeffs),
         op,
         0L,
@@ -346,7 +348,7 @@ internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
 internal fun fitsInt32(values: LongArray): Boolean = values.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
 // Wide coefficients are exact, so callers must not lose a duplicate term before construction.
-internal fun wideLinearTerms(vars: IntArray, coeffs: Array<BigInteger>): CoalescedTerms {
+internal fun wideLinearTerms(vars: IntArray, coeffs: Array<BigInt>): CoalescedTerms {
     require(vars.size == coeffs.size) { "wide coeffs/vars length mismatch" }
     val seen = IntHashSet(vars.size)
     for (variable in vars) require(seen.add(variable)) { "wide linear vars must be distinct" }
@@ -354,10 +356,10 @@ internal fun wideLinearTerms(vars: IntArray, coeffs: Array<BigInteger>): Coalesc
 }
 
 // Keep zero coefficients: a remap can cancel every nonzero term, but the factor stays representable.
-internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntArray, Array<BigInteger>> {
+internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInt>): Pair<IntArray, Array<BigInt>> {
     require(vars.size == coeffs.size) { "wide coeffs/vars length mismatch" }
     val order = ArrayList<Int>(vars.size)
-    val sum = HashMap<Int, BigInteger>(vars.size)
+    val sum = HashMap<Int, BigInt>(vars.size)
     for (i in vars.indices) {
         val v = vars[i]
         val prev = sum[v]

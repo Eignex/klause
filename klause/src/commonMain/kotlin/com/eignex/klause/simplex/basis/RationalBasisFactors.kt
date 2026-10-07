@@ -5,7 +5,15 @@ import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.PollStride
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.shr
+import com.eignex.klause.util.toLong
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -246,7 +254,7 @@ private class RationalMeter(val limits: RationalBasisLimits, private val cancell
     )
 }
 
-private fun BigFraction.bits(): Int = maxOf(num.bitLength(), den.bitLength())
+private fun BigFraction.bits(): Int = maxOf(num.magnitudeBitLength(), den.magnitudeBitLength())
 
 private fun wordBits(high: ULong, low: ULong): Int = if (high == 0uL) {
     64 - low.countLeadingZeroBits()
@@ -262,21 +270,21 @@ private fun Frac128.bits(): Int {
 
 private fun toFixed(value: BigFraction, meter: RationalMeter): Frac128 {
     meter.visit(value)
-    val numeratorBits = value.num.bitLength()
+    val numeratorBits = value.num.magnitudeBitLength()
     val negative = value.signum() < 0
-    if (numeratorBits > 128 || (numeratorBits == 128 && !negative) || value.den.bitLength() > 127) {
+    if (numeratorBits > 128 || (numeratorBits == 128 && !negative) || value.den.magnitudeBitLength() > 127) {
         throw RationalOverflow()
     }
     meter.arithmetic(value.bits().toLong())
     val magnitude = value.num.abs()
-    val low = magnitude.longValue(exactRequired = false)
-    val high = (magnitude shr 64).longValue(exactRequired = false)
+    val low = magnitude.toLong()
+    val high = (magnitude shr 64).toLong()
     if (numeratorBits == 128 && (high != Long.MIN_VALUE || low != 0L)) throw RationalOverflow()
     return Frac128(
         if (negative) high.inv() + if (low == 0L) 1L else 0L else high,
         if (negative) -low else low,
-        (value.den shr 64).longValue(),
-        value.den.longValue(exactRequired = false),
+        (value.den shr 64).toLongExact(),
+        value.den.toLong(),
     )
 }
 
@@ -285,10 +293,10 @@ private fun toBig(value: Frac128, meter: RationalMeter): BigFraction {
     val negative = value.nHi < 0
     val low = if (negative) 0uL - value.nLo.toULong() else value.nLo.toULong()
     val high = if (negative) value.nHi.toULong().inv() + if (value.nLo == 0L) 1uL else 0uL else value.nHi.toULong()
-    val magnitude = (BigInteger.fromULong(high) shl 64) + BigInteger.fromULong(low)
+    val magnitude = (bigIntOf(high) shl 64) + bigIntOf(low)
     val result = BigFraction.of(
         if (negative) -magnitude else magnitude,
-        (BigInteger.fromLong(value.dHi) shl 64) + BigInteger.fromULong(value.dLo.toULong()),
+        (bigIntOf(value.dHi) shl 64) + bigIntOf(value.dLo.toULong()),
     )
     return meter.visit(result)
 }

@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactSimplexDoubleView
 import com.eignex.klause.simplex.exact.ExactSimplexModel
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -11,10 +12,11 @@ import com.eignex.klause.util.MutableIntDoubleMap
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
+import com.eignex.klause.util.toLongExact
 import com.eignex.klause.util.toSortedIntArray
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -162,7 +164,7 @@ internal class LpModel(
         var widest = 1
         for (j in 0 until n) {
             forEachRationalColumn(j) { _, value ->
-                widest = maxOf(widest, value.num.bitLength(), value.den.bitLength())
+                widest = maxOf(widest, value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
             }
         }
         widest
@@ -936,12 +938,12 @@ internal class ExactLpNumber private constructor(val value: BigFraction, val iee
     }
 
     fun legacyLong(): Long? {
-        if (ieeeBits != null || value.den != BigInteger.ONE ||
+        if (ieeeBits != null || value.den != BIG_ONE ||
             value < BigFraction.ofLong(Long.MIN_VALUE) || value > BigFraction.ofLong(Long.MAX_VALUE)
         ) {
             return null
         }
-        return value.num.longValue(exactRequired = true)
+        return value.num.toLongExact()
     }
 
     override fun equals(other: Any?): Boolean =

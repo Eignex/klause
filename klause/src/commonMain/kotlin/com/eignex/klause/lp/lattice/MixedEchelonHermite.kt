@@ -1,7 +1,12 @@
 package com.eignex.klause.lp.lattice
 
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 
 /**
  * Bromberger, *A Reduction from Unbounded Linear Mixed Arithmetic Problems into Bounded Problems*
@@ -24,13 +29,13 @@ internal class MixedEchelonHermite(
     /** The equality right-hand sides after the same elimination, index-aligned with [equalities]; empty
      *  when the caller did not supply them. The Hermite step is a *column* operation, so it leaves these
      *  untouched — only the echelon step recombines them. */
-    val equalityRhs: Array<BigInteger> = emptyArray(),
+    val equalityRhs: Array<BigInt> = emptyArray(),
     /** True when the equalities reduced to `0 = c` for a non-zero `c`, refuting them on their own. */
     val inconsistent: Boolean = false,
 ) {
     /** The original point `x = V·y` for a solution [y] of the rewritten system. */
-    fun recover(y: Array<BigInteger>): Array<BigInteger> {
-        val x = Array(transform.size) { BigInteger.ZERO }
+    fun recover(y: Array<BigInt>): Array<BigInt> {
+        val x = Array(transform.size) { BIG_ZERO }
         transform.forEachEntry { row, col, value -> x[row] += value * y[col] }
         return x
     }
@@ -59,7 +64,7 @@ internal fun mixedEchelonHermite(
     equalities: List<SparseIntRow>,
     inequalities: List<SparseIntRow>,
     cols: Int,
-    equalityRhs: Array<BigInteger>? = null,
+    equalityRhs: Array<BigInt>? = null,
     cancellation: Cancellation = Cancellation.Never,
 ): MixedEchelonHermite {
     if (cols == 0) {
@@ -88,10 +93,10 @@ internal fun mixedEchelonHermite(
  * here; the equalities come out of the Hermite step already transformed.
  */
 private fun applyTransform(row: SparseIntRow, v: UnimodularTransform): SparseIntRow {
-    val acc = HashMap<Int, BigInteger>()
+    val acc = HashMap<Int, BigInt>()
     v.forEachEntry { k, j, value ->
         val a = row[k]
-        if (!a.isZero()) acc[j] = (acc[j] ?: BigInteger.ZERO) + a * value
+        if (!a.isZero()) acc[j] = (acc[j] ?: BIG_ZERO) + a * value
     }
     return sparseIntRow(acc)
 }
@@ -107,20 +112,20 @@ private fun applyTransform(row: SparseIntRow, v: UnimodularTransform): SparseInt
  * A side stays `null` when any term feeding it is open — an unbounded `y` makes `x` unbounded in the
  * direction its coefficient points, and claiming otherwise would invent exactly the box this avoids.
  */
-internal fun MixedEchelonHermite.originalBounds(yLo: Array<BigInteger?>, yHi: Array<BigInteger?>): TriangularBounds {
+internal fun MixedEchelonHermite.originalBounds(yLo: Array<BigInt?>, yHi: Array<BigInt?>): TriangularBounds {
     val n = transform.size
-    val lo = arrayOfNulls<BigInteger>(n)
-    val hi = arrayOfNulls<BigInteger>(n)
+    val lo = arrayOfNulls<BigInt>(n)
+    val hi = arrayOfNulls<BigInt>(n)
     // A row with no term at all reads as pinned to zero, which is what an all-zero row of V would mean;
     // V is unimodular so no such row exists, and every row starts the sweep at the empty sum.
     val open = BooleanArray(n)
     val openHigh = BooleanArray(n)
     for (i in 0 until n) {
-        lo[i] = BigInteger.ZERO
-        hi[i] = BigInteger.ZERO
+        lo[i] = BIG_ZERO
+        hi[i] = BIG_ZERO
     }
     transform.forEachEntry { row, col, c ->
-        val positive = c > BigInteger.ZERO
+        val positive = c > BIG_ZERO
         val termLo = if (positive) yLo.getOrNull(col)?.times(c) else yHi.getOrNull(col)?.times(c)
         val termHi = if (positive) yHi.getOrNull(col)?.times(c) else yLo.getOrNull(col)?.times(c)
         if (termLo == null) open[row] = true else lo[row] = lo[row]?.plus(termLo)

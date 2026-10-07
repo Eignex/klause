@@ -7,8 +7,8 @@ import com.eignex.klause.simplex.exact.ContinuationStatus
 import com.eignex.klause.simplex.exact.ExactContinuation
 import com.eignex.klause.simplex.exact.ExactContinuationInput
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -55,7 +55,7 @@ class LpExactContinuationTest {
 
     @Test
     fun `cancellation before lane publication retains admitted input peak`() {
-        val large = BigFraction.of(BigInteger.ONE shl 40, BigInteger.ONE)
+        val large = BigFraction.of(BIG_ONE shl 40, BIG_ONE)
         val session = ExactContinuation(
             ExactContinuationInput(
                 listOf(emptyList()),
@@ -79,7 +79,7 @@ class LpExactContinuationTest {
 
     @Test
     fun `precision restart peak survives a lower scalar ceiling`() {
-        val huge = ExactLpNumber.of(BigFraction.of(BigInteger.ONE shl 100, BigInteger.ONE))
+        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 100, BIG_ONE))
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(

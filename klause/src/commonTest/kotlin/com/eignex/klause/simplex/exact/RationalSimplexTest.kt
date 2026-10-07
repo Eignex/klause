@@ -3,8 +3,9 @@ package com.eignex.klause.simplex.exact
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.bigIntOf
 import kotlin.math.sign
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -233,14 +234,14 @@ class RationalSimplexTest {
 
     @Test
     fun `keeps arbitrary precision rows out of the floating relaxation`() {
-        val large = BigInteger.ONE shl 160
+        val large = BIG_ONE shl 160
         val model = ExactRationalFeasibilityModel(
             n = 1,
             rows = listOf(
                 ExactRationalInequality(
                     columns = intArrayOf(0),
-                    coefficients = listOf(BigFraction.of(large, BigInteger.ONE)),
-                    rhs = BigFraction.of(large, BigInteger.ONE),
+                    coefficients = listOf(BigFraction.of(large, BIG_ONE)),
+                    rhs = BigFraction.of(large, BIG_ONE),
                 ),
             ),
         )
@@ -253,14 +254,14 @@ class RationalSimplexTest {
 
     @Test
     fun `records an input escalation separately from a direct BigFraction attempt`() {
-        val large = BigInteger.ONE shl 160
+        val large = BIG_ONE shl 160
         val model = ExactRationalFeasibilityModel(
             n = 1,
             rows = listOf(
                 ExactRationalInequality(
                     intArrayOf(0),
-                    listOf(BigFraction.of(large, BigInteger.ONE)),
-                    BigFraction.of(large, BigInteger.ONE),
+                    listOf(BigFraction.of(large, BIG_ONE)),
+                    BigFraction.of(large, BIG_ONE),
                 ),
             ),
         )
@@ -449,8 +450,8 @@ class RationalSimplexTest {
 
         val witness = checkNotNull(exactMixedUnitCubeSolution(rows, realColumns = 1, integerColumns = 1))
 
-        assertTrue(witness[1].den == BigInteger.ONE)
-        assertTrue(witness[1].num >= BigInteger.fromInt(1000000))
+        assertTrue(witness[1].den == BIG_ONE)
+        assertTrue(witness[1].num >= bigIntOf(1000000))
         assertTrue(witness[0] - witness[1] < BigFraction.ofLong(3))
     }
 
@@ -587,8 +588,8 @@ class RationalSimplexTest {
     private val fractionSamples = listOf(
         BigFraction.ZERO, BigFraction.ONE, BigFraction.MINUS_ONE, q(-6, 1), q(1, 2), q(-3, 4), q(5, 12),
         q(7, 18), q(6, 35), q(-10, 21), q(1, 1024), checkNotNull(BigFraction.ofDouble(0.1)),
-        BigFraction.of(-(BigInteger.ONE shl 70), BigInteger.fromLong(3)),
+        BigFraction.of(-(BIG_ONE shl 70), bigIntOf(3)),
     )
 
-    private fun q(num: Long, den: Long) = BigFraction.of(BigInteger.fromLong(num), BigInteger.fromLong(den))
+    private fun q(num: Long, den: Long) = BigFraction.of(bigIntOf(num), bigIntOf(den))
 }

@@ -2,7 +2,9 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Publication
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -17,7 +19,7 @@ class OpenTheoryIncumbentsTest {
     private fun witness(x: Long): OpenTheoryAssignment =
         OpenTheoryAssignment.Difference(Sample(BooleanArray(0), longArrayOf(x)))
 
-    private fun value(text: String): BigInteger = BigInteger.parseString(text)
+    private fun value(text: String): BigInt = parseBigInt(text)
 
     @Test
     fun `no incumbent stands before the first witness is offered`() {
@@ -29,7 +31,7 @@ class OpenTheoryIncumbentsTest {
         val exchange = minimizingWitnessExchange()
         val first = witness(7)
 
-        val published = assertIs<Publication.Installed<OpenTheoryAssignment, BigInteger>>(
+        val published = assertIs<Publication.Installed<OpenTheoryAssignment, BigInt>>(
             exchange.offer(first, value("7")),
         )
 
@@ -43,7 +45,7 @@ class OpenTheoryIncumbentsTest {
         exchange.offer(witness(7), value("7"))
         val better = witness(3)
 
-        assertIs<Publication.Installed<OpenTheoryAssignment, BigInteger>>(exchange.offer(better, value("3")))
+        assertIs<Publication.Installed<OpenTheoryAssignment, BigInt>>(exchange.offer(better, value("3")))
 
         assertEquals(better, exchange.current()?.assignment)
         assertEquals(value("3"), exchange.current()?.objective)
@@ -82,10 +84,10 @@ class OpenTheoryIncumbentsTest {
         val huge = value("170141183460469231731687303715884105728")
         exchange.offer(witness(0), huge)
 
-        assertIs<Publication.Installed<OpenTheoryAssignment, BigInteger>>(
-            exchange.offer(witness(1), huge - BigInteger.ONE),
+        assertIs<Publication.Installed<OpenTheoryAssignment, BigInt>>(
+            exchange.offer(witness(1), huge - BIG_ONE),
         )
 
-        assertEquals(huge - BigInteger.ONE, exchange.current()?.objective)
+        assertEquals(huge - BIG_ONE, exchange.current()?.objective)
     }
 }

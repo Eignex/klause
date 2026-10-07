@@ -11,7 +11,7 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.simplex.exact.BigFraction
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
 
 internal data class CutColumnSource(
     val source: CutSource,
@@ -61,9 +61,9 @@ internal class CutSourceMap(
     fun parent(row: Int): CutProvenance? = parentSnapshot[row]
     fun isGlobal(premise: CutPremise): Boolean = implied(premise, globalSnapshot) ||
         (
-            premise is CutPremise.Integral && premise.expression.constant.den == BigInteger.ONE &&
+            premise is CutPremise.Integral && premise.expression.constant.den == BIG_ONE &&
                 premise.expression.terms.all { (source, coefficient) ->
-                    coefficient.den == BigInteger.ONE &&
+                    coefficient.den == BIG_ONE &&
                         (source.kind == CutSourceKind.INTEGER || source.kind == CutSourceKind.BOOLEAN)
                 }
             )

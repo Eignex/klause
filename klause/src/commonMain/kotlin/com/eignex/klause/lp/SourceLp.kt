@@ -29,6 +29,7 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.magnitudeBitLength
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource.Monotonic
@@ -162,8 +163,8 @@ internal class SourceLpBudget(
             var bits = 0L
             fun admit(number: BigFraction): Boolean {
                 if (token()) return false
-                val numerator = number.num.bitLength()
-                val denominator = number.den.bitLength()
+                val numerator = number.num.magnitudeBitLength()
+                val denominator = number.den.magnitudeBitLength()
                 if (numerator > 4096 || denominator > 4096) return false
                 bits += numerator.toLong() + denominator
                 return bits <= 8192L
@@ -437,7 +438,7 @@ internal class SourceLp(
 }
 
 internal fun List<BigFraction>.admittedSourcePoint(): Boolean = all {
-    it.num.bitLength() <= 4096 && it.den.bitLength() <= 4096
+    it.num.magnitudeBitLength() <= 4096 && it.den.magnitudeBitLength() <= 4096
 }
 
 internal fun List<BigFraction>.satisfiesSourceRows(

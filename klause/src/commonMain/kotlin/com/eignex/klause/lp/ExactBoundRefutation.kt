@@ -2,8 +2,22 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.negate
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
+import com.eignex.klause.util.unaryMinus
 
 /**
  * Whether the constraint system is unsatisfiable over its **genuinely open** ranges, decided in exact
@@ -30,11 +44,11 @@ internal fun exactBoundsInfeasible(
 ): Boolean {
     val n = openBounds.size
     if (n == 0 || constraints.isEmpty()) return false
-    val lo = arrayOfNulls<BigInteger>(n)
-    val hi = arrayOfNulls<BigInteger>(n)
+    val lo = arrayOfNulls<BigInt>(n)
+    val hi = arrayOfNulls<BigInt>(n)
     for (v in 0 until n) {
-        lo[v] = openBounds[v].lo?.let { BigInteger.fromLong(it) }
-        hi[v] = openBounds[v].hi?.let { BigInteger.fromLong(it) }
+        lo[v] = openBounds[v].lo?.let { bigIntOf(it) }
+        hi[v] = openBounds[v].hi?.let { bigIntOf(it) }
     }
     val rows = constraints.mapNotNull { rowOf(it, n) }.toMutableList()
     if (rows.isEmpty()) return false
@@ -57,27 +71,27 @@ internal fun exactBoundsInfeasible(
  */
 private fun divisibilityFails(row: Row): Boolean {
     if (!row.equality || row.coeffs.isEmpty()) return false
-    var g = BigInteger.ZERO
+    var g = BIG_ZERO
     for (c in row.coeffs.values) g = gcd(g, c.abs())
-    if (g.isZero() || g == BigInteger.ONE) return false
+    if (g.isZero() || g == BIG_ONE) return false
     return !(row.bound % g).isZero()
 }
 
-private tailrec fun gcd(a: BigInteger, b: BigInteger): BigInteger = if (b.isZero()) a else gcd(b, a % b)
+private tailrec fun gcd(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a else gcd(b, a % b)
 
 /** A row `Σ coeffs·vars ⟨op⟩ bound` in exact arithmetic, mutable so substitution can rewrite it. */
-private class Row(val coeffs: MutableMap<Int, BigInteger>, var bound: BigInteger, val equality: Boolean)
+private class Row(val coeffs: MutableMap<Int, BigInt>, var bound: BigInt, val equality: Boolean)
 
 /** The exact form of [f], or null when it is outside the fragment (a `≠` row constrains no interval). */
 private fun rowOf(f: Linear, n: Int): Row? {
     if (f.op != LinearOp.LE && f.op != LinearOp.EQ) return null
     val constants = f.integralConstants ?: return null
-    val coeffs = HashMap<Int, BigInteger>(f.vars.size)
+    val coeffs = HashMap<Int, BigInt>(f.vars.size)
     for (k in f.vars.indices) {
         val v = f.vars[k]
         if (v >= n) return null
         val c = constants.exactCoeff(k)
-        if (!c.isZero()) coeffs[v] = (coeffs[v] ?: BigInteger.ZERO) + c
+        if (!c.isZero()) coeffs[v] = (coeffs[v] ?: BIG_ZERO) + c
     }
     return Row(coeffs, constants.exactBound, f.op == LinearOp.EQ)
 }
@@ -91,8 +105,8 @@ private fun rowOf(f: Linear, n: Int): Row? {
  */
 private fun eliminateOpenDefinitions(
     rows: MutableList<Row>,
-    lo: Array<BigInteger?>,
-    hi: Array<BigInteger?>,
+    lo: Array<BigInt?>,
+    hi: Array<BigInt?>,
     cancellation: Cancellation,
 ) {
     var budget = MAX_ELIMINATIONS
@@ -105,7 +119,7 @@ private fun eliminateOpenDefinitions(
             if (!row.equality) continue
             for ((v, c) in row.coeffs) {
                 if (lo[v] != null || hi[v] != null) continue
-                if (c.abs() != BigInteger.ONE) continue
+                if (c.abs() != BIG_ONE) continue
                 chosenRow = r
                 chosenVar = v
                 break@outer
@@ -125,9 +139,9 @@ private fun eliminateOpenDefinitions(
 private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, cancellation: Cancellation): Boolean {
     val c = definition.coeffs.getValue(target)
     // |c| = 1, so `target = (bound − rest) / c` is exact: scale by c itself rather than dividing.
-    val scale = if (c > BigInteger.ZERO) BigInteger.ONE else BigInteger.ONE.negate()
+    val scale = if (c > BIG_ZERO) BIG_ONE else BIG_ONE.negate()
     val valueBound = definition.bound * scale
-    val valueTerms = HashMap<Int, BigInteger>(definition.coeffs.size)
+    val valueTerms = HashMap<Int, BigInt>(definition.coeffs.size)
     for ((v, ci) in definition.coeffs) {
         if (v == target) continue
         valueTerms[v] = -ci * scale
@@ -138,7 +152,7 @@ private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, can
         cancellation.charge(EXACT_REFUTATION_WORK_WEIGHT * (1L + valueTerms.size))
         row.bound -= k * valueBound
         for ((v, ci) in valueTerms) {
-            val merged = (row.coeffs[v] ?: BigInteger.ZERO) + k * ci
+            val merged = (row.coeffs[v] ?: BIG_ZERO) + k * ci
             if (merged.isZero()) row.coeffs.remove(v) else row.coeffs[v] = merged
         }
         if (row.coeffs.size > MAX_ROW_TERMS) return false
@@ -149,8 +163,8 @@ private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, can
 /** Interval propagation to a fixpoint; true as soon as a domain comes out empty. */
 private fun propagateToEmpty(
     rows: List<Row>,
-    lo: Array<BigInteger?>,
-    hi: Array<BigInteger?>,
+    lo: Array<BigInt?>,
+    hi: Array<BigInt?>,
     cancellation: Cancellation,
 ): Boolean {
     repeat(MAX_ROUNDS) {
@@ -167,8 +181,8 @@ private fun propagateToEmpty(
 /** One row's tightening pass; returns true as soon as a domain comes out empty. */
 private inline fun tightenRow(
     row: Row,
-    lo: Array<BigInteger?>,
-    hi: Array<BigInteger?>,
+    lo: Array<BigInt?>,
+    hi: Array<BigInt?>,
     cancellation: Cancellation,
     onChange: () -> Unit,
 ): Boolean {
@@ -179,11 +193,11 @@ private inline fun tightenRow(
         // exhausted propagation gives.
         if (cancellation()) return false
         cancellation.charge(EXACT_REFUTATION_WORK_WEIGHT * row.coeffs.size)
-        var restMin: BigInteger? = BigInteger.ZERO
-        var restMax: BigInteger? = BigInteger.ZERO
+        var restMin: BigInt? = BIG_ZERO
+        var restMax: BigInt? = BIG_ZERO
         for ((i, ci) in row.coeffs) {
             if (i == j) continue
-            val positive = ci > BigInteger.ZERO
+            val positive = ci > BIG_ZERO
             val low = if (positive) lo[i] else hi[i]
             val high = if (positive) hi[i] else lo[i]
             restMin = if (restMin == null || low == null) null else restMin + ci * low
@@ -193,7 +207,7 @@ private inline fun tightenRow(
         // c·xⱼ ≥ bound − restMax.
         val upper = restMin?.let { rest -> row.bound - rest }
         val lower = if (row.equality) restMax?.let { rest -> row.bound - rest } else null
-        val positive = c > BigInteger.ZERO
+        val positive = c > BIG_ZERO
         val newHi = if (positive) upper?.let { s -> floorDiv(s, c) } else lower?.let { s -> floorDiv(s, c) }
         val newLo = if (positive) lower?.let { s -> ceilDiv(s, c) } else upper?.let { s -> ceilDiv(s, c) }
         val curHi = hi[j]
@@ -226,12 +240,12 @@ private const val MAX_ELIMINATIONS = 4096
 /** Substitution densifies rows; past this width the reduction costs more than the refutation is worth. */
 private const val MAX_ROW_TERMS = 512
 
-private fun floorDiv(a: BigInteger, b: BigInteger): BigInteger {
+private fun floorDiv(a: BigInt, b: BigInt): BigInt {
     val q = a / b
-    return if (a % b != BigInteger.ZERO && (a.signum() < 0) != (b.signum() < 0)) q - BigInteger.ONE else q
+    return if (a % b != BIG_ZERO && (a.signum() < 0) != (b.signum() < 0)) q - BIG_ONE else q
 }
 
-private fun ceilDiv(a: BigInteger, b: BigInteger): BigInteger {
+private fun ceilDiv(a: BigInt, b: BigInt): BigInt {
     val q = a / b
-    return if (a % b != BigInteger.ZERO && (a.signum() < 0) == (b.signum() < 0)) q + BigInteger.ONE else q
+    return if (a % b != BIG_ZERO && (a.signum() < 0) == (b.signum() < 0)) q + BIG_ONE else q
 }

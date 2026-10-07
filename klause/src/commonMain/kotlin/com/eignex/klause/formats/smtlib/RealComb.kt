@@ -14,7 +14,7 @@ import com.eignex.klause.theory.qflra.ExactLpSourceColumn
 import com.eignex.klause.theory.qflra.ExactLpSourceNumber
 import com.eignex.klause.theory.qflra.ExactLpSourceRow
 import com.eignex.klause.theory.qflra.QfLraRelaxation
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
 
 /**
  * An exact rational linear combination over integer and LP-only real variables — the folded form of
@@ -96,10 +96,10 @@ internal fun exactLpModel(sourceColumns: List<ExactLpSourceColumn>, sourceRows: 
             ),
         )
         rhs.add(ExactLpNumber.of(bound))
-        val integralSlack = inequality.rhs.den == BigInteger.ONE &&
+        val integralSlack = inequality.rhs.den == BIG_ONE &&
             inequality.columns.indices.all { entry ->
                 sourceColumns[inequality.columns[entry]].integral &&
-                    inequality.coefficients[entry].den == BigInteger.ONE
+                    inequality.coefficients[entry].den == BIG_ONE
             }
         columns.add(ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero)), integral = integralSlack))
     }

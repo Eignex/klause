@@ -2,7 +2,15 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.div
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.times
 
 /**
  * One step of recovering the Boolean columns a pass eliminated, stated as data rather than as a closure.
@@ -139,32 +147,32 @@ internal class SourceRebuilds(private val steps: List<RebuildStep>) {
      * A coefficient still does — the model states it that way — so each product is an arbitrary-precision
      * value times a `Long`, and only the accumulation widens.
      */
-    fun rebuildInto(bools: BooleanArray, ints: Array<BigInteger>) {
+    fun rebuildInto(bools: BooleanArray, ints: Array<BigInt>) {
         for (step in steps) {
             if (step is RebuildStep.AffineValue) {
-                var v = BigInteger.fromLong(step.constTerm)
+                var v = bigIntOf(step.constTerm)
                 for (k in step.termVars.indices) {
-                    v += ints[step.termVars[k]] * BigInteger.fromLong(step.termCoeffs[k])
+                    v += ints[step.termVars[k]] * bigIntOf(step.termCoeffs[k])
                 }
-                ints[step.variable] = if (step.divisor == 1L) v else v / BigInteger.fromLong(step.divisor)
+                ints[step.variable] = if (step.divisor == 1L) v else v / bigIntOf(step.divisor)
                 continue
             }
             if (step is RebuildStep.QuotientValue) {
-                var n = BigInteger.fromLong(step.constTerm)
+                var n = bigIntOf(step.constTerm)
                 for (k in step.termVars.indices) {
-                    n += ints[step.termVars[k]] * BigInteger.fromLong(step.termCoeffs[k])
+                    n += ints[step.termVars[k]] * bigIntOf(step.termCoeffs[k])
                 }
-                val d = BigInteger.fromLong(step.divisor)
+                val d = bigIntOf(step.divisor)
                 val truncated = n / d
                 val exact = truncated * d == n
                 // Truncation rounds toward zero; step to the satisfying side when it rounded the wrong way.
-                val negative = n.isNegative xor d.isNegative
+                val negative = (n.signum() < 0) xor (d.signum() < 0)
                 val value = when {
                     exact -> truncated
-                    step.roundDown -> if (negative) truncated - BigInteger.ONE else truncated
-                    else -> if (negative) truncated else truncated + BigInteger.ONE
+                    step.roundDown -> if (negative) truncated - BIG_ONE else truncated
+                    else -> if (negative) truncated else truncated + BIG_ONE
                 }
-                val clamp = step.clamp?.let { BigInteger.fromLong(it) }
+                val clamp = step.clamp?.let { bigIntOf(it) }
                 ints[step.variable] = when {
                     clamp == null -> value
                     step.roundDown -> if (value > clamp) clamp else value

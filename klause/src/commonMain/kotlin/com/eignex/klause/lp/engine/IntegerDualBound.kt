@@ -1,9 +1,15 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.Int128
-import com.ionspin.kotlin.bignum.integer.BigInteger
+import com.eignex.klause.util.abs
+import com.eignex.klause.util.div
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.shl
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -540,16 +546,16 @@ private fun scaledInteger(value: Double, scale: Double): Long? {
 
 private fun scaledInteger(value: BigFraction, bits: Int): Long? {
     if (bits !in scaleRange(value)) return null
-    return (value.num * (BigInteger.ONE shl bits) / value.den).longValue(exactRequired = true)
+    return (value.num * (BIG_ONE shl bits) / value.den).toLongExact()
 }
 
 // The exponents k at which value·2ᵏ is an integer below MAX_EXACT_INT in magnitude: from the power of two in the
 // denominator up to the headroom the numerator leaves. A denominator with an odd factor admits none.
 private fun scaleRange(value: BigFraction): IntRange {
     if (value.isZero) return 0..MAX_SCALE_BITS
-    val need = value.den.bitLength() - 1
-    if (value.den != BigInteger.ONE shl need) return IntRange.EMPTY
-    return need..(EXACT_INT_BITS + need - value.num.abs().bitLength())
+    val need = value.den.magnitudeBitLength() - 1
+    if (value.den != BIG_ONE shl need) return IntRange.EMPTY
+    return need..(EXACT_INT_BITS + need - value.num.abs().magnitudeBitLength())
 }
 
 private fun IntRange.meet(other: IntRange): IntRange = maxOf(first, other.first)..minOf(last, other.last)
