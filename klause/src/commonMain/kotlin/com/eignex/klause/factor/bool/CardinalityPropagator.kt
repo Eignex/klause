@@ -104,7 +104,7 @@ internal class CardinalityPropagator(
      * Load the constraint into [acc] as a coefficient-carrying `≥` reason for cutting-planes conflict
      * analysis. A cardinality is two unit-weight bounds; the relevant half is chosen by
      * [forcedLit] when resolving a pivot (forced-true own-literal ⇒ at-least side `Σ ℓ ≥ min`; forced-false
-     * ⇒ at-most side `Σ ℓ ≤ max` ⇒ `Σ ¬ℓ ≥ n − max`). For a *seed* (`forcedLit == 0`, the conflicting
+     * ⇒ at-most side `Σ ℓ ≤ max` ⇒ `Σ ¬ℓ ≥ n − max`). For a *seed* (`forcedLit == Lit.NONE`, the conflicting
      * constraint) the violated side is detected from [state]: too many true literals ⇒ at-most, too few
      * non-false ⇒ at-least. Returns false for a degenerate bound or a variable not in scope.
      */
@@ -117,7 +117,7 @@ internal class CardinalityPropagator(
             val flipped = IntArray(n) { literals[it] xor 1 }
             return acc.loadPb(ones, flipped, geBound = (n - max).toLong())
         }
-        if (forcedLit == 0) {
+        if (forcedLit == Lit.NONE) {
             // Seed: pick the violated bound from the current assignment.
             var trueCount = 0
             var nonFalse = 0

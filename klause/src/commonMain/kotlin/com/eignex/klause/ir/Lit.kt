@@ -5,6 +5,9 @@ package com.eignex.klause.ir
  * `lit xor 1` flips polarity, `lit ushr 1` recovers the variable.
  */
 object Lit {
+    /** A value no literal takes, standing for "no literal": every non-negative int encodes one, 0 included. */
+    const val NONE: Int = -1
+
     /** Encode a literal from its [variable] id and polarity ([positive] = non-negated). */
     fun make(variable: Int, positive: Boolean): Int = (variable shl 1) or if (positive) 0 else 1
 

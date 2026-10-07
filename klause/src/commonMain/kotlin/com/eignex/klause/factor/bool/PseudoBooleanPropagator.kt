@@ -94,7 +94,7 @@ internal class PseudoBooleanPropagator(
     /** Clause-form nogood when propagation fails: the disjunction of each pinned
      *  literal's false-form. */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = 0)
+        pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = Lit.NONE)
 
     /**
      * Load this constraint into [acc] as a coefficient-carrying `≥` reason for pseudo-Boolean
@@ -110,9 +110,9 @@ internal class PseudoBooleanPropagator(
         PbOp.LE -> loadLe(acc)
 
         // An equality is two `≥` constraints. A resolved pivot picks the half by its forced polarity; a
-        // seed (forcedLit == 0, the conflicting constraint) picks the violated half from [state].
+        // seed (forcedLit == Lit.NONE, the conflicting constraint) picks the violated half from [state].
         PbOp.EQ -> when {
-            forcedLit != 0 -> if (forcedByGeSide(
+            forcedLit != Lit.NONE -> if (forcedByGeSide(
                     forcedLit,
                 )
             ) {

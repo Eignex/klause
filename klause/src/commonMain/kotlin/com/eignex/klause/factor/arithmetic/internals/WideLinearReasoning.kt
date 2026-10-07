@@ -60,7 +60,8 @@ internal fun wideNeverHolds(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: B
 /**
  * Enforce `Σ coeffs·vars ⟨op⟩ bound` exactly: return `false` on a definite conflict, otherwise narrow each
  * variable's `Long` bound as far as the row implies (skipping a derived bound that escapes the `Long` range).
- * [auxLit] is the reifying literal to thread into every tighten's antecedent (`0` for a bare, unreified row).
+ * [auxLit] is the reifying literal to thread into every tighten's antecedent, null for a bare, unreified row
+ * (every int is a literal, so 0 cannot mean none).
  */
 internal fun wideEnforceRow(
     state: PropagationState,
@@ -68,7 +69,7 @@ internal fun wideEnforceRow(
     coeffs: Array<BigInt>,
     op: LinearOp,
     bound: BigInt,
-    auxLit: Int,
+    auxLit: Int?,
 ): Boolean {
     val n = vars.size
     val termLo = Array(n) { BIG_ZERO }
@@ -89,9 +90,9 @@ internal fun wideEnforceRow(
     }
     if (wideNeverHolds(op, sumLo, sumHi, bound)) return false
     val rootFact = state.currentLevel == 0
-    val includeAux = auxLit != 0
+    val includeAux = auxLit != null
     fun ant(i: Int): IntArray? =
-        if (rootFact && !includeAux) null else collectLinearTightenAntecedents(state, vars, i, auxLit, includeAux)
+        if (rootFact && !includeAux) null else collectLinearTightenAntecedents(state, vars, i, auxLit ?: 0, includeAux)
     if (op == LinearOp.NE) {
         for (i in 0 until n) {
             val c = coeffs[i]
