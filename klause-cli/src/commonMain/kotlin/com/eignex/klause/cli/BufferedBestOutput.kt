@@ -89,6 +89,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
             printStatPairs(commentPrefix, openTheoryStatPairs(stats, solveTimeMs).filter { (k, _) -> keepStat(k) })
         }
         printStatPairs(commentPrefix, lpStatPairs(stats))
+        printStatPairs(commentPrefix, lsStatPairs(stats, solveTimeMs))
         printStatPairs(commentPrefix, portfolioStatPairs(stats))
     }
 

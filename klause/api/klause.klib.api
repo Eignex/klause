@@ -10591,8 +10591,14 @@ final class com.eignex.klause.solver.result/ConflictAnalysisStats { // com.eigne
 }
 
 final class com.eignex.klause.solver.result/LocalSearchStats { // com.eignex.klause.solver.result/LocalSearchStats|null[0]
-    constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ...) // com.eignex.klause.solver.result/LocalSearchStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;kotlin.Long;kotlin.Double;kotlin.Double){}[0]
+    constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...) // com.eignex.klause.solver.result/LocalSearchStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;kotlin.Long;kotlin.Double;kotlin.Double;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
 
+    final val completions // com.eignex.klause.solver.result/LocalSearchStats.completions|{}completions[0]
+        final fun <get-completions>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.completions.<get-completions>|<get-completions>(){}[0]
+    final val completionsRefuted // com.eignex.klause.solver.result/LocalSearchStats.completionsRefuted|{}completionsRefuted[0]
+        final fun <get-completionsRefuted>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.completionsRefuted.<get-completionsRefuted>|<get-completionsRefuted>(){}[0]
+    final val completionsUndecided // com.eignex.klause.solver.result/LocalSearchStats.completionsUndecided|{}completionsUndecided[0]
+        final fun <get-completionsUndecided>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.completionsUndecided.<get-completionsUndecided>|<get-completionsUndecided>(){}[0]
     final val incumbentObjective // com.eignex.klause.solver.result/LocalSearchStats.incumbentObjective|{}incumbentObjective[0]
         final fun <get-incumbentObjective>(): kotlin/Double // com.eignex.klause.solver.result/LocalSearchStats.incumbentObjective.<get-incumbentObjective>|<get-incumbentObjective>(){}[0]
     final val incumbentViolation // com.eignex.klause.solver.result/LocalSearchStats.incumbentViolation|{}incumbentViolation[0]
@@ -10609,7 +10615,10 @@ final class com.eignex.klause.solver.result/LocalSearchStats { // com.eignex.kla
     final fun component3(): kotlin/Long // com.eignex.klause.solver.result/LocalSearchStats.component3|component3(){}[0]
     final fun component4(): kotlin/Double // com.eignex.klause.solver.result/LocalSearchStats.component4|component4(){}[0]
     final fun component5(): kotlin/Double // com.eignex.klause.solver.result/LocalSearchStats.component5|component5(){}[0]
-    final fun copy(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ...): com.eignex.klause.solver.result/LocalSearchStats // com.eignex.klause.solver.result/LocalSearchStats.copy|copy(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;kotlin.Long;kotlin.Double;kotlin.Double){}[0]
+    final fun component6(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component6|component6(){}[0]
+    final fun component7(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component7|component7(){}[0]
+    final fun component8(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/LocalSearchStats.component8|component8(){}[0]
+    final fun copy(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...): com.eignex.klause.solver.result/LocalSearchStats // com.eignex.klause.solver.result/LocalSearchStats.copy|copy(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;kotlin.Long;kotlin.Double;kotlin.Double;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/LocalSearchStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/LocalSearchStats): com.eignex.klause.solver.result/LocalSearchStats // com.eignex.klause.solver.result/LocalSearchStats.mergedWith|mergedWith(com.eignex.klause.solver.result.LocalSearchStats){}[0]

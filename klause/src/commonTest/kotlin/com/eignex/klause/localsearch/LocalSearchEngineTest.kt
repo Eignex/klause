@@ -73,4 +73,17 @@ class LocalSearchEngineTest {
         assertIs<SolveResult.Unknown>(result)
         assertTrue(calls in 1..3, "calls=$calls")
     }
+
+    @Test
+    fun `decided candidates are counted in the stats`() {
+        var calls = 0
+        val result = engine { candidate ->
+            calls++
+            if (calls == 1) Completion.Refuted() else Completion.Witness(candidate)
+        }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
+
+        val ls = assertIs<SolveResult.Sat>(result).stats.ls
+        assertEquals(2.0, ls.completions.sum)
+        assertEquals(1.0, ls.completionsRefuted.sum)
+    }
 }

@@ -20,6 +20,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
+import com.eignex.klause.solver.result.LocalSearchStatsSink
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -249,7 +250,7 @@ internal class LocalSearchEngine(
                     if (state.cost == 0L && state.intValuesInDomain()) {
                         if (completion != null) state.refreshRealRows()
                         if (state.cost != 0L) continue
-                        val solution = decide(state, state.assignment.snapshot()) { work ->
+                        val solution = decide(state, state.assignment.snapshot(), sink?.ls) { work ->
                             moves += work
                             flipsSinceYield += work
                         }
@@ -447,7 +448,7 @@ internal class LocalSearchEngine(
                     objective.evaluate(state.assignment)
                 }
                 if (obj < bestObj && state.intValuesInDomain()) {
-                    val solution = decide(state, state.assignment.snapshot()) { work -> totalFlips += work }
+                    val solution = decide(state, state.assignment.snapshot(), sink.ls) { work -> totalFlips += work }
                     if (solution == null) {
                         restartAndRepair(state, restartAnchor(null))
                         restartCount++
@@ -668,10 +669,16 @@ internal class LocalSearchEngine(
      * row exactly, so its candidate is its own solution; otherwise the [completion] decides it, the work that took
      * goes to [charge], and the rows a refutation names gain weight so the search steers away from the same failure.
      */
-    private fun decide(state: LocalSearchState, candidate: Sample, charge: (Long) -> Unit): Sample? {
+    private fun decide(
+        state: LocalSearchState,
+        candidate: Sample,
+        stats: LocalSearchStatsSink?,
+        charge: (Long) -> Unit,
+    ): Sample? {
         val completion = completion ?: return candidate
         val decided = completion.complete(candidate)
         charge(decided.work)
+        stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided)
         return when (decided) {
             is Completion.Witness -> decided.sample
 
