@@ -15,8 +15,11 @@ import kotlin.math.roundToLong
  * reports. The relaxation is built over [domains] as a box, which is what lets it serve a model with open sides.
  */
 internal fun Problem.lpSeed(domains: Array<IntDomain>, cancellation: Cancellation): Sample? {
+    // Rows that read a column's declared range, a reified row's big-M among them, need one even on an open column;
+    // the box stands in for it, which only bounds where the seed is looked for.
+    val boxed = withIntDomains(domains)
     val relaxation = try {
-        CpToLpRelaxation(this, objective = null).build(BoxDomains(domains), cancellation = cancellation)
+        CpToLpRelaxation(boxed, objective = null).build(BoxDomains(domains), cancellation = cancellation)
     } catch (_: LpAssemblyCancelled) {
         return null
     }
@@ -30,7 +33,7 @@ internal fun Problem.lpSeed(domains: Array<IntDomain>, cancellation: Cancellatio
         val column = relaxation.boolColOf.getOrElse(b) { -1 }
         column in primal.indices && primal[column] > 0.5
     }
-    return Sample(bools, ints, relaxation.floatReals(primal, this))
+    return Sample(bools, ints, relaxation.floatReals(primal, boxed))
 }
 
 /** [RelaxationDomains] over fixed [domains]: every integer column at its box, every Boolean free. */
