@@ -136,6 +136,9 @@ class Portfolio(
 ) : PortfolioExecutor {
     private val lanes = minOf(lanes, workers.size)
 
+    // The policy shares the run's time between families, not arms; see [remainingShare].
+    private val familyCount = workers.distinctBy { it.family }.size
+
     init {
         require(workers.isNotEmpty()) { "Portfolio must have at least one worker" }
         require(lanes >= 1) { "lanes must be ≥ 1" }
@@ -638,7 +641,7 @@ class Portfolio(
 
     /**
      * The cancellation token bounding one non-resumable arm's segment: its time slice, or [probeSliceMillis] for a
-     * counted arm's probe, and never more than an arm's half share of the time the run has left. The share keeps a
+     * counted arm's probe, and never more than its [remainingShare] of the time the run has left. The share keeps a
      * short budget from going to a few long segments: with the probes and a couple of grown slices spending it, the
      * policy would get almost no choices to make. A counted arm ([PortfolioWorker.acceptsInstructionBudget]) usually
      * ends at its instruction budget first; see [baseSliceWork]. An arm with neither a counter nor a resumable handle
@@ -648,18 +651,29 @@ class Portfolio(
     private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation {
         if (claim.whole) return cancellation
         val slice = if (claim.probing && worker.acceptsInstructionBudget) probeSliceMillis else claim.sliceMillis
-        return until(slice) or cancellation.shorten(REMAINING_SHARE / workers.size)
+        return until(slice) or cancellation.shorten(remainingShare(claim))
     }
 
-    /** The time a resumable arm's slice may run before its work runs out: its time slice, within its half share
-     *  of what the run has left, as a counted segment's ([segmentToken]). A node is priced at one unit whatever
-     *  it costs, so without the bound a slice of a few thousand expensive nodes holds the core for the run. */
+    /** The time a resumable arm's slice may run before its work runs out: its time slice, within its
+     *  [remainingShare] of what the run has left, as a counted segment's ([segmentToken]). A node is priced at one
+     *  unit whatever it costs, so without the bound a slice of a few thousand expensive nodes holds the core for the
+     *  run. */
     private fun handleMillis(cancellation: Cancellation, claim: Claim): Long {
         if (claim.whole) return Long.MAX_VALUE
         val deadline = cancellation.deadline() ?: return claim.sliceMillis
-        val share = (deadline - TimeSource.Monotonic.markNow()) * (REMAINING_SHARE / workers.size)
+        val share = (deadline - TimeSource.Monotonic.markNow()) * remainingShare(claim)
         return minOf(claim.sliceMillis, share.inWholeMilliseconds.coerceAtLeast(1L))
     }
+
+    /**
+     * The share of the time the run has left one segment may take: half of it split between the families the
+     * policy chooses among, since the policy shares time by family and an arm's segments add up to its family's.
+     * A segment cut to a share per arm would chop a proof into pieces too short to finish however much of the run
+     * its family won. Probes run before the policy chooses anything, one for every arm, so each takes a share per
+     * arm, and the probes together never take more than half the run.
+     */
+    private fun remainingShare(claim: Claim): Double =
+        REMAINING_SHARE / (if (claim.probing) workers.size else familyCount)
 
     private fun until(millis: Long): Cancellation =
         Cancellation.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
