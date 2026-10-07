@@ -87,3 +87,31 @@ internal fun PropagationState.exclusionLiteral(v: Int, k: Long, atTrail: Int): I
         else -> Lit.NONE
     }
 }
+
+/** Whether Boolean [v] was already pinned at undo-log position [atTrail]. */
+internal fun PropagationState.boolPinnedAt(v: Int, atTrail: Int): Boolean =
+    boolValues[v] != null && (atTrail >= undo.size || boolPinPos[v] < atTrail)
+
+/**
+ * The literal, false at undo-log position [atTrail], saying [v]'s lower ([lower]) or upper bound reached [need]:
+ * [need] itself where the bound may be cited weaker than it stood, else the bound then. [Lit.NONE] when the root
+ * domain already guarantees [need]. A bound established below [atLevel] lifts freely, since only the learned
+ * clause ever cites it; one at [atLevel] lifts only when it is that level's decision, the one literal there with
+ * no reason to resolve.
+ */
+internal fun PropagationState.boundLiteral(v: Int, lower: Boolean, need: Long, atTrail: Int, atLevel: Int): Int {
+    val root = rootDomains[v]
+    if (if (lower) need <= root.min else need >= root.max) return Lit.NONE
+    val d = domainAt(v, atTrail)
+    val bound = if (lower) d.min else d.max
+    check(if (lower) need <= bound else need >= bound) { "a bound literal must hold when cited" }
+    val cite = if (need != bound && liftableAt(v, lower, bound, atLevel)) need else bound
+    return if (lower) Lit.make(atomVarGe(v, cite), false) else Lit.make(atomVarLe(v, cite), false)
+}
+
+private fun PropagationState.liftableAt(v: Int, lower: Boolean, bound: Long, atLevel: Int): Boolean {
+    val est = boundEstablishment(v, bound, lower) ?: return false
+    if (est.level < atLevel) return true
+    val decisions = levelToDecisionVar
+    return est.reason == null && est.level <= decisions.size && decisions[est.level - 1] == problem.numBoolVars + v
+}

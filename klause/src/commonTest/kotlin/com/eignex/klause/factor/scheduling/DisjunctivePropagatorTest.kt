@@ -12,6 +12,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import kotlin.random.Random
@@ -54,6 +56,61 @@ class DisjunctivePropagatorTest {
     }
 
     @Test
+    fun `disjunctive deductions over duration variables are implied by their reasons`() {
+        val rng = Random(0xD16)
+        repeat(300) { iter ->
+            val n = 3
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2 * n,
+                intDomains = Array(2 * n) { if (it < n) IntDomain(0, 6) else IntDomain(1, 3) },
+                factors = arrayOf<Factor>(
+                    Cumulative.unary(
+                        starts = IntArray(n) { it },
+                        durations = LongArray(n) { 1L },
+                        durationVars = IntArray(n) { n + it },
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "disjunctive-durations#$iter") { state ->
+                (0 until n).all { (1L + rng.nextInt(3)).let { d -> state.tightenIntMin(n + it, d) && state.tightenIntMax(n + it, d) } } &&
+                    (0 until 3).all {
+                        val v = rng.nextInt(n)
+                        when (rng.nextInt(3)) {
+                            0 -> state.excludeIntValue(v, rng.nextInt(7).toLong())
+                            1 -> state.tightenIntMin(v, 1L + rng.nextInt(4))
+                            else -> state.tightenIntMax(v, rng.nextInt(5).toLong())
+                        }
+                    }
+            }
+        }
+    }
+
+    @Test
+    fun `an edge-finding bound cites only the cluster it follows`() {
+        // Tasks 0 and 1 must both finish by 5; task 2 cannot fit among them, so it starts at 4 or later. Only the
+        // cluster's deadlines are cited: task 2's own earliest start is the root's, and task 3, pushed to 7, plays
+        // no part.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 9) },
+            factors = arrayOf<Factor>(Cumulative.unary(starts = intArrayOf(0, 1, 2, 3), durations = longArrayOf(2, 2, 2, 2))),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 3) && state.tightenIntMax(1, 3) && state.tightenIntMax(2, 4))
+        check(state.tightenIntMin(3, 7))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.intMinAntecedents[2])!!.map { state.atoms.intVar[Lit.variable(it)] }.toSet()
+        assertEquals(setOf(0, 1), cited)
+    }
+
+    @Test
     fun `energetic-window conflict reason cites only the tasks packed into the overloaded window`() {
         // Four unit tasks over starts [0,9] (globally schedulable). A decision squeezes tasks 0,1,2
         // to start ≤ 1, packing three unit jobs into the length-2 window [0,2) — an edge-finding
@@ -74,8 +131,9 @@ class DisjunctivePropagatorTest {
         check(state.tightenIntMax(1, 1))
         check(state.tightenIntMax(2, 1))
         check(state.tightenIntMin(3, 5)) // idle task tightened so a coarse reason would cite it
-        assertFalse(problem.propagators[0].propagate(state, 0))
-        val reason = problem.propagators[0].conflictReason(state, 0)!!
+        state.currentFactor = 0
+        assertFalse(state.factorAt(0).propagate(state, 0))
+        val reason = state.factorAt(0).conflictReason(state, 0)!!
         val citedVars = reason.map { state.atoms.intVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
         assertTrue(citedVars.all { it in setOf(0, 1, 2) }, "reason must cite only the packed tasks, got $citedVars")
         assertTrue(3 !in citedVars, "idle task 3 must not appear in the sharp reason")
@@ -100,8 +158,9 @@ class DisjunctivePropagatorTest {
         check(state.tightenIntMax(0, 2))
         check(state.tightenIntMax(1, 2))
         check(state.tightenIntMin(2, 6)) // idle task tightened so a coarse reason would cite it
-        assertFalse(problem.propagators[0].propagate(state, 0))
-        val reason = problem.propagators[0].conflictReason(state, 0)!!
+        state.currentFactor = 0
+        assertFalse(state.factorAt(0).propagate(state, 0))
+        val reason = state.factorAt(0).conflictReason(state, 0)!!
         val citedVars = reason.map { state.atoms.intVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
         assertTrue(
             citedVars.all { it == 0 || it == 1 },
@@ -127,9 +186,10 @@ class DisjunctivePropagatorTest {
         state.undoLogging = true
         state.currentLevel = 1
         assertTrue(state.tightenIntMax(0, 2) && state.tightenIntMax(1, 2), "squeeze starts to [0, 2]")
-        assertTrue(!problem.propagators[0].propagate(state, 0), "the squeezed window must overload (energy 6 > 5)")
+        state.currentFactor = 0
+        assertTrue(!state.factorAt(0).propagate(state, 0), "the squeezed window must overload (energy 6 > 5)")
 
-        val reason = problem.propagators[0].conflictReason(state, 0)
+        val reason = state.factorAt(0).conflictReason(state, 0)
         assertTrue(reason != null && reason.isNotEmpty(), "overload must yield a non-empty clause-form reason")
         for (lit in reason) {
             assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")

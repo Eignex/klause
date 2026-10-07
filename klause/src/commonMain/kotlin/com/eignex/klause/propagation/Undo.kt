@@ -4,6 +4,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
 internal fun PropagationState.logBoolPin(v: Int) {
+    boolPinPos[v] = undo.size
     undo.tag.add(0)
     undo.varId.add(v)
     undo.level.add(0)
