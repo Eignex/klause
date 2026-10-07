@@ -144,9 +144,11 @@ internal fun PropagationState.boundLiteral(v: Int, lower: Boolean, need: Long, a
     return if (lower) Lit.make(atomVarGe(v, cite), false) else Lit.make(atomVarLe(v, cite), false)
 }
 
+// Only a level decided on [v] itself can make the move a decision, so only then is the move's reason built.
 private fun PropagationState.liftableAt(v: Int, lower: Boolean, bound: Long, atLevel: Int): Boolean {
-    val est = boundEstablishment(v, bound, lower) ?: return false
-    if (est.level < atLevel) return true
+    val level = boundEstablishmentLevel(v, bound, lower) ?: return false
+    if (level < atLevel) return true
     val decisions = levelToDecisionVar
-    return est.reason == null && est.level <= decisions.size && decisions[est.level - 1] == problem.numBoolVars + v
+    return level in 1..decisions.size && decisions[level - 1] == problem.numBoolVars + v &&
+        boundEstablishment(v, bound, lower)?.reason == null
 }
