@@ -81,15 +81,23 @@ internal fun PropagationState.setIntAsDecision(v: Int, value: Long): Boolean {
     currentFactor = -1
     val d = intDomains[v]
     if (!undoLogging || value !in d || d.min == d.max) return setIntImpl(v, value, null)
-    val eq = atomVarEq(v, value)
-    val atomId = eq - problem.numBoolVars
+    val reason = stampDecision(atomVarEq(v, value))
+    return tightenIntMinImpl(v, value, reason) && tightenIntMaxImpl(v, value, reason)
+}
+
+/**
+ * Stamp atom variable [atom] true as the current level's decision, with no reason, and return that literal as a
+ * reason for the moves it causes. Stamped ahead of those moves, it precedes everything they establish, and their
+ * own wakes find it already true and leave it unexplained.
+ */
+private fun PropagationState.stampDecision(atom: Int): IntArray {
+    val atomId = atom - problem.numBoolVars
     recordAtomTruthChange(atomId)
-    boolPinOrder.add(eq)
+    boolPinOrder.add(atom)
     atoms.truth[atomId] = 1
     atoms.lvl[atomId] = currentLevel
     atoms.ant[atomId] = null
-    val reason = intArrayOf(Lit.make(eq, false))
-    return tightenIntMinImpl(v, value, reason) && tightenIntMaxImpl(v, value, reason)
+    return intArrayOf(Lit.make(atom, false))
 }
 
 /**
@@ -98,11 +106,18 @@ internal fun PropagationState.setIntAsDecision(v: Int, value: Long): Boolean {
  * conflicts seeded by it have a single 1UIP literal there (an equality pin contributes
  * two same-level bound atoms that 1UIP cannot collapse). The caller must ensure `hi`
  * strictly narrows the domain (`hi in d.min until d.max`) so the level is non-empty.
+ *
+ * With the undo log on, `[v ≤ hi]` is stamped as the decision before the move. A move that snaps past a hole below
+ * `hi` lands on a tighter bound, which cites `[v ≤ hi]`; woken after it, `[v ≤ hi]` would otherwise take that bound
+ * as its channeling reason, and the two would explain each other with no unexplained literal left at the level.
+ * The move itself keeps no reason, which is how a decided bound is told apart when a reason lifts it.
  */
 internal fun PropagationState.setIntMaxAsDecision(v: Int, hi: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
+    val d = intDomains[v]
+    if (undoLogging && hi in d.min until d.max) stampDecision(atomVarLe(v, hi))
     return tightenIntMaxImpl(v, hi, null)
 }
 
@@ -111,6 +126,8 @@ internal fun PropagationState.setIntMinAsDecision(v: Int, lo: Long): Boolean {
     levelToDecisionVar.add(problem.numBoolVars + v)
     currentLevel = levelToDecisionVar.size
     currentFactor = -1
+    val d = intDomains[v]
+    if (undoLogging && lo in (d.min + 1)..d.max) stampDecision(atomVarGe(v, lo))
     return tightenIntMinImpl(v, lo, null)
 }
 

@@ -622,7 +622,12 @@ private fun PropagationState.channelingReasonAtWake(atomId: Int, newT: Boolean):
 
         // A value the move swept past without a carve is excluded by the bound it now lies beyond, a reason
         // even when the move itself is a decision with none.
-        AtomKind.EQ -> if (k < d.min) frontier(AtomKind.GE, d.min) else frontier(AtomKind.LE, d.max)
+        AtomKind.EQ -> when {
+            k < d.min -> frontier(AtomKind.GE, d.min)
+            k > d.max -> frontier(AtomKind.LE, d.max)
+            // An interior value (a survivor restriction's) is excluded by the move itself, not by a bound.
+            else -> atoms.pendingMoveAnt
+        }
     }
 }
 
