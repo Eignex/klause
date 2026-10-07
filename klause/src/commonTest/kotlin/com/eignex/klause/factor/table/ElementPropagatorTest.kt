@@ -446,6 +446,33 @@ class ElementPropagatorTest {
     }
 
     @Test
+    fun `a constant-array element raises the result bound citing the positions below it not the holes it crossed`() {
+        // arr = [1, 2, 3, 4]: result value 2 is carved and index position 0 dropped, so the result's minimum
+        // climbs past the hole at 2 to 3. Every constant below 3 lost its positions to the index bound alone.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(1, 4)),
+            factors = arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = longArrayOf(1, 2, 3, 4), arrIsVars = false, indexOffset = 0),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.excludeIntValue(1, 2L) && state.tightenIntMin(0, 1L))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        assertEquals(3L, state.intDomains[1].min)
+        assertEquals(
+            listOf(Lit.make(state.atomVarGe(0, 2), false)),
+            state.reasonOf(state.intMinAntecedents[1])?.toList(),
+        )
+    }
+
+    @Test
     fun `a variable-array element drops a position citing only how its cell misses the result`() {
         // The result is at most 3 and cell 1 at least 5, so position 1 goes; cell 2's hole and cell 0's bound play
         // no part.
