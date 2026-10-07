@@ -2,8 +2,11 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.simplex.exact.BigFraction
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.PrintStream
 import kotlin.test.Test
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsModeTest {
@@ -17,6 +20,34 @@ class MpsModeTest {
             System.setOut(previous)
         }
         return output.toString()
+    }
+
+    @Test
+    fun `exact MPS loading requires certificates instead of tolerance acceptance`() {
+        val mps = File.createTempFile("mpsfloat", ".mps").apply {
+            writeText(
+                """
+                NAME T
+                ROWS
+                 N COST
+                 L LIMIT
+                COLUMNS
+                    X COST 1 LIMIT 1
+                RHS
+                    RHS LIMIT 1
+                BOUNDS
+                 UP BND X 1
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val tolerant = MpsMode.newSession().load(mps.absolutePath, CommonOptions())
+        val exact = MpsMode.newSession().load(mps.absolutePath, CommonOptions().apply { this.exact = true })
+
+        assertNotNull(tolerant.toleranceCheck)
+        assertNull(exact.toleranceCheck)
     }
 
     @Test

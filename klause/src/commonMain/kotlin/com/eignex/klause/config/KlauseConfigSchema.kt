@@ -67,6 +67,16 @@ data class LongConfigSpec(
     override val default: String get() = value.toString()
 }
 
+/** A Double knob with its [value] default. */
+@Serializable
+@SerialName("double")
+data class DoubleConfigSpec(
+    /** The knob's built-in default. */
+    val value: Double,
+) : ConfigSpec {
+    override val default: String get() = value.toString()
+}
+
 /**
  * A typed handle for one [KlauseConfig] knob: its [name] (captured from the property it is
  * declared on, never spelled as a literal) and how to apply a raw string value onto a config.
@@ -116,6 +126,12 @@ object KlauseConfigSchema : Schema<ConfigSpec>() {
             ConfigKey(name) { c, raw -> raw.trim().toLongOrNull()?.let { set(c, it) } ?: c }.also { mutableKeys += it }
         }
 
+    private fun double(default: Double, set: (KlauseConfig, Double) -> KlauseConfig) =
+        register(DoubleConfigSpec(default)) { name ->
+            ConfigKey(name) { c, raw -> raw.trim().toDoubleOrNull()?.takeIf { it.isFinite() }?.let { set(c, it) } ?: c }
+                .also { mutableKeys += it }
+        }
+
     /** Override for [KlauseConfig.pinAbsentOptVars]. */
     val pinAbsentOptVars by bool(KlauseConfig.DEFAULT.pinAbsentOptVars) { c, v -> c.copy(pinAbsentOptVars = v) }
 
@@ -135,6 +151,12 @@ object KlauseConfigSchema : Schema<ConfigSpec>() {
 
     /** Override for [KlauseConfig.floatScale]. */
     val floatScale by long(KlauseConfig.DEFAULT.floatScale) { c, v -> c.copy(floatScale = v) }
+
+    /** Override for [KlauseConfig.unboundedFloatLo]. */
+    val unboundedFloatLo by double(KlauseConfig.DEFAULT.unboundedFloatLo) { c, v -> c.copy(unboundedFloatLo = v) }
+
+    /** Override for [KlauseConfig.unboundedFloatHi]. */
+    val unboundedFloatHi by double(KlauseConfig.DEFAULT.unboundedFloatHi) { c, v -> c.copy(unboundedFloatHi = v) }
 
     /** Override for [KlauseConfig.lpMaxTableauCells]. */
     val lpMaxTableauCells by long(KlauseConfig.DEFAULT.lpMaxTableauCells) { c, v -> c.copy(lpMaxTableauCells = v) }

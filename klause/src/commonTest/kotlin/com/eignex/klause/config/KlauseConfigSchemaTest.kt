@@ -18,11 +18,15 @@ class KlauseConfigSchemaTest {
     fun `fromProps applies overrides looked up by property key and leaves the rest at base`() {
         val overrides = mapOf(
             "klause.float.buckets" to "2048",
+            "klause.unbounded.float.lo" to "-5.5",
+            "klause.unbounded.float.hi" to "12.5",
             "klause.bitset.threshold" to "256",
             "klause.pin.absent.opt.vars" to "off",
         )
         val config = KlauseConfig.fromProps(KlauseConfig.DEFAULT) { overrides[it] }
         assertEquals(2048, config.floatBuckets)
+        assertEquals(-5.5, config.unboundedFloatLo)
+        assertEquals(12.5, config.unboundedFloatHi)
         assertEquals(256, config.bitsetThreshold)
         assertTrue(!config.pinAbsentOptVars)
         // An untouched knob keeps the base value.

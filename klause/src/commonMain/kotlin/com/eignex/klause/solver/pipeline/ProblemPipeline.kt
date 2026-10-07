@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.theory.qflra.exactTheoryOwnable
+import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
 import com.eignex.klause.util.Cancellation
 
@@ -75,6 +76,7 @@ sealed interface SourceProblemRoute {
  * Finite source ranges defer their root-propagated CP projection. Open models carry a complete theory
  * request when one exists; callers only need to render its uniform assignment surface. A frontend that
  * supports exact pure-real solving sets [routePureRealToTheory] to select that lane instead of finite CP.
+ * [routeLinearToTheory] also offers bounded mixed integer/real linear models to the exact theory.
  *
  * A model the source left open is first offered to [proveBounded], because what the lane must be chosen
  * from is the model as it can be proved, not as it was written. [boundCancellation] bounds that proof.
@@ -84,12 +86,14 @@ fun Problem.pipelineRoute(
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
     boundCancellation: Cancellation = Cancellation.Never,
+    routeLinearToTheory: Boolean = false,
 ): SourceProblemRoute = pipelineRouteObserved(
     objective,
     maximize,
     routePureRealToTheory,
     boundCancellation,
     onLpStats = null,
+    routeLinearToTheory = routeLinearToTheory,
 )
 
 /** Select a pipeline and report the LP work performed while proving bounds for that selection. */
@@ -98,6 +102,7 @@ fun Problem.pipelineRoute(
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
     boundCancellation: Cancellation = Cancellation.Never,
+    routeLinearToTheory: Boolean = false,
     onLpStats: (LpStats) -> Unit,
 ): SourceProblemRoute = pipelineRouteObserved(
     objective,
@@ -105,6 +110,7 @@ fun Problem.pipelineRoute(
     routePureRealToTheory,
     boundCancellation,
     onLpStats,
+    routeLinearToTheory,
 )
 
 private fun Problem.pipelineRouteObserved(
@@ -113,6 +119,7 @@ private fun Problem.pipelineRouteObserved(
     routePureRealToTheory: Boolean,
     boundCancellation: Cancellation,
     onLpStats: ((LpStats) -> Unit)?,
+    routeLinearToTheory: Boolean,
 ): SourceProblemRoute {
     val lpStats = onLpStats?.let { LpStatsSink(LpRoute.STANDALONE) }
     val bounded = proveBounded(boundCancellation, lpStats)
@@ -122,7 +129,8 @@ private fun Problem.pipelineRouteObserved(
         is BoundedRouting.Proved -> bounded.problem
     }
     val finiteIntegerRanges = routed.hasFiniteIntegerRanges()
-    val preferFinite = finiteIntegerRanges && (!routePureRealToTheory || !routed.supportsExactLra())
+    val preferExact = routeLinearToTheory && (routed.supportsExactLra() || routed.supportsExactLira())
+    val preferFinite = finiteIntegerRanges && !preferExact && (!routePureRealToTheory || !routed.supportsExactLra())
     val plan = routed.componentPlan(preferFinite)
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
         return SourceProblemRoute.Finite(routed, plan)

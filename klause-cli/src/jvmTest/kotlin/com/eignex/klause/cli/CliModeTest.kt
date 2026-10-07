@@ -26,6 +26,184 @@ import kotlin.test.assertTrue
 class CliModeTest {
 
     @Test
+    fun `exact FlatZinc accepts constants in float result positions`() {
+        val constraints = listOf(
+            "float_abs(x, 3.25)",
+            "float_times(x, 2.0, 6.5)",
+            "float_div(x, 2.0, 1.625)",
+            "array_float_element(i, [1.5, 72.125], 72.125)",
+        )
+        for (constraint in constraints) {
+            val fzn = File.createTempFile("floatconstantresult", ".fzn").apply {
+                writeText(
+                    "var float: x :: output_var;\nvar 1..2: i = 2;\n" +
+                        "constraint float_eq(x, 3.25);\nconstraint $constraint;\nsolve satisfy;",
+                )
+                deleteOnExit()
+            }
+
+            val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
+
+            assertTrue("x = 3.25;" in output, "$constraint: $output")
+        }
+    }
+
+    @Test
+    fun `exact FlatZinc refutes a false constant strict linear constraint`() {
+        val fzn = File.createTempFile("floatconstantlinear", ".fzn").apply {
+            writeText("constraint float_lin_lt([], [], 0.0);\nsolve satisfy;")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
+
+        assertTrue("=====UNSATISFIABLE=====" in output, output)
+    }
+
+    @Test
+    fun `exact FlatZinc solves multiplication and division by constants`() {
+        val cases = listOf(
+            "float_times(x, 2.0, y)" to 6.0,
+            "float_times(2.0, 3.0, y)" to 6.0,
+            "float_div(x, 2.0, y)" to 1.5,
+        )
+        for ((constraint, expected) in cases) {
+            val fzn = File.createTempFile("floatscaling", ".fzn").apply {
+                writeText(
+                    "var float: x;\nvar float: y :: output_var;\n" +
+                        "constraint float_eq(x, 3.0);\nconstraint $constraint;\nsolve satisfy;",
+                )
+                deleteOnExit()
+            }
+
+            val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
+
+            assertTrue("y = $expected;" in output, "$constraint: $output")
+        }
+    }
+
+    @Test
+    fun `exact FlatZinc enforces both directions of real reification`() {
+        val cases = listOf(
+            "float_eq_reif(x, 0.0, r)" to false,
+            "float_le_reif(x, 0.0, r)" to false,
+            "float_lt_reif(x, 0.25, r)" to false,
+            "float_ne_reif(x, 0.0, r)" to true,
+            "float_lin_eq_reif([1.0], [x], 0.0, r)" to false,
+            "float_lin_lt_reif([1.0], [x], 0.25, r)" to false,
+        )
+        for ((constraint, expected) in cases) {
+            val fzn = File.createTempFile("floatreif", ".fzn").apply {
+                writeText(
+                    "var float: x;\nvar bool: r :: output_var;\n" +
+                        "constraint float_eq(x, 0.25);\nconstraint $constraint;\nsolve satisfy;",
+                )
+                deleteOnExit()
+            }
+
+            val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
+
+            assertTrue("r = $expected;" in output, "$constraint: $output")
+        }
+    }
+
+    @Test
+    fun `exact FlatZinc solves piecewise linear float operations`() {
+        val cases = listOf(
+            "float_abs(x, y)" to 3.25,
+            "float_min(x, 1.5, y)" to -3.25,
+            "float_max(x, 1.5, y)" to 1.5,
+        )
+        for ((constraint, expected) in cases) {
+            val fzn = File.createTempFile("floatpiecewise", ".fzn").apply {
+                writeText(
+                    "var float: x;\nvar float: y :: output_var;\n" +
+                        "constraint float_eq(x, -3.25);\nconstraint $constraint;\nsolve satisfy;",
+                )
+                deleteOnExit()
+            }
+
+            val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
+
+            assertTrue("y = $expected;" in output, "$constraint: $output")
+        }
+    }
+
+    @Test
+    fun `exact FlatZinc selects float array constants without rounding`() {
+        val fzn = File.createTempFile("floatelement", ".fzn").apply {
+            writeText(
+                "var 1..2: i = 2;\nvar float: x :: output_var;\n" +
+                    "constraint array_float_element(i, [1.5, 72.125], x);\nsolve satisfy;",
+            )
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
+
+        assertTrue("x = 72.125;" in output, output)
+    }
+
+    @Test
+    fun `exact FlatZinc solves a value beyond the bucketed default range`() {
+        val fzn = File.createTempFile("float", ".fzn").apply {
+            writeText("var float: x :: output_var;\nconstraint float_eq(x, 2000001.0);\nsolve satisfy;")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
+
+        assertTrue("x = 2000001.0;" in output, output)
+        assertTrue("==========" in output, output)
+    }
+
+    @Test
+    fun `exact FlatZinc optimizes a continuous objective in either direction`() {
+        for ((direction, expected) in listOf("minimize" to -1.5, "maximize" to 1.5)) {
+            val fzn = File.createTempFile("floatobj", ".fzn").apply {
+                writeText(
+                    """
+                    var float: x :: output_var;
+                    constraint float_le(-1.5, x);
+                    constraint float_le(x, 1.5);
+                    solve $direction x;
+                    """.trimIndent(),
+                )
+                deleteOnExit()
+            }
+
+            val output = capture {
+                assertEquals(0, runCli(arrayOf("--exact", "--output-objective", "-e", "cp", fzn.absolutePath)))
+            }
+
+            assertTrue("_objective = $expected;" in output, output)
+            assertTrue("==========" in output, output)
+        }
+    }
+
+    @Test
+    fun `exact FlatZinc solves a mixed integer and real linear array`() {
+        val fzn = File.createTempFile("mixedfloat", ".fzn").apply {
+            writeText(
+                """
+                var 1..3: n :: output_var;
+                var float: x;
+                array[1..2] of var float: values :: output_array([1..2]) = [x, 72.0];
+                constraint int2float(n, x);
+                constraint float_lin_eq([1.0, 1.0], values, 74.0);
+                solve satisfy;
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
+
+        assertTrue("n = 2;" in output, output)
+        assertTrue("values = [2.0, 72.0];" in output, output)
+    }
+
+    @Test
     fun `SMT finite decimals and integral reals render as exact real terms`() {
         val half = BigFraction.ofLong(2).reciprocal()
         val whole = BigFraction.ofLong(5)

@@ -158,6 +158,7 @@ internal class CommonOptions {
     var loadElapsedMs: Long? = null
     var randomSeed: Long? = null
     var verbose = false
+    var exact = false
     var statistics = false
     var allSolutions = false
     var solutionCap: Long? = null
@@ -251,6 +252,12 @@ internal fun defaultLp(): String? = cliProp(CliKnobs.lp)
 
 /** The solver-control flags every mode accepts. Mode-specific flags are appended per mode. */
 internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
+    FlagSpec(
+        listOf("--exact"),
+        false,
+        FlagGroup.KLAUSE,
+        help = "Preserve continuous FlatZinc floats and require exact MPS certificates",
+    ) { o.exact = true },
     FlagSpec(
         listOf("-a", "--all-solutions"),
         false,

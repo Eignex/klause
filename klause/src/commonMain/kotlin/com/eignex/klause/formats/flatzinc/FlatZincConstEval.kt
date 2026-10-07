@@ -333,15 +333,9 @@ internal fun FlatZincCompiler.resolveVarRef(e: FznExpr, declaredElement: FznType
 
     is FznType.IntRange, is FznType.IntSet, FznType.IntAny -> resolveIntVar(e)
 
-    is FznType.FloatRange, FznType.FloatAny -> when (e) {
-        is FznExpr.Ident -> intVars[e.name] ?: failHere("undefined float var `${e.name}`")
-        else -> failHere("expected float var, got ${e::class.simpleName}")
-    }
+    is FznType.FloatRange, FznType.FloatAny -> resolveFloatElement(e, "__float_${floatVars.size}").varId
 
     is FznType.SetOfInt -> unsupportedHere("set-of-int element refs not supported")
 
     is FznType.Array -> unsupportedHere("nested arrays not supported")
 }
-
-internal fun FlatZincCompiler.nameOfBoundVar(e: FznExpr): String = (e as? FznExpr.Ident)?.name
-    ?: failHere("expected a var name, got ${e::class.simpleName}")

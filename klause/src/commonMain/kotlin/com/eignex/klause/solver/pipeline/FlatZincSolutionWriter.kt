@@ -7,10 +7,49 @@ import com.eignex.klause.formats.flatzinc.OutputItem
 import com.eignex.klause.formats.flatzinc.SetVarLayout
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.lowering.FloatBucketing
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** Render one solved sample in FlatZinc output format. */
-fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObjective: Boolean = false): String {
+fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObjective: Boolean = false): String =
+    writeFlatZincSolution(program, FlatZincValues(sample), outputObjective)
+
+/** Render an open-theory witness in the FlatZinc solution protocol. */
+fun writeFlatZincSolution(
+    program: FlatZincProgram,
+    assignment: OpenTheoryAssignment,
+    outputObjective: Boolean = false,
+): String = writeFlatZincSolution(program, FlatZincValues(assignment), outputObjective)
+
+internal class FlatZincValues(
+    val boolValue: (Int) -> Boolean,
+    val intValue: (Int) -> String,
+    val realValue: (Int) -> Double,
+) {
+    constructor(sample: Sample) : this(
+        { sample.bools[it] },
+        { sample.ints[it].toString() },
+        { sample.approximateRealValue(it) },
+    )
+
+    constructor(assignment: OpenTheoryAssignment) : this(
+        assignment::boolValue,
+        assignment::intValue,
+        { id ->
+            val parts = assignment.realValue(id).split('/')
+            BigFraction.of(
+                BigInteger.parseString(parts[0]),
+                if (parts.size == 1) BigInteger.ONE else BigInteger.parseString(parts[1]),
+            ).toDouble()
+        },
+    )
+
+    fun floatValue(b: FloatBucketing): Double =
+        if (b.lpOnly) realValue(b.varId) else b.valueOf(intValue(b.varId).toInt())
+}
+
+private fun writeFlatZincSolution(program: FlatZincProgram, sample: FlatZincValues, outputObjective: Boolean): String {
     val sb = StringBuilder()
     val items = program.outputItems
     if (items != null) {
@@ -26,14 +65,14 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObject
         val setIndicatorBools = program.setVarsByName.values.flatMap { it.indicatorBoolIds.toList() }.toSet()
         for ((name, id) in program.boolVarsByName) {
             if (id in setIndicatorBools) continue
-            sb.append("$name = ${sample.bools[id]};\n")
+            sb.append("$name = ${sample.boolValue(id)};\n")
         }
         for ((name, id) in program.intVarsByName) {
             if (program.floatVarsByName.containsKey(name)) continue
-            sb.append("$name = ${sample.ints[id]};\n")
+            sb.append("$name = ${sample.intValue(id)};\n")
         }
         for ((name, b) in program.floatVarsByName) {
-            sb.append("$name = ${floatSolutionValue(b, sample)};\n")
+            sb.append("$name = ${sample.floatValue(b)};\n")
         }
         for ((name, layout) in program.setVarsByName) {
             sb.append("$name = ${renderSet(sample, layout)};\n")
@@ -46,31 +85,26 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObject
     return sb.toString()
 }
 
-/** The solved value of a float variable: its LP-only continuous value from [Sample.approximateRealValue], or the value
- *  of its bucket index. */
-private fun floatSolutionValue(b: FloatBucketing, sample: Sample): Double =
-    if (b.lpOnly) sample.approximateRealValue(b.varId) else b.valueOf(sample.ints[b.varId].toInt())
-
 private fun objectiveVarName(solve: SolveDirective): String? = when (solve) {
     is SolveDirective.Minimize -> solve.objVar
     is SolveDirective.Maximize -> solve.objVar
     SolveDirective.Satisfy -> null
 }
 
-private fun renderScalar(program: FlatZincProgram, sample: Sample, name: String): String {
+private fun renderScalar(program: FlatZincProgram, sample: FlatZincValues, name: String): String {
     program.setVarsByName[name]?.let { return renderSet(sample, it) }
-    program.boolVarsByName[name]?.let { return sample.bools[it].toString() }
-    program.floatVarsByName[name]?.let { b -> return floatSolutionValue(b, sample).toString() }
-    program.intVarsByName[name]?.let { return sample.ints[it].toString() }
+    program.boolVarsByName[name]?.let { return sample.boolValue(it).toString() }
+    program.floatVarsByName[name]?.let { b -> return sample.floatValue(b).toString() }
+    program.intVarsByName[name]?.let { return sample.intValue(it) }
     throw IllegalArgumentException("output: unknown var `$name`")
 }
 
 // Reconstruct MiniZinc set output `{a, b, c}` from indicator bools.
-private fun renderSet(sample: Sample, layout: SetVarLayout): String {
+private fun renderSet(sample: FlatZincValues, layout: SetVarLayout): String {
     val sb = StringBuilder("{")
     var first = true
     for (i in layout.elements.indices) {
-        if (sample.bools[layout.indicatorBoolIds[i]]) {
+        if (sample.boolValue(layout.indicatorBoolIds[i])) {
             if (!first) sb.append(", ")
             sb.append(layout.elements[i])
             first = false
@@ -80,7 +114,7 @@ private fun renderSet(sample: Sample, layout: SetVarLayout): String {
     return sb.toString()
 }
 
-private fun renderArray(program: FlatZincProgram, sample: Sample, name: String): String {
+private fun renderArray(program: FlatZincProgram, sample: FlatZincValues, name: String): String {
     val arr = program.arraysByName[name]
         ?: throw IllegalArgumentException("output: unknown array `$name`")
     val sb = StringBuilder("[")
@@ -106,13 +140,13 @@ private fun renderArray(program: FlatZincProgram, sample: Sample, name: String):
             for (i in arr.varIds.indices) {
                 if (i > 0) sb.append(", ")
                 when (arr.elementKind) {
-                    FlatZincArray.Vars.ElementKind.Bool -> sb.append(sample.bools[arr.varIds[i]])
+                    FlatZincArray.Vars.ElementKind.Bool -> sb.append(sample.boolValue(arr.varIds[i]))
 
-                    FlatZincArray.Vars.ElementKind.Int -> sb.append(sample.ints[arr.varIds[i]])
+                    FlatZincArray.Vars.ElementKind.Int -> sb.append(sample.intValue(arr.varIds[i]))
 
                     FlatZincArray.Vars.ElementKind.Float -> {
                         val b = requireNotNull(arr.floatBucketings)[i]
-                        sb.append(b.valueOf(sample.ints[arr.varIds[i]].toInt()))
+                        sb.append(sample.floatValue(b))
                     }
                 }
             }
