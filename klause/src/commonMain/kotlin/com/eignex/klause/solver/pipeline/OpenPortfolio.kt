@@ -70,7 +70,15 @@ internal class OpenPortfolio(
             request?.let { add(theoryWorker(it, armId = 0)) }
             addAll(localSearch)
         }
-        val portfolio = Portfolio.thompson(workers, lanes = 1, seed = seed, witnessCheck = witnessCheck(null))
+        // A refutation earns the theory nothing until it lands, and one that needs most of the budget is lost if
+        // local search's early finds talk the policy out of it, so the theory is owed most of the time outright.
+        val portfolio = Portfolio.thompson(
+            workers,
+            lanes = 1,
+            seed = seed,
+            witnessCheck = witnessCheck(null),
+            minShares = DoubleArray(workers.size).also { if (request != null) it[0] = THEORY_SHARE },
+        )
         val result = portfolio.use { it.solve(cancellation) }
         return when (result) {
             is SolveResult.Sat -> OpenTheoryResult.Sat(assignmentOf(result.assignment), result.stats)
@@ -306,6 +314,10 @@ internal class OpenPortfolio(
 
         // The descent's least share of an optimizing run: half, the rest to local search.
         const val DESCENT_SHARE: Double = 0.5
+
+        // The theory's least share of a satisfaction run: enough that a refutation the theory alone finishes in
+        // three fifths of the budget still finishes, the rest to local search.
+        const val THEORY_SHARE: Double = 0.75
 
         // Wall-clock ceiling on the seed LP, a small slice beside any portfolio budget.
         val SEED_BUDGET: Duration = 500.milliseconds
