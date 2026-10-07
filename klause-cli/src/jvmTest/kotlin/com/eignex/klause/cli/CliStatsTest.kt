@@ -450,11 +450,19 @@ class CliStatsTest {
     @Test
     fun `portfolio pairs report each arm with its schedule and credit`() {
         val credit = mapOf("ClauseUses" to 4.0)
-        val arm = ArmSchedule("bt-0", segments = 3, work = 15_000, meanReward = 0.5, failures = 0, credit = credit)
+        val arm = ArmSchedule(
+            "bt-0",
+            segments = 3,
+            work = 15_000,
+            millis = 1_200,
+            meanReward = 0.5,
+            failures = 0,
+            credit = credit,
+        )
         val stats = SolveStats(portfolio = PortfolioStats(listOf(arm)))
 
         val pairs = portfolioStatPairs(stats).toMap()
 
-        assertEquals("segments=3 work=15000 reward=0.5 failures=0 faults=0 ClauseUses=4", pairs["arm.bt-0"])
+        assertEquals("segments=3 work=15000 ms=1200 reward=0.5 failures=0 faults=0 ClauseUses=4", pairs["arm.bt-0"])
     }
 }
