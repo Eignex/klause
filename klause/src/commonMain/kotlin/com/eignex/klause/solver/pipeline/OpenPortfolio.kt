@@ -95,12 +95,15 @@ internal class OpenPortfolio(
             addAll(localSearch)
         }
         // A descent rebuilt for making no progress would prepare the model again and lose the round it was proving.
+        // Its rounds earn credit only when they land, so it is owed its share outright rather than left to the
+        // policy, which local search's frequent improvements would otherwise talk out of scheduling it.
         val portfolio = Portfolio.thompson(
             workers,
             lanes = 1,
             seed = seed,
             reseedStaleThreshold = 0,
             witnessCheck = witnessCheck(objective),
+            minShares = DoubleArray(workers.size).also { if (minimizer != null) it[0] = DESCENT_SHARE },
         )
         val result = portfolio.use { it.minimize(cancellation) }
         return optimumOf(result, objective)
@@ -293,6 +296,9 @@ internal class OpenPortfolio(
 
     private companion object {
         const val DEFAULT_LS_ARMS: Int = 3
+
+        // The descent's least share of an optimizing run: half, the rest to local search.
+        const val DESCENT_SHARE: Double = 0.5
 
         // Wall-clock ceiling on the seed LP, a small slice beside any portfolio budget.
         val SEED_BUDGET: Duration = 500.milliseconds

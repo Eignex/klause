@@ -127,6 +127,12 @@ class Portfolio(
     private val witnessCheck: WitnessCheck? = null,
     /** Told about each arm the run quarantines for a refuted claim; see [ArmFault]. */
     private val onFault: ((ArmFault) -> Unit)? = null,
+    /**
+     * Least share of the run's segment time each arm is owed, by arm; empty owes none. An arm below its share is
+     * scheduled before the policy chooses, so an arm whose progress earns no credit until it proves something — a
+     * complete search closing in on a bound — is not starved by arms that improve the incumbent often.
+     */
+    private val minShares: DoubleArray = DoubleArray(0),
 ) : PortfolioExecutor {
     private val lanes = minOf(lanes, workers.size)
 
@@ -140,6 +146,8 @@ class Portfolio(
         require(baseSliceWork > 0 && maxSliceWork >= baseSliceWork) { "invalid work slice bounds" }
         require(probeSliceMillis > 0) { "probeSliceMillis must be > 0" }
         require(lsInstructionsPerWork > 0.0) { "lsInstructionsPerWork must be > 0" }
+        require(minShares.isEmpty() || minShares.size == workers.size) { "minShares must give every arm a share" }
+        require(minShares.all { it >= 0.0 } && minShares.sum() <= 1.0) { "minShares must be shares of one run" }
     }
 
     // The pool every arm shares, when it shares one; the same object reached through any worker.
@@ -422,6 +430,10 @@ class Portfolio(
         private val retired = BooleanArray(workers.size)
         private var remaining = workers.size
         private var probed = 0
+
+        // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
+        private val armNanos = LongArray(workers.size)
+        private var totalNanos = 0L
         private var slice = baseSliceMillis
         private var sliceWork = baseSliceWork
 
@@ -452,10 +464,16 @@ class Portfolio(
             try {
                 while (!token()) {
                     val claim = claim(index) ?: break
+                    val started = TimeSource.Monotonic.markNow()
                     try {
                         segment(claim)
                     } finally {
-                        locked { busy[claim.arm] = false }
+                        val spent = started.elapsedNow().inWholeNanoseconds
+                        locked {
+                            busy[claim.arm] = false
+                            armNanos[claim.arm] += spent
+                            totalNanos += spent
+                        }
                     }
                 }
             } catch (failure: Throwable) {
@@ -484,8 +502,10 @@ class Portfolio(
             Claim(arm, probing, slice, sliceWork, whole = dedicated)
         }
 
-        // The policy's pick among free arms, falling back to the first free one if it keeps naming taken arms.
+        // The free arm furthest below its owed share, else the policy's pick among free arms, falling back to the first
+        // free one if the policy keeps naming taken arms.
         private fun policyPick(): Int {
+            owedArm()?.let { return it }
             repeat(workers.size) {
                 val chosen = bandit.choose()
                 if (retired[chosen]) {
@@ -495,6 +515,21 @@ class Portfolio(
                 }
             }
             return workers.indices.firstOrNull { !busy[it] && !retired[it] } ?: -1
+        }
+
+        private fun owedArm(): Int? {
+            if (minShares.isEmpty()) return null
+            var owed: Int? = null
+            var deficit = 0.0
+            for (arm in workers.indices) {
+                if (busy[arm] || retired[arm]) continue
+                val short = minShares[arm] * totalNanos - armNanos[arm]
+                if (short > deficit) {
+                    owed = arm
+                    deficit = short
+                }
+            }
+            return owed
         }
 
         /**
@@ -664,6 +699,7 @@ class Portfolio(
             phaseRetention: Double = DEFAULT_PHASE_RETENTION,
             witnessCheck: WitnessCheck? = null,
             onFault: ((ArmFault) -> Unit)? = null,
+            minShares: DoubleArray = DoubleArray(0),
         ): Portfolio = Portfolio(
             workers = workers,
             bandit = DiscountedThompson(workers.size, Random(seed), halfLife),
@@ -677,6 +713,7 @@ class Portfolio(
             phaseRetention = phaseRetention,
             witnessCheck = witnessCheck,
             onFault = onFault,
+            minShares = minShares,
         )
     }
 }
