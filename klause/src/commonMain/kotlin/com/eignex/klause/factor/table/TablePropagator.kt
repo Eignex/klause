@@ -140,6 +140,7 @@ internal class TablePropagator(
         val domLo = LongArray(arity)
         val domHi = LongArray(arity)
         val supportBits = arrayOfNulls<LongArray>(arity)
+        val remainingSupports = IntArray(arity)
         // A cell whose interval covers the whole domain (a `*`, or a range spanning it) supports every
         // value of that column, so the column is fully supported and skips gathering and pruning.
         val fullySupported = BooleanArray(arity)
@@ -147,6 +148,7 @@ internal class TablePropagator(
             val d = state.intDomains[xs[col]]
             domLo[col] = d.min
             domHi[col] = d.max
+            remainingSupports[col] = d.valueCount.toInt()
             val span = domHi[col] - domLo[col] + 1
             supportBits[col] = LongArray(((span + 63) ushr 6).toInt())
         }
@@ -182,7 +184,17 @@ internal class TablePropagator(
                     val bits = requireNotNull(supportBits[col])
                     val first = (maxOf(lo, domLo[col]) - domLo[col]).toInt()
                     val last = (minOf(hiC, domHi[col]) - domLo[col]).toInt()
-                    setSupportRange(bits, first, last)
+                    if (first == last) {
+                        val word = first ushr 6
+                        val mask = 1L shl (first and 63)
+                        if (bits[word] and mask == 0L) {
+                            bits[word] = bits[word] or mask
+                            // Ground cells contribute only live values; the count includes sparse domains.
+                            if (hi == null && --remainingSupports[col] == 0) fullySupported[col] = true
+                        }
+                    } else {
+                        setSupportRange(bits, first, last)
+                    }
                 }
                 i++
             }
@@ -190,6 +202,7 @@ internal class TablePropagator(
         // The sparse-set permutation restores every removed row when the prefix size is undone.
         s.numValid = numValid
         if (numValid == 0) return false
+        if (fullySupported.all { it }) return true
         val ant = collectHoleAndBoundAntecedents(state, xs)
         for (col in 0 until arity) {
             if (fullySupported[col]) continue

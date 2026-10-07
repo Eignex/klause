@@ -145,6 +145,28 @@ class TablePropagatorTest {
     }
 
     @Test
+    fun `duplicate ground supports leave unsupported sparse values filtered`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 1), SurvivorsDomain(-10, 130, longArrayOf(-10, 63, 64, 130))),
+            factors = arrayOf<Factor>(
+                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, -10, 0, -10, 1, 64, 1, 64, 0, 130)),
+            ),
+        )
+
+        val session = PropagationSession(problem)
+
+        assertEquals(listOf(-10L, 64L, 130L), listOf(-10L, 63L, 64L, 130L).filter { it in session.intDomain(1) })
+        assertIs<PropagationResult.Implied>(session.pinInt(0, 1))
+        assertEquals(64L, session.intDomain(1).min)
+        assertEquals(64L, session.intDomain(1).max)
+        session.popLast()
+        assertIs<PropagationResult.Implied>(session.pinInt(0, 0))
+        assertEquals(listOf(-10L, 130L), listOf(-10L, 64L, 130L).filter { it in session.intDomain(1) })
+    }
+
+    @Test
     fun `interval supports preserve exact word boundaries over sparse domains`() {
         val ranges = listOf(0 to 0, 0 to 63, 63 to 64, 1 to 190, 64 to 127, 65 to 129)
         for ((first, last) in ranges) {
