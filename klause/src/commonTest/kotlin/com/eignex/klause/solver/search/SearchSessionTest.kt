@@ -933,4 +933,20 @@ class SearchSessionTest {
         assertIs<SearchRunEvent.Exhausted>(run.next())
     }
 
+
+    @Test
+    fun `reset discards a pending decision from a paused traversal`() {
+        val session = SearchSession(emptyList())
+        val run = session.openRun(numBoolVars = 1)
+        run.pauseBeforeDecision = { true }
+        session.initialize()
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        session.popTo(0)
+        run.reset()
+        run.pauseBeforeDecision = { false }
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+    }
+
 }

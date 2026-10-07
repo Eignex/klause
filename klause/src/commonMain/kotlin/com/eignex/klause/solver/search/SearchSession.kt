@@ -1384,6 +1384,7 @@ class SearchRun internal constructor(
         lastModel = null
         consumedModel = false
         terminal = null
+        pendingAdvance = false
         started = false
         cancellationPoller.reset()
         params.restart.beginRun()
