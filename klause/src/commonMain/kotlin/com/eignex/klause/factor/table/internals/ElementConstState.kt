@@ -8,6 +8,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
+import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.lazyReason
@@ -318,20 +319,31 @@ internal class ElementConstState(
         return supports(state, payload[0], values, atTrail)
     }
 
-    // Each lost support cites why it was gone at [atTrail]: a bound it lay past, or its own carve.
+    // Each lost support cites why it was gone at [atTrail]: a bound it lay past, or its own carve. The cited side is
+    // one variable, so its past domain is read once and each bound's literal is looked up once.
     private fun supports(state: PropagationState, side: Int, values: LongArray, atTrail: Int): IntArray? {
         val out = LitSet()
-        fun cite(v: Int, k: Long) {
-            val lit = state.exclusionLiteral(v, k, atTrail)
+        val v = if (side == RESULT) idx else result
+        val d = state.domainAt(v, atTrail)
+        val root = state.rootDomains[v]
+        var belowCited = false
+        var aboveCited = false
+        fun cite(k: Long) {
+            if (k !in root) return
+            when {
+                k < d.min -> if (belowCited) return else belowCited = true
+                k > d.max -> if (aboveCited) return else aboveCited = true
+            }
+            val lit = state.exclusionLiteral(v, k, atTrail, d)
             if (lit != Lit.NONE) out.add(lit)
         }
         for (value in values) {
             if (side == RESULT) {
                 val id = idFor(value)
-                if (id >= 0) for (pos in positionsOfId[id]) cite(idx, indexOffset + pos.toLong())
+                if (id >= 0) for (pos in positionsOfId[id]) cite(indexOffset + pos.toLong())
             } else {
                 val pos = value - indexOffset
-                if (pos in 0 until len) cite(result, arr[pos.toInt()])
+                if (pos in 0 until len) cite(arr[pos.toInt()])
             }
         }
         return out.toArrayOrNull()

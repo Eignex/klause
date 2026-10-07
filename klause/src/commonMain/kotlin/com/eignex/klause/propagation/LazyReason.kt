@@ -109,10 +109,15 @@ internal fun PropagationState.inDomainAt(v: Int, k: Long, atTrail: Int): Boolean
 /**
  * The literal, false at undo-log position [atTrail], that says `k` was out of [v]'s domain then: the bound it lay
  * past, or its own carve. [Lit.NONE] when nothing on the path removed it: a root hole or a survivor restriction,
- * both unconditional. Only for a `k` that was out then (not [inDomainAt]).
+ * both unconditional. Only for a `k` that was out then (not [inDomainAt]); [d] is [v]'s domain then, for a caller
+ * that already read it.
  */
-internal fun PropagationState.exclusionLiteral(v: Int, k: Long, atTrail: Int): Int {
-    val d = domainAt(v, atTrail)
+internal fun PropagationState.exclusionLiteral(
+    v: Int,
+    k: Long,
+    atTrail: Int,
+    d: IntDomain = domainAt(v, atTrail),
+): Int {
     val root = rootDomains[v]
     return when {
         k !in root -> Lit.NONE
