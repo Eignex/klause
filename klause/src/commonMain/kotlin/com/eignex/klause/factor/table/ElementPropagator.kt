@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
@@ -31,6 +32,9 @@ internal class ElementPropagator(
 
     override val consumesIntEventDelta: Boolean = arrIsVars
 
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
+        (state.refPayload[factorId] as ElementConstState).explain(state, payload, atTrail)
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         (if (arrIsVars) null else constantConflictReason(state)) ?: collectHoleAndBoundAntecedents(state, intVars)
 
@@ -45,17 +49,20 @@ internal class ElementPropagator(
         val seen = IntHashSet()
         val out = IntArrayList()
         fun cite(lit: Int) {
-            if (seen.add(lit)) out.add(lit)
+            if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
         }
+        // A hole the path never carved (a root or survivor restriction) is unconditional and needs no literal.
+        fun hole(v: Int, k: Long): Int =
+            if (state.undoLogging) state.exclusionLiteral(v, k, state.undo.size) else Lit.make(state.atomVarEq(v, k), true)
         for (pos in arr.indices) {
             val iv = indexOffset + pos.toLong()
             when {
                 iv !in idxRoot -> Unit
                 iv < idxDom.min -> cite(Lit.make(state.atomVarGe(idx, idxDom.min), false))
                 iv > idxDom.max -> cite(Lit.make(state.atomVarLe(idx, idxDom.max), false))
-                iv !in idxDom -> cite(Lit.make(state.atomVarEq(idx, iv), true))
+                iv !in idxDom -> cite(hole(idx, iv))
                 arr[pos] in resDom -> return null
-                arr[pos] in resRoot -> cite(Lit.make(state.atomVarEq(result, arr[pos]), true))
+                arr[pos] in resRoot -> cite(hole(result, arr[pos]))
             }
         }
         return out.toIntArray()
