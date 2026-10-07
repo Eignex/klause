@@ -126,7 +126,8 @@ internal class ValuePrecedePropagator(
                     sBefore(state, firstForcedT, candidate, state.undo.size).also { it.add(pinnedT) }.toIntArray()
                 }
                 if (!state.tightenIntMin(v, s, ant) || !state.tightenIntMax(v, s, ant)) {
-                    failure = (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
+                    val own = collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0)
+                    failure = (ant ?: IntArray(0)) + own
                     return false
                 }
             }
