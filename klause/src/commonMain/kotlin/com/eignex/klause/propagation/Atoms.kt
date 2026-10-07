@@ -58,7 +58,7 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
     val v = atoms.intVar[atomId]
     val k = atoms.threshold[atomId]
     val truth = atomCurrentTruth(atomId) ?: return levelToDecisionVar.size
-    boundAtomEstablishment(atomId, truth)?.let { return it.level }
+    boundAtomEstablishmentLevel(atomId, truth)?.let { return it }
     return when (atoms.kind[atomId]) {
         AtomKind.GE -> endpointLevel(v, viaMax = !truth)
 
@@ -642,6 +642,17 @@ internal class BoundEstablishment(val level: Int, val reason: IntArray?)
  * with the undo log off. A `[v ≥ k]` that holds was established by the first move that took `v`'s lower bound
  * to `k` or past it, and a false one by the first that took its upper bound below `k`; `[v ≤ k]` mirrors that.
  */
+/** The level [boundAtomEstablishment] reports, without building a reason; null for an equality atom. */
+internal fun PropagationState.boundAtomEstablishmentLevel(atomId: Int, truth: Boolean): Int? {
+    val v = atoms.intVar[atomId]
+    val k = atoms.threshold[atomId]
+    return when (atoms.kind[atomId]) {
+        AtomKind.GE -> boundEstablishmentLevel(v, if (truth) k else k - 1, lower = truth)
+        AtomKind.LE -> boundEstablishmentLevel(v, if (truth) k else k + 1, lower = !truth)
+        AtomKind.EQ -> null
+    }
+}
+
 internal fun PropagationState.boundAtomEstablishment(atomId: Int, truth: Boolean): BoundEstablishment? {
     val v = atoms.intVar[atomId]
     val k = atoms.threshold[atomId]
@@ -661,21 +672,9 @@ internal fun PropagationState.boundAtomEstablishment(atomId: Int, truth: Boolean
  */
 internal fun PropagationState.boundEstablishment(v: Int, k: Long, lower: Boolean): BoundEstablishment? {
     if (!undoLogging) return null
-    // The bound only tightens along the path, so the records whose prior bound already reached k form a
-    // prefix; the first record past it is the move that reached k, and its post-move state is the next
-    // record's prior state, or the live one.
     val moves = boundMoves[v]
     val count = moves?.size ?: 0
-    fun reachedBefore(j: Int): Boolean {
-        val prior = requireNotNull(undo.domain[requireNotNull(moves)[j]])
-        return if (lower) prior.min >= k else prior.max <= k
-    }
-    var lo = 0
-    var hi = count
-    while (lo < hi) {
-        val mid = (lo + hi) ushr 1
-        if (reachedBefore(mid)) hi = mid else lo = mid + 1
-    }
+    val lo = movesBefore(v, k, lower)
     // Moves [lo, count) start already at k; lo == 0 means k held before any logged move, a root fact.
     if (lo == 0) return BoundEstablishment(0, null)
     val next = lo
@@ -694,6 +693,40 @@ internal fun PropagationState.boundEstablishment(v: Int, k: Long, lower: Boolean
         postBound = if (lower) intDomains[v].min else intDomains[v].max
     }
     return established(v, k, lower, postLevel.coerceAtLeast(0), postReason, postBound)
+}
+
+/**
+ * The level [boundEstablishment] would report, without building the move's reason: what a learned clause's
+ * effective level reads on the propagation path. Null with the undo log off.
+ */
+internal fun PropagationState.boundEstablishmentLevel(v: Int, k: Long, lower: Boolean): Int? {
+    if (!undoLogging) return null
+    val lo = movesBefore(v, k, lower)
+    if (lo == 0) return 0
+    val moves = boundMoves[v]
+    val level = if (lo < (moves?.size ?: 0)) {
+        val i = requireNotNull(moves)[lo]
+        if (lower) undo.minLvl[i] else undo.maxLvl[i]
+    } else {
+        if (lower) intMinLevel[v] else intMaxLevel[v]
+    }
+    return level.coerceAtLeast(0)
+}
+
+// The number of [v]'s logged bound moves that came before its lower ([lower]) or upper bound reached [k]. The
+// bound only tightens along the path, so the records whose prior bound already reached k form a suffix; the one
+// just before it is the move that reached k, and its post-move state is the next record's prior state, or the
+// live one.
+private fun PropagationState.movesBefore(v: Int, k: Long, lower: Boolean): Int {
+    val moves = boundMoves[v] ?: return 0
+    var lo = 0
+    var hi = moves.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        val prior = requireNotNull(undo.domain[moves[mid]])
+        if (if (lower) prior.min >= k else prior.max <= k) hi = mid else lo = mid + 1
+    }
+    return lo
 }
 
 // A move with no reason is a decision. The decided bound itself has none either, but a weaker one follows from
