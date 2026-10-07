@@ -9,6 +9,7 @@ import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap
+import kotlin.math.abs
 
 internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongArray, vars: IntArray) {
     var sum = 0L
@@ -162,6 +163,86 @@ internal fun collectLinearDirAntecedents(
     }
     if (out.size == 0) return null
     return out.toIntArray()
+}
+
+/**
+ * The conflict reason [collectLinearDirAntecedents] builds, with each cited bound weakened as far as the
+ * conflict allows: the driving side exceeds the bound by [slack] + 1, and that slack is spent loosening the
+ * cited bounds, latest decision level first. A reason citing exact bounds refutes one value per conflict, so a
+ * search that tries `x ≤ min` refutes `min`, then `min + 1`, and so on across the domain; the lifted reason
+ * refutes every value the conflict rules out at once. A bound loosened to its root value is a global fact and
+ * drops out.
+ *
+ * A literal below the conflict level only ever enters the learned clause, so any weaker atom that still holds
+ * serves. One at the conflict level may be resolved, and only a decision's bound needs no reason there, so the
+ * conflict level loosens only its decision.
+ */
+internal fun collectLinearLiftedAntecedents(
+    state: PropagationState,
+    coeffs: LongArray,
+    vars: IntArray,
+    useLo: Boolean,
+    slack: Long,
+): IntArray? {
+    var anyAboveRoot = false
+    for (v in vars) {
+        if (state.intLevel[v] > 0) {
+            anyAboveRoot = true
+            break
+        }
+    }
+    val cited = IntArrayList()
+    for (j in vars.indices) {
+        val c = coeffs[j]
+        if (c == 0L) continue
+        val v = vars[j]
+        if (anyAboveRoot && state.intLevel[v] <= 0) continue
+        val citeMin = if (useLo) c > 0 else c < 0
+        val d = state.intDomains[v]
+        val orig = state.rootDomains[v]
+        if (if (citeMin) d.min > orig.min else d.max < orig.max) cited.add(j)
+    }
+    fun sideLevel(j: Int): Int {
+        val v = vars[j]
+        val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
+        return if (citeMin) state.intMinLevel[v] else state.intMaxLevel[v]
+    }
+    val order = cited.toIntArray().sortedByDescending(::sideLevel)
+    val seen = IntHashSet(order.size * 2)
+    val out = IntArrayList()
+    var remaining = slack
+    for (j in order) {
+        val c = coeffs[j]
+        val v = vars[j]
+        val citeMin = if (useLo) c > 0 else c < 0
+        val d = state.intDomains[v]
+        val orig = state.rootDomains[v]
+        val room = if (citeMin) d.min - orig.min else orig.max - d.max
+        val step = if (remaining > 0 && liftable(state, v, citeMin, sideLevel(j))) {
+            minOf(remaining / abs(c), room)
+        } else {
+            0L
+        }
+        remaining -= step * abs(c)
+        if (step == room) continue
+        val lit = if (citeMin) {
+            Lit.make(state.atomVarGe(v, d.min - step), false)
+        } else {
+            Lit.make(state.atomVarLe(v, d.max + step), false)
+        }
+        if (seen.add(lit)) out.add(lit)
+    }
+    if (out.size == 0) return null
+    return out.toIntArray()
+}
+
+// Whether the bound on [v]'s [citeMin] side, established at [level], may be cited weaker than it stands.
+private fun liftable(state: PropagationState, v: Int, citeMin: Boolean, level: Int): Boolean {
+    if (level <= 0) return false
+    if (level < state.currentLevel) return true
+    val reason = if (citeMin) state.intMinReason[v] else state.intMaxReason[v]
+    val decisions = state.levelToDecisionVar
+    return reason < 0 && decisions.size == level && decisions[level - 1] == state.problem.numBoolVars + v
 }
 
 internal fun collectLinearTightenAntecedents(
