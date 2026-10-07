@@ -12,11 +12,8 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlin.time.Duration
 
 class ResumableOpenTheoryTest {
 
@@ -74,14 +71,15 @@ class ResumableOpenTheoryTest {
     }
 
     @Test
-    fun `a slice whose clock ends during setup decides nothing`() {
+    fun `a slice with no time left still expands a branch`() {
         val problem = chain(8, total = 20)
         val request = OpenTheoryRequest(problem, componentPlan = problem.componentPlan())
-        val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), TheoryParams(), Duration.ZERO)
+        val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), TheoryParams())
+        var slices = 0
 
-        val result = search.runSlice(Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1)
+        while (search.runSlice(Cancellation.Never, sliceMillis = 0L, sliceWork = -1L) == null) slices++
 
-        assertNull(result)
-        assertFalse(search.isDone)
+        assertIs<OpenTheoryResult.Sat>(search.runSlice(Cancellation.Never, sliceMillis = 0L, sliceWork = -1L))
+        assertTrue(slices > 0, "slices=$slices")
     }
 }
