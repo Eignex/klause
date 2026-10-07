@@ -10616,19 +10616,16 @@ final class com.eignex.klause.solver.result/ArmSchedule { // com.eignex.klause.s
 }
 
 final class com.eignex.klause.solver.result/ConflictAnalysisStats { // com.eignex.klause.solver.result/ConflictAnalysisStats|null[0]
-    constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...) // com.eignex.klause.solver.result/ConflictAnalysisStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
+    constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...) // com.eignex.klause.solver.result/ConflictAnalysisStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
 
     final val nonAsserting // com.eignex.klause.solver.result/ConflictAnalysisStats.nonAsserting|{}nonAsserting[0]
         final fun <get-nonAsserting>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/ConflictAnalysisStats.nonAsserting.<get-nonAsserting>|<get-nonAsserting>(){}[0]
     final val notApplicable // com.eignex.klause.solver.result/ConflictAnalysisStats.notApplicable|{}notApplicable[0]
         final fun <get-notApplicable>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/ConflictAnalysisStats.notApplicable.<get-notApplicable>|<get-notApplicable>(){}[0]
-    final val rejectedTrueLit // com.eignex.klause.solver.result/ConflictAnalysisStats.rejectedTrueLit|{}rejectedTrueLit[0]
-        final fun <get-rejectedTrueLit>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/ConflictAnalysisStats.rejectedTrueLit.<get-rejectedTrueLit>|<get-rejectedTrueLit>(){}[0]
 
     final fun component1(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/ConflictAnalysisStats.component1|component1(){}[0]
     final fun component2(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/ConflictAnalysisStats.component2|component2(){}[0]
-    final fun component3(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/ConflictAnalysisStats.component3|component3(){}[0]
-    final fun copy(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...): com.eignex.klause.solver.result/ConflictAnalysisStats // com.eignex.klause.solver.result/ConflictAnalysisStats.copy|copy(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
+    final fun copy(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...): com.eignex.klause.solver.result/ConflictAnalysisStats // com.eignex.klause.solver.result/ConflictAnalysisStats.copy|copy(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/ConflictAnalysisStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/ConflictAnalysisStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/ConflictAnalysisStats): com.eignex.klause.solver.result/ConflictAnalysisStats // com.eignex.klause.solver.result/ConflictAnalysisStats.mergedWith|mergedWith(com.eignex.klause.solver.result.ConflictAnalysisStats){}[0]
@@ -11333,7 +11330,7 @@ final class com.eignex.klause.solver.result/SchedulingStats { // com.eignex.klau
 }
 
 final class com.eignex.klause.solver.result/SearchStats { // com.eignex.klause.solver.result/SearchStats|null[0]
-    constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/MaxResult = ..., com.eignex.kumulant.stat.summary/WeightedMeanResult = ..., com.eignex.kumulant.stat.summary/MaxResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...) // com.eignex.klause.solver.result/SearchStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.MaxResult;com.eignex.kumulant.stat.summary.WeightedMeanResult;com.eignex.kumulant.stat.summary.MaxResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
+    constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/MaxResult = ..., com.eignex.kumulant.stat.summary/WeightedMeanResult = ..., com.eignex.kumulant.stat.summary/MaxResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...) // com.eignex.klause.solver.result/SearchStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.MaxResult;com.eignex.kumulant.stat.summary.WeightedMeanResult;com.eignex.kumulant.stat.summary.MaxResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
 
     final val depthMean // com.eignex.klause.solver.result/SearchStats.depthMean|{}depthMean[0]
         final fun <get-depthMean>(): com.eignex.kumulant.stat.summary/WeightedMeanResult // com.eignex.klause.solver.result/SearchStats.depthMean.<get-depthMean>|<get-depthMean>(){}[0]
@@ -11347,6 +11344,10 @@ final class com.eignex.klause.solver.result/SearchStats { // com.eignex.klause.s
         final fun <get-inprocessVisits>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.inprocessVisits.<get-inprocessVisits>|<get-inprocessVisits>(){}[0]
     final val learnedClauses // com.eignex.klause.solver.result/SearchStats.learnedClauses|{}learnedClauses[0]
         final fun <get-learnedClauses>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.learnedClauses.<get-learnedClauses>|<get-learnedClauses>(){}[0]
+    final val learnedLbd // com.eignex.klause.solver.result/SearchStats.learnedLbd|{}learnedLbd[0]
+        final fun <get-learnedLbd>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.learnedLbd.<get-learnedLbd>|<get-learnedLbd>(){}[0]
+    final val learnedLiterals // com.eignex.klause.solver.result/SearchStats.learnedLiterals|{}learnedLiterals[0]
+        final fun <get-learnedLiterals>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.learnedLiterals.<get-learnedLiterals>|<get-learnedLiterals>(){}[0]
     final val nodes // com.eignex.klause.solver.result/SearchStats.nodes|{}nodes[0]
         final fun <get-nodes>(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.nodes.<get-nodes>|<get-nodes>(){}[0]
     final val peakDepth // com.eignex.klause.solver.result/SearchStats.peakDepth|{}peakDepth[0]
@@ -11361,18 +11362,20 @@ final class com.eignex.klause.solver.result/SearchStats { // com.eignex.klause.s
         final fun <get-rootFixed>(): com.eignex.kumulant.stat.summary/MaxResult // com.eignex.klause.solver.result/SearchStats.rootFixed.<get-rootFixed>|<get-rootFixed>(){}[0]
 
     final fun component1(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component1|component1(){}[0]
-    final fun component10(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component10|component10(){}[0]
-    final fun component11(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component11|component11(){}[0]
+    final fun component10(): com.eignex.kumulant.stat.summary/WeightedMeanResult // com.eignex.klause.solver.result/SearchStats.component10|component10(){}[0]
+    final fun component11(): com.eignex.kumulant.stat.summary/MaxResult // com.eignex.klause.solver.result/SearchStats.component11|component11(){}[0]
     final fun component12(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component12|component12(){}[0]
+    final fun component13(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component13|component13(){}[0]
+    final fun component14(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component14|component14(){}[0]
     final fun component2(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component2|component2(){}[0]
     final fun component3(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component3|component3(){}[0]
     final fun component4(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component4|component4(){}[0]
     final fun component5(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component5|component5(){}[0]
     final fun component6(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component6|component6(){}[0]
-    final fun component7(): com.eignex.kumulant.stat.summary/MaxResult // com.eignex.klause.solver.result/SearchStats.component7|component7(){}[0]
-    final fun component8(): com.eignex.kumulant.stat.summary/WeightedMeanResult // com.eignex.klause.solver.result/SearchStats.component8|component8(){}[0]
+    final fun component7(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component7|component7(){}[0]
+    final fun component8(): com.eignex.kumulant.stat.summary/SumResult // com.eignex.klause.solver.result/SearchStats.component8|component8(){}[0]
     final fun component9(): com.eignex.kumulant.stat.summary/MaxResult // com.eignex.klause.solver.result/SearchStats.component9|component9(){}[0]
-    final fun copy(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/MaxResult = ..., com.eignex.kumulant.stat.summary/WeightedMeanResult = ..., com.eignex.kumulant.stat.summary/MaxResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...): com.eignex.klause.solver.result/SearchStats // com.eignex.klause.solver.result/SearchStats.copy|copy(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.MaxResult;com.eignex.kumulant.stat.summary.WeightedMeanResult;com.eignex.kumulant.stat.summary.MaxResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
+    final fun copy(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/MaxResult = ..., com.eignex.kumulant.stat.summary/WeightedMeanResult = ..., com.eignex.kumulant.stat.summary/MaxResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...): com.eignex.klause.solver.result/SearchStats // com.eignex.klause.solver.result/SearchStats.copy|copy(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.MaxResult;com.eignex.kumulant.stat.summary.WeightedMeanResult;com.eignex.kumulant.stat.summary.MaxResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SearchStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SearchStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/SearchStats): com.eignex.klause.solver.result/SearchStats // com.eignex.klause.solver.result/SearchStats.mergedWith|mergedWith(com.eignex.klause.solver.result.SearchStats){}[0]
@@ -12371,6 +12374,9 @@ final object com.eignex.klause.formats.xcsp3/Xcsp3 { // com.eignex.klause.format
 }
 
 final object com.eignex.klause.ir/Lit { // com.eignex.klause.ir/Lit|null[0]
+    final const val NONE // com.eignex.klause.ir/Lit.NONE|{}NONE[0]
+        final fun <get-NONE>(): kotlin/Int // com.eignex.klause.ir/Lit.NONE.<get-NONE>|<get-NONE>(){}[0]
+
     final fun evaluate(kotlin/Int, kotlin/Boolean): kotlin/Boolean // com.eignex.klause.ir/Lit.evaluate|evaluate(kotlin.Int;kotlin.Boolean){}[0]
     final fun isPositive(kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/Lit.isPositive|isPositive(kotlin.Int){}[0]
     final fun make(kotlin/Int, kotlin/Boolean): kotlin/Int // com.eignex.klause.ir/Lit.make|make(kotlin.Int;kotlin.Boolean){}[0]
