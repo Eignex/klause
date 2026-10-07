@@ -224,6 +224,10 @@ class PropagationState(
     internal val holeHistVal: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
     internal val holeHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 
+    // The undo-log size when each carve was recorded, so a lazy reason can tell a hole that predates its
+    // deduction from one carved after it ([carvedAt]).
+    internal val holeHistPos: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+
     /**
      * Decision-var encoded per level: index `lvl-1` holds either a bool var id (0..numBoolVars-1)
      * or a shifted int var id (numBoolVars + intVar). Grows as decisions are pushed. Primitive

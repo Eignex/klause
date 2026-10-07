@@ -7,11 +7,16 @@ import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.intdomain.SurvivorsDomain
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.holeReasonFor
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -301,6 +306,32 @@ class TablePropagatorTest {
     }
 
     @Test
+    fun `a table prune cites only what ruled out the tuples holding the removed values`() {
+        // x1 loses 1 and 3: (2, 1, 0) fell to x0 != 2 and (4, 3, 0) to x0 <= 3. x2 <= 0 ruled out no tuple.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 3), IntDomain(0, 1)),
+            factors = arrayOf<Factor>(
+                Table(xs = intArrayOf(0, 1, 2), tuples = longArrayOf(0, 0, 0, 1, 0, 0, 2, 1, 0, 3, 2, 0, 4, 3, 0)),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 2L) && state.tightenIntMax(0, 3L) && state.tightenIntMax(2, 0L))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.holeReasonFor(1, 1L))!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(setOf(Triple(0, AtomKind.EQ, 2L), Triple(0, AtomKind.LE, 3L)), cited.toSet())
+    }
+
+    @Test
     fun `table deductions are implied by their reasons under carved holes`() {
         val rng = Random(0x7AB2)
         repeat(300) { iter ->
@@ -320,6 +351,32 @@ class TablePropagatorTest {
                         0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
                         1 -> state.tightenIntMin(v, rng.nextInt(2).toLong())
                         else -> state.tightenIntMax(v, 2L + rng.nextInt(2))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `interval table deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x7AB3)
+        repeat(300) { iter ->
+            val arity = 3
+            val lo = LongArray(5 * arity) { rng.nextInt(5).toLong() }
+            val hi = LongArray(lo.size) { lo[it] + rng.nextInt(3) }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = arity,
+                intDomains = Array(arity) { IntDomain(0, 5) },
+                factors = arrayOf<Factor>(Table(xs = IntArray(arity) { it }, tuples = lo, hi = hi)),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "interval-table#$iter") { state ->
+                (0 until 5).all {
+                    val v = rng.nextInt(arity)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(6).toLong())
+                        1 -> state.tightenIntMin(v, rng.nextInt(3).toLong())
+                        else -> state.tightenIntMax(v, 3L + rng.nextInt(3))
                     }
                 }
             }

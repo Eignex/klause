@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.IntDomain
+
 // Lazy reasons. A deduction may record, in place of its literal array, a marker array naming the propagator,
 // the trail position and level it was made at, and a propagator-specific payload. Conflict analysis reads every
 // reason through [reasonOf], which asks the propagator to build that one ([Propagator.explain]) only when the
@@ -41,23 +43,23 @@ internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
 }
 
 /**
- * [v]'s lower ([lower]) or upper bound as it stood at undo-log position [atTrail]: the bound before the first of
- * its moves logged at or after that position, else its live bound.
+ * [v]'s domain at undo-log position [atTrail], up to interior carves made since: the snapshot the first of its
+ * logged moves at or after that position saved, else its live domain. Only interior carves are journalled
+ * without a snapshot, so the bounds are exact and a hole is the hole it was unless [carvedAt] places it later.
  */
-internal fun PropagationState.boundAt(v: Int, lower: Boolean, atTrail: Int): Long {
-    val moves = boundMoves[v]
-    if (moves != null) {
-        var lo = 0
-        var hi = moves.size
-        while (lo < hi) {
-            val mid = (lo + hi) ushr 1
-            if (moves[mid] >= atTrail) hi = mid else lo = mid + 1
-        }
-        if (lo < moves.size) {
-            val prior = requireNotNull(undo.domain[moves[lo]])
-            return if (lower) prior.min else prior.max
-        }
+internal fun PropagationState.domainAt(v: Int, atTrail: Int): IntDomain {
+    val moves = boundMoves[v] ?: return intDomains[v]
+    var lo = 0
+    var hi = moves.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (moves[mid] >= atTrail) hi = mid else lo = mid + 1
     }
-    val d = intDomains[v]
+    return if (lo < moves.size) requireNotNull(undo.domain[moves[lo]]) else intDomains[v]
+}
+
+/** [v]'s lower ([lower]) or upper bound as it stood at undo-log position [atTrail]. */
+internal fun PropagationState.boundAt(v: Int, lower: Boolean, atTrail: Int): Long {
+    val d = domainAt(v, atTrail)
     return if (lower) d.min else d.max
 }
