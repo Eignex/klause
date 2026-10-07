@@ -41,6 +41,9 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
         return !exhausted
     }
 
+    /** Work committed so far, on the [OpenTheoryWorkStats.openWork] scale. */
+    val spent: Long get() = work
+
     /** Fixed-work allowance still unspent, which a producer sizing its own allowance may not exceed. */
     fun remaining(): Long = (limit - work).coerceAtLeast(0)
 

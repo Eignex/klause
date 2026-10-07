@@ -1016,6 +1016,9 @@ class SearchRun internal constructor(
                 }
 
                 SearchNodeDisposition.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+
+                // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
+                SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
             }
             when (val alternatives = alternatives()) {
                 is Alternatives.Leaf -> when (val result = session.check()) {

@@ -11,6 +11,7 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.WitnessCheck
+import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.SolveStats
@@ -23,8 +24,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * Decides an open model's satisfiability on the shared [Portfolio] harness: the complete theory route as one arm,
  * local-search arms over the model's source columns as the rest.
  *
- * The theory arm has no pause point, so each segment it is scheduled reruns it, preparation included, under a
- * growing time slice, through the same entry point the default open route uses.
+ * The theory arm pauses at branches and resumes by slice, counted in `openWork`, so it keeps its search across the
+ * segments it is scheduled.
  *
  * Local search proposes witnesses only, never refuting an open model, and every witness it proposes is checked
  * against the source model before it counts. A model no theory decides ([request] null) runs local search alone,
@@ -74,21 +75,41 @@ internal class OpenPortfolio(
     private fun decide(request: OpenTheoryRequest, params: TheoryParams): OpenTheoryResult =
         (OpenTheoryPipeline.execute(request, params) as OpenTheoryExecution.Satisfy).result
 
-    private fun theoryWorker(request: OpenTheoryRequest, armId: Int): PortfolioWorker =
-        PortfolioWorker.ofSolve("theory/${request.route.name.lowercase()}", armId) { slice, _ ->
-            when (val r = decide(request, theoryParams.copy(cancellation = theoryParams.cancellation or slice))) {
-                is OpenTheoryResult.Sat -> {
-                    theoryWitness = r.assignment
-                    val sample = r.assignment.toSampleOrPlaceholder(model)
-                    theorySample = sample
-                    SolveResult.Sat(sample, r.stats)
-                }
+    private fun theoryWorker(request: OpenTheoryRequest, armId: Int): PortfolioWorker = PortfolioWorker.ofSolve(
+        "theory/${request.route.name.lowercase()}",
+        armId,
+        resumable = { theorySlices(request) },
+    ) { slice, _ ->
+        toSolveResult(
+            decide(request, theoryParams.copy(cancellation = theoryParams.cancellation or slice)),
+        )
+    }
 
-                is OpenTheoryResult.Unsat -> SolveResult.Unsat(stats = r.stats)
+    // The theory paused and resumed by slice, so it keeps its search between the segments it is scheduled.
+    private fun theorySlices(request: OpenTheoryRequest): ResumableSolve = object : ResumableSolve {
+        private val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), theoryParams)
+        override val isDone: Boolean get() = search.isDone
+        override val stats: SolveStats get() = search.stats
+        override val work: Long get() = search.work
 
-                is OpenTheoryResult.Unknown -> SolveResult.Unknown(r.reason, r.stats)
-            }
+        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+            search.runSlice(global, sliceMillis, sliceNodes)?.let(::toSolveResult)
+
+        override fun close() = search.close()
+    }
+
+    private fun toSolveResult(result: OpenTheoryResult): SolveResult = when (result) {
+        is OpenTheoryResult.Sat -> {
+            theoryWitness = result.assignment
+            val sample = result.assignment.toSampleOrPlaceholder(model)
+            theorySample = sample
+            SolveResult.Sat(sample, result.stats)
         }
+
+        is OpenTheoryResult.Unsat -> SolveResult.Unsat(stats = result.stats)
+
+        is OpenTheoryResult.Unknown -> SolveResult.Unknown(result.reason, result.stats)
+    }
 
     private fun localSearchWorkers(firstArm: Int, cancellation: Cancellation): List<PortfolioWorker> {
         // On a model of continuous columns alone with no Boolean to choose, the completion of any candidate is the

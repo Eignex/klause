@@ -3163,6 +3163,12 @@ sealed interface com.eignex.klause.solver.search/SearchNodeDisposition { // com.
         final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchNodeDisposition.Indeterminate.toString|toString(){}[0]
     }
 
+    final object Pause : com.eignex.klause.solver.search/SearchNodeDisposition { // com.eignex.klause.solver.search/SearchNodeDisposition.Pause|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchNodeDisposition.Pause.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchNodeDisposition.Pause.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchNodeDisposition.Pause.toString|toString(){}[0]
+    }
+
     final object Prune : com.eignex.klause.solver.search/SearchNodeDisposition { // com.eignex.klause.solver.search/SearchNodeDisposition.Prune|null[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchNodeDisposition.Prune.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchNodeDisposition.Prune.hashCode|hashCode(){}[0]
@@ -11201,6 +11207,9 @@ final class com.eignex.klause.solver.result/OpenTheoryClauseStats { // com.eigne
 
 final class com.eignex.klause.solver.result/OpenTheoryWorkSink { // com.eignex.klause.solver.result/OpenTheoryWorkSink|null[0]
     constructor <init>(kotlin/Long = ...) // com.eignex.klause.solver.result/OpenTheoryWorkSink.<init>|<init>(kotlin.Long){}[0]
+
+    final val spent // com.eignex.klause.solver.result/OpenTheoryWorkSink.spent|{}spent[0]
+        final fun <get-spent>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkSink.spent.<get-spent>|<get-spent>(){}[0]
 
     final var exhausted // com.eignex.klause.solver.result/OpenTheoryWorkSink.exhausted|{}exhausted[0]
         final fun <get-exhausted>(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.exhausted.<get-exhausted>|<get-exhausted>(){}[0]

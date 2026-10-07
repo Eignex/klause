@@ -299,6 +299,9 @@ sealed interface SearchNodeDisposition {
 
     /** The node cannot be decided under the active limits. */
     data object Indeterminate : SearchNodeDisposition
+
+    /** Return control to a resumable caller before branching; the next [SearchRun.next] resumes at this node. */
+    data object Pause : SearchNodeDisposition
 }
 
 /**
