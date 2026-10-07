@@ -183,6 +183,20 @@ class PropagationSession(
     /** Current int domain after propagation. Always non-empty unless the session is Unsat. */
     fun intDomain(v: Int): IntDomain = state.intDomains[v]
 
+    /**
+     * Variables fixed at the root, however deep the search stands: bools assigned at decision level 0 and ints down
+     * to one value with no deeper decision behind their domain. Visits every variable.
+     */
+    fun rootFixedVariableCount(): Int {
+        var fixed = 0
+        for (v in 0 until problem.numBoolVars) if (state.boolValues[v] != null && state.boolLevel[v] <= 0) fixed++
+        for (v in 0 until problem.numIntVars) {
+            val d = state.intDomains[v]
+            if (d.min == d.max && state.intLevel[v] <= 0) fixed++
+        }
+        return fixed
+    }
+
     /** Variables fixed right now: bools with a value and ints down to one. Visits every variable. */
     fun fixedVariableCount(): Int {
         var fixed = 0
