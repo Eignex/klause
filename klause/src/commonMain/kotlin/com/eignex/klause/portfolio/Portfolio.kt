@@ -754,7 +754,6 @@ private const val REMAINING_SHARE = 0.5
 // Most of an arm's time incumbent checks may take; see `Portfolio.minimize`.
 private const val CHECK_SHARE = 0.2
 
-
 // The caller's token that also stops on [flag], keeping the caller's deadline.
 private fun Cancellation.alsoStoppedBy(flag: AtomicBoolean): Cancellation =
     cancelledWhen(this::deadline) { flag.load() || this() }

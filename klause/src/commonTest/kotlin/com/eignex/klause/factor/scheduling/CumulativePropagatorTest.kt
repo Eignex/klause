@@ -63,8 +63,11 @@ class CumulativePropagatorTest {
                 (0 until n).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
                     (0 until 3).all {
                         val v = rng.nextInt(n)
-                        if (rng.nextBoolean()) state.tightenIntMax(v, rng.nextInt(4).toLong())
-                        else state.tightenIntMin(v, 1L + rng.nextInt(4))
+                        if (rng.nextBoolean()) {
+                            state.tightenIntMax(v, rng.nextInt(4).toLong())
+                        } else {
+                            state.tightenIntMin(v, 1L + rng.nextInt(4))
+                        }
                     }
             }
         }

@@ -39,11 +39,8 @@ internal class ComparisonClauseInvariant(
         val c = consts[i]
         return when (ops[i]) {
             LinearOp.LE -> if (x <= c) 0L else saturatedSub(x, c)
-
             LinearOp.GE -> if (x >= c) 0L else saturatedSub(c, x)
-
             LinearOp.EQ -> distance(x, c)
-
             LinearOp.NE -> if (x != c) 0L else 1L
         }
     }
