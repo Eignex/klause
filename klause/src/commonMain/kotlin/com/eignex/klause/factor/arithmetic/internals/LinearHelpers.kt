@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.boundEstablishment
+import com.eignex.klause.propagation.boundEstablishmentLevel
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.util.Int128
@@ -253,12 +254,13 @@ internal fun explainLinearBound(
         val b = if (citeMin) d.min else d.max
         bound[j] = b
         if (if (citeMin) b <= root.min else b >= root.max) continue
-        val est = state.boundEstablishment(v, b, citeMin)
-        val l = est?.level ?: 0
+        val l = state.boundEstablishmentLevel(v, b, citeMin) ?: 0
         level[j] = l
         aboveRoot[j] = l > 0
         // As [liftable], against the deduction's level: below it any weaker atom serves; at it, only a decision.
-        val decided = l in 1..decisions.size && est?.reason == null && decisions[l - 1] == numBools + v
+        // Only a level decided on this very variable can be one, so only then is the move's reason built.
+        val decided = l in 1..decisions.size && decisions[l - 1] == numBools + v &&
+            state.boundEstablishment(v, b, citeMin)?.reason == null
         lift[j] = l > 0 && (l < atLevel || decided)
     }
     return liftedAntecedents(
