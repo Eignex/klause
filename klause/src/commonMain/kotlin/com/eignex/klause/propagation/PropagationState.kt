@@ -213,6 +213,11 @@ class PropagationState(
     // interior hole materialized after the carve reads its level/reason from here. Lazily
     // allocated, maintained while [undoLogging], truncated on backtrack via the undo log.
     internal val holeHistAnt: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
+
+    // Per int var, the undo-log positions of its bound-move records on the current path, oldest first, so a
+    // bound's history is searched without walking the whole log. Appended by [logIntChange], popped as the
+    // undo replay passes each record.
+    internal val boundMoves: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
     internal val holeHistVal: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
     internal val holeHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 
