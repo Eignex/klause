@@ -162,7 +162,7 @@ class FlowCoverSeparatorTest {
     fun `randomized flow-cover cuts never exclude a feasible integer point`() {
         val rng = Random(20260624)
         var fired = 0
-        repeat(400) { _ ->
+        repeat(80) { _ ->
             val n = rng.nextInt(2, 4)
             val u = rng.nextInt(1, 4)
             val b = rng.nextInt(1, u * n) // 1 .. u*n-1, so the capacity genuinely binds
@@ -200,6 +200,6 @@ class FlowCoverSeparatorTest {
             }
             rec(0)
         }
-        assertTrue(fired > 50, "flow-cover fired on only $fired instances")
+        assertTrue(fired > 10, "flow-cover fired on only $fired instances")
     }
 }

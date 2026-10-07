@@ -210,7 +210,7 @@ class ArithmeticPropagatorTest {
             Inst(
                 4,
                 0,
-                5,
+                3,
                 listOf(Con(intArrayOf(4, -2, 3, -1), LinearOp.LE, 6), Con(intArrayOf(1, 1, 1, 1), LinearOp.GE, 4)),
             ),
         )
