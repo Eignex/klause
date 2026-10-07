@@ -18,7 +18,7 @@ import kotlin.math.*
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {
     expectArity(c, if (reified) 4 else 3)
     val varRefsAll = evalFloatVarArray(c.args[1])
-    if (exactFloats) {
+    if (varRefsAll.all { it.lpOnly }) {
         // Real columns retain the source coefficients; scaled bucket arithmetic would lose precision.
         val coefs = evalFloatConstArray(c.args[0])
         if (coefs.size != varRefsAll.size) {
@@ -209,10 +209,10 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
 
 /** Strict float linear compare lowered to `<= bound - 1` in scaled space. */
 internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: Boolean) {
-    if (exactFloats) {
-        expectArity(c, if (reified) 4 else 3)
+    expectArity(c, if (reified) 4 else 3)
+    val variables = evalFloatVarArray(c.args[1])
+    if (variables.all { it.lpOnly }) {
         val coefficients = evalFloatConstArray(c.args[0])
-        val variables = evalFloatVarArray(c.args[1])
         if (coefficients.size != variables.size) {
             failHere("float linear coefficient and variable arrays differ in length")
         }
@@ -226,7 +226,7 @@ internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: B
         )
         return
     }
-    val scaled = resolveScaledFloatLinear(c, reified)
+    val scaled = resolveScaledFloatLinear(c, reified, variables)
     val strictBound = subtractScaledFloat(scaled.bound, 1L)
     postLinear(
         scaled.coeffs,
@@ -276,7 +276,7 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
  *  arity is checked before the args are reordered so a truncated call fails with a located error. */
 internal fun FlatZincCompiler.emitFloatDiv(c: FznConstraint) {
     expectArity(c, 3)
-    if (exactFloats && (resolveFloatVarOrConst(c.args[1]) as? FloatRef.Const)?.value == 0.0) {
+    if ((resolveFloatVarOrConst(c.args[1]) as? FloatRef.Const)?.value == 0.0) {
         failHere("float_div: division by zero")
     }
     emitFloatTimes(
@@ -341,6 +341,10 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     ) {
         val y = realRef.bk
         factors.add(RealProduct(resolveIntVar(intExpr), y.varId, cRef.bk.varId, y.lo, y.hi))
+        return
+    }
+    if ((aRef as? FloatRef.Var)?.bk?.lpOnly == true || (bRef as? FloatRef.Var)?.bk?.lpOnly == true) {
+        emitFiniteFloatProduct(aRef, bRef, cRef)
         return
     }
     if (aRef !is FloatRef.Var || bRef !is FloatRef.Var || cRef !is FloatRef.Var) {
@@ -412,9 +416,9 @@ internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
     val x = (xRef as FloatRef.Var).bk
     val y = when (yRef) {
         is FloatRef.Var -> yRef.bk
-        is FloatRef.Const -> resolveFloatElement(c.args[1], "__float_abs_${floatVars.size}", exactFloats)
+        is FloatRef.Const -> resolveFloatElement(c.args[1], "__float_abs_${floatVars.size}", x.lpOnly)
     }
-    if (exactFloats) {
+    if (x.lpOnly) {
         val variables = intArrayOf(x.varId, y.varId)
         postExactFloatLinear(doubleArrayOf(1.0, -1.0), variables, LinearOp.LE, 0.0)
         postExactFloatLinear(doubleArrayOf(-1.0, -1.0), variables, LinearOp.LE, 0.0)
@@ -465,12 +469,12 @@ internal fun FlatZincCompiler.emitArrayFloatElement(c: FznConstraint) {
         is FloatRef.Var -> xRef.bk
         is FloatRef.Const -> resolveFloatElement(c.args[2], "__float_element_${floatVars.size}", exactFloats)
     }
-    if (exactFloats) {
+    if (x.lpOnly) {
         factors.add(Linear(longArrayOf(1L), intArrayOf(idx), LinearOp.GE, 1L))
         factors.add(Linear(longArrayOf(1L), intArrayOf(idx), LinearOp.LE, arr.size.toLong()))
         for (i in arr.indices) {
             val selected = reifyLinear(longArrayOf(1L), intArrayOf(idx), LinearOp.EQ, (i + 1).toLong())
-            val value = reifyRealLinear(doubleArrayOf(1.0), intArrayOf(x.varId), LinearOp.EQ, arr[i])
+            val value = exactFloatValueLiteral(x.varId, arr[i])
             factors.add(Clause(intArrayOf(Lit.negate(selected), value)))
         }
         return
@@ -510,7 +514,8 @@ internal fun FlatZincCompiler.emitArrayFloatElement(c: FznConstraint) {
 internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing> = when (e) {
     is FznExpr.ArrayLit -> {
         val refs = e.elements.map(::resolveFloatVarOrConst)
-        val lpOnly = exactFloats && refs.filterIsInstance<FloatRef.Var>().all { it.bk.lpOnly }
+        val vars = refs.filterIsInstance<FloatRef.Var>()
+        val lpOnly = (exactFloats || vars.isNotEmpty()) && vars.all { it.bk.lpOnly }
         e.elements.map { resolveFloatElement(it, "__float_${floatVars.size}", lpOnly) }
     }
 

@@ -55,8 +55,10 @@ types of variables and constraints the problem contain.
 Linear reals are handled by the LP: continuous variables exist only as LP
 columns and are never branched on. The LP runs in double precision but
 every bound and infeasibility verdict is certified exactly, so floating
-point never decides an answer. Non-linear float constraints are instead
-discretized into integer buckets at a configurable resolution.
+point never decides an answer. FlatZinc tries finite float choices first,
+lowering their supported operations to conditional linear rows. Components
+requiring approximation or excessive finite expansion use integer buckets
+at a configurable resolution; `--exact` declines those cases.
 
 The SMT-LIB frontend decides QF_LIRA, quantifier-free linear integer and
 real arithmetic, optionally with a minimize or maximize objective.

@@ -163,10 +163,14 @@ MiniZinc-mode-only flags:
   declarations.
 - `--unbounded-float-lo N` / `--unbounded-float-hi N` — search bounds for bucketed `var float`
   declarations without a range, including array elements. Defaults are `-1000000.0` and `1000000.0`;
-  `--exact` preserves open float bounds instead.
+  finite choices and `--exact` preserve open float bounds instead.
 
-FlatZinc floats are bucketed by default, with the configured bucket count and fixed-point scale.
-Float arrays accept variable references, literals and numeric parameters. A bucketed search decides
+FlatZinc first preserves finite float choices from constant-array selection and singleton domains.
+Connected float constraints use exact linear lowering when supported. A component falls back to a
+uniform grid when an operation needs approximation or its array selections and finite products
+generate more than 4096 alternatives. Repeated array entries count toward this limit. Continuous
+components without finite choices also use the grid. Float arrays accept variable references,
+literals and numeric parameters. A bucketed search decides
 this finite grid; it can miss real solutions between grid points. Rounding can also produce an
 assignment that violates the original float constraints, so grid feasibility and optimality need
 source-level validation before being interpreted as results for the original model. An arithmetic overflow in the
@@ -174,8 +178,11 @@ lowering is declined with a diagnostic suggesting `--exact` or smaller bounds or
 
 Exact float lowering supports linear comparisons (including strict and reified comparisons),
 absolute values, minimum/maximum, constant-array selection, and multiplication or division by
-constants. These become linear rows with Boolean structure where needed. Products of two
-continuous variables are outside LRA/LIRA and are declined.
+constants. These become linear rows with Boolean structure where needed. Products with an operand
+selected from a constant float array also become conditional linear rows, preserving the selected
+values and intermediate products without bucketing. Products of two unrestricted continuous
+variables are outside LRA/LIRA and are declined.
+`--exact` also declines encodings above the finite-alternative limit, without grid fallback.
 
 ## Environment knobs
 

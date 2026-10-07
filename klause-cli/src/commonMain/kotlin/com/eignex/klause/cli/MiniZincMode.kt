@@ -92,7 +92,7 @@ internal object MiniZincMode : CliMode {
             val render: (Sample) -> String =
                 { s -> applier?.render(program, s) ?: writeFlatZincSolution(program, s, outputObjective) }
 
-            if (common.exact) {
+            if (common.exact || program.problem.numRealVars > 0) {
                 val maximize = program.solve is SolveDirective.Maximize
                 val minimized = program.linearObjective()
                 val sourceObjective = if (maximize) minimized?.negated() else minimized
@@ -118,7 +118,7 @@ internal object MiniZincMode : CliMode {
                     })
 
                     is SourceProblemRoute.UnsupportedOpen -> throw UnsupportedFlatZincException(
-                        "exact FlatZinc requires a supported arithmetic theory",
+                        "FlatZinc real columns require a supported arithmetic theory",
                         0,
                         0,
                     )

@@ -35,10 +35,12 @@ internal class FlatZincCompiler(
     internal val unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     internal val unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     internal val exactFloats: Boolean = false,
+    internal val floatChoiceLimit: Int = DEFAULT_FLOAT_CHOICE_LIMIT,
 ) : CnfLowering {
     init {
         require(floatBuckets > 0) { "floatBuckets must be positive" }
         require(floatScale > 0) { "floatScale must be positive" }
+        require(floatChoiceLimit > 0) { "floatChoiceLimit must be positive" }
         if (!exactFloats) {
             require(
                 unboundedFloatLo.isFinite() && unboundedFloatHi.isFinite() && unboundedFloatLo <= unboundedFloatHi,
@@ -61,6 +63,8 @@ internal class FlatZincCompiler(
     internal var lpOnlyFloats: Set<String> = emptySet()
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
+    internal val finiteFloatChoices = HashMap<Int, DoubleArray>()
+    internal val floatValueLiterals = HashMap<Pair<Int, Double>, Int>()
 
     // Float var name -> the integer argument of the `int2float` that defines it (the float is that int's
     // continuous image). Lets a `float_times` with one such operand lower as an exact int·real product
@@ -77,17 +81,35 @@ internal class FlatZincCompiler(
                 (c.args[1] as? FznExpr.Ident)?.let { int2floatSource[it.name] = c.args[0] }
             }
         }
-        lpOnlyFloats = if (exactFloats) exactFloatNames() else emptySet()
+        lpOnlyFloats = selectFloatNames()
+        processDeclarations()
+        if (lpOnlyFloats.isNotEmpty()) {
+            for (c in model.constraints) {
+                locateConstraint(c)
+                recordFiniteFloatChoices(c)
+            }
+        }
+        return compileConstraints(onLowered)
+    }
+
+    internal fun processDeclarations() {
         for (decl in model.varDecls) {
             currentLine = decl.line
             currentCol = decl.col
             processDecl(decl)
         }
+    }
+
+    internal fun locateConstraint(c: FznConstraint) {
+        currentLine = c.line
+        currentCol = c.col
+    }
+
+    private fun compileConstraints(onLowered: ((FlatZincCompiler, SolveDirective) -> Unit)?): FlatZincProgram {
         val impliedFactorIds = IntArrayList()
         var hasSymmetryBreaking = false
         for (c in model.constraints) {
-            currentLine = c.line
-            currentCol = c.col
+            locateConstraint(c)
             val before = factors.size
             processConstraint(c)
             val redundant = c.annotations.any { it.name == "klause_redundant" }
@@ -430,7 +452,7 @@ internal class FlatZincCompiler(
         else -> failHere("set `$ownerName`: universe must be an int range or int set, got ${elem::class.simpleName}")
     }
 
-    internal fun allocOpenFloat(name: String): Int = if (exactFloats) {
+    internal fun allocOpenFloat(name: String): Int = if (name in lpOnlyFloats) {
         allocFloat(name, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
     } else {
         allocFloat(name, unboundedFloatLo, unboundedFloatHi)
