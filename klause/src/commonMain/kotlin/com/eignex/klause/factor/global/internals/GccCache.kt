@@ -43,7 +43,6 @@ internal class GccIncrementalState(state: PropagationState, val xs: IntArray, va
 
 /** Per-propagation-state scratch for GlobalCardinality. */
 internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
-    var conflictVars: IntArray? = null
     val flow = GccFlowBuilder()
     var flowAssign: RevIntArray? = null
 
