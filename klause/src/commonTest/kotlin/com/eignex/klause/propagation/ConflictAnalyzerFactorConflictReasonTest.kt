@@ -590,7 +590,7 @@ class ConflictAnalyzerFactorConflictReasonTest {
     }
 
     @Test
-    fun `a conflict takes its level from its own path, not the previous analysis`() {
+    fun `a conflict takes its level from its own path and not the previous analysis`() {
         // x1 >= 1 with x2 >= 1 forces x3 >= 3 (x3 >= x1 + x2 + 1), which with x0 >= 3 breaks x0 + x1 + x3 <= 6. The
         // first conflict has x0 >= 3 and x1 >= 1 at levels 1 and 2; the second at levels 2 and 3, where x3 >= 3 must
         // be resolved back to x1's decision for the clause to assert.
