@@ -137,12 +137,8 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
  *  itself search-derived ([cite]); a root-level bound is a global fact and needs none. */
 internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, base: IntArray?): IntArray? {
     if (!cite) return base
-    val lits = reasonOf(base)
-    if (lits != null && lits.contains(priorLit)) return lits
-    val out = IntArray((lits?.size ?: 0) + 1)
-    lits?.copyInto(out)
-    out[out.size - 1] = priorLit
-    return out
+    if (!isLazyReason(base) && base != null && base.contains(priorLit)) return base
+    return extendReason(base, intArrayOf(priorLit))
 }
 
 /** Citation cap for a snapped bound's crossed holes; a wider block takes the decision-cut reason. */
@@ -183,10 +179,7 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
     var out: IntArrayList? = null
     val orig = rootDomains[v]
     fun cite(value: Long) {
-        val o = out ?: IntArrayList().also { fresh ->
-            out = fresh
-            reasonOf(base)?.forEach { fresh.add(it) }
-        }
+        val o = out ?: IntArrayList().also { out = it }
         o.add(Lit.make(atomVarEq(v, value), true))
     }
     // Cite the search-carved values the bound snapped past — those in [crossed] still in the root
@@ -220,7 +213,7 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
             value = orig.higher(value)
         }
     }
-    return out?.toIntArray() ?: base
+    return out?.let { extendReason(base, it.toIntArray()) } ?: base
 }
 
 internal fun PropagationState.tightenIntMinImpl(v: Int, lo: Long, antecedents: IntArray?): Boolean =
@@ -420,10 +413,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
     var out: IntArrayList? = null
     val root = rootDomains[v]
     fun cite(value: Long) {
-        val o = out ?: IntArrayList().also { fresh ->
-            out = fresh
-            reasonOf(base)?.forEach { fresh.add(it) }
-        }
+        val o = out ?: IntArrayList().also { out = it }
         o.add(Lit.make(atomVarEq(v, value), true))
     }
     // Cite the search-carved holes crossed in the range: values absent from [prior] but inside the
@@ -442,7 +432,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
             if (value in root) cite(value)
         }
     }
-    return out?.toIntArray() ?: base
+    return out?.let { extendReason(base, it.toIntArray()) } ?: base
 }
 
 /**

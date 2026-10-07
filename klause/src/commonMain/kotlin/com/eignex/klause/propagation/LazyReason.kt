@@ -13,6 +13,10 @@ import com.eignex.klause.ir.Lit
 private const val LAZY_MARKER = -2
 private const val HEADER = 4
 
+// The factor slot of a lazy reason extended by literals ([extendReason]): no propagator builds it; it is its
+// base, embedded after the literals, plus those literals.
+private const val EXTENDED = -1
+
 /** Whether [reason] is a lazy marker rather than literals. */
 internal fun isLazyReason(reason: IntArray?): Boolean = reason != null && reason.isNotEmpty() && reason[0] == LAZY_MARKER
 
@@ -28,6 +32,23 @@ internal fun PropagationState.lazyReason(payload: IntArray): IntArray {
 }
 
 /**
+ * [base] with [extra] literals added. A lazy [base] stays unbuilt: the result is a lazy reason that embeds it,
+ * so a bound move that crossed holes or cites its prior bound costs no reason-building on the propagation path.
+ */
+internal fun extendReason(base: IntArray?, extra: IntArray): IntArray? {
+    if (extra.isEmpty()) return base
+    if (base == null) return extra
+    if (!isLazyReason(base)) return base + extra
+    val out = IntArray(HEADER + 1 + extra.size + base.size)
+    out[0] = LAZY_MARKER
+    out[1] = EXTENDED
+    out[HEADER] = extra.size
+    extra.copyInto(out, HEADER + 1)
+    base.copyInto(out, HEADER + 1 + extra.size)
+    return out
+}
+
+/**
  * The literals of [reason]: the array itself when it is eager, else the reason its propagator builds for the
  * deduction it recorded. Built once per lazy marker and kept in [PropagationState.lazyReasonMemo], since the
  * bounds it is built from stay as they were for as long as the deduction stands.
@@ -37,7 +58,14 @@ internal fun PropagationState.reasonOf(reason: IntArray?): IntArray? {
     val marker = requireNotNull(reason)
     if (lazyReasonMemo.containsKey(marker)) return lazyReasonMemo[marker]
     val fid = marker[1]
-    val built = factorAt(fid).explain(this, fid, marker.copyOfRange(HEADER, marker.size), marker[2], marker[3])
+    val built = if (fid == EXTENDED) {
+        val count = marker[HEADER]
+        val extra = marker.copyOfRange(HEADER + 1, HEADER + 1 + count)
+        val base = reasonOf(marker.copyOfRange(HEADER + 1 + count, marker.size))
+        if (base == null) extra else base + extra
+    } else {
+        factorAt(fid).explain(this, fid, marker.copyOfRange(HEADER, marker.size), marker[2], marker[3])
+    }
     check(!isLazyReason(built)) { "a lazy reason must explain itself in literals" }
     lazyReasonMemo[marker] = built
     return built

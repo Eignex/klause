@@ -11,10 +11,11 @@ import com.eignex.klause.util.LongArrayList
 // [pushHoleHist], truncated on backtrack alongside the carve, read by [holeReasonFor] /
 // [holeLevelFor] / [holeHistHas].
 
-/** Reason for the interior carve of `k` from `v`'s domain; null = bake-time fact. */
+/** Reason for the interior carve of `k` from `v`'s domain, as recorded (possibly lazy, see [reasonOf]); null =
+ *  bake-time fact. */
 internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
     val vals = holeHistVal[v] ?: return null
-    for (i in 0 until vals.size) if (vals[i] == k) return reasonOf(requireNotNull(holeHistAnt[v])[i])
+    for (i in 0 until vals.size) if (vals[i] == k) return requireNotNull(holeHistAnt[v])[i]
     return null
 }
 
