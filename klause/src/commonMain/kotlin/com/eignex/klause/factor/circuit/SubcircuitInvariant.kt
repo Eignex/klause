@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.circuit
 
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -17,8 +18,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
             val cur = state.assignment.intValue(v)
             val d = state.rootDomains[v]
             if (i.toLong() != cur && i.toLong() in d) sink.addChannelingIntSet(state, v, i.toLong())
-            val span = d.values.size
-            if (span <= MAX_TARGETS) {
+            if (d.valueCount <= MAX_TARGETS) {
                 d.values.forEach { target ->
                     if (target != cur) sink.addChannelingIntSet(state, v, target)
                 }
@@ -26,7 +26,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
                 if (cur < d.max) sink.addChannelingIntSet(state, v, d.higher(cur))
                 if (cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
                 repeat(MAX_TARGETS) {
-                    val target = d.values.valueAt(state.rng.nextInt(span))
+                    val target = d.randomValue(state.rng)
                     if (target != cur) sink.addChannelingIntSet(state, v, target)
                 }
             }
@@ -35,7 +35,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (n < 2) return
-        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]).toInt() }
+        val nextOf = IntArray(n) { nodeOf(state.assignment.intValue(succ[it])) }
         val active = BooleanArray(n)
         var activeCount = 0
         for (i in 0 until n) {
@@ -115,7 +115,7 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
      *  the active cycle into an order array and delegates to the shared reversal generator. */
     private fun proposeActiveReversals(state: LocalSearchState, sink: MoveSink) {
         if (n < 2) return
-        val nextOf = IntArray(n) { state.assignment.intValue(succ[it]).toInt() }
+        val nextOf = IntArray(n) { nodeOf(state.assignment.intValue(succ[it])) }
         var firstActive = -1
         var activeCount = 0
         for (i in 0 until n) {
@@ -156,6 +156,9 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
         }
         return true
     }
+
+    // A successor value as a node index, or -1 when it names no node; a wide value must not truncate into one.
+    private fun nodeOf(value: Long): Int = if (value in 0L until n.toLong()) value.toInt() else -1
 
     private companion object {
         const val MAX_TARGETS: Int = 4

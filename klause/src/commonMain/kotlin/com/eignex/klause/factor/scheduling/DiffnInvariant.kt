@@ -1,8 +1,9 @@
 package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.factor.saturatedAdd
 import com.eignex.klause.factor.scheduling.internals.DiffnLsState
-import com.eignex.klause.ir.values
+import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -54,8 +55,8 @@ internal class DiffnInvariant(
 
     private fun overlaps(x1: Long, y1: Long, w1: Long, h1: Long, x2: Long, y2: Long, w2: Long, h2: Long): Boolean {
         if (nonStrict && (w1 == 0L || h1 == 0L || w2 == 0L || h2 == 0L)) return false
-        val xOverlap = !(x1 + w1 <= x2 || x2 + w2 <= x1)
-        val yOverlap = !(y1 + h1 <= y2 || y2 + h2 <= y1)
+        val xOverlap = !(saturatedAdd(x1, w1) <= x2 || saturatedAdd(x2, w2) <= x1)
+        val yOverlap = !(saturatedAdd(y1, h1) <= y2 || saturatedAdd(y2, h2) <= y1)
         return xOverlap && yOverlap
     }
 
@@ -282,21 +283,13 @@ internal class DiffnInvariant(
                 val d = state.rootDomains[xv]
                 val cand = if (prevRight > d.min) prevRight else d.min
                 if (cand > d.max) return false
-                var s = Long.MIN_VALUE
-                var found = false
-                d.values.forEach {
-                    if (!found && it >= cand) {
-                        s = it
-                        found = true
-                    }
-                }
-                if (!found) return false
+                val s = d.ceilingOrNull(cand) ?: return false
                 state.assignment.setInt(xv, s)
-                prevRight = s + w
+                prevRight = saturatedAdd(s, w)
             } else {
                 val s = state.assignment.intValue(xv)
                 if (s < prevRight) return false
-                prevRight = s + w
+                prevRight = saturatedAdd(s, w)
             }
             val yv = ys[i]
             if (!state.assumptions.isFrozenInt(yv)) state.assignment.setInt(yv, state.rootDomains[yv].min)

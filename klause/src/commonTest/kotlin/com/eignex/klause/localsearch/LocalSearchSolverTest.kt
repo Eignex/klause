@@ -15,7 +15,6 @@ import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.*
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
@@ -83,7 +82,7 @@ class LocalSearchSolverTest {
     }
 
     @Test
-    fun `declines a non-linear factor over a domain past the 32-bit range`() {
+    fun `solves a non-linear factor over a domain past the 32-bit range`() {
         val wide = 1L shl 62
         val problem = Problem(
             0,
@@ -91,8 +90,11 @@ class LocalSearchSolverTest {
             arrayOf(IntDomain(-wide, wide), IntDomain(0, 1), IntDomain(0, 1)),
             arrayOf<Factor>(Product(0, 1, 2)),
         )
-        val result = LocalSearchSolver(problem.bake()).solve(LocalSearchParams(maxFlips = 100, randomSeed = 1))
-        assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(result).reason)
+
+        val result = LocalSearchSolver(problem.bake()).solve(LocalSearchParams(maxFlips = 1_000, randomSeed = 1))
+
+        val ints = assertIs<SolveResult.Sat>(result).assignment.ints
+        assertEquals(ints[2], ints[0] * ints[1])
     }
 
     @Test

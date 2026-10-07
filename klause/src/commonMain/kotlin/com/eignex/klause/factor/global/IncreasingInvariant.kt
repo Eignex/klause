@@ -1,6 +1,8 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.factor.saturatedAdd
+import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.localsearch.Invariant
@@ -51,8 +53,8 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
     private inline fun degree(softCap: Int, valueAt: (Int) -> Long): Int {
         var raw = 0L
         for (i in 0 until xs.size - 1) {
-            val overshoot = valueAt(i) + gap - valueAt(i + 1)
-            if (overshoot > 0L) raw += overshoot
+            val overshoot = saturatedSub(saturatedAdd(valueAt(i), gap.toLong()), valueAt(i + 1))
+            if (overshoot > 0L) raw = saturatedAdd(raw, overshoot)
         }
         return compressViolation(raw, softCap)
     }

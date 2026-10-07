@@ -1,10 +1,13 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.factor.distance
+import com.eignex.klause.factor.saturatedAdd
+import com.eignex.klause.factor.saturatedMul
+import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import kotlin.math.abs
 
 /** LS invariant for [Product]: violation tracking and repair for `a * b = result`. */
 internal class ProductInvariant(private val a: Int, private val b: Int, private val result: Int) : Invariant {
@@ -13,14 +16,14 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        return av * bv != rv
+        return saturatedMul(av, bv) != rv
     }
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        return compressViolation(abs(av * bv - rv), state.violationSoftCap)
+        return compressViolation(residual(av, bv, rv), state.violationSoftCap)
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
@@ -29,13 +32,13 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val rv = state.assignment.intValue(result)
         val nv = newValue
         val after = when (intVar) {
-            a -> abs(nv * bv - rv)
-            b -> abs(av * nv - rv)
-            result -> abs(av * bv - nv)
+            a -> residual(nv, bv, rv)
+            b -> residual(av, nv, rv)
+            result -> residual(av, bv, nv)
             else -> return 0
         }
         return compressViolation(after, state.violationSoftCap) -
-            compressViolation(abs(av * bv - rv), state.violationSoftCap)
+            compressViolation(residual(av, bv, rv), state.violationSoftCap)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
@@ -44,12 +47,12 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val rv = state.assignment.intValue(result)
         val ov = oldValue
         val before = when (intVar) {
-            a -> abs(ov * bv - rv)
-            b -> abs(av * ov - rv)
-            result -> abs(av * bv - ov)
+            a -> residual(ov, bv, rv)
+            b -> residual(av, ov, rv)
+            result -> residual(av, bv, ov)
             else -> return 0
         }
-        return compressViolation(abs(av * bv - rv), state.violationSoftCap) -
+        return compressViolation(residual(av, bv, rv), state.violationSoftCap) -
             compressViolation(before, state.violationSoftCap)
     }
 
@@ -57,8 +60,8 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val av = state.assignment.intValue(a)
         val bv = state.assignment.intValue(b)
         val rv = state.assignment.intValue(result)
-        if (av * bv == rv) return
-        val rTarget = av * bv
+        if (saturatedMul(av, bv) == rv) return
+        val rTarget = saturatedMul(av, bv)
         val rDomain = state.rootDomains[result]
         val rClamped = rDomain.clamp(rTarget)
         if (rClamped == rTarget && rClamped != rv) sink.addChannelingIntSet(state, result, rClamped)
@@ -77,21 +80,24 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
             proposeClosestOperand(state, operandVar = b, otherValue = av, currentValue = bv, sink)
         }
         val rvL = rv
-        val curResidual = abs(av * bv - rvL)
+        val curResidual = residual(av, bv, rvL)
         for (v in intArrayOf(a, b, result)) {
             val cur = state.assignment.intValue(v)
             val d = state.rootDomains[v]
-            for (cand in longArrayOf(cur + 1, cur - 1)) {
+            for (cand in longArrayOf(saturatedAdd(cur, 1L), saturatedSub(cur, 1L))) {
                 if (cand !in d) continue
                 val res = when (v) {
-                    a -> abs(cand * bv - rvL)
-                    b -> abs(av * cand - rvL)
-                    else -> abs(av * bv - cand)
+                    a -> residual(cand, bv, rvL)
+                    b -> residual(av, cand, rvL)
+                    else -> residual(av, bv, cand)
                 }
                 if (res <= curResidual) sink.addChannelingIntSet(state, v, cand)
             }
         }
     }
+
+    // |x·y − r| without wrapping, so a product past the Long range still reads as violated.
+    private fun residual(x: Long, y: Long, r: Long): Long = distance(saturatedMul(x, y), r)
 
     private fun proposeClosestOperand(
         state: LocalSearchState,
@@ -105,11 +111,11 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val center = rv / otherValue
         val domain = state.rootDomains[operandVar]
         var bestCandidate = currentValue
-        var bestError = abs(currentValue * otherValue - rv)
+        var bestError = residual(currentValue, otherValue, rv)
         for (delta in -2..2) {
-            val cand = center + delta
+            val cand = saturatedAdd(center, delta.toLong())
             if (cand !in domain) continue
-            val error = abs(cand * otherValue - rv)
+            val error = residual(cand, otherValue, rv)
             if (error < bestError) {
                 bestError = error
                 bestCandidate = cand

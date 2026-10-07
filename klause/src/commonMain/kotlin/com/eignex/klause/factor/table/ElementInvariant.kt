@@ -1,6 +1,8 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.factor.distance
+import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
@@ -112,9 +114,8 @@ internal fun elementDegreeAt(
     elemAt: (pos: Int) -> Long,
 ): Int {
     val pos = idxVal - indexOffset
-    if (pos < 0) return compressViolation(indexOffset - idxVal, softCap)
-    if (pos >= len) return compressViolation(idxVal - (indexOffset + len - 1), softCap)
+    if (pos < 0) return compressViolation(saturatedSub(indexOffset.toLong(), idxVal), softCap)
+    if (pos >= len) return compressViolation(saturatedSub(idxVal, indexOffset.toLong() + len - 1), softCap)
     val ev = elemAt(pos.toInt())
-    val d = resultVal - ev
-    return compressViolation(if (d < 0) -d else d, softCap)
+    return compressViolation(distance(resultVal, ev), softCap)
 }

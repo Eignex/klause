@@ -1,15 +1,17 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.factor.distance
 import com.eignex.klause.factor.global.internals.GccState
 import com.eignex.klause.factor.global.internals.countPresentOccurrences
 import com.eignex.klause.factor.global.internals.proposeRandomRotations
 import com.eignex.klause.factor.global.internals.proposeRandomSwaps
+import com.eignex.klause.factor.saturatedAdd
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
@@ -158,7 +160,7 @@ internal class GlobalCardinalityInvariant(
                     if (cur != coverVal) continue
                     val d = state.rootDomains[xs[i]]
                     var pick: Long? = null
-                    d.values.forEach { if (pick == null && it != coverVal) pick = it }
+                    d.forEachCandidate(state.rng) { if (pick == null && it != coverVal) pick = it }
                     val p = pick
                     if (p != null) sink.addChannelingIntSet(state, xs[i], p)
                 }
@@ -284,8 +286,7 @@ internal class GlobalCardinalityInvariant(
         for (k in cover.indices) {
             if (cvArr != null) {
                 val expected = if (cvArr[k] == ovVar) ovVal else state.assignment.intValue(cvArr[k])
-                val d = expected - simCounts[k]
-                deg += if (d < 0) -d else d
+                deg = saturatedAdd(deg, distance(expected, simCounts[k].toLong()))
             } else {
                 val cnt = simCounts[k]
                 val lo = requireNotNull(countLow)[k]

@@ -110,14 +110,14 @@ internal class RealRowInvariant(
         degree(state.doublePayload[factorId], aux(state), state.violationSoftCap)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
-        val step = (newValue - state.assignment.intValue(intVar)).toDouble()
+        val step = newValue.toDouble() - state.assignment.intValue(intVar).toDouble()
         val newSum = state.doublePayload[factorId] + intCoeff(intVar) * step
         return degree(newSum, aux(state), state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val oldSum = state.doublePayload[factorId]
-        val newSum = oldSum + intCoeff(intVar) * (state.assignment.intValue(intVar) - oldValue).toDouble()
+        val newSum = oldSum + intCoeff(intVar) * (state.assignment.intValue(intVar).toDouble() - oldValue.toDouble())
         return commit(state, factorId, oldSum, newSum)
     }
 

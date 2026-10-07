@@ -1,6 +1,8 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -11,6 +13,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -32,6 +35,28 @@ class LocalSearchEngineTest {
 
     private fun engine(completion: CandidateCompletion) =
         LocalSearchEngine(LocalSearchModel.of(mixedProblem().bake()), completion = completion)
+
+    @Test
+    fun `local search runs a nonlinear factor over wide domains`() {
+        val wide = IntDomain(0, 1L shl 40)
+        val maxOf = ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)
+        val model = Problem(0, 3, Array(3) { wide }, arrayOf<Factor>(maxOf))
+
+        assertTrue(localSearchSupports(LocalSearchModel.of(model.bake())))
+    }
+
+    @Test
+    fun `local search declines a schedule over wide domains`() {
+        val cumulative = Cumulative(
+            starts = intArrayOf(0, 1),
+            durations = longArrayOf(2, 2),
+            resources = longArrayOf(1, 1),
+            capacity = 1,
+        )
+        val model = Problem(0, 2, Array(2) { IntDomain(0, 1L shl 40) }, arrayOf<Factor>(cumulative))
+
+        assertFalse(localSearchSupports(LocalSearchModel.of(model.bake())))
+    }
 
     @Test
     fun `a model with continuous columns is declined without a completion`() {

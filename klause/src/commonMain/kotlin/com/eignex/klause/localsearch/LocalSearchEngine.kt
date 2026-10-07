@@ -3,8 +3,8 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.objective.MutableObjectiveBound
-import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.factor.objective.objectiveSumIsWide
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
@@ -869,23 +869,19 @@ internal class LocalSearchEngine(
 }
 
 /**
- * Whether local search can soundly run on [model]: every factor it scores either a linear row, whose sum is kept
- * exactly however wide its terms, or one whose integer columns all move over narrow domains ([isNarrow]). Another
- * invariant over a wider domain would wrap its plain `Long` bookkeeping and slip an unsound "solution" through, or
- * walk the domain value by value. A model with continuous columns also needs [completes]: its rows are scored in
- * floating point, so a candidate is a solution only once a [CandidateCompletion] decides it. A portfolio leaves its
- * local-search arms out otherwise.
+ * Whether local search can soundly run on [model]. Every invariant scores any domain exactly: linear rows keep their
+ * sum in the narrowest exact form, and the others measure violation with saturating arithmetic, which is zero exactly
+ * when the factor holds. The exception is [Cumulative], whose resource profile is a timeline as long as the horizon,
+ * so a scheduling factor over a wide domain is declined. A model with continuous columns also needs [completes]: its
+ * rows are scored in floating point, so a candidate is a solution only once a [CandidateCompletion] decides it. A
+ * portfolio leaves its local-search arms out otherwise.
  */
 internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = false): Boolean {
     val problem = model.problem
     if (problem.numRealVars != 0 && !completes) return false
     val domains = model.domains
     if (domains.all(::isNarrow)) return true
-    return problem.factors.all { factor ->
-        factor is Linear || factor is ReifiedLinear || factor is ObjectiveBoundFactor ||
-            factor.intVars.all { isNarrow(domains[it]) } ||
-            factor.invariantProjection() === NoInvariant
-    }
+    return problem.factors.none { factor -> factor is Cumulative && factor.intVars.any { !isNarrow(domains[it]) } }
 }
 
 // Whether this objective's integer sum can pass the 64-bit range over [domains].

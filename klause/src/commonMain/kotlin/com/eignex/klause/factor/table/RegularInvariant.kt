@@ -1,10 +1,10 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 
@@ -117,7 +117,7 @@ internal class RegularInvariant(
             val next = regularDelta(transitions, numStates, alphabetSize, path[i], s)
             if (next == 0) {
                 val d = state.rootDomains[seq[i]]
-                d.values.forEach { sym ->
+                d.forEachCandidate(state.rng) { sym ->
                     if (sym != s && regularDelta(transitions, numStates, alphabetSize, path[i], sym) != 0) {
                         sink.addChannelingIntSet(state, seq[i], sym)
                     }
@@ -130,7 +130,7 @@ internal class RegularInvariant(
             val last = seq.size - 1
             val curLast = state.assignment.intValue(seq[last])
             val d = state.rootDomains[seq[last]]
-            d.values.forEach { sym ->
+            d.forEachCandidate(state.rng) { sym ->
                 val target = regularDelta(transitions, numStates, alphabetSize, path[last], sym)
                 if (sym != curLast && target in acceptingSet) sink.addChannelingIntSet(state, seq[last], sym)
             }
