@@ -1,8 +1,8 @@
 # Table search throughput
 
 The integrated comparison uses main baseline e4dc3458d8f8cae1e3321987132bab43b155c68c and
-candidate 84800b5124888eb4c878d9b5658dafae82487b9f. Later documentation commits preserve the
-candidate's table code. Main's lazy per-column explanations are present in both revisions.
+candidate 84800b5124888eb4c878d9b5658dafae82487b9f. Formatting and documentation commits preserve the
+candidate's behavior. Main's lazy per-column explanations are present in both revisions.
 The [historical comparison](historical/README.md) predates those explanations and is kept separately.
 
 ## Paired experiments
@@ -24,6 +24,18 @@ progress; conflictDriven can spend substantial time resolving conflicts between 
 so its failure count matters alongside completed nodes. Longer trajectories may diverge and
 are not an isolated per-node speed ratio. The tiny controls check verdicts, objectives, and search
 counters; their millisecond timing differences do not demonstrate a general speedup.
+
+Median solve seconds at 100 nodes for satOptimized:
+
+| HSP instance | Baseline | Candidate | Reduction |
+| --- | ---: | ---: | ---: |
+| 12407_c23 | 29.416 | 10.590 | 64.0% |
+| 13408_c23 | 17.756 | 7.165 | 59.6% |
+| 14409_c23 | 19.090 | 6.383 | 66.6% |
+
+All nine HSP pairs are faster and match the search counters listed above. Each remains unknown
+at the node cap. The three file controls match verdicts, objectives, and search counters, with
+median times of 15–35 ms in both revisions. All 36 records load successfully.
 
 The abandoned integration jobs 564 and 565 were cancelled after profiling identified the
 explanation bottleneck; they are not evidence for this candidate. Portfolio work is charged work,
