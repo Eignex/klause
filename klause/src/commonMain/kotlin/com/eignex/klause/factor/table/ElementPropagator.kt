@@ -60,14 +60,13 @@ internal class ElementPropagator(
         fun toArray(): IntArray = out.toIntArray()
     }
 
-    private fun excluded(state: PropagationState, v: Int, k: Long, atTrail: Int): Int =
-        if (state.undoLogging) {
-            state.exclusionLiteral(v, k, atTrail)
-        } else if (k in state.rootDomains[v]) {
-            Lit.make(state.atomVarEq(v, k), true)
-        } else {
-            Lit.NONE
-        }
+    private fun excluded(state: PropagationState, v: Int, k: Long, atTrail: Int): Int = if (state.undoLogging) {
+        state.exclusionLiteral(v, k, atTrail)
+    } else if (k in state.rootDomains[v]) {
+        Lit.make(state.atomVarEq(v, k), true)
+    } else {
+        Lit.NONE
+    }
 
     /**
      * Cell [a] and the result share no value: below the overlap of their bounds the variable with the higher
@@ -134,13 +133,13 @@ internal class ElementPropagator(
         fun cite(lit: Int) {
             if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
         }
+
         // A hole the path never carved (a root or survivor restriction) is unconditional and needs no literal.
-        fun hole(v: Int, k: Long): Int =
-            if (state.undoLogging) {
-                state.exclusionLiteral(v, k, state.undo.size)
-            } else {
-                Lit.make(state.atomVarEq(v, k), true)
-            }
+        fun hole(v: Int, k: Long): Int = if (state.undoLogging) {
+            state.exclusionLiteral(v, k, state.undo.size)
+        } else {
+            Lit.make(state.atomVarEq(v, k), true)
+        }
         for (pos in arr.indices) {
             val iv = indexOffset + pos.toLong()
             when {

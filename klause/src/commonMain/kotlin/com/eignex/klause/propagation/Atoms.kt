@@ -624,7 +624,9 @@ private fun PropagationState.channelingReasonAtWake(atomId: Int, newT: Boolean):
         // even when the move itself is a decision with none.
         AtomKind.EQ -> when {
             k < d.min -> frontier(AtomKind.GE, d.min)
+
             k > d.max -> frontier(AtomKind.LE, d.max)
+
             // An interior value (a survivor restriction's) is excluded by the move itself, not by a bound.
             else -> atoms.pendingMoveAnt
         }

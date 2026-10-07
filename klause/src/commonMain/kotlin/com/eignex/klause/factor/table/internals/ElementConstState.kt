@@ -331,6 +331,7 @@ internal class ElementConstState(
 
     private fun reason(state: PropagationState, side: Int, values: LongArray): IntArray? = when {
         state.currentLevel == 0 -> null
+
         state.undoLogging -> state.lazyReason(
             IntArray(1 + 2 * values.size).also { p ->
                 p[0] = side
@@ -340,6 +341,7 @@ internal class ElementConstState(
                 }
             },
         )
+
         // Without the undo log nothing reads reasons, and the live domains stand in for the past ones.
         else -> supports(state, side, values, state.undo.size)
     }

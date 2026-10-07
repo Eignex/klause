@@ -1,8 +1,8 @@
 package com.eignex.klause.factor.global.internals
 
-import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
+import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.exclusionLiteral

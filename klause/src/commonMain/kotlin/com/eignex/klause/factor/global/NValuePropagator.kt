@@ -474,6 +474,7 @@ internal class NValuePropagator(
         previousEdge: Long?,
     ): Int {
         var status = 0
+
         // A member that cannot reach the next window, nor the previous one, shares its group's value: with the
         // member that set the squeeze, both confined to the group the same way.
         fun confined(vid: Int, lits: Lits) {

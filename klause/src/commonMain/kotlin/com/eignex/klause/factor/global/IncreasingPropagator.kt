@@ -38,6 +38,7 @@ internal class IncreasingPropagator(private val xs: IntArray, private val gap: I
         failure = null
         val d = state.intDomains
         val level = state.currentLevel
+
         // A bound move rests on its neighbour's bound on the same side as it stands now, which an earlier step of
         // the same sweep may just have moved.
         fun neighbour(v: Int, lower: Boolean, need: Long): IntArray? {

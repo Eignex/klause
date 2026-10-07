@@ -83,7 +83,9 @@ internal class DisjunctivePropagator(
     // A deduction's reason, recorded for [explain] to build from [payload] if analysis reads it.
     private fun reasonFor(state: PropagationState, payload: IntArray): IntArray? = when {
         state.currentLevel == 0 -> null
+
         state.undoLogging -> state.lazyReason(payload)
+
         else -> now(state).run {
             explainPayload(payload)
             literals()

@@ -90,23 +90,29 @@ internal class ReifiedLinearPropagator(
         return if (holds) {
             when (op) {
                 LinearOp.LE -> if (sumHi <= b) Side(useLo = false, slack = b - sumHi) else null
+
                 LinearOp.GE -> if (sumLo >= b) Side(useLo = true, slack = sumLo - b) else null
+
                 LinearOp.NE -> when {
                     sumHi < b -> Side(useLo = false, slack = b - 1 - sumHi)
                     sumLo > b -> Side(useLo = true, slack = sumLo - b - 1)
                     else -> null
                 }
+
                 LinearOp.EQ -> null
             }
         } else {
             when (op) {
                 LinearOp.LE -> if (sumLo > b) Side(useLo = true, slack = sumLo - b - 1) else null
+
                 LinearOp.GE -> if (sumHi < b) Side(useLo = false, slack = b - sumHi - 1) else null
+
                 LinearOp.EQ -> when {
                     sumLo > b -> Side(useLo = true, slack = sumLo - b - 1)
                     sumHi < b -> Side(useLo = false, slack = b - sumHi - 1)
                     else -> null
                 }
+
                 LinearOp.NE -> null
             }
         }

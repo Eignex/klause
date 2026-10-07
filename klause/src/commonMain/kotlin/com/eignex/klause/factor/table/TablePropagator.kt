@@ -76,8 +76,11 @@ internal class TablePropagator(
             val stood = (0 until arity).all { c -> c == col || cellAt(state, row, c, snapshot, null) == Cell.LIVE }
             when {
                 !stood -> ruledOut.add(row)
+
                 groundSupport != null -> groundSupport.add(cellLo(row, col))
+
                 col >= 0 -> kept.add(ownCell(row, col, snapshot))
+
                 // The table cannot fail with a tuple standing, so a conflict found elsewhere rests on every domain.
                 else -> for (c in 0 until arity) columnLiterals(state, c, snapshot, out)
             }
@@ -87,8 +90,11 @@ internal class TablePropagator(
         for (k in 0 until ruledOut.size) {
             val row = ruledOut[k]
             if (col >= 0) {
-                val supported = if (groundSupport != null) cellLo(row, col) in groundSupport
-                else covers(support, ownCell(row, col, snapshot))
+                val supported = if (groundSupport != null) {
+                    cellLo(row, col) in groundSupport
+                } else {
+                    covers(support, ownCell(row, col, snapshot))
+                }
                 if (supported) continue
             }
             var covered = false
@@ -129,7 +135,13 @@ internal class TablePropagator(
      * path. Root holes and survivor restrictions are unconditional and need none. Walks only the cell's holes,
      * and only once every value in it is known to be one.
      */
-    private fun cellAt(state: PropagationState, row: Int, c: Int, snapshot: ExplanationSnapshot, into: IntArrayList?): Cell {
+    private fun cellAt(
+        state: PropagationState,
+        row: Int,
+        c: Int,
+        snapshot: ExplanationSnapshot,
+        into: IntArrayList?,
+    ): Cell {
         val v = xs[c]
         val lo = cellLo(row, c)
         val hiC = cellHi(row, c)
@@ -526,7 +538,11 @@ internal class TablePropagator(
     // undo log to see the domains as they stood. Without it nothing reads reasons, and every column's current
     // domain stands in.
     private inline fun columnReason(state: PropagationState, col: Int, coarse: () -> IntArray?): IntArray? =
-        if (state.currentLevel == 0) null else if (state.undoLogging) state.lazyReason(intArrayOf(col)) else coarse()
+        if (state.currentLevel == 0) null else if (state.undoLogging) {
+            state.lazyReason(intArrayOf(col))
+        } else {
+            coarse()
+        }
 
     private companion object {
         /** [ranges] sorted and merged where they touch or overlap. */

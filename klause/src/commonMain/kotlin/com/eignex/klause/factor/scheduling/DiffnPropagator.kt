@@ -189,6 +189,7 @@ internal class DiffnPropagator(
             failure = now().apply { stuck(i) }.literals()
             return false
         }
+
         // An origin move, recorded for [explain]; it rests on the compulsory parts that blocked the skipped columns.
         fun movedReason(i: Int, lower: Boolean, bound: Long): IntArray? {
             val payload =

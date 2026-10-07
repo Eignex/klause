@@ -40,12 +40,11 @@ internal class MddPropagator(
 
     private val explainer = MddExplainer(seq, numStatesPerLayer, transitions, initial, accepting, cost) { index }
 
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        if (state.undoLogging) {
-            explainer.conflict(state, state.undo.size)
-        } else {
-            state.composeIntVarAtomAntecedents(intVars)
-        }
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = if (state.undoLogging) {
+        explainer.conflict(state, state.undo.size)
+    } else {
+        state.composeIntVarAtomAntecedents(intVars)
+    }
 
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
         if (payload[0] == MddIncrementalState.PRUNE) {
