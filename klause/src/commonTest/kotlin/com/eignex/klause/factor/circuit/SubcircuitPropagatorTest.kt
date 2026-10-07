@@ -2,20 +2,25 @@ package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
+import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -35,6 +40,36 @@ class SubcircuitPropagatorTest {
             cur = next[cur]
         }
         return cur == included[0] && visited.size == included.size
+    }
+
+    @Test
+    fun `a premature subtour cites only its edges and one node that must join it`() {
+        // succ(0)=1 and succ(1)=0 close a 2-cycle while node 2 cannot opt out (2 is outside succ(2)'s
+        // domain), so the cycle is too short. Node 3 is tightened but may still opt out: a reason
+        // citing every successor would name it.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(Circuit(succ = intArrayOf(0, 1, 2, 3, 4), subcircuit = true)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 1))
+        check(state.tightenIntMax(0, 1))
+        check(state.tightenIntMin(1, 0))
+        check(state.tightenIntMax(1, 0))
+        check(state.tightenIntMax(2, 1))
+        check(state.tightenIntMin(3, 1))
+        state.currentFactor = 0
+
+        assertFalse(state.factorAt(0).propagate(state, 0))
+
+        val reason = state.factorAt(0).conflictReason(state, 0)!!
+        val cited = reason.map { state.atoms.intVar[Lit.variable(it) - problem.numBoolVars] }.toSet()
+        assertEquals(setOf(0, 1, 2), cited)
+        ConflictReasonOracle.assertEntailed(problem, state, 0, "subcircuit-subtour")
     }
 
     @Test
