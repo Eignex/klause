@@ -83,19 +83,21 @@ class FlatZincFiniteFloatProductsTest {
 
     @Test
     fun `a singleton float domain supports a constant product result`() {
-        val program = parseFlatZinc(
-            """
-            var 2.0..2.0: x;
-            var float: y :: output_var;
-            constraint float_times(x, y, 6.0);
-            solve satisfy;
-            """.trimIndent(),
-            exactFloats = true,
-        )
+        for (exact in listOf(false, true)) {
+            val program = parseFlatZinc(
+                """
+                var 2.0..2.0: x;
+                var float: y :: output_var;
+                constraint float_times(x, y, 6.0);
+                solve satisfy;
+                """.trimIndent(),
+                exactFloats = exact,
+            )
 
-        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+            val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
 
-        val assignment = assertIs<SolveResult.Sat>(result).assignment
-        assertTrue("y = 3.0;" in writeFlatZincSolution(program, assignment))
+            val assignment = assertIs<SolveResult.Sat>(result).assignment
+            assertTrue("y = 3.0;" in writeFlatZincSolution(program, assignment))
+        }
     }
 }

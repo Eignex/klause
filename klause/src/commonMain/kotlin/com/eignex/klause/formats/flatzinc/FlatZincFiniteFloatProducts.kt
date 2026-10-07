@@ -9,6 +9,7 @@ internal fun FlatZincCompiler.recordFiniteFloatChoices(c: FznConstraint) {
     if (c.name != "array_float_element") return
     expectArity(c, 3)
     val result = resolveFloatVarOrConst(c.args[2]) as? FloatRef.Var ?: return
+    if (!result.bk.lpOnly) return
     val values = evalFloatConstArray(c.args[1]).distinct().toDoubleArray()
     val existing = finiteFloatChoices[result.bk.varId]
     finiteFloatChoices[result.bk.varId] = existing?.filter { candidate -> values.any { it == candidate } }
