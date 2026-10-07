@@ -287,10 +287,6 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
         resolvent.resolve(seedReason, currentLevel)
 
-        if (resolvent.liveAtCurrentLevel == 0) {
-            return resolvent.finalizeResult(currentLevel)
-        }
-
         // Pin-trail cursor for the 1UIP pivot scan. The pivot is always the most-recent still-seen
         // current-level literal (reverse-assignment order); under single establishment a
         // reason cites only earlier-established (lower-position) literals, so resolving the pivot at
@@ -320,7 +316,15 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     break
                 }
             }
-            if (pivot >= 0) {
+            // A trail pivot with no reason is the level's decision, so it is the UIP only once nothing else at
+            // the level is live; a literal the cursor passed, or an atom off the trail, may still be, and
+            // resolving it first keeps the clause asserting.
+            val decisionTooSoon = pivot >= 0 && resolvent.liveAtCurrentLevel > 1 && antecedentsOf(pivot) == null
+            val offTrailFirst = if (decisionTooSoon) explainedPivot(resolvent, currentLevel, numBoolVars) else -1
+            if (offTrailFirst >= 0) {
+                pivot = offTrailFirst
+                rescanFromTop = true
+            } else if (pivot >= 0) {
                 // Trail pivot: its antecedents land strictly below `pivotPos`, so the next pivot is
                 // at or below it — descend the cursor and keep scanning from there.
                 pinCursor = pivotPos - 1
@@ -359,6 +363,24 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
         resolvent.drainFrontier()
         return resolvent.finalizeResult(currentLevel)
+    }
+
+    // A live literal at [currentLevel] with a reason to resolve through, or -1: one on the trail that the
+    // descending cursor passed before a reason cited it, or an atom off the trail.
+    private fun explainedPivot(resolvent: ConflictResolvent, currentLevel: Int, numBoolVars: Int): Int {
+        for (i in state.boolPinOrder.size - 1 downTo 0) {
+            val v = state.boolPinOrder[i]
+            if (!resolvent.isFrontier(v)) continue
+            val lvl = if (v < numBoolVars) state.boolLevel[v] else cachedAtomLevel(v - numBoolVars)
+            if (lvl == currentLevel && antecedentsOf(v) != null) return v
+        }
+        val offTrail = resolvent.offTrailFrontier
+        for (k in 0 until offTrail.size) {
+            val v = offTrail[k]
+            if (!resolvent.isFrontier(v) || cachedAtomLevel(v - numBoolVars) != currentLevel) continue
+            if (antecedentsOf(v) != null) return v
+        }
+        return -1
     }
 
     /** Antecedents of `v`, or null when `v` is a decision/leaf — or when `v` falls outside
