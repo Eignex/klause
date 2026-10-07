@@ -200,6 +200,9 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
         if (failed) failures[arm]++
     }
 
+    /** Wall-clock milliseconds [arm]'s segments have taken. */
+    fun millisOf(arm: Int): Long = millis[arm]
+
     /** Count a refuted claim against [arm]. */
     fun fault(arm: Int) {
         faults[arm]++

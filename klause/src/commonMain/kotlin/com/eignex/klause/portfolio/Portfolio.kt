@@ -500,7 +500,11 @@ class Portfolio(
             val present = free.mapTo(LinkedHashSet()) { workers[it].family }
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
             val family = families.choose(eligible)
-            return armAmong(free.filter { workers[it].family == family })
+            val candidates = free.filter { workers[it].family == family }
+            // Before an incumbent a silent family's arms have nothing comparable to show, so a draw between them
+            // leaves the split to chance; the arm that has had the least time runs next.
+            if (!improving && !family.observable) return candidates.minBy { log.millisOf(it) }
+            return armAmong(candidates)
         }
 
         // A policy that cannot be restricted to [candidates] is asked until it names one of them.
