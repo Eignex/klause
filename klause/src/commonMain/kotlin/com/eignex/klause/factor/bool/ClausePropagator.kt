@@ -63,6 +63,7 @@ internal class ClausePropagator(
         if (literals.size == 1) {
             val lit = literals[0]
             val t = state.litTruth(lit)
+            state.settleClauseLevel(literals)
             return if (t == null) {
                 state.pinLit(lit, antecedents = null)
             } else {
@@ -102,6 +103,7 @@ internal class ClausePropagator(
 
         val w0False = litFalseInPropState(state, literals, watches[0])
         val w1False = litFalseInPropState(state, literals, watches[1])
+        if (w0False || w1False) state.settleClauseLevel(literals)
         return when {
             w0False && w1False -> false
             w0False -> pinUnitLit(state, literals, watches[1])
