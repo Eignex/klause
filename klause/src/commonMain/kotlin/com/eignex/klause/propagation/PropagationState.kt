@@ -228,6 +228,10 @@ class PropagationState(
     // deduction from one carved after it ([carvedAt]).
     internal val holeHistPos: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 
+    // Per Boolean variable, the undo-log size when its current pin was logged, so a lazy reason can tell a pin
+    // that predates its deduction from a later one ([boolPinnedAt]). Meaningful only while the variable is pinned.
+    internal val boolPinPos = IntArray(problem.numBoolVars)
+
     /**
      * Decision-var encoded per level: index `lvl-1` holds either a bool var id (0..numBoolVars-1)
      * or a shifted int var id (numBoolVars + intVar). Grows as decisions are pushed. Primitive
