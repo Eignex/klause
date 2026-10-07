@@ -1,0 +1,17 @@
+gradle.projectsEvaluated {
+    def project = rootProject.project(':klause')
+    project.kotlin.sourceSets.getByName('jvmTest').kotlin.srcDir(new File(rootProject.rootDir, 'klause-bench/scripts/repair-chains/kotlin'))
+    def compilation = project.kotlin.targets.getByName('jvm').compilations.getByName('test')
+    project.tasks.register('repairChainProbe', JavaExec) {
+        group = 'bench'
+        dependsOn(compilation.compileTaskProvider)
+        def cli = rootProject.findProperty('chainProbeCli')
+        if (cli == null) {
+            classpath(compilation.output.allOutputs, compilation.runtimeDependencyFiles)
+        } else {
+            classpath(compilation.output.allOutputs, project.fileTree(cli + '/lib') { include '*.jar' })
+        }
+        mainClass.set('com.eignex.klause.localsearch.ChainProbeKt')
+        jvmArgs('-Xmx3g', '-XX:+UseSerialGC', '-XX:ActiveProcessorCount=1', '--add-modules=jdk.incubator.vector')
+    }
+}

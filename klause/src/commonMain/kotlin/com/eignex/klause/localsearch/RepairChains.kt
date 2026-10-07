@@ -38,11 +38,15 @@ internal fun LocalSearchState.proposeRepairChains(
     firstMoveCap: Int,
     sink: MoveSink,
 ): Int {
-    val propose = MoveSink(assumptions).also {
+    val propose = repairChainProposals.also {
+        it.clear()
+        it.setAssumptions(assumptions)
         it.setInvariants(invariants)
         it.setOwners(seeding.ownerInt)
     }
-    val firsts = MoveSink(assumptions).also {
+    val firsts = repairChainFirsts.also {
+        it.clear()
+        it.setAssumptions(assumptions)
         it.setInvariants(invariants)
         it.setOwners(seeding.ownerInt)
     }
@@ -231,12 +235,11 @@ internal fun LocalSearchState.recordConeDegrees(intSeeds: IntArray, boolSeeds: I
 
 /** The factor with the largest weighted degree increase over its chain-start baseline,
  *  or -1 when nothing regressed (the chain caused no new damage). */
-internal fun LocalSearchState.worstRegressedFactor(base: RepairChainDegrees): Int {
-    return base.worstRegressed(factorDegree, weights.factorWeights)
-}
+internal fun LocalSearchState.worstRegressedFactor(base: RepairChainDegrees): Int =
+    base.worstRegressed(factorDegree, weights.factorWeights)
 
 /** Best repair proposal of [target] that avoids every pinned slot, by immediate
- *  [LocalSearchState.netDelta] probe (ties broken uniformly). Null when [target] proposes nothing
+ *  cost delta (ties broken uniformly). Null when [target] proposes nothing
  *  eligible — the chain ends. */
 internal fun LocalSearchState.pickChainRepair(target: Int, pinnedSlots: IntHashSet, propose: MoveSink): Move? {
     propose.clear()
@@ -244,7 +247,8 @@ internal fun LocalSearchState.pickChainRepair(target: Int, pinnedSlots: IntHashS
     var best: Move? = null
     var bestDelta = Long.MAX_VALUE
     var ties = 0
-    outer@ for (m in propose.list) {
+    outer@ for (i in 0 until propose.size) {
+        val m = propose.moveAt(i)
         when (m) {
             is Move.Compound -> {
                 for (q in m.parts) if (slotOf(q) in pinnedSlots) continue@outer
@@ -252,7 +256,11 @@ internal fun LocalSearchState.pickChainRepair(target: Int, pinnedSlots: IntHashS
 
             else -> if (slotOf(m) in pinnedSlots) continue@outer
         }
-        val d = netDelta(m)
+        val d = if (m is Move.BoolFlip && repairChainClauseOnly) {
+            boolBreakCount[m.varId].toLong() - boolMakeCount[m.varId]
+        } else {
+            netDelta(m)
+        }
         if (d < bestDelta) {
             best = m
             bestDelta = d

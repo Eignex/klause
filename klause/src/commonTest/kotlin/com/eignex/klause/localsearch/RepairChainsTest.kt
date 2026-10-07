@@ -1,18 +1,72 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 
 class RepairChainsTest {
+
+    @Test
+    fun `chain repair scoring matches clause deltas after real moves`() {
+        val problem = Problem(
+            numBoolVars = 3,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            ),
+        ).bake()
+        for (mask in 0 until 8) {
+            val state = LocalSearchState(problem, Random(mask))
+            for (v in 0 until 3) state.assignment.setBool(v, mask and (1 shl v) != 0)
+            state.recompute()
+            state.apply(Move.BoolFlip(1))
+            state.apply(Move.BoolFlip(0))
+            for (fid in state.factors.indices) {
+                val proposals = MoveSink()
+                state.factors[fid].proposeRepairMoves(state, fid, proposals)
+                val expectedDelta = proposals.list.minOfOrNull { state.netDelta(it) }
+
+                val picked = state.pickChainRepair(fid, IntHashSet(), MoveSink())
+
+                assertEquals(expectedDelta, picked?.let { state.netDelta(it) }, "mask=$mask fid=$fid")
+            }
+        }
+    }
+
+    @Test
+    fun `chain repair respects graded boolean factors`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                PseudoBoolean(longArrayOf(10), intArrayOf(Lit.make(0, true)), PbOp.LE, 0),
+                PseudoBoolean(longArrayOf(2), intArrayOf(Lit.make(1, true)), PbOp.LE, 0),
+            ),
+        )
+        val state = LocalSearchState(problem.bake(), Random(3))
+        state.recompute()
+
+        val picked = state.pickChainRepair(0, IntHashSet(), MoveSink())
+
+        assertEquals(Move.BoolFlip(1), picked)
+    }
 
     @Test
     fun `first sampling preserves seeded chains and the next random draw`() {
@@ -25,34 +79,36 @@ class RepairChainsTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 6),
             ),
         ).bake()
-        for (cap in intArrayOf(0, 1, 4, 20)) for (seed in 0 until 6) {
-            val expectedState = LocalSearchState(problem, Random(seed))
-            val actualState = LocalSearchState(problem, Random(seed))
-            for (state in listOf(expectedState, actualState)) {
-                state.assignment.setInt(0, 0)
-                state.assignment.setInt(1, 6)
-                state.recompute()
-            }
-            val firsts = MoveSink()
-            for (value in 1L..6L) firsts.addIntSet(0, value)
-            firsts.addCompound(listOf(Move.IntSet(0, 3), Move.IntSet(1, 5)))
-            val expected = MoveSink()
-            val list = firsts.list
-            val order = IntArray(list.size) { it }
-            val propose = MoveSink()
-            for (i in 0 until minOf(cap, list.size)) {
-                val j = i + expectedState.rng.nextInt(list.size - i)
-                val tmp = order[i]
-                order[i] = order[j]
-                order[j] = tmp
-                expectedState.buildRepairChain(list[order[i]], 4, propose)?.let { expected.addCompound(it) }
-            }
+        for (cap in intArrayOf(0, 1, 4, 20)) {
+            for (seed in 0 until 6) {
+                val expectedState = LocalSearchState(problem, Random(seed))
+                val actualState = LocalSearchState(problem, Random(seed))
+                for (state in listOf(expectedState, actualState)) {
+                    state.assignment.setInt(0, 0)
+                    state.assignment.setInt(1, 6)
+                    state.recompute()
+                }
+                val firsts = MoveSink()
+                for (value in 1L..6L) firsts.addIntSet(0, value)
+                firsts.addCompound(listOf(Move.IntSet(0, 3), Move.IntSet(1, 5)))
+                val expected = MoveSink()
+                val list = firsts.list
+                val order = IntArray(list.size) { it }
+                val propose = MoveSink()
+                for (i in 0 until minOf(cap, list.size)) {
+                    val j = i + expectedState.rng.nextInt(list.size - i)
+                    val tmp = order[i]
+                    order[i] = order[j]
+                    order[j] = tmp
+                    expectedState.buildRepairChain(list[order[i]], 4, propose)?.let { expected.addCompound(it) }
+                }
 
-            val actual = MoveSink()
-            actualState.sampleChainFirsts(firsts, cap, 4, MoveSink(), actual)
+                val actual = MoveSink()
+                actualState.sampleChainFirsts(firsts, cap, 4, MoveSink(), actual)
 
-            assertEquals(expected.list, actual.list, "seed=$seed cap=$cap")
-            assertEquals(expectedState.rng.nextLong(), actualState.rng.nextLong(), "seed=$seed cap=$cap")
+                assertEquals(expected.list, actual.list, "seed=$seed cap=$cap")
+                assertEquals(expectedState.rng.nextLong(), actualState.rng.nextLong(), "seed=$seed cap=$cap")
+            }
         }
     }
 
