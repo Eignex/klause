@@ -118,6 +118,25 @@ class LocalSearchSolverTest {
     }
 
     @Test
+    fun `a satisfy run starts from a supplied assignment`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 20), IntDomain(0, 20)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 7),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+            ),
+        )
+        val start = Sample(BooleanArray(0), longArrayOf(4, 3))
+
+        val result = LocalSearchSolver(problem.bake())
+            .solve(LocalSearchParams(maxFlips = 1, randomSeed = 1, initialAssignment = start))
+
+        assertEquals(listOf(4L, 3L), assertIs<SolveResult.Sat>(result).assignment.ints.toList())
+    }
+
+    @Test
     fun `solves simple 3 sat instance`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),

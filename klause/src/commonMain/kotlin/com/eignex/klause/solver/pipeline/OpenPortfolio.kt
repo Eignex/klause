@@ -5,6 +5,7 @@ import com.eignex.klause.localsearch.LocalSearchEngine
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
+import com.eignex.klause.lp.relaxation.lpSeed
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.portfolio.LocalSearchCatalog
@@ -16,6 +17,8 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Decides an open model's satisfiability on the shared [Portfolio] harness: the complete theory route as one arm,
@@ -42,7 +45,7 @@ internal class OpenPortfolio(
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
     fun solve(cancellation: Cancellation): OpenTheoryResult {
         val firstLocalArm = if (request != null) 1 else 0
-        val localSearch = localSearchWorkers(firstLocalArm)
+        val localSearch = localSearchWorkers(firstLocalArm, cancellation)
         if (localSearch.isEmpty()) {
             // With the theory as the only arm there is nothing to schedule, and slicing it would only rerun it
             // from scratch each segment.
@@ -88,13 +91,16 @@ internal class OpenPortfolio(
             }
         }
 
-    private fun localSearchWorkers(firstArm: Int): List<PortfolioWorker> {
+    private fun localSearchWorkers(firstArm: Int, cancellation: Cancellation): List<PortfolioWorker> {
         // On a model of continuous columns alone with no Boolean to choose, the completion of any candidate is the
         // whole LP: local search would only hand the theory the problem it already solves.
         if (model.numIntVars == 0 && model.numBoolVars == 0) return emptyList()
         val searchModel = LocalSearchModel.open(model)
         val completion = if (model.numRealVars > 0) LeafRealCompletion(model, objective = null) else null
         if (!localSearchSupports(searchModel, completes = completion != null)) return emptyList()
+        // Every arm starts from the relaxation's optimum inside the search windows rather than near zero; an LP
+        // that finds no point in its slice of the budget leaves the arms to their own random starts.
+        val start = model.lpSeed(searchModel.domains, cancellation or Cancellation.after(SEED_BUDGET))
         return LocalSearchCatalog.diverse(Kind.CSP, localSearchArms).mapIndexed { i, recipe ->
             val engine = LocalSearchEngine(
                 searchModel,
@@ -105,7 +111,12 @@ internal class OpenPortfolio(
             )
             PortfolioWorker.ofSolve("ls/${recipe.label}", firstArm + i, countsInstructions = true) { slice, budget ->
                 engine.solve(
-                    LocalSearchParams(randomSeed = seed + i, maxInstructions = budget, cancellation = slice),
+                    LocalSearchParams(
+                        randomSeed = seed + i,
+                        maxInstructions = budget,
+                        cancellation = slice,
+                        initialAssignment = start,
+                    ),
                     warm = null,
                 )
             }
@@ -119,5 +130,8 @@ internal class OpenPortfolio(
 
     private companion object {
         const val DEFAULT_LS_ARMS: Int = 3
+
+        // Wall-clock ceiling on the seed LP, a small slice beside any portfolio budget.
+        val SEED_BUDGET: Duration = 500.milliseconds
     }
 }
