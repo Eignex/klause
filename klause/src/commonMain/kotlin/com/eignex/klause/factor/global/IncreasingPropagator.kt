@@ -1,8 +1,11 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.boundLiteral
 
 /**
  * CP propagator for [Increasing]: bounds consistency on the chain `xs(0) (+gap) ≤ xs(1) …` via a
@@ -26,26 +29,40 @@ internal class IncreasingPropagator(private val xs: IntArray, private val gap: I
         out
     }
 
+    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
+    private var failure: IntArray? = null
+
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = failure
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        failure = null
         val d = state.intDomains
+        val level = state.currentLevel
+        // A bound move rests on its neighbour's bound on the same side as it stands now, which an earlier step of
+        // the same sweep may just have moved.
+        fun neighbour(v: Int, lower: Boolean, need: Long): IntArray? {
+            if (level == 0) return null
+            val lit = state.boundLiteral(v, lower, need, state.undo.size, level)
+            return if (lit == Lit.NONE) IntArray(0) else intArrayOf(lit)
+        }
+        fun fail(ant: IntArray?, v: Int): Boolean {
+            failure = (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
+            return false
+        }
         // Forward: xs(i).min ≥ xs(i−1).min + gap. Each tighten feeds the next iteration, so the
         // prefix maximum propagates in one pass; a failed tighten (min crosses max) is the conflict.
         for (i in 1 until xs.size) {
             val need = d[xs[i - 1]].min + gap
-            if (need > d[xs[i]].min &&
-                !state.tightenIntMin(xs[i], need, state.composeIntVarAtomAntecedents(intArrayOf(xs[i - 1])))
-            ) {
-                return false
-            }
+            if (need <= d[xs[i]].min) continue
+            val ant = neighbour(xs[i - 1], true, need - gap)
+            if (!state.tightenIntMin(xs[i], need, ant)) return fail(ant, xs[i])
         }
         // Backward: xs(i).max ≤ xs(i+1).max − gap.
         for (i in xs.size - 2 downTo 0) {
             val cap = d[xs[i + 1]].max - gap
-            if (cap < d[xs[i]].max &&
-                !state.tightenIntMax(xs[i], cap, state.composeIntVarAtomAntecedents(intArrayOf(xs[i + 1])))
-            ) {
-                return false
-            }
+            if (cap >= d[xs[i]].max) continue
+            val ant = neighbour(xs[i + 1], false, cap + gap)
+            if (!state.tightenIntMax(xs[i], cap, ant)) return fail(ant, xs[i])
         }
         return true
     }
