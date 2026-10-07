@@ -167,7 +167,9 @@ MiniZinc-mode-only flags:
 
 FlatZinc floats are bucketed by default, with the configured bucket count and fixed-point scale.
 Float arrays accept variable references, literals and numeric parameters. A bucketed search decides
-this finite grid; it can miss real solutions between grid points. An arithmetic overflow in the
+this finite grid; it can miss real solutions between grid points. Rounding can also produce an
+assignment that violates the original float constraints, so grid feasibility and optimality need
+source-level validation before being interpreted as results for the original model. An arithmetic overflow in the
 lowering is declined with a diagnostic suggesting `--exact` or smaller bounds or scale.
 
 Exact float lowering supports linear comparisons (including strict and reified comparisons),
