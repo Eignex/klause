@@ -499,7 +499,13 @@ class Portfolio(
             if (free.isEmpty()) return -1
             val present = free.mapTo(LinkedHashSet()) { workers[it].family }
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
-            val family = families.choose(eligible)
+            // Before an incumbent the families' signals measure different things (a local search lowering its
+            // violation, a complete search learning clauses), so they share the time evenly instead.
+            val family = if (improving) {
+                families.choose(eligible)
+            } else {
+                eligible.minBy { f -> workers.indices.filter { workers[it].family == f }.sumOf { log.millisOf(it) } }
+            }
             val candidates = free.filter { workers[it].family == family }
             // Before an incumbent a silent family's arms have nothing comparable to show, so a draw between them
             // leaves the split to chance; the arm that has had the least time runs next.
