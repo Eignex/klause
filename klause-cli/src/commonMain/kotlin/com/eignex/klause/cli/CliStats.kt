@@ -296,14 +296,14 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
 }
 
 /**
- * A sequential portfolio's schedule for `-s`, one `arm.<label>` pair per arm: segments run, work spent, mean
+ * A sequential portfolio's schedule for `-s`, one `arm.<label>` pair per arm: segments run, work and time spent, mean
  * reward, failures, and the credit earned by each kind of contribution. Empty outside a sequential portfolio.
  */
 internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> = stats.portfolio.arms.map { arm ->
     val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
     "arm.${arm.label}" to
-        "segments=${arm.segments} work=${arm.work} reward=${round4(arm.meanReward)} failures=${arm.failures} " +
-        "faults=${arm.faults}$credit"
+        "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
+        "failures=${arm.failures} faults=${arm.faults}$credit"
 }
 
 /** Exact deterministic open-theory accounting pairs for `-s`. */

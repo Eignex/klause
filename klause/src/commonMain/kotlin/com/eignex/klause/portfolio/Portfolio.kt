@@ -392,6 +392,9 @@ class Portfolio(
         /** The work a resumable handle's slice may spend; a negative allowance leaves it to the run's token. */
         val handleNodes: Long get() = if (whole) -1L else sliceWork
 
+        /** When the lane claimed the segment. */
+        val started = TimeSource.Monotonic.markNow()
+
         var hadIncumbent = false
         var improved = false
         var foundFirst = false
@@ -579,7 +582,7 @@ class Portfolio(
                 if (other == arm || busy[other] || retired[other] || !ledger.hasPending(other)) continue
                 bandit.update(other, ledger.settleIdle(other, claim.sliceWork), 1.0)
             }
-            log.record(arm, work, reward, failed)
+            log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
             if (!claim.probing) {
                 slice = grow(slice, maxSliceMillis)

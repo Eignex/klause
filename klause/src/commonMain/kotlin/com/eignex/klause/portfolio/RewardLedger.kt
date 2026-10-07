@@ -185,14 +185,17 @@ internal class ProgressCredit(arms: Int) {
 internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
     private val segments = LongArray(workers.size)
     private val work = LongArray(workers.size)
+    private val millis = LongArray(workers.size)
     private val rewards = DoubleArray(workers.size)
     private val failures = LongArray(workers.size)
     private val faults = LongArray(workers.size)
 
-    /** One segment of [arm]: the [spent] work, the [reward] it settled for, and whether it [failed]. */
-    fun record(arm: Int, spent: Long, reward: Double, failed: Boolean) {
+    /** One segment of [arm]: the [spent] work, the [elapsed] milliseconds, the [reward] it settled for, and whether
+     *  it [failed]. */
+    fun record(arm: Int, spent: Long, elapsed: Long, reward: Double, failed: Boolean) {
         segments[arm]++
         work[arm] += spent
+        millis[arm] += elapsed
         rewards[arm] += reward
         if (failed) failures[arm]++
     }
@@ -215,6 +218,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                     label = if (occurrence == 1) label else "$label#$occurrence",
                     segments = segments[arm],
                     work = work[arm],
+                    millis = millis[arm],
                     meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
                     failures = failures[arm],
                     faults = faults[arm],

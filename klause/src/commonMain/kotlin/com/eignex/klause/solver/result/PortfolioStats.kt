@@ -20,6 +20,8 @@ data class ArmSchedule(
     val segments: Long,
     /** Work its segments spent, in node-equivalents. */
     val work: Long,
+    /** Wall-clock milliseconds its segments took, so time and work can be compared. */
+    val millis: Long = 0L,
     /** Mean reward its segments settled for. */
     val meanReward: Double,
     /** Segments that failed with an exception. */
