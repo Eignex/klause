@@ -215,6 +215,9 @@ internal class CpSatisfactionTraversal(
             run?.fixedCancellationCadence = value
         }
 
+    /** Variables the traversal's search has fixed at its root; see [PropagationSession.rootFixedVariableCount]. */
+    fun rootFixedVariableCount(): Int = cp.session.rootFixedVariableCount()
+
     /** LP work the traversal's relaxations have done, for a slice that charges it against its budget. */
     fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() }
 

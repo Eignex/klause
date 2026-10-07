@@ -71,6 +71,26 @@ class PropagationSessionTest {
     }
 
     @Test
+    fun `the root fixed count leaves out what decisions fixed`() {
+        val p = Problem(
+            numBoolVars = 3,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(4, 4)),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
+            ),
+        )
+        val s = PropagationSession(p)
+        s.seed(Assumptions.None)
+
+        s.pinBool(1, true)
+
+        assertEquals(4, s.fixedVariableCount())
+        assertEquals(2, s.rootFixedVariableCount())
+    }
+
+    @Test
     fun `an imported clause that forces a unit counts a use for its origin`() {
         for (native in listOf(false, true)) {
             val p = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
