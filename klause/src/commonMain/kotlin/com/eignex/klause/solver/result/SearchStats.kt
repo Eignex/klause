@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.util.LongHashSet
 import com.eignex.kumulant.stat.summary.CountStat
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.MaxStat
@@ -23,6 +24,10 @@ data class SearchStats(
     val propagations: SumResult = ZERO_COUNT,
     /** Clauses learned by conflict analysis. */
     val learnedClauses: SumResult = ZERO_COUNT,
+    /** Literals across [learnedClauses]; their mean size shows whether the explanations behind them are sharp. */
+    val learnedLiterals: SumResult = ZERO_COUNT,
+    /** Literal block distance summed across [learnedClauses]. */
+    val learnedLbd: SumResult = ZERO_COUNT,
     /** Clauses conflict analysis re-derived identically — a livelock indicator when large. */
     val relearned: SumResult = ZERO_COUNT,
     /** Deepest decision level reached. */
@@ -43,6 +48,8 @@ data class SearchStats(
         restarts = SumResult(restarts.sum + o.restarts.sum),
         propagations = SumResult(propagations.sum + o.propagations.sum),
         learnedClauses = SumResult(learnedClauses.sum + o.learnedClauses.sum),
+        learnedLiterals = SumResult(learnedLiterals.sum + o.learnedLiterals.sum),
+        learnedLbd = SumResult(learnedLbd.sum + o.learnedLbd.sum),
         relearned = SumResult(relearned.sum + o.relearned.sum),
         peakDepth = MaxResult(maxOf(peakDepth.max, o.peakDepth.max)),
         depthMean = mergeDepthMean(depthMean, o.depthMean),
@@ -59,7 +66,12 @@ internal class SearchStatsSink {
     val restarts: CountStat = CountStat()
     val propagations: CountStat = CountStat()
     val learnedClauses: CountStat = CountStat()
+    private var learnedLiterals = 0L
+    private var learnedLbd = 0L
     val relearned: CountStat = CountStat()
+
+    // Fingerprints of the clauses learned so far, to count the ones derived again.
+    private val learnedFingerprints = LongHashSet()
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
     val rootFixed: MaxStat = MaxStat()
@@ -91,8 +103,13 @@ internal class SearchStatsSink {
     fun observeFail() = fails.update(1.0)
     fun observeRestart() = restarts.update(1.0)
     fun observePropagation(count: Long = 1L) = repeat(count.toInt()) { propagations.update(1.0) }
-    fun observeLearn(count: Long = 1L) = repeat(count.toInt()) { learnedClauses.update(1.0) }
-    fun observeRelearn() = relearned.update(1.0)
+    /** Count a learned constraint over [literals] with literal block distance [lbd], and whether it was learned before. */
+    fun observeLearned(literals: IntArray, lbd: Int) {
+        learnedClauses.update(1.0)
+        learnedLiterals += literals.size
+        learnedLbd += lbd
+        if (!learnedFingerprints.add(fingerprint(literals))) relearned.update(1.0)
+    }
     fun observeRootFixed(count: Int) = rootFixed.update(count.toDouble())
 
     /** Count an inprocessing slice's [probes] and clause-literal [visits]. */
@@ -107,6 +124,8 @@ internal class SearchStatsSink {
         restarts = restarts.read(),
         propagations = propagations.read(),
         learnedClauses = learnedClauses.read(),
+        learnedLiterals = SumResult(learnedLiterals.toDouble()),
+        learnedLbd = SumResult(learnedLbd.toDouble()),
         relearned = relearned.read(),
         peakDepth = peakDepth.read(),
         depthMean = depthMean.read(),
@@ -114,4 +133,17 @@ internal class SearchStatsSink {
         inprocessProbes = SumResult(inprocessProbes.toDouble()),
         inprocessVisits = SumResult(inprocessVisits.toDouble()),
     )
+}
+
+// An order-independent 64-bit fingerprint of a literal set: equal sets always match, and distinct ones collide
+// rarely enough for a diagnostic count.
+private fun fingerprint(literals: IntArray): Long {
+    var sum = 0L
+    var xor = 0L
+    for (literal in literals) {
+        val mixed = (literal.toLong() + 1) * -0x61c8864680b583ebL
+        sum += mixed
+        xor = xor xor (mixed ushr 17)
+    }
+    return sum * 31 + xor + literals.size
 }

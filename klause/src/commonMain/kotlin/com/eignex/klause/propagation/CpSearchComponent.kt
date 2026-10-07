@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.result.ConflictAnalysisStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
@@ -45,6 +46,9 @@ class CpSearchComponent(
     private var sharedRootLevel = 0
     private val nativeLevelBySharedLevel = IntArrayList().apply { add(0) }
     private var lastResult: PropagationResult? = null
+
+    /** Where conflicts this component cannot learn from are counted; null counts nothing. */
+    internal var conflictStats: ConflictAnalysisStatsSink? = null
 
     override val resolvesAfterModelBlock: Boolean
         get() = session.problem.numIntVars == 0 && session.problem.factors.isEmpty()
@@ -249,10 +253,16 @@ class CpSearchComponent(
     }
 
     override fun resolveConflict(context: com.eignex.klause.solver.search.SearchContext): SearchConflictResolution {
-        val learned = (lastResult as? PropagationResult.Unsat)?.learnedClause
-            as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
-            ?: return SearchConflictResolution.Chronological
-        if (!learned.asserting) return SearchConflictResolution.Chronological
+        val unsat = lastResult as? PropagationResult.Unsat ?: return SearchConflictResolution.Chronological
+        val learned = unsat.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
+        if (learned == null) {
+            conflictStats?.observeNotApplicable()
+            return SearchConflictResolution.Chronological
+        }
+        if (!learned.asserting) {
+            conflictStats?.observeNonAsserting()
+            return SearchConflictResolution.Chronological
+        }
         if (learned.guardLiterals.isEmpty() && learned.backjumpLevel == 0) {
             return SearchConflictResolution.Exhausted
         }

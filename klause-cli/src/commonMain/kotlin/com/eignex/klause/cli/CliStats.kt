@@ -285,7 +285,12 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "failures" to "${stats.search.fails.sum.toLong()}"
     out += "restarts" to "${stats.search.restarts.sum.toLong()}"
     out += "propagations" to "${stats.search.propagations.sum.toLong()}"
-    out += "learned" to "${stats.search.learnedClauses.sum.toLong()}"
+    val learned = stats.search.learnedClauses.sum
+    out += "learned" to "${learned.toLong()}"
+    if (learned > 0.0) {
+        out += "learnedMeanSize" to round4(stats.search.learnedLiterals.sum / learned)
+        out += "learnedMeanLbd" to round4(stats.search.learnedLbd.sum / learned)
+    }
     out += "relearned" to "${stats.search.relearned.sum.toLong()}"
     if (stats.search.peakDepth.max.isFinite()) out += "peakDepth" to "${stats.search.peakDepth.max.toLong()}"
     if (stats.search.rootFixed.max.isFinite()) out += "rootFixed" to "${stats.search.rootFixed.max.toLong()}"
@@ -403,7 +408,6 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
 internal fun caStatPairs(stats: SolveStats): List<Pair<String, String>> = listOf(
     "caNotApplicable" to "${stats.ca.notApplicable.sum.toLong()}",
     "caNonAsserting" to "${stats.ca.nonAsserting.sum.toLong()}",
-    "caRejectedTrueLit" to "${stats.ca.rejectedTrueLit.sum.toLong()}",
 )
 
 /** Print [pairs] one per line as `<prefix> key=value` — the shared stat-emission loop each mode
