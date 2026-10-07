@@ -636,7 +636,7 @@ abstract fun interface com.eignex.klause.ir/IntConsumer { // com.eignex.klause.i
 }
 
 abstract fun interface com.eignex.klause.localsearch/CandidateCompletion { // com.eignex.klause.localsearch/CandidateCompletion|null[0]
-    abstract fun complete(com.eignex.klause.solver/Sample): com.eignex.klause.localsearch/Completion // com.eignex.klause.localsearch/CandidateCompletion.complete|complete(com.eignex.klause.solver.Sample){}[0]
+    abstract fun complete(com.eignex.klause.solver/Sample, com.eignex.klause.util/Cancellation): com.eignex.klause.localsearch/Completion // com.eignex.klause.localsearch/CandidateCompletion.complete|complete(com.eignex.klause.solver.Sample;com.eignex.klause.util.Cancellation){}[0]
 }
 
 abstract fun interface com.eignex.klause.portfolio/WitnessCheck { // com.eignex.klause.portfolio/WitnessCheck|null[0]

@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -32,7 +33,10 @@ class LeafRealCompletionTest {
 
     @Test
     fun `a candidate whose discrete part admits a completion gets exact reals`() {
-        val completion = LeafRealCompletion(problem, objective = null).complete(candidate(2, 0.4999999))
+        val completion = LeafRealCompletion(
+            problem,
+            objective = null,
+        ).complete(candidate(2, 0.4999999), Cancellation.Never)
 
         val witness = assertIs<Completion.Witness>(completion)
         assertEquals(BigFraction.ofDouble(0.5), witness.sample.exactReals?.get(0))
@@ -41,13 +45,15 @@ class LeafRealCompletionTest {
 
     @Test
     fun `a candidate whose discrete part admits no completion is refuted`() {
-        assertIs<Completion.Refuted>(LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0)))
+        assertIs<Completion.Refuted>(
+            LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0), Cancellation.Never),
+        )
     }
 
     @Test
     fun `a refutation names the rows its proof combines`() {
         // k = 0 forces x = 2.5 through the first row, which the second row's x ≤ 1 forbids.
-        val completion = LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0))
+        val completion = LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0), Cancellation.Never)
 
         val refuted = assertIs<Completion.Refuted>(completion)
         assertEquals(setOf(0, 1), refuted.factors.toSet())
