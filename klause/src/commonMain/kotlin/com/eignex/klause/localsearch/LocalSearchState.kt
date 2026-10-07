@@ -103,6 +103,8 @@ class LocalSearchState(
     /** Buffer that strategies push candidate moves into. */
     val moveSink: MoveSink = MoveSink(assumptions)
 
+    internal val repairChainDegrees: RepairChainDegrees by lazy(LazyThreadSafetyMode.NONE) { RepairChainDegrees() }
+
     /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */
     val factors: Array<out Invariant> = projection.invariants
 

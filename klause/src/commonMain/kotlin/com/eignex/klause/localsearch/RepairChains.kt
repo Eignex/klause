@@ -5,7 +5,6 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
 
 /** Shared empty seed array for one-sided [recordConeDegrees] calls. */
 private val EMPTY_INTS = EmptyIntArray
@@ -43,36 +42,48 @@ internal fun LocalSearchState.proposeRepairChains(
         it.setInvariants(invariants)
         it.setOwners(seeding.ownerInt)
     }
-    factors[seedFactor].proposeRepairMoves(this, seedFactor, propose)
-    var emitted = sampleChainFirsts(propose.list, firstMoveCap, maxDepth, propose, sink)
+    val firsts = MoveSink(assumptions).also {
+        it.setInvariants(invariants)
+        it.setOwners(seeding.ownerInt)
+    }
+    factors[seedFactor].proposeRepairMoves(this, seedFactor, firsts)
+    var emitted = sampleChainFirsts(firsts, firstMoveCap, maxDepth, propose, sink)
     // Ejection firsts: primitives on the variables of factors neighbouring the seed (sharing a
     // variable). Some cost-1 orbits are closed under violated-factor repairs — every escape must
     // first perturb a satisfied neighbour (eject), then repair the cascade. Repair firsts keep their
     // own budget above so they aren't crowded out.
-    propose.clear()
-    neighbourPrimitives(seedFactor, propose)
-    emitted += sampleChainFirsts(propose.list, firstMoveCap, maxDepth, propose, sink)
+    firsts.clear()
+    neighbourPrimitives(seedFactor, firsts)
+    emitted += sampleChainFirsts(firsts, firstMoveCap, maxDepth, propose, sink)
     return emitted
 }
 
 /** Sample up to [cap] distinct first moves from [firsts] (uniform, without replacement)
  *  and emit each one's grown chain into [sink]; returns the number emitted. */
 internal fun LocalSearchState.sampleChainFirsts(
-    firsts: List<Move>,
+    firsts: MoveSink,
     cap: Int,
     maxDepth: Int,
     propose: MoveSink,
     sink: MoveSink,
 ): Int {
-    if (firsts.isEmpty()) return 0
+    val count = minOf(cap, firsts.size).coerceAtLeast(0)
+    if (count == 0) return 0
     var emitted = 0
-    val order = IntArray(firsts.size) { it }
-    for (i in 0 until minOf(cap, firsts.size)) {
+    // Sparse Fisher-Yates swaps retain the draw order while storing only the sampled prefix.
+    // Chain growth consumes the same RNG between first-move draws.
+    val positions = IntArray(count)
+    val replacements = IntArray(count)
+    fun at(index: Int, swaps: Int): Int {
+        for (k in swaps - 1 downTo 0) if (positions[k] == index) return replacements[k]
+        return index
+    }
+    for (i in 0 until count) {
         val j = i + rng.nextInt(firsts.size - i)
-        val tmp = order[i]
-        order[i] = order[j]
-        order[j] = tmp
-        val parts = buildRepairChain(firsts[order[i]], maxDepth, propose)
+        val selected = at(j, i)
+        positions[i] = j
+        replacements[i] = at(i, i)
+        val parts = buildRepairChain(firsts.moveAt(selected), maxDepth, propose)
         if (parts != null) {
             sink.addCompound(parts)
             emitted++
@@ -131,7 +142,7 @@ internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propo
     val pinnedSlots = IntHashSet()
     // Degree of every potentially-affected factor at its first sighting — the chain-start
     // baseline that "newly regressed" is measured against.
-    val baseDegree = MutableIntIntMap()
+    val baseDegree = repairChainDegrees.also { it.clear() }
 
     fun applyPart(p: Move) {
         val slot = slotOf(p)
@@ -185,7 +196,7 @@ internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propo
 /** Record into [base] the current degree of every factor [p] could affect — factors over
  *  [p]'s own variable plus factors over any defined variable in its invariant cone —
  *  keeping the *first* sighting (the chain-start baseline). */
-internal fun LocalSearchState.recordBaseDegrees(p: Move, base: MutableIntIntMap) {
+internal fun LocalSearchState.recordBaseDegrees(p: Move, base: RepairChainDegrees) {
     when (p) {
         is Move.BoolFlip -> {
             for (fid in projection.boolOccurrences[p.varId]) recordFirstDegree(base, fid)
@@ -204,12 +215,12 @@ internal fun LocalSearchState.recordBaseDegrees(p: Move, base: MutableIntIntMap)
 }
 
 /** Record [LocalSearchState.factorDegree] for [fid] on its first sighting only (mirrors `getOrPut`). */
-internal fun LocalSearchState.recordFirstDegree(base: MutableIntIntMap, fid: Int) {
-    if (!base.containsKey(fid)) base.put(fid, factorDegree[fid])
+internal fun LocalSearchState.recordFirstDegree(base: RepairChainDegrees, fid: Int) {
+    base.record(fid, factorDegree[fid])
 }
 
 /** [recordBaseDegrees] helper: factors over the invariant cone's output vars. */
-internal fun LocalSearchState.recordConeDegrees(intSeeds: IntArray, boolSeeds: IntArray, base: MutableIntIntMap) {
+internal fun LocalSearchState.recordConeDegrees(intSeeds: IntArray, boolSeeds: IntArray, base: RepairChainDegrees) {
     val net = invariants ?: return
     for (idx in net.affectedNodes(intSeeds, boolSeeds)) {
         val n = net.node(idx)
@@ -220,21 +231,8 @@ internal fun LocalSearchState.recordConeDegrees(intSeeds: IntArray, boolSeeds: I
 
 /** The factor with the largest weighted degree increase over its chain-start baseline,
  *  or -1 when nothing regressed (the chain caused no new damage). */
-internal fun LocalSearchState.worstRegressedFactor(base: MutableIntIntMap): Int {
-    val w = weights.factorWeights
-    var worst = -1
-    var worstScore = 0.0
-    base.forEach { fid, deg0 ->
-        val inc = factorDegree[fid] - deg0
-        if (inc > 0) {
-            val s = w[fid] * inc
-            if (s > worstScore) {
-                worstScore = s
-                worst = fid
-            }
-        }
-    }
-    return worst
+internal fun LocalSearchState.worstRegressedFactor(base: RepairChainDegrees): Int {
+    return base.worstRegressed(factorDegree, weights.factorWeights)
 }
 
 /** Best repair proposal of [target] that avoids every pinned slot, by immediate

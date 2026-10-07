@@ -35,6 +35,14 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      *  Compound moves follow primitives in the iteration order. */
     val list: List<Move> get() = cachedList ?: materialize().also { cachedList = it }
 
+    internal val size: Int get() = lane.size + (compounds?.size ?: 0)
+
+    internal fun moveAt(index: Int): Move = if (index < lane.size) {
+        decode(lane[index], valueLane[index])
+    } else {
+        compounds!![index - lane.size]
+    }
+
     /** Replace the [Assumptions] this sink filters against. Called by [LocalSearchState] on
      *  init / restart so per-call assumptions take effect. */
     fun setAssumptions(a: Assumptions) {
