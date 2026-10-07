@@ -9,6 +9,8 @@ import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.propagation.excludeIntValues
+import com.eignex.klause.propagation.exclusionLiteral
+import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.propagation.restrictIntToSurvivors
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -287,31 +289,50 @@ internal class ElementConstState(
 
     private fun sortedDistinct(list: LongArrayList): LongArray = list.toSortedLongArray()
 
-    // A result value leaves because every position holding it left idx, so its reason is those positions'
-    // `[idx = i]`, false now; one batch shares the union over its values.
-    private fun resultReason(state: PropagationState, values: LongArray): IntArray? {
-        val out = LitSet()
-        val root = state.rootDomains[idx]
-        for (r in values) {
-            val id = idFor(r)
-            if (id < 0) continue
-            for (pos in positionsOfId[id]) {
-                val iv = indexOffset + pos.toLong()
-                if (iv in root) out.add(Lit.make(state.atomVarEq(idx, iv), true))
-            }
-        }
-        return out.toArrayOrNull()
+    // A result value leaves because every position holding it left idx; a position leaves because its constant left
+    // result. One batch shares the union over its values, built only if conflict analysis reads it ([explain]).
+    private fun resultReason(state: PropagationState, values: LongArray): IntArray? = reason(state, RESULT, values)
+
+    private fun indexReason(state: PropagationState, positions: LongArray): IntArray? = reason(state, INDEX, positions)
+
+    private fun reason(state: PropagationState, side: Int, values: LongArray): IntArray? = when {
+        state.currentLevel == 0 -> null
+        state.undoLogging -> state.lazyReason(
+            IntArray(1 + 2 * values.size).also { p ->
+                p[0] = side
+                for (k in values.indices) {
+                    p[1 + 2 * k] = (values[k] ushr 32).toInt()
+                    p[2 + 2 * k] = values[k].toInt()
+                }
+            },
+        )
+        // Without the undo log nothing reads reasons, and the live domains stand in for the past ones.
+        else -> supports(state, side, values, state.undo.size)
     }
 
-    // A position leaves because its constant left result: `[result = arr(i)]`, false now.
-    private fun indexReason(state: PropagationState, positions: LongArray): IntArray? {
+    /** The reason a batch recorded by [reason] rests on, from [payload], as of undo-log position [atTrail]. */
+    fun explain(state: PropagationState, payload: IntArray, atTrail: Int): IntArray? {
+        val values = LongArray((payload.size - 1) / 2) { k ->
+            (payload[1 + 2 * k].toLong() shl 32) or (payload[2 + 2 * k].toLong() and 0xFFFFFFFFL)
+        }
+        return supports(state, payload[0], values, atTrail)
+    }
+
+    // Each lost support cites why it was gone at [atTrail]: a bound it lay past, or its own carve.
+    private fun supports(state: PropagationState, side: Int, values: LongArray, atTrail: Int): IntArray? {
         val out = LitSet()
-        val root = state.rootDomains[result]
-        for (iv in positions) {
-            val pos = iv - indexOffset
-            if (pos !in 0 until len) continue
-            val r = arr[pos.toInt()]
-            if (r in root) out.add(Lit.make(state.atomVarEq(result, r), true))
+        fun cite(v: Int, k: Long) {
+            val lit = state.exclusionLiteral(v, k, atTrail)
+            if (lit != Lit.NONE) out.add(lit)
+        }
+        for (value in values) {
+            if (side == RESULT) {
+                val id = idFor(value)
+                if (id >= 0) for (pos in positionsOfId[id]) cite(idx, indexOffset + pos.toLong())
+            } else {
+                val pos = value - indexOffset
+                if (pos in 0 until len) cite(result, arr[pos.toInt()])
+            }
         }
         return out.toArrayOrNull()
     }
@@ -329,5 +350,7 @@ internal class ElementConstState(
 
     private companion object {
         val EMPTY = LongArrayList()
+        const val RESULT = 0
+        const val INDEX = 1
     }
 }
