@@ -7726,6 +7726,7 @@ public final class com/eignex/klause/propagation/DeducedRestrictions$Companion {
 public final class com/eignex/klause/propagation/NoPropagator : com/eignex/klause/propagation/Propagator {
 	public static final field INSTANCE Lcom/eignex/klause/propagation/NoPropagator;
 	public fun conflictReason (Lcom/eignex/klause/propagation/PropagationState;I)[I
+	public fun explain (Lcom/eignex/klause/propagation/PropagationState;I[III)[I
 	public fun getConsumesIntEventDelta ()Z
 	public fun getExpensiveBake ()Z
 	public fun getInitialBoolWatcherBlockers ()[I
@@ -7947,6 +7948,7 @@ public abstract interface class com/eignex/klause/propagation/PropagationState$S
 
 public abstract interface class com/eignex/klause/propagation/Propagator {
 	public fun conflictReason (Lcom/eignex/klause/propagation/PropagationState;I)[I
+	public fun explain (Lcom/eignex/klause/propagation/PropagationState;I[III)[I
 	public fun getConsumesIntEventDelta ()Z
 	public fun getExpensiveBake ()Z
 	public fun getInitialBoolWatcherBlockers ()[I
@@ -7957,6 +7959,7 @@ public abstract interface class com/eignex/klause/propagation/Propagator {
 
 public final class com/eignex/klause/propagation/Propagator$DefaultImpls {
 	public static fun conflictReason (Lcom/eignex/klause/propagation/Propagator;Lcom/eignex/klause/propagation/PropagationState;I)[I
+	public static fun explain (Lcom/eignex/klause/propagation/Propagator;Lcom/eignex/klause/propagation/PropagationState;I[III)[I
 	public static fun getConsumesIntEventDelta (Lcom/eignex/klause/propagation/Propagator;)Z
 	public static fun getExpensiveBake (Lcom/eignex/klause/propagation/Propagator;)Z
 	public static fun getInitialBoolWatcherBlockers (Lcom/eignex/klause/propagation/Propagator;)[I
