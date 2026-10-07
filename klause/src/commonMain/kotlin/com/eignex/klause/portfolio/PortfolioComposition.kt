@@ -86,9 +86,10 @@ data class PortfolioScenario(
      *  uses the curated [BacktrackWorkerConfig] pool. */
     val btPool: List<() -> BacktrackRecipe>? = null,
     /** Optional model search-annotation arm: the [BacktrackParams] compiled from the model's
-     *  `int_search(...)` annotations. When present (and the pool carries ≥ 2 backtrack arms), it takes
-     *  the last backtrack slot so the free CP portfolio also follows the model's own search order,
-     *  while the `satOptimized` guard keeps slot 0. Ignored when [btPool] overrides the pool. */
+     *  `int_search(...)` annotations. When present (and the pool carries ≥ 2 backtrack arms), the free CP
+     *  portfolio also follows the model's own search order: beside the curated backtrack arms in a scheduled
+     *  pool, else in the last backtrack slot while the `satOptimized` guard keeps slot 0. Ignored when
+     *  [btPool] overrides the pool. */
     val annotationArm: BacktrackParams? = null,
     /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool], the
      *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
@@ -238,9 +239,10 @@ internal object PortfolioComposition {
 
     /** The [count] backtrack arms for [scenario]. [PortfolioScenario.btPool] (when set) overrides the pool
      *  with injected templates. Otherwise the curated pool the model behind [facts] offers the needs of, with
-     *  the model's [PortfolioScenario.annotationArm] taking the last slot when present and there are ≥ 2 slots
-     *  (so the `satOptimized` guard keeps slot 0). Every resulting arm spends [PortfolioScenario.nodeBudget],
-     *  which is applied to the composed pool so that capping a run does not also change which pool it composes. */
+     *  the model's [PortfolioScenario.annotationArm] when present and there are ≥ 2 slots: beside them in a
+     *  scheduled pool, else in the last slot (so the `satOptimized` guard keeps slot 0). Every resulting arm
+     *  spends [PortfolioScenario.nodeBudget], which is applied to the composed pool so that capping a run does
+     *  not also change which pool it composes. */
     private fun btArms(scenario: PortfolioScenario, count: Int, facts: ProblemFacts): List<WorkerConfig> {
         val lpCeiling = scenario.lpCeiling
         val btPool = scenario.btPool
@@ -267,7 +269,10 @@ internal object PortfolioComposition {
         )
         if (annotationArm == null || count < 2) return base
         val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))
-        return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
+        val arm = BacktrackWorkerConfig(annotation, zeroObjectivePricing)
+        // A scheduled pool shares time by family, so the model's own search joins the curated arms without taking
+        // time from them; a pool with a core per arm keeps its cores.
+        return if (scenario.cores < scenario.arms) base + arm else base.dropLast(1) + arm
     }
 
     private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
