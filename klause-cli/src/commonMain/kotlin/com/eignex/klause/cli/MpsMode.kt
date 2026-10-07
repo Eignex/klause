@@ -9,6 +9,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
@@ -94,12 +95,24 @@ internal object MpsMode : CliMode {
                         unsupportedOpenMpsModel()
                     }
                     requireOpenMpsSource(compiled)
-                    openTheorySolvable(
-                        route.request,
-                        { assignment -> renderMpsOpenModel(compiled, assignment) },
-                        routingLpStats,
-                        routingElapsedMs,
-                    )
+                    // An objective whose bound row leaves the theory is left to local search.
+                    if (route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request)) {
+                        openTheorySolvable(
+                            route.request,
+                            { assignment -> renderMpsOpenModel(compiled, assignment) },
+                            routingLpStats,
+                            routingElapsedMs,
+                        )
+                    } else {
+                        openLocalSearchSolvable(
+                            route.request.model,
+                            { assignment -> renderMpsOpenModel(compiled, assignment) },
+                            routingLpStats,
+                            routingElapsedMs,
+                            objective = if (compiled.maximize) objective?.negated() else objective,
+                            maximize = compiled.maximize,
+                        )
+                    }
                 }
 
                 // No theory decides it, so local search looks for incumbents alone.

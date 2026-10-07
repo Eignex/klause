@@ -484,6 +484,28 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open SMT objective is minimized to its optimum`() {
+        val smt = File.createTempFile("cliopenobjective", ".smt2").apply {
+            writeText(
+                """
+                (set-logic QF_LIA)
+                (declare-const x Int)
+                (assert (>= x 3))
+                (minimize x)
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+        var code = -1
+        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertEquals("sat", out.lines().firstOrNull(), out)
+        assertTrue("(define-fun x () Int 3)" in out, out)
+    }
+
+    @Test
     fun `an open SMT exact LIA model is solved without finite lowering`() {
         val smt = File.createTempFile("cliopen", ".smt2").apply {
             writeText(

@@ -188,6 +188,16 @@ object OpenTheoryPipeline {
         return OpenTheoryExecution.Optimize(minimizerFor(request, objective).minimize(params))
     }
 
+    /**
+     * Whether the descent can minimize [request]'s objective: an integral one weighting no Boolean, whose bound row
+     * leaves the model inside a complete open theory. A request it cannot minimize is left to local search.
+     */
+    fun canMinimize(request: OpenTheoryRequest): Boolean {
+        val objective = request.minimizedObjective ?: return false
+        if (objective.realCoefficients.any { it != 0.0 } || objective.boolWeights.any { it != 0L }) return false
+        return minimizerFor(request, objective).decidesEveryRound
+    }
+
     // The descent minimizing [objective], the request's own in minimized form.
     private fun minimizerFor(request: OpenTheoryRequest, objective: LinearObjective): OpenTheoryMinimizer =
         OpenTheoryMinimizer(

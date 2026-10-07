@@ -9232,6 +9232,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;
+	public final fun canMinimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Z
 	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun executePortfolio (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;

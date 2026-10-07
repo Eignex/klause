@@ -10,6 +10,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -36,6 +37,30 @@ class OpenTheoryPipelineTest {
         val preparation = OpenTheoryPipeline.prepare(request)
 
         assertEquals(7L, preparation.model.intBounds.upper(0), "x must keep the values maximization wants")
+    }
+
+    // x ≤ 7 over a column open below, with one Boolean beside it.
+    private fun openBelow(): Problem {
+        val openLower = Bits(1).also { it.set(0) }
+        return Problem(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), openLower, null),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
+        )
+    }
+
+    @Test
+    fun `the descent minimizes an integral objective`() {
+        val request = OpenTheoryRequest(openBelow(), LinearObjective(intCoefficients = longArrayOf(-1L)))
+
+        assertTrue(OpenTheoryPipeline.canMinimize(request))
+    }
+
+    @Test
+    fun `an objective weighting a Boolean is left to local search`() {
+        val objective = LinearObjective(boolWeights = longArrayOf(1L), intCoefficients = longArrayOf(-1L))
+
+        assertFalse(OpenTheoryPipeline.canMinimize(OpenTheoryRequest(openBelow(), objective)))
     }
 
     @Test
