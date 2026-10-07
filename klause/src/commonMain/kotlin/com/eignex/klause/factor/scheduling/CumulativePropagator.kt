@@ -38,7 +38,11 @@ internal class CumulativePropagator(
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        val fallback = collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        val fallback = OptPresence.withPresencePremises(
+            presents,
+            state,
+            collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0),
+        )
         if (!sharpReasonEligible) return fallback
         val eff = effectiveSnapshot(state) ?: return fallback
         val profile = MandatoryProfile()
@@ -251,7 +255,7 @@ internal class CumulativePropagator(
             if (newMin > state.intDomains[v].max) return false
             if (newMin != oldMin) {
                 val ant = (if (sharpEff != null) minTightenReason(state, i, d, oldMin, newMin, sharpEff) else null)
-                    ?: state.composeIntVarAtomAntecedents(intVars)
+                    ?: OptPresence.withPresencePremises(presents, state, state.composeIntVarAtomAntecedents(intVars))
                 if (!state.tightenIntMin(v, newMin, ant)) return false
             }
             var newMax = state.intDomains[v].max
@@ -265,7 +269,7 @@ internal class CumulativePropagator(
             if (newMax < state.intDomains[v].min) return false
             if (newMax != oldMax) {
                 val ant = (if (sharpEff != null) maxTightenReason(state, i, d, oldMax, newMax, sharpEff) else null)
-                    ?: state.composeIntVarAtomAntecedents(intVars)
+                    ?: OptPresence.withPresencePremises(presents, state, state.composeIntVarAtomAntecedents(intVars))
                 if (!state.tightenIntMax(v, newMax, ant)) return false
             }
         }
@@ -306,7 +310,7 @@ internal class CumulativePropagator(
         val lct = LongArray(m) { state.intDomains[starts[ids[it]]].max + maxDur(state, ids[it]) }
         val order = argsortBy(m) { a, b -> lct[a].compareTo(lct[b]) }
         val camax = capMax(state)
-        val ant = state.composeIntVarAtomAntecedents(intVars)
+        val ant = OptPresence.withPresencePremises(presents, state, state.composeIntVarAtomAntecedents(intVars))
         var xMin = Long.MAX_VALUE
         var xMax = Long.MIN_VALUE
         var surface = 0L
@@ -358,7 +362,7 @@ internal class CumulativePropagator(
             if (lst < ect && h > 0) profile.addTask(lst, ect, h)
         }
         if (!profile.build(cap)) return false
-        val ant = state.composeIntVarAtomAntecedents(intVars)
+        val ant = OptPresence.withPresencePremises(presents, state, state.composeIntVarAtomAntecedents(intVars))
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val lst = state.intDomains[starts[i]].max
@@ -431,7 +435,11 @@ internal class CumulativePropagator(
                     val reason: IntArray?
                     if (activeStarts != null) {
                         if (!scopedAntBuilt) {
-                            scopedAnt = state.composeIntVarAtomAntecedents(activeStarts.toIntArray())
+                            scopedAnt = OptPresence.withPresencePremises(
+                                presents,
+                                state,
+                                state.composeIntVarAtomAntecedents(activeStarts.toIntArray()),
+                            )
                             scopedAntBuilt = true
                         }
                         // The detection placed i at its earliest start, so `start(i) ≥ est(i)` is a premise:
@@ -439,7 +447,11 @@ internal class CumulativePropagator(
                         reason = withOwnEstPremise(state, v, scopedAnt)
                     } else {
                         if (!antBuilt) {
-                            ant = state.composeIntVarAtomAntecedents(intVars)
+                            ant = OptPresence.withPresencePremises(
+                                presents,
+                                state,
+                                state.composeIntVarAtomAntecedents(intVars),
+                            )
                             antBuilt = true
                         }
                         reason = ant

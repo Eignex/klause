@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.ConflictReasonOracle
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
@@ -13,12 +14,41 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DisjunctivePropagatorTest {
+
+    @Test
+    fun `disjunctive deductions over optional tasks are implied by their reasons`() {
+        val rng = Random(0xD15)
+        repeat(400) { iter ->
+            val n = 3
+            val problem = Problem(
+                numBoolVars = n,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 6) },
+                factors = arrayOf<Factor>(
+                    Cumulative.unary(
+                        starts = IntArray(n) { it },
+                        durations = LongArray(n) { 2L + rng.nextInt(2) },
+                        presents = IntArray(n) { Lit.make(it, true) },
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "disjunctive#$iter") { state ->
+                (0 until n).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
+                    (0 until 3).all {
+                        val v = rng.nextInt(n)
+                        if (rng.nextBoolean()) state.tightenIntMax(v, rng.nextInt(4).toLong())
+                        else state.tightenIntMin(v, 1L + rng.nextInt(4))
+                    }
+            }
+        }
+    }
 
     @Test
     fun `energetic-window conflict reason cites only the tasks packed into the overloaded window`() {
