@@ -3,12 +3,14 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -120,5 +122,35 @@ class ComparisonClauseTest {
             factors = arrayOf<Factor>(clauseOf(listOf(le(0, 0), ge(1, 5)))),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L)))
+    }
+
+    @Test
+    fun `comparison clause deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0xCC10)
+        repeat(300) { iter ->
+            val n = 3
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 3) },
+                factors = arrayOf<Factor>(
+                    ComparisonClause(
+                        vars = IntArray(n) { rng.nextInt(n) },
+                        ops = Array(n) { LinearOp.entries[rng.nextInt(LinearOp.entries.size)] },
+                        consts = LongArray(n) { rng.nextInt(4).toLong() },
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "comparison-clause#$iter") { state ->
+                (0 until 5).all {
+                    val v = rng.nextInt(n)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                        1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                        else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+                    }
+                }
+            }
+        }
     }
 }

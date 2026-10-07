@@ -3,6 +3,7 @@ package com.eignex.klause.factor.table
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -20,6 +21,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -379,5 +381,61 @@ class ElementPropagatorTest {
         val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 5L)).take(100_000)
             .map { it.ints.map { v -> v.toInt() } }.toHashSet()
         assertEquals(brute, found, "coupled const Elements: enumerated set must equal brute force")
+    }
+
+    @Test
+    fun `constant-array element deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0xE1E0)
+        repeat(300) { iter ->
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 2,
+                intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 4)),
+                factors = arrayOf<Factor>(
+                    Element(
+                        idx = 0,
+                        result = 1,
+                        arr = LongArray(4) { rng.nextInt(5).toLong() },
+                        arrIsVars = false,
+                        indexOffset = 0,
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "element-const#$iter") { state ->
+                (0 until 3).all {
+                    val v = rng.nextInt(2)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(5).toLong())
+                        1 -> state.tightenIntMin(v, rng.nextInt(3).toLong())
+                        else -> state.tightenIntMax(v, 1L + rng.nextInt(4))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `variable-array element deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0xE1E1)
+        repeat(300) { iter ->
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 5,
+                intDomains = Array(5) { if (it == 0) IntDomain(0, 2) else IntDomain(0, 3) },
+                factors = arrayOf<Factor>(
+                    Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "element-var#$iter") { state ->
+                (0 until 5).all {
+                    val v = rng.nextInt(5)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                        1 -> state.tightenIntMin(v, rng.nextInt(2).toLong())
+                        else -> state.tightenIntMax(v, 1L + rng.nextInt(3))
+                    }
+                }
+            }
+        }
     }
 }

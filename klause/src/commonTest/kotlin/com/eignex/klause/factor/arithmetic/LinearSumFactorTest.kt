@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -86,5 +87,73 @@ class LinearSumFactorTest {
         state.assignment.setInt(1, 0)
         state.recompute()
         assertEquals(0, state.factors[0].violationDegree(state, 0), "2·5 + 3·0 = 10 >= 10 is satisfied")
+    }
+
+    @Test
+    fun `linear deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x11E0)
+        for (op in LinearOp.entries) {
+            repeat(100) { iter ->
+                val n = 3
+                val problem = Problem(
+                    numBoolVars = 0,
+                    numIntVars = n,
+                    intDomains = Array(n) { IntDomain(0, 4) },
+                    factors = arrayOf<Factor>(
+                        Linear(
+                            IntArray(n) { (1 + rng.nextInt(3)) * (if (rng.nextBoolean()) 1 else -1) },
+                            IntArray(n) { it },
+                            op,
+                            rng.nextInt(-4, 9),
+                        ),
+                    ),
+                )
+                PropagationReasonOracle.assertReasonsImply(problem, "linear-$op#$iter") { state ->
+                    (0 until 4).all {
+                        val v = rng.nextInt(n)
+                        when (rng.nextInt(3)) {
+                            0 -> state.excludeIntValue(v, rng.nextInt(5).toLong())
+                            1 -> state.tightenIntMin(v, 1L + rng.nextInt(3))
+                            else -> state.tightenIntMax(v, 1L + rng.nextInt(3))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `reified linear deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x11E1)
+        for (op in LinearOp.entries) {
+            repeat(100) { iter ->
+                val n = 3
+                val problem = Problem(
+                    numBoolVars = 1,
+                    numIntVars = n,
+                    intDomains = Array(n) { IntDomain(0, 3) },
+                    factors = arrayOf<Factor>(
+                        ReifiedLinear(
+                            0,
+                            IntArray(n) { (1 + rng.nextInt(3)) * (if (rng.nextBoolean()) 1 else -1) },
+                            IntArray(n) { it },
+                            op,
+                            rng.nextInt(-3, 7),
+                        ),
+                    ),
+                )
+                PropagationReasonOracle.assertReasonsImply(problem, "reified-linear-$op#$iter") { state ->
+                    (rng.nextInt(3) != 0 || state.pinBool(0, rng.nextBoolean())) &&
+                        (0 until 4).all {
+                            val v = rng.nextInt(n)
+                            when (rng.nextInt(3)) {
+                                0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                                1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                                else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+                            }
+                        }
+                }
+            }
+        }
     }
 }

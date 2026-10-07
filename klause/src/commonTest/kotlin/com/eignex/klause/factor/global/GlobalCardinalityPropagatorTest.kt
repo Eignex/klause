@@ -381,4 +381,62 @@ class GlobalCardinalityPropagatorTest {
             assertEquals(brute, found, "GCC+Linear (bound=$bound): solution set must equal brute force")
         }
     }
+
+    @Test
+    fun `global cardinality deductions with count vars are implied by their reasons under carved holes`() {
+        val rng = Random(0x6CC1)
+        repeat(300) { iter ->
+            val n = 4
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = n + 2,
+                intDomains = Array(n + 2) { if (it < n) IntDomain(0, 2) else IntDomain(0, n.toLong()) },
+                factors = arrayOf<Factor>(
+                    GlobalCardinality(
+                        xs = IntArray(n) { it },
+                        cover = longArrayOf(0, 1),
+                        countVars = intArrayOf(n, n + 1),
+                        closed = rng.nextBoolean(),
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "gcc-counts#$iter") { state ->
+                (0 until 5).all {
+                    val v = rng.nextInt(n + 2)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(3).toLong())
+                        1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                        else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `global cardinality deductions over optional positions are implied by their reasons`() {
+        val rng = Random(0x6CC2)
+        repeat(300) { iter ->
+            val n = 3
+            val problem = Problem(
+                numBoolVars = n,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 2) },
+                factors = arrayOf<Factor>(
+                    GlobalCardinality(
+                        xs = IntArray(n) { it },
+                        cover = longArrayOf(0, 1, 2),
+                        countLow = intArrayOf(1, 0, 1),
+                        countHigh = intArrayOf(1, 2, 2),
+                        closed = rng.nextBoolean(),
+                        presents = IntArray(n) { Lit.make(it, true) },
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "gcc-opt#$iter") { state ->
+                (0 until n).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
+                    (0 until 4).all { state.excludeIntValue(rng.nextInt(n), rng.nextInt(3).toLong()) }
+            }
+        }
+    }
 }
