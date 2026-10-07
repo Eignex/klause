@@ -249,7 +249,6 @@ class CpSearchComponent(
     }
 
     override fun resolveConflict(context: com.eignex.klause.solver.search.SearchContext): SearchConflictResolution {
-        if (session.problem.numIntVars != 0) return SearchConflictResolution.Chronological
         val learned = (lastResult as? PropagationResult.Unsat)?.learnedClause
             as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
             ?: return SearchConflictResolution.Chronological

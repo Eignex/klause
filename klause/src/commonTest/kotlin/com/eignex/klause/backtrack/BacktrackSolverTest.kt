@@ -239,6 +239,26 @@ class BacktrackSolverTest {
     }
 
     @Test
+    fun `an integer model learns from its conflicts`() {
+        // x + y = 5 and x - y = 2 need 2x = 7: bounds reasoning cannot see the parity, so the search fails
+        // at its leaves and each failure is analyzed into a learned constraint.
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 5),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 2),
+            ),
+        )
+
+        val result = BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        assertIs<SolveResult.Unsat>(result)
+        assertTrue(result.stats.search.learnedClauses.sum > 0.0, "learned: ${result.stats.search.learnedClauses.sum}")
+    }
+
+    @Test
     fun `solve returns SAT with valid witness on simple clause`() {
         val p = Problem(
             numBoolVars = 2,
