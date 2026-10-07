@@ -561,8 +561,12 @@ internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
         newT && atoms.kind[atomId] == AtomKind.EQ ->
             composeIntVarAtomAntecedents(intArrayOf(atoms.intVar[atomId]))
 
-        !newT && atoms.kind[atomId] == AtomKind.EQ && holeHistHas(atoms.intVar[atomId], atoms.threshold[atomId]) ->
+        !newT && atoms.kind[atomId] == AtomKind.EQ && holeHistHas(atoms.intVar[atomId], atoms.threshold[atomId]) -> {
+            // The value left at its carve, which may be well before this move woke the atom: its level is the
+            // carve's, matching the carve's reason, or a root carve would sit at this level with no reason.
+            atoms.lvl[atomId] = holeLevelFor(atoms.intVar[atomId], atoms.threshold[atomId])
             holeReasonFor(atoms.intVar[atomId], atoms.threshold[atomId])
+        }
 
         // A bound atom crossed by this move: the tight frontier atom (threshold at the live bound)
         // rests on the move's explanation; a looser one is entailed by that frontier atom through a

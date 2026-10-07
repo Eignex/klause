@@ -43,6 +43,20 @@ class PropagationStateHoleEqAtomStaleReasonTest {
         currentFactor = fid
     }
 
+    @Test
+    fun `a carved value keeps its carve level when a later move wakes its eq atom`() {
+        // 3 is carved out at the root, its eq atom materialized there; a level-1 move past 3 wakes the atom,
+        // which must stay a root fact rather than a reasonless literal at level 1.
+        val s = freshState(numVars = 1, hi = 5)
+        check(s.excludeIntValue(0, 3, null))
+        val atom = s.atomVarEq(0, 3)
+        s.beginLevel(0, fid = -1)
+
+        check(s.tightenIntMax(0, 2, null))
+
+        assertEquals(0, s.atomLevelForConflict(atom))
+    }
+
     /** No determined atom's derived antecedents may cite an undetermined atom (#670). */
     private fun assertReasonsCiteOnlyDeterminedAtoms(s: PropagationState, where: String) {
         for (id in 0 until s.atoms.intVar.size) {
