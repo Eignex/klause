@@ -51,7 +51,8 @@ internal class DisjunctivePropagator(
             profileOverloadReason(state, effDur)?.let { return it }
             energeticWindowReason(state, effDur)?.let { return it }
         }
-        return collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        val base = collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        return OptPresence.withPresencePremises(presents, state, base)
     }
 
     private fun isActive(state: PropagationState, i: Int, effDur: LongArray): Boolean =
@@ -64,7 +65,8 @@ internal class DisjunctivePropagator(
             vars.add(starts[i])
             if (durationVars.isNotEmpty()) vars.add(durationVars[i])
         }
-        return collectLinearTightenAntecedents(state, vars.toIntArray(), excludeIdx = -1, extraLit = 0)
+        val base = collectLinearTightenAntecedents(state, vars.toIntArray(), excludeIdx = -1, extraLit = 0)
+        return OptPresence.withPresencePremises(presents, state, base, taskIdx.toIntArray())
     }
 
     /** Two tasks each forced strictly after the other — implied by just those two starts. */
@@ -152,7 +154,7 @@ internal class DisjunctivePropagator(
             profile.addTask(lst = dom.max, ect = dom.min + d, resource = 1L)
         }
         if (!profile.build(cap = 1L)) return false
-        val ant = state.composeIntVarAtomAntecedents(intVars)
+        val ant = OptPresence.withPresencePremises(presents, state, state.composeIntVarAtomAntecedents(intVars))
         for (i in 0 until n) {
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
@@ -190,7 +192,7 @@ internal class DisjunctivePropagator(
     /** Pairwise rule: if `est_i + dur_i > lst_j`, task i can't end before j must start;
      *  i must come strictly after j. Tighten `start_i.min ≥ est_j + dur_j`. */
     private fun detectablePrecedences(state: PropagationState, effDur: LongArray): Boolean {
-        val ant = state.composeIntVarAtomAntecedents(intVars)
+        val ant = OptPresence.withPresencePremises(presents, state, state.composeIntVarAtomAntecedents(intVars))
         for (i in 0 until n) {
             if (effDur[i] == 0L) continue
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
@@ -253,7 +255,7 @@ internal class DisjunctivePropagator(
 
         val tree = CumulativeThetaTree(n = m, capacity = 1L)
         tree.setLeafOrder(leafPos)
-        val ant = state.composeIntVarAtomAntecedents(intVars)
+        val ant = OptPresence.withPresencePremises(presents, state, state.composeIntVarAtomAntecedents(intVars))
 
         var k = 0
         while (k < m) {

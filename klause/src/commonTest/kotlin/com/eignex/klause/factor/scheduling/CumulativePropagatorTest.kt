@@ -4,12 +4,14 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.FactorPropagationOracle
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.internals.CumulativeThetaTree
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
@@ -37,6 +39,36 @@ import kotlin.test.assertTrue
 class CumulativePropagatorTest {
 
     // --- Energetic reasoning ---
+
+    @Test
+    fun `cumulative deductions over optional tasks are implied by their reasons`() {
+        val rng = Random(0xC0A1)
+        repeat(400) { iter ->
+            val n = 3
+            val problem = Problem(
+                numBoolVars = n,
+                numIntVars = n,
+                intDomains = Array(n) { IntDomain(0, 5) },
+                factors = arrayOf<Factor>(
+                    Cumulative(
+                        starts = IntArray(n) { it },
+                        durations = LongArray(n) { 2L + rng.nextInt(2) },
+                        resources = LongArray(n) { 1L + rng.nextInt(2) },
+                        capacity = 2L,
+                        presents = IntArray(n) { Lit.make(it, true) },
+                    ),
+                ),
+            )
+            PropagationReasonOracle.assertReasonsImply(problem, "cumulative#$iter") { state ->
+                (0 until n).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
+                    (0 until 3).all {
+                        val v = rng.nextInt(n)
+                        if (rng.nextBoolean()) state.tightenIntMax(v, rng.nextInt(4).toLong())
+                        else state.tightenIntMin(v, 1L + rng.nextInt(4))
+                    }
+            }
+        }
+    }
 
     @Test
     fun `energetic reasoning caps a resource height that cannot fit the shared window`() {
