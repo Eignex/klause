@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -13,6 +14,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -103,5 +105,40 @@ class WideReifiedLinearPropagatorTest {
         val p = Problem(0, 1, arrayOf(IntDomain(0, 5)), arrayOf<Factor>(row))
         val r = LocalSearchSolver(p.bake()).solve(LocalSearchParams(maxFlips = 1_000, randomSeed = 1))
         assertEquals(3L, assertIs<SolveResult.Sat>(r).assignment.ints[0])
+    }
+
+    @Test
+    fun `wide reified linear deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x1DE1)
+        for (op in LinearOp.entries) {
+            repeat(75) { iter ->
+                val n = 3
+                val problem = Problem(
+                    numBoolVars = 1,
+                    numIntVars = n,
+                    intDomains = Array(n) { IntDomain(0, 3) },
+                    factors = arrayOf<Factor>(
+                        ReifiedLinear(
+                            0,
+                            IntArray(n) { it },
+                            Array(n) { w * BigInteger.fromInt(listOf(-3, -2, -1, 1, 2, 3).random(rng)) },
+                            op,
+                            w * BigInteger.fromInt(rng.nextInt(-3, 7)),
+                        ),
+                    ),
+                )
+                PropagationReasonOracle.assertReasonsImply(problem, "wide-reified-linear-$op#$iter") { state ->
+                    (rng.nextInt(3) != 0 || state.pinBool(0, rng.nextBoolean())) &&
+                        (0 until 4).all {
+                            val v = rng.nextInt(n)
+                            when (rng.nextInt(3)) {
+                                0 -> state.excludeIntValue(v, rng.nextInt(4).toLong())
+                                1 -> state.tightenIntMin(v, 1L + rng.nextInt(2))
+                                else -> state.tightenIntMax(v, 1L + rng.nextInt(2))
+                            }
+                        }
+                }
+            }
+        }
     }
 }

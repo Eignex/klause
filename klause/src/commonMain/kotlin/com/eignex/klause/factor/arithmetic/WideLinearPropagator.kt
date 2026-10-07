@@ -36,7 +36,7 @@ internal class WideLinearPropagator(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
-        wideEnforceRow(state, vars, coeffs, op, bound, auxLit = 0)
+        wideEnforceRow(state, vars, coeffs, op, bound, auxLit = null)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)

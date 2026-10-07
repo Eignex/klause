@@ -22,7 +22,7 @@ internal class ReifiedPseudoBooleanPropagator(
 ) : Propagator {
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: 0
+        val auxLit = state.boolValues[auxBoolVar]?.let { Lit.make(auxBoolVar, !it) } ?: Lit.NONE
         return pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = auxLit)
     }
 
@@ -45,7 +45,7 @@ internal class ReifiedPseudoBooleanPropagator(
             auxBoolVar,
             alwaysHolds,
             neverHolds,
-            pinAntecedent = { pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0) },
+            pinAntecedent = { pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = Lit.NONE) },
             propagateTrue = { a -> propagatePbBounds(state, weights, literals, op, bnd, extraLit = a) },
             propagateFalse = { a ->
                 when (val falseForm = falseForm(op, bnd)) {
@@ -77,7 +77,7 @@ internal class ReifiedPseudoBooleanPropagator(
         weights: LongArray,
         literals: IntArray,
         bound: Long,
-        extraLit: Int = 0,
+        extraLit: Int = Lit.NONE,
     ): Boolean {
         val r = pbLitRanges(state, weights, literals)
         val sumLo = r.sumLo
