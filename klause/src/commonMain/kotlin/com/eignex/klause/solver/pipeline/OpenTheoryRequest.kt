@@ -160,21 +160,20 @@ object OpenTheoryPipeline {
     fun searchWithoutTheory(model: Problem, params: TheoryParams = TheoryParams()): OpenTheoryResult =
         OpenPortfolio(model, request = null, params).solve(params.cancellation or params.timeout)
 
+    /** The engine that decides the satisfaction [request]. */
+    internal fun engineFor(request: OpenTheoryRequest): OpenTheoryEngine = OpenTheoryEngine(
+        request.model,
+        request.route,
+        request.presolveConfig,
+        request.solutionSetSensitive,
+        request.presolveCancellation,
+        request.presolveBudget,
+    )
+
     /** Execute [request] through its selected complete theory route. */
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
         val objective = request.minimizedObjective
-        if (objective == null) {
-            return OpenTheoryExecution.Satisfy(
-                OpenTheoryEngine(
-                    request.model,
-                    request.route,
-                    request.presolveConfig,
-                    request.solutionSetSensitive,
-                    request.presolveCancellation,
-                    request.presolveBudget,
-                ).solve(params),
-            )
-        }
+        if (objective == null) return OpenTheoryExecution.Satisfy(engineFor(request).solve(params))
         return OpenTheoryExecution.Optimize(
             OpenTheoryMinimizer(
                 request.model,

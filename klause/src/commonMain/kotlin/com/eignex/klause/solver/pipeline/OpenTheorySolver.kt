@@ -21,8 +21,10 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.HeuristicBooleanBranching
 import com.eignex.klause.solver.search.SearchCandidateHints
 import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRestart
-import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchRun
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
@@ -245,20 +247,44 @@ class OpenTheoryEngine internal constructor(
         }
     }
 
-    private fun solvePrepared(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult {
+    private fun solvePrepared(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult =
+        when (val begun = begin(params, state, SearchNodePolicy.ExpandAll)) {
+            is OpenTheoryStart.Decided -> begun.result
+
+            is OpenTheoryStart.Running -> begun.run.use {
+                checkNotNull(
+                    it.advance(),
+                ) { "an unsliced run never pauses" }
+            }
+        }
+
+    /**
+     * Prepare the source, close its open sides and set the search up, stopping at the first branch: decided when
+     * preparation or the root settles the model, else a run [OpenTheoryRun.advance] drives. [nodePolicy] sees every
+     * branch, so a caller that pauses there gets a run it can resume slice by slice; the theory's own checks stop
+     * only on [params]' tokens, never on a slice.
+     */
+    internal fun begin(
+        params: TheoryParams,
+        state: OpenTheorySolveState,
+        nodePolicy: SearchNodePolicy,
+    ): OpenTheoryStart {
         val work = state.work
         val cancellation = params.timeout or params.cancellation
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
         stats.start()
         // Preparation reads the whole model, so a budget already spent is answered before that work
         // starts rather than after it.
-        if (cancellation()) return unknown(params.timeout(), stats = stats, state = state)
+        if (cancellation()) return OpenTheoryStart.Decided(unknown(params.timeout(), stats = stats, state = state))
         // Preparation runs before the route exists, so its refutation is the model's verdict.
         val source = prepare(cancellation)
         val prepared = source.prepared
         stats.presolve = prepared.stats.takeIf { prepared.changed || it.infeasible }
         val routed = when (source) {
-            is OpenSourcePreparation.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
+            is OpenSourcePreparation.Refuted -> return OpenTheoryStart.Decided(
+                OpenTheoryResult.Unsat(stats.finish(state)),
+            )
+
             is OpenSourcePreparation.Planned -> source
         }
         val plan = routed.plan
@@ -276,7 +302,10 @@ class OpenTheoryEngine internal constructor(
                     stats.lp,
                 )
             ) {
-                OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
+                OpenPresolveResult.Refuted -> return OpenTheoryStart.Decided(
+                    OpenTheoryResult.Unsat(stats.finish(state)),
+                )
+
                 is OpenPresolveResult.Tightened -> closed.spec
             }
         }
@@ -290,21 +319,24 @@ class OpenTheoryEngine internal constructor(
             smtStats = state.smt,
             theorySolveStop = cancellation,
         )
-        planned.use {
+        var handedOff = false
+        try {
             planned.session.attachOpenTheoryWork(work)
             when (planned.session.initialize()) {
                 ComponentResult.Consistent -> Unit
 
-                is ComponentResult.Conflict -> return OpenTheoryResult.Unsat(
-                    stats.finish(state),
+                is ComponentResult.Conflict -> return OpenTheoryStart.Decided(
+                    OpenTheoryResult.Unsat(stats.finish(state)),
                 )
 
-                ComponentResult.Indeterminate -> return unknown(
-                    params.timeout(),
-                    planned.session.checkBudgetExhausted() ||
-                        (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
-                    stats,
-                    state,
+                ComponentResult.Indeterminate -> return OpenTheoryStart.Decided(
+                    unknown(
+                        params.timeout(),
+                        planned.session.checkBudgetExhausted() ||
+                            (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
+                        stats,
+                        state,
+                    ),
                 )
             }
             val solveParams = SearchSolveParams(
@@ -318,38 +350,60 @@ class OpenTheoryEngine internal constructor(
                 OpenBranching.SourceOrder -> BooleanBranching.SourceOrder(model.numBoolVars)
                 OpenBranching.Activity -> HeuristicBooleanBranching(Vsids(), model.numBoolVars)
             }
-            val result = planned.session.solve(
+            val run = planned.session.openRun(
                 model.numBoolVars,
                 solveParams,
-                hints,
-                branching,
-                branching as? SearchRunObserver ?: SearchRunObserver.None,
+                booleanBranching = branching,
+                observer = branching as? SearchRunObserver ?: SearchRunObserver.None,
+                nodePolicy = nodePolicy,
+                candidateHints = hints,
             )
-            return when (result) {
-                // The witness is of the prepared model, so the columns preparation eliminated are
-                // recovered before it leaves this route. Boolean ids are the source model's throughout —
-                // a source pass leaves an eliminated column in place rather than renumbering.
-                is SearchResult.Satisfied -> OpenTheoryResult.Sat(
-                    prepared.rebuild.lift(
-                        assignment(result.model, checkNotNull(planned.theory), route),
-                        prepared.source.numBoolVars,
-                        prepared.source.numIntVars,
-                    ),
-                    stats.finish(state, planned.session),
-                )
-
-                SearchResult.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
-
-                SearchResult.Indeterminate -> unknown(
-                    params.timeout(),
-                    planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted() ||
-                        (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
-                    stats,
-                    state,
-                    planned.session,
-                )
-            }
+            handedOff = true
+            return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, route, stats, state, params))
+        } finally {
+            if (!handedOff) planned.close()
         }
+    }
+
+    /** A theory search held open across [advance] calls; closing it releases the search. */
+    internal inner class OpenTheoryRun(
+        private val planned: PlannedSearch,
+        private val run: SearchRun,
+        private val prepared: PreparedSource,
+        private val route: ProblemPipeline,
+        private val stats: SolveStatsSink,
+        private val state: OpenTheorySolveState,
+        private val params: TheoryParams,
+    ) : AutoCloseable {
+        /** Continue the search: its verdict, or null when the node policy paused it. */
+        fun advance(): OpenTheoryResult? = when (val event = run.next()) {
+            // The witness is of the prepared model, so the columns preparation eliminated are
+            // recovered before it leaves this route. Boolean ids are the source model's throughout —
+            // a source pass leaves an eliminated column in place rather than renumbering.
+            is SearchRunEvent.Satisfied -> OpenTheoryResult.Sat(
+                prepared.rebuild.lift(
+                    assignment(event.model, checkNotNull(planned.theory), route),
+                    prepared.source.numBoolVars,
+                    prepared.source.numIntVars,
+                ),
+                stats.finish(state, planned.session),
+            )
+
+            SearchRunEvent.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
+
+            SearchRunEvent.Paused -> null
+
+            is SearchRunEvent.Indeterminate -> unknown(
+                params.timeout(),
+                planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted() ||
+                    (planned.theory as? ExactLiraSearchComponent)?.operationBudgetExhausted == true,
+                stats,
+                state,
+                planned.session,
+            )
+        }
+
+        override fun close() = planned.close()
     }
 
     /** Prepare the source under the caller's stop, once per engine. */
@@ -491,4 +545,13 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
         session ?: return
         clauses = clauses.mergedWith(session.learnedClauseStats())
     }
+}
+
+/** How [OpenTheoryEngine.begin] left a solve: decided before the first branch, or running. */
+internal sealed interface OpenTheoryStart {
+    /** Preparation, bound closing or the root settled the model. */
+    class Decided(val result: OpenTheoryResult) : OpenTheoryStart
+
+    /** The search is set up; [run] drives it. */
+    class Running(val run: OpenTheoryEngine.OpenTheoryRun) : OpenTheoryStart
 }

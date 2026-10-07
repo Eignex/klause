@@ -171,13 +171,14 @@ class PortfolioWorker private constructor(
 
         /**
          * A worker over an engine that has no [Session]: [solve] runs one segment under the segment's cancellation
-         * and, when [countsInstructions], its counted allowance. It streams no improvements and no samples and has
-         * no pause handle, so a [Portfolio] reruns it each segment.
+         * and, when [countsInstructions], its counted allowance. It streams no improvements and no samples. With
+         * [resumable] a [Portfolio] resumes one handle each segment instead of calling [solve].
          */
         internal fun ofSolve(
             label: String,
             armId: Int,
             countsInstructions: Boolean = false,
+            resumable: (() -> ResumableSolve)? = null,
             solve: (Cancellation, Long?) -> SolveResult,
         ): PortfolioWorker = PortfolioWorker(
             label = label,
@@ -186,7 +187,7 @@ class PortfolioWorker private constructor(
             improvementsFn = { _, _, _, _ -> error("PortfolioWorker '$label' cannot stream improvements") },
             samplesFn = { emptySequence() },
             resumableFn = null,
-            resumableSolveFn = null,
+            resumableSolveFn = resumable,
             withInstructions = countsInstructions,
             closeFn = {},
         )
