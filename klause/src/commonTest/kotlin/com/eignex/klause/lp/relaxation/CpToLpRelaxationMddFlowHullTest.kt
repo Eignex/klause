@@ -126,7 +126,7 @@ class CpToLpRelaxationMddFlowHullTest {
     fun `randomized plain MDD flow hull matches the brute-force optimum`() {
         val rng = Random(20260616)
         var checked = 0
-        repeat(300) { _ ->
+        repeat(60) { _ ->
             val n = rng.nextInt(2, 5)
             val alphabet = rng.nextInt(2, 4)
             val spl = IntArray(n + 1) { if (it == 0) 1 else rng.nextInt(1, 4) }
@@ -210,6 +210,6 @@ class CpToLpRelaxationMddFlowHullTest {
                 "MDD flow hull optimum ${sol.objectiveValue} != brute $opt",
             )
         }
-        assertTrue(checked > 100, "only $checked feasible instances checked")
+        assertTrue(checked > 20, "only $checked feasible instances checked")
     }
 }

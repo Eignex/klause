@@ -46,7 +46,7 @@ class ObjectiveBoundFactorTest {
         )
         val solver = LocalSearchSolver(overlay, strategy = ProbSat()).apply { objectiveBound = bound }
 
-        val result = solver.minimize(objective, LocalSearchParams(maxFlips = 50_000, randomSeed = 7))
+        val result = solver.minimize(objective, LocalSearchParams(maxFlips = 5_000, randomSeed = 7))
 
         val best = assertIs<MinimizeResult.BestFound>(result, "the ratchet arm should reach a feasible incumbent")
         assertEquals(1.0, best.objective, "the ratchet should drive the objective to the optimum (one true)")

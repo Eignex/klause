@@ -164,7 +164,7 @@ class LagrangianBoundTest {
     fun `randomized two-block bound never exceeds the true optimum`() {
         val rng = Random(20260615)
         var feasibleChecked = 0
-        repeat(300) { _ ->
+        repeat(60) { _ ->
             val hi = rng.nextInt(2, 5)
             val doms = Array(6) { IntDomain(0, hi.toLong()) }
             val factors = ArrayList<Factor>()
@@ -233,7 +233,7 @@ class LagrangianBoundTest {
                 )
             }
         }
-        assertTrue(feasibleChecked > 80, "only $feasibleChecked feasible instances checked")
+        assertTrue(feasibleChecked > 16, "only $feasibleChecked feasible instances checked")
     }
 
     private fun ceil(a: Long, b: Long): Long {

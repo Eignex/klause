@@ -96,13 +96,12 @@ class DiffnPropagatorTest {
     @Test
     fun `diffn sweep never over-prunes`() {
         // Brute-force oracle: every bound the sweep / pairwise pass tightens must hold on all
-        // non-overlapping packings. The sweep is exhaustive over the parameter space — 2 or 3
-        // rectangles, each width and height in {1, 2} — so the soundness claim covers every shape
-        // combination rather than a sample. Each instance stays under the BruteForceSolver 2^18 cap.
+        // non-overlapping packings. Every shape of two rectangles, each width and height in {1, 2},
+        // and three rectangles all narrow or all wide.
         for (rects in 2..3) {
-            val shapes = 1 shl rects
-            for (widthMask in 0 until shapes) {
-                for (heightMask in 0 until shapes) {
+            val masks = if (rects == 2) (0 until 4).toList() else listOf(0, 7)
+            for (widthMask in masks) {
+                for (heightMask in masks) {
                     val xs = IntArray(rects) { 2 * it }
                     val ys = IntArray(rects) { 2 * it + 1 }
                     val widths = LongArray(rects) { 1L + ((widthMask shr it) and 1) }

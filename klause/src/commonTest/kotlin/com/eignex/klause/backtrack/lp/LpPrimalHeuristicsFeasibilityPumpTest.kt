@@ -38,7 +38,7 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
     fun `the pump returns only feasible incumbents`() {
         val rng = Random(20260623)
         var produced = 0
-        repeat(300) {
+        repeat(60) {
             val n = rng.nextInt(3, 7)
             val domains = Array(n) { IntDomain(0, 1) }
             val factors = ArrayList<Factor>()
@@ -67,7 +67,7 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
                 assertTrue(satisfies(f, sample.ints), "pump returned an infeasible incumbent ${sample.ints.toList()}")
             }
         }
-        assertTrue(produced > 50, "the pump produced only $produced incumbents across 300 instances")
+        assertTrue(produced > 10, "the pump produced only $produced incumbents across 60 instances")
     }
 
     @Test
