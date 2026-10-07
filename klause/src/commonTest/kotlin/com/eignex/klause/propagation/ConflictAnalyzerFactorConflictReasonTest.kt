@@ -194,6 +194,28 @@ class ConflictAnalyzerFactorConflictReasonTest {
     }
 
     @Test
+    fun `a linear conflict cites the weakest bound that still forces it`() {
+        // x0 + x1 <= 5 with x1 >= 3 at the root: deciding x0 >= 4 overshoots by two, so x0 >= 3 already
+        // forces the conflict and the reason cites that rather than the decision's own bound.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 10), IntDomain(3, 10)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 5)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        check(state.setIntMinAsDecision(0, 4))
+        state.currentFactor = 0
+
+        assertFalse(state.factorAt(0).propagate(state, 0))
+
+        val reason = state.factorAt(0).conflictReason(state, 0)!!
+        val atom = Lit.variable(reason.single()) - problem.numBoolVars
+        assertEquals(0 to 3L, state.atoms.intVar[atom] to state.atoms.threshold[atom])
+    }
+
+    @Test
     fun `Linear int-domain conflict produces learned clause via coarse default`() {
         // Two ReifiedLinears share aux x:
         //   x ↔ (var0 = 5) and x ↔ (var1 = 5).
