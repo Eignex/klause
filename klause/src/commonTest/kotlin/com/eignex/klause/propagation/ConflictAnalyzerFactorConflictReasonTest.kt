@@ -194,6 +194,26 @@ class ConflictAnalyzerFactorConflictReasonTest {
     }
 
     @Test
+    fun `a linear bound cites the weakest bound that still forces it`() {
+        // x0 + 2 * x1 <= 10: deciding x0 >= 4 forces x1 <= 3, which x0 >= 3 already does.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 10)),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        check(state.setIntMinAsDecision(0, 4))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val atom = Lit.variable(state.intMaxAntecedents[1]!!.single()) - problem.numBoolVars
+        assertEquals(0 to 3L, state.atoms.intVar[atom] to state.atoms.threshold[atom])
+    }
+
+    @Test
     fun `a linear conflict cites the weakest bound that still forces it`() {
         // x0 + x1 <= 5 with x1 >= 3 at the root: deciding x0 >= 4 overshoots by two, so x0 >= 3 already
         // forces the conflict and the reason cites that rather than the decision's own bound.
