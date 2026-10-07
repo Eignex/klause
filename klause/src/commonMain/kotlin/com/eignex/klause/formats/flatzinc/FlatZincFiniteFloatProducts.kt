@@ -3,6 +3,7 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.reifyRealLinear
 import com.eignex.klause.lowering.tseitinOr
 
@@ -30,14 +31,11 @@ internal fun FlatZincCompiler.emitFiniteFloatDomains() {
     }
 }
 
-internal fun FlatZincCompiler.recordFiniteFloatChoices(c: FznConstraint) {
-    if (c.name != "array_float_element") return
-    expectArity(c, 3)
-    val result = resolveFloatVarOrConst(c.args[2]) as? FloatRef.Var ?: return
-    if (!result.bk.lpOnly) return
-    val values = evalFloatConstArray(c.args[1]).distinct().toDoubleArray()
-    val existing = finiteFloatChoices[result.bk.varId]
-    finiteFloatChoices[result.bk.varId] = existing?.filter { candidate -> values.any { it == candidate } }
+internal fun FlatZincCompiler.recordFiniteFloatChoices(domain: FiniteFloatDomain) {
+    if (!domain.variable.lpOnly) return
+    val values = domain.values.distinct().toDoubleArray()
+    val existing = finiteFloatChoices[domain.variable.varId]
+    finiteFloatChoices[domain.variable.varId] = existing?.filter { candidate -> values.any { it == candidate } }
         ?.toDoubleArray() ?: values
 }
 
@@ -82,7 +80,14 @@ internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, r
 internal fun FlatZincCompiler.exactFloatValueLiteral(variable: Int, value: Double): Int {
     val canonical = if (value == 0.0) 0.0 else value
     return floatValueLiterals.getOrPut(variable to canonical) {
-        reifyRealLinear(doubleArrayOf(1.0), intArrayOf(variable), LinearOp.EQ, canonical)
+        val integer = integerFloatSources[variable]
+        if (integer != null && canonical >= -9007199254740992.0 && canonical <= 9007199254740992.0 &&
+            canonical.toLong().toDouble() == canonical
+        ) {
+            reifyLinear(longArrayOf(1L), intArrayOf(integer), LinearOp.EQ, canonical.toLong())
+        } else {
+            reifyRealLinear(doubleArrayOf(1.0), intArrayOf(variable), LinearOp.EQ, canonical)
+        }
     }
 }
 
