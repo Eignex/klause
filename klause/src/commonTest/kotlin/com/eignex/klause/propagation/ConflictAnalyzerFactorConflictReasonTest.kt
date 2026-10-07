@@ -214,6 +214,31 @@ class ConflictAnalyzerFactorConflictReasonTest {
     }
 
     @Test
+    fun `a wide linear bound cites the bounds as they stood when it was deduced`() {
+        // x0 + 2 * x1 + x2 + ... + x32 <= 10: deciding x0 >= 4 forces x1 <= 3, which x0 >= 3 already does,
+        // and a later x0 >= 6 must not change what that deduction rested on.
+        val n = 33
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = n,
+            intDomains = Array(n) { IntDomain(0, 10) },
+            factors = arrayOf<Factor>(
+                Linear(IntArray(n) { if (it == 1) 2 else 1 }, IntArray(n) { it }, LinearOp.LE, 10),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        check(state.setIntMinAsDecision(0, 4))
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0))
+        check(state.setIntMinAsDecision(0, 6))
+
+        val atom = Lit.variable(state.reasonOf(state.intMaxAntecedents[1])!!.single()) - problem.numBoolVars
+
+        assertEquals(0 to 3L, state.atoms.intVar[atom] to state.atoms.threshold[atom])
+    }
+
+    @Test
     fun `a linear conflict cites the weakest bound that still forces it`() {
         // x0 + x1 <= 5 with x1 >= 3 at the root: deciding x0 >= 4 overshoots by two, so x0 >= 3 already
         // forces the conflict and the reason cites that rather than the decision's own bound.

@@ -218,6 +218,9 @@ class PropagationState(
     // bound's history is searched without walking the whole log. Appended by [logIntChange], popped as the
     // undo replay passes each record.
     internal val boundMoves: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+
+    // Built lazy reasons, keyed by their marker array (identity); see [reasonOf].
+    internal val lazyReasonMemo = HashMap<IntArray, IntArray?>()
     internal val holeHistVal: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
     internal val holeHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 

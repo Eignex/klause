@@ -517,7 +517,7 @@ class PropagationSession(
      * can resolve through a CP-implied literal instead of stopping at it.
      */
     fun boolReasonClause(v: Int): IntArray? {
-        val antecedents = state.boolAntecedents[v] ?: return null
+        val antecedents = state.reasonOf(state.boolAntecedents[v]) ?: return null
         val assigned = state.boolValues[v] ?: return null
         val reason = IntArray(antecedents.size + 1)
         reason[0] = Lit.make(v, assigned)

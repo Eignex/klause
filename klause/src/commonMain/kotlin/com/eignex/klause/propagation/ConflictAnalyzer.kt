@@ -199,6 +199,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * sit below the literal's level on this one.
      */
     private fun beginAnalysis() {
+        state.lazyReasonMemo.clear()
         val atomCount = state.atoms.intVar.size
         if (atomLevelStamp.size < atomCount) {
             atomLevelStamp = IntArray(atomCount)
@@ -236,7 +237,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     fun analyzeDecisionConflict(conflictedVar: Int): AnalysisResult {
         beginAnalysis()
         val priorValue = state.boolValues[conflictedVar] ?: return AnalysisResult.NotApplicable
-        val priorAnt = state.boolAntecedents[conflictedVar]
+        val priorAnt = state.reasonOf(state.boolAntecedents[conflictedVar])
         // The just-attempted decision lit (currently false in state because the prior
         // pin still holds and pinBoolImpl rejected the new value).
         val decisionLit = Lit.make(conflictedVar, !priorValue)
@@ -391,7 +392,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     override fun antecedentsOf(v: Int): IntArray? {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
-            if (v < 0) null else state.boolAntecedents[v]
+            if (v < 0) null else state.reasonOf(state.boolAntecedents[v])
         } else {
             val atomId = v - numBoolVars
             if (atomId < state.atoms.intVar.size) state.atomAntecedentsDerived(atomId) else null
