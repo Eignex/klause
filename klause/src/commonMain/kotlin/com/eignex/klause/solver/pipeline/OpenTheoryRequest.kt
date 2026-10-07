@@ -145,20 +145,31 @@ object OpenTheoryPipeline {
     }
 
     /**
-     * Decide the satisfaction [request] on the open portfolio: its theory route as one arm and local-search arms over
-     * the source columns beside it, every local-search witness checked against the source model.
+     * Execute [request] on the open portfolio: its theory route as one arm — the descent when it optimizes — and
+     * local-search arms over the source columns beside it, every local-search witness checked against the source
+     * model.
      */
-    fun executePortfolio(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryResult {
-        require(request.objective == null) { "the open portfolio decides satisfaction only" }
-        return OpenPortfolio(request.model, request, params).solve(params.cancellation or params.timeout)
+    fun executePortfolio(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
+        val portfolio = OpenPortfolio(request.model, request, params)
+        val stop = params.cancellation or params.timeout
+        val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
+        return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizerFor(request, objective), stop))
     }
 
     /**
-     * Search [model], an open model no theory decides, with local search alone. It can show the model satisfiable and
-     * never shows it unsatisfiable.
+     * Search [model], an open model no theory decides, with local search alone. It can show the model satisfiable
+     * and find incumbents for [objective], minimized, and never shows the model unsatisfiable or an incumbent optimal.
      */
-    fun searchWithoutTheory(model: Problem, params: TheoryParams = TheoryParams()): OpenTheoryResult =
-        OpenPortfolio(model, request = null, params).solve(params.cancellation or params.timeout)
+    fun searchWithoutTheory(
+        model: Problem,
+        params: TheoryParams = TheoryParams(),
+        objective: LinearObjective? = null,
+    ): OpenTheoryExecution {
+        val portfolio = OpenPortfolio(model, request = null, params)
+        val stop = params.cancellation or params.timeout
+        if (objective == null) return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
+        return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizer = null, stop))
+    }
 
     /** The engine that decides the satisfaction [request]. */
     internal fun engineFor(request: OpenTheoryRequest): OpenTheoryEngine = OpenTheoryEngine(
@@ -174,15 +185,17 @@ object OpenTheoryPipeline {
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
         val objective = request.minimizedObjective
         if (objective == null) return OpenTheoryExecution.Satisfy(engineFor(request).solve(params))
-        return OpenTheoryExecution.Optimize(
-            OpenTheoryMinimizer(
-                request.model,
-                objective,
-                request.presolveConfig,
-                request.solutionSetSensitive,
-                request.presolveCancellation,
-                request.presolveBudget,
-            ).minimize(params),
-        )
+        return OpenTheoryExecution.Optimize(minimizerFor(request, objective).minimize(params))
     }
+
+    // The descent minimizing [objective], the request's own in minimized form.
+    private fun minimizerFor(request: OpenTheoryRequest, objective: LinearObjective): OpenTheoryMinimizer =
+        OpenTheoryMinimizer(
+            request.model,
+            objective,
+            request.presolveConfig,
+            request.solutionSetSensitive,
+            request.presolveCancellation,
+            request.presolveBudget,
+        )
 }

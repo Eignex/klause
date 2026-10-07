@@ -133,7 +133,8 @@ internal class LocalSearchEngine(
             return if (model.refutesModel) {
                 SolveResult.Unsat(stats = sink.snapshot())
             } else {
-                SolveResult.Unknown(TerminationReason.SearchExhausted, sink.snapshot())
+                // A root refuted inside windows the engine chose covers none of the model: nothing was exhausted.
+                SolveResult.Unknown(TerminationReason.Unsupported, sink.snapshot())
             }
         }
         val sample = streamImpl(params, eff, warm, sink).firstOrNull()
@@ -194,7 +195,8 @@ internal class LocalSearchEngine(
                 if (model.refutesModel) {
                     MinimizeResult.Infeasible(stats = sink.snapshot())
                 } else {
-                    MinimizeResult.Unknown(TerminationReason.SearchExhausted, sink.snapshot())
+                    // Not SearchExhausted, which a portfolio reads as the whole space covered.
+                    MinimizeResult.Unknown(TerminationReason.Unsupported, sink.snapshot())
                 },
             )
             return@sequence

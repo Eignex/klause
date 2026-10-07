@@ -11,7 +11,9 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -92,6 +94,39 @@ class OpenTheoryMinimizeTest {
         val optimum = assertIs<OpenTheoryOptimum.Optimal>(result)
         assertEquals("3", optimum.value.toString())
         assertTrue(optimum.stats.lp.standalonePasses.sum > 0.0, "bound-closing LP work must reach the result")
+    }
+
+    @Test
+    fun `a sliced descent reaches the optimum an unsliced one proves`() {
+        val parsed = stepped()
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = -1L })
+        val minimizer = OpenTheoryMinimizer(parsed.model, objective)
+        val unsliced = assertIs<OpenTheoryOptimum.Optimal>(minimizer.minimize())
+
+        val sliced = minimizer.descent(TheoryParams()).use { descent ->
+            var verdict: OpenTheoryOptimum? = null
+            while (verdict == null) verdict = descent.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) { _, _ -> }
+            verdict
+        }
+
+        assertEquals(unsliced.value, assertIs<OpenTheoryOptimum.Optimal>(sliced).value)
+    }
+
+    @Test
+    fun `a round refuting another arm's bound leaves the optimum to that arm`() {
+        val parsed = stepped()
+        val x = parsed.intVarNames.getValue("x")
+        val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+        val minimizer = OpenTheoryMinimizer(parsed.model, objective)
+
+        val result = minimizer.descent(TheoryParams()) { BigInteger.ZERO }.use { descent ->
+            descent.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork = -1L) { _, _ -> }
+        }
+
+        val bounded = assertIs<OpenTheoryOptimum.Bounded>(result)
+        assertEquals(TerminationReason.SearchExhausted, bounded.reason)
+        assertNull(bounded.incumbent)
     }
 
     @Test

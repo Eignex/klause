@@ -6,12 +6,15 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 class OpenPortfolioTest {
@@ -27,6 +30,10 @@ class OpenPortfolioTest {
 
     private fun params() = TheoryParams(cancellation = Cancellation.after(10.seconds))
 
+    private fun satisfied(execution: OpenTheoryExecution) = assertIs<OpenTheoryExecution.Satisfy>(execution).result
+
+    private fun optimum(execution: OpenTheoryExecution) = assertIs<OpenTheoryExecution.Optimize>(execution).result
+
     @Test
     fun `local search finds a witness of an open model no theory decides`() {
         // x0 = 3, x1 = 4 and x2 = x0·x1 over open columns: the product holds no theory.
@@ -37,7 +44,7 @@ class OpenPortfolioTest {
             Product(0, 1, 2),
         )
 
-        val result = OpenTheoryPipeline.searchWithoutTheory(model, params())
+        val result = satisfied(OpenTheoryPipeline.searchWithoutTheory(model, params()))
 
         assertEquals("12", assertIs<OpenTheoryResult.Sat>(result).assignment.intValue(2))
     }
@@ -48,7 +55,7 @@ class OpenPortfolioTest {
         val model = openColumns(1, Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1))
         val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
 
-        val result = OpenTheoryPipeline.executePortfolio(request, params())
+        val result = satisfied(OpenTheoryPipeline.executePortfolio(request, params()))
 
         assertIs<OpenTheoryResult.Unsat>(result)
     }
@@ -69,8 +76,39 @@ class OpenPortfolioTest {
         )
         val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
 
-        val result = assertIs<OpenTheoryResult.Sat>(OpenTheoryPipeline.executePortfolio(request, params()))
+        val result = assertIs<OpenTheoryResult.Sat>(satisfied(OpenTheoryPipeline.executePortfolio(request, params())))
 
         assertTrue(result.stats.portfolio.arms.isEmpty())
+    }
+
+    @Test
+    fun `the portfolio proves the optimum of an open model`() {
+        // Minimize x0 + x1 with x0 ≥ 7 and x1 ≥ x0 − 2 over open columns: 7 + 5.
+        val model = openColumns(
+            2,
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 7),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.GE, -2),
+        )
+        val request = OpenTheoryRequest(model, LinearObjective(intCoefficients = longArrayOf(1, 1)))
+
+        val result = optimum(OpenTheoryPipeline.executePortfolio(request, params()))
+
+        assertEquals(BigInteger.fromLong(12), assertIs<OpenTheoryOptimum.Optimal>(result).value)
+    }
+
+    @Test
+    fun `local search bounds the optimum of an open model no theory decides`() {
+        val model = openColumns(
+            3,
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
+            Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 4),
+            Product(0, 1, 2),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1))
+        val params = TheoryParams(cancellation = Cancellation.after(100.milliseconds))
+
+        val result = optimum(OpenTheoryPipeline.searchWithoutTheory(model, params, objective))
+
+        assertEquals(BigInteger.fromLong(12), assertIs<OpenTheoryOptimum.Bounded>(result).value)
     }
 }

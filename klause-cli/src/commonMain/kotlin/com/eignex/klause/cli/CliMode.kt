@@ -615,23 +615,28 @@ internal fun openTheorySolvable(
     routingElapsedMs = routingElapsedMs,
 )
 
-/** Build an open model no theory decides, for local search to look for a witness of. */
+/**
+ * Build an open model no theory decides, for local search to look for a witness of, or incumbents for [objective] in
+ * minimized form.
+ */
 internal fun openLocalSearchSolvable(
     model: Problem,
     renderOpenTheory: (OpenTheoryAssignment) -> String,
     routingLpStats: LpStats = LpStats(),
     routingElapsedMs: Long = 0L,
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
 ): Solvable = Solvable(
     problem = null,
-    optimize = false,
-    maximize = false,
+    optimize = objective != null,
+    maximize = maximize,
     lsObjective = null,
     linearObjective = null,
     objVarId = null,
     definitionalSweep = null,
     render = { error("open local-search witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenLocalSearch(model, renderOpenTheory),
+    pipeline = SolvablePipeline.OpenLocalSearch(model, renderOpenTheory, objective, maximize),
     routingLpStats = routingLpStats,
     routingElapsedMs = routingElapsedMs,
 )

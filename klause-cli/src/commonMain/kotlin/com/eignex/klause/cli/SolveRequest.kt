@@ -155,11 +155,18 @@ internal sealed interface SolvablePipeline {
         val render: (OpenTheoryAssignment) -> String,
     ) : SolvablePipeline
 
-    /** An open model no theory decides, searched by local search alone: shown satisfiable or left unknown. */
+    /**
+     * An open model no theory decides, searched by local search alone: shown satisfiable, or given incumbents for
+     * [objective], or left unknown.
+     */
     data class OpenLocalSearch(
         /** The model as routing proved it. */
         val model: Problem,
         val render: (OpenTheoryAssignment) -> String,
+        /** The objective in minimized form, or null for satisfaction. */
+        val objective: LinearObjective? = null,
+        /** Whether [objective] is the negation of a maximized one. */
+        val maximize: Boolean = false,
     ) : SolvablePipeline
 
     /** Routing refuted the model while bounding its open sides, so no engine runs. */

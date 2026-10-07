@@ -9,12 +9,12 @@ import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.objectiveUnboundedBelow
 import com.eignex.klause.lp.statesOneBranch
 import com.eignex.klause.presolve.OpenPresolveResult
+import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
@@ -25,6 +25,8 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.ionspin.kotlin.bignum.integer.BigInteger
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /**
  * What an optimizing open-model route answers.
@@ -182,146 +184,265 @@ class OpenTheoryMinimizer internal constructor(
     )
 
     /** Minimizes the objective, tightening the bound until a round refutes it. */
-    fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum {
-        // Preparation is the descent's first phase, so the caller's stop reaches it and its own summary is
-        // what a run refuted here has to report — there is no round behind it to carry one.
-        val stats = SolveStatsSink(backend = "")
-        stats.start()
-        stats.backend = route.backendName()
-        val stop = presolveCancellation or params.cancellation or params.timeout
-        val prepared = PresolvePipeline.prepareSource(
-            source,
-            presolveConfig,
-            objective,
-            solutionSetSensitive,
-            stop,
-            presolveBudget,
-        )
-        if (prepared.infeasible) {
-            stats.presolve = prepared.stats
-            stats.stop()
-            return OpenTheoryOptimum.Infeasible(stats.snapshot())
-        }
-        // Ownership stays selected from the model as prepared, not from the closed one below. Closing a
-        // column does not move a factor between components, but it does change what `componentPlan` reads:
-        // a descent whose every side closed would select the finite route, which no round of it can run.
-        val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning()).plan
-        // Close the open sides once for the whole descent. Every round decides this model plus a strictly
-        // tighter objective row, and a row only removes solutions, so a bound proved here holds for every
-        // round below it. Leaving the close to the rounds has each one re-derive the same bounds from the
-        // declared sides, at one LP solve per open side per round.
-        //
-        // Not extra work: the opening round decides the model under no bound at all, so the close it would
-        // have run is this one. A refutation here is over the genuinely open ranges rather than inside an
-        // invented box, so it refutes the model itself — which, with no witness yet, is infeasibility.
-        var closingInterrupted = false
-        val closingStop = prepared.budget?.orSpent(stop) ?: stop
-        val closingCancellation = object : Cancellation {
-            override fun isCancelled(): Boolean = closingStop().also { if (it) closingInterrupted = true }
-
-            override fun workMeter(): WorkMeter? = closingStop.workMeter()
-        }
-        val base = when (
-            val closed = prepared.problem.closeOpenBounds(
-                closingCancellation,
-                stats.lp,
-            )
-        ) {
-            OpenPresolveResult.Refuted -> {
-                stats.presolve = prepared.stats
-                stats.stop()
-                return OpenTheoryOptimum.Infeasible(stats.snapshot())
-            }
-
-            is OpenPresolveResult.Tightened -> closed.spec
-        }
-        // A second bounded attempt on the same opening model cannot read a stronger input. If the
-        // first attempt changed a declared range or saw cancellation, let the round close again.
-        var reuseOpeningBoundAttempt = base.sameDeclaredIntegerRanges(prepared.problem) &&
-            !closingInterrupted && !stop() && prepared.budget?.remaining() != 0L
-        val state = OpenTheorySolveState(params)
-        fun finish(round: SolveStats): SolveStats {
-            stats.stop()
-            return round.withOptimizationEnvelope(stats.snapshot()).copy(smt = state.smt.snapshot())
-        }
-        // One incumbent for the whole descent: every witness a round proves feasible is offered here with
-        // the value read off it, and the bound the next round refutes is whatever the offer installed.
-        val incumbents = minimizingWitnessExchange()
-        // The opening round decides the model itself, so the row leaves plan and spec together until a
-        // witness gives it a bound to state.
-        var spec = base
-        var plan = if (terms.isEmpty()) boundedPlan else boundedPlan.withoutAppendedFactor(spec)
-        while (true) {
-            val result = OpenTheoryEngine(
-                OpenSourcePreparation.Planned(prepared, spec, plan),
-                presolveCancellation,
-                reuseOpeningBoundAttempt,
-            ).solve(params, state)
-            reuseOpeningBoundAttempt = false
-            when (result) {
-                is OpenTheoryResult.Sat -> {
-                    val value = objective.valueOf(result.assignment)
-                    when (val published = incumbents.offer(result.assignment, value)) {
-                        is Publication.Installed -> {
-                            val installed = published.incumbent
-                            when {
-                                // A constant objective has no row to tighten: its first witness is
-                                // already optimal, and a bound below the constant would exclude every
-                                // assignment rather than a worse one.
-                                terms.isEmpty() -> return incumbents.proven(finish(result.stats))
-
-                                // A bound row states that nothing feasible sits at the incumbent or
-                                // above it, and a model with a ray has a witness below every such row:
-                                // the descent would improve forever, so it states the verdict instead.
-                                unboundedBelow(
-                                    prepared.problem,
-                                    installed.assignment,
-                                    params,
-                                    state,
-                                ) ->
-                                    return OpenTheoryOptimum.Unbounded(
-                                        installed.assignment,
-                                        installed.objective,
-                                        finish(result.stats),
-                                    )
-
-                                else -> {
-                                    spec = base.boundedBy(installed.objective - BigInteger.ONE)
-                                    plan = boundedPlan
-                                }
-                            }
-                        }
-
-                        // A round carrying the row decided the model *plus* the objective held below the
-                        // incumbent, so a witness the gate declines is one that row excluded; the opening
-                        // round has no incumbent for the gate to decline against. Either way a declined
-                        // witness refutes no bound, which is what an optimum would take.
-                        Publication.NotImproving -> error("witness at $value does not improve its own bound")
-
-                        // The exchange trusts the route's certificate, so nothing here judges a witness.
-                        // Either outcome means a verifier reached this descent without its proofs being
-                        // revisited, and neither says anything about the model.
-                        is Publication.Rejected -> error("a trusted witness was refuted: ${published.reason}")
-
-                        is Publication.Indeterminate ->
-                            error("a trusted witness was left undecided: ${published.reason}")
-                    }
-                }
-
-                is OpenTheoryResult.Unsat -> return incumbents.proven(finish(result.stats))
-
-                is OpenTheoryResult.Unknown -> {
-                    val standing = incumbents.current()
-                    return OpenTheoryOptimum.Bounded(
-                        standing?.assignment,
-                        standing?.objective,
-                        result.reason,
-                        finish(result.stats),
-                    )
-                }
-            }
+    fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum = descent(params).use { descent ->
+        checkNotNull(descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { _, _ -> }) {
+            "an unsliced descent never pauses"
         }
     }
+
+    /**
+     * The descent advanced a slice at a time, for a portfolio to schedule beside other arms.
+     *
+     * [externalBound] is an objective value some other arm has reached, read as each round starts: a round
+     * refutes the better of it and the descent's own incumbent, so the descent never re-proves ground another arm
+     * has covered. A round that refutes a bound read there proves only that nothing beats that arm's value, which
+     * the descent reports as [OpenTheoryOptimum.Bounded] by [TerminationReason.SearchExhausted].
+     */
+    internal fun descent(params: TheoryParams, externalBound: () -> BigInteger? = { null }): Descent =
+        Descent(params, externalBound)
+
+    /** The exact objective value of [assignment]. */
+    internal fun valueOf(assignment: OpenTheoryAssignment): BigInteger = objective.valueOf(assignment)
+
+    /**
+     * One descent, its preparation done once and each round a [ResumableOpenTheory] kept across slices.
+     *
+     * Preparation and each round's setup run whole in the slice that reaches them; a slice ends only inside a
+     * round's search, or between rounds once its share is spent.
+     */
+    internal inner class Descent(private val params: TheoryParams, private val externalBound: () -> BigInteger?) :
+        AutoCloseable {
+        private val sink = SolveStatsSink(backend = "")
+        private val state = OpenTheorySolveState(params)
+
+        // One incumbent for the whole descent: every witness a round proves feasible is offered here with
+        // the value read off it, and the bound the next round refutes is whatever the offer installed.
+        private val incumbents = minimizingWitnessExchange()
+        private var opening: Opening? = null
+        private var reuseOpeningBoundAttempt = false
+        private var round: ResumableOpenTheory? = null
+
+        // Whether the current round's row states a bound another arm reached rather than the descent's own.
+        private var roundBoundExternal = false
+        private var verdict: OpenTheoryOptimum? = null
+
+        /** Whether the descent has reached its verdict. */
+        val isDone: Boolean get() = verdict != null
+
+        /** Work spent so far, in `openWork` units. */
+        val work: Long get() = state.work.spent
+
+        /** The verdict's stats once decided, else the work counters so far. */
+        val stats: SolveStats get() = verdict?.stats ?: SolveStats(openTheory = state.work.snapshot())
+
+        /**
+         * Advance until a verdict, [global] firing, or the slice ending: after [sliceWork] `openWork` units when
+         * non-negative, or after [sliceMillis], whichever comes first. [onIncumbent] sees every witness the
+         * descent installs, with its objective value. The verdict once there is one, else null with the descent
+         * paused.
+         */
+        fun runSlice(
+            global: Cancellation,
+            sliceMillis: Long,
+            sliceWork: Long,
+            onIncumbent: (OpenTheoryAssignment, BigInteger) -> Unit,
+        ): OpenTheoryOptimum? {
+            verdict?.let { return it }
+            val endWork = if (sliceWork >= 0L) state.work.spent + sliceWork else -1L
+            val end =
+                if (sliceMillis == Long.MAX_VALUE) null else TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
+            val opened = opening ?: open(global)?.also { opening = it } ?: return verdict
+            var first = true
+            while (true) {
+                val spent = (endWork >= 0L && state.work.spent >= endWork) || end?.hasPassedNow() == true
+                if (!first && spent) return null
+                first = false
+                val current = round ?: startRound(opened).also { round = it }
+                val remainingWork = if (endWork < 0L) -1L else (endWork - state.work.spent).coerceAtLeast(0L)
+                val remainingMillis = end?.let { (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
+                    ?.coerceAtLeast(0L) ?: Long.MAX_VALUE
+                val result = current.runSlice(global, remainingMillis, remainingWork) ?: return null
+                round = null
+                endRound(opened, result, onIncumbent)?.let { return decide(it) }
+            }
+        }
+
+        // Prepare the source and close its open sides once for the whole descent; null with the verdict set when
+        // that alone decides the model.
+        private fun open(global: Cancellation): Opening? {
+            // Preparation is the descent's first phase, so the caller's stop reaches it and its own summary is
+            // what a run refuted here has to report — there is no round behind it to carry one.
+            sink.start()
+            sink.backend = route.backendName()
+            val stop = presolveCancellation or params.cancellation or params.timeout or global
+            val prepared = PresolvePipeline.prepareSource(
+                source,
+                presolveConfig,
+                objective,
+                solutionSetSensitive,
+                stop,
+                presolveBudget,
+            )
+            if (prepared.infeasible) {
+                sink.presolve = prepared.stats
+                sink.stop()
+                verdict = OpenTheoryOptimum.Infeasible(sink.snapshot())
+                return null
+            }
+            // Ownership stays selected from the model as prepared, not from the closed one below. Closing a
+            // column does not move a factor between components, but it does change what `componentPlan` reads:
+            // a descent whose every side closed would select the finite route, which no round of it can run.
+            val boundedPlan = prepared.planned(prepared.problem.boundedForPlanning()).plan
+            // Close the open sides once for the whole descent. Every round decides this model plus a strictly
+            // tighter objective row, and a row only removes solutions, so a bound proved here holds for every
+            // round below it. Leaving the close to the rounds has each one re-derive the same bounds from the
+            // declared sides, at one LP solve per open side per round.
+            //
+            // Not extra work: the opening round decides the model under no bound at all, so the close it would
+            // have run is this one. A refutation here is over the genuinely open ranges rather than inside an
+            // invented box, so it refutes the model itself — which, with no witness yet, is infeasibility.
+            var closingInterrupted = false
+            val closingStop = prepared.budget?.orSpent(stop) ?: stop
+            val closingCancellation = object : Cancellation {
+                override fun isCancelled(): Boolean = closingStop().also { if (it) closingInterrupted = true }
+
+                override fun workMeter(): WorkMeter? = closingStop.workMeter()
+            }
+            val base = when (val closed = prepared.problem.closeOpenBounds(closingCancellation, sink.lp)) {
+                OpenPresolveResult.Refuted -> {
+                    sink.presolve = prepared.stats
+                    sink.stop()
+                    verdict = OpenTheoryOptimum.Infeasible(sink.snapshot())
+                    return null
+                }
+
+                is OpenPresolveResult.Tightened -> closed.spec
+            }
+            // A second bounded attempt on the same opening model cannot read a stronger input. If the
+            // first attempt changed a declared range or saw cancellation, let the round close again.
+            reuseOpeningBoundAttempt = base.sameDeclaredIntegerRanges(prepared.problem) &&
+                !closingInterrupted && !stop() && prepared.budget?.remaining() != 0L
+            return Opening(prepared, base, boundedPlan)
+        }
+
+        // The next round: the model under a row refuting the better of the incumbent and the external bound, or
+        // the model itself while there is neither.
+        private fun startRound(opened: Opening): ResumableOpenTheory {
+            val own = incumbents.current()?.objective
+            val external = externalBound()?.takeIf { terms.isNotEmpty() && (own == null || it < own) }
+            roundBoundExternal = external != null
+            val bound = external ?: own
+            // The opening round decides the model itself, so the row leaves plan and spec together until a
+            // witness gives it a bound to state.
+            val (spec, plan) = when {
+                terms.isEmpty() -> opened.base to opened.boundedPlan
+                bound == null -> opened.base to opened.boundedPlan.withoutAppendedFactor(opened.base)
+                else -> opened.base.boundedBy(bound - BigInteger.ONE) to opened.boundedPlan
+            }
+            val engine = OpenTheoryEngine(
+                OpenSourcePreparation.Planned(opened.prepared, spec, plan),
+                presolveCancellation,
+                reuseOpeningBoundAttempt,
+            )
+            reuseOpeningBoundAttempt = false
+            return ResumableOpenTheory(engine, params, state)
+        }
+
+        // Read a finished round: the descent's verdict when it ends here, else null to go on to the next round.
+        private fun endRound(
+            opened: Opening,
+            result: OpenTheoryResult,
+            onIncumbent: (OpenTheoryAssignment, BigInteger) -> Unit,
+        ): OpenTheoryOptimum? = when (result) {
+            is OpenTheoryResult.Sat -> {
+                val value = objective.valueOf(result.assignment)
+                when (val published = incumbents.offer(result.assignment, value)) {
+                    is Publication.Installed -> {
+                        val installed = published.incumbent
+                        onIncumbent(installed.assignment, installed.objective)
+                        when {
+                            // A constant objective has no row to tighten: its first witness is
+                            // already optimal, and a bound below the constant would exclude every
+                            // assignment rather than a worse one.
+                            terms.isEmpty() -> proven(finish(result.stats))
+
+                            // A bound row states that nothing feasible sits at the incumbent or
+                            // above it, and a model with a ray has a witness below every such row:
+                            // the descent would improve forever, so it states the verdict instead.
+                            unboundedBelow(opened.prepared.problem, installed.assignment, params, state) ->
+                                OpenTheoryOptimum.Unbounded(
+                                    installed.assignment,
+                                    installed.objective,
+                                    finish(result.stats),
+                                )
+
+                            else -> null
+                        }
+                    }
+
+                    // A round carrying the row decided the model *plus* the objective held below the
+                    // incumbent, so a witness the gate declines is one that row excluded; the opening
+                    // round has no incumbent for the gate to decline against. Either way a declined
+                    // witness refutes no bound, which is what an optimum would take.
+                    Publication.NotImproving -> error("witness at $value does not improve its own bound")
+
+                    // The exchange trusts the route's certificate, so nothing here judges a witness.
+                    // Either outcome means a verifier reached this descent without its proofs being
+                    // revisited, and neither says anything about the model.
+                    is Publication.Rejected -> error("a trusted witness was refuted: ${published.reason}")
+
+                    is Publication.Indeterminate ->
+                        error("a trusted witness was left undecided: ${published.reason}")
+                }
+            }
+
+            // Nothing beats another arm's value, which proves that arm's witness optimal rather than this one's.
+            is OpenTheoryResult.Unsat -> if (roundBoundExternal) {
+                standing(TerminationReason.SearchExhausted, finish(result.stats))
+            } else {
+                proven(finish(result.stats))
+            }
+
+            is OpenTheoryResult.Unknown -> standing(result.reason, finish(result.stats))
+        }
+
+        private fun standing(reason: TerminationReason, stats: SolveStats): OpenTheoryOptimum {
+            val standing = incumbents.current()
+            return OpenTheoryOptimum.Bounded(standing?.assignment, standing?.objective, reason, stats)
+        }
+
+        /**
+         * What the standing incumbent proves once the descent has nothing left to refute: it is optimal, or —
+         * with no witness ever installed — the model is infeasible, because the round that ended the descent
+         * was the opening one, which decided the model under no bound at all.
+         *
+         * Only for a descent that ended in a proof. A round the budget stopped refuted nothing, so its
+         * incumbent bounds the optimum instead of naming it.
+         */
+        private fun proven(stats: SolveStats): OpenTheoryOptimum {
+            val standing = incumbents.current() ?: return OpenTheoryOptimum.Infeasible(stats)
+            return OpenTheoryOptimum.Optimal(standing.assignment, standing.objective, stats)
+        }
+
+        private fun finish(round: SolveStats): SolveStats {
+            sink.stop()
+            return round.withOptimizationEnvelope(sink.snapshot()).copy(smt = state.smt.snapshot())
+        }
+
+        private fun decide(result: OpenTheoryOptimum): OpenTheoryOptimum {
+            verdict = result
+            close()
+            return result
+        }
+
+        override fun close() {
+            round?.close()
+            round = null
+        }
+    }
+
+    // What the descent prepares once: the prepared source, its closed model, and the plan selected with the row.
+    private class Opening(val prepared: PreparedSource, val base: Problem, val boundedPlan: ComponentPlan)
 
     /**
      * Whether the objective descends without limit through the branch [witness] lies in.
@@ -351,19 +472,6 @@ class OpenTheoryMinimizer internal constructor(
         )
         rayRefusedForEveryWitness = ray == false && model.statesOneBranch()
         return ray == true
-    }
-
-    /**
-     * What the standing incumbent proves once the descent has nothing left to refute: it is optimal, or —
-     * with no witness ever installed — the model is infeasible, because the round that ended the descent
-     * was the opening one, which decided the model under no bound at all.
-     *
-     * Only for a descent that ended in a proof. A round the budget stopped refuted nothing, so its
-     * incumbent bounds the optimum instead of naming it.
-     */
-    private fun IncumbentSource<OpenTheoryAssignment, BigInteger>.proven(stats: SolveStats): OpenTheoryOptimum {
-        val standing = current() ?: return OpenTheoryOptimum.Infeasible(stats)
-        return OpenTheoryOptimum.Optimal(standing.assignment, standing.objective, stats)
     }
 
     /**

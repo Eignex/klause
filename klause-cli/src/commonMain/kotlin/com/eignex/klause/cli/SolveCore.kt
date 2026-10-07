@@ -23,7 +23,6 @@ import com.eignex.klause.solver.pipeline.OpenBranching
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
-import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.autoArms
@@ -77,15 +76,31 @@ internal object SolveCore {
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
         // Taken whatever the route, so one run configuration serves a suite whose models routing sends either way;
-        // only an open satisfaction model has a portfolio to run.
+        // only an open theory model has a portfolio to run.
         val openPortfolio = takeOpenBoolParam(common, "open-portfolio") ?: false
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenLocalSearch -> {
+                val params = TheoryParams(cancellation = deadlineCancel, timeout = deadlineCancel)
+                val objective = pipeline.objective
+                if (objective != null) {
+                    output.begin(optimize = true, maximize = pipeline.maximize)
+                    val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, objective)
+                    reportOpenTheoryOptimum(
+                        (execution as OpenTheoryExecution.Optimize).result,
+                        pipeline.maximize,
+                        pipeline.render,
+                        common.statistics,
+                        output,
+                        rawSolvable.routingLpStats,
+                        rawSolvable.routingElapsedMs,
+                    ) {
+                        budgetSpent(common, it)
+                    }
+                    return
+                }
                 output.begin(optimize = false, maximize = false)
-                val result = OpenTheoryPipeline.searchWithoutTheory(
-                    pipeline.model,
-                    TheoryParams(cancellation = deadlineCancel, timeout = deadlineCancel),
-                )
+                val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params)
+                val result = (execution as OpenTheoryExecution.Satisfy).result
                 output.onVerdictContext(
                     VerdictContext(
                         budgetExhausted = budgetSpent(common, result.stats.run.timedOut),
@@ -156,10 +171,15 @@ internal object SolveCore {
                 val objective = request.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = request.maximize)
-                    solveOpenTheoryOptimum(
-                        request,
+                    val execution = if (openPortfolio) {
+                        OpenTheoryPipeline.executePortfolio(request, theoryParams)
+                    } else {
+                        OpenTheoryPipeline.execute(request, theoryParams)
+                    }
+                    reportOpenTheoryOptimum(
+                        (execution as OpenTheoryExecution.Optimize).result,
+                        request.maximize,
                         pipeline.render,
-                        theoryParams,
                         common.statistics,
                         output,
                         rawSolvable.routingLpStats,
@@ -172,11 +192,12 @@ internal object SolveCore {
                 }
                 output.begin(optimize = false, maximize = false)
                 // Local-search arms beside the theory are opt-in until the bench shows what they buy.
-                val result = if (openPortfolio) {
+                val execution = if (openPortfolio) {
                     OpenTheoryPipeline.executePortfolio(request, theoryParams)
                 } else {
-                    (OpenTheoryPipeline.execute(request, theoryParams) as OpenTheoryExecution.Satisfy).result
+                    OpenTheoryPipeline.execute(request, theoryParams)
                 }
+                val result = (execution as OpenTheoryExecution.Satisfy).result
                 val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(rawSolvable.routingLpStats))
                 output.onVerdictContext(
                     VerdictContext(
@@ -847,30 +868,24 @@ internal fun portfolioVerboseListener(verbose: Boolean): ((String, SearchEvent) 
 private const val MIB = 1024L * 1024L
 
 /**
- * Minimize [objective] over an open theory route and report the outcome.
+ * Report the outcome of minimizing an open model's objective.
  *
  * A maximize is driven as the minimization of the negated objective, and the reported value is negated
  * back, so the descent has one direction and the sign lives only at this boundary.
  */
-private fun solveOpenTheoryOptimum(
-    request: OpenTheoryRequest,
+private fun reportOpenTheoryOptimum(
+    result: OpenTheoryOptimum,
+    maximize: Boolean,
     render: (com.eignex.klause.solver.pipeline.OpenTheoryAssignment) -> String,
-    params: TheoryParams,
     statistics: Boolean,
     output: OutputProtocol,
     routingLpStats: LpStats,
     routingElapsedMs: Long,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
-    val result = (
-        OpenTheoryPipeline.execute(
-            request,
-            params,
-        ) as OpenTheoryExecution.Optimize
-        ).result
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
     val reported: (BigInteger) -> Long? = { value ->
-        val signed = if (request.maximize) -value else value
+        val signed = if (maximize) -value else value
         // An objective past 64 bits is reported as absent rather than as a wrapped number.
         if (signed >= LONG_MIN_BIG && signed <= LONG_MAX_BIG) signed.longValue() else null
     }
