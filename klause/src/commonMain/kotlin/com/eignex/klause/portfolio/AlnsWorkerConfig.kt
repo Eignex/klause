@@ -98,7 +98,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
             withInstructionBudget = { p, limit ->
                 p.copy(maxInstructions = minOf(p.maxInstructions ?: Long.MAX_VALUE, limit))
             },
-        )
+        ).also { it.family = ArmFamily.Lns }
     }
 
     /**
