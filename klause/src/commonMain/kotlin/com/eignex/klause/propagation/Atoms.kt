@@ -637,11 +637,6 @@ internal fun PropagationState.installLitWatch(lit: Int, fid: Int, blocker: Int =
 /** The level and reason of the bound move that established a bound atom's truth; see [boundEstablishment]. */
 internal class BoundEstablishment(val level: Int, val reason: IntArray?)
 
-/**
- * Where bound atom [atomId], currently [truth], became so on the current path, or null for an equality atom or
- * with the undo log off. A `[v ≥ k]` that holds was established by the first move that took `v`'s lower bound
- * to `k` or past it, and a false one by the first that took its upper bound below `k`; `[v ≤ k]` mirrors that.
- */
 /** The level [boundAtomEstablishment] reports, without building a reason; null for an equality atom. */
 internal fun PropagationState.boundAtomEstablishmentLevel(atomId: Int, truth: Boolean): Int? {
     val v = atoms.intVar[atomId]
@@ -653,6 +648,11 @@ internal fun PropagationState.boundAtomEstablishmentLevel(atomId: Int, truth: Bo
     }
 }
 
+/**
+ * Where bound atom [atomId], currently [truth], became so on the current path, or null for an equality atom or
+ * with the undo log off. A `[v ≥ k]` that holds was established by the first move that took `v`'s lower bound
+ * to `k` or past it, and a false one by the first that took its upper bound below `k`; `[v ≤ k]` mirrors that.
+ */
 internal fun PropagationState.boundAtomEstablishment(atomId: Int, truth: Boolean): BoundEstablishment? {
     val v = atoms.intVar[atomId]
     val k = atoms.threshold[atomId]

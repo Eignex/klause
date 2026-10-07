@@ -116,7 +116,8 @@ internal class MddExplainer(
 
         fun bounds(pos: Int): Pair<Long, Long> = lo[pos] to hi[pos]
 
-        inline fun forEachRecord(layer: Int, action: (src: Int, sym: Long, dst: Int, weight: Long) -> Unit) {
+        // Not inline: the native backend fails to generate the inlined body inside this inner class.
+        fun forEachRecord(layer: Int, action: (src: Int, sym: Long, dst: Int, weight: Long) -> Unit) {
             val head = idx.fwdHead[layer]
             val ptr = idx.fwdPtr[layer]
             val numN = numStatesPerLayer[layer + 1]
@@ -205,7 +206,7 @@ internal class MddExplainer(
             if (initial in 0 until numStatesPerLayer[0]) best[0][initial] = 0L
             for (i in 0 until n) {
                 forEachRecord(i) { src, sym, dst, w ->
-                    if (best[i][src] == none || live && sym !in lo[i]..hi[i]) return@forEachRecord
+                    if (best[i][src] == none || (live && sym !in lo[i]..hi[i])) return@forEachRecord
                     val c = best[i][src] + w
                     if (if (lower) c < best[i + 1][dst] else c > best[i + 1][dst]) best[i + 1][dst] = c
                 }

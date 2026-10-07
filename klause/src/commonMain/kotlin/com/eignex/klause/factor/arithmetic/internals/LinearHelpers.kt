@@ -450,8 +450,6 @@ private fun int128Sign(v: Int128): Int = when {
     else -> 1
 }
 
-/** True iff `a * b` wraps 64-bit range. Both-magnitudes-below-2^31 short-circuits before the
- *  division so the propagation hot loop pays two xors, not an idiv, on ordinary domains. */
 /**
  * How far the other terms' cited side may loosen while `c·x ⟨op⟩ s` still yields the bound [t] on x, in sum
  * units: `c·t + |c| − 1 + offset`, where [offset] is `−s` for a `≤` row and `s` for a `≥` row (with [c] negated,
@@ -467,6 +465,8 @@ private fun liftBudget(c: Long, t: Long, offset: Long): Long {
     return (head + offset).coerceAtLeast(0L)
 }
 
+/** True iff `a * b` wraps 64-bit range. Both-magnitudes-below-2^31 short-circuits before the
+ *  division so the propagation hot loop pays two xors, not an idiv, on ordinary domains. */
 private fun mulOverflows(a: Long, b: Long): Boolean {
     if (((a xor (a shr 63)) or (b xor (b shr 63))) ushr 31 == 0L) return false
     if (a == 0L || b == 0L) return false
