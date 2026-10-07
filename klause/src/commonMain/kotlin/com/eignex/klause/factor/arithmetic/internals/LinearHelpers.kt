@@ -326,8 +326,9 @@ private fun liftedAntecedents(
         val orig = state.rootDomains[v]
         if (if (citeMin) bound[j] > orig.min else bound[j] < orig.max) cited.add(j)
     }
-    // Latest level first: those are the bounds worth loosening, since only they could be resolved.
-    val order = argsortByIntKey(cited.size) { -level[cited[it]] }
+    // Latest level first: those are the bounds worth loosening, since only they could be resolved. Without slack
+    // nothing loosens, so the order is moot.
+    val order = if (slack > 0) argsortByIntKey(cited.size) { -level[cited[it]] } else IntArray(cited.size) { it }
     val seen = IntHashSet(order.size * 2)
     val out = IntArrayList()
     if (includeExtraLit) {
