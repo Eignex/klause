@@ -50,11 +50,12 @@ import kotlin.time.TimeSource
  * credited when another arm uses what it shared: an imported clause in a conflict or unit, an imported cut
  * selected into a relaxation, an imported bound tightening a domain ([ContributionTally]).
  *
- * **Resumable backtrack arms:** a backtrack arm exposes a [ResumableSearch] ([PortfolioWorker.newResumableSearch])
+ * **Resumable arms:** a backtrack arm exposes a [ResumableSearch] ([PortfolioWorker.newResumableSearch])
  * or, for satisfaction, a [ResumableSolve] ([PortfolioWorker.newResumableSolve]). The portfolio holds one handle
  * per such arm and *resumes* it each time the arm is scheduled, on whichever lane, so the arm continues its exact
- * search — learned clauses, trail, heuristics and LP warm-start caches intact. Local-search arms have no handle and
- * run a fresh segment warm-started from the shared incumbent. Every counted arm's segment spends the same work,
+ * search — learned clauses, trail, heuristics and LP warm-start caches intact. Local-search satisfaction handles
+ * retain the assignment, RNG and restart state between segments. An optimising arm without a handle runs a fresh
+ * segment warm-started from the shared incumbent. Every counted arm's segment spends the same work,
  * growing by [sliceGrowth] after each segment: a restarting arm needs the growth to dig deeper than one short
  * restart reaches, and a resumable arm takes it too, since an arm whose turns were shorter than its peers' would get
  * less of the core than the policy picks it for.
@@ -160,7 +161,7 @@ class Portfolio(
     /**
      * Satisfaction: run arms in scheduled segments until one returns a definitive Sat/Unsat, which ends the run.
      * A backtrack arm's [ResumableSolve] is resumed each time it is scheduled; an arm whose handle reaches a verdict
-     * that settles nothing, or fails, is retired. Local-search arms run a fresh counted segment each time.
+     * that settles nothing, or fails, is retired. Local-search satisfaction walks resume across counted segments.
      */
     override fun solve(cancellation: Cancellation): SolveResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSolve>(workers.size))
@@ -175,12 +176,17 @@ class Portfolio(
             val work: Long
             if (handle != null) {
                 val workBefore = handle.work
+                val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
                 val outcome = runCatching {
-                    handle.runSlice(run.token, handleMillis(run.token, claim), claim.handleNodes)
+                    handle.runSlice(run.token, handleMillis(worker, run.token, claim), solveSliceNodes(worker, claim))
                 }
                 r = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
-                work = handle.work - workBefore
+                work = if (worker.acceptsInstructionBudget) {
+                    countedInstructions(claim, handle.stats.ls.moves.sum - instructionsBefore)
+                } else {
+                    handle.work - workBefore
+                }
             } else {
                 val token = segmentToken(worker, run.token, claim)
                 val outcome = runCatching { worker.solve(token, instructionsOf(claim)) }
@@ -313,7 +319,7 @@ class Portfolio(
                 val workBefore = handle.work
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
-                    handle.runSlice(run.token, handleMillis(run.token, claim), claim.handleNodes) { accept(claim, it) }
+                    handle.runSlice(run.token, handleMillis(worker, run.token, claim), claim.handleNodes) { accept(claim, it) }
                 }
                 terminal = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
@@ -639,16 +645,27 @@ class Portfolio(
     private fun countedWork(claim: Claim, stats: SolveStats?): Long {
         val worker = workers[claim.arm]
         val instructions = stats?.ls?.moves?.sum ?: 0.0
-        val moves = (instructions / lsInstructionsPerWork).toLong()
         return when {
-            claim.whole -> moves
-            worker.acceptsInstructionBudget && worker.family == ArmFamily.LocalSearch -> {
-                if (instructions >= instructionsOf(claim)) claim.sliceWork else minOf(moves, claim.sliceWork)
-            }
+            claim.whole -> countedInstructions(claim, instructions)
+            worker.acceptsInstructionBudget && worker.family == ArmFamily.LocalSearch -> countedInstructions(claim, instructions)
             // ALNS charges its outer repair allowances independently of the inner solver's move count.
             else -> claim.sliceWork
         }
     }
+
+    private fun countedInstructions(claim: Claim, instructions: Double): Long {
+        val spent = (instructions / lsInstructionsPerWork).toLong()
+        return when {
+            claim.whole -> spent
+            instructions >= instructionsOf(claim) -> claim.sliceWork
+            else -> minOf(spent, claim.sliceWork)
+        }
+    }
+
+    private fun solveSliceNodes(worker: PortfolioWorker, claim: Claim): Long =
+        if (claim.whole || !worker.acceptsInstructionBudget) claim.handleNodes else {
+            (instructionsOf(claim) / LS_INSTRUCTIONS_PER_WORK).toLong().coerceAtLeast(1L)
+        }
 
     /**
      * The cancellation token bounding one non-resumable arm's segment: its time slice, or [probeSliceMillis] for a
@@ -669,11 +686,12 @@ class Portfolio(
      *  [remainingShare] of what the run has left, as a counted segment's ([segmentToken]). A node is priced at one
      *  unit whatever it costs, so without the bound a slice of a few thousand expensive nodes holds the core for the
      *  run. */
-    private fun handleMillis(cancellation: Cancellation, claim: Claim): Long {
+    private fun handleMillis(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Long {
         if (claim.whole) return Long.MAX_VALUE
-        val deadline = cancellation.deadline() ?: return claim.sliceMillis
+        val slice = if (claim.probing && worker.acceptsInstructionBudget) probeSliceMillis else claim.sliceMillis
+        val deadline = cancellation.deadline() ?: return slice
         val share = (deadline - TimeSource.Monotonic.markNow()) * remainingShare(claim)
-        return minOf(claim.sliceMillis, share.inWholeMilliseconds.coerceAtLeast(1L))
+        return minOf(slice, share.inWholeMilliseconds.coerceAtLeast(1L))
     }
 
     /**

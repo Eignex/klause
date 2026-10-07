@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.objective.MutableObjectiveBound
@@ -16,6 +17,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -23,10 +25,17 @@ import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.LocalSearchStatsSink
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
+
+private fun interface SatisfyCheckpoint {
+    fun shouldPause(moves: Long): Boolean
+}
 
 /**
  * The local-search engine over a [LocalSearchModel]: strategy, restart cadence and the satisfy and minimize loops.
@@ -137,7 +146,7 @@ internal class LocalSearchEngine(
                 SolveResult.Unknown(TerminationReason.Unsupported, sink.snapshot())
             }
         }
-        val sample = streamImpl(params, eff, warm, sink).firstOrNull()
+        val sample = streamImpl(params, eff, warm, sink).filterNotNull().firstOrNull()
         sink.stop()
         return if (sample != null) {
             SolveResult.Sat(sample, sink.snapshot())
@@ -154,7 +163,82 @@ internal class LocalSearchEngine(
         // may violate factors.
         if (!localSearchSupports(model, completion != null)) return emptySequence()
         val eff = model.pinsUnder(params.assumptions) ?: return emptySequence()
-        return streamImpl(params, eff, warm)
+        return streamImpl(params, eff, warm).filterNotNull()
+    }
+
+    fun resumableSolve(params: LocalSearchParams): ResumableSolve {
+        val sink = SolveStatsSink(backend = "ls")
+        sink.start()
+        val supported = localSearchSupports(model, completion != null)
+        val effective = if (supported) model.pinsUnder(params.assumptions) else null
+        val maxInstructions = moveCap(params)
+        var token: Cancellation = Cancellation.Never
+        var instructions = 0L
+        var limit = Long.MAX_VALUE
+        var cursor = effective?.let {
+            streamImpl(
+                params.copy(cancellation = Cancellation { token() }),
+                it,
+                sink = sink,
+                checkpoint = SatisfyCheckpoint { spent ->
+                    instructions = spent
+                    spent >= limit
+                },
+            ).iterator()
+        }
+        return object : ResumableSolve {
+            private var verdict: SolveResult? = null
+            private var closed = false
+
+            override val isDone: Boolean get() = verdict != null
+            override val stats: SolveStats get() = sink.snapshot()
+            override val work: Long get() = (instructions / LS_INSTRUCTIONS_PER_WORK).toLong()
+
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+                check(!closed) { "the local-search handle is closed" }
+                verdict?.let { return it }
+                if (!supported) return unknown(TerminationReason.Unsupported)
+                if (effective == null) {
+                    return if (model.refutesModel) {
+                        sink.stop()
+                        SolveResult.Unsat(stats = stats).also { verdict = it }
+                    } else {
+                        unknown(TerminationReason.Unsupported)
+                    }
+                }
+                val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE
+                if (available == 0L) return unknown(TerminationReason.BudgetExhausted)
+                token = if (sliceMillis == Long.MAX_VALUE) global else {
+                    global or Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
+                }
+                val allowance = if (sliceNodes < 0L) Long.MAX_VALUE else (sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong()
+                limit = instructions + minOf(allowance, available, Long.MAX_VALUE - instructions)
+                if (instructions >= limit || token()) return null
+                val live = checkNotNull(cursor)
+                if (!live.hasNext()) return unknown(TerminationReason.BudgetExhausted)
+                val sample = live.next() ?: return if (instructions >= maxInstructions) {
+                    unknown(TerminationReason.BudgetExhausted)
+                } else {
+                    null
+                }
+                sink.stop()
+                return SolveResult.Sat(sample, stats).also { verdict = it }
+            }
+
+            private fun unknown(reason: TerminationReason): SolveResult {
+                sink.timedOut = reason == TerminationReason.BudgetExhausted
+                sink.stop()
+                return SolveResult.Unknown(reason, stats).also { verdict = it }
+            }
+
+            override fun close() {
+                if (!closed) {
+                    closed = true
+                    cursor = null
+                    if (verdict == null) sink.stop()
+                }
+            }
+        }
     }
 
     /**
@@ -221,7 +305,8 @@ internal class LocalSearchEngine(
         effectiveAssumptions: Assumptions,
         warm: WarmState? = null,
         sink: SolveStatsSink? = null,
-    ): Sequence<Sample> {
+        checkpoint: SatisfyCheckpoint? = null,
+    ): Sequence<Sample?> {
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val maxFlips = moveCap(params)
         return sequence {
@@ -242,6 +327,15 @@ internal class LocalSearchEngine(
             // Use the unwrapped restart policy so an adaptive one is detected past a sweep wrapper.
             val roundFeedback = RoundFeedback.of(strategy, configuredRestart)
 
+            fun reportProgress() {
+                params.nodeBudget?.spendMoves(moves - charged)
+                charged = moves
+                if (!everFeasible) {
+                    sink?.ls?.recordWork(moves = moves, restarts = restartCount, stalls = 0L)
+                    sink?.ls?.recordIncumbent(objective = Double.NaN, violation = bestCost.toDouble(), foundAtMs = -1L)
+                }
+            }
+
             // A restart transition consumes one unit of the maxFlips/maxInstructions allowance, same as
             // an applied move (see [LocalSearchParams.maxInstructions]).
             fun countedRestart(anchor: Sample?) {
@@ -255,7 +349,11 @@ internal class LocalSearchEngine(
             try {
                 while (flipsSinceYield < maxFlips) {
                     if (cancelCountdown-- <= 0) {
-                        if (params.cancellation()) return@sequence
+                        while (params.cancellation()) {
+                            if (checkpoint == null) return@sequence
+                            reportProgress()
+                            yield(null)
+                        }
                         cancelCountdown = CANCEL_CHECK_INTERVAL
                     }
                     if (state.cost == 0L && state.intValuesInDomain()) {
@@ -272,6 +370,10 @@ internal class LocalSearchEngine(
                         }
                         if (solution == null) {
                             countedRestart(bestSnap)
+                            if (checkpoint?.shouldPause(moves) == true) {
+                                reportProgress()
+                                yield(null)
+                            }
                             continue
                         }
                         if (!everFeasible) {
@@ -291,6 +393,7 @@ internal class LocalSearchEngine(
                         warm?.captureFrom(state)
                         params.nodeBudget?.spendMoves(moves - charged)
                         charged = moves
+                        checkpoint?.shouldPause(moves)
                         yield(solution)
                         flipsSinceYield = 0
                         countedRestart(null)
@@ -301,6 +404,10 @@ internal class LocalSearchEngine(
                     if (restarts.shouldRestart(flipsSinceRestart)) {
                         countedRestart(bestSnap)
                         roundFeedback?.endRound()
+                        if (checkpoint?.shouldPause(moves) == true) {
+                            reportProgress()
+                            yield(null)
+                        }
                         continue
                     }
                     val costBefore = state.cost
@@ -308,6 +415,10 @@ internal class LocalSearchEngine(
                     if (move == null) {
                         countedRestart(bestSnap)
                         roundFeedback?.endRound()
+                        if (checkpoint?.shouldPause(moves) == true) {
+                            reportProgress()
+                            yield(null)
+                        }
                         continue
                     }
                     state.apply(move)
@@ -319,19 +430,16 @@ internal class LocalSearchEngine(
                     flipsSinceRestart++
                     flipsSinceYield++
                     roundFeedback?.record(costBefore, state.cost, moves)
+                    if (checkpoint?.shouldPause(moves) == true) {
+                        reportProgress()
+                        yield(null)
+                    }
                 }
             } finally {
                 // Sync learned weights back into warm state on natural exit or consumer cancel.
                 // Abandoned sequences may not fire this; accepted loss.
                 warm?.captureFrom(state)
-                params.nodeBudget?.spendMoves(moves - charged)
-                // Reached only when the search never hit feasibility (the feasible path records at the
-                // yield above and suspends there). Report the lowest residual cost as the incumbent
-                // violation so an UNKNOWN run still shows how close it got.
-                if (!everFeasible) {
-                    sink?.ls?.recordWork(moves = moves, restarts = restartCount, stalls = 0L)
-                    sink?.ls?.recordIncumbent(objective = Double.NaN, violation = bestCost.toDouble(), foundAtMs = -1L)
-                }
+                reportProgress()
             }
         }
     }

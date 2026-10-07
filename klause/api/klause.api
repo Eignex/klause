@@ -3664,7 +3664,7 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
-public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/Solver {
+public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/ResumableSolver {
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -3691,6 +3691,8 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 	public final fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public synthetic fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public fun resumableSolve (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/ResumableSolve;
+	public synthetic fun resumableSolve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSolve;
 	public final fun sample ()Lcom/eignex/klause/solver/result/SampleResult;
 	public fun sample (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public synthetic fun sample (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;

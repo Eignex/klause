@@ -15,15 +15,114 @@ import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.*
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchSolverTest {
+
+    @Test
+    fun `slice boundaries preserve the seeded satisfaction walk`() {
+        val problem = Problem(
+            4, 0, emptyArray(),
+            Array<Factor>(2) { i -> Clause(intArrayOf(Lit.make(2 * i, true), Lit.make(2 * i + 1, true))) },
+        ).bake()
+        val params = LocalSearchParams(
+            maxFlips = 20L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(4), LongArray(0)),
+        )
+        val solver = LocalSearchSolver(problem, greedyRepairOnRestart = false)
+        val expected = assertIs<SolveResult.Sat>(solver.solve(params))
+
+        for (slice in longArrayOf(1L, 3L, 9L)) {
+            val actual = solver.resumableSolve(params).use { handle ->
+                var result: SolveResult? = null
+                repeat(20) { if (result == null) result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, slice) }
+                assertIs<SolveResult.Sat>(result)
+            }
+
+            assertEquals(expected.assignment, actual.assignment)
+            assertEquals(expected.stats.ls.moves, actual.stats.ls.moves)
+        }
+    }
+
+    @Test
+    fun `cancellation pauses the walk without exhausting it`() {
+        val problem = Problem(
+            80, 0, emptyArray(),
+            Array<Factor>(40) { i -> Clause(intArrayOf(Lit.make(2 * i, true), Lit.make(2 * i + 1, true))) },
+        ).bake()
+        val params = LocalSearchParams(
+            maxFlips = 200L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(80), LongArray(0)),
+        )
+        val solver = LocalSearchSolver(problem, greedyRepairOnRestart = false)
+        val expected = assertIs<SolveResult.Sat>(solver.solve(params))
+        solver.resumableSolve(params.copy(cancellation = Cancellation { true })).use { handle ->
+            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            val paused = handle.runSlice(Cancellation { true }, Long.MAX_VALUE, -1L)
+            assertNull(paused)
+            assertTrue(handle.stats.ls.moves.sum > 0.0)
+            assertTrue(!handle.isDone)
+
+            val actual = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+
+            assertEquals(expected.assignment, actual.assignment)
+            assertEquals(expected.stats.ls.moves, actual.stats.ls.moves)
+        }
+    }
+
+    @Test
+    fun `cancellation during a slice preserves the remaining work allowance`() {
+        val problem = Problem(
+            3, 0, emptyArray(),
+            Array<Factor>(8) { mask -> Clause(IntArray(3) { v -> Lit.make(v, mask and (1 shl v) != 0) }) },
+        ).bake()
+        val params = LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L)
+        val solver = LocalSearchSolver(
+            problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 7), greedyRepairOnRestart = false,
+        )
+        val expected = assertIs<SolveResult.Unknown>(solver.solve(params))
+        var polls = 0
+
+        solver.resumableSolve(params).use { handle ->
+            val paused = handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L)
+            assertNull(paused)
+            assertTrue(handle.stats.ls.moves.sum > 0.0)
+
+            val actual = assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+
+            assertEquals(expected.stats.ls.moves, actual.stats.ls.moves)
+            assertEquals(expected.stats.search.restarts, actual.stats.search.restarts)
+            assertEquals(expected.stats.ls.incumbentViolation, actual.stats.ls.incumbentViolation)
+        }
+    }
+
+    @Test
+    fun `an exhausted resumed walk keeps its terminal verdict`() {
+        val problem = Problem(
+            4, 0, emptyArray(),
+            Array<Factor>(2) { i -> Clause(intArrayOf(Lit.make(2 * i, true), Lit.make(2 * i + 1, true))) },
+        ).bake()
+        val params = LocalSearchParams(
+            maxFlips = 1L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(4), LongArray(0)),
+        )
+
+        LocalSearchSolver(problem, greedyRepairOnRestart = false).resumableSolve(params).use { handle ->
+            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L))
+            val result = assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+
+            assertEquals(TerminationReason.BudgetExhausted, result.reason)
+            assertEquals(1.0, result.stats.ls.moves.sum)
+            assertTrue(handle.isDone)
+            assertEquals(result, handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 100L))
+        }
+    }
 
     @Test
     fun `searches a linear model whose int values exceed the 32-bit range`() {

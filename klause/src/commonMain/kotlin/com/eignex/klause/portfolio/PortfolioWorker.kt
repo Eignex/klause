@@ -61,7 +61,7 @@ class PortfolioWorker private constructor(
 
     /**
      * Open a fresh pause/resume handle over this worker's satisfaction search, or `null` when the engine can't be
-     * paused (local search, which restarts each segment instead). The satisfaction counterpart of
+     * paused. Local-search handles retain their walk across segments. The satisfaction counterpart of
      * [newResumableSearch]: [Portfolio.solve] resumes it each segment rather than restarting the arm.
      */
     fun newResumableSolve(): ResumableSolve? = resumableSolveFn?.invoke()
