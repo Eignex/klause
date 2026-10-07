@@ -173,6 +173,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * sits above this, keeping the asserting/backjump computation sound.)
      */
     fun analyze(conflictFactorId: Int): AnalysisResult {
+        beginAnalysis()
         val factor = state.factorAt(conflictFactorId)
         val seedReason = factor.conflictReason(state, conflictFactorId) ?: return AnalysisResult.NotApplicable
         return analyzeFromSeed(seedReason, conflictLevelOf(seedReason), seedFactorId = conflictFactorId)
@@ -187,8 +188,25 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * backjumps non-chronologically. Returns [AnalysisResult.NotApplicable] when the conflict sits at
      * the root (nothing to learn) or 1UIP cannot collapse it to an asserting clause.
      */
-    fun analyzeConflictClause(conflictClause: IntArray): AnalysisResult =
-        analyzeFromSeed(conflictClause, conflictLevelOf(conflictClause))
+    fun analyzeConflictClause(conflictClause: IntArray): AnalysisResult {
+        beginAnalysis()
+        return analyzeFromSeed(conflictClause, conflictLevelOf(conflictClause))
+    }
+
+    /**
+     * Start a fresh analysis with a new epoch for the atom-level memo. It runs before anything reads a level, the
+     * conflict level included, since a level memoised by the previous conflict belongs to another path and can
+     * sit below the literal's level on this one.
+     */
+    private fun beginAnalysis() {
+        val atomCount = state.atoms.intVar.size
+        if (atomLevelStamp.size < atomCount) {
+            atomLevelStamp = IntArray(atomCount)
+            atomLevelMemo = IntArray(atomCount)
+            atomLevelEpoch = 0 // fresh arrays read as epoch 0, so don't start at 0
+        }
+        atomLevelEpoch++
+    }
 
     /** Deepest accurate decision level among [reason]'s literals — the conflict level for a
      *  factor-seeded analysis (see [analyze]). */
@@ -216,6 +234,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * minimiser resolve the decision lit away into the stronger underlying nogood.
      */
     fun analyzeDecisionConflict(conflictedVar: Int): AnalysisResult {
+        beginAnalysis()
         val priorValue = state.boolValues[conflictedVar] ?: return AnalysisResult.NotApplicable
         val priorAnt = state.boolAntecedents[conflictedVar]
         // The just-attempted decision lit (currently false in state because the prior
@@ -241,16 +260,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      */
     private fun analyzeFromSeed(seedReason: IntArray, currentLevel: Int, seedFactorId: Int = -1): AnalysisResult {
         if (currentLevel <= 0) return AnalysisResult.NotApplicable
-
-        val numBoolVars = state.problem.numBoolVars
-        val atomCount = state.atoms.intVar.size
-        universe = numBoolVars + atomCount
-        if (atomLevelStamp.size < atomCount) {
-            atomLevelStamp = IntArray(atomCount)
-            atomLevelMemo = IntArray(atomCount)
-            atomLevelEpoch = 0 // fresh arrays read as epoch 0, so don't start at 0
-        }
-        atomLevelEpoch++
+        universe = state.problem.numBoolVars + state.atoms.intVar.size
 
         pbResolvent?.let { pb ->
             pb.seedFactorId = seedFactorId
