@@ -21,10 +21,12 @@ import com.eignex.klause.util.Cancellation
  * Decides an open model's satisfiability on the shared [Portfolio] harness: the complete theory route as one arm,
  * local-search arms over the model's source columns as the rest.
  *
- * The theory arm has no pause point, so each segment it is scheduled reruns it under a growing time slice; the engine
- * keeps its source preparation across segments. Local search proposes witnesses only — it never refutes an open
- * model — and every witness it proposes is checked against the source model before it counts. A model no theory
- * decides ([request] null) runs local search alone, so it can be shown satisfiable and never shown unsatisfiable.
+ * The theory arm has no pause point, so each segment it is scheduled reruns it, preparation included, under a
+ * growing time slice, through the same entry point the default open route uses.
+ *
+ * Local search proposes witnesses only, never refuting an open model, and every witness it proposes is checked
+ * against the source model before it counts. A model no theory decides ([request] null) runs local search alone,
+ * so it can be shown satisfiable and never shown unsatisfiable.
  */
 internal class OpenPortfolio(
     private val model: Problem,
@@ -44,7 +46,7 @@ internal class OpenPortfolio(
         if (localSearch.isEmpty()) {
             // With the theory as the only arm there is nothing to schedule, and slicing it would only rerun it
             // from scratch each segment.
-            return request?.engine()?.solve(theoryParams.copy(cancellation = theoryParams.cancellation or cancellation))
+            return request?.let { decide(it, theoryParams) }
                 ?: OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
         }
         val workers = buildList {
@@ -66,10 +68,13 @@ internal class OpenPortfolio(
         return if (sample === theorySample && theory != null) theory else OpenTheoryAssignment.Sampled(sample)
     }
 
-    private fun theoryWorker(request: OpenTheoryRequest, armId: Int): PortfolioWorker {
-        val engine = request.engine()
-        return PortfolioWorker.ofSolve("theory/${request.route.name.lowercase()}", armId) { slice, _ ->
-            when (val r = engine.solve(theoryParams.copy(cancellation = theoryParams.cancellation or slice))) {
+    // The theory exactly as the default open route decides it.
+    private fun decide(request: OpenTheoryRequest, params: TheoryParams): OpenTheoryResult =
+        (OpenTheoryPipeline.execute(request, params) as OpenTheoryExecution.Satisfy).result
+
+    private fun theoryWorker(request: OpenTheoryRequest, armId: Int): PortfolioWorker =
+        PortfolioWorker.ofSolve("theory/${request.route.name.lowercase()}", armId) { slice, _ ->
+            when (val r = decide(request, theoryParams.copy(cancellation = theoryParams.cancellation or slice))) {
                 is OpenTheoryResult.Sat -> {
                     theoryWitness = r.assignment
                     val sample = r.assignment.toSampleOrPlaceholder(model)
@@ -82,7 +87,6 @@ internal class OpenPortfolio(
                 is OpenTheoryResult.Unknown -> SolveResult.Unknown(r.reason, r.stats)
             }
         }
-    }
 
     private fun localSearchWorkers(firstArm: Int): List<PortfolioWorker> {
         // On a model of continuous columns alone with no Boolean to choose, the completion of any candidate is the
