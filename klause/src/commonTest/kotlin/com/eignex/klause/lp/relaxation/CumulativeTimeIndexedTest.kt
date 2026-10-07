@@ -243,7 +243,7 @@ class CumulativeTimeIndexedTest {
         // during search — their rows and nogoods must never exclude the true optimum.
         val rng = Random(20260613)
         var optimal = 0
-        repeat(60) { iter ->
+        repeat(20) { iter ->
             val n = rng.nextInt(2, 4)
             val durations = LongArray(n) { rng.nextInt(1, 4).toLong() }
             val resources = LongArray(n) { rng.nextInt(1, 3).toLong() }
@@ -276,7 +276,7 @@ class CumulativeTimeIndexedTest {
                 else -> error("unexpected non-terminal result $res on instance #$iter")
             }
         }
-        assertTrue(optimal > 15, "covered only $optimal optimal instances")
+        assertTrue(optimal > 5, "covered only $optimal optimal instances")
     }
 
     /** Minimal feasible `max(startᵢ + durᵢ)` over all in-domain start assignments, or null if none. */

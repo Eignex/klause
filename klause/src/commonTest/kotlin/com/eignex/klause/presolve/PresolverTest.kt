@@ -492,9 +492,9 @@ class PresolverTest {
         factors.add(Circuit(succ = IntArray(n) { n + it }))
         val problem = Problem(0, 2 * n, domains, factors)
 
-        fun count(config: PresolveConfig, sensitive: Boolean): Int {
+        fun count(config: PresolveConfig, sensitive: Boolean, cap: Int = Int.MAX_VALUE): Int {
             val pre = Presolver.run(problem.bake(), config, PresolveContext(solutionSetSensitive = sensitive))
-            return BacktrackSolver(pre.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).count()
+            return BacktrackSolver(pre.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).take(cap).count()
         }
 
         val unpresolved = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).count()
@@ -503,7 +503,7 @@ class PresolverTest {
         assertEquals(6, count(PresolveConfig.AUTO, sensitive = true), "presolve must not inflate the count under -a")
         // Non-sensitive solve may eliminate aux vars (count is allowed to change there) — but every
         // surviving solution still projects to a valid circuit, so it stays satisfiable.
-        assertTrue(count(PresolveConfig.AUTO, sensitive = false) >= 6, "solve presolve stays feasible")
+        assertEquals(6, count(PresolveConfig.AUTO, sensitive = false, cap = 6), "solve presolve stays feasible")
     }
 
     @Test
