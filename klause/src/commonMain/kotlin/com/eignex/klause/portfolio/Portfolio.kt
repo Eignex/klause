@@ -169,7 +169,6 @@ class Portfolio(
         run.execute { claim ->
             val arm = claim.arm
             val worker = workers[arm]
-            val workBefore = run.handles[arm]?.work ?: 0L
             val setup = TimeSource.Monotonic.markNow()
             val handle = run.handles[arm] ?: worker.newResumableSolve()?.also {
                 run.handles[arm] = it
@@ -179,6 +178,7 @@ class Portfolio(
             val failure: Throwable?
             val work: Long
             if (handle != null) {
+                val workBefore = handle.work
                 val outcome = runCatching {
                     handle.runSlice(run.token, handleMillis(run.token, claim), claim.handleNodes)
                 }
@@ -309,7 +309,6 @@ class Portfolio(
             val arm = claim.arm
             val worker = workers[arm]
             claim.hadIncumbent = incumbent.current() != null
-            val workBefore = run.handles[arm]?.work ?: 0L
             val setup = TimeSource.Monotonic.markNow()
             val handle = run.handles[arm] ?: worker.newResumableSearch(readBound)?.also {
                 run.handles[arm] = it
@@ -319,6 +318,7 @@ class Portfolio(
             val failure: Throwable?
             val work: Long
             if (handle != null) {
+                val workBefore = handle.work
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
                     handle.runSlice(run.token, handleMillis(run.token, claim), claim.handleNodes) { accept(claim, it) }

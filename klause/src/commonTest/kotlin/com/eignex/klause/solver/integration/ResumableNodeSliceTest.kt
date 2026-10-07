@@ -2,6 +2,7 @@ package com.eignex.klause.solver.integration
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -183,6 +184,33 @@ class ResumableNodeSliceTest {
         assertEquals(whole.stats.search.nodes, search.stats.search.nodes)
         assertEquals(whole.stats.search.propagationWork, search.stats.search.propagationWork)
         assertTrue(search.stats.search.propagationWork.sum > 0.0)
+    }
+
+
+    @Test
+    fun `leaf LP completions spend work even without a node LP arm`() {
+        val reals = 20
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1)),
+            numRealVars = reals,
+            realLower = DoubleArray(reals),
+            realUpper = DoubleArray(reals) { 2.0 },
+            factors = Array<Factor>(reals) { v ->
+                Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(v), LinearOp.GE, 1L)
+            },
+        ).bake()
+        val search = BacktrackSolver(problem).resumable(
+            LinearObjective(realCoefficients = DoubleArray(reals) { 1.0 }),
+            BacktrackParams(randomSeed = 0L),
+        )
+
+        search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        val leafWork = search.stats.lp.standaloneWorkOps.sum.toLong() / LP_WORK_PER_NODE
+
+        assertTrue(leafWork > 0L)
+        assertTrue(search.work >= search.stats.search.nodes.sum.toLong() + leafWork)
     }
 
 }

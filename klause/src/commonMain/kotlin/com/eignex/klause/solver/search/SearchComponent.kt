@@ -375,6 +375,8 @@ internal interface SearchTraversalPolicy {
     /** Per-node pruning or learned-backjump policy. */
     val nodePolicy: SearchNodePolicy
 
+    val pauseBeforeDecision: () -> Boolean get() = { false }
+
     /** Restart, cancellation, and resumable boundary work. */
     val lifecycle: SearchRunLifecycle
 

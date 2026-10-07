@@ -138,7 +138,7 @@ internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () ->
 internal class CpSatisfactionTraversal(
     private val problem: BakedProblem,
     params: BacktrackParams,
-    sink: SolveStatsSink?,
+    private val sink: SolveStatsSink?,
     solveContext: LpSolveContext,
     propagationCancellation: Cancellation = params.cancellation,
     private val slice: TraversalSlice? = null,
@@ -227,7 +227,7 @@ internal class CpSatisfactionTraversal(
     fun rootFixedVariableCount(): Int = cp.session.rootFixedVariableCount()
 
     /** LP work the traversal's relaxations have done, for a slice that charges it against its budget. */
-    fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() }
+    fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() } + (sink?.lp?.standaloneWork ?: 0L)
 
     fun propagationWork(): Long = cp.session.work
 
@@ -353,6 +353,7 @@ private class CpSatisfactionTraversalPolicy(
     override val observer: SearchRunObserver = brancher
     override val modelContinuation = SearchModelContinuation.BlockAtRoot
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
+    override val pauseBeforeDecision: () -> Boolean = slice?.beforeBranch ?: { false }
     override val nodePolicy: SearchNodePolicy = slice?.let { s ->
         object : SearchNodePolicy {
             override fun beforeBranch(context: SearchContext): SearchNodeDisposition {

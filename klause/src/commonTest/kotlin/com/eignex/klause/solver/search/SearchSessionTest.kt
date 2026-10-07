@@ -885,4 +885,52 @@ class SearchSessionTest {
             retractions.add(decisionLevel)
         }
     }
+
+    @Test
+    fun `pausing between failed siblings retains the untried alternative`() {
+        val attempted = ArrayList<Long>()
+        val brancher = object : SearchBrancher {
+            override fun nextBranch(context: SearchContext): List<SearchDecision>? =
+                if (context.intLowerBound(0) == null) {
+                    listOf(SearchDecision.IntEqual(0, 0), SearchDecision.IntEqual(0, 1))
+                } else {
+                    null
+                }
+        }
+        val refuter = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                val value = (decision as SearchDecision.IntEqual).value
+                attempted += value
+                return if (value == 0L) ComponentResult.Conflict() else ComponentResult.Consistent
+            }
+        }
+        val session = SearchSession(listOf(brancher, refuter))
+        val run = session.openRun(numBoolVars = 0)
+        run.pauseBeforeDecision = { attempted.size == 1 }
+        session.initialize()
+
+        assertIs<SearchRunEvent.Paused>(run.next())
+        assertEquals(listOf(0L), attempted)
+        run.pauseBeforeDecision = { false }
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        assertEquals(listOf(0L, 1L), attempted)
+    }
+
+    @Test
+    fun `a spent slice after the last rejected leaf does not replay the exhausted root`() {
+        var checked = false
+        val component = object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                checked = true
+                return ComponentCheck.Infeasible()
+            }
+        }
+        val session = SearchSession(listOf(component), cancellation = Cancellation { checked })
+        val run = session.openRun(numBoolVars = 0)
+        session.initialize()
+
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+    }
+
 }

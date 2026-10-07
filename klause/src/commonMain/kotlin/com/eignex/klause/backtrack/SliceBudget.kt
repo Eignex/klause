@@ -93,7 +93,9 @@ internal class SliceBudget(
 // 13 MIPLIB 2017 models with continuous columns, was 519 (spread 58 to 8145, geometric mean 629).
 internal const val LP_WORK_PER_NODE = 600L
 
-internal const val PROPAGATION_WORK_PER_NODE = 1_000L
+// Propagation visits per cheap search node: median measured rate ratio 3936 over four controls
+// (range 2192 to 7135). The rate converts work; it does not change the scheduler's slice sizes.
+internal const val PROPAGATION_WORK_PER_NODE = 4_000L
 
 /** The search work a slice is charged, in nodes: every node, plus inprocessing at its measured rates. */
 internal val SearchStatsSink.searchWork: Long

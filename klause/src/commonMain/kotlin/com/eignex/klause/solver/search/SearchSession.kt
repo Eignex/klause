@@ -649,7 +649,7 @@ class SearchSession(
         nodePolicy = policy.nodePolicy,
         lifecycle = policy.lifecycle,
         candidateHints = policy.candidateHints,
-    )
+    ).also { it.pauseBeforeDecision = policy.pauseBeforeDecision }
 
     internal fun blockModelAtRoot(model: AssembledSearchModel): ComponentResult {
         popTo(0)
@@ -935,6 +935,8 @@ class SearchRun internal constructor(
     private var started = false
     private var budgetInterrupted = false
     private val cancellationPoller = SearchCancellationPoller()
+    internal var pauseBeforeDecision: () -> Boolean = { false }
+    private var pendingAdvance = false
 
     /**
      * Poll the cancellation token on a fixed cadence rather than a time-adaptive one.
@@ -961,6 +963,10 @@ class SearchRun internal constructor(
             lifecycle.onStart(session).toEvent()?.let { return it }
         }
         lifecycle.onResume(session).toEvent()?.let { return it }
+        if (pendingAdvance) {
+            pendingAdvance = false
+            if (!backtrack()) return stopAfterBacktrack()
+        }
         if (resumeAfterSolution) {
             resumeAfterSolution = false
             when (modelContinuation) {
@@ -1124,6 +1130,7 @@ class SearchRun internal constructor(
                     frames += Frame(session.decisionLevel, alternatives.decisions)
                     when (advanceFrame()) {
                         Advance.Expanded -> Unit
+                        Advance.Paused -> return SearchRunEvent.Paused
                         Advance.Budget -> return finish(SearchRunEvent.Indeterminate.Budget)
                         Advance.Exhausted -> if (!backtrack()) return stopAfterBacktrack()
                         Advance.Restart -> restart()?.let { return it }
@@ -1142,6 +1149,10 @@ class SearchRun internal constructor(
     private fun advanceFrame(): Advance {
         val frame = frames.last()
         while (frame.next < frame.decisions.size) {
+            if (pauseBeforeDecision()) {
+                pendingAdvance = true
+                return Advance.Paused
+            }
             if (decisions == params.maxDecisions) {
                 session.markDecisionBudgetExhausted()
                 return Advance.Budget
@@ -1210,6 +1221,8 @@ class SearchRun internal constructor(
             if (session.decisionLevel > frame.level) session.popTo(frame.level)
             when (advanceFrame()) {
                 Advance.Expanded -> return true
+
+                Advance.Paused -> return false
 
                 Advance.Budget -> {
                     budgetInterrupted = true
@@ -1319,6 +1332,9 @@ class SearchRun internal constructor(
     }
 
     private fun stopAfterBacktrack(indeterminate: Boolean = false): SearchRunEvent {
+        if (pendingAdvance) return SearchRunEvent.Paused
+        // An exhausted frame stack has no pending region for a later slice to resume.
+        if (frames.isEmpty() && !budgetInterrupted) return finish(exhausted())
         if (session.cancelled()) {
             return lifecycle.onCancellation(session).toEvent()
                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
@@ -1382,6 +1398,7 @@ class SearchRun internal constructor(
 
     private enum class Advance {
         Expanded,
+        Paused,
         Exhausted,
         Budget,
         Restart,
