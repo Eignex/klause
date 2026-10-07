@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.solver.Sample
 import kotlin.test.assertTrue
 
@@ -23,7 +24,7 @@ import kotlin.test.assertTrue
 object ConflictReasonOracle {
 
     fun assertEntailed(problem: Problem, state: PropagationState, factorId: Int, label: String = "reason") {
-        val reason = problem.propagators[factorId].conflictReason(state, factorId) ?: return
+        val reason = state.factorAt(factorId).conflictReason(state, factorId) ?: return
         val solutions = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
         for (s in solutions) {
             val satisfied = reason.any { lit -> litTrueUnder(problem, state, lit, s) }
