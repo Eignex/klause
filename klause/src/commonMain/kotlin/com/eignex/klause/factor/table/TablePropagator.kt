@@ -538,7 +538,9 @@ internal class TablePropagator(
     // undo log to see the domains as they stood. Without it nothing reads reasons, and every column's current
     // domain stands in.
     private inline fun columnReason(state: PropagationState, col: Int, coarse: () -> IntArray?): IntArray? =
-        if (state.currentLevel == 0) null else if (state.undoLogging) {
+        if (state.currentLevel == 0) {
+            null
+        } else if (state.undoLogging) {
             state.lazyReason(intArrayOf(col))
         } else {
             coarse()

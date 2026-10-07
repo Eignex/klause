@@ -78,21 +78,34 @@ internal class WideReifiedLinearPropagator(
     private fun wideSettlingSide(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: BigInt, holds: Boolean): Boolean? =
         when (op) {
             LinearOp.LE -> if (holds) false else true
+
             LinearOp.GE -> if (holds) true else false
-            LinearOp.EQ -> if (holds) null else (
-                if (sumLo > bound) true else if (sumHi < bound) {
-                false
-            } else {
+
+            LinearOp.EQ -> if (holds) {
                 null
-            }
-            )
-            LinearOp.NE -> if (holds) (
-                if (sumLo > bound) true else if (sumHi < bound) {
-                false
             } else {
-                null
+                (
+                if (sumLo > bound) {
+                    true
+                } else if (sumHi < bound) {
+                    false
+                } else {
+                    null
+                }
+                )
             }
-            ) else {
+
+            LinearOp.NE -> if (holds) {
+                (
+                if (sumLo > bound) {
+                    true
+                } else if (sumHi < bound) {
+                    false
+                } else {
+                    null
+                }
+                )
+            } else {
                 null
             }
         }
