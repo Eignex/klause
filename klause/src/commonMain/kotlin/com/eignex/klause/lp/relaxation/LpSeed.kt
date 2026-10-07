@@ -5,11 +5,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import kotlin.math.roundToLong
 
 /**
  * A starting point for a search over [domains]: the LP relaxation's optimum inside them, integers rounded and kept in
- * their domains, Booleans read at one half. Null when the LP finds no point before [cancellation].
+ * their domains, Booleans read at one half. Null when the LP finds no point before [cancellation], or the 64-bit LP
+ * cannot state the model over [domains].
  *
  * Only a seed: nothing here claims the point satisfies anything, so it suits a search that verifies whatever it
  * reports. The relaxation is built over [domains] as a box, which is what lets it serve a model with open sides.
@@ -21,6 +23,9 @@ internal fun Problem.lpSeed(domains: Array<IntDomain>, cancellation: Cancellatio
     val relaxation = try {
         CpToLpRelaxation(boxed, objective = null).build(BoxDomains(domains), cancellation = cancellation)
     } catch (_: LpAssemblyCancelled) {
+        return null
+    } catch (_: CheckedLongOverflowException) {
+        // A row the 64-bit LP cannot state over this box, which leaves the search its own starts.
         return null
     }
     val primal = solveAndCertify(relaxation.model, cancellation = cancellation).float?.primal ?: return null
