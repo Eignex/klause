@@ -1,0 +1,53 @@
+{
+  "name": "table-throughput-time",
+  "description": "Paired baseline versus completed ground-column support gathering, word-wise interval supports, and batched STR2 live-prefix writes on three HSP tables and three fast core controls. Pinned individual backtrack arms, identical seed and 10-second budgets measure wall-time search progress; work denotes charged nodes, not candidate evaluations.",
+  "problems": [
+    {
+      "suite": "xcsp3-cop",
+      "name": "HSP-table-14409_c23,HSP-table-12407_c23,HSP-table-13408_c23",
+      "max": "3",
+      "reference": "any",
+      "per-family": "3"
+    },
+    {
+      "suite": "core",
+      "max": "3",
+      "reference": "any",
+      "name": "threeClauses,linearLE,permutation3"
+    }
+  ],
+  "base": {
+    "engine": "cp",
+    "processors": "1",
+    "timeout": "10000",
+    "param.arms": "1"
+  },
+  "configs": [
+    {
+      "ref": "da388ebcd1c20580bfe061c7a9811829e8cb2efc",
+      "label": "baseline-satOptimized",
+      "param.bt-arm": "satOptimized"
+    },
+    {
+      "ref": "234a97c76acec97e2fa7b89972ddcddc284f20e9",
+      "label": "complete-supports-satOptimized",
+      "param.bt-arm": "satOptimized"
+    },
+    {
+      "ref": "da388ebcd1c20580bfe061c7a9811829e8cb2efc",
+      "label": "baseline-conflictDriven",
+      "param.bt-arm": "conflictDriven"
+    },
+    {
+      "ref": "234a97c76acec97e2fa7b89972ddcddc284f20e9",
+      "label": "complete-supports-conflictDriven",
+      "param.bt-arm": "conflictDriven"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 3,
+  "parallel": 1,
+  "priority": 1
+}
