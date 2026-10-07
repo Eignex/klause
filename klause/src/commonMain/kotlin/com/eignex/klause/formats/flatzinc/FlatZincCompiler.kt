@@ -68,23 +68,18 @@ internal class FlatZincCompiler(
     internal val floatValueLiterals = HashMap<Pair<Int, Double>, Int>()
     internal val integerFloatSources = HashMap<Int, Int>()
 
-    // Float var name -> the integer argument of the `int2float` that defines it (the float is that int's
-    // continuous image). Lets a `float_times` with one such operand lower as an exact int·real product
-    // ([com.eignex.klause.factor.arithmetic.RealProduct]) rather than a bucket table.
-    internal val int2floatSource = HashMap<String, FznExpr>()
+    internal data class IntegerFloatImage(val variable: Int, val scale: Double)
+
+    internal val integerFloatImages = HashMap<Int, IntegerFloatImage>()
 
     internal val enumLabelsByVar = HashMap<String, List<String>>()
 
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
     internal fun compile(onLowered: ((FlatZincCompiler, SolveDirective) -> Unit)? = null): FlatZincProgram {
-        for (c in model.constraints) {
-            if (c.name == "int2float" && c.args.size == 2) {
-                (c.args[1] as? FznExpr.Ident)?.let { int2floatSource[it.name] = c.args[0] }
-            }
-        }
         lpOnlyFloats = selectFloatNames()
         processDeclarations()
+        integerFloatImages.putAll(collectIntegerFloatImages(onlyRealColumns = true))
         if (lpOnlyFloats.isNotEmpty()) {
             for (domain in collectFiniteFloatDomains()) {
                 recordFiniteFloatChoices(domain)

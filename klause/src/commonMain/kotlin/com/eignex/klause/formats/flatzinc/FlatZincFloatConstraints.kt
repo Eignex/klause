@@ -338,18 +338,12 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         )
         return
     }
-    // int·real product: one operand is an `int2float` image of an integer variable and the other operand
-    // and the result are LP-only reals. Lower as an exact [RealProduct] `result = n·y` — at a search leaf
-    // `n` is fixed, so the product is the exact linear equality the residual LP decides.
-    val aInt = (c.args[0] as? FznExpr.Ident)?.name?.let { int2floatSource[it] }
-    val bInt = (c.args[1] as? FznExpr.Ident)?.name?.let { int2floatSource[it] }
-    val intExpr = aInt ?: bInt // exactly one is non-null in the branch below (an XOR guard)
-    val realRef = if (aInt != null) bRef else aRef
-    if (cRef is FloatRef.Var && cRef.bk.lpOnly && (aInt != null) != (bInt != null) &&
-        intExpr != null && realRef is FloatRef.Var && realRef.bk.lpOnly
-    ) {
-        val y = realRef.bk
-        factors.add(RealProduct(resolveIntVar(intExpr), y.varId, cRef.bk.varId, y.lo, y.hi))
+    val aImage = (aRef as? FloatRef.Var)?.takeIf { it.bk.lpOnly }?.let { integerFloatImages[it.bk.varId] }
+    val bImage = (bRef as? FloatRef.Var)?.takeIf { it.bk.lpOnly }?.let { integerFloatImages[it.bk.varId] }
+    val image = aImage ?: bImage
+    val realRef = if (aImage != null) bRef else aRef
+    if (cRef is FloatRef.Var && cRef.bk.lpOnly && image != null && realRef is FloatRef.Var && realRef.bk.lpOnly) {
+        emitIntegerFloatProduct(image, realRef, cRef)
         return
     }
     if ((aRef as? FloatRef.Var)?.bk?.lpOnly == true || (bRef as? FloatRef.Var)?.bk?.lpOnly == true) {
