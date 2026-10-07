@@ -210,12 +210,11 @@ internal class LocalSearchEngine(
     }
 
     // The moves one run may make: its own caps, and what is left of the solve's node budget.
-    private fun moveCap(params: LocalSearchParams): Long =
-        minOf(
-            params.maxFlips,
-            params.maxInstructions ?: Long.MAX_VALUE,
-            params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE,
-        )
+    private fun moveCap(params: LocalSearchParams): Long = minOf(
+        params.maxFlips,
+        params.maxInstructions ?: Long.MAX_VALUE,
+        params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE,
+    )
 
     private fun streamImpl(
         params: LocalSearchParams,

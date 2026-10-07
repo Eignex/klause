@@ -27,9 +27,8 @@ internal class ArrayMinMaxInvariant(private val result: Int, private val xs: Int
         return best
     }
 
-    private fun degreeFor(resultValue: Long, best: Long, softCap: Int): Int {
-        return compressViolation(distance(resultValue, best), softCap)
-    }
+    private fun degreeFor(resultValue: Long, best: Long, softCap: Int): Int =
+        compressViolation(distance(resultValue, best), softCap)
 
     private fun simulateBest(state: LocalSearchState, intVar: Int, newValue: Long): Long {
         var best = Long.MIN_VALUE

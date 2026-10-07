@@ -312,7 +312,13 @@ internal class ExactLinearInvariant(
             sum.candidate.clear()
             sum.candidate.add(sum.wide)
             sum.candidate.subtract(wideBound)
-            if (sum.candidate.hi < 0L) -1 else if (sum.candidate.hi == 0L && sum.candidate.lo == 0L) 0 else 1
+            if (sum.candidate.hi < 0L) {
+                -1
+            } else if (sum.candidate.hi == 0L && sum.candidate.lo == 0L) {
+                0
+            } else {
+                1
+            }
         }
 
         else -> (sum.big - bound).signum()
@@ -346,6 +352,7 @@ internal class ExactLinearInvariant(
         val ceil = if (remaining % c == 0L) floor else floor + 1L
         return when (op) {
             LinearOp.EQ -> if (remaining % c == 0L) floor else null
+
             LinearOp.LE -> when {
                 want -> if (positive) floor else ceil
                 positive -> floor + 1L
@@ -370,6 +377,7 @@ internal class ExactLinearInvariant(
         val ceil = saturatedLong(ceil(quotient))
         return when (op) {
             LinearOp.EQ -> saturatedLong(round(quotient))
+
             LinearOp.LE -> when {
                 want -> if (positive) floor else ceil
                 positive -> floor + if (floor == Long.MAX_VALUE) 0L else 1L
@@ -448,8 +456,7 @@ internal class ExactLinearInvariant(
             return !addOverflows(sum, term, sum + term)
         }
 
-        fun toBigInt(value: Int128): BigInt =
-            bigIntOf(value.hi) * TWO_TO_64 + bigIntOf(value.lo.toULong())
+        fun toBigInt(value: Int128): BigInt = bigIntOf(value.hi) * TWO_TO_64 + bigIntOf(value.lo.toULong())
 
         fun addOverflows(a: Long, b: Long, sum: Long): Boolean = (a xor sum) and (b xor sum) < 0L
 

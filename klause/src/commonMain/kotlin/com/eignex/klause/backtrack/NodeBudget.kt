@@ -53,8 +53,7 @@ class NodeBudget(
     }
 
     /** Local-search moves the allowance still covers. */
-    internal fun movesLeft(): Long =
-        ((limit - used) * LS_INSTRUCTIONS_PER_WORK).toLong().minus(moves).coerceAtLeast(0L)
+    internal fun movesLeft(): Long = ((limit - used) * LS_INSTRUCTIONS_PER_WORK).toLong().minus(moves).coerceAtLeast(0L)
 
     /** Whether the allowance is gone. A driver's cancellation token reads this to stop re-entering. */
     fun exhausted(): Boolean = spent >= limit

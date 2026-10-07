@@ -158,7 +158,9 @@ internal class NValueInvariant(
                 if (s.counts.getOrDefault(cur, 0) <= 1) continue
                 val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
-                d.forEachCandidate(state.rng) { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it }
+                d.forEachCandidate(state.rng) {
+                    if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it
+                }
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
@@ -170,7 +172,9 @@ internal class NValueInvariant(
                 if (s.counts.getOrDefault(cur, 0) > 1) continue
                 val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
-                d.forEachCandidate(state.rng) { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it }
+                d.forEachCandidate(state.rng) {
+                    if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it
+                }
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
