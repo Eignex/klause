@@ -407,19 +407,14 @@ class ConflictAnalyzerFactorConflictReasonTest {
             xLit in ant.intMinAntecedents[0]!!.toSet(),
             "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}",
         )
-        // z (bool var 1) implied true; its boolAntecedents contain the *atom-lit*
-        // form ¬[v0≥5] and ¬[v0≤5] — the per-bound premise atoms — rather than the
-        // coarser ¬x union. Resolution through these atoms still traces back to ¬x via
-        // their own antecedents = intMin/MaxAntecedents[v0] = [¬x].
+        // z (bool var 1) implied true; its boolAntecedents hold the *atom-lit* ¬[v0≥5] —
+        // `v0 ≥ 4` always holding needs only v0's lower bound — rather than the coarser ¬x
+        // union. Resolution through that atom still traces back to ¬x via its own
+        // antecedents = intMinAntecedents[v0] = [¬x].
         val zAnt = ant.boolAntecedents[1]
         assertTrue(zAnt != null, "z's antecedents should be set by ReifiedLinear C's aux pin")
         val ge5 = Lit.make(ant.atomVarGe(0, 5), false)
-        val le5 = Lit.make(ant.atomVarLe(0, 5), false)
-        val zAntSet = requireNotNull(zAnt).toSet()
-        assertTrue(
-            ge5 in zAntSet && le5 in zAntSet,
-            "z's antecedents should contain ¬[v0≥5] and ¬[v0≤5], got ${zAnt.toList()}",
-        )
+        assertEquals(listOf(ge5), requireNotNull(zAnt).toList(), "z's antecedents should be just ¬[v0≥5]")
     }
 
     @Test
