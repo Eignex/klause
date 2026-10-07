@@ -339,7 +339,11 @@ internal class MddIncrementalState(
         if (valid.value == 1 && dirty.isEmpty()) return true
         // With the undo log each deduction's reason is built only if analysis reads it ([MddExplainer]); without
         // one nothing reads reasons, and every variable's bounds stand in.
-        val ant = if (state.undoLogging) null else state.composeIntVarAtomAntecedents(if (cost >= 0) seq + intArrayOf(cost) else seq)
+        val ant = if (state.undoLogging) {
+            null
+        } else {
+            state.composeIntVarAtomAntecedents(if (cost >= 0) seq + intArrayOf(cost) else seq)
+        }
         if (valid.value == 0) return rebuild(state, ant)
         // Standing on the shared snapshot: take a private copy of it first, since the incremental step
         // reads and rewrites the bitsets. A vanished snapshot leaves nothing to step from, so recompute.

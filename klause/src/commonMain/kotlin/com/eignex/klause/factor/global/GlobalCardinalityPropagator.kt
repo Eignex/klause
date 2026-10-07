@@ -290,7 +290,9 @@ internal class GlobalCardinalityPropagator(
                     val toRemove = LongArrayList()
                     d.values.forEach { if (!coverIndexByValue.containsKey(it)) toRemove.add(it) }
                     // A closed cardinality admits no value outside the cover to a variable that takes part.
-                    val ant = Reason(state).apply { if (presents.isNotEmpty()) add(Lit.negate(presents[origIdx[j]])) }.build()
+                    val ant = Reason(state).apply {
+                        if (presents.isNotEmpty()) add(Lit.negate(presents[origIdx[j]]))
+                    }.build()
                     for (k in 0 until toRemove.size) {
                         if (!state.excludeIntValue(x, toRemove[k], ant)) {
                             failure = Reason(state).apply { lacksOthers(x) }.build()

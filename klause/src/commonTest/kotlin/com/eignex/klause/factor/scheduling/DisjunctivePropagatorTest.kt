@@ -73,7 +73,10 @@ class DisjunctivePropagatorTest {
                 ),
             )
             PropagationReasonOracle.assertReasonsImply(problem, "disjunctive-durations#$iter") { state ->
-                (0 until n).all { (1L + rng.nextInt(3)).let { d -> state.tightenIntMin(n + it, d) && state.tightenIntMax(n + it, d) } } &&
+                (0 until n).all {
+                    val d = 1L + rng.nextInt(3)
+                    state.tightenIntMin(n + it, d) && state.tightenIntMax(n + it, d)
+                } &&
                     (0 until 3).all {
                         val v = rng.nextInt(n)
                         when (rng.nextInt(3)) {
@@ -95,7 +98,9 @@ class DisjunctivePropagatorTest {
             numBoolVars = 0,
             numIntVars = 4,
             intDomains = Array(4) { IntDomain(0, 9) },
-            factors = arrayOf<Factor>(Cumulative.unary(starts = intArrayOf(0, 1, 2, 3), durations = longArrayOf(2, 2, 2, 2))),
+            factors = arrayOf<Factor>(
+                Cumulative.unary(starts = intArrayOf(0, 1, 2, 3), durations = longArrayOf(2, 2, 2, 2)),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true

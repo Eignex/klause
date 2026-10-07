@@ -160,7 +160,9 @@ internal class DisjunctivePropagator(
             if (newMax < state.intDomains[v].min) return failWith(state, i) { timeTableReason(i, false, newMax) }
             if (newMax != state.intDomains[v].max) {
                 val ant = reasonFor(state, packed(TIME_TABLE, i, 0, newMax))
-                if (!state.tightenIntMax(v, newMax, ant)) return failWith(state, i) { timeTableReason(i, false, newMax) }
+                if (!state.tightenIntMax(v, newMax, ant)) {
+                    return failWith(state, i) { timeTableReason(i, false, newMax) }
+                }
             }
         }
         return true

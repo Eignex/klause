@@ -381,7 +381,8 @@ internal class CumulativePropagator(
             if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
         }
 
-        private fun bound(v: Int, lower: Boolean, need: Long) = add(state.boundLiteral(v, lower, need, atTrail, atLevel))
+        private fun bound(v: Int, lower: Boolean, need: Long) =
+            add(state.boundLiteral(v, lower, need, atTrail, atLevel))
 
         fun startGe(i: Int, need: Long) = bound(starts[i], true, need)
         fun startLe(i: Int, need: Long) = bound(starts[i], false, need)
@@ -599,7 +600,8 @@ internal class CumulativePropagator(
             val hi = est(i) + durMin(i) - 1
             var peak = lo
             var peakLoad = Long.MIN_VALUE
-            val points = (0 until n).filter { it != i && present(it) }.flatMap { listOf(lst(it), est(it) + durMin(it) - 1) }
+            val points = (0 until n).filter { it != i && present(it) }
+                .flatMap { listOf(lst(it), est(it) + durMin(it) - 1) }
             for (t in (points + lo).filter { it in lo..hi }) {
                 val load = (0 until n).filter { it != i && coversPoint(it, t) }.sumOf { resMin(it) }
                 if (load > peakLoad) {
