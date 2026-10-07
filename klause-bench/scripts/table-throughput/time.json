@@ -1,6 +1,6 @@
 {
   "name": "table-throughput-time",
-  "description": "Paired baseline versus completed ground-column support gathering, word-wise interval supports, and batched STR2 live-prefix writes on three HSP tables and three fast core controls. Pinned individual backtrack arms, identical seed and 10-second budgets measure wall-time search progress; work denotes charged nodes, not candidate evaluations.",
+  "description": "Paired baseline versus completed ground-column support gathering, word-wise interval supports, and batched STR2 live-prefix writes on three HSP tables and three fast XCSP3 file controls. Pinned individual backtrack arms, identical seed and 10-second budgets measure wall-time search progress; work denotes charged nodes, not candidate evaluations.",
   "problems": [
     {
       "suite": "xcsp3-cop",
@@ -10,10 +10,10 @@
       "per-family": "3"
     },
     {
-      "suite": "core",
+      "suite": "xcsp3-core",
+      "name": "magic-series-tiny,sum-opt-tiny,graph-coloring-tiny",
       "max": "3",
-      "reference": "any",
-      "name": "threeClauses,linearLE,permutation3"
+      "reference": "any"
     }
   ],
   "base": {
@@ -49,5 +49,6 @@
   ],
   "repeats": 3,
   "parallel": 1,
-  "priority": 4
+  "priority": 5,
+  "host": "lab"
 }
