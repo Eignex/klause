@@ -28,6 +28,29 @@ internal object OptPresence {
         return if (Lit.isPositive(lit)) raw else !raw
     }
 
+    /**
+     * [base] extended by the presence premises a deduction over [tasks] (every task when null) rests on: a present
+     * task's literal for the tasks it used, an absent one's for the tasks it skipped. Without them the reason holds
+     * only while those presences stand, so a clause learned through it prunes schedules where they do not.
+     */
+    fun withPresencePremises(
+        presents: IntArray,
+        state: PropagationState,
+        base: IntArray?,
+        tasks: IntArray? = null,
+    ): IntArray? {
+        if (presents.isEmpty()) return base
+        val out = IntArrayList()
+        base?.forEach { out.add(it) }
+        for (i in tasks ?: IntArray(presents.size) { it }) {
+            when {
+                isDefinitelyPresent(presents, i, state) -> out.add(Lit.negate(presents[i]))
+                isDefinitelyAbsent(presents, i, state) -> out.add(presents[i])
+            }
+        }
+        return if (out.size == 0) null else out.toIntArray()
+    }
+
     fun isDefinitelyAbsent(presents: IntArray, idx: Int, state: PropagationState): Boolean {
         if (presents.isEmpty()) return false
         val lit = presents[idx]
