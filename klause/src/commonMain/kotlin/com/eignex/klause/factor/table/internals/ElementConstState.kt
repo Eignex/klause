@@ -244,29 +244,8 @@ internal class ElementConstState(
         var idxRem = idxRem0
         var resRem = resRem0
         while (idxRem.size > 0 || resRem.size > 0) {
-            // idx removals → decrement support → result values that dropped to zero support.
-            val resultToExclude = LongArrayList()
-            for (i in 0 until idxRem.size) {
-                val pos = idxRem[i] - indexOffset
-                if (pos !in 0 until len) continue
-                val id = idOfPos[pos.toInt()]
-                val c = supportCount[id] - 1
-                supportCount[id] = c
-                if (c == 0 && valueOfId[id] in state.intDomains[result]) {
-                    resultToExclude.add(valueOfId[id])
-                }
-            }
-            // result removals → idx positions whose constant just left result.
-            val idxToExclude = LongArrayList()
-            val idxDom = state.intDomains[idx]
-            for (i in 0 until resRem.size) {
-                val id = idFor(resRem[i])
-                if (id < 0) continue
-                for (pos in positionsOfId[id]) {
-                    val iv = pos + indexOffset
-                    if (iv.toLong() in idxDom) idxToExclude.add(iv.toLong())
-                }
-            }
+            val resultToExclude = unsupportedResults(state, idxRem)
+            val idxToExclude = positionsOfLeftResults(state, resRem)
 
             var nextIdx = EMPTY
             var nextRes = EMPTY
@@ -283,6 +262,38 @@ internal class ElementConstState(
             resRem = nextRes
         }
         return true
+    }
+
+    // idx removals → decrement support → result values that dropped to zero support. Each of a round's two scans is
+    // its own method so each compiles apart: in one body every loop entered on-stack recompiled the whole of it.
+    private fun unsupportedResults(state: PropagationState, idxRem: LongArrayList): LongArrayList {
+        val resultToExclude = LongArrayList()
+        for (i in 0 until idxRem.size) {
+            val pos = idxRem[i] - indexOffset
+            if (pos !in 0 until len) continue
+            val id = idOfPos[pos.toInt()]
+            val c = supportCount[id] - 1
+            supportCount[id] = c
+            if (c == 0 && valueOfId[id] in state.intDomains[result]) {
+                resultToExclude.add(valueOfId[id])
+            }
+        }
+        return resultToExclude
+    }
+
+    // result removals → idx positions whose constant just left result.
+    private fun positionsOfLeftResults(state: PropagationState, resRem: LongArrayList): LongArrayList {
+        val idxToExclude = LongArrayList()
+        val idxDom = state.intDomains[idx]
+        for (i in 0 until resRem.size) {
+            val id = idFor(resRem[i])
+            if (id < 0) continue
+            for (pos in positionsOfId[id]) {
+                val iv = pos + indexOffset
+                if (iv.toLong() in idxDom) idxToExclude.add(iv.toLong())
+            }
+        }
+        return idxToExclude
     }
 
     private fun sortedDistinct(list: LongArrayList): LongArray = list.toSortedLongArray()
@@ -406,17 +417,24 @@ internal class ElementConstState(
             if (if (below) w >= bound else w <= bound) continue
             if (w !in rootRes) continue
             val positions = positionsOfId[id]
-            val gone = positions.none { state.inDomainAt(idx, indexOffset + it.toLong(), atTrail, dIdx) }
-            if (gone) {
-                for (pos in positions) {
-                    val iv = indexOffset + pos.toLong()
-                    if (iv in rootIdx) idxCite.cite(iv, out)
-                }
+            if (positionsGone(state, positions, atTrail, dIdx)) {
+                citePositions(positions, rootIdx, idxCite, out)
             } else {
                 resCite.cite(w, out)
             }
         }
         return out.toArrayOrNull()
+    }
+
+    // The per-value scans are separate methods so the value loop compiles small.
+    private fun positionsGone(state: PropagationState, positions: IntArray, atTrail: Int, dIdx: IntDomain): Boolean =
+        positions.none { state.inDomainAt(idx, indexOffset + it.toLong(), atTrail, dIdx) }
+
+    private fun citePositions(positions: IntArray, rootIdx: IntDomain, idxCite: BoundOnce, out: LitSet) {
+        for (pos in positions) {
+            val iv = indexOffset + pos.toLong()
+            if (iv in rootIdx) idxCite.cite(iv, out)
+        }
     }
 
     // Cites why a value of [v] was out of its past domain [d] at [atTrail], each bound's literal at most once.

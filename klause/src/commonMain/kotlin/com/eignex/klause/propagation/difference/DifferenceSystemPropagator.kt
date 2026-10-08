@@ -25,6 +25,7 @@ import com.eignex.klause.util.IntArrayList
  * the verdict is unaffected either way.
  */
 private const val HEAD_SWEEP_BUDGET = 64
+private const val HUB_REFUTATION_FAILED = -1
 
 /**
  * Joint propagation of a [DifferenceSystem] in the DPLL(T) shape: the asserted edges are consistent
@@ -231,20 +232,8 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         if (!graph.usable) return true
         // Retraction must complete before any assertion: an edge held by a branch the search has left
         // would otherwise contribute a path that the current state does not contain.
-        for (e in guards.indices) {
-            if (!graph.isActive(e) || asserted(state, e)) continue
-            graph.retract(e)
-            session.retractedSinceSweep = true
-        }
-        for (e in guards.indices) {
-            if (graph.isActive(e) || !asserted(state, e)) continue
-            val cycle = graph.assertEdge(e)
-            session.assertVersion++
-            session.newTails.add(tail[e])
-            if (cycle == null) continue
-            session.reason = blockingClause(cycle)
-            return false
-        }
+        retractReleasedEdges(state, session)
+        if (!assertHeldEdges(state, session)) return false
         // Completed heads need no revisit on descent while their asserted paths and implied pins survive.
         val descended = state.numDecisions >= session.sweptDecisions
         val changed = session.assertVersion != session.sweptVersion
@@ -278,6 +267,31 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         return refuteOpenEdges(state, session)
     }
 
+    // The scans over every edge are separate methods so each compiles apart from the rest of the fixpoint step.
+    private fun retractReleasedEdges(state: PropagationState, session: Session) {
+        val graph = session.graph
+        for (e in guards.indices) {
+            if (!graph.isActive(e) || asserted(state, e)) continue
+            graph.retract(e)
+            session.retractedSinceSweep = true
+        }
+    }
+
+    // Assert every edge that newly holds; false on the first that closes a negative cycle.
+    private fun assertHeldEdges(state: PropagationState, session: Session): Boolean {
+        val graph = session.graph
+        for (e in guards.indices) {
+            if (graph.isActive(e) || !asserted(state, e)) continue
+            val cycle = graph.assertEdge(e)
+            session.assertVersion++
+            session.newTails.add(tail[e])
+            if (cycle == null) continue
+            session.reason = blockingClause(cycle)
+            return false
+        }
+        return true
+    }
+
     /** Whether edge [e] currently holds, so it belongs in the graph. */
     private fun asserted(state: PropagationState, e: Int): Boolean =
         guards[e] == DifferenceEdge.ALWAYS || state.litTrue(guards[e])
@@ -288,42 +302,62 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      * `d` with `d + w < 0`, so one search out of `y` decides every open edge whose head is `y`.
      */
     private fun refuteOpenEdges(state: PropagationState, session: Session): Boolean {
-        val graph = session.graph
         var openHeads = 0
         while (!session.heads.isEmpty() && openHeads < HEAD_SWEEP_BUDGET) {
             val v = session.nextHead()
-            session.pending.clear()
-            session.pendingTails.clear()
-            for (i in bucketStart[v] until bucketStart[v + 1]) {
-                val e = bucketEdge[i]
-                if (graph.isActive(e) || state.litTruth(guards[e]) != null) continue
-                session.pending.add(e)
-                session.pendingTails.add(tail[e])
-            }
+            collectOpenEdges(state, session, v)
             if (session.pending.size == 0) continue
             openHeads++
-            // The route through the constant node is already measured, so it refutes without a search and
-            // spares the search from settling that edge's tail at all.
-            var open = false
-            for (k in 0 until session.pending.size) {
-                val e = session.pending[k]
-                if (state.litTruth(guards[e]) != null) continue
-                if (closesNegativeCycle(hubDistance(graph, v, tail[e]), bound[e])) {
-                    val route = graph.pathToZeroFrom(v) + graph.pathFromZeroTo(tail[e])
-                    if (!refute(state, session, e, blockingClause(route))) return false
-                    continue
-                }
-                open = true
+            val open = refuteViaHub(state, session, v)
+            if (open == HUB_REFUTATION_FAILED) return false
+            if (open == 0) continue
+            if (!refuteBySearch(state, session, v)) return false
+        }
+        return true
+    }
+
+    // The open edges with head [v], into the session's pending lists. A head's stages are separate methods so each
+    // compiles apart: in one body every loop entered on-stack recompiled the whole sweep.
+    private fun collectOpenEdges(state: PropagationState, session: Session, v: Int) {
+        val graph = session.graph
+        session.pending.clear()
+        session.pendingTails.clear()
+        for (i in bucketStart[v] until bucketStart[v + 1]) {
+            val e = bucketEdge[i]
+            if (graph.isActive(e) || state.litTruth(guards[e]) != null) continue
+            session.pending.add(e)
+            session.pendingTails.add(tail[e])
+        }
+    }
+
+    // The route through the constant node is already measured, so it refutes without a search and spares the search
+    // from settling that edge's tail at all. Returns how many pending edges it left open, or
+    // [HUB_REFUTATION_FAILED] when a refutation conflicts.
+    private fun refuteViaHub(state: PropagationState, session: Session, v: Int): Int {
+        val graph = session.graph
+        var open = 0
+        for (k in 0 until session.pending.size) {
+            val e = session.pending[k]
+            if (state.litTruth(guards[e]) != null) continue
+            if (closesNegativeCycle(hubDistance(graph, v, tail[e]), bound[e])) {
+                val route = graph.pathToZeroFrom(v) + graph.pathFromZeroTo(tail[e])
+                if (!refute(state, session, e, blockingClause(route))) return HUB_REFUTATION_FAILED
+                continue
             }
-            if (!open) continue
-            graph.shortestPathsFrom(v, session.pendingTails.toIntArray())
-            for (k in 0 until session.pending.size) {
-                val e = session.pending[k]
-                if (state.litTruth(guards[e]) != null) continue // an earlier refutation in this sweep decided it
-                val d = graph.distanceTo(tail[e])
-                if (!closesNegativeCycle(d, bound[e])) continue
-                if (!refute(state, session, e, blockingClause(graph.pathTo(tail[e])))) return false
-            }
+            open++
+        }
+        return open
+    }
+
+    private fun refuteBySearch(state: PropagationState, session: Session, v: Int): Boolean {
+        val graph = session.graph
+        graph.shortestPathsFrom(v, session.pendingTails.toIntArray())
+        for (k in 0 until session.pending.size) {
+            val e = session.pending[k]
+            if (state.litTruth(guards[e]) != null) continue // an earlier refutation in this sweep decided it
+            val d = graph.distanceTo(tail[e])
+            if (!closesNegativeCycle(d, bound[e])) continue
+            if (!refute(state, session, e, blockingClause(graph.pathTo(tail[e])))) return false
         }
         return true
     }

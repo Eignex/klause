@@ -22,6 +22,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -35,7 +36,13 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.toDouble
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1
@@ -188,6 +195,96 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 )
 
 class PortfolioTest {
+
+    @Test
+    fun `exact improvements install when their floating projections tie`() {
+        val bases = listOf(
+            "9007199254740992" to "1",
+            "-9007199254740996" to "1",
+            "9223372036854775808" to "1",
+            "9007199254740992" to "9007199254740991",
+        )
+        for ((numerator, denominator) in bases) {
+            val text = "$numerator/$denominator"
+            val best = BigFraction.of(parseBigInt(numerator), parseBigInt(denominator))
+            val step = BigFraction.of(BIG_ONE, parseBigInt(denominator))
+            val values = listOf(best + step, best, best + step)
+            assertEquals(values[0].toDouble(), values[1].toDouble())
+            val incumbents = PortfolioIncumbents(
+                valueOf = { candidate -> values[candidate.sample.ints.single().toInt()] },
+                improves = { candidate, standing -> candidate < standing },
+                approximateValue = { it.toDouble() },
+                gain = { standing, candidate -> (standing - candidate).toDouble() },
+            )
+            val worker = PortfolioWorker.ofMinimize("exact", 0) { _, _, _, _ ->
+                sequence {
+                    for (i in values.indices) {
+                        yield(
+                            MinimizeResult.BestFound(
+                                Sample(BooleanArray(0), longArrayOf(i.toLong())),
+                                values[i].toDouble(),
+                                TerminationReason.BudgetExhausted,
+                            ),
+                        )
+                    }
+                    yield(MinimizeResult.Unknown(TerminationReason.SearchExhausted))
+                }
+            }
+            val reported = ArrayList<Long>()
+
+            val result = Portfolio.thompson(listOf(worker)).use { portfolio ->
+                portfolio.minimize(
+                    Cancellation.Never,
+                    { reported += checkNotNull(it.result.assignment).ints.single() },
+                    incumbents,
+                )
+            }
+
+            assertEquals(1L, assertIs<MinimizeResult.Optimal>(result).sample.ints.single(), text)
+            assertEquals(best, incumbents.exchange.current()?.objective, text)
+            assertEquals(listOf(0L, 1L), reported, text)
+        }
+    }
+
+    @Test
+    fun `an exact improvement earns credit with a nonfinite projection`() {
+        val best = parseBigInt("1" + "0".repeat(400))
+        val values = listOf(best + BIG_ONE, best)
+        val incumbents = PortfolioIncumbents(
+            valueOf = { candidate -> values[candidate.sample.ints.single().toInt()] },
+            improves = { candidate, standing -> candidate < standing },
+            approximateValue = { Double.POSITIVE_INFINITY },
+            gain = { standing, candidate -> (standing - candidate).toDouble() },
+        )
+        var next = 0
+        val worker = PortfolioWorker.ofMinimize("exact", 0) { _, _, _, _ ->
+            sequence {
+                val i = next++
+                yield(
+                    MinimizeResult.BestFound(
+                        Sample(BooleanArray(0), longArrayOf(i.toLong())),
+                        Double.POSITIVE_INFINITY,
+                        TerminationReason.BudgetExhausted,
+                    ),
+                )
+                val reason = if (next == values.size) {
+                    TerminationReason.SearchExhausted
+                } else {
+                    TerminationReason.BudgetExhausted
+                }
+                yield(MinimizeResult.Unknown(reason))
+            }
+        }
+
+        val result = Portfolio.thompson(listOf(worker)).use {
+            it.minimize(Cancellation.Never, onImprovement = null, incumbents)
+        }
+
+        assertEquals(1L, assertIs<MinimizeResult.Optimal>(result).sample.ints.single())
+        assertEquals(best, incumbents.exchange.current()?.objective)
+        assertEquals(1.0, result.stats.portfolio.arms.single().credit["Improvement"])
+    }
+
     @Test
     fun `real unresolved arms terminate without claiming complete coverage`() {
         for (withIncumbent in listOf(false, true)) {

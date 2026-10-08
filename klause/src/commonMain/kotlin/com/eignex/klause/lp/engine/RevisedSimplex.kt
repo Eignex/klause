@@ -809,7 +809,7 @@ internal class RevisedSimplex(
         boundUpdateFtran: Boolean = false,
     ): DoubleArray {
         chargeSolve()
-        if (b.any { !it.isFinite() }) throw BasisArithmeticException("nonfinite basis right-hand side")
+        requireFiniteRhs(b)
         carrier.scatter(b)
         val solver = solver()
         val before = operationWork(solver)
@@ -822,10 +822,14 @@ internal class RevisedSimplex(
         return carrier.gather(out)
     }
 
+    private fun requireFiniteRhs(b: DoubleArray) {
+        for (x in b) if (!x.isFinite()) throw BasisArithmeticException("nonfinite basis right-hand side")
+    }
+
     /** `Bᵀ x = b` for a dense right-hand side, into [out] through [carrier]. */
     private fun btranDense(b: DoubleArray, out: DoubleArray, carrier: IndexedVector): DoubleArray {
         chargeSolve()
-        if (b.any { !it.isFinite() }) throw BasisArithmeticException("nonfinite basis right-hand side")
+        requireFiniteRhs(b)
         carrier.scatter(b)
         val solver = solver()
         val before = operationWork(solver)
@@ -1546,13 +1550,7 @@ internal class RevisedSimplex(
         val elig = eligibleColumns
         val eligOrdered = eligibleOrdered // scratch for the ratio-ordered permutation of [elig]
         val theoryCandidates = theoryColumns
-        // The columns this iteration's pivot row reached, and the iteration that reached them. A stamp
-        // rather than a clear: the row is formed over ρ's nonzeros, and zeroing [pivotRowEntry] between
-        // iterations would reintroduce the pass over every column that forming it this way removes.
-        val touched = touchedColumns
-        var touchedCount = 0
-        val touchEpoch = columnEpochs
-        touchEpoch.fill(0)
+        columnEpochs.fill(0)
         var epoch = 0
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.
@@ -1600,32 +1598,10 @@ internal class RevisedSimplex(
             var worst = 0.0
             var belowLower = false
             while (true) {
-                r = -1
-                var bestScore = 0.0
-                for (i in 0 until m) {
-                    val v = basicVar[i]
-                    // An unenforced row's basic slack is free: its value is never a violation.
-                    if (enforced != null && v >= n && !enforced[v - n]) continue
-                    val below = if (finiteLower?.get(v) ?: model.hasFiniteLower(v)) {
-                        lowerAt(v) - beta[i]
-                    } else {
-                        Double.NEGATIVE_INFINITY
-                    }
-                    val above = if (finiteUpper?.get(v) ?: model.hasFiniteUpper(v)) {
-                        beta[i] - upperAt(v)
-                    } else {
-                        Double.NEGATIVE_INFINITY
-                    }
-                    val isBelow = below >= above
-                    val viol = if (isBelow) below else above
-                    if (viol <= tolerance) continue
-                    val score = viol * viol / gamma[i]
-                    if (r == -1 || score > bestScore) {
-                        bestScore = score
-                        r = i
-                        worst = viol
-                        belowLower = isBelow
-                    }
+                r = mostInfeasibleRow(beta, enforced, finiteLower, finiteUpper)
+                if (r != -1) {
+                    worst = leavingViolation
+                    belowLower = leavingBelowLower
                 }
                 if (r == -1 && artificialLower != null) {
                     // Optimal for the boxed LP. With no nonbasic seated on an artificial side it is optimal
@@ -1686,41 +1662,8 @@ internal class RevisedSimplex(
             // entries instead of nnz(A), which is the whole point of ρ staying sparse. A column ρ misses
             // has ρ·A_j = 0 exactly, so the eligibility pass below loses no candidate by skipping it.
             epoch++
-            touchedCount = 0
-            var pivotRowOps = 0L
-            pivotEtaVec.forEachStored { i, rhoI ->
-                val cols = rowCols[i]
-                val vals = rowVals[i]
-                pivotRowOps += cols.size
-                touchedCount = SparseSlices.scatterAxpy(
-                    rhoI, cols, 0, vals, 0, cols.size,
-                    pivotRowEntry, touchEpoch, epoch, touched, 0, touchedCount,
-                )
-            }
-            work.add(pivotRowOps)
-            // Collect the dual-feasible entering candidates and their ratios; eligibility is the sign
-            // rule that keeps reduced costs feasible as the leaving variable moves to its bound.
-            elig.clear()
-            for (t in 0 until touchedCount) {
-                val j = touched[t]
-                if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-                // An unenforced row's slack never enters — it is conceptually basic forever (and the
-                // reconciliation above seats it, so a nonbasic one cannot appear mid-loop).
-                if (enforced != null && j >= n && !enforced[j - n]) continue
-                val a = pivotRowEntry[j]
-                if (abs(a) < tolerance) continue
-                val atLower = status[j] == VarStatus.AT_LOWER
-                val eligible = if (status[j] == VarStatus.FREE) {
-                    true
-                } else if (belowLower) {
-                    (atLower && a < 0) || (!atLower && a > 0)
-                } else {
-                    (atLower && a > 0) || (!atLower && a < 0)
-                }
-                if (!eligible) continue
-                ratioBuf[j] = abs((cost(j) - dotColumn(y, j)) / a)
-                elig.add(j)
-            }
+            val touchedCount = formPivotRow(epoch)
+            collectEligibleEntering(touchedCount, y, belowLower, enforced)
             val entering = if (elig.isEmpty()) {
                 EnteringChoice.Selected(null)
             } else {
@@ -1816,6 +1759,109 @@ internal class RevisedSimplex(
         // Iteration budget spent. Same reasoning as the cancellation exit: the iterate bounds, so hand
         // it back rather than discarding the work.
         return stopped(LpFloatTermination.PIVOTS, if (haveBeta) boundOnly(beta) else null)
+    }
+
+    // The violation and side of the row [mostInfeasibleRow] chose; unset when it found none.
+    private var leavingViolation = 0.0
+    private var leavingBelowLower = false
+
+    // The per-iteration scans of [solveCore] are their own methods: inside its iteration loop they make C2 compile
+    // the whole solve again on-stack for each loop it enters.
+
+    /**
+     * Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate dual steepest
+     * edge); -1 when every basic value is within its bounds.
+     */
+    private fun mostInfeasibleRow(
+        beta: DoubleArray,
+        enforced: BooleanArray?,
+        finiteLower: BooleanArray?,
+        finiteUpper: BooleanArray?,
+    ): Int {
+        var r = -1
+        var bestScore = 0.0
+        for (i in 0 until m) {
+            val v = basicVar[i]
+            // An unenforced row's basic slack is free: its value is never a violation.
+            if (enforced != null && v >= n && !enforced[v - n]) continue
+            val below = if (finiteLower?.get(v) ?: model.hasFiniteLower(v)) {
+                lowerAt(v) - beta[i]
+            } else {
+                Double.NEGATIVE_INFINITY
+            }
+            val above = if (finiteUpper?.get(v) ?: model.hasFiniteUpper(v)) {
+                beta[i] - upperAt(v)
+            } else {
+                Double.NEGATIVE_INFINITY
+            }
+            val isBelow = below >= above
+            val viol = if (isBelow) below else above
+            if (viol <= tolerance) continue
+            val score = viol * viol / gamma[i]
+            if (r == -1 || score > bestScore) {
+                bestScore = score
+                r = i
+                leavingViolation = viol
+                leavingBelowLower = isBelow
+            }
+        }
+        return r
+    }
+
+    /**
+     * ρ·A_j for every column ρ reaches, accumulated over the rows ρ stores, into [pivotRowEntries]; returns how
+     * many columns it reached, listed in [touchedColumns]. Costs those rows' entries instead of nnz(A), which is
+     * the whole point of ρ staying sparse. A column ρ misses has ρ·A_j = 0 exactly, so the eligibility pass loses
+     * no candidate by skipping it. Reached columns are stamped with [epoch] rather than cleared: zeroing
+     * [pivotRowEntries] between iterations would reintroduce the pass over every column this removes.
+     */
+    private fun formPivotRow(epoch: Int): Int {
+        var touchedCount = 0
+        var pivotRowOps = 0L
+        pivotEtaVec.forEachStored { i, rhoI ->
+            val cols = rowCols[i]
+            val vals = rowVals[i]
+            pivotRowOps += cols.size
+            touchedCount = SparseSlices.scatterAxpy(
+                rhoI, cols, 0, vals, 0, cols.size,
+                pivotRowEntries, columnEpochs, epoch, touchedColumns, 0, touchedCount,
+            )
+        }
+        work.add(pivotRowOps)
+        return touchedCount
+    }
+
+    /**
+     * Collect the dual-feasible entering candidates into [eligibleColumns] and their ratios into [enteringRatios];
+     * eligibility is the sign rule that keeps reduced costs feasible as the leaving variable moves to its bound.
+     */
+    private fun collectEligibleEntering(
+        touchedCount: Int,
+        y: DoubleArray,
+        belowLower: Boolean,
+        enforced: BooleanArray?,
+    ) {
+        eligibleColumns.clear()
+        for (t in 0 until touchedCount) {
+            val j = touchedColumns[t]
+            if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
+            // An unenforced row's slack never enters — it is conceptually basic forever (and the
+            // reconciliation above seats it, so a nonbasic one cannot appear mid-loop).
+            if (enforced != null && j >= n && !enforced[j - n]) continue
+            val a = pivotRowEntries[j]
+            if (abs(a) < tolerance) continue
+            val atLower = status[j] == VarStatus.AT_LOWER
+            val eligible = if (status[j] == VarStatus.FREE) {
+                true
+            } else if (belowLower) {
+                (atLower && a < 0) || (!atLower && a > 0)
+            } else {
+                (atLower && a > 0) || (!atLower && a < 0)
+            }
+            if (!eligible) continue
+            enteringRatios[j] = abs((cost(j) - dotColumn(y, j)) / a)
+            eligibleColumns.add(j)
+        }
     }
 
     private fun restartDual(enforced: BooleanArray?, progress: SolveProgress): FloatLpResult? {
@@ -2252,12 +2298,7 @@ internal class RevisedSimplex(
         leavingRow: Int,
         enforced: BooleanArray?,
     ): EnteringChoice {
-        // Stable ascending order by ratio, matching the tie order a stable sort by the same key gives.
-        val order = argsortBy(elig.size, pricingOrder, pricingScratch) { a, b ->
-            ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]])
-        }
-        for (position in 0 until elig.size) ordered[position] = elig[order[position]]
-        for (position in 0 until elig.size) elig[position] = ordered[position]
+        sortByRatio(elig, ordered, ratioBuf)
         var acc = 0.0
         var flipCount = 0
         for (idx in 0 until elig.size) {
@@ -2270,27 +2311,7 @@ internal class RevisedSimplex(
                 flipCount++
             } else {
                 val remaining = maxOf(delta - acc, 0.0)
-                var harrisBound = Double.POSITIVE_INFINITY
-                var best = -1
-                var bestMag = -1.0
-                theoryCandidates.clear()
-                var k = idx
-                while (k < elig.size && ratioBuf[elig[k]] <= harrisBound) {
-                    val cand = elig[k]
-                    val mag = abs(pivotRowEntry[cand])
-                    val candRange = boundRange(cand)
-                    val canFinish = candRange == Double.MAX_VALUE || mag * candRange >= remaining - tolerance
-                    val relaxed = maxOf(minimumDelta / mag, ratioBuf[cand] + harrisTolerance / mag)
-                    harrisBound = minOf(harrisBound, relaxed)
-                    if (canFinish) {
-                        if (mag > bestMag) {
-                            bestMag = mag
-                            best = cand
-                        }
-                        if (mag >= THEORY_PIVOT_MAGNITUDE_FLOOR) theoryCandidates.add(cand)
-                    }
-                    k++
-                }
+                val best = harrisFinishingColumn(elig, idx, remaining, theoryCandidates, ratioBuf, pivotRowEntry)
                 if (best != -1) {
                     val minimizeBoundSupport =
                         pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && originalZeroCost
@@ -2302,14 +2323,7 @@ internal class RevisedSimplex(
                     } else {
                         best
                     }
-                    for (f in 0 until flipCount) {
-                        val flipped = elig[f]
-                        status[flipped] = if (status[flipped] == VarStatus.AT_LOWER) {
-                            VarStatus.AT_UPPER
-                        } else {
-                            VarStatus.AT_LOWER
-                        }
-                    }
+                    flipPassedBreakpoints(elig, flipCount)
                     if (ratioBuf[selected] > ratioBuf[j] + harrisTolerance) lastHarrisMinistepSelections++
                     return EnteringChoice.Selected(selected)
                 }
@@ -2317,6 +2331,57 @@ internal class RevisedSimplex(
             }
         }
         return EnteringChoice.Selected(null) // defensive: the loop handles the last element
+    }
+
+    // Stable ascending order by ratio, matching the tie order a stable sort by the same key gives.
+    private fun sortByRatio(elig: IntArrayList, ordered: IntArray, ratioBuf: DoubleArray) {
+        val order = argsortBy(elig.size, pricingOrder, pricingScratch) { a, b ->
+            ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]])
+        }
+        for (position in 0 until elig.size) ordered[position] = elig[order[position]]
+        for (position in 0 until elig.size) elig[position] = ordered[position]
+    }
+
+    // The largest-pivot column from [from] on that can finish the [remaining] step within the Harris bound, or -1;
+    // every finishing column with a usable pivot is listed in [theoryCandidates].
+    @Suppress("LongParameterList")
+    private fun harrisFinishingColumn(
+        elig: IntArrayList,
+        from: Int,
+        remaining: Double,
+        theoryCandidates: IntArrayList,
+        ratioBuf: DoubleArray,
+        pivotRowEntry: DoubleArray,
+    ): Int {
+        var harrisBound = Double.POSITIVE_INFINITY
+        var best = -1
+        var bestMag = -1.0
+        theoryCandidates.clear()
+        var k = from
+        while (k < elig.size && ratioBuf[elig[k]] <= harrisBound) {
+            val cand = elig[k]
+            val mag = abs(pivotRowEntry[cand])
+            val candRange = boundRange(cand)
+            val canFinish = candRange == Double.MAX_VALUE || mag * candRange >= remaining - tolerance
+            val relaxed = maxOf(minimumDelta / mag, ratioBuf[cand] + harrisTolerance / mag)
+            harrisBound = minOf(harrisBound, relaxed)
+            if (canFinish) {
+                if (mag > bestMag) {
+                    bestMag = mag
+                    best = cand
+                }
+                if (mag >= THEORY_PIVOT_MAGNITUDE_FLOOR) theoryCandidates.add(cand)
+            }
+            k++
+        }
+        return best
+    }
+
+    private fun flipPassedBreakpoints(elig: IntArrayList, flipCount: Int) {
+        for (f in 0 until flipCount) {
+            val flipped = elig[f]
+            status[flipped] = if (status[flipped] == VarStatus.AT_LOWER) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+        }
     }
 
     private fun chooseTheoryEntering(

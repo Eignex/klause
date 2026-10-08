@@ -8,8 +8,10 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -96,6 +98,23 @@ class OpenPortfolioTest {
 
             assertEquals(BigFraction.ofLong(12), assertIs<OpenTheoryOptimum.Optimal>(result, "cores=$cores").value)
         }
+    }
+
+    @Test
+    fun `the portfolio preserves an optimal integer witness outside the Long range`() {
+        val value = parseBigInt("9223372036854775808")
+        val model = openColumns(
+            1,
+            Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, value),
+        )
+        val request = OpenTheoryRequest(model, LinearObjective(intCoefficients = longArrayOf(1)))
+
+        val result = optimum(OpenTheoryPipeline.executePortfolio(request, params()))
+
+        val optimal = assertIs<OpenTheoryOptimum.Optimal>(result)
+        assertEquals(value.toString(), optimal.assignment.intValue(0))
+        assertEquals(value.toString(), optimal.value.toString())
+        assertTrue(optimal.stats.portfolio.arms.isNotEmpty())
     }
 
     @Test
