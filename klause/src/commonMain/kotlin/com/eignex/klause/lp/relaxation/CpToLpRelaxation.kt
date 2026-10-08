@@ -131,6 +131,7 @@ internal class LpRelaxation(
     val colPresence: List<CutAuxiliaryDefinition?> = List(model.n) { null },
     /** The factor each row of [model] was emitted for, or -1 for a cut or a row spanning several factors. */
     val rowFactorIds: IntArray = EmptyIntArray,
+    val realUpperRows: Map<Int, Int> = emptyMap(),
 )
 
 /**
@@ -240,6 +241,8 @@ internal fun LpRelaxation.withModel(
     gatedAux = gatedAux,
     gatedWhenTrue = gatedWhenTrue,
     sourceMap = sources,
+    rowFactorIds = rowFactorIds,
+    realUpperRows = realUpperRows,
 )
 
 /**
@@ -676,6 +679,50 @@ internal class CpToLpRelaxation(
         cancellation: Cancellation = Cancellation.Never,
     ): LpRelaxation = Assembler(domains, cancellation = cancellation).assemble(extraCuts)
 
+    private val timeIndexedViews by lazy {
+        if (cumulativeTimeIndexed && !objectiveCone) schedulingViews(problem) else emptyList()
+    }
+
+    val emissionRegions: List<LpEmissionRegion> by lazy {
+        buildList {
+            add(LpEmissionRegion(LpEmissionKind.OBJECTIVE))
+            if (!objectiveCone) {
+                if (circuitArcs) {
+                    for (id in problem.factors.indices) {
+                        if (problem.factors[id] is Circuit) add(LpEmissionRegion(LpEmissionKind.CIRCUIT, id))
+                    }
+                }
+                cumulativeRelaxation?.plans?.indices?.forEach {
+                    add(LpEmissionRegion(LpEmissionKind.ENERGETIC, it))
+                }
+                timeIndexedViews.indices.forEach { add(LpEmissionRegion(LpEmissionKind.TIME_INDEXED, it)) }
+            }
+            val coneL = cone
+            for (id in problem.factors.indices) {
+                val factor = problem.factors[id]
+                if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
+                if (realResidual && !touchesReals(factor)) continue
+                add(LpEmissionRegion(LpEmissionKind.FACTOR, id))
+            }
+            if (booleanRlt) add(LpEmissionRegion(LpEmissionKind.BOOLEAN_RLT))
+        }
+    }
+
+    fun emitRegion(
+        region: LpEmissionRegion,
+        domains: RelaxationDomains,
+        cancellation: Cancellation = Cancellation.Never,
+    ): LpEmission {
+        val tracked = LpEmissionDomains(domains)
+        val relaxation = Assembler(
+            tracked,
+            cancellation = cancellation,
+            region = region,
+            columnDomains = RootDomains(problem),
+        ).assemble(emptyList())
+        return LpEmission(region, relaxation, tracked.dependencies())
+    }
+
     /**
      * The **gated** residual relaxation ([LpRelaxation.gatedRows]), or null when the model does not
      * qualify: only a pure-real [realResidual] build is node-invariant enough (an integer column's
@@ -695,17 +742,29 @@ internal class CpToLpRelaxation(
 
     private fun realCost(r: Int): Double = objective?.realCoefficients?.getOrElse(r) { 0.0 } ?: 0.0
 
+    private fun touchesReals(factor: Factor): Boolean = when (factor) {
+        is Linear -> factor.realConstants != null
+        is ReifiedRealLinear -> true
+        is RealProduct -> true
+        else -> false
+    }
+
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
      *  [RelaxationBuilder] so an LP factor projection can emit into it. */
     private inner class Assembler(
         private val domains: RelaxationDomains,
         private val gated: Boolean = false,
         private val cancellation: Cancellation = Cancellation.Never,
+        private val region: LpEmissionRegion? = null,
+        private val columnDomains: RelaxationDomains = domains,
     ) : RelaxationBuilder {
         private val builder = LpBuilder()
-        private val intCol = IntArray(problem.numIntVars) { -1 }
-        private val boolCol = IntArray(problem.numBoolVars) { -1 }
-        private val realCol = IntArray(problem.numRealVars) { -1 }
+        private val intCol = IntArray(if (region == null) problem.numIntVars else 0) { -1 }
+        private val boolCol = IntArray(if (region == null) problem.numBoolVars else 0) { -1 }
+        private val realCol = IntArray(if (region == null) problem.numRealVars else 0) { -1 }
+        private val sparseIntCol = MutableIntIntMap()
+        private val sparseBoolCol = MutableIntIntMap()
+        private val sparseRealCol = MutableIntIntMap()
         private val colVarId = IntArrayList()
         private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
 
@@ -716,6 +775,7 @@ internal class CpToLpRelaxation(
 
         // Primary column -> negative-part column of a split lower-unbounded real variable.
         private val realNegOf = MutableIntIntMap()
+        private val realUpperRows = HashMap<Int, Int>()
 
         // Per-column live-bound rule for the persistent relaxation. For an auxiliary column,
         // colReq[c] holds its presence requirement as flat (intVar, value) membership pairs and
@@ -842,7 +902,7 @@ internal class CpToLpRelaxation(
             val inColsByHead = Array(n) { IntArrayList() }
             // Out-degree and channelling rows, building the (sparse) arc columns on the way.
             for (i in 0 until n) {
-                val live = domains.intDomain(succ[i])
+                val live = columnDomains.intDomain(succ[i])
                 val outCols = IntArrayList()
                 val chanCols = IntArrayList()
                 val chanCoef = IntArrayList()
@@ -903,17 +963,17 @@ internal class CpToLpRelaxation(
          */
         override fun intColumn(intVar: Int): Int {
             checkCancellation()
-            var c = intCol[intVar]
+            var c = if (region == null) intCol[intVar] else sparseIntCol.getOrDefault(intVar, -1)
             if (c == -1) {
-                val dom = domains.intDomain(intVar)
+                val dom = columnDomains.intDomain(intVar)
                 val intBounds = problem.intBounds
-                val openHi = domains.honorsOpenSides && !intBounds.hasUpper(intVar) && intBounds.hasLower(intVar)
+                val openHi = columnDomains.honorsOpenSides && !intBounds.hasUpper(intVar) && intBounds.hasLower(intVar)
                 c = if (openHi) {
                     builder.addOpenAboveVar(intBounds.lower(intVar), intCost(intVar), tag = intVar)
                 } else {
                     builder.addVar(dom.min, dom.max, intCost(intVar), tag = intVar)
                 }
-                intCol[intVar] = c
+                if (region == null) intCol[intVar] = c else sparseIntCol.put(intVar, c)
                 colVarId.add(intVar)
                 colIsBool.add(0)
                 colRealId.add(-1)
@@ -941,7 +1001,7 @@ internal class CpToLpRelaxation(
          * enforced by an explicit `x⁺ − x⁻ ≤ hi` row.
          */
         override fun realColumn(realVar: Int): Int {
-            var c = realCol[realVar]
+            var c = if (region == null) realCol[realVar] else sparseRealCol.getOrDefault(realVar, -1)
             if (c == -1) {
                 val lo = problem.realLower[realVar]
                 val hi = problem.realUpper[realVar]
@@ -959,10 +1019,11 @@ internal class CpToLpRelaxation(
                     registerRealCol(realVar, sign = -1)
                     realNegOf.put(c, neg)
                     if (hi.isFinite()) {
+                        realUpperRows[builder.rowCount] = realVar
                         builder.addRealRow(intArrayOf(c, neg), doubleArrayOf(1.0, -1.0), Relation.LE, hi)
                     }
                 }
-                realCol[realVar] = c
+                if (region == null) realCol[realVar] = c else sparseRealCol.put(realVar, c)
             }
             return c
         }
@@ -980,13 +1041,13 @@ internal class CpToLpRelaxation(
         /** Column for Boolean variable `boolVar`; bounds collapse to a point if it is pinned this node. */
         override fun boolColumn(boolVar: Int): Int {
             checkCancellation()
-            var c = boolCol[boolVar]
+            var c = if (region == null) boolCol[boolVar] else sparseBoolCol.getOrDefault(boolVar, -1)
             if (c == -1) {
-                val pinned = domains.boolValue(boolVar)
+                val pinned = columnDomains.boolValue(boolVar)
                 val lo = if (pinned == true) 1L else 0L
                 val hi = if (pinned == false) 0L else 1L
                 c = builder.addVar(lo, hi, boolCost(boolVar), tag = boolVar)
-                boolCol[boolVar] = c
+                if (region == null) boolCol[boolVar] = c else sparseBoolCol.put(boolVar, c)
                 colVarId.add(boolVar)
                 colIsBool.add(1)
                 colRealId.add(-1)
@@ -1058,7 +1119,7 @@ internal class CpToLpRelaxation(
             // Materialize objective-only variables first so the relaxed objective is complete — including
             // LP-only continuous columns, else a real objective term with no constraint on it
             // never reaches the LP and the objective is not minimised over it.
-            objective?.let { obj ->
+            objective?.takeIf { emits(LpEmissionKind.OBJECTIVE) }?.let { obj ->
                 for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intColumn(i)
                 for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolColumn(b)
                 for (r in obj.realCoefficients.indices) if (obj.realCoefficients[r] != 0.0) realColumn(r)
@@ -1069,8 +1130,9 @@ internal class CpToLpRelaxation(
             // (gated by [currentHullEnabled]); only the non-per-factor relaxations live here — circuit
             // arcs feed the subtour separator, and the cumulative rows span a scheduling view.
             if (!objectiveCone) {
-                if (circuitArcs) {
-                    for ((factorId, factor) in problem.factors.withIndex()) {
+                if (circuitArcs && emits(LpEmissionKind.CIRCUIT)) {
+                    for (factorId in factorIndices()) {
+                        val factor = problem.factors[factorId]
                         checkCancellation()
                         currentFactorId = factorId
                         currentEmissionRoute = 1L
@@ -1080,15 +1142,21 @@ internal class CpToLpRelaxation(
                         attributeRows(factorId)
                     }
                 }
-                cumulativeRelaxation?.let { cumulativeRows(it) }
-                if (cumulativeTimeIndexed) {
-                    for (view in schedulingViews(problem)) buildCumulativeTimeIndexed(view)
+                if (emits(LpEmissionKind.ENERGETIC)) {
+                    cumulativeRelaxation?.let {
+                        cumulativeRows(if (region == null) it.plans else listOf(it.plans[region.index]))
+                    }
+                }
+                if (cumulativeTimeIndexed && emits(LpEmissionKind.TIME_INDEXED)) {
+                    val views = if (region == null) timeIndexedViews else listOf(timeIndexedViews[region.index])
+                    for (view in views) buildCumulativeTimeIndexed(view)
                 }
                 attributeRows(-1)
             }
 
             val coneL = cone
-            for ((factorId, factor) in problem.factors.withIndex()) {
+            for (factorId in if (emits(LpEmissionKind.FACTOR)) factorIndices() else emptyList()) {
+                val factor = problem.factors[factorId]
                 checkCancellation()
                 // In cone mode emit only factors connected to the objective; this also drops
                 // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
@@ -1110,7 +1178,7 @@ internal class CpToLpRelaxation(
                 attributeRows(factorId)
             }
 
-            if (booleanRlt) buildBooleanRlt()
+            if (booleanRlt && emits(LpEmissionKind.BOOLEAN_RLT)) buildBooleanRlt()
             attributeRows(-1)
 
             // Separator-produced cuts, over already-created columns. A cut referencing an absent
@@ -1158,7 +1226,7 @@ internal class CpToLpRelaxation(
                 rowFactorIds = rowFactor.toIntArray(),
                 colRealId = IntArray(colRealId.size) { colRealId[it] },
                 colRealSign = IntArray(colRealSign.size) { colRealSign[it] },
-                sourceMap = cpCutSources(
+                sourceMap = if (region == null) cpCutSources(
                     model,
                     problem,
                     colVarIds,
@@ -1169,20 +1237,17 @@ internal class CpToLpRelaxation(
                     colPresence.toList(),
                     auxiliarySources,
                     domains,
-                ),
+                ) else null,
                 gatedRows = gatedRowList.toIntArray(),
                 gatedAux = gatedAuxList.toIntArray(),
                 gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },
+                realUpperRows = realUpperRows.toMap(),
             )
         }
 
-        /** Whether [factor] involves an LP-only continuous column — the [realResidual] filter. */
-        private fun touchesReals(factor: Factor): Boolean = when (factor) {
-            is Linear -> factor.realConstants != null
-            is ReifiedRealLinear -> true
-            is RealProduct -> true
-            else -> false
-        }
+        private fun emits(kind: LpEmissionKind): Boolean = region == null || region.kind == kind
+
+        private fun factorIndices(): Iterable<Int> = region?.let { listOf(it.index) } ?: problem.factors.indices
 
         // Gated residual bookkeeping: parallel (row, aux, whenTrue) entries recorded as the rows are
         // emitted, surfaced on the relaxation with the active/vacuous rhs pair computed post-build.
@@ -1256,7 +1321,8 @@ internal class CpToLpRelaxation(
                             xiCol // wᵢᵢ = xᵢ²= xᵢ
                         } else {
                             val xkCol = intColumn(xk)
-                            val present = domains.intDomain(xk).contains(1L) && domains.intDomain(xi).contains(1L)
+                            val present = columnDomains.intDomain(xk).contains(1L) &&
+                                columnDomains.intDomain(xi).contains(1L)
                             val w = auxColumn(
                                 0L,
                                 if (present) 1L else 0L,
@@ -1287,9 +1353,9 @@ internal class CpToLpRelaxation(
          * and otherwise carries the live starts it leaned on as premises. One row per plan keeps the
          * row count structural (warm-start safe).
          */
-        private fun cumulativeRows(rel: CumulativeRelaxation) {
-            for (plan in rel.plans) {
-                val spec = rel.rowSpec(plan, domains)
+        private fun cumulativeRows(plans: List<CumulativeRelaxation.AreaPlan>) {
+            for (plan in plans) {
+                val spec = requireNotNull(cumulativeRelaxation).rowSpec(plan, domains)
                 // Single-term row capacity·M ≥ rhs; the capacity coefficient is a (possibly wide) Long.
                 builder.addRow(
                     intArrayOf(intColumn(plan.makespanVar)),
