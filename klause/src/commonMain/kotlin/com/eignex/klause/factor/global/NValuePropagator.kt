@@ -4,11 +4,16 @@ import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
+import com.eignex.klause.factor.global.internals.hallReason
 import com.eignex.klause.factor.global.internals.reginTarjanScc
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.boundLiteral
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
@@ -31,8 +36,41 @@ internal class NValuePropagator(
 
     override val consumesIntEventDelta: Boolean get() = consumesIntEventDeltaVal
 
+    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
+    private var failure: IntArray? = null
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        OptPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, intVars))
+        failure ?: OptPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, intVars))
+
+    private class Lits {
+        private val seen = IntHashSet()
+        private val out = IntArrayList()
+
+        fun add(lit: Int) {
+            if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
+        }
+
+        fun addAll(lits: IntArray?) {
+            lits?.forEach { add(it) }
+        }
+
+        fun toArray(): IntArray = out.toIntArray()
+    }
+
+    private fun bound(state: PropagationState, v: Int, lower: Boolean, need: Long): Int =
+        state.boundLiteral(v, lower, need, state.undo.size, state.currentLevel)
+
+    private fun reasonOrNull(state: PropagationState, lits: Lits): IntArray? =
+        if (state.currentLevel == 0) null else lits.toArray()
+
+    // Fail with [ant] plus [v]'s own domain, the bound a tightening of [v] ran into.
+    private fun failOn(state: PropagationState, ant: IntArray?, v: Int): Boolean {
+        failure = Lits().apply {
+            addAll(ant)
+            addAll(collectHoleAndBoundAntecedents(state, intArrayOf(v)))
+        }.toArray()
+        return false
+    }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         // The optional-presence variant keeps the order-insensitive greedy bounds: a presence flip
@@ -40,9 +78,9 @@ internal class NValuePropagator(
         // (which assumes every counted variable is present) does not apply cleanly.
         if (presents.isNotEmpty()) return propagateGreedy(state)
 
+        failure = null
         if (state.cpGateShouldSkip(factorId)) return true
 
-        val ant = collectHoleAndBoundAntecedents(state, intVars)
         // atLeast / eq: the distinct count cannot exceed the maximum number of variables that can be
         // assigned pairwise-distinct values — a maximum bipartite var↦value matching. Tighter than
         // |union of domains|, which ignores that there are only `xs.size` variables. When the count is
@@ -53,21 +91,63 @@ internal class NValuePropagator(
             // GAC value pruning, which needs the matching.
             if (xs.all { state.intDomains[it].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null }) {
                 val matching = buildMatching(state)
-                if (!state.tightenIntMax(n, matching.size.toLong(), ant)) return false
-                if (state.intDomains[n].min == matching.size.toLong()) {
-                    if (!atLeastGacPrune(state, matching, ant)) return false
+                // No matching is larger: the variables alternating paths reach from unmatched ones are
+                // confined to the values they reach (König's cover), a Hall set.
+                val cover = if (state.currentLevel == 0) {
+                    null
+                } else {
+                    hallReason(state, kingCoverVars(matching), EmptyIntArray)
                 }
-            } else if (!state.tightenIntMax(n, xs.size.toLong(), ant)) {
-                return false
+                if (matching.size < state.intDomains[n].max &&
+                    !state.tightenIntMax(n, matching.size.toLong(), cover)
+                ) {
+                    return failOn(state, cover, n)
+                }
+                if (state.intDomains[n].min == matching.size.toLong()) {
+                    if (!atLeastGacPrune(state, matching, cover)) return false
+                }
+            } else if (xs.size < state.intDomains[n].max && !state.tightenIntMax(n, xs.size.toLong(), IntArray(0))) {
+                return failOn(state, IntArray(0), n)
             }
         }
         // atMost / eq: O(n+d) bound-consistency — the count is at least the size of a
         // maximal set of pairwise-disjoint value windows, and when that lower bound meets `n`'s upper
         // bound every variable is forced into the window of its kernel representative.
         if (mode != NValue.Mode.AtLeast) {
-            if (!kernelBoundConsistency(state, ant)) return false
+            if (!kernelBoundConsistency(state)) return false
         }
         return true
+    }
+
+    // The variables reachable over alternating paths (unmatched edges var→value, matched value→var) from the
+    // unmatched variables.
+    private fun kingCoverVars(m: Matching): IntArray {
+        val nv = xs.size
+        val seenVar = BooleanArray(nv)
+        val seenVal = BooleanArray(m.valToVar.size)
+        val stack = IntArrayList()
+        for (i in 0 until nv) {
+            if (m.varToVal[i] == -1) {
+                seenVar[i] = true
+                stack.add(i)
+            }
+        }
+        while (!stack.isEmpty()) {
+            val i = stack[stack.size - 1]
+            stack.removeAt(stack.size - 1)
+            val row = m.adj[i]
+            for (k in 0 until row.size) {
+                val v = row[k]
+                if (seenVal[v]) continue
+                seenVal[v] = true
+                val j = m.valToVar[v]
+                if (j >= 0 && !seenVar[j]) {
+                    seenVar[j] = true
+                    stack.add(j)
+                }
+            }
+        }
+        return (0 until nv).filter { seenVar[it] }.map { xs[it] }.toIntArray()
     }
 
     /** Order-insensitive greedy bounds, the fallback for the optional-presence variant. */
@@ -190,15 +270,43 @@ internal class NValuePropagator(
             if (m.valToVar[vId] == -1) adj[vNode].add(sink) else adj[sink].add(vNode)
         }
         val scc = reginTarjanScc(adj, total)
+        // Every maximum matching is used, as the count's lower bound demands as many values as one covers; an
+        // edge left in no maximum matching stays out because nothing reachable from it leads back, which only
+        // the domains of what it reaches can change.
+        val bySource = HashMap<Int, IntArray?>()
+        fun reasonFrom(node: Int): IntArray? = bySource.getOrPut(scc[node]) {
+            if (state.currentLevel == 0) return@getOrPut null
+            Lits().apply {
+                addAll(ant)
+                add(bound(state, n, true, m.size.toLong()))
+                val reached = BooleanArray(total)
+                val stack = IntArrayList()
+                reached[node] = true
+                stack.add(node)
+                while (!stack.isEmpty()) {
+                    val u = stack[stack.size - 1]
+                    stack.removeAt(stack.size - 1)
+                    val a = adj[u]
+                    for (k in 0 until a.size) {
+                        if (!reached[a[k]]) {
+                            reached[a[k]] = true
+                            stack.add(a[k])
+                        }
+                    }
+                }
+                for (j in 0 until nv) if (reached[j]) addAll(collectHoleAndBoundAntecedents(state, intArrayOf(xs[j])))
+            }.toArray()
+        }
         for (i in 0 until nv) {
             val vIds = m.adj[i].toIntArray()
             for (vId in vIds) {
                 if (scc[i] == scc[nv + vId]) continue
                 val value = m.values[vId]
+                val why = reasonFrom(if (m.varToVal[i] == vId) i else nv + vId)
                 if (m.varToVal[i] == vId) {
-                    if (!state.setInt(xs[i], value, ant)) return false
+                    if (!state.setInt(xs[i], value, why)) return failOn(state, why, xs[i])
                 } else {
-                    if (!state.excludeIntValue(xs[i], value, ant)) return false
+                    if (!state.excludeIntValue(xs[i], value, why)) return failOn(state, why, xs[i])
                 }
             }
         }
@@ -228,7 +336,7 @@ internal class NValuePropagator(
      * Each `while` iteration takes one snapshot of the bounds and runs both a lower-bound pass and an
      * upper-bound pass off it, looping until neither pass narrows anything.
      */
-    private fun kernelBoundConsistency(state: PropagationState, ant: IntArray?): Boolean {
+    private fun kernelBoundConsistency(state: PropagationState): Boolean {
         val nv = xs.size
         val minVal = LongArray(nv)
         val maxVal = LongArray(nv)
@@ -240,10 +348,10 @@ internal class NValuePropagator(
                 minVal[i] = state.intDomains[xs[i]].min
                 maxVal[i] = state.intDomains[xs[i]].max
             }
-            val rLb = kernelPass(state, ant, nv, minVal, maxVal, order, lowerPass = true)
+            val rLb = kernelPass(state, nv, minVal, maxVal, order, lowerPass = true)
             if (rLb < 0) return false
             if (rLb > 0) loop = true
-            val rUb = kernelPass(state, ant, nv, minVal, maxVal, order, lowerPass = false)
+            val rUb = kernelPass(state, nv, minVal, maxVal, order, lowerPass = false)
             if (rUb < 0) return false
             if (rUb > 0) loop = true
         }
@@ -254,7 +362,6 @@ internal class NValuePropagator(
     @Suppress("LongParameterList", "ReturnCount")
     private fun kernelPass(
         state: PropagationState,
-        ant: IntArray?,
         nv: Int,
         minVal: LongArray,
         maxVal: LongArray,
@@ -271,6 +378,10 @@ internal class NValuePropagator(
         val sorted = (0 until nv).sortedWith(compareBy<Int> { primary[it] }.thenByDescending { it })
         for (idx in 0 until nv) order[idx] = sorted[idx]
         val kerRep = BooleanArray(nv)
+        // Per group: the member whose bound closes its window (its least upper bound in the lower pass), and
+        // the window's far edge. These members' ranges are pairwise disjoint.
+        val closer = IntArrayList()
+        val edge = LongArrayList()
         var min = Long.MIN_VALUE
         var max = Long.MIN_VALUE
         var nbKer = 0
@@ -280,36 +391,65 @@ internal class NValuePropagator(
                 min = minVal[node]
                 max = maxVal[node]
                 nbKer++
+                closer.add(node)
             } else if (overlaps(lowerPass, minVal[node], maxVal[node], min, max)) {
                 min = maxOf(min, minVal[node])
                 max = minOf(max, maxVal[node])
+                val current = closer[closer.size - 1]
+                val tighter = if (lowerPass) maxVal[node] < maxVal[current] else minVal[node] > minVal[current]
+                if (tighter) closer[closer.size - 1] = node
             } else {
+                edge.add(if (lowerPass) max else min)
                 min = minVal[node]
                 max = maxVal[node]
                 kerRep[node] = true
                 nbKer++
+                closer.add(node)
             }
         }
+        // The kernel: each group's closing member stays on its side of the edge between it and the next.
+        val kernel = Lits()
+        for (g in 0 until closer.size) {
+            val x = xs[closer[g]]
+            if (lowerPass) {
+                if (g < edge.size) kernel.add(bound(state, x, false, edge[g]))
+                if (g > 0) kernel.add(bound(state, x, true, edge[g - 1] + 1))
+            } else {
+                if (g < edge.size) kernel.add(bound(state, x, true, edge[g]))
+                if (g > 0) kernel.add(bound(state, x, false, edge[g - 1] - 1))
+            }
+        }
+        val kernelLits = kernel.toArray()
         var status = 0
         if (state.intDomains[n].min < nbKer) {
-            if (!state.tightenIntMin(n, nbKer.toLong(), ant)) return -1
+            val ant = if (state.currentLevel == 0) null else kernelLits
+            if (!state.tightenIntMin(n, nbKer.toLong(), ant)) return if (failOn(state, ant, n)) 0 else -1
             status = 1
         }
         // When the kernel count is forced to equal n's max, no variable may stray outside its
         // window's value range, so squeeze each group.
         if (state.intDomains[n].max == nbKer.toLong()) {
+            // As many groups as values allowed: each variable takes its group's closing member's value.
+            val base = Lits().apply {
+                addAll(kernelLits)
+                add(bound(state, n, false, nbKer.toLong()))
+            }.toArray()
             val stamp = IntArrayList()
+            var group = 0
             for (idx in 0 until nv) {
                 val node = order[idx]
                 if (kerRep[node]) {
-                    val s = squeeze(state, ant, stamp, if (lowerPass) minVal[node] else maxVal[node], lowerPass)
+                    val frontier = if (lowerPass) minVal[node] else maxVal[node]
+                    val s = squeeze(state, base, stamp, frontier, lowerPass, if (group > 0) edge[group - 1] else null)
                     if (s < 0) return -1
                     if (s > 0) status = 1
                     stamp.clear()
+                    group++
                 }
                 stamp.add(node)
             }
-            val s = squeeze(state, ant, stamp, if (lowerPass) Long.MAX_VALUE else Long.MIN_VALUE, lowerPass)
+            val lastFrontier = if (lowerPass) Long.MAX_VALUE else Long.MIN_VALUE
+            val s = squeeze(state, base, stamp, lastFrontier, lowerPass, if (group > 0) edge[group - 1] else null)
             if (s < 0) return -1
             if (s > 0) status = 1
         }
@@ -324,39 +464,81 @@ internal class NValuePropagator(
      * [frontier] value is clamped to the group's tightest shared bound. Returns -1 on conflict, 1 if
      * it narrowed a domain, 0 otherwise.
      */
+    @Suppress("LongParameterList")
     private fun squeeze(
         state: PropagationState,
-        ant: IntArray?,
+        base: IntArray,
         stamp: IntArrayList,
         frontier: Long,
         lowerPass: Boolean,
+        previousEdge: Long?,
     ): Int {
         var status = 0
+
+        // A member that cannot reach the next window, nor the previous one, shares its group's value: with the
+        // member that set the squeeze, both confined to the group the same way.
+        fun confined(vid: Int, lits: Lits) {
+            if (lowerPass) {
+                lits.add(bound(state, vid, false, frontier - 1))
+                if (previousEdge != null) lits.add(bound(state, vid, true, previousEdge + 1))
+            } else {
+                lits.add(bound(state, vid, true, frontier + 1))
+                if (previousEdge != null) lits.add(bound(state, vid, false, previousEdge - 1))
+            }
+        }
         if (lowerPass) {
             var newMin = Long.MIN_VALUE
+            var setter = -1
             for (i in 0 until stamp.size) {
                 val vid = xs[stamp[i]]
-                if (state.intDomains[vid].max < frontier) newMin = maxOf(newMin, state.intDomains[vid].min)
+                if (state.intDomains[vid].max < frontier && state.intDomains[vid].min > newMin) {
+                    newMin = state.intDomains[vid].min
+                    setter = vid
+                }
             }
-            if (newMin == Long.MIN_VALUE) return 0
+            if (setter < 0) return 0
             for (i in 0 until stamp.size) {
                 val vid = xs[stamp[i]]
                 if (state.intDomains[vid].max < frontier && state.intDomains[vid].min < newMin) {
-                    if (!state.tightenIntMin(vid, newMin, ant)) return -1
+                    val ant = if (state.currentLevel == 0) {
+                        null
+                    } else {
+                        Lits().apply {
+                            addAll(base)
+                            confined(vid, this)
+                            confined(setter, this)
+                            add(bound(state, setter, true, newMin))
+                        }.toArray()
+                    }
+                    if (!state.tightenIntMin(vid, newMin, ant)) return if (failOn(state, ant, vid)) 0 else -1
                     status = 1
                 }
             }
         } else {
             var newMax = Long.MAX_VALUE
+            var setter = -1
             for (i in 0 until stamp.size) {
                 val vid = xs[stamp[i]]
-                if (state.intDomains[vid].min > frontier) newMax = minOf(newMax, state.intDomains[vid].max)
+                if (state.intDomains[vid].min > frontier && state.intDomains[vid].max < newMax) {
+                    newMax = state.intDomains[vid].max
+                    setter = vid
+                }
             }
-            if (newMax == Long.MAX_VALUE) return 0
+            if (setter < 0) return 0
             for (i in 0 until stamp.size) {
                 val vid = xs[stamp[i]]
                 if (state.intDomains[vid].min > frontier && state.intDomains[vid].max > newMax) {
-                    if (!state.tightenIntMax(vid, newMax, ant)) return -1
+                    val ant = if (state.currentLevel == 0) {
+                        null
+                    } else {
+                        Lits().apply {
+                            addAll(base)
+                            confined(vid, this)
+                            confined(setter, this)
+                            add(bound(state, setter, false, newMax))
+                        }.toArray()
+                    }
+                    if (!state.tightenIntMax(vid, newMax, ant)) return if (failOn(state, ant, vid)) 0 else -1
                     status = 1
                 }
             }

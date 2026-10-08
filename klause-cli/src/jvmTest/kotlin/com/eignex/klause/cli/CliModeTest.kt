@@ -299,7 +299,7 @@ class CliModeTest {
 
         var code = -1
         // A zero wall budget is already spent at the first poll, so the cause is decided rather than raced.
-        val out = capture { code = runCli(arrayOf("-s", "-t", "0", smt.absolutePath)) }
+        val out = capture { code = runCli(arrayOf("-s", "-e", "backtrack", "-t", "0", smt.absolutePath)) }
 
         assertEquals(0, code, out)
         assertTrue(out.lines().firstOrNull() == "unknown", out)
@@ -365,7 +365,7 @@ class CliModeTest {
 
         var code = -1
         val out = capture {
-            code = runCli(arrayOf("-s", "--param", "node-limit=0", smt.absolutePath))
+            code = runCli(arrayOf("-s", "-e", "backtrack", "--param", "node-limit=0", smt.absolutePath))
         }
 
         assertEquals(0, code, out)
@@ -474,7 +474,7 @@ class CliModeTest {
 
         var code = -1
         val out = capture {
-            code = runCli(arrayOf("-s", "--param", "max-decisions=0", smt.absolutePath))
+            code = runCli(arrayOf("-s", "-e", "backtrack", "--param", "max-decisions=0", smt.absolutePath))
         }
 
         assertEquals(0, code, out)
@@ -525,43 +525,37 @@ class CliModeTest {
         assertTrue(out.lines().firstOrNull() == "sat", out)
     }
 
-    @Test
-    fun `an open SMT model is decided on the open portfolio when asked`() {
-        val smt = File.createTempFile("cliopenportfolio", ".smt2").apply {
-            writeText(
-                """
-                (declare-const x Int)
-                (declare-const y Int)
-                (assert (<= (+ (* 2 x) y) 3))
-                (check-sat)
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-        var code = -1
-        val out = capture { code = runCli(arrayOf("--param", "open-portfolio=true", smt.absolutePath)) }
-
-        assertEquals(0, code, out)
-        assertTrue(out.lines().firstOrNull() == "sat", out)
+    // 2x + y ≤ 3 over open columns: every engine with an open route finds a witness.
+    private fun openSmt(): File = File.createTempFile("cliopenengine", ".smt2").apply {
+        writeText(
+            """
+            (declare-const x Int)
+            (declare-const y Int)
+            (assert (<= (+ (* 2 x) y) 3))
+            (check-sat)
+            """.trimIndent(),
+        )
+        deleteOnExit()
     }
 
     @Test
-    fun `the open portfolio switch is accepted on a model routing bounds`() {
-        val smt = File.createTempFile("cliopenportfoliofinite", ".smt2").apply {
-            writeText(
-                """
-                (declare-const x Int)
-                (assert (and (>= x 0) (<= x 3)))
-                (check-sat)
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-        var code = -1
-        val out = capture { code = runCli(arrayOf("--param", "open-portfolio=true", smt.absolutePath)) }
+    fun `an open SMT model is decided under each engine with an open route`() {
+        for (engine in listOf("mixed", "backtrack", "localsearch")) {
+            var code = -1
+            val out = capture { code = runCli(arrayOf("-e", engine, "-t", "10000", openSmt().absolutePath)) }
 
-        assertEquals(0, code, out)
-        assertTrue(out.lines().firstOrNull() == "sat", out)
+            assertEquals(0, code, "$engine: $out")
+            assertEquals("sat", out.lines().firstOrNull(), "$engine: $out")
+        }
+    }
+
+    @Test
+    fun `alns is refused on an open model`() {
+        var code = -1
+        val err = captureErr { code = runCli(arrayOf("-e", "alns", openSmt().absolutePath)) }
+
+        assertTrue(code != 0, err)
+        assertTrue("no open-model route" in err, err)
     }
 
     @Test

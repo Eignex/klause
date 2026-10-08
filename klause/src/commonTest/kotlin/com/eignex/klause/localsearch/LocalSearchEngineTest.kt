@@ -67,17 +67,24 @@ class LocalSearchEngineTest {
         assertTrue(localSearchSupports(LocalSearchModel.of(model.bake())))
     }
 
-    @Test
-    fun `local search declines a schedule over wide domains`() {
-        val cumulative = Cumulative(
-            starts = intArrayOf(0, 1),
-            durations = longArrayOf(2, 2),
-            resources = longArrayOf(1, 1),
-            capacity = 1,
-        )
-        val model = Problem(0, 2, Array(2) { IntDomain(0, 1L shl 40) }, arrayOf<Factor>(cumulative))
+    private fun wideSchedule(): Problem = Problem(
+        0,
+        2,
+        Array(2) { IntDomain(0, 1L shl 40) },
+        arrayOf<Factor>(Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), capacity = 1)),
+    )
 
-        assertFalse(localSearchSupports(LocalSearchModel.of(model.bake())))
+    @Test
+    fun `a schedule over wide domains is searched`() {
+        val result = LocalSearchSolver(wideSchedule().bake()).solve(LocalSearchParams(maxFlips = 1_000, randomSeed = 1))
+
+        val starts = assertIs<SolveResult.Sat>(result).assignment.ints
+        assertTrue(abs(starts[0] - starts[1]) >= 2, "starts=${starts.toList()}")
+    }
+
+    @Test
+    fun `a schedule searched inside a window never refutes the model`() {
+        assertFalse(LocalSearchModel.of(wideSchedule().bake()).refutesModel)
     }
 
     @Test

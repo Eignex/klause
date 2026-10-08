@@ -1,8 +1,6 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -16,7 +14,6 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -1010,15 +1007,3 @@ private fun LinearObjective.isWideOver(domains: Array<IntDomain>): Boolean {
     val n = minOf(intCoefficients.size, domains.size)
     return objectiveSumIsWide(boolWeights, IntArray(n) { it }, intCoefficients.copyOf(n), domains)
 }
-
-/**
- * Whether local search scores the finite model [problem] entirely in its plain `Long` invariants: no continuous
- * column, every domain narrow, no over-64-bit row. A mixed pool builds local-search arms only on such a model; on a
- * wider one they would take slots from arms that search it without that cost.
- */
-internal fun localSearchIsExact(problem: BakedProblem): Boolean =
-    problem.numRealVars == 0 && problem.rootIntDomainsInPlace.all(::isNarrow) &&
-        problem.factors.none {
-            (it is Linear && it.wideConstants != null) ||
-                (it is ReifiedLinear && it.wideConstants != null)
-        }

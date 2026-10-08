@@ -1041,6 +1041,13 @@ class SearchRun internal constructor(
                             SearchModelDisposition.Skip -> {
                                 resumeAfterSolution = false
                                 lastModel = null
+                                // A model is skipped when its check could not decide it, often because the deadline
+                                // cut that check short. Such a check costs far more than the nodes the polling cadence
+                                // was tuned on, so a skip polls at once rather than after the cadence's next interval.
+                                if (session.cancelled()) {
+                                    return lifecycle.onCancellation(session).toEvent()
+                                        ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+                                }
                                 if (!backtrack()) return stopAfterBacktrack()
                             }
 

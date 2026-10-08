@@ -2,11 +2,14 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.global.internals.InverseCache
+import com.eignex.klause.factor.global.internals.explainBoundsHall
+import com.eignex.klause.factor.global.internals.hallReason
 import com.eignex.klause.factor.global.internals.reginFilter
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongHashSet
 
@@ -40,8 +43,19 @@ internal class InversePropagator(
 
     override val consumesIntEventDelta: Boolean = true
 
+    // The Hall violators of a failed matching on either side, read by [conflictReason] before the engine backtracks.
+    private var hallFailure: IntArray? = null
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectHoleAndBoundAntecedents(state, (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars)
+        hallFailure?.let { hallReason(state, it, EmptyIntArray) }
+            ?: collectHoleAndBoundAntecedents(
+                state,
+                (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars,
+            )
+
+    // The matchings' bounds fallback tags each side: 0 for [f], 1 for [g].
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
+        explainBoundsHall(state, if (payload[1] == 0) f else g, { true }, payload, atTrail, atLevel)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val cache = (state.refPayload[factorId] as? InverseCache) ?: run {
@@ -50,6 +64,7 @@ internal class InversePropagator(
             fresh
         }
         cache.conflictVars = null
+        hallFailure = null
         val full = !cache.initialized
         val fDirty = BooleanArray(f.size)
         val gDirty = BooleanArray(g.size)
@@ -159,14 +174,14 @@ internal class InversePropagator(
                 if (!pair(i, gIdx)) return false
             }
         }
-        val fHall = reginFilter(state, f, NO_EXCEPT, cache.fRegin)
+        val fHall = reginFilter(state, f, NO_EXCEPT, cache.fRegin, tag = 0)
         if (fHall != null) {
-            cache.conflictVars = fHall
+            hallFailure = fHall
             return false
         }
-        val gHall = reginFilter(state, g, NO_EXCEPT, cache.gRegin)
+        val gHall = reginFilter(state, g, NO_EXCEPT, cache.gRegin, tag = 1)
         if (gHall != null) {
-            cache.conflictVars = gHall
+            hallFailure = gHall
             return false
         }
         cache.initialized = true

@@ -18,29 +18,6 @@ internal fun tightenSuccToRange(state: PropagationState, succ: IntArray, n: Int)
     return true
 }
 
-/** Shave every claimed value off the other vars' domain endpoints. Returns false on contradiction.
- *  `claimed[target] == -1` means unclaimed; any other value means claimed by that position. */
-internal fun shaveClaimedFromEndpoints(
-    state: PropagationState,
-    succ: IntArray,
-    claimed: IntArray,
-    ant: IntArray?,
-): Boolean {
-    for (i in succ.indices) {
-        val v = succ[i]
-        val d = state.intDomains[v]
-        if (d.min == d.max) continue
-        var newMin = d.min
-        while (newMin < d.max && claimed[newMin.toInt()] != -1 && claimed[newMin.toInt()] != i) newMin++
-        var newMax = d.max
-        while (newMax > newMin && claimed[newMax.toInt()] != -1 && claimed[newMax.toInt()] != i) newMax--
-        if (newMin > newMax) return false
-        if (newMin != d.min && !state.tightenIntMin(v, newMin, ant)) return false
-        if (newMax != d.max && !state.tightenIntMax(v, newMax, ant)) return false
-    }
-    return true
-}
-
 /** Functional-graph cycle decomposition: `next(i)` is each node's single out-edge, -1 a sink.
  *  Counts closed cycles and the nodes on them. */
 internal fun cycleScan(next: IntArray, n: Int): CycleScan {

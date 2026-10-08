@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.excludeIntValues
+import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.util.LongArrayList
 
 /*
@@ -125,8 +126,9 @@ internal class RegularIncrementalState(
     /** Prune every position in `[lo, hi]`: a symbol survives iff some forward-reachable state at i
      *  transitions on it into a backward-co-reachable state at i+1. Returns false on a wipeout. */
     private fun prune(state: PropagationState, lo: Int, hi: Int): Boolean {
-        // Reachability reads every symbol each position still holds, so the reason cites holes as well as bounds.
-        val ant = collectHoleAndBoundAntecedents(state, seq)
+        // Reachability reads every symbol each position still holds. With the undo log a position's reason is
+        // the graph cut [RegularExplainer] builds if analysis reads it; without one nothing reads reasons.
+        val coarse by lazy(LazyThreadSafetyMode.NONE) { collectHoleAndBoundAntecedents(state, seq) }
         for (i in lo..hi) {
             val d = state.intDomains[seq[i]]
             var toRemove: LongArrayList? = null
@@ -140,7 +142,14 @@ internal class RegularIncrementalState(
                 }
                 if (!live) (toRemove ?: LongArrayList().also { toRemove = it }).add(s)
             }
-            toRemove?.let { if (!state.excludeIntValues(seq[i], it.toLongArray(), ant)) return false }
+            toRemove?.let {
+                val ant = when {
+                    state.currentLevel == 0 -> null
+                    state.undoLogging -> state.lazyReason(intArrayOf(i))
+                    else -> coarse
+                }
+                if (!state.excludeIntValues(seq[i], it.toLongArray(), ant)) return false
+            }
         }
         return true
     }

@@ -16,6 +16,7 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult
@@ -23,8 +24,10 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -993,6 +996,53 @@ class AllDifferentPropagatorTest {
             )
         }
     }
+
+    @Test
+    fun `a matching prune cites only how its hall set is confined`() {
+        // x0 and x1 take {0, 1} between them, so x2 leaves both; x3's hole at 4 plays no part. x2's lower bound
+        // climbs past 0 and then 1, so its final move also cites the bound it left.
+        val (state, problem) = alldiffAfter(boundsConsistent = false)
+
+        val cited = citedBounds(state, problem, 2)
+
+        assertEquals(
+            setOf(Triple(0, AtomKind.LE, 1L), Triple(1, AtomKind.LE, 1L), Triple(2, AtomKind.GE, 1L)),
+            cited,
+        )
+    }
+
+    @Test
+    fun `a bounds-consistent move cites only the hall interval it crossed`() {
+        val (state, problem) = alldiffAfter(boundsConsistent = true)
+
+        val cited = citedBounds(state, problem, 2)
+
+        assertEquals(setOf(Triple(0, AtomKind.LE, 1L), Triple(1, AtomKind.LE, 1L)), cited)
+    }
+
+    private fun alldiffAfter(boundsConsistent: Boolean): Pair<PropagationState, Problem> {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, 5) },
+            factors = arrayOf<Factor>(
+                AllDifferent(IntArray(4) { it }, domainMin = 0, domainSize = 6, boundsConsistent = boundsConsistent),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 1) && state.tightenIntMax(1, 1) && state.excludeIntValue(3, 4))
+        state.currentFactor = 0
+        check(state.factorAt(0).propagate(state, 0))
+        return state to problem
+    }
+
+    private fun citedBounds(state: PropagationState, problem: Problem, v: Int) =
+        state.reasonOf(state.intMinAntecedents[v])!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }.toSet()
 
     @Test
     fun `alldifferent matching deductions are implied by their reasons under carved holes`() {

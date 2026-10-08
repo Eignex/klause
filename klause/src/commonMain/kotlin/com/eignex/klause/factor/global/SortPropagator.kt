@@ -2,9 +2,13 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.boundLiteral
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 /**
  * CP propagation logic for `sort` — bound-consistency via the Mehlhorn–Thiel algorithm
@@ -50,7 +54,8 @@ internal class SortPropagator(
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        (state.refPayload[factorId] as? SortWork)?.failure
+            ?: collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val work = (state.refPayload[factorId] as? SortWork)
@@ -94,13 +99,97 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
     // The active state, set per propagate() so the bound accessors above stay terse.
     private lateinit var state: PropagationState
 
+    /** The reason of the failure the last [propagate] hit, read by the propagator's conflict reason. */
+    var failure: IntArray? = null
+        private set
+
+    private class Lits {
+        private val seen = IntHashSet()
+        private val out = IntArrayList()
+
+        fun add(lit: Int) {
+            if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
+        }
+
+        fun toArray(): IntArray = out.toIntArray()
+    }
+
+    private fun Lits.bound(v: Int, lower: Boolean, need: Long) =
+        add(state.boundLiteral(v, lower, need, state.undo.size, state.currentLevel))
+
+    // `ys` is `xs` sorted, so y(i) is the (i+1)-th smallest x: it is at most [b] once a later y is, or once
+    // i+1 of the xs are.
+    private fun Lits.yAtMost(i: Int, b: Long): Boolean {
+        for (k in i + 1 until n) {
+            if (yub(k) <= b) {
+                bound(ys[k], false, b)
+                return true
+            }
+        }
+        val under = (0 until n).filter { xub(it) <= b }.sortedBy { xub(it) }
+        if (under.size < i + 1) return false
+        for (c in 0..i) bound(xs[under[c]], false, b)
+        return true
+    }
+
+    private fun Lits.yAtLeast(i: Int, l: Long): Boolean {
+        for (k in 0 until i) {
+            if (ylb(k) >= l) {
+                bound(ys[k], true, l)
+                return true
+            }
+        }
+        val over = (0 until n).filter { xlb(it) >= l }.sortedByDescending { xlb(it) }
+        if (over.size < n - i) return false
+        for (c in 0 until n - i) bound(xs[over[c]], true, l)
+        return true
+    }
+
+    // x(j) is at least [l] once the ys that may lie below l are all taken by other xs that must.
+    private fun Lits.xAtLeast(j: Int, l: Long): Boolean {
+        val k0 = (0 until n).firstOrNull { ylb(it) >= l } ?: return false
+        val below = (0 until n).filter { it != j && xub(it) <= l - 1 }
+        if (below.size < k0) return false
+        bound(ys[k0], true, l)
+        for (c in 0 until k0) bound(xs[below[c]], false, l - 1)
+        return true
+    }
+
+    private fun Lits.xAtMost(j: Int, u: Long): Boolean {
+        val k1 = (n - 1 downTo 0).firstOrNull { yub(it) <= u } ?: return false
+        val above = (0 until n).filter { it != j && xlb(it) >= u + 1 }
+        if (above.size < n - 1 - k1) return false
+        bound(ys[k1], false, u)
+        for (c in 0 until n - 1 - k1) bound(xs[above[c]], true, u + 1)
+        return true
+    }
+
+    // The reason [witness] finds, or every variable's bounds when it finds none.
+    private fun reason(witness: Lits.() -> Boolean): IntArray? {
+        if (state.currentLevel == 0) return null
+        val lits = Lits()
+        return if (lits.witness()) lits.toArray() else collectLinearTightenAntecedents(state, intVars, -1, 0)
+    }
+
+    private fun tightenMin(v: Int, bound: Long, witness: Lits.() -> Boolean): Boolean {
+        if (bound <= state.intDomains[v].min) return true
+        val ant = reason(witness)
+        if (state.tightenIntMin(v, bound, ant)) return true
+        failure = (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
+        return false
+    }
+
+    private fun tightenMax(v: Int, bound: Long, witness: Lits.() -> Boolean): Boolean {
+        if (bound >= state.intDomains[v].max) return true
+        val ant = reason(witness)
+        if (state.tightenIntMax(v, bound, ant)) return true
+        failure = (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
+        return false
+    }
+
     fun propagate(state: PropagationState): Boolean {
         this.state = state
-        // A single coarse-but-sound antecedent for every narrowing this pass emits: the whole pass
-        // is a deterministic consequence of the pre-pass domains, holes included (a bound that snaps
-        // over a hole mid-pass rests on it), so citing their bounds and holes justifies each
-        // deduction. Reason minimization is a separate concern.
-        val ant = collectHoleAndBoundAntecedents(state, intVars)
+        failure = null
 
         for (i in 0 until n) {
             xyGraph[i].fill(-1)
@@ -109,10 +198,12 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
 
         // (a) Normalize ys into a non-decreasing bound chain.
         for (i in 1 until n) {
-            if (!state.tightenIntMin(ys[i], ylb(i - 1), ant)) return false
+            val b = ylb(i - 1)
+            if (!tightenMin(ys[i], b) { true.also { bound(ys[i - 1], true, b) } }) return false
         }
         for (i in n - 2 downTo 0) {
-            if (!state.tightenIntMax(ys[i], yub(i + 1), ant)) return false
+            val b = yub(i + 1)
+            if (!tightenMax(ys[i], b) { true.also { bound(ys[i + 1], false, b) } }) return false
         }
 
         // (b1) Greedy matching f: assign each ys[j] (ascending) the available xs of smallest UB.
@@ -128,7 +219,8 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
             f[j] = popF(j) ?: return false
         }
         for (i in 0 until n) {
-            if (!state.tightenIntMax(ys[i], xub(f[i]), ant)) return false
+            val b = xub(f[i])
+            if (!tightenMax(ys[i], b) { yAtMost(i, b) }) return false
         }
 
         // (b2) Greedy matching f': assign each ys[j] (descending) the available xs of largest LB.
@@ -144,7 +236,8 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
             fPrime[j] = popFPrime(j) ?: return false
         }
         for (i in 0 until n) {
-            if (!state.tightenIntMin(ys[i], xlb(fPrime[i]), ant)) return false
+            val b = xlb(fPrime[i])
+            if (!tightenMin(ys[i], b) { yAtLeast(i, b) }) return false
         }
 
         // (c) Condense the xy-intersection graph into SCCs, then tighten each xs to the range its
@@ -174,7 +267,8 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
                 var k = 0
                 while (k < n && sccSequences[c][k] != -1 && xlb(jprime) > yub(sccSequences[c][k])) k++
                 if (k >= n || sccSequences[c][k] == -1) return false
-                if (!state.tightenIntMin(xs[jprime], ylb(sccSequences[c][k]), ant)) return false
+                val b = ylb(sccSequences[c][k])
+                if (!tightenMin(xs[jprime], b) { xAtLeast(jprime, b) }) return false
                 j++
             }
             c++
@@ -193,7 +287,8 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
                 var k = 0
                 while (k < n && sccSequences[c][k] != -1 && xub(jprime) < ylb(sccSequences[c][k])) k++
                 if (k >= n || sccSequences[c][k] == -1) return false
-                if (!state.tightenIntMax(xs[jprime], yub(sccSequences[c][k]), ant)) return false
+                val b = yub(sccSequences[c][k])
+                if (!tightenMax(xs[jprime], b) { xAtMost(jprime, b) }) return false
                 j++
             }
             c++

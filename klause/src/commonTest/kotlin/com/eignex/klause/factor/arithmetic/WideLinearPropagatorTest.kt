@@ -6,11 +6,17 @@ import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -150,5 +156,25 @@ class WideLinearPropagatorTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `a wide bound cites only the side of the sum it reads`() {
+        // 2^64·(x + y) <= 5·2^64 with x >= 3 forces y <= 2; x's upper bound plays no part.
+        val row = Linear(intArrayOf(0, 1), arrayOf(w, w), LinearOp.LE, w * bigIntOf(5L))
+        val problem = problem(row, xHi = 9, yHi = 9)
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 3) && state.tightenIntMax(0, 4))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.intMaxAntecedents[1])!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(listOf(Triple(0, AtomKind.GE, 3L)), cited)
     }
 }

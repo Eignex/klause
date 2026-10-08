@@ -11,9 +11,12 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -380,6 +383,41 @@ class GlobalCardinalityPropagatorTest {
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "GCC+Linear (bound=$bound): solution set must equal brute force")
         }
+    }
+
+    @Test
+    fun `a flow prune cites only the variables of the hall set it leaves`() {
+        // Each value at most once: x0 and x1 take {0, 1} between them, so x2 leaves both; x4's carved hole at 3
+        // plays no part. x2's lower bound climbs past 0 and then 1, so its final move also cites the bound it left.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = Array(5) { IntDomain(0, 4) },
+            factors = arrayOf<Factor>(
+                GlobalCardinality(
+                    xs = IntArray(5) { it },
+                    cover = longArrayOf(0, 1, 2, 3, 4),
+                    countLow = IntArray(5) { 0 },
+                    countHigh = IntArray(5) { 1 },
+                ),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 1) && state.tightenIntMax(1, 1) && state.excludeIntValue(4, 3))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.intMinAntecedents[2])!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(
+            setOf(Triple(0, AtomKind.LE, 1L), Triple(1, AtomKind.LE, 1L), Triple(2, AtomKind.GE, 1L)),
+            cited.toSet(),
+        )
     }
 
     @Test

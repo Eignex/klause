@@ -1597,7 +1597,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public fun getBoolVars ()[I
 	public final fun getCapacity ()J
 	public final fun getCapacityVar ()I
-	public final fun getConstantEnergyAndCap ()Z
 	public final fun getDurationVars ()[I
 	public final fun getDurations ()[J
 	public fun getIntVars ()[I
@@ -1606,7 +1605,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public fun getPresents ()[I
 	public final fun getResourceVars ()[I
 	public final fun getResources ()[J
-	public final fun getSharpReasonEligible ()Z
 	public final fun getStarts ()[I
 	public fun getStructuralKeyWeight ()I
 	public final fun getUnary ()Z
@@ -7730,6 +7728,7 @@ public final class com/eignex/klause/propagation/DeducedRestrictions$Companion {
 public final class com/eignex/klause/propagation/NoPropagator : com/eignex/klause/propagation/Propagator {
 	public static final field INSTANCE Lcom/eignex/klause/propagation/NoPropagator;
 	public fun conflictReason (Lcom/eignex/klause/propagation/PropagationState;I)[I
+	public fun explain (Lcom/eignex/klause/propagation/PropagationState;I[III)[I
 	public fun getConsumesIntEventDelta ()Z
 	public fun getExpensiveBake ()Z
 	public fun getInitialBoolWatcherBlockers ()[I
@@ -7951,6 +7950,7 @@ public abstract interface class com/eignex/klause/propagation/PropagationState$S
 
 public abstract interface class com/eignex/klause/propagation/Propagator {
 	public fun conflictReason (Lcom/eignex/klause/propagation/PropagationState;I)[I
+	public fun explain (Lcom/eignex/klause/propagation/PropagationState;I[III)[I
 	public fun getConsumesIntEventDelta ()Z
 	public fun getExpensiveBake ()Z
 	public fun getInitialBoolWatcherBlockers ()[I
@@ -7961,6 +7961,7 @@ public abstract interface class com/eignex/klause/propagation/Propagator {
 
 public final class com/eignex/klause/propagation/Propagator$DefaultImpls {
 	public static fun conflictReason (Lcom/eignex/klause/propagation/Propagator;Lcom/eignex/klause/propagation/PropagationState;I)[I
+	public static fun explain (Lcom/eignex/klause/propagation/Propagator;Lcom/eignex/klause/propagation/PropagationState;I[III)[I
 	public static fun getConsumesIntEventDelta (Lcom/eignex/klause/propagation/Propagator;)Z
 	public static fun getExpensiveBake (Lcom/eignex/klause/propagation/Propagator;)Z
 	public static fun getInitialBoolWatcherBlockers (Lcom/eignex/klause/propagation/Propagator;)[I
@@ -9241,11 +9242,13 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;
 	public final fun canMinimize (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Z
 	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun executePortfolio (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun executePortfolio$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public final fun prepare (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Lcom/eignex/klause/solver/pipeline/OpenPreparation;
 	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun searchWithoutTheory (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 	public static synthetic fun searchWithoutTheory$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/TheoryParams;Lcom/eignex/klause/solver/objective/LinearObjective;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 }
 
