@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
 internal fun PropagationState.logBoolPin(v: Int) {
@@ -22,6 +23,9 @@ internal fun PropagationState.logBoolPin(v: Int) {
 /** Capture int var `v`'s full prior state. Must be called *before* the mutation. */
 internal fun PropagationState.logIntChange(v: Int) {
     (boundMoves[v] ?: IntArrayList(initialCapacity = 4).also { boundMoves[v] = it }).add(undo.size)
+    val prior = intDomains[v]
+    (boundMovePriorMin[v] ?: LongArrayList(initialCapacity = 4).also { boundMovePriorMin[v] = it }).add(prior.min)
+    (boundMovePriorMax[v] ?: LongArrayList(initialCapacity = 4).also { boundMovePriorMax[v] = it }).add(prior.max)
     undo.tag.add(1)
     undo.varId.add(v)
     undo.level.add(intLevel[v])
@@ -119,6 +123,8 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
             1 -> { // int change — restore the full recorded prior int-var state
                 val v = undo.varId[i]
                 boundMoves[v]?.let { it.truncateTo(it.size - 1) }
+                boundMovePriorMin[v]?.let { it.truncateTo(it.size - 1) }
+                boundMovePriorMax[v]?.let { it.truncateTo(it.size - 1) }
                 unassigned?.invoke(numBool + v)
                 intDomains[v] = requireNotNull(undo.domain[i])
                 intLevel[v] = undo.level[i]

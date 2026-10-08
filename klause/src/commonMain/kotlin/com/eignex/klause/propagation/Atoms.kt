@@ -701,8 +701,7 @@ internal fun PropagationState.boundEstablishment(v: Int, k: Long, lower: Boolean
         val i = requireNotNull(moves)[next]
         postLevel = if (lower) undo.minLvl[i] else undo.maxLvl[i]
         postReason = reasonOf(if (lower) undo.minAnt[i] else undo.maxAnt[i])
-        val prior = requireNotNull(undo.domain[i])
-        postBound = if (lower) prior.min else prior.max
+        postBound = requireNotNull(if (lower) boundMovePriorMin[v] else boundMovePriorMax[v])[next]
     } else {
         postLevel = if (lower) intMinLevel[v] else intMaxLevel[v]
         postReason = reasonOf(if (lower) intMinAntecedents[v] else intMaxAntecedents[v])
@@ -734,13 +733,13 @@ internal fun PropagationState.boundEstablishmentLevel(v: Int, k: Long, lower: Bo
 // just before it is the move that reached k, and its post-move state is the next record's prior state, or the
 // live one.
 private fun PropagationState.movesBefore(v: Int, k: Long, lower: Boolean): Int {
-    val moves = boundMoves[v] ?: return 0
+    val priors = (if (lower) boundMovePriorMin[v] else boundMovePriorMax[v]) ?: return 0
     var lo = 0
-    var hi = moves.size
+    var hi = priors.size
     while (lo < hi) {
         val mid = (lo + hi) ushr 1
-        val prior = requireNotNull(undo.domain[moves[mid]])
-        if (if (lower) prior.min >= k else prior.max <= k) hi = mid else lo = mid + 1
+        val prior = priors[mid]
+        if (if (lower) prior >= k else prior <= k) hi = mid else lo = mid + 1
     }
     return lo
 }

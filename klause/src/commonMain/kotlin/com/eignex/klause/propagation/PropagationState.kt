@@ -220,6 +220,11 @@ class PropagationState(
     // undo replay passes each record.
     internal val boundMoves: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
 
+    // The bounds each of those moves started from, parallel to [boundMoves]: a search over a bound's history reads
+    // these contiguous values, not the prior-domain snapshot of every record it probes, scattered over the heap.
+    internal val boundMovePriorMin: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
+    internal val boundMovePriorMax: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
+
     // Built lazy reasons, keyed by their marker array (identity); see [reasonOf].
     internal val lazyReasonMemo = HashMap<IntArray, IntArray?>()
     internal val holeHistVal: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
