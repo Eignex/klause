@@ -696,6 +696,27 @@ internal fun integralQuotientOrNull(value: Long, divisor: Long): Long? = when {
     else -> value / divisor
 }
 
+internal fun unreachableEqualityReason(
+    state: PropagationState,
+    variable: Int,
+    target: Long?,
+    extraLit: Int? = null,
+): IntArray? {
+    val premise = target?.takeIf { it in state.rootDomains[variable] }?.let { value ->
+        val domain = state.intDomains[variable]
+        when {
+            value < domain.min -> Lit.make(state.atomVarGe(variable, domain.min), false)
+            value > domain.max -> Lit.make(state.atomVarLe(variable, domain.max), false)
+            else -> Lit.make(state.atomVarEq(variable, value), true)
+        }
+    }
+    return when {
+        premise == null -> extraLit?.let { intArrayOf(it) }
+        extraLit == null -> intArrayOf(premise)
+        else -> intArrayOf(premise, extraLit)
+    }
+}
+
 /** floor(a / b) with correct handling of negative operands. */
 internal fun floorDivLong(a: Long, b: Long): Long {
     val q = a / b
