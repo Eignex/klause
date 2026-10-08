@@ -150,15 +150,14 @@ internal class ObjectiveBoundInvariant(
     private val bound: MutableObjectiveBound,
 ) : Invariant {
 
-    private fun boolWeightOf(boolVar: Int): Long {
-        for (i in boolVars.indices) if (boolVars[i] == boolVar) return boolWeights[i]
-        return 0L
-    }
+    // Each objective variable's position: a move reads its one weight, not a scan of the objective, which on a
+    // MaxSAT model with thousands of soft literals made every flip cost as much as the objective is long.
+    private val boolIndex = IntIntMap.build(boolVars, IntArray(boolVars.size) { it }, absent = -1)
+    private val intIndex = IntIntMap.build(intVars, IntArray(intVars.size) { it }, absent = -1)
 
-    private fun intCoeffOf(intVar: Int): Long {
-        for (i in intVars.indices) if (intVars[i] == intVar) return intCoeffs[i]
-        return 0L
-    }
+    private fun boolWeightOf(boolVar: Int): Long = boolIndex[boolVar].let { if (it < 0) 0L else boolWeights[it] }
+
+    private fun intCoeffOf(intVar: Int): Long = intIndex[intVar].let { if (it < 0) 0L else intCoeffs[it] }
 
     /** Graded degree of `sum ≤ bound`: `0` when satisfied, else the (soft-capped) overshoot. A
      *  [Long.MAX_VALUE] bound makes the overshoot non-positive, so the factor is inert. */

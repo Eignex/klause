@@ -2,6 +2,7 @@ package com.eignex.klause.factor.objective
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -50,6 +51,24 @@ class ObjectiveBoundFactorTest {
 
         val best = assertIs<MinimizeResult.BestFound>(result, "the ratchet arm should reach a feasible incumbent")
         assertEquals(1.0, best.objective, "the ratchet should drive the objective to the optimum (one true)")
+    }
+
+    @Test
+    fun `a bool flip reads the flipped variable's own weight`() {
+        // The clause holds before and after any single flip, so each delta is the bound factor's alone.
+        val clause = Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))
+        val problem = Problem(3, 0, emptyArray<IntDomain>(), listOf(clause))
+        val (overlay, bound) = assertIs<Pair<BakedProblem, MutableObjectiveBound>>(
+            objectiveBoundOverlay(problem.bake(), LinearObjective(boolWeights = longArrayOf(1, 5, 9))),
+        )
+        val state = LocalSearchState(overlay, Random(0))
+        state.recompute()
+        bound.tightenBelow(1.0)
+        state.recompute()
+
+        val deltas = (0 until 3).map { state.netDelta(Move.BoolFlip(it)) }
+
+        assertEquals(listOf(1L, 5L, 9L), deltas)
     }
 
     @Test
