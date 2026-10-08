@@ -43,6 +43,7 @@ internal object SolverInvocation {
      *  the solver rather than the model's hand-written heuristic, which is the fairer strength
      *  comparison for modern CDCL/portfolio solvers; the annotation-following ("fixed") track is the
      *  explicit opt-in (`fixed=true`). */
+    @Serializable
     internal data class Settings(
         val engine: String? = null,
         val processors: Int? = null,
@@ -74,6 +75,7 @@ internal object SolverInvocation {
         val attribution: List<Attribution> = emptyList(),
         val rawOutput: String,
         val command: String,
+        val buildProvenance: BuildProvenance? = null,
     )
 
     /** Registered MiniZinc solver ids, parsed once from `minizinc --solvers` (the parenthesised tag
@@ -103,7 +105,9 @@ internal object SolverInvocation {
         // Hard wall-clock ceiling: a solve that ignores its `-t` deadline (e.g. an expensive move source
         // that polls cancellation too rarely) must not hang the harness. Generous over the budget so it
         // only ever kills a genuine runaway, never a solve that's merely flushing at the deadline.
+        val provenance = if (solverId == KLAUSE) InstalledBuild.current else null
         return invoke(cmd, dialectFor(solverId, entry.ref.format), hardTimeoutMs = budget.timeoutMillis * 2 + 20_000)
+            .copy(buildProvenance = provenance)
     }
 
     /** Run a registered MiniZinc [solverId] reference directly on [ref] — no klause `Problem` is
@@ -116,8 +120,7 @@ internal object SolverInvocation {
             hardTimeoutMs = budget.timeoutMillis * 2 + 20_000,
         )
 
-    /** The provisioned klause-cli binary (its mtime keys the cache so a klause rebuild invalidates
-     *  klause's cached results while references stay frozen). */
+    /** The provisioned klause-cli launcher. */
     fun klauseCliBin(): File = File(CorpusFetcher.workspaceRoot(), KLAUSE_CLI_BIN)
 
     /**
