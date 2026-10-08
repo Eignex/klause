@@ -916,7 +916,11 @@ class PortfolioTest {
 
     @Test
     fun `a counted local search segment reports the work it spent`() {
-        val cases = listOf(Triple(100L, 0L, 0L), Triple(100L, 75L, 50L), Triple(7L, 10L, 7L))
+        val cases = listOf(
+            Triple(100L, 0L, 0L),
+            Triple(100L, 75L, (75 / LS_INSTRUCTIONS_PER_WORK).toLong()),
+            Triple(7L, 10L, 7L),
+        )
         for ((allowance, moves, expected) in cases) {
             val arms = listOf(
                 PortfolioWorker.ofSolve("ls", 0, countsInstructions = true) { _, _ ->
