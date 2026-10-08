@@ -1089,8 +1089,9 @@ internal class ExactLpModel private constructor(
     val n: Int get() = matrix.size
     val m: Int get() = rows.size
     val numVars: Int get() = columns.size
-    val keySize: Long get() = n.toLong() * 16 + m.toLong() * 16 + matrix.sumOf { it.size.toLong() * 3 } +
-        rows.sumOf { it.premises?.size ?: 0L }
+    private var storageCache: LpLayoutStorage? = null
+    val layoutStorage: LpLayoutStorage get() = storageCache ?: LpLayoutStorage.of(this).also { storageCache = it }
+    val keySize: Long get() = layoutStorage.total
 
     init {
         require(n.toLong() + m == numVars.toLong() && rightHandSide.size == m && objective.size == numVars)
@@ -1128,7 +1129,7 @@ internal class ExactLpModel private constructor(
             if (rows === this.rows) this.rows else rows.toList(),
             objective,
             false,
-        )
+        ).also { it.storageCache = if (rows === this.rows) layoutStorage else layoutStorage.withRows(rows) }
     }
 
     /**
@@ -1139,7 +1140,9 @@ internal class ExactLpModel private constructor(
      */
     fun withBoundColumns(columns: List<ExactLpColumn>): ExactLpModel {
         require(columns.size == numVars)
-        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false)
+        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false).also {
+            it.storageCache = layoutStorage
+        }
     }
 
     fun recentered(origins: List<ExactLpNumber>): ExactLpModel {
@@ -1166,7 +1169,9 @@ internal class ExactLpModel private constructor(
         } else {
             objective.withConstant(ExactLpNumber.of(constant))
         }
-        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows, nextObjective, false)
+        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows, nextObjective, false).also {
+            it.storageCache = layoutStorage
+        }
     }
 
     private fun hasIeeeInput(): Boolean = matrix.any { entries -> entries.any { it.number.ieeeBits != null } } ||

@@ -99,7 +99,7 @@ class CpLpAdapterTest {
 
     @Test
     fun `source nodes reclaim discarded rows and restore fresh bounds on nested pop`() {
-        val problem = Problem(1, 3, Array(3) { IntDomain(0, 12) },
+        val problem = Problem(1, 3, Array(3) { IntDomain(0, 128) },
             arrayOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)))
         LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
@@ -113,23 +113,30 @@ class CpLpAdapterTest {
             val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
             val rootRows = root.model.m
             val rootColumns = root.model.n
-            for (lower in 1L..8L) {
+            var previousRows = rootRows
+            var reclaimed = false
+            for (lower in 1L..96L) {
                 if (lower == 1L) shared.push(SearchDecision.IntAtLeast(1, lower)) else cp.session.implyIntAtLeast(1, lower)
                 val current = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-                val result = assertNotNull(engine.solveNode(current.model, null, Cancellation.Never)?.second)
-                val fresh = relaxer.build(cp.session)
-                val expected = RevisedSimplex(fresh.model).use { assertNotNull(it.solve()).objective }
-
-                assertEquals(expected, result.objective)
-                assertEquals(lower, assertNotNull(integerCertify(current.model, result.duals)).objectiveBoundCeil(0))
-                assertTrue(current.model.m < rootRows * 2 + 4)
+                reclaimed = reclaimed || current.model.m < previousRows
+                if (lower <= 8L || reclaimed) {
+                    val result = assertNotNull(engine.solveNode(current.model, null, Cancellation.Never)?.second)
+                    val fresh = relaxer.build(cp.session)
+                    val expected = RevisedSimplex(fresh.model).use { assertNotNull(it.solve()).objective }
+                    assertEquals(expected, result.objective)
+                    assertEquals(lower, assertNotNull(integerCertify(current.model, result.duals)).objectiveBoundCeil(0))
+                }
+                assertTrue(current.model.m <= previousRows + rootRows)
+                previousRows = current.model.m
                 assertEquals(rootColumns, current.model.n)
                 assertEquals(current.model.m, current.rowFactorIds.size)
+                if (reclaimed) break
             }
+            assertTrue(reclaimed)
             shared.popTo(0)
             val restored = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
             val result = assertNotNull(engine.solveNode(restored.model, null, Cancellation.Never)?.second)
-            assertTrue(restored.model.m < rootRows * 2)
+            assertTrue(restored.model.m <= previousRows)
             assertEquals(rootColumns, restored.model.n)
             assertEquals(0L, assertNotNull(integerCertify(restored.model, result.duals)).objectiveBoundCeil(0))
             assertEquals(rootRows, assertNotNull(restored.model.exactState).rows.activeCount)

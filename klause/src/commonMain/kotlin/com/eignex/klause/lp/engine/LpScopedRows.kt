@@ -10,6 +10,8 @@ internal data class LpRowIdentity(
 internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
     private val identities = entries.toList()
     private val indices by lazy { identities.withIndex().associate { it.value.id to it.index } }
+    private var weightedStorage: LpLayoutStorage? = null
+    private var layoutWeight: LpLayoutWeight? = null
     val size: Int get() = identities.size
     val activeCount: Int = identities.count { it.active }
     val retainedCount: Int = identities.count { it.active || it.suspendedAt != null }
@@ -32,6 +34,14 @@ internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
     fun entries(): List<LpRowIdentity> = identities.toList()
     fun sameIdentities(other: LpScopedRows): Boolean = identities.map { it.id } == other.identities.map { it.id }
     fun sameAuthority(other: LpScopedRows): Boolean = lastId == other.lastId && identities == other.identities
+
+    fun storageWeight(storage: LpLayoutStorage): LpLayoutWeight {
+        if (storage === weightedStorage) return requireNotNull(layoutWeight)
+        return storage.weights(this).also {
+            weightedStorage = storage
+            layoutWeight = it
+        }
+    }
 
     fun append(id: Long, depth: Int?): LpScopedRows = append(listOf(id), depth)
 

@@ -12,6 +12,7 @@ internal data class CutSource(val kind: CutSourceKind, val id: Int) {
 
 internal class CutExpression(terms: Map<CutSource, BigFraction>, val constant: BigFraction = BigFraction.ZERO) {
     private val coefficients = terms.filterValues { !it.isZero }.toMap()
+    val storageUnits: Long get() = coefficients.size.toLong() * 3L + 1L
     val terms: Map<CutSource, BigFraction> get() = coefficients.toMap()
 
     override fun equals(other: Any?): Boolean =
@@ -44,6 +45,7 @@ internal data class CutWeightedRow(val row: CutPremise.Row, val multiplier: Long
 
 internal class CutRoundingRule(val divisor: Long, val mir: Boolean, val reduction: Long, rows: List<CutWeightedRow>) {
     private val snapshot = rows.toList()
+    val storageUnits: Long = 3L + snapshot.sumOf { it.row.storageUnits() + 1L }
     val rows: List<CutWeightedRow> get() = snapshot.toList()
 }
 
@@ -55,6 +57,7 @@ internal class CutAuxiliaryDefinition(
 ) {
     private val roleSnapshot = role.toList()
     private val requiredSnapshot = required.toList()
+    val storageUnits: Long get() = roleSnapshot.size.toLong() + requiredSnapshot.size + 2L
     val role: List<Long> get() = roleSnapshot.toList()
     val required: List<Long> get() = requiredSnapshot.toList()
 
@@ -77,11 +80,23 @@ internal class CutProvenance(
     private val assumptionSnapshot = assumptions.toSet()
     private val ruleSnapshot = rules.toList()
     private val auxiliarySnapshot = auxiliaryDefinitions.toMap()
+    val storageUnits: Long = factSnapshot.sumOf { it.premise.storageUnits() + 1L } +
+        assumptionSnapshot.sumOf { it.length.toLong() } + ruleSnapshot.sumOf { it.storageUnits } +
+        auxiliarySnapshot.values.sumOf { it.storageUnits + 2L } + (conclusion?.storageUnits() ?: 0L) + 3L
     val facts: List<CutProofFact> get() = factSnapshot.toList()
     val assumptions: Set<String> get() = assumptionSnapshot.toSet()
     val rules: List<CutRoundingRule> get() = ruleSnapshot.toList()
     val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> get() = auxiliarySnapshot.toMap()
     val global: Boolean get() = assumptionSnapshot.isEmpty() && factSnapshot.all { it.global }
+}
+
+private fun CutPremise.storageUnits(): Long = when (this) {
+    is CutPremise.Bound -> expression.storageUnits + 3L
+    is CutPremise.Integral -> expression.storageUnits + 1L
+    is CutPremise.Row -> expression.storageUnits + 3L
+    is CutPremise.ObjectiveCutoff -> expression.storageUnits + 2L
+    is CutPremise.Fixed, is CutPremise.Excluded -> 3L
+    is CutPremise.Literal -> 1L
 }
 
 internal data class CutColumnPremise(val column: Int, val lower: Long, val integral: Boolean)

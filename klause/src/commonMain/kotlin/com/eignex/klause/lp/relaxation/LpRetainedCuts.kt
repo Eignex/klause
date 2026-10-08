@@ -33,12 +33,16 @@ internal class LpRetainedCuts {
     private class Binding(val id: Long, val source: SourceCut, val numeric: Cut) {
         val numericKey: String = numeric.key()
         val proof: CutProvenance get() = requireNotNull(numeric.provenance)
+        val storageUnits: Long = numeric.cols.size.toLong() * 2L + numericKey.length +
+            source.expression.storageUnits + proof.storageUnits + 3L
     }
     private class Change(val depth: Int, val previous: List<Binding>)
     private var bindings = emptyList<Binding>()
     private val trail = ArrayList<Change>()
     private var generation = 0L
     var depth: Int = 0
+        private set
+    var storageUnits: Long = 0L
         private set
 
     fun retract(targetDepth: Int) {
@@ -48,7 +52,15 @@ internal class LpRetainedCuts {
             bindings = trail.removeAt(trail.lastIndex).previous
         }
         depth = targetDepth
+        updateStorage()
         generation++
+    }
+
+    private fun updateStorage() {
+        val unique = HashSet<Binding>()
+        unique.addAll(bindings)
+        trail.forEach { unique.addAll(it.previous) }
+        storageUnits = unique.sumOf { it.storageUnits } + bindings.size + trail.sumOf { it.previous.size.toLong() + 2L }
     }
 
     fun parentRows(state: LpExactState): Map<Int, CutProvenance> {
@@ -94,6 +106,7 @@ internal class LpRetainedCuts {
             bindings = next
             trail.clear()
             trail.addAll(changes)
+            updateStorage()
             generation++
         }
     }
@@ -155,6 +168,7 @@ internal class LpRetainedCuts {
             }
             bindings = next.toList()
             depth = state.depth
+            if (changed) updateStorage()
             generation++
         }
     }

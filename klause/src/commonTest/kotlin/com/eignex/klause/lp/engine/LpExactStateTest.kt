@@ -15,6 +15,34 @@ import kotlin.test.assertTrue
 
 class LpExactStateTest {
     @Test
+    fun `trail storage follows retained witnesses through nested pop and row retirement`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        val premises = ExactLpPremises(listOf(ExactLpPremise(0, false, one)), listOf(7, 9))
+        assertTrue(trail.assertBound(0, false, ExactLpSide(one, premises = premises), 0L))
+        assertEquals(10L, trail.state.trailStorageUnits)
+        assertTrue(trail.push())
+        assertTrue(trail.append(LpScopedRow(0L, listOf(0 to one), one,
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), scoped = true))
+        assertTrue(trail.assertBound(1, true, ExactLpSide(one), 1L))
+        assertEquals(16L, trail.state.trailStorageUnits)
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(4L), premises = premises), 2L))
+        assertEquals(27L, trail.state.trailStorageUnits)
+
+        assertTrue(trail.pop(1))
+
+        assertEquals(16L, trail.state.trailStorageUnits)
+        assertFalse(trail.suspend(setOf(0L)))
+        assertEquals(16L, trail.state.trailStorageUnits)
+        assertTrue(trail.pop(0))
+        assertEquals(10L, trail.state.trailStorageUnits)
+        assertEquals(premises, trail.state.activeSide(0, false)?.side?.premises)
+    }
+
+    @Test
     fun `cached owner views respect cancellation and caller projection isolation`() {
         val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
         val state = LpExactState(source)

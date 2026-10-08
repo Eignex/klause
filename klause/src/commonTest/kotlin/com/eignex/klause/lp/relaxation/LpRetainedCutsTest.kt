@@ -142,6 +142,7 @@ class LpRetainedCutsTest {
             assertTrue(owner.replaceRows(root.retired, emptyList(), root.rows, false))
             root.commit()
             val rootProof = cuts.parentRows(owner.state).values.single()
+            val rootStorage = cuts.storageUnits
             assertTrue(owner.push())
             session.implyIntAtLeast(0, 4)
             val model = assertNotNull(owner.state.ownerWorkingModel())
@@ -156,6 +157,8 @@ class LpRetainedCutsTest {
             val child = assertNotNull(cuts.prepare(owner.state, current, listOf(local)))
             assertTrue(owner.replaceRows(child.retired, emptyList(), child.rows, true))
             child.commit()
+            val childStorage = cuts.storageUnits
+            assertTrue(childStorage > rootStorage)
             assertEquals(BigFraction.ofLong(4), assertNotNull(owner.solve()).lowerBound)
             assertTrue(cuts.parentRows(owner.state).values.single().facts.contains(CutProofFact(premise, false)))
             assertTrue(owner.push())
@@ -166,9 +169,11 @@ class LpRetainedCutsTest {
 
             assertTrue(owner.pop(1))
             cuts.retract(1)
+            assertEquals(childStorage, cuts.storageUnits)
             assertEquals(BigFraction.ofLong(4), assertNotNull(owner.solve()).lowerBound)
             assertTrue(owner.pop(0))
             cuts.retract(0)
+            assertEquals(rootStorage, cuts.storageUnits)
 
             assertEquals(BigFraction.ofLong(3), assertNotNull(owner.solve()).lowerBound)
             assertSame(rootProof, cuts.parentRows(owner.state).values.single())

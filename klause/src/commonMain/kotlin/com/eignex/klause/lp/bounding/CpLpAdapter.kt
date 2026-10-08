@@ -262,16 +262,18 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val core = engine.propagator
         val before = requireNotNull(core.state)
         val source = sources
-        val edit = source?.prepareCompaction(before, engine.params.cancellation)
+        val edit = source?.prepareCompaction(before, engine.params.cancellation, cuts.storageUnits)
         val remap = edit?.remap ?: if (source == null && before.rows.retiredCount > 0 &&
-            before.rows.retiredCount >= before.rows.retainedCount
+            before.rows.storageWeight(before.model.layoutStorage)
+                .warrantsCompaction(cuts.storageUnits + before.trailStorageUnits)
         ) {
             LpLayoutRemap(before.model.n, before.rows)
         } else {
             return base
         }
         val cutEdit = cuts.prepareCompaction(before, remap, engine.params.cancellation) ?: return base
-        engine.noteNodeOverhead((edit?.extent ?: before.model.numVars.toLong()) * LpNodeOverhead.BUILD)
+        engine.noteNodeOverhead((edit?.extent ?: (before.model.layoutStorage.total +
+            cuts.storageUnits + before.trailStorageUnits)) * LpNodeOverhead.BUILD)
         if (!core.compact(before, remap, cutEdit, edit)) return base
         val state = requireNotNull(core.state)
         val model = requireNotNull(state.ownerWorkingModel())

@@ -13,6 +13,9 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpLayoutRemap
+import com.eignex.klause.lp.engine.LpLayoutStorage
+import com.eignex.klause.lp.engine.LpLayoutWeight
+import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpStructuralColumn
 import com.eignex.klause.lp.engine.Sense
@@ -70,16 +73,35 @@ internal class LpRetainedSources(
         val required: LongArray?,
         val presentUpper: Long,
         val definition: CutAuxiliaryDefinition?,
-    )
+    ) {
+        val storageUnits: Long = 10L + (required?.size ?: 0) + (definition?.storageUnits ?: 0L)
+    }
 
-    private class Binding(val emission: LpEmission, val columns: IntArray, val rows: LongArray)
+    private class Binding(val emission: LpEmission, val columns: IntArray, val rows: LongArray) {
+        val storageUnits: Long = columns.size.toLong() + rows.size + emission.relaxation.model.let { model ->
+            model.n.toLong() * 16L + model.m.toLong() * 16L +
+                (model.doubleView?.colVal?.size ?: model.csc.rowIdx.size).toLong() * 3L +
+                model.rowPremises.sumOf { (it?.vars?.size ?: 0).toLong() * 3L + (it?.boolLits?.size ?: 0) }
+        }
+    }
     private class Change(val depth: Int, val index: Int, val previous: Binding?)
+    private class CompactionView(
+        val columns: List<Column>,
+        val uses: IntArray,
+        val rows: LpScopedRows,
+        val storage: LpLayoutStorage,
+        val kept: List<Int>,
+        val weight: LpLayoutWeight,
+        val removedDescriptors: Long,
+    )
 
     private val emissions = LpEmissionCache(relaxer)
     private var columns = emptyList<Column>()
     private var handles = emptyMap<ColumnKey, Int>()
     private var columnUses = IntArray(0)
     private var unusedColumns = 0
+    private var ownedStorageUnits = 0L
+    private var compactionView: CompactionView? = null
     private var realDefinitions = emptyMap<Int, Long>()
     private val bindings = arrayOfNulls<Binding>(relaxer.emissionRegions.size)
     private val trail = ArrayList<Change>()
@@ -94,6 +116,7 @@ internal class LpRetainedSources(
         check(generation < Long.MAX_VALUE)
         while (trail.isNotEmpty() && trail.last().depth > targetDepth) {
             val change = trail.removeAt(trail.lastIndex)
+            ownedStorageUnits -= (bindings[change.index]?.storageUnits ?: 0L) + 3L
             bindings[change.index]?.columns?.forEach { column ->
                 check(columnUses[column] > 0)
                 if (--columnUses[column] == 0 && columns[column].reclaimable()) unusedColumns++
@@ -103,6 +126,7 @@ internal class LpRetainedSources(
         emissions.retract(targetDepth)
         generation++
         cached = null
+        compactionView = null
     }
 
     fun prepare(
@@ -224,6 +248,7 @@ internal class LpRetainedSources(
         }
         if (cancellation()) throw LpAssemblyCancelled()
         val uses = columnUses.copyOf(staged.size)
+        var owned = ownedStorageUnits + staged.drop(columns.size).sumOf { it.storageUnits }
         var unused = unusedColumns + (columns.size until staged.size).count { staged[it].reclaimable() }
         fun reference(binding: Binding?, delta: Int) {
             binding?.columns?.forEach { column ->
@@ -238,10 +263,12 @@ internal class LpRetainedSources(
             }
         }
         for (index in update.changed) {
+            owned += requireNotNull(next[index]).storageUnits - (bindings[index]?.storageUnits ?: 0L)
             reference(bindings[index], -1)
             reference(next[index], 1)
         }
         changes.forEach { reference(it.previous, 1) }
+        owned += changes.sumOf { (it.previous?.storageUnits ?: 0L) + 3L }
         val objective = if (added.isEmpty()) null else ExactLpObjective(
             List(state.model.n) { state.model.objective.cost(it) } + added.map { it.cost } +
                 List(state.model.m) { state.model.objective.cost(state.model.n + it) } + rows.map { it.cost },
@@ -258,12 +285,14 @@ internal class LpRetainedSources(
             handles = keys.toMap()
             columnUses = uses
             unusedColumns = unused
+            ownedStorageUnits = owned
             realDefinitions = definitions.toMap()
             next.copyInto(bindings)
             trail.addAll(changes)
             columnEpoch = epoch
             generation++
             cached = null
+            compactionView = null
         }
     }
 
@@ -272,31 +301,23 @@ internal class LpRetainedSources(
     fun prepareCompaction(
         state: LpExactState,
         cancellation: Cancellation = Cancellation.Never,
+        retainedOverhead: Long = 0L,
     ): LpSourceCompaction? {
         require(state.model.n == columns.size && state.depth == depth)
+        require(retainedOverhead >= 0L)
         val rows = state.rows
-        // Reclaiming at least as much discarded state as live state pays for the full remap by amortization.
-        if (!((rows.retiredCount > 0 && rows.retiredCount >= rows.retainedCount) ||
-                (unusedColumns > 0 && unusedColumns >= columns.size - unusedColumns))
-        ) {
-            return null
-        }
+        if (rows.retiredCount == 0 && unusedColumns == 0) return null
         if (cancellation()) return null
         check(generation < Long.MAX_VALUE)
         val expectedGeneration = generation
-        val kept = ArrayList<Int>()
-        var extent = rows.size.toLong() + columns.size
-        for (column in columns.indices) {
-            if (cancellation()) return null
-            val entries = state.model.entries(column)
-            extent += entries.size
-            if (!columns[column].reclaimable() || columnUses[column] > 0 || entries.any {
-                    !it.number.value.isZero && (rows.row(it.row).active || rows.row(it.row).suspendedAt != null)
-                }
-            ) {
-                kept.add(column)
-            }
-        }
+        val view = compactionView?.takeIf {
+            it.columns === columns && it.uses === columnUses && it.rows === rows &&
+                it.storage === state.model.layoutStorage
+        } ?: compactionView(state, cancellation)?.also { compactionView = it } ?: return null
+        val overhead = ownedStorageUnits - view.removedDescriptors + retainedOverhead + state.trailStorageUnits
+        if (!view.weight.warrantsCompaction(overhead)) return null
+        val kept = view.kept
+        var extent = state.model.layoutStorage.total + ownedStorageUnits + retainedOverhead + state.trailStorageUnits
         val remap = LpLayoutRemap(columns.size, rows, kept)
         if (remap.unchanged) return null
         val indices = (0 until rows.size).associateBy { rows.row(it).id }
@@ -322,12 +343,35 @@ internal class LpRetainedSources(
             handles = keys
             columnUses = uses
             unusedColumns = unused
+            ownedStorageUnits -= view.removedDescriptors
             next.copyInto(bindings)
             trail.clear()
             trail.addAll(changes)
             generation++
             cached = null
+            compactionView = null
         }
+    }
+
+    private fun compactionView(state: LpExactState, cancellation: Cancellation): CompactionView? {
+        val rows = state.rows
+        val kept = ArrayList<Int>()
+        var removed = 0L
+        for (column in columns.indices) {
+            if (cancellation()) return null
+            if (!columns[column].reclaimable() || columnUses[column] > 0 || state.model.columnEntries(column).any {
+                    !it.number.value.isZero && (rows.row(it.row).active || rows.row(it.row).suspendedAt != null)
+                }
+            ) {
+                kept.add(column)
+            } else {
+                removed += columns[column].storageUnits
+            }
+        }
+        val storage = state.model.layoutStorage
+        val numeric = rows.storageWeight(storage).retireColumns(columns.size - kept.size)
+        return CompactionView(columns, columnUses, rows, storage, kept,
+            LpLayoutWeight(numeric.retained, numeric.retired + removed), removed)
     }
 
     private fun Column.cpSource(): CutSource? = if (variable < 0) null else {

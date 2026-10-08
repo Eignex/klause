@@ -92,6 +92,7 @@ internal class LpExactState internal constructor(
     val depth: Int get() = scopeMarks.size
     val model: ExactLpModel
     val conflict: LpBoundConflict?
+    val trailStorageUnits: Long
 
     init {
         require(listOf(matrixRevision, boundRevision, objectiveRevision, popRevision, rowRevision).all { it >= 0L })
@@ -101,6 +102,7 @@ internal class LpExactState internal constructor(
         require(changed.all { it in 0 until baseModel.numVars } && changed.distinct().size == changed.size)
         val source = previous?.takeIf { it.baseModel === baseModel && it.rows === rows }
         if (source == null) {
+            trailStorageUnits = activeAssertions.sumOf { it.storageUnits() } + scopeMarks.size
             validateRows()
             validateAssertions(0)
             lower = arrayOfNulls(baseModel.numVars)
@@ -111,6 +113,10 @@ internal class LpExactState internal constructor(
             inconsistent = BooleanArray(model.numVars) { !model.column(it).bounds.consistent }
         } else {
             val shared = sharedPrefix(source.activeAssertions)
+            var storage = source.trailStorageUnits - source.scopeMarks.size + scopeMarks.size
+            for (index in shared until source.activeAssertions.size) storage -= source.activeAssertions[index].storageUnits()
+            for (index in shared until activeAssertions.size) storage += activeAssertions[index].storageUnits()
+            trailStorageUnits = storage
             validateAssertions(shared)
             val touched = HashSet<Int>()
             for (index in shared until source.activeAssertions.size) touched.add(source.activeAssertions[index].column)
@@ -402,6 +408,8 @@ internal class LpExactState internal constructor(
         return constant
     }
 }
+
+private fun LpBoundAssertion.storageUnits(): Long = 5L + (side.premises?.size ?: 0L)
 
 internal fun ExactLpSide.strongerThan(other: ExactLpSide, upper: Boolean): Boolean {
     val comparison = number.value.compareTo(other.number.value)

@@ -21,6 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -49,8 +50,8 @@ class LpRetainedSourcesTest {
                 edit.commit()
                 val variable = sources.relaxation(owner.state, domains).intColOf[1]
                 assertTrue(owner.assertBound(variable, false, assertNotNull(edit.bounds[variable].lower), lower))
-                if (lower > 0) {
-                    val compaction = assertNotNull(sources.prepareCompaction(owner.state))
+                val compaction = sources.prepareCompaction(owner.state)
+                if (compaction != null) {
                     assertTrue(owner.compact(compaction.remap))
                     compaction.commit()
                 }
@@ -60,11 +61,36 @@ class LpRetainedSourcesTest {
 
                 assertEquals(BigFraction.ofLong(lower), assertNotNull(owner.solve()).lowerBound)
                 assertEquals(lower.toDouble(), expected)
-                assertEquals(fresh.model.n, retained.model.n)
-                assertEquals(fresh.model.m, retained.model.m)
-                assertEquals(fresh.rowFactorIds.toList(), retained.rowFactorIds.toList())
-                assertEquals(fresh.colVarId.toList(), retained.colVarId.toList())
+                assertEquals(fresh.model.m, owner.state.rows.activeCount)
+                if (lower == 0L || compaction != null) {
+                    assertEquals(fresh.model.n, retained.model.n)
+                    assertEquals(fresh.model.m, retained.model.m)
+                    assertEquals(fresh.rowFactorIds.toList(), retained.rowFactorIds.toList())
+                    assertEquals(fresh.colVarId.toList(), retained.colVarId.toList())
+                }
             }
+            var compaction: LpSourceCompaction? = null
+            for (iteration in 0 until 16) {
+                honors = !honors
+                val edit = sources.prepare(owner.state, domains)
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+                edit.commit()
+                compaction = sources.prepareCompaction(owner.state)
+                if (compaction != null) break
+            }
+            val planned = assertNotNull(compaction)
+            assertNull(sources.prepareCompaction(owner.state, retainedOverhead = planned.extent))
+            assertNull(sources.prepareCompaction(owner.state, Cancellation { true }))
+            assertTrue(planned.isCurrent())
+            assertTrue(owner.compact(planned.remap))
+            planned.commit()
+            val retained = sources.relaxation(owner.state, domains)
+            val fresh = relaxer.build(domains)
+            assertEquals(fresh.model.n, retained.model.n)
+            assertEquals(fresh.model.m, retained.model.m)
+            assertEquals(fresh.rowFactorIds.toList(), retained.rowFactorIds.toList())
+            assertEquals(fresh.colVarId.toList(), retained.colVarId.toList())
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
         }
     }
 
@@ -99,9 +125,17 @@ class LpRetainedSourcesTest {
                 val variable = sources.relaxation(owner.state, domains).intColOf[1]
                 assertTrue(owner.assertBound(variable, false, assertNotNull(edit.bounds[variable].lower), lower))
             }
-            val compaction = assertNotNull(sources.prepareCompaction(owner.state))
+            var compaction: LpSourceCompaction? = null
+            for (iteration in 0 until 16) {
+                honors = !honors
+                val edit = sources.prepare(owner.state, domains)
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, true, objective = edit.objective))
+                edit.commit()
+                compaction = sources.prepareCompaction(owner.state)
+                if (compaction != null) break
+            }
 
-            assertTrue(owner.compact(compaction.remap))
+            assertTrue(owner.compact(assertNotNull(compaction).remap))
             compaction.commit()
 
             assertEquals(rootColumns + 2, owner.state.model.n)
@@ -114,7 +148,25 @@ class LpRetainedSourcesTest {
             val restored = sources.prepare(owner.state, domains)
             assertTrue(restored.rows.isEmpty() && restored.columns.isEmpty() && restored.retired.isEmpty())
             restored.commit()
-            val rootCompaction = assertNotNull(sources.prepareCompaction(owner.state))
+            assertEquals(rootIds, owner.state.rows.entries().filter { it.active }.map { it.id })
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            var rootCompaction = sources.prepareCompaction(owner.state)
+            for (iteration in 0 until 16) {
+                if (rootCompaction != null) break
+                assertTrue(owner.push())
+                honors = false
+                val edit = sources.prepare(owner.state, domains)
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, true, objective = edit.objective))
+                edit.commit()
+                assertTrue(owner.pop(0))
+                sources.retract(0)
+                honors = true
+                val rootEdit = sources.prepare(owner.state, domains)
+                assertTrue(rootEdit.rows.isEmpty() && rootEdit.columns.isEmpty() && rootEdit.retired.isEmpty())
+                rootEdit.commit()
+                rootCompaction = sources.prepareCompaction(owner.state)
+            }
+            assertNotNull(rootCompaction)
             assertTrue(owner.compact(rootCompaction.remap))
             rootCompaction.commit()
             assertEquals(rootColumns, owner.state.model.n)

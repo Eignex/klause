@@ -411,7 +411,7 @@ class LpScopedRowsTest {
         assertTrue(active.sameMatrix(trail.state))
         assertNotNull(checkedLpWitness(model, listOf(BigFraction.ZERO)))
         assertNotNull(checkedLpWitness(model, listOf(BigFraction.ONE)))
-        assertNull(exactLagrangian(model, listOf(BigFraction.ONE)))
+        assertEquals(BigFraction.ZERO, exactLagrangian(model, listOf(BigFraction.ONE)))
         assertFalse(sourceFarkasValid(model, longArrayOf(1)))
         val certificate = assertNotNull(integerCertify(model, doubleArrayOf(1.0)))
         assertEquals(0L, certificate.objectiveBoundCeil(0L))
