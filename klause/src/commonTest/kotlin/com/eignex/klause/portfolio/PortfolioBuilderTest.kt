@@ -29,22 +29,12 @@ class PortfolioBuilderTest {
     ).bake()
 
     @Test
-    fun `a mixed portfolio over continuous variables builds no local-search arms`() {
+    fun `a mixed portfolio over continuous variables builds local-search arms`() {
         val scenario = PortfolioScenario(cores = 1, arms = 4, kind = Kind.COP, engine = EngineMix.MIXED)
 
         val workers = PortfolioBuilder.build(continuous, scenario)
 
-        assertTrue(workers.isNotEmpty())
-        assertTrue(workers.none { it.label.startsWith("ls/") }, workers.map { it.label }.toString())
-    }
-
-    @Test
-    fun `leaving local-search arms out admits no arm the scenario did not compose`() {
-        val scenario = PortfolioScenario(cores = 1, arms = 4, kind = Kind.COP, engine = EngineMix.MIXED)
-
-        val workers = PortfolioBuilder.build(continuous, scenario)
-
-        assertTrue(workers.none { it.label.startsWith("alns") }, workers.map { it.label }.toString())
+        assertTrue(workers.any { it.label.startsWith("ls/") }, workers.map { it.label }.toString())
     }
 
     @Test
