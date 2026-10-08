@@ -4,6 +4,7 @@ import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.randomValue
@@ -173,6 +174,12 @@ class LocalSearchState(
 
     /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
     val intConfChange: BooleanArray = BooleanArray(problem.numIntVars) { true }
+
+    // Which factors make their variables each other's neighbours for configuration checking: the model's own. The
+    // objective-bound overlay spans every objective variable, so marking through it would make every variable a
+    // neighbour of every other, which is no configuration checking at all, and cost a pass over the objective on
+    // every flip.
+    private val confNeighbours = BooleanArray(problem.factors.size) { problem.factors[it] !is ObjectiveBoundFactor }
 
     // Degree scratch reused by evaluateCompound so an apply+revert probe allocates nothing on its
     // array-copy path (the dominant LS allocation source). State is per-worker, so no locking.
@@ -681,6 +688,7 @@ class LocalSearchState(
 
     private fun markNeighborConfChange(factorIds: IntArray) {
         for (factorId in factorIds) {
+            if (!confNeighbours[factorId]) continue
             for (v in problem.factors[factorId].boolVars) boolConfChange[v] = true
             for (v in problem.factors[factorId].intVars) intConfChange[v] = true
         }
