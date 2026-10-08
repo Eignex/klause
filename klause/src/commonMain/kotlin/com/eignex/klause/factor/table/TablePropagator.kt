@@ -17,6 +17,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableLongIntMap
 
 /** CP propagator for [Table]. Constructed by the propagation projection. */
 internal class TablePropagator(
@@ -64,32 +65,45 @@ internal class TablePropagator(
      * is taken, else the one needing fewest.
      */
     private fun supportLoss(state: PropagationState, col: Int, atTrail: Int): IntArray {
+        val snapshot = ExplanationSnapshot(state, xs, atTrail)
         val out = LitSet()
-        if (col >= 0) columnLiterals(state, col, atTrail, out)
+        if (col >= 0) columnLiterals(state, col, snapshot, out)
         val ruledOut = IntArrayList()
         val kept = ArrayList<LongRange>()
+        val groundSupport = if (hi == null && col >= 0) LongHashSet() else null
         for (row in 0 until numTuples) {
-            if (col >= 0 && cellAt(state, row, col, atTrail, null) == Cell.KILLED) continue
-            val stood = (0 until arity).all { c -> c == col || cellAt(state, row, c, atTrail, null) == Cell.LIVE }
+            if (col >= 0 && cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
+            val stood = (0 until arity).all { c -> c == col || cellAt(state, row, c, snapshot, null) == Cell.LIVE }
             when {
                 !stood -> ruledOut.add(row)
-                col >= 0 -> kept.add(ownCell(state, row, col, atTrail))
+
+                groundSupport != null -> groundSupport.add(cellLo(row, col))
+
+                col >= 0 -> kept.add(ownCell(row, col, snapshot))
+
                 // The table cannot fail with a tuple standing, so a conflict found elsewhere rests on every domain.
-                else -> for (c in 0 until arity) columnLiterals(state, c, atTrail, out)
+                else -> for (c in 0 until arity) columnLiterals(state, c, snapshot, out)
             }
         }
         val support = mergeRanges(kept)
         val pick = IntArrayList()
         for (k in 0 until ruledOut.size) {
             val row = ruledOut[k]
-            if (col >= 0 && covers(support, ownCell(state, row, col, atTrail))) continue
+            if (col >= 0) {
+                val supported = if (groundSupport != null) {
+                    cellLo(row, col) in groundSupport
+                } else {
+                    covers(support, ownCell(row, col, snapshot))
+                }
+                if (supported) continue
+            }
             var covered = false
             var best = -1
             var bestCost = Int.MAX_VALUE
             for (c in 0 until arity) {
                 if (c == col) continue
                 pick.clear()
-                if (cellAt(state, row, c, atTrail, pick) == Cell.LIVE) continue
+                if (cellAt(state, row, c, snapshot, pick) == Cell.LIVE) continue
                 if ((0 until pick.size).all { out.has(pick[it]) }) {
                     covered = true
                     break
@@ -101,37 +115,50 @@ internal class TablePropagator(
             }
             if (covered) continue
             pick.clear()
-            cellAt(state, row, best, atTrail, pick)
+            cellAt(state, row, best, snapshot, pick)
             for (i in 0 until pick.size) out.add(pick[i])
         }
         return out.toArray()
     }
 
-    // The cell at (row, col) clipped to the column's bounds at [atTrail].
-    private fun ownCell(state: PropagationState, row: Int, col: Int, atTrail: Int): LongRange {
-        val d = state.domainAt(xs[col], atTrail)
+    // The cell at (row, col) clipped to the historical column bounds.
+    private fun ownCell(row: Int, col: Int, snapshot: ExplanationSnapshot): LongRange {
+        val d = snapshot.domains[col]
         return maxOf(cellLo(row, col), d.min)..minOf(cellHi(row, col), d.max)
     }
 
     private enum class Cell { LIVE, KILLED }
 
     /**
-     * Whether the cell at (row, c) met column c's domain at [atTrail], adding to [into], when it did not, the
+     * Whether the cell at (row, c) met column c's historical domain, adding to [into], when it did not, the
      * literals false then that say so: the bound it fell past, and each hole it fell in that was carved on the
      * path. Root holes and survivor restrictions are unconditional and need none. Walks only the cell's holes,
      * and only once every value in it is known to be one.
      */
-    private fun cellAt(state: PropagationState, row: Int, c: Int, atTrail: Int, into: IntArrayList?): Cell {
+    private fun cellAt(
+        state: PropagationState,
+        row: Int,
+        c: Int,
+        snapshot: ExplanationSnapshot,
+        into: IntArrayList?,
+    ): Cell {
         val v = xs[c]
         val lo = cellLo(row, c)
         val hiC = cellHi(row, c)
-        val d = state.domainAt(v, atTrail)
+        val d = snapshot.domains[c]
         val root = state.rootDomains[v]
         if (hiC < d.min || lo > d.max) {
             if (into != null) {
-                if (hiC < d.min && hiC >= root.min) into.add(Lit.make(state.atomVarGe(v, d.min), false))
-                if (lo > d.max && lo <= root.max) into.add(Lit.make(state.atomVarLe(v, d.max), false))
+                if (hiC < d.min && hiC >= root.min) into.add(snapshot.lowerLiteral(c))
+                if (lo > d.max && lo <= root.max) into.add(snapshot.upperLiteral(c))
             }
+            return Cell.KILLED
+        }
+        if (lo == hiC) {
+            if (lo in d) return Cell.LIVE
+            val pos = snapshot.carvedAt(c, lo)
+            if (pos > snapshot.atTrail) return Cell.LIVE
+            if (pos >= 0 && into != null) into.add(snapshot.holeLiteral(c, lo))
             return Cell.KILLED
         }
         val a = maxOf(lo, d.min)
@@ -141,31 +168,78 @@ internal class TablePropagator(
         if (b - a >= holes) return Cell.LIVE
         var carvedLater = false
         d.forEachHoleInRange(a, b) { k ->
-            val pos = state.carvedAt(v, k)
-            if (pos > atTrail) {
+            val pos = snapshot.carvedAt(c, k)
+            if (pos > snapshot.atTrail) {
                 carvedLater = true
             } else if (pos >= 0 && into != null) {
-                into.add(Lit.make(state.atomVarEq(v, k), true))
+                into.add(snapshot.holeLiteral(c, k))
             }
         }
         if (carvedLater) return Cell.LIVE
         if (into != null) {
-            if (lo < d.min && d.min > root.min) into.add(Lit.make(state.atomVarGe(v, d.min), false))
-            if (hiC > d.max && d.max < root.max) into.add(Lit.make(state.atomVarLe(v, d.max), false))
+            if (lo < d.min && d.min > root.min) into.add(snapshot.lowerLiteral(c))
+            if (hiC > d.max && d.max < root.max) into.add(snapshot.upperLiteral(c))
         }
         return Cell.KILLED
     }
 
-    // Column [col]'s domain at [atTrail]: its bounds above the root and the holes carved on the path inside them.
-    private fun columnLiterals(state: PropagationState, col: Int, atTrail: Int, out: LitSet) {
+    // Historical bounds above the root and the holes carved on the path inside them.
+    private fun columnLiterals(state: PropagationState, col: Int, snapshot: ExplanationSnapshot, out: LitSet) {
         val v = xs[col]
         val root = state.rootDomains[v]
-        val d = state.domainAt(v, atTrail)
-        if (d.min > root.min) out.add(Lit.make(state.atomVarGe(v, d.min), false))
-        if (d.max < root.max) out.add(Lit.make(state.atomVarLe(v, d.max), false))
-        d.forEachHole { k ->
-            val pos = state.carvedAt(v, k)
-            if (pos in 0..atTrail) out.add(Lit.make(state.atomVarEq(v, k), true))
+        val d = snapshot.domains[col]
+        if (d.min > root.min) out.add(snapshot.lowerLiteral(col))
+        if (d.max < root.max) out.add(snapshot.upperLiteral(col))
+        val cite: (Long) -> Unit = { k ->
+            val pos = snapshot.carvedAt(col, k)
+            if (pos in 0..snapshot.atTrail) out.add(snapshot.holeLiteral(col, k))
+        }
+        // Root holes need no literal; sparse root members can be much fewer than the span's holes.
+        val members = root.spanOrNull(d.holeCount)
+        if (members != null) {
+            members.forEach { k -> if (k in d.min..d.max && k !in d) cite(k) }
+        } else {
+            d.forEachHole { k -> cite(k) }
+        }
+    }
+
+    // One explanation is synchronous, so its historical reads are stable. Keeping this cache local
+    // avoids carrying domain references or carve positions across subsequent propagation and undo.
+    private class ExplanationSnapshot(
+        private val state: PropagationState,
+        private val xs: IntArray,
+        val atTrail: Int,
+    ) {
+        val domains = Array(xs.size) { state.domainAt(xs[it], atTrail) }
+        private val carves = Array(xs.size) { MutableLongIntMap() }
+        private val holes = Array(xs.size) { MutableLongIntMap() }
+        private val lower = IntArray(xs.size) { -1 }
+        private val upper = IntArray(xs.size) { -1 }
+
+        fun lowerLiteral(col: Int): Int {
+            if (lower[col] < 0) lower[col] = Lit.make(state.atomVarGe(xs[col], domains[col].min), false)
+            return lower[col]
+        }
+
+        fun upperLiteral(col: Int): Int {
+            if (upper[col] < 0) upper[col] = Lit.make(state.atomVarLe(xs[col], domains[col].max), false)
+            return upper[col]
+        }
+
+        fun holeLiteral(col: Int, value: Long): Int {
+            val cached = holes[col].getOrDefault(value, -1)
+            if (cached >= 0) return cached
+            val lit = Lit.make(state.atomVarEq(xs[col], value), true)
+            holes[col].put(value, lit)
+            return lit
+        }
+
+        fun carvedAt(col: Int, value: Long): Int {
+            val cached = carves[col].getOrDefault(value, -2)
+            if (cached != -2) return cached
+            val pos = state.carvedAt(xs[col], value)
+            carves[col].put(value, pos)
+            return pos
         }
     }
 
@@ -276,6 +350,7 @@ internal class TablePropagator(
         val domLo = LongArray(arity)
         val domHi = LongArray(arity)
         val supportBits = arrayOfNulls<LongArray>(arity)
+        val remainingSupports = IntArray(arity)
         // A cell whose interval covers the whole domain (a `*`, or a range spanning it) supports every
         // value of that column, so the column is fully supported and skips gathering and pruning.
         val fullySupported = BooleanArray(arity)
@@ -283,11 +358,13 @@ internal class TablePropagator(
             val d = state.intDomains[xs[col]]
             domLo[col] = d.min
             domHi[col] = d.max
+            remainingSupports[col] = d.valueCount.toInt()
             val span = domHi[col] - domLo[col] + 1
             supportBits[col] = LongArray(((span + 63) ushr 6).toInt())
         }
+        var numValid = s.numValid
         var i = 0
-        while (i < s.numValid) {
+        while (i < numValid) {
             val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
@@ -297,14 +374,15 @@ internal class TablePropagator(
                 }
             }
             if (!feasible) {
-                val last = s.numValid - 1
+                val last = numValid - 1
                 if (i != last) {
                     s.validTuples[i] = s.validTuples[last]
                     s.validTuples[last] = row
                 }
-                s.numValid = last
+                numValid = last
             } else {
                 for (col in 0 until arity) {
+                    if (fullySupported[col]) continue
                     val lo = cellLo(row, col)
                     val hiC = cellHi(row, col)
                     if (lo <= domLo[col] && hiC >= domHi[col]) {
@@ -314,17 +392,27 @@ internal class TablePropagator(
                     // Every domain value the interval covers is supported; setting bits over the
                     // (in-range) offsets is safe — the prune only ever consults in-domain positions.
                     val bits = requireNotNull(supportBits[col])
-                    var off = (maxOf(lo, domLo[col]) - domLo[col]).toInt()
-                    val offEnd = (minOf(hiC, domHi[col]) - domLo[col]).toInt()
-                    while (off <= offEnd) {
-                        bits[off ushr 6] = bits[off ushr 6] or (1L shl (off and 63))
-                        off++
+                    val first = (maxOf(lo, domLo[col]) - domLo[col]).toInt()
+                    val last = (minOf(hiC, domHi[col]) - domLo[col]).toInt()
+                    if (first == last) {
+                        val word = first ushr 6
+                        val mask = 1L shl (first and 63)
+                        if (bits[word] and mask == 0L) {
+                            bits[word] = bits[word] or mask
+                            // Ground cells contribute only live values; the count includes sparse domains.
+                            if (hi == null && --remainingSupports[col] == 0) fullySupported[col] = true
+                        }
+                    } else {
+                        setSupportRange(bits, first, last)
                     }
                 }
                 i++
             }
         }
-        if (s.numValid == 0) return false
+        // The sparse-set permutation restores every removed row when the prefix size is undone.
+        s.numValid = numValid
+        if (numValid == 0) return false
+        if (fullySupported.all { it }) return true
         val coarse by lazy(LazyThreadSafetyMode.NONE) { collectHoleAndBoundAntecedents(state, xs) }
         for (col in 0 until arity) {
             if (fullySupported[col]) continue
@@ -379,8 +467,9 @@ internal class TablePropagator(
         val minSup = LongArray(arity) { Long.MAX_VALUE }
         val maxSup = LongArray(arity) { Long.MIN_VALUE }
         val fullySupported = BooleanArray(arity)
+        var numValid = s.numValid
         var i = 0
-        while (i < s.numValid) {
+        while (i < numValid) {
             val row = s.validTuples[i]
             var feasible = true
             for (col in 0 until arity) {
@@ -390,12 +479,12 @@ internal class TablePropagator(
                 }
             }
             if (!feasible) {
-                val last = s.numValid - 1
+                val last = numValid - 1
                 if (i != last) {
                     s.validTuples[i] = s.validTuples[last]
                     s.validTuples[last] = row
                 }
-                s.numValid = last
+                numValid = last
             } else {
                 for (col in 0 until arity) {
                     val d = state.intDomains[xs[col]]
@@ -417,7 +506,9 @@ internal class TablePropagator(
                 i++
             }
         }
-        if (s.numValid == 0) return false
+        // The sparse-set permutation restores every removed row when the prefix size is undone.
+        s.numValid = numValid
+        if (numValid == 0) return false
         val coarse by lazy(LazyThreadSafetyMode.NONE) { collectHoleAndBoundAntecedents(state, xs) }
         for (col in 0 until arity) {
             if (fullySupported[col]) continue
@@ -447,7 +538,13 @@ internal class TablePropagator(
     // undo log to see the domains as they stood. Without it nothing reads reasons, and every column's current
     // domain stands in.
     private inline fun columnReason(state: PropagationState, col: Int, coarse: () -> IntArray?): IntArray? =
-        if (state.currentLevel == 0) null else if (state.undoLogging) state.lazyReason(intArrayOf(col)) else coarse()
+        if (state.currentLevel == 0) {
+            null
+        } else if (state.undoLogging) {
+            state.lazyReason(intArrayOf(col))
+        } else {
+            coarse()
+        }
 
     private companion object {
         /** [ranges] sorted and merged where they touch or overlap. */
@@ -471,6 +568,20 @@ internal class TablePropagator(
         /** Columns whose domain is within Int range and narrower than this take the span-sized bitset
          *  support path; wider columns take the value-keyed set path (sound for any magnitude). */
         const val MAX_BITSET_SPAN: Long = 1L shl 24
+
+        private fun setSupportRange(bits: LongArray, first: Int, last: Int) {
+            val firstWord = first ushr 6
+            val lastWord = last ushr 6
+            val firstMask = -1L shl (first and 63)
+            val lastMask = -1L ushr (63 - (last and 63))
+            if (firstWord == lastWord) {
+                bits[firstWord] = bits[firstWord] or (firstMask and lastMask)
+            } else {
+                bits[firstWord] = bits[firstWord] or firstMask
+                for (word in firstWord + 1 until lastWord) bits[word] = -1L
+                bits[lastWord] = bits[lastWord] or lastMask
+            }
+        }
 
         /** Whether domain [d] holds a value in `[lo, hi]` (hole-aware): the clamped range is non-empty
          *  and, when the domain has holes, not entirely holes. */

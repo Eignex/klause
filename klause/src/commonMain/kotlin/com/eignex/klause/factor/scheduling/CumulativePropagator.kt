@@ -76,7 +76,9 @@ internal class CumulativePropagator(
     // A deduction's reason, recorded for [explain] to build from [payload] if analysis reads it.
     private fun reasonFor(state: PropagationState, payload: IntArray): IntArray? = when {
         state.currentLevel == 0 -> null
+
         state.undoLogging -> state.lazyReason(payload)
+
         else -> now(state).run {
             explainPayload(payload)
             literals()
@@ -490,10 +492,9 @@ internal class CumulativePropagator(
         private fun lct(k: Int): Long = lst(k) + durMin(k)
         private fun energy(k: Int): Long = durMin(k) * resMin(k)
 
-        private fun theta(tau: Long, except: Int): List<Int> =
-            (0 until n).filter {
-                it != except && present(it) && durMin(it) > 0 && resMin(it) > 0 && lct(it) <= tau
-            }
+        private fun theta(tau: Long, except: Int): List<Int> = (0 until n).filter {
+            it != except && present(it) && durMin(it) > 0 && resMin(it) > 0 && lct(it) <= tau
+        }
 
         // Task [k] lies in the window from [from] to [tau] with at least its least energy.
         private fun inWindow(k: Int, from: Long, tau: Long) {

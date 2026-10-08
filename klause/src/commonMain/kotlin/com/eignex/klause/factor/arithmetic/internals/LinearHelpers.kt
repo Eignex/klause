@@ -590,7 +590,9 @@ internal fun propagateLinearBounds(
     val lazy = state.undoLogging && factorId >= 0
     fun reason(i: Int, useLo: Boolean, budget: Long): IntArray? = when {
         rootFact -> null
+
         lazy -> linearLazyReason(state, factorId, i, useLo, budget, extraLit, includeExtraLit)
+
         else -> collectLinearLiftedAntecedents(
             state,
             coeffs,

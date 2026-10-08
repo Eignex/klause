@@ -75,18 +75,39 @@ internal class WideReifiedLinearPropagator(
      * end (true) or the upper end (false); null when only both together settle it (an equality pinned on both
      * ends, or a disequality).
      */
-    private fun wideSettlingSide(
-        op: LinearOp,
-        sumLo: BigInt,
-        sumHi: BigInt,
-        bound: BigInt,
-        holds: Boolean,
-    ): Boolean? =
+    private fun wideSettlingSide(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: BigInt, holds: Boolean): Boolean? =
         when (op) {
             LinearOp.LE -> if (holds) false else true
+
             LinearOp.GE -> if (holds) true else false
-            LinearOp.EQ -> if (holds) null else (if (sumLo > bound) true else if (sumHi < bound) false else null)
-            LinearOp.NE -> if (holds) (if (sumLo > bound) true else if (sumHi < bound) false else null) else null
+
+            LinearOp.EQ -> if (holds) {
+                null
+            } else {
+                (
+                if (sumLo > bound) {
+                    true
+                } else if (sumHi < bound) {
+                    false
+                } else {
+                    null
+                }
+                )
+            }
+
+            LinearOp.NE -> if (holds) {
+                (
+                if (sumLo > bound) {
+                    true
+                } else if (sumHi < bound) {
+                    false
+                } else {
+                    null
+                }
+                )
+            } else {
+                null
+            }
         }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {

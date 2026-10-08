@@ -5,9 +5,9 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * Bounds-consistency filtering for `all_different ::bounds`. This is the López-Ortiz / Quimper /
@@ -58,9 +58,11 @@ private fun boundsReason(
     premises: IntArray,
 ): IntArray? = when {
     state.currentLevel == 0 -> null
+
     state.undoLogging -> state.lazyReason(
         intArrayOf(BOUNDS_HALL, tag, x, if (lower) 1 else 0, (bound ushr 32).toInt(), bound.toInt()) + premises,
     )
+
     else -> premises
 }
 

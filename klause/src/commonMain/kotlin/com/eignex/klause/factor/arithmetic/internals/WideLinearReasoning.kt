@@ -125,9 +125,11 @@ internal fun wideEnforceRow(
     if (wideNeverHolds(op, sumLo, sumHi, bound)) return false
     val rootFact = state.currentLevel == 0
     val includeAux = auxLit != null
+
     // An NE deduction reads every other term pinned, so both bounds.
     fun ant(i: Int): IntArray? =
         if (rootFact && !includeAux) null else collectLinearTightenAntecedents(state, vars, i, auxLit ?: 0, includeAux)
+
     // A bound from the `≤` side reads the other terms' least contributions, from the `≥` side their greatest.
     fun sideAnt(i: Int, useLo: Boolean): IntArray? =
         if (rootFact && !includeAux) null else wideSideReason(state, vars, coeffs, useLo, i, auxLit)
