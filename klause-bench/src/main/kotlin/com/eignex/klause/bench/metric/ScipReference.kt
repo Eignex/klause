@@ -67,14 +67,32 @@ internal object ScipReference {
         p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
     }.getOrElse { false }
 
+    /** SCIP's tolerances and gap limit, its defaults: recorded with every row and part of its cache identity. */
+    internal const val OPTIONS = "numerics/feastol=1e-06,numerics/epsilon=1e-09,limits/gap=0"
+
+    /** The image a result came from, by id, so a rebuilt SCIP never replays an older build's results. */
+    private val image: String by lazy {
+        runCatching {
+            val p = ProcessBuilder("docker", "image", "inspect", "--format", "{{.Id}}", IMAGE).redirectErrorStream(true).start()
+            val id = p.inputStream.bufferedReader().readText().trim()
+            p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS)
+            id.takeIf { p.exitValue() == 0 }
+        }.getOrNull() ?: "unknown"
+    }
+
+    /** What a cached result depends on: the image, the options and the validation rules. */
+    fun identity(): String = "$IMAGE@$image|$OPTIONS|${MpsWitness.VERSION}"
+
     /** Solve [ref] (an MPS instance) with SCIP under [budget], single-threaded. The instance is piped on
      *  stdin and read as MPS; SCIP's objective sense (from the model's `OBJSENSE`) orients the reported
-     *  bound. */
+     *  bound. Its solution is displayed after the solve and checked against the model ([MpsWitness]), a repair
+     *  going through [HighsReference.repair]. */
     fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
         val text = CorpusFiles.readText(CorpusFetcher.resolve(ref.source))
+        val model = runCatching { Mps.parse(text) }.getOrNull()
         // MPS default is minimise; an `OBJSENSE MAXIMIZE` flips it. SCIP reports the bound in this
         // orientation, so record it for the entry (and virtual-best comparison).
-        val maximize = runCatching { Mps.parse(text).sense == ObjectiveDirection.MAXIMIZE }.getOrDefault(false)
+        val maximize = model?.sense == ObjectiveDirection.MAXIMIZE
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
         // The process id keeps names apart across bench processes run side by side, one instance each, as a lab runs
         // them: each counts from 1, and docker refuses a name already in use.
@@ -99,6 +117,7 @@ internal object ScipReference {
             "-c", "set limits memory $MEMORY_LIMIT_MB",
             "-c", "read /dev/stdin mps",
             "-c", "optimize",
+            "-c", "display solution",
             "-c", "quit",
         )
         val startNanos = System.nanoTime()
@@ -138,38 +157,56 @@ internal object ScipReference {
             "scip: docker run exited $exit: ${proc.errorStream.bufferedReader().readText().takeLast(ERROR_TAIL_CHARS)}"
         }
         val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
-        return parse(stdout, elapsedMs, cmd, maximize)
+        val claim = parseClaim(stdout)
+        val attempt = MpsAttempt(
+            label = "default",
+            stdout = stdout,
+            elapsedMs = elapsedMs,
+            command = cmd.joinToString(" "),
+            claim = claim,
+            verdict = MpsReference.judge(model, claim, HighsReference.repair.takeIf { HighsReference.available() }),
+            reported = lines(stdout).lastOrNull { it.startsWith("SCIP Status") }?.let { mapOf("solverStatus" to it.substringAfter(':').trim()) }.orEmpty(),
+        )
+        return MpsReference.result(listOf(attempt), model, maximize, identity(), OPTIONS)
     }
 
-    /** SCIP's `optimize` summary reports `SCIP Status : … [optimal solution found] / [infeasible] / …`
-     *  and a `Primal Bound : <value>` (its best incumbent, or ≥ infinity when none). Map to the
-     *  [SolverInvocation.Result] the reference sweep scores: an optimum/infeasible is a proof, an
-     *  incumbent without proof is a feasible witness, anything else is undecided. */
-    internal fun parse(stdout: String, elapsedMs: Long, cmd: List<String>, maximize: Boolean): SolverInvocation.Result {
-        val lines = stdout.lineSequence().map { it.trim() }.toList()
+    /**
+     * SCIP's `optimize` summary reports `SCIP Status : … [optimal solution found] / [infeasible] / …`, a `Primal Bound`
+     * (at or beyond infinity when it has none), a `Dual Bound` and a `Gap`; `display solution` then lists the
+     * solution's nonzero values after `objective value:`, or says `no solution available`.
+     */
+    internal fun parseClaim(stdout: String): MpsWitness.Claim {
+        val lines = lines(stdout)
         val status = lines.lastOrNull { it.startsWith("SCIP Status") }.orEmpty()
-        val optimal = status.contains("optimal solution found")
-        val infeasible = status.contains("[infeasible]")
-        val primal = lines.lastOrNull { it.startsWith("Primal Bound") }
-            ?.substringAfter(":")?.trim()?.substringBefore(' ')?.toDoubleOrNull()
-        val objective = primal?.takeIf { abs(it) < SCIP_INFINITY }
-        val feasible = when {
-            infeasible -> false
-            objective != null -> true
-            else -> null
+        fun bound(name: String) = lines.lastOrNull { it.startsWith(name) }
+            ?.substringAfter(":")?.trim()?.substringBefore(' ')?.toDoubleOrNull()?.takeIf { abs(it) < SCIP_INFINITY }
+        val start = lines.indexOfLast { it.startsWith("objective value:") }
+        val assignment = if (start < 0) {
+            null
+        } else {
+            lines.drop(start + 1).takeWhile { SOLUTION_LINE.matches(it) }.associate { line ->
+                val (name, value) = SOLUTION_LINE.matchEntire(line)!!.destructured
+                name to value.toDouble()
+            }
         }
-        val proven = optimal || infeasible
-        val timeMs = elapsedMs.takeIf { feasible == true }
-        return SolverInvocation.Result(
-            feasible = feasible,
-            objective = objective.takeIf { feasible == true },
-            timeToBestMs = timeMs,
-            timeToFirstFeasibleMs = timeMs,
-            proven = proven,
-            // Seconds, so [BenchCli.solveReference] derives the proof/first-feasible time uniformly.
-            stats = mapOf("solveTime" to (elapsedMs / 1000.0).toString(), "maximize" to maximize.toString()),
-            rawOutput = stdout,
-            command = cmd.joinToString(" "),
+        return MpsWitness.Claim(
+            status = when {
+                "optimal solution found" in status -> MpsWitness.Status.OPTIMAL
+                "[infeasible]" in status -> MpsWitness.Status.INFEASIBLE
+                "limit reached" in status || "interrupted" in status -> MpsWitness.Status.LIMIT
+                else -> MpsWitness.Status.UNKNOWN
+            },
+            primal = bound("Primal Bound"),
+            dual = bound("Dual Bound"),
+            gap = lines.lastOrNull { it.startsWith("Gap") }?.substringAfter(":")?.trim()?.substringBefore(' ')
+                ?.toDoubleOrNull()?.div(PERCENT),
+            assignment = assignment,
         )
     }
+
+    private fun lines(stdout: String) = stdout.lineSequence().map { it.trim() }.toList()
+
+    /** One value `display solution` lists: the variable, its value, and its objective coefficient. */
+    private val SOLUTION_LINE = Regex("""(\S+)\s+(\S+)\s+\(obj:[^)]*\)""")
+    private const val PERCENT = 100.0
 }

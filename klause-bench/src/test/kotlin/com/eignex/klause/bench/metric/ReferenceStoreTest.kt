@@ -27,4 +27,14 @@ class ReferenceStoreTest {
         assertEquals(1, e.numLinear)
         assertEquals(false, e.boolHeavy)
     }
+
+    @Test
+    fun `a row judged another way replaces a stored proof, a weaker one of the same version does not`() {
+        val proof = ReferenceStore.parseRow("miplib2017,neos4,false,-4.84543837043946E10,true,true,900,60000", "highs")
+        val corrected = proof.copy(objective = -4.86034407505895E10, proven = false, version = "highs|${MpsWitness.VERSION}")
+        val weaker = corrected.copy(objective = null, feasible = null)
+
+        assertEquals(listOf(true, false), listOf(ReferenceStore.replaces(corrected, proof), ReferenceStore.replaces(weaker, corrected)))
+        assertEquals(corrected.version, ReferenceStore.parseRow(ReferenceStore.encodeRow(corrected), "highs").version)
+    }
 }
