@@ -585,9 +585,7 @@ internal fun propagateLinearBounds(
             if (otherLo != otherHi) continue
             if (subOverflows(bound, otherLo)) continue
             val rhs = bound - otherLo
-            if (rhs % c != 0L) continue
-            val forbidden = rhs / c
-            if (forbidden < Int.MIN_VALUE || forbidden > Int.MAX_VALUE) continue
+            val forbidden = integralQuotientOrNull(rhs, c) ?: continue
             val ant = if (rootFact) {
                 null
             } else {
@@ -690,6 +688,13 @@ private fun tightenMinClamped(state: PropagationState, v: Int, newMin: Long, ant
 
 private fun tightenMaxClamped(state: PropagationState, v: Int, newMax: Long, ant: IntArray? = null): Boolean =
     state.tightenIntMax(v, newMax, ant)
+
+internal fun integralQuotientOrNull(value: Long, divisor: Long): Long? = when {
+    divisor == 0L -> null
+    value == Long.MIN_VALUE && divisor == -1L -> null
+    value % divisor != 0L -> null
+    else -> value / divisor
+}
 
 /** floor(a / b) with correct handling of negative operands. */
 internal fun floorDivLong(a: Long, b: Long): Long {

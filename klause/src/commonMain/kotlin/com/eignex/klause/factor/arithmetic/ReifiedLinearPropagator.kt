@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecede
 import com.eignex.klause.factor.arithmetic.internals.collectLinearLiftedAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.explainLinearBound
+import com.eignex.klause.factor.arithmetic.internals.integralQuotientOrNull
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
@@ -25,6 +26,9 @@ internal class ReifiedLinearPropagator(
     private val op: LinearOp,
     private val bound: Long,
 ) : Propagator {
+
+    private val equalityTarget: Long? =
+        if (vars.size == 1) integralQuotientOrNull(bound, coeffs[0]) else null
 
     /**
      * Advisor subscription: like [Linear], the integer reasoning is purely interval-based.
@@ -196,10 +200,7 @@ internal class ReifiedLinearPropagator(
      * bound; an interior hole carved during search cites its eq-atom (the soundness-critical case).
      */
     private fun eqUnreachableReason(state: PropagationState): IntArray? {
-        val c = coeffs[0]
-        if (c == 0L || bound % c != 0L) return null
-        val k = bound / c
-        if (k < Int.MIN_VALUE.toLong() || k > Int.MAX_VALUE.toLong()) return null
+        val k = equalityTarget ?: return null
         val v = vars[0]
         val d = state.intDomains[v]
         val orig = state.rootDomains[v]
@@ -215,12 +216,8 @@ internal class ReifiedLinearPropagator(
      *  domain — i.e. the equality is unsatisfiable even though `bound` lies within `x`'s bounds
      *  (an interior hole) or `bound` is not divisible by `c`. */
     private fun eqTargetUnreachable(state: PropagationState): Boolean {
-        val c = coeffs[0]
-        val b = bound
-        if (c == 0L) return b != 0L
-        if (b % c != 0L) return true
-        val value = b / c
-        if (value < Int.MIN_VALUE.toLong() || value > Int.MAX_VALUE.toLong()) return true
+        if (coeffs[0] == 0L) return bound != 0L
+        val value = equalityTarget ?: return true
         return value !in state.intDomains[vars[0]]
     }
 }
