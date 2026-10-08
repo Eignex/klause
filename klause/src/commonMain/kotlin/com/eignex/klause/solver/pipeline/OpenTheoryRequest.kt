@@ -202,20 +202,21 @@ object OpenTheoryPipeline {
         params: TheoryParams,
         engine: FiniteEngine,
         cores: Int = 1,
-    ): OpenTheoryExecution =
-        when (engine) {
-            FiniteEngine.MIXED -> executePortfolio(request, params, cores)
-            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
-            FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(
-                request.model,
-                params,
-                request.minimizedObjective,
-                cores,
-                searchesContinuousOnly = true,
-            )
+    ): OpenTheoryExecution = when (engine) {
+        FiniteEngine.MIXED -> executePortfolio(request, params, cores)
 
-            FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
-        }
+        FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
+
+        FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(
+            request.model,
+            params,
+            request.minimizedObjective,
+            cores,
+            searchesContinuousOnly = true,
+        )
+
+        FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
+    }
 
     /**
      * Search [model], an open model no theory decides, the way [engine] asks: local search under

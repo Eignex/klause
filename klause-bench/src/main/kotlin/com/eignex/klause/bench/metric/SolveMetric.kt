@@ -190,7 +190,7 @@ internal object SolveMetric {
         val sha = Reports.readGitSha()
         val name = ref.name.replace('/', '_')
         val (rec, raw) = if (solverId == REFERENCE) {
-            referenceRecord(ref, settings, budget, timestamp, sha, referenceSolver)
+            referenceRecord(ref, settings, budget, timestamp, sha, referenceSolver, File(dir, "$name.sol"))
         } else {
             runCatching { Runners.resolve(ref, settings.exact) }.fold(
                 { entry -> solve(entry, solverId, settings, budget, tag, timestamp, sha) },
@@ -205,7 +205,8 @@ internal object SolveMetric {
     /**
      * The format's reference solver on [ref] (see [ReferenceSolve]), as a record whose `solver` names the solver that
      * ran. The instance goes to that solver as it is, without klause's front end, so a model klause declines still
-     * gets a reference verdict. A run that fails is an error record.
+     * gets a reference verdict. A run that fails is an error record. A solution the reference returned is written to
+     * [solution], as `name value` lines, so its verdict can be checked again.
      */
     private fun referenceRecord(
         ref: ProblemRef,
@@ -214,9 +215,11 @@ internal object SolveMetric {
         timestamp: String,
         sha: String?,
         solver: String?,
+        solution: File,
     ): Pair<SolveRecord, String?> = runCatching {
         val run = ReferenceSolve.run(ref, REFERENCE_MINIZINC_BACKEND, s, budget, solver)
         val r = run.result
+        r.assignment?.let { solution.writeText(it) }
         SolveRecord(
             problem = ref.name,
             solver = run.solver,

@@ -113,14 +113,7 @@ internal class DisjunctivePropagator(
      *  level > 1; shave any non-fixed task's start endpoints if placement would create
      *  an additional unit-overlap with the mandatory profile. */
     private fun timeTable(state: PropagationState, effDur: LongArray): Boolean {
-        val profile = MandatoryProfile()
-        for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            val d = effDur[i]
-            if (d == 0L) continue
-            val dom = state.intDomains[starts[i]]
-            profile.addTask(lst = dom.max, ect = dom.min + d, resource = 1L)
-        }
+        val profile = mandatoryProfile(state, effDur)
         if (!profile.build(cap = 1L)) {
             failure = now(state).run {
                 overloadAt(profile.overloadTime)
@@ -132,39 +125,59 @@ internal class DisjunctivePropagator(
             if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             if (d == 0L) continue
-            val v = starts[i]
-            val dom = state.intDomains[v]
-            if (dom.min == dom.max) continue
-            val lstI = dom.max
-            val ectI = dom.min + d
-            val ownsMandatory = lstI < ectI
-            var newMin = dom.min
-            while (newMin <= state.intDomains[v].max) {
-                if (profile.overloadsAt(newMin, newMin + d, r = 1L, cap = 1L, ownsMandatory, lstI, ectI)) {
-                    newMin++
-                } else {
-                    break
-                }
+            if (!shaveAgainstProfile(state, profile, i, d)) return false
+        }
+        return true
+    }
+
+    // The profile's build and each task's shave are separate methods so each compiles apart: in one body every loop
+    // entered on-stack recompiled the whole of it.
+    private fun mandatoryProfile(state: PropagationState, effDur: LongArray): MandatoryProfile {
+        val profile = MandatoryProfile()
+        for (i in 0 until n) {
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            val d = effDur[i]
+            if (d == 0L) continue
+            val dom = state.intDomains[starts[i]]
+            profile.addTask(lst = dom.max, ect = dom.min + d, resource = 1L)
+        }
+        return profile
+    }
+
+    // Shave task [i]'s start endpoints that would add a unit overlap with the mandatory profile.
+    private fun shaveAgainstProfile(state: PropagationState, profile: MandatoryProfile, i: Int, d: Long): Boolean {
+        val v = starts[i]
+        val dom = state.intDomains[v]
+        if (dom.min == dom.max) return true
+        val lstI = dom.max
+        val ectI = dom.min + d
+        val ownsMandatory = lstI < ectI
+        var newMin = dom.min
+        while (newMin <= state.intDomains[v].max) {
+            if (profile.overloadsAt(newMin, newMin + d, r = 1L, cap = 1L, ownsMandatory, lstI, ectI)) {
+                newMin++
+            } else {
+                break
             }
-            if (newMin > state.intDomains[v].max) return failWith(state, i) { timeTableReason(i, true, newMin) }
-            if (newMin != state.intDomains[v].min) {
-                val ant = reasonFor(state, packed(TIME_TABLE, i, 1, newMin))
-                if (!state.tightenIntMin(v, newMin, ant)) return failWith(state, i) { timeTableReason(i, true, newMin) }
+        }
+        if (newMin > state.intDomains[v].max) return failWith(state, i) { timeTableReason(i, true, newMin) }
+        if (newMin != state.intDomains[v].min) {
+            val ant = reasonFor(state, packed(TIME_TABLE, i, 1, newMin))
+            if (!state.tightenIntMin(v, newMin, ant)) return failWith(state, i) { timeTableReason(i, true, newMin) }
+        }
+        var newMax = state.intDomains[v].max
+        while (newMax >= state.intDomains[v].min) {
+            if (profile.overloadsAt(newMax, newMax + d, r = 1L, cap = 1L, ownsMandatory, lstI, ectI)) {
+                newMax--
+            } else {
+                break
             }
-            var newMax = state.intDomains[v].max
-            while (newMax >= state.intDomains[v].min) {
-                if (profile.overloadsAt(newMax, newMax + d, r = 1L, cap = 1L, ownsMandatory, lstI, ectI)) {
-                    newMax--
-                } else {
-                    break
-                }
-            }
-            if (newMax < state.intDomains[v].min) return failWith(state, i) { timeTableReason(i, false, newMax) }
-            if (newMax != state.intDomains[v].max) {
-                val ant = reasonFor(state, packed(TIME_TABLE, i, 0, newMax))
-                if (!state.tightenIntMax(v, newMax, ant)) {
-                    return failWith(state, i) { timeTableReason(i, false, newMax) }
-                }
+        }
+        if (newMax < state.intDomains[v].min) return failWith(state, i) { timeTableReason(i, false, newMax) }
+        if (newMax != state.intDomains[v].max) {
+            val ant = reasonFor(state, packed(TIME_TABLE, i, 0, newMax))
+            if (!state.tightenIntMax(v, newMax, ant)) {
+                return failWith(state, i) { timeTableReason(i, false, newMax) }
             }
         }
         return true
@@ -227,11 +240,7 @@ internal class DisjunctivePropagator(
 
     @Suppress("ReturnCount")
     private fun forwardPass(state: PropagationState, effDur: LongArray, reversed: Boolean): Boolean {
-        val active = IntArrayList()
-        for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
-            if (effDur[i] > 0) active.add(i)
-        }
+        val active = edgeFindingTasks(state, effDur)
         val m = active.size
         if (m < 2) return true
 
@@ -239,16 +248,7 @@ internal class DisjunctivePropagator(
         val durs = LongArray(m) { effDur[taskIds[it]] }
         val ests = LongArray(m)
         val lcts = LongArray(m)
-        for (t in 0 until m) {
-            val dom = state.intDomains[starts[taskIds[t]]]
-            if (!reversed) {
-                ests[t] = dom.min
-                lcts[t] = dom.max + durs[t]
-            } else {
-                ests[t] = -(dom.max + durs[t])
-                lcts[t] = -dom.min
-            }
-        }
+        fillWindows(state, taskIds, durs, ests, lcts, reversed)
         val energies = LongArray(m) { durs[it] }
 
         val estOrder = argsortBy(m) { a, b -> ests[a].compareTo(ests[b]) }
@@ -259,6 +259,7 @@ internal class DisjunctivePropagator(
         val tree = CumulativeThetaTree(n = m, capacity = 1L)
         tree.setLeafOrder(leafPos)
 
+        val sweep = EdgeSweep(tree, taskIds, durs, ests, energies, lctOrder, reversed)
         var k = 0
         while (k < m) {
             val tau = lcts[lctOrder[k]]
@@ -275,29 +276,85 @@ internal class DisjunctivePropagator(
                 }
                 return false
             }
-            for (ki in k until m) {
-                val cand = lctOrder[ki]
-                tree.activate(cand, ests[cand], energies[cand])
-                val envWith = tree.envOfTheta()
-                tree.deactivate(cand)
-                if (envWith <= tau) continue
-                val bound = envTheta
-                val task = taskIds[cand]
-                val v = starts[task]
-                val payload = packed(EDGE, if (reversed) 1 else 0, task, tau)
-                if (!reversed) {
-                    if (bound > state.intDomains[v].min &&
-                        !state.tightenIntMin(v, bound, reasonFor(state, payload))
-                    ) {
-                        return failWith(state, task) { edgeReason(false, task, tau) }
-                    }
-                } else {
-                    val newMax = -bound - durs[cand]
-                    if (newMax < state.intDomains[v].max &&
-                        !state.tightenIntMax(v, newMax, reasonFor(state, payload))
-                    ) {
-                        return failWith(state, task) { edgeReason(true, task, tau) }
-                    }
+            if (!pushOutOfTheta(state, sweep, k, tau, envTheta)) return false
+        }
+        return true
+    }
+
+    // The arrays one edge-finding sweep reads, indexed by position among its active tasks.
+    private class EdgeSweep(
+        val tree: CumulativeThetaTree,
+        val taskIds: IntArray,
+        val durs: LongArray,
+        val ests: LongArray,
+        val energies: LongArray,
+        val lctOrder: IntArray,
+        val reversed: Boolean,
+    )
+
+    private fun edgeFindingTasks(state: PropagationState, effDur: LongArray): IntArrayList {
+        val active = IntArrayList()
+        for (i in 0 until n) {
+            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (effDur[i] > 0) active.add(i)
+        }
+        return active
+    }
+
+    @Suppress("LongParameterList")
+    private fun fillWindows(
+        state: PropagationState,
+        taskIds: IntArray,
+        durs: LongArray,
+        ests: LongArray,
+        lcts: LongArray,
+        reversed: Boolean,
+    ) {
+        for (t in taskIds.indices) {
+            val dom = state.intDomains[starts[taskIds[t]]]
+            if (!reversed) {
+                ests[t] = dom.min
+                lcts[t] = dom.max + durs[t]
+            } else {
+                ests[t] = -(dom.max + durs[t])
+                lcts[t] = -dom.min
+            }
+        }
+    }
+
+    // Push every task still outside Θ (from position [from] of the lct order) whose addition overloads [tau] past
+    // Θ's envelope [envTheta].
+    private fun pushOutOfTheta(
+        state: PropagationState,
+        sweep: EdgeSweep,
+        from: Int,
+        tau: Long,
+        envTheta: Long,
+    ): Boolean {
+        val tree = sweep.tree
+        val reversed = sweep.reversed
+        for (ki in from until sweep.lctOrder.size) {
+            val cand = sweep.lctOrder[ki]
+            tree.activate(cand, sweep.ests[cand], sweep.energies[cand])
+            val envWith = tree.envOfTheta()
+            tree.deactivate(cand)
+            if (envWith <= tau) continue
+            val bound = envTheta
+            val task = sweep.taskIds[cand]
+            val v = starts[task]
+            val payload = packed(EDGE, if (reversed) 1 else 0, task, tau)
+            if (!reversed) {
+                if (bound > state.intDomains[v].min &&
+                    !state.tightenIntMin(v, bound, reasonFor(state, payload))
+                ) {
+                    return failWith(state, task) { edgeReason(false, task, tau) }
+                }
+            } else {
+                val newMax = -bound - sweep.durs[cand]
+                if (newMax < state.intDomains[v].max &&
+                    !state.tightenIntMax(v, newMax, reasonFor(state, payload))
+                ) {
+                    return failWith(state, task) { edgeReason(true, task, tau) }
                 }
             }
         }

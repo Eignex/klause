@@ -890,6 +890,7 @@ private fun reportOpenTheoryOptimum(
     budgetExhausted: (Boolean) -> Boolean,
 ) {
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
+
     // An integral value is reported exactly, and as absent past 64 bits rather than as a wrapped number; a fractional
     // one, from an objective over continuous columns, as the continuous objective.
     fun solution(rendered: String, value: BigFraction?) {

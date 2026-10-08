@@ -64,7 +64,11 @@ internal object ReferenceSolve {
         val cacheTag = when (ref.format) {
             Format.XCSP3 -> "$backend-xcsp3"
 
-            Format.DIMACS, Format.OPB, Format.WCNF, Format.SMTLIB, Format.MPS -> id
+            Format.DIMACS, Format.OPB, Format.WCNF, Format.SMTLIB -> id
+
+            // An MPS result also depends on the solver's build, its options and how its claim is checked: a change to
+            // any of them must not replay a result judged under the old ones.
+            Format.MPS -> "$id|${if (id == "highs") HighsReference.identity() else ScipReference.identity()}"
 
             // The seed fixes the instance a random-data model compiles to, so results under another seed differ; so do
             // results with another worker count.

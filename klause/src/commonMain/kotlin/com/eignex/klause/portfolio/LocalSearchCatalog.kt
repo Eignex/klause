@@ -220,7 +220,6 @@ object LocalSearchCatalog {
     private fun rankedArms(kind: Kind, problemClass: ProblemClass): List<LocalSearchArm> {
         val lead = when (problemClass) {
             ProblemClass.PseudoBoolean -> listOf(LocalSearchArm.ProbsatBanditFixed, LocalSearchArm.FeasibilityJumpFixed)
-
             else -> emptyList()
         }
         val order = rankedArms(kind)

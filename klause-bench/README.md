@@ -188,7 +188,22 @@ Klause cache keys include SHA-256 hashes of every installed distribution file (l
 all dependency jars), the selected Java runtime files, OS/architecture and inherited Java/runtime
 options. Hashes use relative paths and file contents, so a byte-identical rebuild reuses results;
 a replaced jar invalidates results even if the launcher timestamp and source commit are unchanged.
-One campaign captures one installed build; keep its distribution and runtime fixed while it runs.
+Keep the installed distribution and runtime fixed while a campaign runs. For a campaign that starts a
+bench JVM per case, capture their hashes once after installing the CLI and bench:
+
+```bash
+cd klause-bench
+./build/install/klause-bench/bin/klause-bench provenance out=build/provenance.json
+export KLAUSE_BENCH_PROVENANCE="$PWD/build/provenance.json"
+```
+
+Each bench process validates the manifest's absolute roots, file set, identities, sizes, modification
+and change times before reusing the hashes. Manifests require Unix file metadata; changed files or a
+copied installation are refused. Generate a fresh manifest after installing or restoring a build on
+each host. Without the environment variable, the bench hashes the installed trees itself.
+Inherited runtime options are captured for each case. The harness-only `-Dklause.bench.cache`,
+`-Dklause.bench.corpusCache` and `-Dklause.workspace.root` properties are excluded from the
+fingerprint; solver JVM options and input-processing properties remain.
 
 Per-problem JSON records carry `buildProvenance`, `buildFingerprint` and `validationPolicy`.
 `gitSha` describes the harness checkout and does not identify the installed solver. Cache keys also
@@ -406,6 +421,20 @@ Some formats have a second reference solver, which `solve-one backend=reference 
 carry two verdicts: kissat beside clasp for DIMACS CNF, cvc5 beside z3 for SMT-LIB, HiGHS beside SCIP for MPS, and any
 MiniZinc solver (Chuffed beside cp-sat) for MiniZinc. All run single-threaded; kissat, cvc5 and HiGHS are native
 binaries found on `PATH`, or at `-Dklause.bench.<name>=<path>`.
+
+An MPS reference's claim is checked against the model before it becomes a verdict, since SCIP and HiGHS judge their
+own presolved, scaled models under their own tolerances. Each returns its solution (SCIP by `display solution`, HiGHS
+in a solution file, written beside the case record as `<problem>.sol`). The check rounds and fixes every integer
+variable, then recomputes every bound and row of the original model to a relative 1e-6. A solution that fails is
+repaired once by solving the LP over the continuous variables with the integers fixed (HiGHS), and checked again;
+one that cannot be repaired is unknown, as is one the check cannot settle. The objective recorded is the one
+recomputed from the checked solution. An optimum counts as proven only when its dual bound meets its primal bound:
+HiGHS stopping within its 0.01% gap tolerance records a solution, not a proof. A HiGHS run whose claim does not hold
+up (infeasible, or a solution that fails the check) is retried without presolve on what is left of its budget, and
+that run is checked the same way. The record keeps the solver's status, solution status, dual bound, gap, the
+violations, how the solution was checked, the options, and `referenceVersion`: the solver build, its options and the
+check's version. That identity is part of the cache key, so a result judged another way is never replayed, and the
+lab replaces a row of another version whatever its strength.
 ## Running the parity sweep
 
 The parity sweep measures klause against the reference solvers on the MiniZinc Challenge corpus. The method is fixed so every run is comparable:

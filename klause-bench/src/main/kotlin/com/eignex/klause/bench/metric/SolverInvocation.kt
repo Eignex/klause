@@ -76,6 +76,9 @@ internal object SolverInvocation {
         val rawOutput: String,
         val command: String,
         val buildProvenance: BuildProvenance? = null,
+        /** The solution a reference returned, as `name value` lines: kept beside its record so the verdict can be
+         *  checked again. Null when it returned none, or for a solver that does not report one. */
+        val assignment: String? = null,
     )
 
     /** Registered MiniZinc solver ids, parsed once from `minizinc --solvers` (the parenthesised tag

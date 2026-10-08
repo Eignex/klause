@@ -47,6 +47,9 @@ internal data class ReferenceEntry(
      *  `QF_NRA`, …) or an MPS integrality class (`MIP` / `LP`). Blank for formats classified purely by
      *  [structure] (MiniZinc/XCSP3/OPB/DIMACS), or when unclassified. */
     val logic: String = "",
+    /** How the row was produced where that decides whether it still holds: an MPS reference's solver build, options
+     *  and validation rules ([MpsWitness.VERSION]). Blank for other solvers and for rows from before it was kept. */
+    val version: String = "",
 )
 
 /**
@@ -56,14 +59,16 @@ internal data class ReferenceEntry(
  * never overwrite one another. [load] unions them into one instance-keyed view, empty when no table has been
  * written. Merges are **virtual-best**: a proven optimum always wins, and among unproven bounds the tighter
  * objective (lower for minimize, higher for maximize) wins, so references only ever tighten and unproven bounds
- * stay honest. Regenerable and incremental via `bench reference`.
+ * stay honest. A row produced another way ([ReferenceEntry.version]) replaces a solver's own row whatever their
+ * strengths: a proof the old way judged wrongly must not outlive its correction. Regenerable and incremental via
+ * `bench reference`.
  */
 internal object ReferenceStore {
     // No `solver` column: each row's solver is the file it lives in (`<solver>.csv` for a reference
     // table, `<config>.csv` for a per-run result table), so `readCsv` reads it from the file name.
     private val COLUMNS = listOf(
         "suite", "problem", "maximize", "objective", "feasible", "proven", "elapsedMs", "budgetMs",
-        "format", "structure", "numGlobal", "numLinear", "boolHeavy", "logic",
+        "format", "structure", "numGlobal", "numLinear", "boolHeavy", "logic", "version",
     )
 
     /** The oracle-only prefix — a legacy row (pre-features) has exactly this many columns and decodes
@@ -149,7 +154,7 @@ internal object ReferenceStore {
                         added++
                     }
 
-                    isBetter(e, old) -> {
+                    replaces(e, old) -> {
                         table[key(e)] = e
                         tightened++
                     }
@@ -189,6 +194,11 @@ internal object ReferenceStore {
         return matched.size to (features.size - matched.size)
     }
 
+    /** Whether [incoming] takes the place of the same solver's [stored] row: when it was produced another way, or
+     *  is the stronger reference. */
+    internal fun replaces(incoming: ReferenceEntry, stored: ReferenceEntry): Boolean =
+        incoming.version != stored.version || isBetter(incoming, stored)
+
     /** Whether [a] is a strictly better reference than [b]: proven beats unproven; among feasible
      *  bounds the tighter objective wins; any feasible beats none. */
     private fun isBetter(a: ReferenceEntry, b: ReferenceEntry): Boolean {
@@ -197,6 +207,9 @@ internal object ReferenceStore {
         val bo = b.objective ?: return true
         return if (a.maximize) ao > bo else ao < bo
     }
+
+    /** One entry as its CSV data row (test seam over the private encode). */
+    fun encodeRow(e: ReferenceEntry): String = encode(e)
 
     private fun encode(e: ReferenceEntry): String = listOf(
         csv(e.suite),
@@ -213,6 +226,7 @@ internal object ReferenceStore {
         e.numLinear?.toString().orEmpty(),
         e.boolHeavy?.toString().orEmpty(),
         csv(e.logic),
+        csv(e.version),
     ).joinToString(",")
 
     /** Parse one CSV data row into a [ReferenceEntry] with the given [solver] (test seam over the
@@ -238,6 +252,7 @@ internal object ReferenceStore {
             numLinear = f.getOrNull(11)?.ifEmpty { null }?.toInt(),
             boolHeavy = f.getOrNull(12)?.ifEmpty { null }?.toBoolean(),
             logic = f.getOrElse(13) { "" },
+            version = f.getOrElse(14) { "" },
         )
     }
 

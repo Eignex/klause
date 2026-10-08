@@ -346,22 +346,15 @@ private class LuConstruction(
         return best
     }
 
+    // Each pass of [eliminate] is its own method: in one body, the per-column Schur loop and the collection loops
+    // make C2 compile the whole elimination again on-stack for each loop it enters.
     private fun eliminate(pivot: LuPivot): Boolean {
         val i = pivot.row
         val j = pivot.column
         val diagonal = columns[j].getOrDefault(i, 0.0)
-        var affectedRowCount = 0
-        columns[j].forEach { row, _ -> if (row != i) affectedRows[affectedRowCount++] = row }
-        affectedRows.sort(0, affectedRowCount)
-        var affectedColumnCount = 0
-        rows[i].forEach { column -> affectedColumns[affectedColumnCount++] = column }
-        affectedColumns.sort(0, affectedColumnCount)
-        for (k in 0 until affectedRowCount) {
-            val multiplier = columns[j].getOrDefault(affectedRows[k], 0.0) / diagonal
-            if (!multiplier.isFinite() || multiplier == 0.0) return false
-            multipliers[k] = multiplier
-            lower.add(affectedRows[k], pivots, multiplier)
-        }
+        val affectedRowCount = collectAffectedRows(i, j)
+        val affectedColumnCount = collectAffectedColumns(i)
+        if (!recordMultipliers(j, diagonal, affectedRowCount)) return false
         rowBuckets.remove(i)
         activeRows[i] = false
         columnBuckets.remove(j)
@@ -371,39 +364,76 @@ private class LuConstruction(
             upper.add(pivots, column, top)
             columns[column].remove(i)
             if (column == j) continue
-            for (k in 0 until affectedRowCount) {
-                val row = affectedRows[k]
-                val product = multipliers[k] * top
-                val before = columns[column].getOrDefault(row, 0.0)
-                val after = before - product
-                schurUpdates++
-                if (!product.isFinite() || product == 0.0 || !after.isFinite()) return false
-                when {
-                    after == 0.0 -> {
-                        columns[column].remove(row)
-                        rows[row].remove(column)
-                    }
-
-                    else -> {
-                        columns[column].put(row, after)
-                        if (before == 0.0) {
-                            rows[row].add(column)
-                            fillCreated++
-                        }
-                    }
-                }
-            }
+            if (!schurUpdate(column, top, affectedRowCount)) return false
             columnBuckets.move(column, columns[column].size)
             refreshMaximum(column)
         }
+        detachPivotColumn(j, affectedRowCount)
+        columns[j].clear()
+        rows[i].clear()
+        return true
+    }
+
+    // The rows below pivot row [i] in pivot column [j], sorted into [affectedRows].
+    private fun collectAffectedRows(i: Int, j: Int): Int {
+        var count = 0
+        columns[j].forEach { row, _ -> if (row != i) affectedRows[count++] = row }
+        affectedRows.sort(0, count)
+        return count
+    }
+
+    // The columns of pivot row [i], sorted into [affectedColumns].
+    private fun collectAffectedColumns(i: Int): Int {
+        var count = 0
+        rows[i].forEach { column -> affectedColumns[count++] = column }
+        affectedColumns.sort(0, count)
+        return count
+    }
+
+    // Each affected row's multiplier into [multipliers] and the lower factor; false on a zero or nonfinite one.
+    private fun recordMultipliers(j: Int, diagonal: Double, affectedRowCount: Int): Boolean {
+        for (k in 0 until affectedRowCount) {
+            val multiplier = columns[j].getOrDefault(affectedRows[k], 0.0) / diagonal
+            if (!multiplier.isFinite() || multiplier == 0.0) return false
+            multipliers[k] = multiplier
+            lower.add(affectedRows[k], pivots, multiplier)
+        }
+        return true
+    }
+
+    // Subtract the pivot row's [top] entry times each multiplier from [column]; false on a nonfinite update.
+    private fun schurUpdate(column: Int, top: Double, affectedRowCount: Int): Boolean {
+        for (k in 0 until affectedRowCount) {
+            val row = affectedRows[k]
+            val product = multipliers[k] * top
+            val before = columns[column].getOrDefault(row, 0.0)
+            val after = before - product
+            schurUpdates++
+            if (!product.isFinite() || product == 0.0 || !after.isFinite()) return false
+            when {
+                after == 0.0 -> {
+                    columns[column].remove(row)
+                    rows[row].remove(column)
+                }
+
+                else -> {
+                    columns[column].put(row, after)
+                    if (before == 0.0) {
+                        rows[row].add(column)
+                        fillCreated++
+                    }
+                }
+            }
+        }
+        return true
+    }
+
+    private fun detachPivotColumn(j: Int, affectedRowCount: Int) {
         for (position in 0 until affectedRowCount) {
             val row = affectedRows[position]
             rows[row].remove(j)
             rowBuckets.move(row, rows[row].size)
         }
-        columns[j].clear()
-        rows[i].clear()
-        return true
     }
 
     private fun refreshMaximum(column: Int) {

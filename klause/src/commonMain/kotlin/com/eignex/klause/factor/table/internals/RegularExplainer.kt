@@ -82,6 +82,13 @@ internal class RegularExplainer(
         private val out = IntArrayList()
 
         init {
+            markReachable()
+            markCanAccept()
+        }
+
+        // The two sweeps are separate methods so each compiles apart: in the initializer every loop entered on-stack
+        // recompiled the whole of it.
+        private fun markReachable() {
             if (q0 in 1..numStates) fwd[0][q0] = true
             for (i in 0 until n) {
                 for (s in 1..alphabetSize) {
@@ -91,6 +98,9 @@ internal class RegularExplainer(
                     }
                 }
             }
+        }
+
+        private fun markCanAccept() {
             for (q in accepting) if (q in 1..numStates) bwd[n][q] = true
             for (i in n - 1 downTo 0) {
                 for (s in 1..alphabetSize) {
