@@ -168,9 +168,23 @@ private fun reginSccReachPrune(
     dirtyLabels: IntHashSet?,
     premises: IntArray,
 ): IntArray? {
-    val n = inc.n
     val total = inc.total
     val (adj, radj) = cache.graphBuffers(total)
+    orientMatchedGraph(inc, valuesPerVar, adj, radj)
+    val reached = reachedFromFreeValues(inc, radj)
+    relabelScc(adj, inc, dirtyLabels)
+    return pruneUnsupportedEdges(state, vars, cache, inc, valuesPerVar, adj, reached, premises)
+}
+
+// The passes are separate methods so each compiles apart: in one body every loop entered on-stack recompiled the
+// whole of it.
+private fun orientMatchedGraph(
+    inc: ReginIncrementalState,
+    valuesPerVar: Array<IntArray>,
+    adj: Array<IntArrayList>,
+    radj: Array<IntArrayList>,
+) {
+    val n = inc.n
     for (i in 0 until n) {
         for (vid in valuesPerVar[i]) {
             val vNode = n + vid
@@ -183,8 +197,12 @@ private fun reginSccReachPrune(
             }
         }
     }
+}
 
-    // Reachability from free (unmatched) values over the reverse graph.
+// Reachability from free (unmatched) values over the reverse graph.
+private fun reachedFromFreeValues(inc: ReginIncrementalState, radj: Array<IntArrayList>): BooleanArray {
+    val n = inc.n
+    val total = inc.total
     val reached = BooleanArray(total)
     val queue = IntArray(total)
     var qHead = 0
@@ -206,8 +224,13 @@ private fun reginSccReachPrune(
             }
         }
     }
+    return reached
+}
 
-    // SCC labels — canonical (min node id per component), written reversibly (no-op for unchanged).
+// SCC labels — canonical (min node id per component), written reversibly (no-op for unchanged). [dirtyLabels]
+// non-null and empty means no intra-component deletion, so every SCC label is still valid.
+private fun relabelScc(adj: Array<IntArrayList>, inc: ReginIncrementalState, dirtyLabels: IntHashSet?) {
+    val total = inc.total
     if (dirtyLabels == null) {
         val raw = reginTarjanScc(adj, total)
         val canon = IntArray(total) { Int.MAX_VALUE }
@@ -216,9 +239,21 @@ private fun reginSccReachPrune(
     } else if (!dirtyLabels.isEmpty()) {
         reginRecomputeDirtyScc(adj, total, inc, dirtyLabels)
     }
-    // dirtyLabels non-null and empty → no intra-component deletion → every SCC label still valid.
+}
 
-    // Prune unsupported unmatched edges: different SCC and not reachable from a free value.
+// Prune unsupported unmatched edges: different SCC and not reachable from a free value.
+@Suppress("LongParameterList")
+private fun pruneUnsupportedEdges(
+    state: PropagationState,
+    vars: IntArray,
+    cache: ReginCache,
+    inc: ReginIncrementalState,
+    valuesPerVar: Array<IntArray>,
+    adj: Array<IntArrayList>,
+    reached: BooleanArray,
+    premises: IntArray,
+): IntArray? {
+    val n = inc.n
     val sccHallVars = MutableIntObjectMap<IntArray>()
     val hallReasons = HashMap<Int, IntArray?>()
     for (i in 0 until n) {

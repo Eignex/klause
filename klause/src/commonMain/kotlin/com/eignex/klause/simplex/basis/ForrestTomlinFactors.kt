@@ -60,63 +60,37 @@ internal class ForrestTomlinFactors(factors: LuFactors) {
 
     fun fillAdvice(factor: Double): Boolean = upperEntries.toDouble() + transformEntries > factor * initialEntries
 
+    // Work counters of the update in progress, reported in [lastUpdateWork] whether or not it publishes.
+    private var columnProducts = 0L
+    private var rowProducts = 0L
+    private var copiedEntries = 0L
+
+    // Each pass of [update] is its own method: one body holding every loop is compiled again for each loop it
+    // enters on-stack, at the cost of the whole body each time.
     fun update(pivot: Int, spike: BasisWorkspace, tolerance: Double): Boolean {
         column.clear()
         row.clear()
         multipliers.clear()
-        var columnProducts = 0L
-        var rowProducts = 0L
-        var copiedEntries = 0L
+        columnProducts = 0L
+        rowProducts = 0L
+        copiedEntries = 0L
         var published = false
         lastUpdateWork = null
         try {
-            for (k in 0 until spike.count) {
-                val j = spike.indices[k]
-                val value = spike.values[j]
-                if (value == 0.0) continue
-                column.scatter(value, upper.columns[j])
-                columnProducts += upper.columns[j].count
-            }
-            val rows = transpose.columns.copyOf()
-            for (i in 0 until n) {
-                if (rows[i][pivot] != column.values[i]) {
-                    rows[i] = replace(rows[i], pivot, column.values[i])
-                    copiedEntries += rows[i].count
-                }
-            }
+            scatterSpike(spike)
+            val rows = rowsWithSpike(pivot)
             row.load(rows[pivot])
             val order = upper.order
             val position = order.indexOf(pivot)
-            for (k in position + 1 until n) {
-                val j = order[k]
-                val value = row.values[j]
-                if (value == 0.0) continue
-                val multiplier = basisQuotient(value, upper.columns[j][j])
-                multipliers.set(j, multiplier)
-                row.scatter(-multiplier, rows[j])
-                rowProducts += rows[j].count
-                // The eliminated entry is structural zero, independent of division roundoff.
-                row.set(j, 0.0)
-            }
+            eliminateSpikeRow(rows, order, position)
             val diagonal = row.values[pivot]
             if (!diagonal.isFinite() || diagonal == 0.0 || abs(diagonal) < tolerance) return false
             basisQuotient(1.0, diagonal)
             rows[pivot] = BasisSlice(intArrayOf(pivot), doubleArrayOf(diagonal))
             copiedEntries++
             column.set(pivot, diagonal)
-            val columns = upper.columns.copyOf()
-            for (j in 0 until n) {
-                if (j == pivot) {
-                    columns[j] = compact(column)
-                    copiedEntries += columns[j].count
-                } else if (columns[j][pivot] != 0.0) {
-                    columns[j] = replace(columns[j], pivot, 0.0)
-                    copiedEntries += columns[j].count
-                }
-            }
-            val nextOrder = order.copyOf()
-            for (k in position until n - 1) nextOrder[k] = order[k + 1]
-            nextOrder[n - 1] = pivot
+            val columns = columnsWithSpike(pivot)
+            val nextOrder = pivotMovedLast(order, position, pivot)
             val transform = ForrestTomlinRow(pivot, compact(multipliers))
             val entries = columns.sumOf { it.count }
             val report = ForrestTomlinWork(
@@ -150,6 +124,66 @@ internal class ForrestTomlinFactors(factors: LuFactors) {
                 )
             }
         }
+    }
+
+    // The spike column `U * spike` in [column].
+    private fun scatterSpike(spike: BasisWorkspace) {
+        for (k in 0 until spike.count) {
+            val j = spike.indices[k]
+            val value = spike.values[j]
+            if (value == 0.0) continue
+            column.scatter(value, upper.columns[j])
+            columnProducts += upper.columns[j].count
+        }
+    }
+
+    // The row view with [pivot]'s entry in every row replaced by the spike's.
+    private fun rowsWithSpike(pivot: Int): Array<BasisSlice> {
+        val rows = transpose.columns.copyOf()
+        for (i in 0 until n) {
+            if (rows[i][pivot] != column.values[i]) {
+                rows[i] = replace(rows[i], pivot, column.values[i])
+                copiedEntries += rows[i].count
+            }
+        }
+        return rows
+    }
+
+    // Eliminate the pivot row past its position in [order], recording each row multiplier.
+    private fun eliminateSpikeRow(rows: Array<BasisSlice>, order: IntArray, position: Int) {
+        for (k in position + 1 until n) {
+            val j = order[k]
+            val value = row.values[j]
+            if (value == 0.0) continue
+            val multiplier = basisQuotient(value, upper.columns[j][j])
+            multipliers.set(j, multiplier)
+            row.scatter(-multiplier, rows[j])
+            rowProducts += rows[j].count
+            // The eliminated entry is structural zero, independent of division roundoff.
+            row.set(j, 0.0)
+        }
+    }
+
+    // The column view with [pivot]'s column replaced by the spike and its row cleared elsewhere.
+    private fun columnsWithSpike(pivot: Int): Array<BasisSlice> {
+        val columns = upper.columns.copyOf()
+        for (j in 0 until n) {
+            if (j == pivot) {
+                columns[j] = compact(column)
+                copiedEntries += columns[j].count
+            } else if (columns[j][pivot] != 0.0) {
+                columns[j] = replace(columns[j], pivot, 0.0)
+                copiedEntries += columns[j].count
+            }
+        }
+        return columns
+    }
+
+    private fun pivotMovedLast(order: IntArray, position: Int, pivot: Int): IntArray {
+        val nextOrder = order.copyOf()
+        for (k in position until n - 1) nextOrder[k] = order[k + 1]
+        nextOrder[n - 1] = pivot
+        return nextOrder
     }
 
     private fun replace(slice: BasisSlice, index: Int, value: Double): BasisSlice {

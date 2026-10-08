@@ -306,19 +306,9 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         while (true) {
             // Resolved / lower-level literals (no longer frontier) are skipped. `scanFrom` is the
             // trail top on a re-armed rescan, else the descending cursor.
-            var pivot = -1
-            var pivotPos = -1
             val scanFrom = if (rescanFromTop) state.boolPinOrder.size - 1 else pinCursor
-            for (i in scanFrom downTo 0) {
-                val v = state.boolPinOrder[i]
-                if (!resolvent.isFrontier(v)) continue
-                val lvl = if (v < numBoolVars) state.boolLevel[v] else cachedAtomLevel(v - numBoolVars)
-                if (lvl == currentLevel) {
-                    pivot = v
-                    pivotPos = i
-                    break
-                }
-            }
+            val pivotPos = trailPivotPosition(resolvent, scanFrom, currentLevel, numBoolVars)
+            var pivot = if (pivotPos >= 0) state.boolPinOrder[pivotPos] else -1
             // A trail pivot with no reason is the level's decision, so it is the UIP only once nothing else at
             // the level is live; a literal the cursor passed, or an atom off the trail, may still be, and
             // resolving it first keeps the clause asserting.
@@ -337,14 +327,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 // woken, hence absent from the pin trail. Scan the seen-atom frontier by its
                 // [atomLevelForConflict]-derived level. Stale / duplicate entries are skipped by the
                 // [ConflictResolvent.isFrontier] recheck.
-                val offTrail = resolvent.offTrailFrontier
-                for (k in 0 until offTrail.size) {
-                    val v = offTrail[k]
-                    if (resolvent.isFrontier(v) && cachedAtomLevel(v - numBoolVars) == currentLevel) {
-                        pivot = v
-                        break
-                    }
-                }
+                pivot = offTrailPivot(resolvent, currentLevel, numBoolVars)
                 if (pivot < 0) break
                 // Off-trail pivot: its derived antecedents may cite trail literals above the cursor,
                 // so re-arm the full rescan for the next iteration.
@@ -366,6 +349,36 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         }
         resolvent.drainFrontier()
         return resolvent.finalizeResult(currentLevel)
+    }
+
+    // The pivot scans are their own methods: inside the resolution loop each is a loop C2 would otherwise compile
+    // the whole analysis again on-stack for.
+
+    // Position on the pin trail of the most recent frontier literal at [currentLevel], scanning down from
+    // [scanFrom], or -1.
+    private fun trailPivotPosition(
+        resolvent: ConflictResolvent,
+        scanFrom: Int,
+        currentLevel: Int,
+        numBoolVars: Int,
+    ): Int {
+        for (i in scanFrom downTo 0) {
+            val v = state.boolPinOrder[i]
+            if (!resolvent.isFrontier(v)) continue
+            val lvl = if (v < numBoolVars) state.boolLevel[v] else cachedAtomLevel(v - numBoolVars)
+            if (lvl == currentLevel) return i
+        }
+        return -1
+    }
+
+    // A frontier atom at [currentLevel] absent from the pin trail, or -1.
+    private fun offTrailPivot(resolvent: ConflictResolvent, currentLevel: Int, numBoolVars: Int): Int {
+        val offTrail = resolvent.offTrailFrontier
+        for (k in 0 until offTrail.size) {
+            val v = offTrail[k]
+            if (resolvent.isFrontier(v) && cachedAtomLevel(v - numBoolVars) == currentLevel) return v
+        }
+        return -1
     }
 
     // A live literal at [currentLevel] with a reason to resolve through, or -1: one on the trail that the
