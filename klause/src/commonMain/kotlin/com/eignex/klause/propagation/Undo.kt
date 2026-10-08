@@ -102,6 +102,37 @@ internal fun PropagationState.mark(): PropagationState.LevelMark {
  * caller only ever marks / undoes between propagation cycles, when those are idle.
  */
 internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
+    replayVarUndo(mark.undoSize)
+    undo.truncateTo(mark.undoSize)
+    restoreReversibleCells(mark.revSize)
+    boolPinOrder.truncateTo(mark.pinOrderSize)
+    levelToDecisionVar.truncateTo(mark.ltdvSize)
+    // The native-SAT BCP cursor must not point past the truncated trail; the surviving prefix is
+    // already propagated, so resume from its end. Any stashed conflict reason belonged to the
+    // rewound state.
+    nativeEngine?.let {
+        it.bcpHead = boolPinOrder.size
+        nativeConflictReason = null
+    }
+    // Restore snapshottable per-factor payloads. Defensive snapshotCopy so a later
+    // undo to the same mark returns to the same logical state.
+    mark.snapshottablePayloads.forEach { fid, payload ->
+        refPayloadStore[fid] = payload.snapshotCopy()
+    }
+    restoreAtomTruths(mark.atomUndoSize)
+    atoms.dirtyFactors.clear()
+    dirtyBools.clear()
+    dirtyInts.clear()
+    conflictLevels = null
+    conflictSeedFactors.clear()
+    lastDecisionConflictVar = -1
+    currentLevel = 0
+    currentFactor = -1
+}
+
+// The replay passes of [undoTo] are separate functions: each is a loop over its own log, and one body holding
+// them all is compiled again on-stack for each loop a long backjump enters.
+private fun PropagationState.replayVarUndo(undoSize: Int) {
     // Optional sink for variables made (potentially) free again by this revert. Used by
     // VSIDS-style pickers that remove a variable from their order heap when it's assigned
     // and need it re-inserted on backtrack (combined-index encoding: bool id `v`, int id
@@ -109,7 +140,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     val unassigned = unassignListener
     val numBool = problem.numBoolVars
     var i = undo.size - 1
-    while (i >= mark.undoSize) {
+    while (i >= undoSize) {
         when (undo.tag[i]) {
             0 -> { // bool pin — prior state is always unassigned
                 val v = undo.varId[i]
@@ -159,32 +190,23 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
         }
         i--
     }
-    undo.truncateTo(mark.undoSize)
+}
+
+private fun PropagationState.restoreReversibleCells(revSize: Int) {
     // Roll back reversible cells (incremental factor state) top-down to the mark, so a cell
     // mutated several times since the mark lands on its mark-time value (LIFO via each cell's
     // own prior-value stack). Independent of the bool/int cells above (disjoint state), so the
     // replay order between the two groups is immaterial.
     val revTrail = undo.revTrail
     var r = revTrail.size - 1
-    while (r >= mark.revSize) {
+    while (r >= revSize) {
         revTrail[r].restore()
         r--
     }
-    while (revTrail.size > mark.revSize) revTrail.removeAt(revTrail.size - 1)
-    boolPinOrder.truncateTo(mark.pinOrderSize)
-    levelToDecisionVar.truncateTo(mark.ltdvSize)
-    // The native-SAT BCP cursor must not point past the truncated trail; the surviving prefix is
-    // already propagated, so resume from its end. Any stashed conflict reason belonged to the
-    // rewound state.
-    nativeEngine?.let {
-        it.bcpHead = boolPinOrder.size
-        nativeConflictReason = null
-    }
-    // Restore snapshottable per-factor payloads. Defensive snapshotCopy so a later
-    // undo to the same mark returns to the same logical state.
-    mark.snapshottablePayloads.forEach { fid, payload ->
-        refPayloadStore[fid] = payload.snapshotCopy()
-    }
+    while (revTrail.size > revSize) revTrail.removeAt(revTrail.size - 1)
+}
+
+private fun PropagationState.restoreAtomTruths(atomUndoSize: Int) {
     // Restore atom truths recorded since the mark (the reversible atom trail): replay top-down so
     // an atom whose truth changed several times since the mark lands on its mark-time value. This
     // is the atoms' own assignment trail — an atom-lit forced directly by a channeling / learned
@@ -192,23 +214,15 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     // reconcile could not do. Independent of the int/bool cells above (disjoint
     // state), so the replay order between the two groups is immaterial.
     var a = atoms.undoAtomId.size - 1
-    while (a >= mark.atomUndoSize) {
+    while (a >= atomUndoSize) {
         val id = atoms.undoAtomId[a]
         atoms.truth[id] = atoms.undoTruth[a]
         atoms.lvl[id] = atoms.undoLvl[a]
         atoms.ant[id] = atoms.undoAnt[a]
         a--
     }
-    atoms.undoAtomId.truncateTo(mark.atomUndoSize)
-    atoms.undoTruth.truncateTo(mark.atomUndoSize)
-    atoms.undoLvl.truncateTo(mark.atomUndoSize)
-    while (atoms.undoAnt.size > mark.atomUndoSize) atoms.undoAnt.removeAt(atoms.undoAnt.size - 1)
-    atoms.dirtyFactors.clear()
-    dirtyBools.clear()
-    dirtyInts.clear()
-    conflictLevels = null
-    conflictSeedFactors.clear()
-    lastDecisionConflictVar = -1
-    currentLevel = 0
-    currentFactor = -1
+    atoms.undoAtomId.truncateTo(atomUndoSize)
+    atoms.undoTruth.truncateTo(atomUndoSize)
+    atoms.undoLvl.truncateTo(atomUndoSize)
+    while (atoms.undoAnt.size > atomUndoSize) atoms.undoAnt.removeAt(atoms.undoAnt.size - 1)
 }

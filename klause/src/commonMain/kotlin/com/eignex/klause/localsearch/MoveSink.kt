@@ -114,43 +114,53 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     /** Add a multi-variable atomic transition. Skips the move entirely if any part
      *  would touch a frozen variable — a Compound is all-or-nothing. */
     fun addCompound(parts: List<Move>) {
-        for (p in parts) {
-            when (p) {
-                is Move.BoolFlip -> if (assumptions.isFrozenBool(p.varId)) return
-                is Move.IntSet -> if (assumptions.isFrozenInt(p.varId)) return
-                is Move.RealSet -> {}
-                is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet/RealSet)")
-            }
-        }
-        // Under per-move invariants, parts targeting defined vars are redundant (propagation
-        // recomputes them) — drop them individually rather than the whole compound.
-        val net = invariants
-        val kept = if (net == null && ownerInt == null) {
-            parts
-        } else {
-            parts.filter { p ->
-                when (p) {
-                    is Move.BoolFlip -> net?.isDefinedBool(p.varId) != true
-                    is Move.IntSet -> net?.isDefinedInt(p.varId) != true && !ownedByOther(p.varId)
-                    is Move.RealSet, is Move.Compound -> true
-                }
-            }
-        }
+        if (touchesFrozen(parts)) return
+        val kept = withoutRedundantParts(parts)
         if (kept.isEmpty()) return
         if (kept.size == 1) {
             // A compound reduced to one survivor is just a primitive move (Compound requires
             // two parts); the part already passed the frozen/defined filters above.
-            when (val p = kept[0]) {
-                is Move.BoolFlip -> addBoolFlip(p.varId)
-                is Move.IntSet -> addIntSet(p.varId, p.newValue)
-                is Move.RealSet -> addRealSet(p.varId, p.newValue)
-                is Move.Compound -> error("unreachable: parts are primitive")
-            }
+            addPrimitive(kept[0])
             return
         }
         val side = compounds ?: ArrayList<Move.Compound>(2).also { compounds = it }
         side.add(Move.Compound(kept))
         cachedList = null
+    }
+
+    private fun touchesFrozen(parts: List<Move>): Boolean {
+        for (p in parts) {
+            when (p) {
+                is Move.BoolFlip -> if (assumptions.isFrozenBool(p.varId)) return true
+                is Move.IntSet -> if (assumptions.isFrozenInt(p.varId)) return true
+                is Move.RealSet -> {}
+                is Move.Compound -> error("Compound parts must be primitive (BoolFlip/IntSet/RealSet)")
+            }
+        }
+        return false
+    }
+
+    // Under per-move invariants, parts targeting defined vars are redundant (propagation
+    // recomputes them) — drop them individually rather than the whole compound.
+    private fun withoutRedundantParts(parts: List<Move>): List<Move> {
+        val net = invariants
+        if (net == null && ownerInt == null) return parts
+        return parts.filter { p ->
+            when (p) {
+                is Move.BoolFlip -> net?.isDefinedBool(p.varId) != true
+                is Move.IntSet -> net?.isDefinedInt(p.varId) != true && !ownedByOther(p.varId)
+                is Move.RealSet, is Move.Compound -> true
+            }
+        }
+    }
+
+    private fun addPrimitive(p: Move) {
+        when (p) {
+            is Move.BoolFlip -> addBoolFlip(p.varId)
+            is Move.IntSet -> addIntSet(p.varId, p.newValue)
+            is Move.RealSet -> addRealSet(p.varId, p.newValue)
+            is Move.Compound -> error("unreachable: parts are primitive")
+        }
     }
 
     /** Discard all queued moves. */

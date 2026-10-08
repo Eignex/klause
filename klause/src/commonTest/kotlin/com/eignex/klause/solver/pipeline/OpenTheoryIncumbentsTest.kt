@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
@@ -20,6 +22,38 @@ class OpenTheoryIncumbentsTest {
         OpenTheoryAssignment.Difference(Sample(BooleanArray(0), longArrayOf(x)))
 
     private fun value(text: String): BigInt = parseBigInt(text)
+
+    @Test
+    fun `an external integer bound preserves precision beyond Double and Long`() {
+        for (text in listOf("9007199254740993", "-9007199254740993", "9223372036854775808")) {
+            val exchange = IncumbentExchange<OpenTheoryAssignment, BigFraction>(
+                improves = { candidate, standing -> candidate < standing },
+            )
+            val bound = value(text)
+            exchange.offer(witness(0), BigFraction.of(bound, BIG_ONE))
+
+            assertEquals(bound, exchange.integerBound(), text)
+        }
+    }
+
+    @Test
+    fun `an external integer bound is absent before an incumbent installs`() {
+        val exchange = IncumbentExchange<OpenTheoryAssignment, BigFraction>(
+            improves = { candidate, standing -> candidate < standing },
+        )
+
+        assertNull(exchange.integerBound())
+    }
+
+    @Test
+    fun `a fractional incumbent supplies no integer cutoff`() {
+        val exchange = IncumbentExchange<OpenTheoryAssignment, BigFraction>(
+            improves = { candidate, standing -> candidate < standing },
+        )
+        exchange.offer(witness(0), BigFraction.of(value("3"), value("2")))
+
+        assertNull(exchange.integerBound())
+    }
 
     @Test
     fun `no incumbent stands before the first witness is offered`() {

@@ -999,22 +999,37 @@ class PropagationState(
         // defers the poll past the fire floor, so a normal small fixpoint — and resumable slicing,
         // which pauses at decision granularity — is never cut mid-propagation.
         val floor = if (allFactors) 0 else cancelFloor
-        var fireCount = 0
+        seedQueue(allFactors, factorCount, initialFactor, initialFactors)
+        return fireQueue(pollable, floor, cancellation, skipExpensiveBake)
+    }
+
+    private fun seedQueue(allFactors: Boolean, factorCount: Int, initialFactor: Int, initialFactors: IntArray) {
         if (allFactors) {
             for (fid in 0 until factorCount) propEnq(fid)
-        } else {
-            // Atom-lit watchers woken by int tightens before runToFixpoint was called are capped:
-            // a stale id from before a forget/renumber may linger in the pre-run queue.
-            drainDirtyIntoQueue(atomFactorCap = factorCount)
-            // Optional seed — used by [PropagationSession.addLearnedClause] to force the
-            // newly-stored learned clause to fire on the next propagation cycle (it would
-            // otherwise sit dormant since the watcher index only wakes on false-going
-            // literals, and a freshly-added clause's watches haven't been triggered yet).
-            if (initialFactor in 0 until factorCount) propEnq(initialFactor)
-            // Seed a batch of freshly-added mid-life factors so each fires once on the next cycle;
-            // like [initialFactor], their watches haven't been triggered yet so they'd sit dormant.
-            for (fid in initialFactors) if (fid in 0 until factorCount) propEnq(fid)
+            return
         }
+        // Atom-lit watchers woken by int tightens before runToFixpoint was called are capped:
+        // a stale id from before a forget/renumber may linger in the pre-run queue.
+        drainDirtyIntoQueue(atomFactorCap = factorCount)
+        // Optional seed — used by [PropagationSession.addLearnedClause] to force the
+        // newly-stored learned clause to fire on the next propagation cycle (it would
+        // otherwise sit dormant since the watcher index only wakes on false-going
+        // literals, and a freshly-added clause's watches haven't been triggered yet).
+        if (initialFactor in 0 until factorCount) propEnq(initialFactor)
+        // Seed a batch of freshly-added mid-life factors so each fires once on the next cycle;
+        // like [initialFactor], their watches haven't been triggered yet so they'd sit dormant.
+        for (fid in initialFactors) if (fid in 0 until factorCount) propEnq(fid)
+    }
+
+    // The fire loop is its own method so the on-stack compile a long fixpoint triggers covers it alone, not the
+    // seeding passes ahead of it.
+    private fun fireQueue(
+        pollable: Boolean,
+        floor: Int,
+        cancellation: Cancellation,
+        skipExpensiveBake: Boolean,
+    ): IntArray? {
+        var fireCount = 0
         while (propQueue.isNotEmpty()) {
             // Only a single fixpoint that itself runs away — an O(span) reified-linear bound crawl
             // over a Long-wide domain, millions of fires deep — needs the deadline *inside*

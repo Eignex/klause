@@ -326,26 +326,7 @@ private fun liftedAntecedents(
     lift: BooleanArray,
     aboveRoot: BooleanArray,
 ): IntArray? {
-    var anyAboveRoot = false
-    for (j in vars.indices) {
-        state.work++
-        if (j != excludeIdx && aboveRoot[j]) {
-            anyAboveRoot = true
-            break
-        }
-    }
-    val cited = IntArrayList()
-    for (j in vars.indices) {
-        state.work++
-        if (j == excludeIdx) continue
-        val c = coeffs[j]
-        if (c == 0L) continue
-        val v = vars[j]
-        if (anyAboveRoot && !aboveRoot[j]) continue
-        val citeMin = if (useLo) c > 0 else c < 0
-        val orig = state.rootDomains[v]
-        if (if (citeMin) bound[j] > orig.min else bound[j] < orig.max) cited.add(j)
-    }
+    val cited = citedTerms(state, coeffs, vars, useLo, excludeIdx, bound, aboveRoot)
     // Latest level first: those are the bounds worth loosening, since only they could be resolved. Without slack
     // nothing loosens, so the order is moot.
     val order = if (slack > 0) argsortByIntKey(cited.size) { -level[cited[it]] } else IntArray(cited.size) { it }
@@ -368,16 +349,55 @@ private fun liftedAntecedents(
         val step = if (remaining > 0 && lift[j]) minOf(remaining / abs(c), room) else 0L
         remaining -= step * abs(c)
         if (step == room) continue
-        val lit = if (citeMin) {
-            Lit.make(state.atomVarGe(v, b - step), false)
-        } else {
-            Lit.make(state.atomVarLe(v, b + step), false)
-        }
+        val lit = boundLiteralLiftedBy(state, v, citeMin, b, step)
         if (seen.add(lit)) out.add(lit)
     }
     if (out.size == 0) return null
     return out.toIntArray()
 }
+
+// The terms a reason cites: every one off its root bound on the cited side, and only those above the root when any
+// is. Its own method, as is [boundLiteralLiftedBy], so the lifting loop compiles small.
+@Suppress("LongParameterList")
+private fun citedTerms(
+    state: PropagationState,
+    coeffs: LongArray,
+    vars: IntArray,
+    useLo: Boolean,
+    excludeIdx: Int,
+    bound: LongArray,
+    aboveRoot: BooleanArray,
+): IntArrayList {
+    var anyAboveRoot = false
+    for (j in vars.indices) {
+        state.work++
+        if (j != excludeIdx && aboveRoot[j]) {
+            anyAboveRoot = true
+            break
+        }
+    }
+    val cited = IntArrayList()
+    for (j in vars.indices) {
+        state.work++
+        if (j == excludeIdx) continue
+        val c = coeffs[j]
+        if (c == 0L) continue
+        val v = vars[j]
+        if (anyAboveRoot && !aboveRoot[j]) continue
+        val citeMin = if (useLo) c > 0 else c < 0
+        val orig = state.rootDomains[v]
+        if (if (citeMin) bound[j] > orig.min else bound[j] < orig.max) cited.add(j)
+    }
+    return cited
+}
+
+// The false literal of [v]'s cited bound [b] loosened by [step].
+private fun boundLiteralLiftedBy(state: PropagationState, v: Int, citeMin: Boolean, b: Long, step: Long): Int =
+    if (citeMin) {
+        Lit.make(state.atomVarGe(v, b - step), false)
+    } else {
+        Lit.make(state.atomVarLe(v, b + step), false)
+    }
 
 // Whether the bound on [v]'s [citeMin] side, established at [level], may be cited weaker than it stands.
 private fun liftable(state: PropagationState, v: Int, citeMin: Boolean, level: Int): Boolean {
@@ -569,32 +589,81 @@ internal fun propagateLinearBounds(
     val rootFact = state.currentLevel == 0
     if (op == LinearOp.NE) {
         if (loOverflow || hiOverflow) return true
-        for (i in 0 until n) {
-            state.work++
-            val c = coeffs[i]
-            if (c == 0L) continue
-            val v = vars[i]
-            val d = state.intDomains[v]
-            val a = c * d.min
-            val b = c * d.max
-            val loTerm = if (a <= b) a else b
-            val hiTerm = if (a <= b) b else a
-            if (subOverflows(sumLo, loTerm) || subOverflows(sumHi, hiTerm)) continue
-            val otherLo = sumLo - loTerm
-            val otherHi = sumHi - hiTerm
-            if (otherLo != otherHi) continue
-            if (subOverflows(bound, otherLo)) continue
-            val rhs = bound - otherLo
-            val forbidden = integralQuotientOrNull(rhs, c) ?: continue
-            val ant = if (rootFact) {
-                null
-            } else {
-                collectLinearTightenAntecedents(state, vars, i, extraLit, includeExtraLit = includeExtraLit)
-            }
-            if (!state.excludeIntValue(v, forbidden, ant)) return false
-        }
-        return true
+        return excludeNotEqualValues(state, coeffs, vars, bound, sumLo, sumHi, extraLit, includeExtraLit, rootFact)
     }
+    return tightenLinearTerms(
+        state,
+        coeffs,
+        vars,
+        op,
+        bound,
+        sumLo,
+        sumHi,
+        loOverflow,
+        hiOverflow,
+        extraLit,
+        includeExtraLit,
+        factorId,
+    )
+}
+
+// The `≠` pass and the bound-tightening pass are their own methods so each compiles apart from the summing loop: in one
+// body every loop entered on-stack recompiled the whole of it.
+@Suppress("LongParameterList")
+private fun excludeNotEqualValues(
+    state: PropagationState,
+    coeffs: LongArray,
+    vars: IntArray,
+    bound: Long,
+    sumLo: Long,
+    sumHi: Long,
+    extraLit: Int,
+    includeExtraLit: Boolean,
+    rootFact: Boolean,
+): Boolean {
+    for (i in vars.indices) {
+        state.work++
+        val c = coeffs[i]
+        if (c == 0L) continue
+        val v = vars[i]
+        val d = state.intDomains[v]
+        val a = c * d.min
+        val b = c * d.max
+        val loTerm = if (a <= b) a else b
+        val hiTerm = if (a <= b) b else a
+        if (subOverflows(sumLo, loTerm) || subOverflows(sumHi, hiTerm)) continue
+        val otherLo = sumLo - loTerm
+        val otherHi = sumHi - hiTerm
+        if (otherLo != otherHi) continue
+        if (subOverflows(bound, otherLo)) continue
+        val rhs = bound - otherLo
+        val forbidden = integralQuotientOrNull(rhs, c) ?: continue
+        val ant = if (rootFact) {
+            null
+        } else {
+            collectLinearTightenAntecedents(state, vars, i, extraLit, includeExtraLit = includeExtraLit)
+        }
+        if (!state.excludeIntValue(v, forbidden, ant)) return false
+    }
+    return true
+}
+
+@Suppress("LongParameterList")
+private fun tightenLinearTerms(
+    state: PropagationState,
+    coeffs: LongArray,
+    vars: IntArray,
+    op: LinearOp,
+    bound: Long,
+    sumLo: Long,
+    sumHi: Long,
+    loOverflow: Boolean,
+    hiOverflow: Boolean,
+    extraLit: Int,
+    includeExtraLit: Boolean,
+    factorId: Int,
+): Boolean {
+    val rootFact = state.currentLevel == 0
     // A sum's reason costs O(arity) to build, and lifting it materializes order atoms that every later bound move
     // must wake; most are never read, so it is recorded lazily and built only if conflict analysis reaches it,
     // from the bounds the undo log recovers.
@@ -617,7 +686,7 @@ internal fun propagateLinearBounds(
     }
     fun loReason(i: Int, budget: Long) = reason(i, useLo = true, budget)
     fun hiReason(i: Int, budget: Long) = reason(i, useLo = false, budget)
-    for (i in 0 until n) {
+    for (i in vars.indices) {
         state.work++
         val c = coeffs[i]
         if (c == 0L) continue
@@ -654,6 +723,7 @@ internal fun propagateLinearBounds(
     }
     return true
 }
+
 
 /**
  * Range `[sumLo, sumHi]` reachable by `Σ coeffs[i] * vars[i]` given current domains.
