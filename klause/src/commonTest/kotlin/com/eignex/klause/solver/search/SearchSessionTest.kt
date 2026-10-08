@@ -936,6 +936,16 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `a sole component's publications reach a fixpoint`() {
+        val session = SearchSession(listOf(ExplainingPublisher(explains = false)))
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+
+        assertEquals(true, session.boolValue(2))
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
     fun `shared analysis resolves through a literal its publisher explains`() {
         val session = SearchSession(listOf(ExplainingPublisher(explains = true)))
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))

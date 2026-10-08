@@ -238,7 +238,7 @@ internal class ResumableMinimize(
 
     private val cp = CpSearchComponent(
         PropagationSession(
-            problem,
+            solver.propagationProjection(params.nativeSat ?: true, problem),
             cancelledWhen(::runDeadline) { solveCancelled() },
             params.propagationCancelFloor,
             nativeSat = params.nativeSat ?: true,

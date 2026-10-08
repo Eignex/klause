@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve.linear
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.IntegralConstants
@@ -45,6 +46,7 @@ internal object LinearBoundFusion {
     fun fuseLinearBounds(problem: Problem): PassDelta {
         val groups = HashMap<Terms, Group>()
         for ((index, factor) in problem.factors.withIndex()) {
+            if (factor is Clause) continue
             for (row in factor.impliedLinearRows) {
                 val canonical = canonicalize(row) ?: continue
                 val group = groups.getOrPut(canonical.terms) {

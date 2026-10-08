@@ -25,6 +25,33 @@ class ClauseInvariantTest {
     }
 
     @Test
+    fun `flip deltas match clause truth for dense and sparse variable ids`() {
+        for (arity in listOf(4, 5)) {
+            for (spacing in listOf(1, 17)) {
+                val literals = IntArray(arity) { Lit.make(it * spacing, it % 2 == 0) }
+                val numVars = arity * spacing + 1
+                val state = stateFor(numVars, Clause(literals))
+                for (v in 0 until numVars) state.assignment.setBool(v, false)
+                for (literal in literals) state.assignment.setBool(Lit.variable(literal), !Lit.isPositive(literal))
+                state.recompute()
+
+                for (i in 0..arity) {
+                    val variable = i * spacing
+                    repeat(2) {
+                        val before = if (naiveIsViolated(literals, state)) 1 else 0
+                        val predicted = state.factors[0].deltaIfBoolFlipped(state, 0, variable)
+
+                        state.apply(Move.BoolFlip(variable))
+
+                        val after = if (naiveIsViolated(literals, state)) 1 else 0
+                        assertEquals(after - before, predicted, "arity=$arity spacing=$spacing variable=$variable")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `delta if flipped matches apply flip`() {
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true)))
         val state = stateFor(3, clause)

@@ -78,6 +78,7 @@ internal object ComparisonClauseFold {
         // A consumed definition must be equivalent to its single reified row.
         val defByAux = MutableIntObjectMap<Pair<Int, LinearRow>>()
         for (i in factors.indices) {
+            if (factors[i] is Clause) continue
             val row = (factors[i].linearForm as? LinearForm.Conjunction)?.rows?.singleOrNull() ?: continue
             if (row.activator != LinearRow.ALWAYS) defByAux.put(row.activator, i to row)
         }

@@ -31,6 +31,8 @@ internal fun presolveLinearRows(factors: List<Factor>, activatedOnly: Boolean = 
     for (variable in conflicting) fixed.remove(variable)
     return buildList {
         for (factor in factors) {
+            // A clause has no integer or real columns to specialize.
+            if (factor is Clause) continue
             for (row in factor.impliedLinearRows) {
                 if (activatedOnly && row.activator == LinearRow.ALWAYS) continue
                 val truth = if (row.activator == LinearRow.ALWAYS) true else fixed[row.activator] ?: continue

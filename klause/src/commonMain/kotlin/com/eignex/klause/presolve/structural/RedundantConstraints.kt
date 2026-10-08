@@ -140,6 +140,8 @@ internal object RedundantConstraints {
             val keys = keysByShallow.getOrPut(sk) { hashSetOf(first.structuralKey()) }
             if (keys.add(f.structuralKey())) deduped.add(f)
         }
+        // Unit-coefficient clause rows have the same bound; their duplicates were removed by keys.
+        if (deduped.all { it is Clause }) return finishAfterPhase2(problem, ranges, deduped, cancellation)
         // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
         // tightest bound (and whether an `=` provides it) decides which inequalities are implied.
         val bucketMin = HashMap<TermKey, Long>()
@@ -536,6 +538,7 @@ internal object RedundantConstraints {
         val candidates = ArrayList<LeRow>()
         for (i in factors.indices) {
             val f = factors[i]
+            if (f is Clause) continue
             val fRows = f.impliedLinearRows
             // This monotone-domination scan reads the integer side; skip Boolean-literal rows for now.
             if (fRows.isEmpty() || fRows.any { !it.isIntegerOnly }) continue
@@ -615,6 +618,8 @@ internal object RedundantConstraints {
      * is unsound.
      */
     private fun dropCliqueImpliedKnapsacks(factors: List<Factor>, cancellation: Cancellation): List<Factor> {
+        // Clauses declare >= rows, so none can be a <= knapsack drop candidate.
+        if (factors.all { it is Clause }) return factors
         val cliques = maximalPersistentAmoCliques(factors, cancellation)
         if (cliques.isEmpty()) return factors
         val out = ArrayList<Factor>(factors.size)

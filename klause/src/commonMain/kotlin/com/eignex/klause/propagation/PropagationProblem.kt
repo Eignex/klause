@@ -17,23 +17,31 @@ class PropagationProblem(
     /** Whether this projection can use the packed native-SAT propagation lane. */
     val isNativeSatEligible: Boolean = problem.isClausal()
 
-    /** One propagator per model factor. */
-    val propagators: Array<out Propagator> = Array(problem.numFactors) { problem.factors[it].propagatorProjection() }
+    /** One propagator per model factor, materialized only by consumers of the general CP lane. */
+    val propagators: Array<out Propagator> by lazy {
+        Array(problem.numFactors) { problem.factors[it].propagatorProjection() }
+    }
 
     /** Propagator occurrences indexed by Boolean variable. */
-    val boolOccurrences: Array<IntArray> = invert(
-        problem.numBoolVars,
-        { propagators[it] !== NoPropagator },
-    ) { it.boolVars }
+    val boolOccurrences: Array<IntArray> by lazy {
+        if (isNativeSatEligible) {
+            invert(problem.numBoolVars, { true }) { it.boolVars }
+        } else {
+            invert(problem.numBoolVars, { propagators[it] !== NoPropagator }) { it.boolVars }
+        }
+    }
 
     /** Propagator occurrences indexed by integer variable. */
-    val intOccurrences: Array<IntArray> = invert(
-        problem.numIntVars,
-        { propagators[it] !== NoPropagator },
-    ) { it.intVars }
+    val intOccurrences: Array<IntArray> by lazy {
+        if (problem.numIntVars == 0) {
+            emptyArray()
+        } else {
+            invert(problem.numIntVars, { propagators[it] !== NoPropagator }) { it.intVars }
+        }
+    }
 
     /** Boolean occurrences excluding factors with literal watchers. */
-    val nonBoolWatcherBoolOccurrences: Array<IntArray> = run {
+    val nonBoolWatcherBoolOccurrences: Array<IntArray> by lazy {
         val watcherFid = BooleanArray(problem.numFactors)
         var any = false
         for (fid in propagators.indices) {
@@ -52,28 +60,34 @@ class PropagationProblem(
     }
 
     /** Whether any propagator subscribes to typed integer-domain events. */
-    val usesIntEventWatchers: Boolean = propagators.any { it.initialIntEventWatches != null }
+    val usesIntEventWatchers: Boolean by lazy {
+        !isNativeSatEligible && propagators.any { it.initialIntEventWatches != null }
+    }
 
     /** Whether any propagator consumes its dirty integer-variable delta. */
-    val usesIntEventDeltaConsumers: Boolean = propagators.any { it.consumesIntEventDelta }
+    val usesIntEventDeltaConsumers: Boolean by lazy {
+        !isNativeSatEligible && propagators.any { it.consumesIntEventDelta }
+    }
 
     /** Integer occurrences excluding factors with typed event subscriptions for that variable. */
-    val nonIntEventWatcherIntOccurrences: Array<IntArray> = if (!usesIntEventWatchers) {
-        intOccurrences
-    } else {
-        val watchedVarsByFactor = arrayOfNulls<IntHashSet>(problem.numFactors)
-        for (fid in propagators.indices) {
-            val watches = propagators[fid].initialIntEventWatches ?: continue
-            val watched = IntHashSet(watches.size)
-            for (watch in watches) watched.add(IntEvent.intVarOf(watch))
-            watchedVarsByFactor[fid] = watched
-        }
-        Array(problem.numIntVars) { v ->
-            retain(intOccurrences[v]) { fid -> watchedVarsByFactor[fid]?.contains(v) != true }
+    val nonIntEventWatcherIntOccurrences: Array<IntArray> by lazy {
+        if (!usesIntEventWatchers) {
+            intOccurrences
+        } else {
+            val watchedVarsByFactor = arrayOfNulls<IntHashSet>(problem.numFactors)
+            for (fid in propagators.indices) {
+                val watches = propagators[fid].initialIntEventWatches ?: continue
+                val watched = IntHashSet(watches.size)
+                for (watch in watches) watched.add(IntEvent.intVarOf(watch))
+                watchedVarsByFactor[fid] = watched
+            }
+            Array(problem.numIntVars) { v ->
+                retain(intOccurrences[v]) { fid -> watchedVarsByFactor[fid]?.contains(v) != true }
+            }
         }
     }
 
-    internal val clauseArena: ClauseArena by lazy(LazyThreadSafetyMode.NONE) { ClauseArena.of(problem) }
+    internal val clauseArena: ClauseArena by lazy { ClauseArena.of(problem) }
 
     private inline fun retain(src: IntArray, keep: (Int) -> Boolean): IntArray {
         var kept = 0

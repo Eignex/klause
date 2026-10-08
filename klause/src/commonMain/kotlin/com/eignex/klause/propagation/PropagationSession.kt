@@ -34,23 +34,32 @@ enum class VarKind {
  *
  * Not thread-safe. One consumer per session.
  */
-class PropagationSession(
+class PropagationSession private constructor(
     /** The problem being propagated. */
     val problem: Problem,
-    /** Deadline token polled by every fixpoint (bake, seed, and per-node pushes) so a slow
-     *  propagator over wide domains can't wedge past the solve budget. Defaults to never. */
-    private val cancellation: Cancellation = Cancellation.Never,
-    /** Per-call fire floor before the deadline poll engages; see [PROPAGATION_CANCEL_FLOOR]. */
-    propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
-    /** Opt into the native-SAT BCP lane for an eligible pure-Boolean problem;
-     *  ignored when the problem has integer variables or non-clause factors. */
-    nativeSat: Boolean = false,
-    /** Opt into pseudo-Boolean cutting-planes conflict learning; ignored on problems
-     *  with integer variables. */
-    pbLearning: Boolean = false,
-) {
+    private val cancellation: Cancellation,
+    propagationCancelFloor: Int,
+    nativeSat: Boolean,
+    pbLearning: Boolean,
     /** Engine projection shared by this session and its state. */
-    val projection: PropagationProblem = PropagationProblem(problem)
+    val projection: PropagationProblem,
+) {
+    /** Construct a private propagation projection over [problem]. */
+    constructor(
+        problem: Problem,
+        cancellation: Cancellation = Cancellation.Never,
+        propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
+        nativeSat: Boolean = false,
+        pbLearning: Boolean = false,
+    ) : this(problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, PropagationProblem(problem))
+
+    internal constructor(
+        projection: PropagationProblem,
+        cancellation: Cancellation = Cancellation.Never,
+        propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
+        nativeSat: Boolean = false,
+        pbLearning: Boolean = false,
+    ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection)
 
     private val state: PropagationState =
         PropagationState(

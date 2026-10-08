@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntegerConstants
@@ -56,6 +57,8 @@ internal object CoefficientStrengthening {
             if ((i and STRENGTHEN_CANCEL_POLL_MASK) == 0 && cancellation()) break
             val factor = factors[i]
             cancellation.charge(STRENGTHEN_WORK_WEIGHT * (1L + factor.structuralKeyWeight))
+            // Clauses have unit coefficients and a positive bound, so neither reduction applies.
+            if (factor is Clause) continue
             if (indivisibleEquality(factor)) {
                 infeasible = true
                 break

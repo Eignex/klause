@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -158,6 +159,7 @@ object PortfolioBuilder {
             SharedVarBounds(problem.numIntVars, concurrency.lock()),
             IncumbentExchange.minimizing(),
             ContributionTally(concurrency.lock()),
+            nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
         )
     }
 }

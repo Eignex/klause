@@ -15,6 +15,7 @@ import com.eignex.klause.ir.impliedLinearRows
 
 /** Gather the immutable difference fragment represented by this core model data. */
 internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): DifferenceFragment? {
+    if (numIntVars == 0) return null
     val zero = DifferenceFragment.ZERO
     val edges = ArrayList<DifferenceEdge>()
     factors.forEach { factor -> appendFactorDifferenceEdges(factor, edges) }

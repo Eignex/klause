@@ -19,6 +19,10 @@ import com.eignex.klause.util.IntArrayList
  */
 internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int) -> Unit) {
     if (Lit.variable(lit) >= problem.numBoolVars) return
+    nativeEngine?.let {
+        it.forEachBinaryPartner(lit, action)
+        return
+    }
     val list = watches.byLit[lit]
     for (i in 0 until list.size) {
         val f = factorAt(list[i])
@@ -38,8 +42,17 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
  *  (a tombstoned factor reads [NoPropagator]) or to [PropagationState.learnedClauses] otherwise. */
 internal fun PropagationState.factorAt(fid: Int): Propagator = when {
     incremental && !factorAliveAt(fid) -> NoPropagator
-    fid < baseFactorCount -> baseFactors[fid]
+
+    fid < baseFactorCount ->
+        if (nativeEngine == null) baseFactors[fid] else problem.factors[fid].propagatorProjection()
+
     incremental -> midlife.store[fid - baseFactorCount]
+
+    nativeEngine != null -> {
+        val literals = nativeEngine.literalsOf(fid - baseFactorCount)
+        ClausePropagator(literals.litVars(), EmptyIntArray, literals)
+    }
+
     else -> learned.store[fid - baseFactorCount]
 }
 

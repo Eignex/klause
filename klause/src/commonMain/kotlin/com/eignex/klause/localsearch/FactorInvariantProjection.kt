@@ -42,7 +42,7 @@ internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Inva
         CircuitInvariant(succ, n, ::computeCost)
     }
 
-    is Clause -> ClauseInvariant(boolVars, literals, tautological)
+    is Clause -> ClauseInvariant.of(this)
 
     is ComparisonClause -> ComparisonClauseInvariant(vars, ops, consts)
 

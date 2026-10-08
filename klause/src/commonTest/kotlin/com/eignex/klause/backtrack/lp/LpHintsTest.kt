@@ -54,6 +54,15 @@ class LpHintsTest {
     }
 
     @Test
+    fun `clearing hints restores the configured value order`() {
+        val hints = recordedHints(3.7)
+
+        hints.clear()
+
+        assertEquals(listOf(5L, 6L, 7L), hints.order(VarRef.IntVar(0), sequenceOf(5L, 6L, 7L)).toList())
+    }
+
+    @Test
     fun `the branch score weighs a real row's share of the reduced cost`() {
         // x in [0,10] sits only in the real row 0.5x <= 3; a dual of -4 on it gives x a reduced cost of 2.
         val b = LpBuilder()

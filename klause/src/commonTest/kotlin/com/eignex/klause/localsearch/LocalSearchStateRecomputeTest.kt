@@ -68,11 +68,14 @@ class LocalSearchStateRecomputeTest {
                         state.intPayload[fid],
                         "${case.name} seed=$seed: intPayload[$fid] drifted",
                     )
-                    assertEquals(
-                        sibling.longPayload[fid],
-                        state.longPayload[fid],
-                        "${case.name} seed=$seed: longPayload[$fid] drifted",
-                    )
+                    // Clause watch positions may differ while tracking the same truth.
+                    if (case.problem.factors[fid] !is Clause) {
+                        assertEquals(
+                            sibling.longPayload[fid],
+                            state.longPayload[fid],
+                            "${case.name} seed=$seed: longPayload[$fid] drifted",
+                        )
+                    }
                     val fa = case.problem.invariants[fid]
                     assertEquals(
                         fa.isViolated(sibling, fid),

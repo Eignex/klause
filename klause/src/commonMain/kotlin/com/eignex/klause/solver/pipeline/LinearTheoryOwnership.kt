@@ -6,5 +6,5 @@ import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.linearRows
 
 internal val Factor.integerTheoryOwnable: Boolean
-    get() = (linearForm is LinearForm.Conjunction || linearForm is LinearForm.Disjunction) && intVars.isNotEmpty() &&
+    get() = intVars.isNotEmpty() && (linearForm is LinearForm.Conjunction || linearForm is LinearForm.Disjunction) &&
         linearRows.all { it.constants is IntegralConstants }

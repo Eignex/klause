@@ -120,7 +120,7 @@ internal class BacktrackWorkerConfig(
         return PortfolioWorker.of(
             workerLabel,
             armId,
-            BacktrackSolver(problem).session(),
+            (pools?.nativeProjection?.let { BacktrackSolver(problem, it) } ?: BacktrackSolver(problem)).session(),
             params,
             objective = objective,
             withBound = withBound,
