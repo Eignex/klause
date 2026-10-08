@@ -85,6 +85,10 @@ data class PortfolioScenario(
      *  recipe per slot, wrapping past the pool size), the exact backtrack analogue of [lsPool]. `null`
      *  uses the curated [BacktrackWorkerConfig] pool. */
     val btPool: List<() -> BacktrackRecipe>? = null,
+    /** Optional edit applied to the [BacktrackParams] every backtrack arm builds, curated or from [btPool]. It
+     *  changes how each arm is built, never which arms the model offers, so the curated pool keeps its
+     *  applicability filter under an override. */
+    val btEdit: ((BacktrackParams) -> BacktrackParams)? = null,
     /** Optional model search-annotation arm: the [BacktrackParams] compiled from the model's
      *  `int_search(...)` annotations. When present (and the pool carries ≥ 2 backtrack arms), it takes
      *  the last backtrack slot so the free CP portfolio also follows the model's own search order,
@@ -250,12 +254,13 @@ internal object PortfolioComposition {
         val annotationArm = scenario.annotationArm
         val nodeBudget = scenario.nodeBudget
         val zeroObjectivePricing = scenario.zeroObjectivePricing
+        val edit = scenario.btEdit
         if (btPool != null) {
             // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
             // curated one leaves `--lp` silently ignored whenever the caller names its arms.
             return List(count) {
                 BacktrackWorkerConfig(
-                    btPool[it % btPool.size]().capLp(lpCeiling).spending(nodeBudget),
+                    btPool[it % btPool.size]().editing(edit).capLp(lpCeiling).spending(nodeBudget),
                     zeroObjectivePricing,
                 )
             }
@@ -267,6 +272,7 @@ internal object PortfolioComposition {
             nodeBudget,
             zeroObjectivePricing,
             facts,
+            edit,
         )
         if (annotationArm == null || count < 2) return base
         val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))

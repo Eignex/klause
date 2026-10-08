@@ -139,12 +139,13 @@ internal class BacktrackWorkerConfig(
             nodeBudget: NodeBudget? = null,
             zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
             facts: ProblemFacts = ProblemFacts.assumed(kind),
+            edit: ((BacktrackParams) -> BacktrackParams)? = null,
         ): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val order = BacktrackCatalog.ranked(kind, facts)
             return List(count) {
                 BacktrackWorkerConfig(
-                    order[it % order.size].capLp(lpCeiling).spending(nodeBudget),
+                    order[it % order.size].editing(edit).capLp(lpCeiling).spending(nodeBudget),
                     zeroObjectivePricing,
                 )
             }
@@ -159,6 +160,11 @@ private fun BacktrackParams.separatesCuts(): Boolean {
     return lpPlan.cuts || lpPlan.circuit ||
         (config != null && (config.resolved(LpTechnique.CUTS) || config.resolved(LpTechnique.CIRCUIT)))
 }
+
+/** This recipe with [edit] applied to the [BacktrackParams] it builds, per worker so selector state stays
+ *  unshared; itself when [edit] is null. Keeps the arm's label. */
+internal fun BacktrackRecipe.editing(edit: ((BacktrackParams) -> BacktrackParams)?): BacktrackRecipe =
+    if (edit == null) this else BacktrackRecipe(label) { seed, onEvent -> edit(build(seed, onEvent)) }
 
 /** Cap this recipe under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
  *  emphasis lowered and the ceiling's per-technique overrides applied — so no arm runs LP above what the
