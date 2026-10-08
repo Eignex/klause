@@ -253,18 +253,22 @@ internal class LpBoundTrail(initial: LpExactState) {
         )
     }
 
-    fun deactivate(id: Long, token: Cancellation = Cancellation.Never): Boolean {
+    fun deactivate(id: Long, token: Cancellation = Cancellation.Never): Boolean = deactivate(setOf(id), token)
+
+    fun deactivate(ids: Set<Long>, token: Cancellation = Cancellation.Never): Boolean {
         if (token()) return false
-        val index = state.rows.index(id)
-        if (index < 0) return false
-        if (!state.rows.row(index).active && state.rows.row(index).suspendedAt == null) return true
-        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(setOf(index), state.assertions)) return false
+        val indices = rowIndices(ids) ?: return false
+        val changed = indices.filterTo(HashSet()) {
+            state.rows.row(it).active || state.rows.row(it).suspendedAt != null
+        }
+        if (changed.isEmpty()) return true
+        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(changed, state.assertions)) return false
         return commit(
             snapshot(
-                rows = state.rows.deactivate(setOf(index)),
+                rows = state.rows.deactivate(changed),
                 boundRevision = state.boundRevision + 1L,
                 rowRevision = state.rowRevision + 1L,
-                changedColumns = listOf(state.model.n + index),
+                changedColumns = changed.map { state.model.n + it }.sorted(),
             ),
             token,
         )
@@ -272,8 +276,7 @@ internal class LpBoundTrail(initial: LpExactState) {
 
     fun suspend(ids: Set<Long>, token: Cancellation = Cancellation.Never): Boolean {
         if (token() || state.depth == 0) return false
-        val indices = ids.map { state.rows.index(it) }.toSet()
-        if (-1 in indices) return false
+        val indices = rowIndices(ids) ?: return false
         val active = indices.filterTo(HashSet()) { state.rows.row(it).active }
         if (active.isEmpty()) return true
         if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(active, state.assertions)) return false
@@ -286,6 +289,13 @@ internal class LpBoundTrail(initial: LpExactState) {
             ),
             token,
         )
+    }
+
+    private fun rowIndices(ids: Set<Long>): Set<Int>? {
+        if (ids.isEmpty()) return emptySet()
+        val indices = HashSet<Int>()
+        for (index in 0 until state.rows.size) if (state.rows.row(index).id in ids) indices.add(index)
+        return indices.takeIf { it.size == ids.size }
     }
 
     fun compact(token: Cancellation = Cancellation.Never): Boolean {

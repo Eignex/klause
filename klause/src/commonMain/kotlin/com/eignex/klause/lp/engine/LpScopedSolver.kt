@@ -165,6 +165,24 @@ internal class LpScopedSolver(
 
     fun suspend(ids: Set<Long>, token: Cancellation = cancellation): Boolean = edit(token) { it.suspend(ids, token) }
 
+    fun replaceRows(
+        retired: Set<Long>,
+        columns: List<LpStructuralColumn>,
+        rows: List<LpScopedRow>,
+        scoped: Boolean,
+        token: Cancellation = cancellation,
+    ): Boolean = edit(token, rows.isNotEmpty() || columns.isNotEmpty()) {
+        if (rows.size > maxRetainedRows - state.model.m) return@edit false
+        val hidden = if (retired.isEmpty()) {
+            true
+        } else if (scoped) {
+            it.suspend(retired, token)
+        } else {
+            it.deactivate(retired, token)
+        }
+        hidden && it.append(columns, rows, scoped, token)
+    }
+
     fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }
 
     val basisLifecycleWork: BasisOperationWork? get() = solver?.basisLifecycleWork
@@ -353,6 +371,7 @@ internal class LpScopedSolver(
 
     private fun replace(next: LpBoundTrail, token: Cancellation, append: Boolean): Boolean {
         if (append) solver?.let { recordPendingAppendSolve(it) }
+        val warm = if (append) solver?.retainedBasis()?.extended(state.model, next.state.model) else null
         val expected = if (next.state.model.m < state.model.m) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
@@ -369,14 +388,14 @@ internal class LpScopedSolver(
         } else {
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
-        val replacement = prepared(next.state, token, append) ?: return false
+        val replacement = prepared(next.state, token, append, warm) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
             val replacementWork = if (append) appendBasisLifecycleWork(replacement.first) else null
             if (append) recordAppendWork(replacementWork)
             val pendingWork = basisWorkUnits(replacementWork)
-            if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
+            if ((warm == null && !replacement.second.basicVars.contentEquals(expected)) || token()) return false
             val old = solver
             if (!append && old != null) recordPendingAppendSolve(old)
             solver = replacement.first
@@ -501,6 +520,7 @@ internal class LpScopedSolver(
         next: LpExactState,
         token: Cancellation,
         recordRejectedAppendWork: Boolean = false,
+        warm: Basis? = null,
     ): Pair<PersistentLpSolver, Basis>? {
         preparationAttempts++
         var candidate: PersistentLpSolver? = null
@@ -542,15 +562,16 @@ internal class LpScopedSolver(
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
             if (!candidate.adopt(next, token)) return null
             val basis = try {
-                candidate.prepareLogicals(token)
+                if (warm == null) candidate.prepareLogicals(token) else candidate.prepareBasis(warm, token)
             } finally {
                 preparationWork = saturated(preparationWork, candidate.lastMetrics.workOps)
                 constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
-            if (basis.basicVars.size != next.model.m || basis.status.size != next.model.numVars ||
-                basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
-                basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) } || token()
+            if (!basis.validFor(next.model) || (warm == null &&
+                    (basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
+                        basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) })) ||
+                token()
             ) {
                 return null
             }

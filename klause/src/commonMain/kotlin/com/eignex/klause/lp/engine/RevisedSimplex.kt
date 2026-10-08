@@ -1009,7 +1009,21 @@ internal class RevisedSimplex(
         }
     }
 
-    override fun prepareLogicals(token: Cancellation): Basis? {
+    override fun prepareLogicals(token: Cancellation): Basis? = prepareSourceBasis(null, token)
+
+    override fun prepareBasis(basis: Basis, token: Cancellation): Basis? = prepareSourceBasis(basis, token)
+
+    override fun retainedBasis(): Basis? {
+        if (!basisKept || !basisFactorized || basicVar.distinct().size != m ||
+            status.count { it == VarStatus.BASIC } != m ||
+            basicVar.any { it !in status.indices || status[it] != VarStatus.BASIC }
+        ) {
+            return null
+        }
+        return Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
+    }
+
+    private fun prepareSourceBasis(warm: Basis?, token: Cancellation): Basis? {
         lastTermination = null
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -1023,8 +1037,16 @@ internal class RevisedSimplex(
         if (model.exactState == null || token()) return null
         stopToken = token
         return try {
-            coldStart()
-            if (refactorize(LpRefactorReason.INITIAL) == RefactorResult.FAILED || token() ||
+            val imported = warm != null && tryWarmStart(warm)
+            if (!imported) coldStart()
+            var prepared = refactorize(if (imported) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL)
+            if (prepared == RefactorResult.FAILED && imported && repairStop == null && !token() &&
+                (workLimit == 0L || work.ops < workLimit)
+            ) {
+                coldStart()
+                prepared = refactorize(LpRefactorReason.SINGULAR_RECOVERY)
+            }
+            if (prepared == RefactorResult.FAILED || token() ||
                 (workLimit > 0L && work.ops > workLimit)
             ) {
                 null

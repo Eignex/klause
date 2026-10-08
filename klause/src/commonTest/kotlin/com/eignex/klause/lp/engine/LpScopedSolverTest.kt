@@ -23,6 +23,76 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `adding a redundant row preserves the solved parent basis`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val redundant = LpScopedRow(
+            1, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+            assertTrue(owner.append(redundant, true))
+
+            val child = assertNotNull(assertNotNull(owner.solveFloat()).second)
+
+            assertTrue(child.warmStarted)
+            assertEquals(0, child.pivots)
+            assertEquals(1.0, child.objective)
+        }
+    }
+
+    @Test
+    fun `a source row replacement publishes one structural edit and restores the parent on pop`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val row = LpScopedRow(
+            1, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+
+            assertTrue(owner.replaceRows(setOf(0), emptyList(), listOf(row), true))
+
+            assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
+            assertEquals(2L, owner.metrics.createdOwners)
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `an invalid replacement keeps the retired source row active`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val invalid = LpScopedRow(
+            1, listOf(1 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertTrue(owner.push())
+            val before = owner.state
+
+            assertFalse(owner.replaceRows(setOf(0), emptyList(), listOf(invalid), true))
+
+            assertSame(before, owner.state)
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
     fun `suspending and restoring a source row reuses its numerical owner`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 2L, cost = 1L)
@@ -1094,6 +1164,9 @@ class LpScopedSolverTest {
                     override fun prepareLogicals(token: Cancellation): Basis? =
                         if (model.m > 0) throw primary else delegate.prepareLogicals(token)
 
+                    override fun prepareBasis(basis: Basis, token: Cancellation): Basis? =
+                        if (model.m > 0) throw primary else delegate.prepareBasis(basis, token)
+
                     override fun close() {
                         delegate.close()
                         if (model.m > 0) throw cleanup
@@ -1597,6 +1670,9 @@ class LpScopedSolverTest {
                     return object : PersistentLpSolver by delegate {
                         override fun prepareLogicals(token: Cancellation): Basis? =
                             if (fail && failure == "unsupported") null else delegate.prepareLogicals(token)
+
+                        override fun prepareBasis(basis: Basis, token: Cancellation): Basis? =
+                            if (fail && failure == "unsupported") null else delegate.prepareBasis(basis, token)
                         override fun close() {
                             closes++
                             delegate.close()

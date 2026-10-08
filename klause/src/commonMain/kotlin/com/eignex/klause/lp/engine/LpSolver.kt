@@ -297,6 +297,10 @@ internal interface PersistentLpSolver : LpSolver {
     // Builds an all-logical basis without claiming feasibility; null means unsupported or declined.
     fun prepareLogicals(token: Cancellation = Cancellation.Never): Basis? = null
 
+    fun prepareBasis(basis: Basis, token: Cancellation = Cancellation.Never): Basis? = prepareLogicals(token)
+
+    fun retainedBasis(): Basis? = null
+
     fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
 
     val basisLifecycleWork: BasisOperationWork? get() = null
