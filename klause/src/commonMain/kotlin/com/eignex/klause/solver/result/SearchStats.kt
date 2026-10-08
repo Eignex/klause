@@ -165,7 +165,7 @@ internal class SearchStatsSink {
 }
 
 // The largest literal block distance a learned clause can have and still count as glue.
-private const val GLUE_LBD = 2
+internal const val GLUE_LBD = 2
 
 // An order-independent 64-bit fingerprint of a literal set: equal sets always match, and distinct ones collide
 // rarely enough for a diagnostic count.

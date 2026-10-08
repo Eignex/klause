@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchNodeDisposition
@@ -50,8 +51,11 @@ internal class ResumableOpenTheory(
     /** Work spent so far on [state], in `openWork` units. */
     val work: Long get() = state.work.spent
 
-    /** The verdict's stats once decided, else the work counters so far. */
-    val stats: SolveStats get() = verdict?.stats ?: SolveStats(openTheory = state.work.snapshot())
+    /** The search's root fixings and glue clauses so far, counted over [state]. */
+    val progress: SearchStats get() = state.progress(run?.session)
+
+    /** The verdict's stats once decided, else the work and progress counters so far. */
+    val stats: SolveStats get() = verdict?.stats ?: SolveStats(openTheory = state.work.snapshot(), search = progress)
 
     /**
      * Advance until a verdict, [global] firing, or the slice ending: after [sliceWork] `openWork` units when

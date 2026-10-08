@@ -107,13 +107,13 @@ internal enum class Signal {
     /** Rise of the pool's proven lower bound on the objective: the dual side of the gap. */
     Floor,
 
-    /** Variables a backtrack arm newly fixed at its root. */
+    /** Variables a complete search, backtrack or open theory, newly fixed at its root. */
     RootFixings,
 
     /** Share of the pool's record constraint violation a local-search arm removed. */
     Violation,
 
-    /** Short learned clauses a backtrack arm derived: the conflicts that teach it most. */
+    /** Short learned clauses a complete search derived: the conflicts that teach it most. */
     Glue,
 
     /** Uses other arms made of this arm's shared clauses. */
@@ -128,8 +128,9 @@ internal enum class Signal {
 
 /**
  * Whether [worker]'s engine can earn this signal. A counted arm is local search or ALNS: it lowers violation and
- * shares nothing. Any other arm runs backtrack search: it fixes variables at its root, proves bounds and shares
- * clauses, cuts and bounds, and has no violation to lower. Both find and improve solutions.
+ * shares nothing. Any other arm runs a complete search, backtrack or open theory: it fixes variables at its root,
+ * proves bounds and shares clauses, cuts and bounds, and has no violation to lower. Both find and improve
+ * solutions.
  */
 internal fun Signal.earnableBy(worker: PortfolioWorker): Boolean = when (this) {
     Signal.FirstSolution, Signal.Improvement -> true
@@ -144,11 +145,10 @@ internal fun Signal.earnableBy(worker: PortfolioWorker): Boolean = when (this) {
  * Turns the counters a segment reports into progress credit, the graded signal a search earns before it has
  * anything to show for itself.
  *
- * A backtrack arm is credited for variables newly fixed at its root, the one kind of progress no later search
+ * A complete-search arm is credited for variables newly fixed at its root, the one kind of progress no later search
  * undoes; its count is the most the arm has shown, so a re-seeded handle does not earn the same fixings twice. It
  * is credited too for the short clauses it learns, the conflicts that teach it most, though it has fixed nothing
- * yet. A
- * local-search arm is credited for lowering the pool's record violation, by the share of the record it removed,
+ * yet. A local-search arm is credited for lowering the pool's record violation, by the share of the record it removed,
  * so getting close to a solution pays and merely matching the best so far does not.
  */
 internal class ProgressCredit(arms: Int) {

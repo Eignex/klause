@@ -896,6 +896,31 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `glue counts the distinct learned clauses spanning at most two levels`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(6, 8)))
+        session.learn(SearchExplanation(intArrayOf(6, 8)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+
+        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+
+        assertEquals(1L, session.glueClauseCount)
+    }
+
+    @Test
+    fun `root fixings count only the Booleans assigned below every decision`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+
+        assertEquals(1, session.rootFixedCount)
+    }
+
+    @Test
     fun `a clause retained through a reduction still propagates`() {
         val session = SearchSession(
             emptyList(),

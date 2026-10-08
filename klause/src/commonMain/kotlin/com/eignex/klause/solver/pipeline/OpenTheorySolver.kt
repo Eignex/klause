@@ -12,6 +12,7 @@ import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.result.OpenHintStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
+import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -34,6 +35,8 @@ import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
+import com.eignex.kumulant.stat.summary.MaxResult
+import com.eignex.kumulant.stat.summary.SumResult
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
@@ -376,6 +379,9 @@ class OpenTheoryEngine internal constructor(
         private val state: OpenTheorySolveState,
         private val params: TheoryParams,
     ) : AutoCloseable {
+        /** The search this run drives. */
+        val session: com.eignex.klause.solver.search.SearchSession get() = planned.session
+
         /** Continue the search: its verdict, or null when the node policy paused it. */
         fun advance(): OpenTheoryResult? = when (val event = run.next()) {
             // The witness is of the prepared model, so the columns preparation eliminated are
@@ -448,7 +454,7 @@ class OpenTheoryEngine internal constructor(
         openTheoryClauses = state.clauses
         openHints = state.hints
         stop()
-        return snapshot()
+        return snapshot().let { it.copy(search = it.search.mergedWith(state.progress(null))) }
     }
 
     private fun assignment(
@@ -487,6 +493,8 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     private val maxDecisions = params.maxDecisions
     var clauses = OpenTheoryClauseStats()
         private set
+    private var capturedGlue = 0L
+    private var capturedRootFixed = 0
 
     /** What the request's hint draw produced, cost, and has steered so far. */
     val hints: OpenHintStats get() = drawStats.copy(steeredSplits = steering?.steeredSplits ?: 0L)
@@ -545,7 +553,18 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     fun capture(session: com.eignex.klause.solver.search.SearchSession?) {
         session ?: return
         clauses = clauses.mergedWith(session.learnedClauseStats())
+        capturedGlue += session.glueClauseCount
+        capturedRootFixed = maxOf(capturedRootFixed, session.rootFixedCount)
     }
+
+    /**
+     * Root fixings and glue clauses over every round so far, [live] the round still searching, in the counters a
+     * backtrack search reports them in: the portfolio credits both routes' progress alike.
+     */
+    fun progress(live: com.eignex.klause.solver.search.SearchSession?): SearchStats = SearchStats(
+        rootFixed = MaxResult(maxOf(capturedRootFixed, live?.rootFixedCount ?: 0).toDouble()),
+        glueClauses = SumResult((capturedGlue + (live?.glueClauseCount ?: 0L)).toDouble()),
+    )
 }
 
 /** How [OpenTheoryEngine.begin] left a solve: decided before the first branch, or running. */
