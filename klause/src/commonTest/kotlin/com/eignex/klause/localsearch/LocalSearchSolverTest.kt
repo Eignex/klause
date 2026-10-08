@@ -31,11 +31,15 @@ class LocalSearchSolverTest {
     @Test
     fun `slice boundaries preserve the seeded satisfaction walk`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             Array<Factor>(2) { i -> Clause(intArrayOf(Lit.make(2 * i, true), Lit.make(2 * i + 1, true))) },
         ).bake()
         val params = LocalSearchParams(
-            maxFlips = 20L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(4), LongArray(0)),
+            maxFlips = 20L,
+            randomSeed = 3L,
+            initialAssignment = Sample(BooleanArray(4), LongArray(0)),
         )
         val solver = LocalSearchSolver(problem, greedyRepairOnRestart = false)
         val expected = assertIs<SolveResult.Sat>(solver.solve(params))
@@ -55,11 +59,15 @@ class LocalSearchSolverTest {
     @Test
     fun `cancellation pauses the walk without exhausting it`() {
         val problem = Problem(
-            80, 0, emptyArray(),
+            80,
+            0,
+            emptyArray(),
             Array<Factor>(40) { i -> Clause(intArrayOf(Lit.make(2 * i, true), Lit.make(2 * i + 1, true))) },
         ).bake()
         val params = LocalSearchParams(
-            maxFlips = 200L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(80), LongArray(0)),
+            maxFlips = 200L,
+            randomSeed = 3L,
+            initialAssignment = Sample(BooleanArray(80), LongArray(0)),
         )
         val solver = LocalSearchSolver(problem, greedyRepairOnRestart = false)
         val expected = assertIs<SolveResult.Sat>(solver.solve(params))
@@ -80,12 +88,16 @@ class LocalSearchSolverTest {
     @Test
     fun `cancellation during a slice preserves the remaining work allowance`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             Array<Factor>(8) { mask -> Clause(IntArray(3) { v -> Lit.make(v, mask and (1 shl v) != 0) }) },
         ).bake()
         val params = LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L)
         val solver = LocalSearchSolver(
-            problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 7), greedyRepairOnRestart = false,
+            problem,
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 7),
+            greedyRepairOnRestart = false,
         )
         val expected = assertIs<SolveResult.Unknown>(solver.solve(params))
         var polls = 0
@@ -106,11 +118,15 @@ class LocalSearchSolverTest {
     @Test
     fun `an exhausted resumed walk keeps its terminal verdict`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             Array<Factor>(2) { i -> Clause(intArrayOf(Lit.make(2 * i, true), Lit.make(2 * i + 1, true))) },
         ).bake()
         val params = LocalSearchParams(
-            maxFlips = 1L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(4), LongArray(0)),
+            maxFlips = 1L,
+            randomSeed = 3L,
+            initialAssignment = Sample(BooleanArray(4), LongArray(0)),
         )
 
         LocalSearchSolver(problem, greedyRepairOnRestart = false).resumableSolve(params).use { handle ->
