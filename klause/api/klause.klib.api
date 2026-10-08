@@ -1146,6 +1146,9 @@ abstract interface com.eignex.klause.solver.search/SearchContext { // com.eignex
     abstract fun publish(kotlin/Int): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchContext.publish|publish(kotlin.Int){}[0]
     abstract fun requestCancellationPoll() // com.eignex.klause.solver.search/SearchContext.requestCancellationPoll|requestCancellationPoll(){}[0]
     open fun atomLiteral(com.eignex.klause.solver.search/SearchDecision): kotlin/Int? // com.eignex.klause.solver.search/SearchContext.atomLiteral|atomLiteral(com.eignex.klause.solver.search.SearchDecision){}[0]
+    open fun intLowerBoundPremise(kotlin/Int): com.eignex.klause.solver.search/SearchAtomPremise // com.eignex.klause.solver.search/SearchContext.intLowerBoundPremise|intLowerBoundPremise(kotlin.Int){}[0]
+    open fun intUpperBoundPremise(kotlin/Int): com.eignex.klause.solver.search/SearchAtomPremise // com.eignex.klause.solver.search/SearchContext.intUpperBoundPremise|intUpperBoundPremise(kotlin.Int){}[0]
+    open fun publish(com.eignex.klause.solver.search/SearchDecision, com.eignex.klause.solver.search/SearchAtomPremise): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchContext.publish|publish(com.eignex.klause.solver.search.SearchDecision;com.eignex.klause.solver.search.SearchAtomPremise){}[0]
     open fun registerAtom(com.eignex.klause.solver.search/SearchTheoryDecision, com.eignex.klause.solver.search/SearchTheoryDecision): com.eignex.klause.solver.search/SearchTheoryAtom? // com.eignex.klause.solver.search/SearchContext.registerAtom|registerAtom(com.eignex.klause.solver.search.SearchTheoryDecision;com.eignex.klause.solver.search.SearchTheoryDecision){}[0]
 }
 
@@ -11862,7 +11865,9 @@ final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.so
     final fun imply(kotlin/Int, com.eignex.klause.solver.search/SearchExplanation): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.imply|imply(kotlin.Int;com.eignex.klause.solver.search.SearchExplanation){}[0]
     final fun initialize(): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.initialize|initialize(){}[0]
     final fun intLowerBound(kotlin/Int): kotlin/Long? // com.eignex.klause.solver.search/SearchSession.intLowerBound|intLowerBound(kotlin.Int){}[0]
+    final fun intLowerBoundPremise(kotlin/Int): com.eignex.klause.solver.search/SearchAtomPremise // com.eignex.klause.solver.search/SearchSession.intLowerBoundPremise|intLowerBoundPremise(kotlin.Int){}[0]
     final fun intUpperBound(kotlin/Int): kotlin/Long? // com.eignex.klause.solver.search/SearchSession.intUpperBound|intUpperBound(kotlin.Int){}[0]
+    final fun intUpperBoundPremise(kotlin/Int): com.eignex.klause.solver.search/SearchAtomPremise // com.eignex.klause.solver.search/SearchSession.intUpperBoundPremise|intUpperBoundPremise(kotlin.Int){}[0]
     final fun learn(com.eignex.klause.solver.search/SearchExplanation?) // com.eignex.klause.solver.search/SearchSession.learn|learn(com.eignex.klause.solver.search.SearchExplanation?){}[0]
     final fun learnedClauseStats(): com.eignex.klause.solver.result/OpenTheoryClauseStats // com.eignex.klause.solver.search/SearchSession.learnedClauseStats|learnedClauseStats(){}[0]
     final fun levelOf(kotlin/Int): kotlin/Int // com.eignex.klause.solver.search/SearchSession.levelOf|levelOf(kotlin.Int){}[0]
@@ -11871,6 +11876,7 @@ final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.so
     final fun popTo(kotlin/Int) // com.eignex.klause.solver.search/SearchSession.popTo|popTo(kotlin.Int){}[0]
     final fun propagate(): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.propagate|propagate(){}[0]
     final fun publish(com.eignex.klause.solver.search/SearchDecision): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.publish|publish(com.eignex.klause.solver.search.SearchDecision){}[0]
+    final fun publish(com.eignex.klause.solver.search/SearchDecision, com.eignex.klause.solver.search/SearchAtomPremise): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.publish|publish(com.eignex.klause.solver.search.SearchDecision;com.eignex.klause.solver.search.SearchAtomPremise){}[0]
     final fun publish(kotlin/Int): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.publish|publish(kotlin.Int){}[0]
     final fun push(com.eignex.klause.solver.search/SearchDecision): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchSession.push|push(com.eignex.klause.solver.search.SearchDecision){}[0]
     final fun reasonFor(kotlin/Int): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/SearchSession.reasonFor|reasonFor(kotlin.Int){}[0]

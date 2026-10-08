@@ -204,6 +204,30 @@ internal class LiveQfLraSystem(
         return true
     }
 
+    fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
+        val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
+        val fixed = rootFixedColumns(key.columns)
+        val slot = if (fixed.isEmpty()) {
+            key.slot ?: normalized[key] ?: return null
+        } else {
+            SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
+        }
+        val term = slot.term
+        val column = slot.column.takeIf { it >= 0 } ?: term.coefficients.keys.singleOrNull()
+            ?: definitions[term.coefficients] ?: return null
+        val threshold = term.bound(comparison.bound)
+        val state = lp.state ?: return null
+        for (sourceUpper in listOf(true, false)) {
+            val upper = if (term.scale.signum() < 0) !sourceUpper else sourceUpper
+            val active = state.activeSide(column, upper) ?: continue
+            val bound = active.side.number.value
+            if (if (upper) bound > threshold else bound < threshold) continue
+            val premise = lp.activeBoundPremise(column, upper) ?: return null
+            return DerivedDisequalitySide(if (sourceUpper) LinearOp.LE else LinearOp.GE, term.premise(premise))
+        }
+        return null
+    }
+
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
         val expression = sourceTerms(atom) ?: return false
         return assertTerms(SmtTermKey.of(expression), atom.upper, atom.threshold, atom.strict, premise)
@@ -305,6 +329,8 @@ internal class LiveQfLraSystem(
         }
     }
 }
+
+internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
 
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.

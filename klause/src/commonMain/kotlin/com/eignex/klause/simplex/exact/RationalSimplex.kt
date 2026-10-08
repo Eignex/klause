@@ -246,9 +246,9 @@ class BigFraction private constructor(
 
     override fun equals(other: Any?): Boolean = this === other || (
         other is BigFraction &&
-        (num === other.num || num.compareTo(other.num) == 0) &&
-        (den === other.den || den.compareTo(other.den) == 0)
-    )
+            (num === other.num || num.compareTo(other.num) == 0) &&
+            (den === other.den || den.compareTo(other.den) == 0)
+        )
 
     override fun hashCode(): Int = num.hashCode() * 31 + den.hashCode()
 

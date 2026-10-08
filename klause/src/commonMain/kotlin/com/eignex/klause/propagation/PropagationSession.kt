@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
@@ -198,6 +199,8 @@ class PropagationSession private constructor(
 
     /** Current int domain after propagation. Always non-empty unless the session is Unsat. */
     fun intDomain(v: Int): IntDomain = state.intDomains[v]
+
+    internal val explanationState: PropagationState get() = state
 
     /**
      * Variables fixed at the root, however deep the search stands: bools assigned at decision level 0 and ints down
@@ -870,10 +873,18 @@ class PropagationSession private constructor(
         val top = state.undoTop
         if (top <= base) return PropagationResult.Implied.EMPTY
         val bRaw = IntArrayList()
-        val iRaw = IntArrayList()
+        val iRaw = LongArrayList()
         for (i in base until top) {
             val v = state.undoVarAt(i)
-            if (state.undoIsBoolAt(i)) bRaw.add(v) else iRaw.add(v)
+            if (state.undoIsBoolAt(i)) {
+                bRaw.add(v)
+            } else {
+                val prior = state.undo.domain[i]
+                val current = state.intDomains[v]
+                val sides = (if (prior != null && current.min > prior.min) IntEvent.LB_RAISED_BIT else 0) or
+                    (if (prior != null && current.max < prior.max) IntEvent.UB_LOWERED_BIT else 0)
+                iRaw.add((v.toLong() shl 2) or sides.toLong())
+            }
         }
         val bKeys = IntArrayList()
         val bVals = ArrayList<Boolean>()
@@ -892,25 +903,60 @@ class PropagationSession private constructor(
         }
         val iKeys = IntArrayList()
         val iVals = LongArrayList()
+        var minKeys = EmptyIntArray
+        var minValues = EmptyLongArray
+        var maxKeys = EmptyIntArray
+        var maxValues = EmptyLongArray
         if (iRaw.size > 0) {
-            val sorted = iRaw.toIntArray()
+            val sorted = iRaw.toLongArray()
             sorted.sort()
+            val mins = IntArrayList()
+            val minVals = LongArrayList()
+            val maxs = IntArrayList()
+            val maxVals = LongArrayList()
             var prev = -1
-            for (v in sorted) {
-                if (v == prev) continue
-                prev = v
-                if (intPinnedSet[v]) continue // decision var — excluded
+            var changed = 0
+            fun record(v: Int, sides: Int) {
+                if (v < 0 || intPinnedSet[v]) return
                 val d = state.intDomains[v]
-                if (d.min != d.max) continue // not yet determined
-                iKeys.add(v)
-                iVals.add(d.min)
+                if (d.min == d.max) {
+                    iKeys.add(v)
+                    iVals.add(d.min)
+                } else {
+                    if (sides and IntEvent.LB_RAISED_BIT != 0) {
+                        mins.add(v)
+                        minVals.add(d.min)
+                    }
+                    if (sides and IntEvent.UB_LOWERED_BIT != 0) {
+                        maxs.add(v)
+                        maxVals.add(d.max)
+                    }
+                }
             }
+            for (entry in sorted) {
+                val v = (entry ushr 2).toInt()
+                if (v != prev) {
+                    record(prev, changed)
+                    prev = v
+                    changed = 0
+                }
+                changed = changed or (entry and 3L).toInt()
+            }
+            record(prev, changed)
+            minKeys = mins.toIntArray()
+            minValues = minVals.toLongArray()
+            maxKeys = maxs.toIntArray()
+            maxValues = maxVals.toLongArray()
         }
         return PropagationResult.Implied(
             boolKeys = bKeys.toIntArray(),
             boolValues = BooleanArray(bVals.size) { bVals[it] },
             intKeys = iKeys.toIntArray(),
             intValues = iVals.toLongArray(),
+            intMinKeys = minKeys,
+            intMinValues = minValues,
+            intMaxKeys = maxKeys,
+            intMaxValues = maxValues,
         )
     }
 }

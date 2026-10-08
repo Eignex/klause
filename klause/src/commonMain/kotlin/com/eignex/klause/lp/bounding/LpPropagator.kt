@@ -98,6 +98,13 @@ internal class LpPropagator(
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
 
+    fun activeBoundPremise(column: Int, upper: Boolean): SearchAtomPremise? {
+        val active = state?.activeSide(column, upper) ?: return null
+        val declared = rootState?.takeIf { column < it.model.numVars }?.activeSide(column, upper)
+        val premise = if (active == declared) SearchAtomPremise.All(emptyList()) else boundPremise(active.witness)
+        return active.side.premises?.let { SearchAtomPremise.All(listOf(premise, it.asPremise())) } ?: premise
+    }
+
     fun explainConflict(support: LpExactSupport?, context: SearchContext): SearchExplanation? {
         val current = state ?: return null
         if (support == null || support.state !== current || proofContext !== context || context.cancelled()) return null

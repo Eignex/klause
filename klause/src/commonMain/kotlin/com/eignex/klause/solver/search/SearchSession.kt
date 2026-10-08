@@ -96,6 +96,12 @@ class SearchSession(
 
     override fun intUpperBound(variable: Int): Long? = intFacts[variable]?.upper
 
+    override fun intLowerBoundPremise(variable: Int): SearchAtomPremise =
+        intFacts[variable]?.lowerPremise ?: SearchAtomPremise.Unavailable
+
+    override fun intUpperBoundPremise(variable: Int): SearchAtomPremise =
+        intFacts[variable]?.upperPremise ?: SearchAtomPremise.Unavailable
+
     /** Clause-form reason for the current assignment of [variable], or null when it is a decision. */
     fun reasonFor(variable: Int): SearchExplanation? = boolReasons[variable]
 
@@ -138,6 +144,13 @@ class SearchSession(
         }
     }
 
+    override fun publish(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult = when (decision) {
+        is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual ->
+            publishIntFact(decision, premise)
+
+        else -> publish(decision)
+    }
+
     /**
      * Import a consequence that [source] has already applied to its native state.
      *
@@ -145,10 +158,14 @@ class SearchSession(
      * clause at an existing level). The source is excluded from the pending delivery, preventing a
      * second native pin from creating an extra private decision level.
      */
-    internal fun publishFrom(source: SearchComponent, decision: SearchDecision): ComponentResult {
+    internal fun publishFrom(
+        source: SearchComponent,
+        decision: SearchDecision,
+        premise: SearchAtomPremise = SearchAtomPremise.Unavailable,
+    ): ComponentResult {
         val previous = activeComponent
         activeComponent = source
-        val result = publish(decision)
+        val result = publish(decision, premise)
         activeComponent = previous
         return result
     }
@@ -251,6 +268,13 @@ class SearchSession(
     private fun recordAndDispatch(decision: SearchDecision, source: SearchComponent?): ComponentResult {
         conflictResolver = null
         conflictOwner = null
+        if (atoms != null) {
+            val bound = SearchIntegerBound.of(decision)
+            if (bound != null) {
+                val atom = registerAtom(bound, bound.complement()) ?: return ComponentResult.Indeterminate
+                return recordAndDispatch(SearchDecision.Theory(atom.positive), source)
+            }
+        }
         if (decision is SearchDecision.Theory && decision.decision is RegisteredTheoryDecision) {
             val literal = atomLiteral(decision) ?: return ComponentResult.Indeterminate
             return recordAndDispatch(SearchDecision.Bool(literal), source)
@@ -278,7 +302,27 @@ class SearchSession(
             )
 
             is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual -> {
-                when (val result = updateIntFact(decision)) {
+                val premise = if (decision is SearchDecision.IntEqual && atoms != null) {
+                    val sides = listOf(
+                        SearchDecision.IntAtLeast(decision.variable, decision.value),
+                        SearchDecision.IntAtMost(decision.variable, decision.value),
+                    )
+                    val assertions = sides.map { side ->
+                        val bound = checkNotNull(SearchIntegerBound.of(side))
+                        registerAtom(bound, bound.complement())?.positive ?: return ComponentResult.Indeterminate
+                    }
+                    for (assertion in assertions) {
+                        val variable = assertion.literal ushr 1
+                        val value = if (assertion.literal and 1 == 0) TRUE else FALSE
+                        val prior = boolValues.getOrDefault(variable, UNASSIGNED)
+                        if (prior != UNASSIGNED && prior != value) return ComponentResult.Conflict()
+                        if (prior == UNASSIGNED) assignBool(variable, value, source)
+                    }
+                    SearchAtomPremise.All(assertions.map { SearchAtomPremise.Asserted(SearchDecision.Theory(it)) })
+                } else {
+                    SearchAtomPremise.Unavailable
+                }
+                when (val result = updateIntFact(decision, premise)) {
                     ComponentResult.Consistent -> Unit
                     else -> return result
                 }
@@ -356,11 +400,18 @@ class SearchSession(
             selfPublicationsPending = false
             while (pendingAssertions.isNotEmpty()) {
                 val pending = pendingAssertions.removeFirst()
+                val registered = (pending.decision as? SearchDecision.Theory)?.decision as? RegisteredTheoryDecision
+                val integer = (registered?.payload as? SearchIntegerBound)?.decision()
+                val asserted = integer ?: pending.decision
+                if (integer != null) {
+                    val result = updateIntFact(integer, SearchAtomPremise.Asserted(pending.decision))
+                    if (result !is ComponentResult.Consistent) return result
+                }
                 if (singleComponent != null) {
                     val component = singleComponent
                     if (component !== pending.source) {
                         activeComponent = component
-                        val result = component.assert(pending.decision, this)
+                        val result = component.assert(asserted, this)
                         activeComponent = null
                         if (result !is ComponentResult.Consistent) return recordConflict(component, result)
                     }
@@ -368,7 +419,7 @@ class SearchSession(
                     for (component in components) {
                         if (component === pending.source) continue
                         activeComponent = component
-                        val result = component.assert(pending.decision, this)
+                        val result = component.assert(asserted, this)
                         activeComponent = null
                         if (result !is ComponentResult.Consistent) return recordConflict(component, result)
                     }
@@ -852,18 +903,24 @@ class SearchSession(
         }
     }
 
-    private fun publishIntFact(decision: SearchDecision): ComponentResult {
+    private fun publishIntFact(
+        decision: SearchDecision,
+        premise: SearchAtomPremise = SearchAtomPremise.Unavailable,
+    ): ComponentResult {
         val before = intFacts[decision.intVariable()]
-        val result = updateIntFact(decision)
+        val result = updateIntFact(decision, premise)
         if (result !is ComponentResult.Consistent || intFacts[decision.intVariable()] == before) return result
         pendingAssertions.addLast(PendingAssertion(decision, activeComponent))
         return ComponentResult.Consistent
     }
 
-    private fun updateIntFact(decision: SearchDecision): ComponentResult {
+    private fun updateIntFact(
+        decision: SearchDecision,
+        premise: SearchAtomPremise = SearchAtomPremise.Unavailable,
+    ): ComponentResult {
         val variable = decision.intVariable()
         val prior = intFacts[variable]
-        val candidate = when (decision) {
+        val values = when (decision) {
             is SearchDecision.IntAtMost -> IntFact(prior?.lower, minOf(prior?.upper ?: Long.MAX_VALUE, decision.upper))
 
             is SearchDecision.IntAtLeast -> IntFact(maxOf(prior?.lower ?: Long.MIN_VALUE, decision.lower), prior?.upper)
@@ -875,8 +932,22 @@ class SearchSession(
 
             is SearchDecision.Bool, is SearchDecision.Theory -> error("only integer decisions carry integer facts")
         }
+        val candidate = values.copy(
+            lowerPremise = if (values.lower == prior?.lower) {
+                prior?.lowerPremise ?: SearchAtomPremise.Unavailable
+            } else {
+                premise
+            },
+            upperPremise = if (values.upper == prior?.upper) {
+                prior?.upperPremise ?: SearchAtomPremise.Unavailable
+            } else {
+                premise
+            },
+        )
         if (candidate.lower != null && candidate.upper != null && candidate.lower > candidate.upper) {
-            return ComponentResult.Conflict()
+            return ComponentResult.Conflict(
+                explainAtoms(SearchAtomPremise.All(listOf(candidate.lowerPremise, candidate.upperPremise))),
+            )
         }
         if (candidate == prior) return ComponentResult.Consistent
         val changedAtLevel = priorIntFactsAtLevel[decisionLevel]
@@ -912,7 +983,12 @@ class SearchSession(
         }
     }
 
-    private data class IntFact(val lower: Long?, val upper: Long?)
+    private data class IntFact(
+        val lower: Long?,
+        val upper: Long?,
+        val lowerPremise: SearchAtomPremise = SearchAtomPremise.Unavailable,
+        val upperPremise: SearchAtomPremise = SearchAtomPremise.Unavailable,
+    )
 
     private companion object {
         const val UNASSIGNED = -1

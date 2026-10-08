@@ -1,9 +1,11 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -11,9 +13,35 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PropagationSessionTest {
+    @Test
+    fun `incremental propagation reports changed non singleton endpoints`() {
+        for (upper in listOf(false, true)) {
+            val session = PropagationSession(
+                Problem(
+                    0,
+                    3,
+                    arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+                    arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
+                ),
+            )
+
+            val result = assertIs<PropagationResult.Implied>(
+                if (upper) session.pinIntAtMost(1, 3L) else session.pinIntAtLeast(0, 5L),
+            )
+
+            assertEquals(
+                if (upper) 3L else 5L,
+                if (upper) result.intMaxOrNullCompat(0) else result.intMinOrNullCompat(1),
+            )
+            assertNull(if (upper) result.intMinOrNullCompat(0) else result.intMaxOrNullCompat(1))
+            assertNull(result.intMinOrNullCompat(2))
+            assertNull(result.intMaxOrNullCompat(2))
+        }
+    }
 
     @Test
     fun `pushed pins imply the same values a one-shot propagate does`() {

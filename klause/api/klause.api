@@ -11025,15 +11025,21 @@ public abstract interface class com/eignex/klause/solver/search/SearchContext {
 	public abstract fun getDecisionLevel ()I
 	public abstract fun imply (ILcom/eignex/klause/solver/search/SearchExplanation;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public abstract fun intLowerBound (I)Ljava/lang/Long;
+	public fun intLowerBoundPremise (I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
 	public abstract fun intUpperBound (I)Ljava/lang/Long;
+	public fun intUpperBoundPremise (I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
 	public abstract fun publish (I)Lcom/eignex/klause/solver/search/ComponentResult;
 	public abstract fun publish (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun publish (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchAtomPremise;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun registerAtom (Lcom/eignex/klause/solver/search/SearchTheoryDecision;Lcom/eignex/klause/solver/search/SearchTheoryDecision;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
 	public abstract fun requestCancellationPoll ()V
 }
 
 public final class com/eignex/klause/solver/search/SearchContext$DefaultImpls {
 	public static fun atomLiteral (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchDecision;)Ljava/lang/Integer;
+	public static fun intLowerBoundPremise (Lcom/eignex/klause/solver/search/SearchContext;I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
+	public static fun intUpperBoundPremise (Lcom/eignex/klause/solver/search/SearchContext;I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
+	public static fun publish (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchAtomPremise;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun registerAtom (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchTheoryDecision;Lcom/eignex/klause/solver/search/SearchTheoryDecision;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
 }
 
@@ -11590,7 +11596,9 @@ public final class com/eignex/klause/solver/search/SearchSession : com/eignex/kl
 	public fun imply (ILcom/eignex/klause/solver/search/SearchExplanation;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public final fun initialize ()Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun intLowerBound (I)Ljava/lang/Long;
+	public fun intLowerBoundPremise (I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
 	public fun intUpperBound (I)Ljava/lang/Long;
+	public fun intUpperBoundPremise (I)Lcom/eignex/klause/solver/search/SearchAtomPremise;
 	public final fun learn (Lcom/eignex/klause/solver/search/SearchExplanation;)V
 	public final fun learnedClauseStats ()Lcom/eignex/klause/solver/result/OpenTheoryClauseStats;
 	public fun levelOf (I)I
@@ -11601,6 +11609,7 @@ public final class com/eignex/klause/solver/search/SearchSession : com/eignex/kl
 	public final fun propagate ()Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun publish (I)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun publish (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/ComponentResult;
+	public fun publish (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchAtomPremise;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public final fun push (Lcom/eignex/klause/solver/search/SearchDecision;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public final fun reasonFor (I)Lcom/eignex/klause/solver/search/SearchExplanation;
 	public fun registerAtom (Lcom/eignex/klause/solver/search/SearchTheoryDecision;Lcom/eignex/klause/solver/search/SearchTheoryDecision;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;

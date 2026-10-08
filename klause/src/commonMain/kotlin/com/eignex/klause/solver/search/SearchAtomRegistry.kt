@@ -64,7 +64,7 @@ class SearchAtomRegistry(
         is SearchDecision.Theory -> (decision.decision as? RegisteredTheoryDecision)
             ?.takeIf { it.owner === this }?.literal
 
-        else -> null
+        else -> SearchIntegerBound.of(decision)?.let { names[it]?.literal }
     }
 
     private companion object {
