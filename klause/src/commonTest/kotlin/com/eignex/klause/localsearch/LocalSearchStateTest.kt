@@ -2,11 +2,15 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.objective.objectiveBoundOverlay
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,6 +38,22 @@ class LocalSearchStateTest {
             ReifiedLinear(auxBoolVar = 2, coeffs = intArrayOf(1), vars = intArrayOf(0), op = LinearOp.EQ, bound = 2),
         ),
     )
+
+    @Test
+    fun `an objective variable's flip leaves the other objective variables' configuration as it was`() {
+        // The model ties no variable to another; only the objective-bound overlay spans all three.
+        val problem = Problem(3, 0, emptyArray<IntDomain>(), listOf(Clause(intArrayOf(Lit.make(0, true)))))
+        val (overlay, _) = requireNotNull(
+            objectiveBoundOverlay(problem.bake(), LinearObjective(boolWeights = longArrayOf(1, 1, 1))),
+        )
+        val state = LocalSearchState(overlay, Random(0))
+        state.recompute()
+        state.boolConfChange.fill(false)
+
+        state.apply(Move.BoolFlip(0))
+
+        assertEquals(listOf(false, false), listOf(state.boolConfChange[1], state.boolConfChange[2]))
+    }
 
     @Test
     fun `single-var EQ reified channeling rolls indicator flips into one compound`() {
