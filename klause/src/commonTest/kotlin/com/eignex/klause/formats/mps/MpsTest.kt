@@ -217,6 +217,42 @@ class MpsTest {
     }
 
     @Test
+    fun `defaults a marker integer without a bounds entry to binary`() {
+        val cases = listOf("", "BOUNDS\n", "BOUNDS\n UP BND Y 5\n")
+        for (bounds in cases) {
+            val text = "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 1\n" +
+                " M1 'MARKER' 'INTEND'\n Y COST 1\n${bounds}ENDATA"
+
+            val variable = Mps.parse(text).variables.first()
+
+            assertEquals(MpsVar("X", integer = true, lower = 0.0, upper = 1.0), variable, bounds)
+        }
+    }
+
+    @Test
+    fun `explicit bounds replace a marker integer binary default`() {
+        val cases = listOf(
+            Triple("LO BND X 2", 2.0, null),
+            Triple("LI BND X 2", 2.0, null),
+            Triple("UP BND X 5", 0.0, 5.0),
+            Triple("UI BND X 5", 0.0, 5.0),
+            Triple("FX BND X 2", 2.0, 2.0),
+            Triple("FR BND X", null, null),
+            Triple("MI BND X", null, null),
+            Triple("PL BND X", 0.0, null),
+            Triple("BV BND X", 0.0, 1.0),
+        )
+        for ((bound, lower, upper) in cases) {
+            val text = "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 1\n" +
+                " M1 'MARKER' 'INTEND'\nBOUNDS\n $bound\nENDATA"
+
+            val variable = Mps.parse(text).variables.single()
+
+            assertEquals(MpsVar("X", integer = true, lower = lower, upper = upper), variable, bound)
+        }
+    }
+
+    @Test
     fun `resolves each bounds type`() {
         // (bound line, expected lower, expected upper); null bound = infinity.
         val cases = listOf(

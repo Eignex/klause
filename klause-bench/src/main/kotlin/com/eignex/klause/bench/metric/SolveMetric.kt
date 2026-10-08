@@ -98,6 +98,9 @@ internal data class SolveRecord(
     val gitSha: String?,
     val timestamp: String,
     val command: String,
+    val buildProvenance: BuildProvenance? = null,
+    val buildFingerprint: String? = null,
+    val validationPolicy: String = REPORTED_RESULT_POLICY,
 )
 
 internal object SolveMetric {
@@ -233,6 +236,8 @@ internal object SolveMetric {
             gitSha = sha,
             timestamp = timestamp,
             command = r.command,
+            buildProvenance = r.buildProvenance,
+            buildFingerprint = r.buildProvenance?.fingerprint,
         ) to r.rawOutput
     }.getOrElse { failure ->
         println("?? [${ref.name}] reference ERROR: ${failure.message ?: failure::class.simpleName}")
@@ -311,10 +316,17 @@ internal object SolveMetric {
         val optimize = entry.objective != null
         val kind = if (optimize) "optimize" else "satisfy"
         return runCatching {
-            val key = BenchCache.keyFor(entry.ref, tag, budget)
+            val policy = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
+                PINNED_SOURCE_POLICY
+            } else {
+                REPORTED_RESULT_POLICY
+            }
+            val provenance = if (solverId == SolverInvocation.KLAUSE) InstalledBuild.current else null
+            val key = BenchCache.keyFor(entry.ref, tag, budget, provenance, settings, policy)
             val r = BenchCache.load(key)
                 ?: SolverInvocation.run(entry, solverId, settings, budget, optimize).also { BenchCache.store(key, it) }
             val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
+                .copy(validationPolicy = policy)
             val checked = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
                 val validation = if (r.feasible == true) {
                     MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective)
@@ -424,6 +436,8 @@ internal object SolveMetric {
             gitSha = sha,
             timestamp = timestamp,
             command = r.command,
+            buildProvenance = r.buildProvenance,
+            buildFingerprint = r.buildProvenance?.fingerprint,
         )
     }
 
