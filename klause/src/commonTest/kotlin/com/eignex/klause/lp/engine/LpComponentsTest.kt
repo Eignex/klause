@@ -268,7 +268,7 @@ class LpComponentsTest {
     }
 
     @Test
-    fun `component bounds decline objectives with omitted slack costs`() {
+    fun `component bounds include logical costs in the full objective`() {
         val model = LpBuilder().apply {
             repeat(2) {
                 val x = addVar(0L, 3L)
@@ -279,7 +279,7 @@ class LpComponentsTest {
 
         assertIs<ComponentLpSolver>(newLpSolver(model)).use { solver ->
             assertNotNull(solver.solve())
-            assertNull(solver.exactBound())
+            assertEquals(BigFraction.ofLong(-4L), assertNotNull(solver.exactBound()).value)
             val point = assertNotNull(checkedLpWitness(model, List(2) { BigFraction.ofLong(3L) }))
             assertEquals(BigFraction.ofLong(-4L), point.objective)
         }

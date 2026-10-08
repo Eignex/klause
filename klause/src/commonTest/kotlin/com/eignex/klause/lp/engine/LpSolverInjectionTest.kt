@@ -243,6 +243,45 @@ class LpSolverInjectionTest {
     }
 
     @Test
+    fun `certified exact imports use component engines and report component work`() {
+        val factory = RecordingLpEngineFactory()
+        val observer = SolveRecordingObserver()
+
+        val result = solveAndCertify(twoComponentModel(), observer = observer,
+            context = LpSolveContext(engineFactory = factory))
+
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(2, result.float?.blocks)
+        assertEquals(2, factory.calls.count { it.kind == EngineConstruction.GENERAL })
+        assertEquals(1, factory.calls.count { it.kind == EngineConstruction.COMPONENT })
+        assertTrue(observer.solves.single().second)
+    }
+
+    @Test
+    fun `component close releases every child and preserves the first close failure`() {
+        val first = IllegalStateException("first close")
+        val second = IllegalStateException("second close")
+        var created = 0
+        var closed = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newGeneralSolver(model: LpModel, cancellation: Cancellation, workLimit: Long,
+                pricing: LpPricingOptions): LpSolver {
+                val failure = if (created++ == 0) first else second
+                return closeTrackingSolver { closed++; throw failure }
+            }
+        }
+        val solver = newLpSolver(twoComponentModel(), factory = factory)
+
+        val failure = assertFailsWith<IllegalStateException> { solver.close() }
+
+        assertSame(first, failure)
+        assertSame(second, failure.suppressedExceptions.single())
+        assertEquals(2, closed)
+        solver.close()
+        assertEquals(2, closed)
+    }
+
+    @Test
     fun `component split closes owned solvers when subsolver construction throws`() {
         val model = twoComponentModel()
         var construction = 0
