@@ -1,9 +1,12 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.editing
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -21,27 +24,32 @@ class BacktrackPoolResolutionTest {
 
     @Test
     fun `no arm and no override leaves the curated pool alone`() {
-        assertNull(pool(), "a null pool is what tells the caller to use the catalog as-is")
+        val resolved = pool()
+
+        assertNull(resolved.pool, "a null pool is what tells the caller to use the catalog as-is")
+        assertNull(resolved.edit)
     }
 
     @Test
     fun `pinning one arm resolves a pool of one`() {
-        assertEquals(1, pool("bt-arm=$anArm")?.size)
+        assertEquals(1, pool("bt-arm=$anArm").pool?.size)
     }
 
     @Test
-    fun `an override alone edits every curated arm`() {
-        val edited = pool("lp-branching=false")
+    fun `an override alone keeps the curated pool and carries the edit`() {
+        val resolved = pool("lp-branching=false")
 
-        assertEquals(BacktrackCatalog.labels(Kind.COP).size, edited?.size)
+        assertNull(resolved.pool, "the curated pool is composed, and filtered, before the edit applies")
+        val edit = assertNotNull(resolved.edit)
+        assertTrue(!edit(BacktrackParams()).lpPlan.branching)
     }
 
     @Test
     fun `a pinned arm accepts an override rather than refusing it`() {
         val resolved = pool("bt-arm=$anArm", "lp-branching=false")
 
-        assertEquals(1, resolved?.size, "pinning chooses the arm; the override only changes how it is built")
-        val recipe = resolved!!.single()()
+        assertEquals(1, resolved.pool?.size, "pinning chooses the arm; the override only changes how it is built")
+        val recipe = resolved.pool!!.single()().editing(resolved.edit)
         assertEquals(anArm, recipe.label, "an edit preserves the arm's label for telemetry")
         assertTrue(!recipe.build(1L, null).lpPlan.branching)
     }

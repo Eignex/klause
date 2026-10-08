@@ -7,9 +7,12 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.portfolio.editing
+import com.eignex.klause.portfolio.spending
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.Cancellation
@@ -134,14 +137,13 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
     if (lsResolution.dryRunSolver) return PortfolioPlan.LocalSearchDryRun(lsResolution.pool)
 
     val kind = if (request.optimize) Kind.COP else Kind.CSP
-    val resolvedBtPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
-    val btPool = if (request.nodeBudget != null && mix != EngineMix.LOCAL_SEARCH) {
-        withNodeBudget(resolvedBtPool, kind, request.nodeBudget)
-    } else {
-        resolvedBtPool
-    }
+    val bt = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else BtResolution(null, null)
     if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
-        return PortfolioPlan.BacktrackDryRun(btPool, kind, request.zeroObjectivePricing)
+        // The listing renders each arm as it would be built: the pinned or curated recipes, edited and budgeted.
+        val rebuilt = bt.edit != null || request.nodeBudget != null
+        val listed = bt.pool ?: if (rebuilt) BacktrackCatalog.factories(kind) else null
+        val pool = listed?.map { factory -> { factory().editing(bt.edit).spending(request.nodeBudget) } }
+        return PortfolioPlan.BacktrackDryRun(pool, kind, request.zeroObjectivePricing)
     }
 
     return PortfolioPlan.Execute(
@@ -155,7 +157,8 @@ fun FinitePipeline.planPortfolio(request: PortfolioPlanRequest): PortfolioPlan {
             lpCeiling = request.lpCeiling,
             zeroObjectivePricing = request.zeroObjectivePricing,
             lsPool = lsResolution.pool,
-            btPool = btPool,
+            btPool = bt.pool,
+            btEdit = bt.edit,
             nodeBudget = request.nodeBudget,
             annotationArm = request.annotationArm?.copy(
                 nodeBudget = request.nodeBudget,

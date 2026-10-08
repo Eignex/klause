@@ -55,6 +55,27 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `an edited curated pool still builds no LP arm on a model with nothing to relax`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 6)
+            .copy(btEdit = { it.copy(lubyRestartBase = 7L) })
+        val facts = ProblemFacts(optimizing = true, realColumns = false, relaxation = { false })
+
+        val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
+
+        assertTrue(labels.none { it.startsWith("lp-") }, "labels: $labels")
+    }
+
+    @Test
+    fun `an edit reaches every arm the curated pool builds`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 4)
+            .copy(btEdit = { it.copy(lubyRestartBase = 7L) })
+
+        val arms = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertEquals(listOf(7L, 7L, 7L, 7L), arms.map { it.recipe.build(1L, null).lubyRestartBase })
+    }
+
+    @Test
     fun `an injected backtrack pool is built as asked whatever the model offers`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 2)
             .copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") })

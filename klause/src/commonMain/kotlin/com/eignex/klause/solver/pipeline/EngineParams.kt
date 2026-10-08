@@ -567,6 +567,7 @@ fun buildPortfolioScenario(
     btPool: List<() -> BacktrackRecipe>? = null,
     annotationArm: BacktrackParams? = null,
     nodeBudget: NodeBudget? = null,
+    btEdit: ((BacktrackParams) -> BacktrackParams)? = null,
 ): PortfolioScenario {
     val seed = p.long("seed") ?: fallbackSeed ?: 1L
     val lambda = p.double("lambda") ?: 1.0
@@ -605,6 +606,7 @@ fun buildPortfolioScenario(
         zeroObjectivePricing = zeroObjectivePricing,
         lsPool = lsPool,
         btPool = btPool,
+        btEdit = btEdit,
         annotationArm = annotationArm,
         nodeBudget = nodeBudget,
     )
@@ -615,60 +617,49 @@ fun buildPortfolioScenario(
 }
 
 /**
- * Resolve the `cp`/`mixed` engine's backtrack arm pool from `--param`, the backtrack analogue of
- * [resolveLocalSearchRecipes]. Two mutually-exclusive forms:
+ * The backtrack arms `--param` asks for: [pool] pins named [BacktrackCatalog] arms, null for the curated pool, and
+ * [edit] is applied to every arm built, whichever pool supplies it.
+ */
+class BtResolution(
+    /** The pinned arms, or null for the curated pool. */
+    val pool: List<() -> BacktrackRecipe>?,
+    /** The override every arm's [BacktrackParams] goes through, or null for none. */
+    val edit: ((BacktrackParams) -> BacktrackParams)?,
+)
+
+/**
+ * Resolve the `cp`/`mixed` engine's backtrack arms from `--param`, the backtrack analogue of
+ * [resolveLocalSearchRecipes]. Two forms, which compose:
  *  - `bt-arm=label,label` pins named [BacktrackCatalog] arms, each validated for [kind] (so a CSP
  *    rejects the COP-only LP/LinUCB arms); an unknown label is a hard usage error.
  *  - the per-solver override keys ([BACKTRACK_OVERRIDE_KEYS] — `var-selector`/`val-selector`/`luby`/…)
- *    *edit the curated pool* ([backtrackOverride]): every arm keeps its own seed/lp/luby diversity with
- *    the override pinned across it, so `-p8 -e cp --param var-selector=vsids` stays a full 8-worker pool
- *    (the arms converge to one only if the overrides pin every distinguishing axis). A one-solver A/B
- *    is this same pool at `-p1`.
+ *    *edit* the arms ([backtrackOverride]): every arm keeps its own seed/lp/luby diversity with the override
+ *    pinned across it, so `-p8 -e cp --param var-selector=vsids` stays a full 8-worker pool. An edit without
+ *    `bt-arm` edits the curated pool after it is composed, so the arms the model offers nothing to stay out.
  *
- * `null` when neither is set — the curated pool is used. A resolved pool is the *set* of arms; the
- * worker *count* still comes from `arms=`/`bt=`/the default and wraps over it, exactly as `lsPool` does.
+ * A pinned pool is the *set* of arms; the worker *count* still comes from `arms=`/`bt=`/the default and wraps
+ * over it, exactly as `lsPool` does.
  */
-fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? {
+fun resolveBtRecipes(p: EngineParams, kind: Kind): BtResolution {
     val btArm = p.string("bt-arm")
     val edit = backtrackOverride(p, allowSelectors = true)
-    if (btArm != null) {
-        val labels = btArm.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-        if (labels.isEmpty()) pipelineConfigError("bt-arm: expected a comma-separated list of backtrack arm labels")
-        val known = BacktrackCatalog.labels(kind).toSet()
-        for (label in labels) {
-            if (label !in known) {
-                pipelineConfigError(
-                    "bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})",
-                )
-            }
-        }
-        // Pinning and editing compose: `bt-arm` chooses *which* arms run, an override changes *how*
-        // each is built. Refusing the pair forced a knob to be A/B'd across the whole curated pool,
-        // where the arms that cannot express it dilute the very thing being measured.
-        return labels.map { label ->
-            { BacktrackCatalog.byLabel(label).let { if (edit == null) it else editRecipe(it, edit) } }
+    if (btArm == null) return BtResolution(null, edit)
+    val labels = btArm.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    if (labels.isEmpty()) pipelineConfigError("bt-arm: expected a comma-separated list of backtrack arm labels")
+    val known = BacktrackCatalog.labels(kind).toSet()
+    for (label in labels) {
+        if (label !in known) {
+            pipelineConfigError(
+                "bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})",
+            )
         }
     }
-    if (edit == null) return null
-    // Edit every curated arm, exactly as resolveLocalSearchRecipes edits its pool. The edit rebuilds selectors
-    // per worker (fresh mutable state), so the wrapped factory stays safe across parallel slots.
-    return BacktrackCatalog.factories(kind).map { factory -> { editRecipe(factory(), edit) } }
+    return BtResolution(labels.map { label -> { BacktrackCatalog.byLabel(label) } }, edit)
 }
 
 /** The `--param` key naming a [NodeBudget]; consumed in `SolveCore` rather than here, because one
  *  budget has to serve the whole invocation and [EngineParams] consumes keys per instance. */
 const val NODE_LIMIT_KEY = "node-limit"
-
-/** [pool], or the curated pool when it is null, with every arm spending [budget]. */
-fun withNodeBudget(pool: List<() -> BacktrackRecipe>?, kind: Kind, budget: NodeBudget): List<() -> BacktrackRecipe> =
-    (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
-        { editRecipe(factory(), { params -> params.copy(nodeBudget = budget) }) }
-    }
-
-/** Wrap [recipe] so [edit] is applied to the [BacktrackParams] it builds — per worker, so selector
- *  state stays unshared. Preserves the arm's label for telemetry / the `dry-run-solver` listing. */
-private fun editRecipe(recipe: BacktrackRecipe, edit: (BacktrackParams) -> BacktrackParams): BacktrackRecipe =
-    BacktrackRecipe(recipe.label) { seed, onEvent -> edit(recipe.build(seed, onEvent)) }
 
 /** Auto-tuned default arm-pool size, scaling with the core count: [ARMS_PER_CORE] arms per
  *  core — always *more* arms than cores, so the bandit (single core) / parallel race always has a

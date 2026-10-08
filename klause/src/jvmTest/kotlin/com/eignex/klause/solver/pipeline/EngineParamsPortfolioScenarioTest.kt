@@ -66,13 +66,13 @@ class EngineParamsPortfolioScenarioTest {
 
     @Test
     fun `bt-arm resolves a named backtrack recipe pool, null when unset`() {
-        val pool = resolveBtRecipes(EngineParams(listOf("bt-arm=free,conflictDriven")), Kind.COP)
+        val pool = resolveBtRecipes(EngineParams(listOf("bt-arm=free,conflictDriven")), Kind.COP).pool
         assertEquals(
             listOf("free", "conflictDriven"),
             pool?.map { it().label },
             "bt-arm resolves the named arms in order",
         )
-        assertNull(resolveBtRecipes(EngineParams(emptyList()), Kind.COP), "no bt-arm keeps the curated pool")
+        assertNull(resolveBtRecipes(EngineParams(emptyList()), Kind.COP).pool, "no bt-arm keeps the curated pool")
     }
 
     @Test
