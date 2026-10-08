@@ -690,7 +690,8 @@ class LocalSearchState(
         )
     }
 
-    private fun retractForBoolFlip(touched: IntArray) = retractBruteForce(touched) { it.maintainsBreakMakeIncrementally }
+    private fun retractForBoolFlip(touched: IntArray) =
+        retractBruteForce(touched) { it.maintainsBreakMakeIncrementally }
 
     private fun refreshForBoolFlip(touched: IntArray, boolVar: Int) =
         refreshFactors(touched) { factors[it].applyBoolFlip(this, it, boolVar) }
