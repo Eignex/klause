@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -18,7 +19,7 @@ import com.eignex.klause.util.IntArrayList
  * distances through the constant node move on each sweep, which widens the head set back to all of them.
  * Removing the window costs 2.3-2.7x at an identical 4000 nodes.
  *
- * Visiting a rotating window still reaches every head across successive calls — a refutation is deferred,
+ * Keeping deferred heads queued still reaches every head across successive decisions — a refutation is deferred,
  * never dropped, and a deferred one only leaves an edge open that the Boolean layer may still decide, so
  * the verdict is unaffected either way.
  */
@@ -94,9 +95,6 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         val pendingTails = IntArrayList()
         var reason: IntArray? = null
 
-        /** Bumped whenever an edge enters or leaves the graph, so a sweep can tell the system apart. */
-        var version: Int = 0
-
         /** Bumped only when an edge is asserted, which is the one way a path can shorten. */
         var assertVersion: Int = 0
         var sweptVersion: Int = -1
@@ -105,11 +103,22 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         /** Tails of the edges asserted since the last sweep; see [headsToSweep]. */
         val newTails = IntArrayList()
 
-        /** Rotating start into the head list, so a budgeted sweep covers every head over successive calls. */
-        var headCursor = 0
+        val heads = IntArrayDeque()
+        private val queuedHeads = BooleanArray(numVertices)
+        var retractedSinceSweep = false
         private val reached = IntArray(numVertices)
         private val queue = IntArrayList()
         private var stamp = 0
+
+        fun queueHeads(vertices: IntArray) {
+            for (v in vertices) {
+                if (queuedHeads[v]) continue
+                queuedHeads[v] = true
+                heads.addLast(v)
+            }
+        }
+
+        fun nextHead(): Int = heads.removeFirst().also { queuedHeads[it] = false }
 
         /** Mark [v] reached in the current traversal, false when it already was. */
         fun reach(v: Int): Boolean {
@@ -225,22 +234,21 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         for (e in guards.indices) {
             if (!graph.isActive(e) || asserted(state, e)) continue
             graph.retract(e)
-            session.version++
+            session.retractedSinceSweep = true
         }
         for (e in guards.indices) {
             if (graph.isActive(e) || !asserted(state, e)) continue
             val cycle = graph.assertEdge(e)
-            session.version++
             session.assertVersion++
             session.newTails.add(tail[e])
             if (cycle == null) continue
             session.reason = blockingClause(cycle)
             return false
         }
-        // Nothing to re-derive while the asserted system stands as it was swept and the search has only
-        // gone deeper: the same edges refute the same open ones, and those pins are still in force.
+        // Completed heads need no revisit on descent while their asserted paths and implied pins survive.
         val descended = state.numDecisions >= session.sweptDecisions
-        if (session.assertVersion == session.sweptVersion && descended) {
+        val changed = session.assertVersion != session.sweptVersion
+        if (!changed && descended && !session.retractedSinceSweep && session.heads.isEmpty()) {
             session.newTails.clear()
             return true
         }
@@ -251,21 +259,23 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         // edge stays open and the Boolean layer may decide it in the meantime, which the sweep then reads
         // off the trail. Assertion and retraction above stay eager, because a negative cycle is a
         // conflict and must be seen on the trail that produced it.
-        if (state.numDecisions == session.sweptDecisions) {
+        if (state.numDecisions == session.sweptDecisions && !session.retractedSinceSweep) return true
+        if (changed || !descended || session.retractedSinceSweep) {
+            // A route through the constant can shorten outside row-only reachability, so it widens the
+            // scheduled heads. Retraction can release implied guards even on a sibling at the same depth.
+            val hubMoved = graph.refreshZeroDistances(zeroVertex)
+            val heads = if (descended && !hubMoved && !session.retractedSinceSweep) {
+                headsToSweep(session)
+            } else {
+                bucketVertex
+            }
+            session.queueHeads(heads)
             session.newTails.clear()
-            return true
+            session.retractedSinceSweep = false
+            session.sweptVersion = session.assertVersion
         }
-        // Refreshed before the heads are chosen: a route through the constant node can shorten for a pair
-        // the row-only reachability below would never reach, so a move there widens the sweep to all of
-        // them. Twice per sweep, against once per head had the node stayed a hub.
-        val hubMoved = graph.refreshZeroDistances(zeroVertex)
-        // A backtrack releases the guards earlier sweeps pinned, so every head has to be revisited; a
-        // descent only has to revisit the heads the new assertions could have moved.
-        val heads = if (descended && !hubMoved) headsToSweep(session) else bucketVertex
-        session.newTails.clear()
-        session.sweptVersion = session.assertVersion
         session.sweptDecisions = state.numDecisions
-        return refuteOpenEdges(state, session, heads)
+        return refuteOpenEdges(state, session)
     }
 
     /** Whether edge [e] currently holds, so it belongs in the graph. */
@@ -277,11 +287,11 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      * weight `w` closes a negative cycle exactly when the shortest asserted path `y ⇝ x` has weight
      * `d` with `d + w < 0`, so one search out of `y` decides every open edge whose head is `y`.
      */
-    private fun refuteOpenEdges(state: PropagationState, session: Session, heads: IntArray): Boolean {
+    private fun refuteOpenEdges(state: PropagationState, session: Session): Boolean {
         val graph = session.graph
-        val budget = if (heads.size <= HEAD_SWEEP_BUDGET) heads.size else HEAD_SWEEP_BUDGET
-        for (k in 0 until budget) {
-            val v = heads[(session.headCursor + k) % heads.size]
+        val budget = minOf(session.heads.size, HEAD_SWEEP_BUDGET)
+        repeat(budget) {
+            val v = session.nextHead()
             session.pending.clear()
             session.pendingTails.clear()
             for (i in bucketStart[v] until bucketStart[v + 1]) {
@@ -290,7 +300,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
                 session.pending.add(e)
                 session.pendingTails.add(tail[e])
             }
-            if (session.pending.size == 0) continue
+            if (session.pending.size == 0) return@repeat
             // The route through the constant node is already measured, so it refutes without a search and
             // spares the search from settling that edge's tail at all.
             var open = false
@@ -304,7 +314,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
                 }
                 open = true
             }
-            if (!open) continue
+            if (!open) return@repeat
             graph.shortestPathsFrom(v, session.pendingTails.toIntArray())
             for (k in 0 until session.pending.size) {
                 val e = session.pending[k]
@@ -313,7 +323,6 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
                 if (!closesNegativeCycle(d, bound[e])) continue
                 if (!refute(state, session, e, blockingClause(graph.pathTo(tail[e])))) return false
             }
-            session.headCursor = if (heads.size == 0) 0 else (session.headCursor + budget) % heads.size
         }
         return true
     }
