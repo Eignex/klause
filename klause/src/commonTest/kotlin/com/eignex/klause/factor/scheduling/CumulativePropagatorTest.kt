@@ -3,6 +3,7 @@ package com.eignex.klause.factor.scheduling
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.arithmetic.Linear
@@ -27,6 +28,7 @@ import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
@@ -252,6 +254,36 @@ class CumulativePropagatorTest {
     }
 
     // --- Conflict reasons ---
+
+    @Test
+    fun `time table domain wipeout cites the tasks blocking every start`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 6), IntDomain(0, 6)),
+            factors = arrayOf<Factor>(
+                Cumulative(
+                    starts = intArrayOf(0, 1, 2),
+                    durations = longArrayOf(5, 1, 1),
+                    resources = longArrayOf(2, 3, 3),
+                    capacity = 4,
+                ),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        assertTrue(state.setInt(1, 3) && state.setInt(2, 5))
+        state.currentFactor = 0
+
+        assertFalse(state.factorAt(0).propagate(state, 0))
+
+        val reason = assertNotNull(state.factorAt(0).conflictReason(state, 0))
+        for (starts in listOf(longArrayOf(4, 3, 0), longArrayOf(0, 6, 5))) {
+            val solution = Sample(BooleanArray(0), starts)
+            assertTrue(reason.any { ConflictReasonOracle.litTrueUnder(problem, state, it, solution) })
+        }
+    }
 
     @Test
     fun `profile-overload reason is a sound witness that omits non-covering tasks`() {

@@ -447,8 +447,8 @@ internal class CumulativePropagator(
 
         /**
          * Task [i]'s start moved to [bound] ([lower]) because each start it skipped overloads the profile. When it
-         * moved by at most its duration every skipped placement spans the one point just short of [bound], and
-         * that point's overload suffices; otherwise every compulsory part meeting a skipped placement is cited.
+         * retains a start after moving by at most its duration, the surviving placement isolates the point
+         * blocking the last skipped start; otherwise every compulsory part meeting a skipped placement is cited.
          */
         fun shaveReason(i: Int, lower: Boolean, bound: Long) {
             task(i)
@@ -458,7 +458,8 @@ internal class CumulativePropagator(
             resGe(i, r)
             val old = if (lower) est(i) else lst(i)
             val shift = if (lower) bound - old else old - bound
-            if (shift <= d) {
+            val withinBounds = if (lower) bound <= lst(i) else bound >= est(i)
+            if (shift <= d && withinBounds) {
                 val t = if (lower) bound - 1 else bound + d
                 if (lower) startGe(i, bound - d) else startLe(i, bound + d)
                 overloadAt(t, i, capMax() - r)
