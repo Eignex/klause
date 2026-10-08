@@ -13,6 +13,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SharingChannel
 
 /**
  * A portfolio arm wrapping a [BacktrackRecipe] for execution — the backtrack counterpart of
@@ -57,12 +58,17 @@ internal class BacktrackWorkerConfig(
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
         // Shared entries name the worker's position as their origin, so replicas of one arm are credited apart.
         val sharing = HashSet<Contribution>()
+        val meter = SharingMeter()
         pools?.clauses?.let {
-            params = params.copy(clauseExchange = PoolClauseExchange(it, origin = index, tally = pools.contributions))
+            params = params.copy(
+                clauseExchange = PoolClauseExchange(it, origin = index, tally = pools.contributions, meter = meter),
+            )
             sharing += Contribution.Clause
         }
         pools?.cuts?.let {
-            params = params.copy(cutExchange = PoolCutExchange(it, origin = index, tally = pools.contributions))
+            params = params.copy(
+                cutExchange = PoolCutExchange(it, origin = index, tally = pools.contributions, meter = meter),
+            )
             if (params.separatesCuts()) sharing += Contribution.Cut
         }
         // Wire this arm to the shared objective lower-bound manager when optimising: publish
@@ -71,18 +77,24 @@ internal class BacktrackWorkerConfig(
             pools?.bounds?.let { bounds ->
                 params = params.copy(
                     objectiveLowerBoundSink = { v ->
+                        meter.exported(SharingChannel.Floor, 1)
                         pools.contributions.note(Contribution.Floor, index, bounds.publish(v))
                     },
                     objectiveLowerBoundSupplier = bounds::current,
+                    sharingTimer = meter::charge,
                 )
                 sharing += Contribution.Floor
             }
             pools?.varBounds?.let { vb ->
                 params = params.copy(
-                    globalVarBoundSink = { v, lo, hi -> vb.publish(v, lo, hi, origin = index) },
+                    globalVarBoundSink = { v, lo, hi ->
+                        meter.exported(SharingChannel.Bounds, 1)
+                        vb.publish(v, lo, hi, origin = index)
+                    },
                     globalVarLowerSupplier = vb::lowerOf,
                     globalVarUpperSupplier = vb::upperOf,
                     globalVarImportSink = { v, lower ->
+                        meter.imported(SharingChannel.Bounds, 1)
                         val from = if (lower) vb.lowerOriginOf(v) else vb.upperOriginOf(v)
                         if (from != index) pools.contributions.note(Contribution.Bound, from)
                     },
@@ -93,8 +105,11 @@ internal class BacktrackWorkerConfig(
             // best during stable phases (solution phasing). Only STABLE windows consult it, so arms explore.
             pools?.solutions?.let { sols ->
                 params = params.copy(
-                    improvedSolutionSink = { sample, objective -> sols.offer(sample, objective) },
-                    pooledIncumbents = sols,
+                    improvedSolutionSink = { sample, objective ->
+                        meter.exported(SharingChannel.Incumbents, 1)
+                        meter.timed(SharingChannel.Incumbents) { sols.offer(sample, objective) }
+                    },
+                    pooledIncumbents = sols.metered(meter),
                     solutionPhasing = true,
                 )
             }
@@ -112,6 +127,7 @@ internal class BacktrackWorkerConfig(
         ).also {
             it.sharedPools = pools
             it.sharing = sharing
+            it.sharingMeter = meter
         }
     }
 

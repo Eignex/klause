@@ -3,7 +3,9 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.SingleIntObjective
+import com.eignex.klause.solver.result.SharingChannel
 import kotlin.math.ceil
+import kotlin.time.TimeSource
 
 /**
  * Level-0 bound exchange with sibling portfolio arms. At the root the branch-and-bound engine
@@ -25,11 +27,11 @@ internal class PortfolioBoundExchange(
     private var lastPublishedFloor = Double.NEGATIVE_INFINITY
 
     /** Import a peer-proven objective lower bound, tightening this arm's objective variable. */
-    fun applySharedFloor() {
-        val supplier = params.objectiveLowerBoundSupplier ?: return
-        val obj = singleObj?.takeIf { it.ascending } ?: return
+    fun applySharedFloor() = timed(SharingChannel.Floor) {
+        val supplier = params.objectiveLowerBoundSupplier ?: return@timed
+        val obj = singleObj?.takeIf { it.ascending } ?: return@timed
         val bound = supplier()
-        if (!bound.isFinite()) return
+        if (!bound.isFinite()) return@timed
         val floor = ceil(bound)
         if (floor in Long.MIN_VALUE.toDouble()..Long.MAX_VALUE.toDouble()) {
             session.implyIntAtLeast(obj.varId, floor.toLong())
@@ -38,10 +40,10 @@ internal class PortfolioBoundExchange(
 
     /** Publish this arm's objective floor (the objective variable's current root lower bound) when it
      *  has risen, so peers can import it. Level-0 only. */
-    fun publishFloor() {
-        val sink = params.objectiveLowerBoundSink ?: return
-        val obj = singleObj?.takeIf { it.ascending } ?: return
-        if (session.decisionLevel != 0) return
+    fun publishFloor() = timed(SharingChannel.Floor) {
+        val sink = params.objectiveLowerBoundSink ?: return@timed
+        val obj = singleObj?.takeIf { it.ascending } ?: return@timed
+        if (session.decisionLevel != 0) return@timed
         val floor = session.intDomain(obj.varId).min.toDouble()
         if (floor > lastPublishedFloor) {
             lastPublishedFloor = floor
@@ -51,10 +53,10 @@ internal class PortfolioBoundExchange(
 
     /** Import peers' globally-valid level-0 variable tightenings (import only — level-0 domains here
      *  may carry this arm's incumbent-relative fixings, which are not global). */
-    fun importGlobalVarBounds() {
-        val lower = params.globalVarLowerSupplier ?: return
-        val upper = params.globalVarUpperSupplier ?: return
-        if (session.decisionLevel != 0) return
+    fun importGlobalVarBounds() = timed(SharingChannel.Bounds) {
+        val lower = params.globalVarLowerSupplier ?: return@timed
+        val upper = params.globalVarUpperSupplier ?: return@timed
+        if (session.decisionLevel != 0) return@timed
         val used = params.globalVarImportSink
         for (v in 0 until problem.numIntVars) {
             val lo = lower(v)
@@ -71,13 +73,21 @@ internal class PortfolioBoundExchange(
     }
 
     /** Publish this arm's root variable tightenings (any narrowed past its root domain). */
-    fun publishGlobalVarBounds() {
-        val sink = params.globalVarBoundSink ?: return
-        if (session.decisionLevel != 0) return
+    fun publishGlobalVarBounds() = timed(SharingChannel.Bounds) {
+        val sink = params.globalVarBoundSink ?: return@timed
+        if (session.decisionLevel != 0) return@timed
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
             val root = problem.rootIntDomain(v)
             if (d.min > root.min || d.max < root.max) sink(v, d.min, d.max)
         }
+    }
+
+    // Charge [block]'s time to [channel] when the portfolio measures this arm's sharing.
+    private inline fun timed(channel: SharingChannel, block: () -> Unit) {
+        val timer = params.sharingTimer ?: return block()
+        val start = TimeSource.Monotonic.markNow()
+        block()
+        timer(channel, start.elapsedNow().inWholeNanoseconds)
     }
 }

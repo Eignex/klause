@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.lp.cut.SharedCut
+import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
@@ -77,11 +78,18 @@ internal class PoolCutExchange(
     private val origin: Int = SharedCutPool.NO_ORIGIN,
     /** Where selections of imported cuts are counted for the arms that published them; null counts nothing. */
     private val tally: ContributionTally? = null,
+    /** Where this arm's cut traffic is recorded; null records nothing. */
+    private val meter: SharingMeter? = null,
 ) : CutExchange {
     private var cursor = 0
     private val seen = LongHashSet()
 
     override fun exchange(sharing: CutSharing) {
+        val m = meter
+        if (m == null) exchangeWith(sharing) else m.timed(SharingChannel.Cuts) { exchangeWith(sharing) }
+    }
+
+    private fun exchangeWith(sharing: CutSharing) {
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
         val fresh = drained.cuts.indices.filter { seen.add(drained.cuts[it].key) }
@@ -92,5 +100,8 @@ internal class PoolCutExchange(
         tally?.let { t -> sharing.drainImportUses { from, uses -> t.note(Contribution.Cut, from, uses.toDouble()) } }
         val exported = sharing.exportGlobalCuts().filter { seen.add(it.key) }
         pool.publish(exported, origin)
+        meter?.imported(SharingChannel.Cuts, fresh.size)
+        meter?.duplicates(SharingChannel.Cuts, drained.cuts.size - fresh.size)
+        meter?.exported(SharingChannel.Cuts, exported.size)
     }
 }

@@ -34,4 +34,6 @@ data class ArmSchedule(
     val maxMillis: Long = 0L,
     /** Milliseconds constructing resumable handles, included in [millis]. */
     val initializationMillis: Long = 0L,
+    /** What the arm's sharing with the rest of the pool cost and moved, included in [millis]. */
+    val sharing: SharingStats = SharingStats(),
 )
