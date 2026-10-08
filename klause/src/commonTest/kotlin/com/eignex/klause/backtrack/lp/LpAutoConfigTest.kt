@@ -6,6 +6,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
@@ -71,6 +72,55 @@ class LpAutoConfigTest {
         } finally {
             KlauseConfig.current = saved
         }
+    }
+
+    @Test
+    fun `continuous columns count toward the relaxation-size ceiling`() {
+        val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2)
+        val discrete = problem(row)
+        val mixed = Problem(
+            0,
+            3,
+            Array(3) { IntDomain(0, 5) },
+            arrayOf<Factor>(row),
+            numRealVars = 100,
+            realLower = DoubleArray(100),
+            realUpper = DoubleArray(100) { 1.0 },
+        )
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = saved.copy(lpCeilingTableauCells = 50L)
+
+            assertTrue(LpAutoConfig.recommend(discrete).bounding)
+            assertFalse(LpAutoConfig.recommend(mixed).bounding, "100 continuous columns are past a 50-cell ceiling")
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
+    @Test
+    fun `a reified real row enables the bounding stack`() {
+        val p = Problem(
+            1,
+            1,
+            arrayOf(IntDomain(0, 5)),
+            arrayOf<Factor>(
+                ReifiedRealLinear(
+                    aux = 0,
+                    vars = intArrayOf(0),
+                    intCoeffs = doubleArrayOf(1.0),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.LE,
+                    bound = 3.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(4.0),
+        )
+
+        assertTrue(LpAutoConfig.recommend(p).bounding)
     }
 
     @Test
