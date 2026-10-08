@@ -1037,4 +1037,21 @@ class PortfolioTest {
         assertEquals(first.stats.ls.moves, second.stats.ls.moves, "mixed runs must reproduce LS work")
         assertEquals(first.stats.search.nodes, second.stats.search.nodes, "mixed runs must reproduce CP work")
     }
+
+    @Test
+    fun `handle construction work is charged once across resumed segments`() {
+        var slices = 0
+        val scripted = ScriptedSearch({ false }) { slices++ }
+        val handle = object : ResumableSearch by scripted {
+            override val initialWork: Long = 10L
+            override val work: Long get() = initialWork + scripted.work
+        }
+        val worker = trackingWorker("initialized", 0, handle)
+
+        val result = Portfolio.thompson(listOf(worker)).use {
+            it.minimize(Cancellation { slices >= 2 })
+        }
+
+        assertEquals(handle.work, result.stats.portfolio.arms.single().work)
+    }
 }

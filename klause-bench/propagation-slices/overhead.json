@@ -1,0 +1,37 @@
+{
+  "name": "2221-propagation-work-contiguity-overhead",
+  "problems": [],
+  "problemList": [
+    {
+      "suite": "hakank",
+      "problem": "contiguity_mip/contiguity_mip2",
+      "collection": "hakank",
+      "family": "contiguity_mip",
+      "format": "MINIZINC",
+      "category": "CSP"
+    }
+  ],
+  "base": {
+    "timeout": "30000",
+    "processors": "1",
+    "engine": "fixed",
+    "param.node-limit": "5000"
+  },
+  "configs": [
+    {
+      "label": "baseline",
+      "ref": "da388ebcd1c20580bfe061c7a9811829e8cb2efc"
+    },
+    {
+      "label": "bounded-work",
+      "ref": "16644a3be424380e395ffa88e66f73580b71bb41"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 12,
+  "parallel": 2,
+  "host": "lab",
+  "priority": 5
+}

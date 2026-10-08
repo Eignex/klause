@@ -727,6 +727,61 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `a skipped root model is exhausted after a cancellation pause`() {
+        var cancelled = false
+        var checked = 0
+        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        val run = session.openRun(
+            numBoolVars = 0,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+                    checked++
+                    cancelled = true
+                    return SearchModelDisposition.Skip
+                }
+            },
+            lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            },
+        )
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        cancelled = false
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Exhausted>(result)
+        assertEquals(1, checked)
+    }
+
+    @Test
+    fun `a skipped model resumes at its sibling after a cancellation pause`() {
+        var cancelled = false
+        var checked = 0
+        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        val run = session.openRun(
+            numBoolVars = 1,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+                    checked++
+                    if (checked > 1) return SearchModelDisposition.Surface
+                    cancelled = true
+                    return SearchModelDisposition.Skip
+                }
+            },
+            lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            },
+        )
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        cancelled = false
+        val result = assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(true, result.model.valueOf<Boolean>(SearchBoolValue(0)))
+        assertEquals(2, checked)
+    }
+
+    @Test
     fun `node policy prunes through the shared frame stack`() {
         var calls = 0
         val session = SearchSession(emptyList())
@@ -902,5 +957,67 @@ class SearchSessionTest {
         override fun retract(decisionLevel: Int) {
             retractions.add(decisionLevel)
         }
+    }
+
+    @Test
+    fun `pausing between failed siblings retains the untried alternative`() {
+        val attempted = ArrayList<Long>()
+        val brancher = object : SearchBrancher {
+            override fun nextBranch(context: SearchContext): List<SearchDecision>? =
+                if (context.intLowerBound(0) == null) {
+                    listOf(SearchDecision.IntEqual(0, 0), SearchDecision.IntEqual(0, 1))
+                } else {
+                    null
+                }
+        }
+        val refuter = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                val value = (decision as SearchDecision.IntEqual).value
+                attempted += value
+                return if (value == 0L) ComponentResult.Conflict() else ComponentResult.Consistent
+            }
+        }
+        val session = SearchSession(listOf(brancher, refuter))
+        val run = session.openRun(numBoolVars = 0)
+        run.pauseBeforeDecision = { attempted.size == 1 }
+        session.initialize()
+
+        assertIs<SearchRunEvent.Paused>(run.next())
+        assertEquals(listOf(0L), attempted)
+        run.pauseBeforeDecision = { false }
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+        assertEquals(listOf(0L, 1L), attempted)
+    }
+
+    @Test
+    fun `a spent slice after the last rejected leaf does not replay the exhausted root`() {
+        var checked = false
+        val component = object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck {
+                checked = true
+                return ComponentCheck.Infeasible()
+            }
+        }
+        val session = SearchSession(listOf(component), cancellation = Cancellation { checked })
+        val run = session.openRun(numBoolVars = 0)
+        session.initialize()
+
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+    }
+
+    @Test
+    fun `reset discards a pending decision from a paused traversal`() {
+        val session = SearchSession(emptyList())
+        val run = session.openRun(numBoolVars = 1)
+        run.pauseBeforeDecision = { true }
+        session.initialize()
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        session.popTo(0)
+        run.reset()
+        run.pauseBeforeDecision = { false }
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
     }
 }

@@ -1,0 +1,107 @@
+{
+  "name": "2221-propagation-work-final-10s",
+  "problems": [],
+  "problemList": [
+    {
+      "suite": "hakank",
+      "problem": "contiguity_mip/contiguity_mip2",
+      "collection": "hakank",
+      "family": "contiguity_mip",
+      "format": "MINIZINC",
+      "category": "CSP"
+    },
+    {
+      "suite": "miplib2017",
+      "problem": "misc04inf",
+      "collection": "miplib2017",
+      "family": "misc04inf",
+      "format": "MPS",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "miplib2003",
+      "problem": "fixnet6",
+      "collection": "miplib2003",
+      "family": "fixnet6",
+      "format": "MPS",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "miplib3",
+      "problem": "blend2",
+      "collection": "miplib3-mps",
+      "family": "blend2",
+      "format": "MPS",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "hakank",
+      "problem": "knapsack_rosetta_code_unbounded_int/knapsack_rosetta_code_unbounded_int",
+      "collection": "hakank",
+      "family": "knapsack_rosetta_code_unbounded_int",
+      "format": "MINIZINC",
+      "category": "CSP"
+    },
+    {
+      "suite": "xcsp3-cop",
+      "problem": "IHTC-i16_c25",
+      "collection": "xcsp3-cop-22to25",
+      "family": "IHTC",
+      "format": "XCSP3",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "mzn-bench",
+      "problem": "2024/concert-hall-cap/concert_200_20",
+      "collection": "mzn-challenge",
+      "family": "2024/concert-hall-cap",
+      "format": "MINIZINC",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "xcsp3-cop",
+      "problem": "Coprime-14_c25",
+      "collection": "xcsp3-cop-22to25",
+      "family": "Coprime",
+      "format": "XCSP3",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "xcsp3-cop",
+      "problem": "IHTC-i04_c25",
+      "collection": "xcsp3-cop-22to25",
+      "family": "IHTC",
+      "format": "XCSP3",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "mzn-bench",
+      "problem": "2022/arithmetic-target/8657_with_1_1_2_3_4_4_5_5_8_9_50",
+      "collection": "mzn-challenge",
+      "family": "2022/arithmetic-target",
+      "format": "MINIZINC",
+      "category": "OPTIMIZATION"
+    }
+  ],
+  "base": {
+    "timeout": "10000",
+    "processors": "1"
+  },
+  "configs": [
+    {
+      "label": "baseline",
+      "ref": "da388ebcd1c20580bfe061c7a9811829e8cb2efc"
+    },
+    {
+      "label": "bounded-work",
+      "ref": "16644a3be424380e395ffa88e66f73580b71bb41"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 3,
+  "parallel": 2,
+  "host": "lab",
+  "priority": 4
+}

@@ -30,4 +30,8 @@ data class ArmSchedule(
     val faults: Long = 0L,
     /** Credit the arm earned, by the kind of contribution that earned it. */
     val credit: Map<String, Double>,
+    /** Longest segment, including handle construction and root setup. */
+    val maxMillis: Long = 0L,
+    /** Milliseconds constructing resumable handles, included in [millis]. */
+    val initializationMillis: Long = 0L,
 )

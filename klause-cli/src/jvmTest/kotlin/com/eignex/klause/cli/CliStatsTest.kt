@@ -471,11 +471,16 @@ class CliStatsTest {
             meanReward = 0.5,
             failures = 0,
             credit = credit,
+            maxMillis = 500,
+            initializationMillis = 100,
         )
         val stats = SolveStats(portfolio = PortfolioStats(listOf(arm)))
 
         val pairs = portfolioStatPairs(stats).toMap()
 
-        assertEquals("segments=3 work=15000 ms=1200 reward=0.5 failures=0 faults=0 ClauseUses=4", pairs["arm.bt-0"])
+        assertEquals(
+            "segments=3 work=15000 ms=1200 reward=0.5 failures=0 faults=0 maxMs=500 initMs=100 ClauseUses=4",
+            pairs["arm.bt-0"],
+        )
     }
 }

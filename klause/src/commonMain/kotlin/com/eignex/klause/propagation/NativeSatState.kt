@@ -384,6 +384,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val wb = watchBlockers[falseLit]
         var wi = 0
         while (wi < wc.size) {
+            state.work++
             val h = wc[wi]
             val blocker = wb[wi]
             if (state.litTrue(blocker)) {

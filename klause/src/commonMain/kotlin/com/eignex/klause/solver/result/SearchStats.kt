@@ -42,6 +42,14 @@ data class SearchStats(
     val inprocessVisits: SumResult = ZERO_COUNT,
     /** Learned clauses with a literal block distance of at most two: the short, reusable ones. */
     val glueClauses: SumResult = ZERO_COUNT,
+    /** Propagation dispatches, watcher/level visits, and linear term inspections, including reasons. */
+    val propagationWork: SumResult = ZERO_COUNT,
+    /** Work in the session constructor's root fixpoint. */
+    val rootPropagationWork: SumResult = ZERO_COUNT,
+    /** Nanoseconds in propagation fixpoints, including the constructor's root fixpoint. */
+    val propagationNanos: SumResult = ZERO_COUNT,
+    /** Nanoseconds in the session constructor's root fixpoint. */
+    val rootPropagationNanos: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers' search stats: counters add, peak depth maxes, depth means weight-combine. */
     fun mergedWith(o: SearchStats): SearchStats = SearchStats(
@@ -49,6 +57,10 @@ data class SearchStats(
         fails = SumResult(fails.sum + o.fails.sum),
         restarts = SumResult(restarts.sum + o.restarts.sum),
         propagations = SumResult(propagations.sum + o.propagations.sum),
+        propagationWork = SumResult(propagationWork.sum + o.propagationWork.sum),
+        rootPropagationWork = SumResult(rootPropagationWork.sum + o.rootPropagationWork.sum),
+        propagationNanos = SumResult(propagationNanos.sum + o.propagationNanos.sum),
+        rootPropagationNanos = SumResult(rootPropagationNanos.sum + o.rootPropagationNanos.sum),
         learnedClauses = SumResult(learnedClauses.sum + o.learnedClauses.sum),
         learnedLiterals = SumResult(learnedLiterals.sum + o.learnedLiterals.sum),
         learnedLbd = SumResult(learnedLbd.sum + o.learnedLbd.sum),
@@ -64,6 +76,11 @@ data class SearchStats(
 
 /** Mutable [SearchStats] accumulator; snapshots into a [SearchStats]. See [SolveStatsSink]. */
 internal class SearchStatsSink {
+    var propagationWork: () -> Long = { 0L }
+    var rootPropagationWork: () -> Long = { 0L }
+    var propagationNanos: () -> Long = { 0L }
+    var rootPropagationNanos: () -> Long = { 0L }
+
     val nodes: CountStat = CountStat()
     val fails: CountStat = CountStat()
     val restarts: CountStat = CountStat()
@@ -130,6 +147,10 @@ internal class SearchStatsSink {
         fails = fails.read(),
         restarts = restarts.read(),
         propagations = propagations.read(),
+        propagationWork = SumResult(propagationWork().toDouble()),
+        rootPropagationWork = SumResult(rootPropagationWork().toDouble()),
+        propagationNanos = SumResult(propagationNanos().toDouble()),
+        rootPropagationNanos = SumResult(rootPropagationNanos().toDouble()),
         learnedClauses = learnedClauses.read(),
         learnedLiterals = SumResult(learnedLiterals.toDouble()),
         learnedLbd = SumResult(learnedLbd.toDouble()),

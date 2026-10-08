@@ -85,26 +85,26 @@ internal class WideReifiedLinearPropagator(
                 null
             } else {
                 (
-                if (sumLo > bound) {
-                    true
-                } else if (sumHi < bound) {
-                    false
-                } else {
-                    null
-                }
-                )
+                    if (sumLo > bound) {
+                        true
+                    } else if (sumHi < bound) {
+                        false
+                    } else {
+                        null
+                    }
+                    )
             }
 
             LinearOp.NE -> if (holds) {
                 (
-                if (sumLo > bound) {
-                    true
-                } else if (sumHi < bound) {
-                    false
-                } else {
-                    null
-                }
-                )
+                    if (sumLo > bound) {
+                        true
+                    } else if (sumHi < bound) {
+                        false
+                    } else {
+                        null
+                    }
+                    )
             } else {
                 null
             }
