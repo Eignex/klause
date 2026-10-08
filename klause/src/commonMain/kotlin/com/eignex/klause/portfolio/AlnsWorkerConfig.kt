@@ -120,7 +120,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
 
     companion object {
         /** What an ALNS arm needs from a model: an incumbent to optimise, and local search for its inner loop. */
-        val NEEDS: Set<ArmNeed> = setOf(ArmNeed.Objective, ArmNeed.LocalSearch)
+        val NEEDS: Set<ArmNeed> = setOf(ArmNeed.Objective)
 
         /** [count] diverse ALNS arms cycling the curated regimes ([AlnsProfile.Curated]) — the ALNS analog
          *  of [LocalSearchWorkerConfig.diverse]. Every slot is a fresh instance even when regimes repeat,

@@ -38,7 +38,7 @@ class PortfolioBuilderTest {
     }
 
     @Test
-    fun `a local-search portfolio keeps its arms when none can run the model`() {
+    fun `a local-search portfolio over continuous columns builds every arm`() {
         val scenario = PortfolioScenario(cores = 1, arms = 2, kind = Kind.COP, engine = EngineMix.LOCAL_SEARCH)
 
         val workers = PortfolioBuilder.build(continuous, scenario)
