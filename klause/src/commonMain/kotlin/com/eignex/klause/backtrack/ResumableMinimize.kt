@@ -528,7 +528,7 @@ internal class ResumableMinimize(
 
     private fun terminal(result: MinimizeResult): StepEvent {
         done = result
-        if (!rebindable) close() else releaseForSequenceYield()
+        if (!rebindable) close()
         return StepEvent.Terminal(result)
     }
 

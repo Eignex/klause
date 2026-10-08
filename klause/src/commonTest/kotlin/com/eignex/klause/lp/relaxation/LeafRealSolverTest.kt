@@ -3,13 +3,20 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -20,6 +27,52 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
+    @Test
+    fun `finite fractional product leaves preserve fresh exact refutations`() {
+        val program = parseFlatZinc(
+            """
+            var 1..1: i;
+            var float: x;
+            var 0.1..0.1: y;
+            constraint array_float_element(i, [0.1], x);
+            constraint float_times(x, y, 0.010000000000000002);
+            solve satisfy;
+            """.trimIndent(),
+            exactFloats = true,
+        )
+        val problem = program.problem
+        var captured: LpModel? = null
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                if (captured == null) captured = model
+                return ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
+                    iterationLimit, workLimit, trackDegeneracy, pricing)
+            }
+        }
+        val sample = Sample(BooleanArray(problem.numBoolVars) { true },
+            LongArray(problem.numIntVars) { problem.finiteIntDomain(it).min })
+        val fresh = leafRealFeasibility(problem, null, sample)
+
+        LeafRealSolver(problem, null, componentSplit = false, context = LpSolveContext(factory)).use { owner ->
+            val actual = owner.solve(sample)
+            val reconstructed = solveAndCertify(assertNotNull(captured), componentSplit = false)
+
+            assertEquals(LpVerdict.INFEASIBLE, fresh.verdict)
+            assertEquals(fresh.verdict, reconstructed.verdict,
+                "continuation=${reconstructed.continuation}, refinement=${reconstructed.refinement}")
+            assertEquals(fresh.verdict, actual.verdict)
+            assertEquals(fresh.refutingFactors.toSet(), actual.refutingFactors.toSet())
+        }
+    }
+
     @Test
     fun `sibling integer pins preserve fresh exact real optima with one numerical owner`() {
         val problem = Problem(

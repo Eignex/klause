@@ -12,6 +12,25 @@ import kotlin.test.assertTrue
 
 class LpSolveSessionTest {
     @Test
+    fun `retained fractional equalities reject a rounded product`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.1)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(0.1), Relation.EQ, 0.010000000000000002)
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        val fresh = solveAndCertify(model)
+
+        LpSolveSession().use { owner ->
+            val actual = owner.solve(model)
+
+            assertEquals(LpVerdict.INFEASIBLE, fresh.verdict)
+            assertEquals(fresh.verdict, actual.verdict,
+                "continuation=${actual.continuation}, refinement=${actual.refinement}")
+        }
+    }
+
+    @Test
     fun `retained solves use each calls work allowance independently of construction`() {
         val model = assertNotNull(LpExactState(assertNotNull(LpBuilder().apply {
             val x = addRealVar(0.0, 5.0, cost = 1.0)

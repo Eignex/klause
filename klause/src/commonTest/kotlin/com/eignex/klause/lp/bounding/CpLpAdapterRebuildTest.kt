@@ -14,6 +14,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -21,7 +22,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -36,19 +36,24 @@ class CpLpAdapterRebuildTest {
             LpParams(),
             SolveStatsSink(backend = "adapter"),
         ).use { assertNotNull(it.cpAdapter.relaxation(base, session)).model }
-        assertEquals(expected.n, actual.n, "n")
-        assertEquals(expected.m, actual.m, "m")
-        assertContentEquals(expected.csc.colPtr, actual.csc.colPtr, "colPtr")
-        assertContentEquals(expected.csc.rowIdx, actual.csc.rowIdx, "rowIdx")
-        assertContentEquals(expected.csc.colVal, actual.csc.colVal, "colVal")
-        assertContentEquals(expected.rhs, actual.rhs, "rhs")
-        assertContentEquals(expected.cost, actual.cost, "cost")
-        assertContentEquals(expected.upper, actual.upper, "upper")
-        assertContentEquals(expected.hasUpper, actual.hasUpper, "hasUpper")
-        assertContentEquals(expected.loShift, actual.loShift, "loShift")
-        assertContentEquals(expected.tag, actual.tag, "tag")
-        assertEquals(expected.objConstant, actual.objConstant, "objConstant")
-        assertEquals(expected.sense, actual.sense, "sense")
+        val expectedAuthority = assertNotNull(expected.authoritativeModel())
+        val actualAuthority = assertNotNull(actual.authoritativeModel())
+        assertEquals(expectedAuthority.n, actualAuthority.n, "n")
+        assertEquals(expectedAuthority.m, actualAuthority.m, "m")
+        val recentered = actualAuthority.recentered(List(expected.n) { expectedAuthority.column(it).origin })
+        for (column in 0 until expectedAuthority.numVars) {
+            assertEquals(expectedAuthority.column(column), recentered.column(column), "column $column")
+            if (column < expected.n) {
+                assertEquals(
+                    expectedAuthority.columnEntries(column), recentered.columnEntries(column), "matrix $column",
+                )
+            }
+        }
+        for (row in 0 until expected.m) {
+            assertEquals(expectedAuthority.rhs(row), recentered.rhs(row), "rhs $row")
+            assertEquals(expectedAuthority.row(row), recentered.row(row), "row $row")
+        }
+        assertEquals(expectedAuthority.objective, recentered.objective, "objective")
     }
 
     @Test

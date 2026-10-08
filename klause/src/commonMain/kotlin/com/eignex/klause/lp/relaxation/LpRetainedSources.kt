@@ -443,9 +443,11 @@ internal class LpRetainedSources(
         when {
             column.variable >= 0 && column.boolean -> {
                 val pin = domains.boolValue(column.variable)
+                val lower = if (pin == true) BigFraction.ONE else BigFraction.ZERO
+                val upper = if (pin == false) BigFraction.ZERO else BigFraction.ONE
                 ExactLpBounds(
-                    ExactLpSide(ExactLpNumber.of((if (pin == true) BigFraction.ONE else BigFraction.ZERO) - origin)),
-                    ExactLpSide(ExactLpNumber.of((if (pin == false) BigFraction.ZERO else BigFraction.ONE) - origin)),
+                    ExactLpSide(ExactLpNumber.of(lower - origin)),
+                    ExactLpSide(ExactLpNumber.of(upper - origin)),
                 )
             }
             column.variable >= 0 -> {

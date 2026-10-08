@@ -466,7 +466,7 @@ class PortfolioTest {
             assertTrue(search.isDone)
         }
         assertTrue(declined)
-        assertTrue(fixture.opened > 1, "the donor passes over each undecided leaf")
+        assertTrue(fixture.visited > 1, "the donor passes over each undecided leaf")
         assertEquals(fixture.opened, fixture.closed)
         assertTrue(pool.drainSince(0L).clauses.isEmpty())
         val worker = PortfolioWorker.of(
