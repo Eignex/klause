@@ -7,11 +7,9 @@ import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Publication
-import com.eignex.klause.solver.incumbent.bound
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -255,16 +253,23 @@ class Portfolio(
      * [MinimizeResult.BestFound]. `onImprovement` fires once per strict global improvement, tagged with the arm
      * that produced it, in the order the incumbent installed them.
      */
-    // A callback failure stays the primary failure.
-    @Suppress("TooGenericExceptionCaught")
     override fun minimize(
         cancellation: Cancellation,
         onImprovement: ((AttributedImprovement) -> Unit)?,
+    ): MinimizeResult = minimize(cancellation, onImprovement, PortfolioIncumbents.floating())
+
+    // A callback failure stays the primary failure.
+    @Suppress("TooGenericExceptionCaught")
+    internal fun <V> minimize(
+        cancellation: Cancellation,
+        onImprovement: ((AttributedImprovement) -> Unit)?,
+        incumbents: PortfolioIncumbents<V>,
     ): MinimizeResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSearch>(workers.size))
-        val incumbent = IncumbentExchange.minimizing<Sample>()
+        val incumbent = incumbents.exchange
+        val pending = MutableList<Candidate<MinimizeResult.WithSample, V>?>(workers.size) { null }
         val start = TimeSource.Monotonic.markNow()
-        val readBound = { incumbent.bound() }
+        val readBound = { incumbents.bound() }
         // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
         val staleSegments = IntArray(workers.size)
         var callbackFailure: Throwable? = null
@@ -274,9 +279,10 @@ class Portfolio(
         // Install a strictly-improving incumbent and credit it to [claim]'s arm. Called under the run's lock, so the
         // check, the callback and the install are one step: concurrent lanes report improvements in the order they
         // installed and never report one a peer already beat.
-        fun install(claim: Claim, r: MinimizeResult.WithSample) {
-            val before = readBound()
-            if (r.objective >= before) return
+        fun install(claim: Claim, candidate: Candidate<MinimizeResult.WithSample, V>) {
+            val r = candidate.assignment
+            val before = incumbent.current()
+            if (!incumbents.isImproving(candidate.objective)) return
             val worker = workers[claim.arm]
             try {
                 onImprovement?.invoke(AttributedImprovement(worker.label, worker.armId, start.elapsedNow(), r))
@@ -285,10 +291,13 @@ class Portfolio(
                 run.finish()
                 throw failure
             }
-            if (incumbent.offer(r.sample, r.objective) !is Publication.Installed) return
+            if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
             claim.improved = true
-            if (before.isFinite()) {
-                if (claim.hadIncumbent) run.ledger.credit(claim.arm, Signal.Improvement, before - r.objective)
+            if (before != null) {
+                if (claim.hadIncumbent) {
+                    val reward = incumbents.gain(before.objective, candidate.objective)
+                    run.ledger.credit(claim.arm, Signal.Improvement, reward)
+                }
             } else if (!claim.foundFirst) {
                 claim.foundFirst = true
                 run.ledger.credit(claim.arm, Signal.FirstSolution, 1.0)
@@ -298,16 +307,17 @@ class Portfolio(
         // Check [claim]'s waiting candidate: refuted, it marks the arm faulty; verified, it goes to [install]. Checked
         // outside the lock: re-deriving a whole assignment is the costly part, and peers need not wait.
         fun check(claim: Claim) {
-            val r = claim.pending ?: return
-            claim.pending = null
-            if (claim.fault != null || r.objective >= readBound()) return
+            val candidate = pending[claim.arm] ?: return
+            pending[claim.arm] = null
+            val r = candidate.assignment
+            if (claim.fault != null || !incumbents.isImproving(candidate.objective)) return
             val started = TimeSource.Monotonic.markNow()
             witnessCheck?.refute(r.sample, r.objective)?.let {
                 claim.fault = "claimed an incumbent the problem refutes: $it"
                 return
             }
             claim.checked(started.elapsedNow())
-            run.locked { install(claim, r) }
+            run.locked { install(claim, candidate) }
         }
 
         // Offer [claim]'s arm's candidate. Re-deriving a whole assignment can cost far more than the search took to
@@ -315,9 +325,13 @@ class Portfolio(
         // verifying instead of searching. So the best candidate waits, and is checked once checks have taken no more
         // than [CHECK_SHARE] of the arm's time; whatever still waits is checked as the segment ends.
         fun accept(claim: Claim, r: MinimizeResult.WithSample) {
-            if (claim.fault != null || !r.objective.isFinite() || r.objective >= readBound()) return
-            val waiting = claim.pending
-            if (waiting == null || r.objective < waiting.objective) claim.pending = r
+            if (claim.fault != null) return
+            val value = incumbents.valueOf(r) ?: return
+            if (!incumbents.isImproving(value)) return
+            val waiting = pending[claim.arm]
+            if (waiting == null || incumbents.improves(value, waiting.objective)) {
+                pending[claim.arm] = Candidate(r, value)
+            }
             if (claim.checkDue()) check(claim)
         }
 
@@ -405,7 +419,7 @@ class Portfolio(
         val stats = run.folded()
         unbounded?.let { return it.copy(stats = stats) }
         // Cancellation or retirement stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
-        return PortfolioReduction.terminal(incumbent.current(), dirty = !exhausted, stats)
+        return PortfolioReduction.terminal(incumbents.projected(), dirty = !exhausted, stats)
     }
 
     /** One segment's assignment: the arm a lane claimed and what it may spend, plus what its segment found. A
@@ -430,8 +444,7 @@ class Portfolio(
         // Why the segment's claim was refuted, when it was; the arm is quarantined as the segment settles.
         var fault: String? = null
 
-        // The best incumbent the segment found that is not checked yet, and when the next check is due.
-        var pending: MinimizeResult.WithSample? = null
+        // When the segment's next candidate check is due.
         private var nextCheck = TimeSource.Monotonic.markNow()
 
         fun checkDue(): Boolean = nextCheck.hasPassedNow()

@@ -1,6 +1,9 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.IncumbentSource
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.compareTo
 
@@ -20,3 +23,6 @@ import com.eignex.klause.util.compareTo
  */
 internal fun minimizingWitnessExchange(): IncumbentExchange<OpenTheoryAssignment, BigInt> =
     IncumbentExchange(improves = { candidate, standing -> candidate < standing })
+
+internal fun IncumbentSource<*, BigFraction>.integerBound(): BigInt? =
+    current()?.objective?.let { if (it.den == BIG_ONE) it.num else null }
