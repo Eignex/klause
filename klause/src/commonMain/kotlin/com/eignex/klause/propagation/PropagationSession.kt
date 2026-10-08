@@ -109,6 +109,7 @@ class PropagationSession private constructor(
     private val intPinnedSet: BooleanArray = BooleanArray(problem.numIntVars)
     private val intPinnedVal: LongArray = LongArray(problem.numIntVars)
     private val trail: IntArrayList = IntArrayList()
+    private val impliedIntUndo: IntArray = IntArray(problem.numIntVars) { -1 }
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
     private fun trailIsBool(enc: Int): Boolean = enc < problem.numBoolVars
@@ -873,17 +874,15 @@ class PropagationSession private constructor(
         val top = state.undoTop
         if (top <= base) return PropagationResult.Implied.EMPTY
         val bRaw = IntArrayList()
-        val iRaw = LongArrayList()
+        val iRaw = IntArrayList()
         for (i in base until top) {
             val v = state.undoVarAt(i)
             if (state.undoIsBoolAt(i)) {
                 bRaw.add(v)
-            } else {
-                val prior = state.undo.domain[i]
-                val current = state.intDomains[v]
-                val sides = (if (prior != null && current.min > prior.min) IntEvent.LB_RAISED_BIT else 0) or
-                    (if (prior != null && current.max < prior.max) IntEvent.UB_LOWERED_BIT else 0)
-                iRaw.add((v.toLong() shl 2) or sides.toLong())
+            } else if (!intPinnedSet[v] && impliedIntUndo[v] < 0 && state.undo.domain[i] != null) {
+                // Interior carves preserve endpoints; the first full snapshot precedes every endpoint move.
+                impliedIntUndo[v] = i
+                iRaw.add(v)
             }
         }
         val bKeys = IntArrayList()
@@ -908,41 +907,30 @@ class PropagationSession private constructor(
         var maxKeys = EmptyIntArray
         var maxValues = EmptyLongArray
         if (iRaw.size > 0) {
-            val sorted = iRaw.toLongArray()
+            val sorted = iRaw.toIntArray()
             sorted.sort()
             val mins = IntArrayList()
             val minVals = LongArrayList()
             val maxs = IntArrayList()
             val maxVals = LongArrayList()
-            var prev = -1
-            var changed = 0
-            fun record(v: Int, sides: Int) {
-                if (v < 0 || intPinnedSet[v]) return
+            for (v in sorted) {
+                val prior = requireNotNull(state.undo.domain[impliedIntUndo[v]])
+                impliedIntUndo[v] = -1
                 val d = state.intDomains[v]
                 if (d.min == d.max) {
                     iKeys.add(v)
                     iVals.add(d.min)
                 } else {
-                    if (sides and IntEvent.LB_RAISED_BIT != 0) {
+                    if (d.min > prior.min) {
                         mins.add(v)
                         minVals.add(d.min)
                     }
-                    if (sides and IntEvent.UB_LOWERED_BIT != 0) {
+                    if (d.max < prior.max) {
                         maxs.add(v)
                         maxVals.add(d.max)
                     }
                 }
             }
-            for (entry in sorted) {
-                val v = (entry ushr 2).toInt()
-                if (v != prev) {
-                    record(prev, changed)
-                    prev = v
-                    changed = 0
-                }
-                changed = changed or (entry and 3L).toInt()
-            }
-            record(prev, changed)
             minKeys = mins.toIntArray()
             minValues = minVals.toLongArray()
             maxKeys = maxs.toIntArray()

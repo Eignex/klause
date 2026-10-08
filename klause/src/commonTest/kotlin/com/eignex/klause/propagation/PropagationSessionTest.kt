@@ -18,6 +18,57 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `repeated endpoint tightening publishes the final bound`() {
+        for (upper in listOf(false, true)) {
+            val coefficients = if (upper) listOf(2, 1) else listOf(1, 2)
+            val session = PropagationSession(
+                Problem(
+                    0,
+                    2,
+                    arrayOf(IntDomain(0, 20), IntDomain(0, 10)),
+                    coefficients.map { coefficient ->
+                        Linear(
+                            intArrayOf(if (upper) 1 else -1, if (upper) -coefficient else coefficient),
+                            intArrayOf(0, 1),
+                            LinearOp.LE,
+                            0,
+                        )
+                    },
+                ),
+            )
+
+            val result = assertIs<PropagationResult.Implied>(
+                if (upper) session.pinIntAtMost(1, 3L) else session.pinIntAtLeast(1, 3L),
+            )
+
+            assertEquals(
+                if (upper) 3L else 6L,
+                if (upper) result.intMaxOrNullCompat(0) else result.intMinOrNullCompat(0),
+            )
+            assertNull(if (upper) result.intMinOrNullCompat(0) else result.intMaxOrNullCompat(0))
+        }
+    }
+
+    @Test
+    fun `endpoint publications follow a new push after rollback`() {
+        val session = PropagationSession(
+            Problem(
+                0,
+                2,
+                arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
+            ),
+        )
+        assertIs<PropagationResult.Implied>(session.pinIntAtMost(1, 3L))
+        session.popLast()
+
+        val result = assertIs<PropagationResult.Implied>(session.pinIntAtMost(1, 7L))
+
+        assertEquals(7L, result.intMaxOrNullCompat(0))
+        assertNull(result.intMinOrNullCompat(0))
+    }
+
+    @Test
     fun `incremental propagation reports changed non singleton endpoints`() {
         for (upper in listOf(false, true)) {
             val session = PropagationSession(
