@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -140,6 +141,12 @@ object LpAutoConfig {
                     rows += 2
                 }
 
+                // The relaxation gates a reified real row by its indicator: two big-M rows, like a ReifiedLinear.
+                is ReifiedRealLinear -> {
+                    lpEmittable = true
+                    rows += 2
+                }
+
                 is ReifiedPseudoBoolean -> {
                     lpEmittable = true
                     rows += 2
@@ -214,7 +221,7 @@ object LpAutoConfig {
             0
         }
         rows += diffnPlans.toLong()
-        val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
+        val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong() + problem.numRealVars.toLong()
         // Two per-node cost-guard tiers (the sparse revised simplex is the only LP engine; both are
         // pure cost guards on solve time, the bound is sound either way). `tableauCells` is a size proxy,
         // not a literal allocation. The base cap bounds the hull budget of a small base relaxation; the
