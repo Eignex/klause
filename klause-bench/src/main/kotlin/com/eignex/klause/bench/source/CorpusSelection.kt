@@ -233,6 +233,8 @@ internal object CorpusSelection {
             ?.sortedBy { it.name } ?: return emptyList()
         val out = ArrayList<Discovered>()
         for (pd in families) {
+            // This legacy model uses the is_output annotation undefined in current MiniZinc.
+            if (pd.relativeTo(root).path == "2010/depot_placement") continue
             val candidates = pd.listFiles { f -> f.isFile && f.extension == "mzn" }?.toList()
                 ?: pd.walkTopDown().maxDepth(3).filter { it.isFile && it.extension == "mzn" }.toList()
             if (candidates.isEmpty()) continue
@@ -243,6 +245,8 @@ internal object CorpusSelection {
             val dzns = pd.walkTopDown().maxDepth(3)
                 .filter { it.isFile && it.extension in DATA_EXTENSIONS }
                 .sortedBy { it.relativeTo(pd).path }.toList()
+            // The 2026 archive publishes parameterized models without their instance data.
+            if (dzns.isEmpty() && mznRel.startsWith("2026/")) continue
             if (dzns.isEmpty()) {
                 // familyKey is set explicitly (not left to the name.substringBefore('/') fallback)
                 // because a year-prefixed name already contains a '/' (`2013/black-hole`), which
