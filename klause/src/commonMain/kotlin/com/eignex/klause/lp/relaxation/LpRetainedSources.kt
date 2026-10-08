@@ -11,13 +11,13 @@ import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpSide
-import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpBoundAssertion
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpLayoutStorage
 import com.eignex.klause.lp.engine.LpLayoutWeight
-import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.engine.LpScopedRow
+import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.engine.LpStructuralColumn
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
@@ -100,7 +100,36 @@ internal class LpRetainedSources(
         val presentUpper: Long,
         val definition: CutAuxiliaryDefinition?,
     ) {
-        val storageUnits: Long = 10L + (required?.size ?: 0) + (definition?.storageUnits ?: 0L)
+        // Live values key the last immutable pair, so a pop requires no cache trail or assertion authority.
+        private var lastLower = 0L
+        private var lastUpper = 0L
+        private var lastOpenUpper = false
+        private var lastBounds: ExactLpBounds? = null
+        val storageUnits: Long = 16L + (required?.size ?: 0) + (definition?.storageUnits ?: 0L)
+
+        fun bounds(lower: Long, upper: Long, openUpper: Boolean = false): ExactLpBounds {
+            val finiteUpper = if (openUpper) 0L else upper
+            val previous = lastBounds
+            if (previous != null && lastLower == lower && lastUpper == finiteUpper && lastOpenUpper == openUpper) {
+                return previous
+            }
+            val origin = if (variable >= 0) source.origin.value else BigFraction.ZERO
+            val next = ExactLpBounds(
+                if (previous != null && lastLower == lower) previous.lower else {
+                    ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(lower) - origin))
+                },
+                when {
+                    openUpper -> null
+                    previous != null && !lastOpenUpper && lastUpper == finiteUpper -> previous.upper
+                    else -> ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(upper) - origin))
+                },
+            )
+            lastLower = lower
+            lastUpper = finiteUpper
+            lastOpenUpper = openUpper
+            lastBounds = next
+            return next
+        }
     }
 
     private class Binding(val emission: LpEmission, val columns: IntArray, val rows: LongArray) {
@@ -439,34 +468,20 @@ internal class LpRetainedSources(
         columns: List<Column>,
         domains: RelaxationDomains,
     ): List<ExactLpBounds> = columns.map { column ->
-        val origin = column.source.origin.value
         when {
             column.variable >= 0 && column.boolean -> {
                 val pin = domains.boolValue(column.variable)
-                val lower = if (pin == true) BigFraction.ONE else BigFraction.ZERO
-                val upper = if (pin == false) BigFraction.ZERO else BigFraction.ONE
-                ExactLpBounds(
-                    ExactLpSide(ExactLpNumber.of(lower - origin)),
-                    ExactLpSide(ExactLpNumber.of(upper - origin)),
-                )
+                column.bounds(if (pin == true) 1L else 0L, if (pin == false) 0L else 1L)
             }
             column.variable >= 0 -> {
                 val domain = domains.intDomain(column.variable)
-                ExactLpBounds(
-                    ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(domain.min) - origin)),
-                    if (domains.honorsOpenSides && column.source.bounds.upper == null) null else {
-                        ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(domain.max) - origin))
-                    },
-                )
+                column.bounds(domain.min, domain.max, domains.honorsOpenSides && column.source.bounds.upper == null)
             }
             column.required != null -> {
                 val present = column.required.indices.step(2).all {
                     domains.intDomain(column.required[it].toInt()).contains(column.required[it + 1])
                 }
-                ExactLpBounds(
-                    ExactLpSide(ExactLpNumber.of(0L)),
-                    ExactLpSide(ExactLpNumber.of(if (present) column.presentUpper else 0L)),
-                )
+                column.bounds(0L, if (present) column.presentUpper else 0L)
             }
             else -> column.source.bounds
         }

@@ -4,30 +4,161 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
-import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.integerCertify
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
+    @Test
+    fun `live integer bounds preserve exact origins and earlier snapshots through nested pops`() {
+        for (origin in listOf(5L, Long.MIN_VALUE + 1L, Long.MAX_VALUE - 5L)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(origin, origin + 4L)), emptyArray())
+            val session = PropagationSession(problem)
+            val domains = SessionDomains(session)
+            val sources = LpRetainedSources(problem,
+                CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))))
+            LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+                val edit = sources.prepare(owner.state, domains)
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+                edit.commit()
+                val column = sources.relaxation(owner.state, domains).intColOf[0]
+                val root = sources.liveBounds(domains)[column]
+
+                session.pinIntAtLeast(0, origin + 2L)
+                val child = sources.liveBounds(domains)[column]
+                session.pinIntAtMost(0, origin + 3L)
+                val nested = sources.liveBounds(domains)[column]
+                session.popLast()
+                val parent = sources.liveBounds(domains)[column]
+                session.popLast()
+                val restored = sources.liveBounds(domains)[column]
+                session.pinIntAtMost(0, origin + 1L)
+                val sibling = sources.liveBounds(domains)[column]
+
+                assertEquals(BigFraction.ZERO, assertNotNull(root.lower).number.value)
+                assertEquals(BigFraction.ofLong(4L), assertNotNull(root.upper).number.value)
+                assertEquals(BigFraction.ofLong(2L), assertNotNull(child.lower).number.value)
+                assertEquals(BigFraction.ofLong(4L), assertNotNull(child.upper).number.value)
+                assertEquals(BigFraction.ofLong(2L), assertNotNull(nested.lower).number.value)
+                assertEquals(BigFraction.ofLong(3L), assertNotNull(nested.upper).number.value)
+                assertEquals(child, parent)
+                assertEquals(root, restored)
+                assertEquals(BigFraction.ZERO, assertNotNull(sibling.lower).number.value)
+                assertEquals(BigFraction.ONE, assertNotNull(sibling.upper).number.value)
+            }
+        }
+    }
+
+    @Test
+    fun `live Boolean bounds preserve free and opposite sibling snapshots`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray())
+        val session = PropagationSession(problem)
+        val domains = SessionDomains(session)
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, LinearObjective(boolWeights = longArrayOf(1L))))
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = sources.prepare(owner.state, domains)
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+            val column = sources.relaxation(owner.state, domains).boolColOf[0]
+            val root = sources.liveBounds(domains)[column]
+
+            session.pinBool(0, true)
+            val positive = sources.liveBounds(domains)[column]
+            session.popLast()
+            val restored = sources.liveBounds(domains)[column]
+            session.pinBool(0, false)
+            val negative = sources.liveBounds(domains)[column]
+
+            assertEquals(BigFraction.ZERO, assertNotNull(root.lower).number.value)
+            assertEquals(BigFraction.ONE, assertNotNull(root.upper).number.value)
+            assertEquals(BigFraction.ONE, assertNotNull(positive.lower).number.value)
+            assertEquals(BigFraction.ONE, assertNotNull(positive.upper).number.value)
+            assertEquals(root, restored)
+            assertEquals(BigFraction.ZERO, assertNotNull(negative.lower).number.value)
+            assertEquals(BigFraction.ZERO, assertNotNull(negative.upper).number.value)
+        }
+    }
+
+    @Test
+    fun `live bounds distinguish open source sides from finite search bounds`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(5L, 9L)), emptyArray(), openIntHi = booleanArrayOf(true))
+        val rootDomains = RootDomains(problem)
+        val searchDomains = SessionDomains(PropagationSession(problem))
+        val sources = LpRetainedSources(problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))))
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = sources.prepare(owner.state, rootDomains)
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+            val column = sources.relaxation(owner.state, rootDomains).intColOf[0]
+            val root = sources.liveBounds(rootDomains)[column]
+
+            val finite = sources.liveBounds(searchDomains)[column]
+            val reopened = sources.liveBounds(rootDomains)[column]
+
+            assertEquals(BigFraction.ZERO, assertNotNull(root.lower).number.value)
+            assertNull(root.upper)
+            assertEquals(BigFraction.ZERO, assertNotNull(finite.lower).number.value)
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(finite.upper).number.value)
+            assertEquals(root, reopened)
+        }
+    }
+
+    @Test
+    fun `live auxiliary bounds follow interior membership changes without altering earlier snapshots`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0L, 2L), IntDomain(3L, 9L)),
+            arrayOf(Element(idx = 0, result = 1, arr = longArrayOf(3L, 5L, 9L), arrIsVars = false, indexOffset = 0)))
+        var live = problem.finiteIntDomain(0)
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = if (varId == 0) live else problem.finiteIntDomain(varId)
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sources = LpRetainedSources(problem,
+            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0L, 1L)), elementHull = true))
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = sources.prepare(owner.state, domains)
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+            val relaxation = sources.relaxation(owner.state, domains)
+            val column = relaxation.colReq.indices.single { relaxation.colReq[it].contentEquals(longArrayOf(0L, 1L)) }
+            val root = sources.liveBounds(domains)[column]
+
+            live = live.excludeValue(1L)
+            val absent = sources.liveBounds(domains)[column]
+            live = live.includeInteriorValue(1L)
+            val restored = sources.liveBounds(domains)[column]
+
+            assertEquals(0L, live.min)
+            assertEquals(2L, live.max)
+            assertEquals(BigFraction.ZERO, assertNotNull(root.lower).number.value)
+            assertEquals(BigFraction.ONE, assertNotNull(root.upper).number.value)
+            assertEquals(BigFraction.ZERO, assertNotNull(absent.lower).number.value)
+            assertEquals(BigFraction.ZERO, assertNotNull(absent.upper).number.value)
+            assertEquals(root, restored)
+        }
+    }
+
     @Test
     fun `catalog compaction rejects stale plans and preserves numerical authority`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
