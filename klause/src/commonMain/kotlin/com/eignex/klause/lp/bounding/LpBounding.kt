@@ -14,6 +14,7 @@ import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
@@ -635,7 +636,7 @@ internal fun LpEngine.sparseSafePrune(
         }
         if (rounded != null) {
             val reason = if (learn && cert != null && exactFloor != null && rounded == lpFloor) {
-                LpExplanation.objectiveBoundReason(boundRel, cert, session)
+                LpExplanation.objectiveBoundReason(boundRel, cert, session, sink.lp.certificationObserver(LpRoute.NODE))
             } else {
                 null
             }
@@ -694,7 +695,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     learn: Boolean = false,
     cancellation: Cancellation = Cancellation.Never,
 ): Boolean {
-    if (cancellation() || !cert.belongsTo(relaxation.model)) return false
+    if (cancellation() || !cert.belongsTo(relaxation.model, sink.lp.certificationObserver(LpRoute.NODE))) return false
     if (sourceObjectiveRange(relaxation) == null) return false
     val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
     if (ceiling == Long.MIN_VALUE) return false
@@ -702,7 +703,8 @@ internal fun LpEngine.applySparseReducedCostFixing(
     val sourceConstant = relaxation.objectiveConstant
     if (!cert.improvingGapNonNegative(improvingMax, sourceConstant)) return false
     val reasonSupport = if (learn && objectiveVar >= 0 && objectiveAscending) {
-        reducedCostFixingReasons(relaxation, cert, session, objectiveVar, improvingMax)
+        reducedCostFixingReasons(relaxation, cert, session, objectiveVar, improvingMax,
+            sink.lp.certificationObserver(LpRoute.NODE))
     } else {
         null
     }
@@ -804,8 +806,9 @@ internal fun reducedCostFixingReasons(
     session: PropagationSession,
     objectiveVar: Int,
     improvingMax: Long,
+    observer: LpCertificationObserver? = null,
 ): ReducedCostFixingReasons? {
-    if (!cert.belongsTo(relaxation.model)) return null
+    if (!cert.belongsTo(relaxation.model, observer)) return null
     val objectiveVarMax = relaxation.objectiveVariableValue(objectiveVar, BigFraction.ofLong(improvingMax))
         ?.floorLong() ?: return null
     if (session.intDomain(objectiveVar).max > objectiveVarMax) return null
@@ -813,7 +816,7 @@ internal fun reducedCostFixingReasons(
     val supportLits = IntArrayList()
     val seen = IntHashSet()
     val premLits = IntArrayList()
-    if (!LpExplanation.addDualRowPremiseLits(premLits, seen, relaxation, cert, session)) return null
+    if (!LpExplanation.addDualRowPremiseLits(premLits, seen, relaxation, cert, session, observer)) return null
     for (k in 0 until premLits.size) {
         supportCols.add(-1) // row premise: part of every fixing's reason, never excluded
         supportLits.add(premLits[k])

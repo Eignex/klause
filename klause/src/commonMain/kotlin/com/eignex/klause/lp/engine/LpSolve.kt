@@ -1077,7 +1077,12 @@ internal fun LpModel.finiteExactInput(): Boolean {
     if (exactState != null) return exactState.model.n == n && exactState.model.m == m
     if (n < 0 || m < 0 || n > Int.MAX_VALUE - m) return false
     if (colContinuous.size != n || probeClampedLo.size != n || probeClampedHi.size != n ||
-        rowStrict.size != m || rowGlobal.size != m || rowPremises.size != m
+        rowStrict.size != m || rowGlobal.size != m || rowPremises.size != m || tag.size != n || flippedRhs.size != m
+    ) {
+        return false
+    }
+    if (rowPremises.any { it != null && (it.vars.size != it.isUpper.size || it.vars.size != it.thresholds.size ||
+            it.vars.any { variable -> variable < 0 } || it.boolLits.any { literal -> literal < 0 }) }
     ) {
         return false
     }

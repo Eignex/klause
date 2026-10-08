@@ -204,7 +204,7 @@ internal fun tightObjectiveLowerBound(
     observer: LpCertificationObserver? = null,
 ): Double? = tighterLowerBound(
     safeObjectiveLowerBound(model, y, observer),
-    certificate?.takeIf { it.belongsTo(model) && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
+    certificate?.takeIf { it.belongsTo(model, observer) && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
 )
 
 /** The larger of two sound lower bounds on the same objective, either of which may be unavailable. */

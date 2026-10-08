@@ -19,6 +19,25 @@ import kotlin.test.assertTrue
 /** The Neumaier–Shcherbina safe bound must never exceed the true optimum (#567 component 3): a
  *  sound lower bound on `min cᵀz`, validated against the exact [DualSimplex]. */
 class SafeObjectiveBoundTest {
+    @Test
+    fun `supplied legacy certificates cannot preserve a bound after its objective changes`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 9L, cost = 1L)
+            val y = addVar(0L, 9L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+            addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 4L)
+        }.build(Sense.MINIMIZE)
+        val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0, -1.0)))
+        assertEquals(7L, certificate.objectiveBoundCeil(0L))
+
+        model.cost[0] = 0L
+        val current = doubleArrayOf(0.0, -1.0)
+        val bound = assertNotNull(tightObjectiveLowerBound(model, current, certificate))
+
+        assertTrue(bound <= 4.0 && bound > 3.0)
+        assertEquals(bound, certifiedTightObjectiveLowerBound(model, current, certificate, null, ProductionLpCertificationPolicy))
+    }
+
 
     @Test
     fun `retained variable bounds follow nested endpoints and rollback in source coordinates`() {

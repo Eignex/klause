@@ -134,9 +134,17 @@ internal class IntegerCertificate(
     // Row weights and endpoint support cannot be reinterpreted after a pop or an objective edit.
     private val authority = model.exactState
     private val legacyModel = model.takeIf { authority == null }
+    private val legacySnapshot = legacyModel?.let(LpCapturedModel::snapshotIntegerAuthority)
+    val authorityStorageUnits: Long = legacySnapshot?.integerAuthorityUnits ?: 0L
 
-    fun belongsTo(model: LpModel): Boolean = model.m == mult.size && model.numVars == reduced.size &&
-        if (authority == null) model === legacyModel else model.exactState === authority
+    fun belongsTo(model: LpModel, observer: LpCertificationObserver? = null): Boolean {
+        if (model.m != mult.size || model.numVars != reduced.size) return false
+        if (authority != null) return model.exactState === authority
+        if (model !== legacyModel) return false
+        val matches = requireNotNull(legacySnapshot).matchesIntegerAuthority(model)
+        observer?.observe(LpCertifier.INTEGER, matches, LpCertifierCost.Metered(authorityStorageUnits))
+        return matches
+    }
 
     /** The scale exponent `k`: the objective is `objectiveNumerator / 2ᵏ`. Lets a caller summing several
      *  certificates' objectives bring them to a common denominator. */
@@ -215,8 +223,12 @@ internal fun integerCertify(
     y: DoubleArray,
     scaleBits: Int = DEFAULT_SCALE_BITS,
     observer: LpCertificationObserver? = null,
-): IntegerCertificate? = integerCertifyUnchecked(model, y, scaleBits).also {
-    observer?.observe(LpCertifier.INTEGER, it != null, LpScanCount(model).apply { scan() }.cost())
+): IntegerCertificate? = integerCertifyUnchecked(model, y, scaleBits).also { certificate ->
+    observer?.let {
+        val arithmetic = LpScanCount(model).apply { scan() }.cost()
+        it.observe(LpCertifier.INTEGER, certificate != null,
+            LpCertifierCost.Metered(arithmetic.work + (certificate?.authorityStorageUnits ?: 0L)))
+    }
 }
 
 private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: Int): IntegerCertificate? {

@@ -7,6 +7,7 @@ import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.IntegerCertificate
+import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
@@ -162,10 +163,11 @@ internal object LpExplanation {
         relaxation: LpRelaxation,
         cert: IntegerCertificate,
         session: PropagationSession,
+        observer: LpCertificationObserver? = null,
     ): IntArray? {
         val lits = IntArrayList()
         val seen = IntHashSet()
-        if (!addDualRowPremiseLits(lits, seen, relaxation, cert, session)) return null
+        if (!addDualRowPremiseLits(lits, seen, relaxation, cert, session, observer)) return null
         for (col in relaxation.colVarId.indices) {
             val sign = cert.reducedCostSign(col)
             if (sign == 0) continue
@@ -255,9 +257,10 @@ internal object LpExplanation {
         session: PropagationSession,
     ): Boolean {
         val model = relaxation.model
+        if (model.rowGlobal.size != model.m || model.rowPremises.size != model.m) return false
         for (r in rows) {
             if (r !in 0 until model.m || model.exactState?.rows?.row(r)?.active == false) return false
-            if (model.rowGlobal[r]) continue
+            if (model.exactState?.model?.row(r)?.global ?: model.rowGlobal[r]) continue
             val source = relaxation.sourceMap?.parent(r)
             if (source != null) {
                 if (source.model !== session.problem || source.assumptions.isNotEmpty()) return false
@@ -281,17 +284,17 @@ internal object LpExplanation {
                 continue
             }
             val prem = model.rowPremises[r] ?: return false
+            if (prem.vars.size != prem.isUpper.size || prem.vars.size != prem.thresholds.size) return false
             for (k in prem.vars.indices) {
-                val lit = if (prem.isUpper[k]) {
-                    session.boundLeLit(prem.vars[k], prem.thresholds[k], positive = false)
-                } else {
-                    session.boundGeLit(prem.vars[k], prem.thresholds[k], positive = false)
-                }
-                if (seen.add(lit)) lits.add(lit)
+                if (prem.vars[k] !in 0 until session.problem.numIntVars) return false
+                val premise = CutPremise.Bound(
+                    CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, prem.vars[k]) to BigFraction.ONE)),
+                    prem.isUpper[k], BigFraction.ofLong(prem.thresholds[k]),
+                )
+                if (!addSourcePremise(lits, seen, premise, session)) return false
             }
             for (bl in prem.boolLits) {
-                val neg = Lit.negate(bl)
-                if (seen.add(neg)) lits.add(neg)
+                if (!addSourcePremise(lits, seen, CutPremise.Literal(bl), session)) return false
             }
         }
         return true
@@ -304,8 +307,9 @@ internal object LpExplanation {
         relaxation: LpRelaxation,
         cert: IntegerCertificate,
         session: PropagationSession,
+        observer: LpCertificationObserver? = null,
     ): Boolean {
-        if (!cert.belongsTo(relaxation.model)) return false
+        if (!cert.belongsTo(relaxation.model, observer)) return false
         val rows = (0 until relaxation.model.m).filter { cert.dualNonzeroRow(it) }.toIntArray()
         return addRowPremiseLits(lits, seen, relaxation, rows, session)
     }

@@ -43,6 +43,10 @@ internal class LpCapturedPremises(
     val thresholds: LongArray,
     val boolLits: IntArray,
 ) {
+    fun matches(premises: LpRowPremises): Boolean = vars.contentEquals(premises.vars) &&
+        isUpper.contentEquals(premises.isUpper) && thresholds.contentEquals(premises.thresholds) &&
+        boolLits.contentEquals(premises.boolLits)
+
     fun copy(): LpCapturedPremises = LpCapturedPremises(
         vars.copyOf(),
         isUpper.copyOf(),
@@ -106,6 +110,34 @@ internal class LpCapturedModel(
     val numericAuthority: LpNumericAuthority,
     val doubleView: LpCapturedDoubleView?,
 ) {
+    val integerAuthorityUnits: Long = colPtr.size.toLong() + rowIdx.size + colVal.size + rhs.size + cost.size +
+        upper.size + hasUpper.size + loShift.size + tag.size + rowGlobal.size + rowStrict.size + rowPremises.size +
+        flippedRhs.size + probeClampedLo.size + probeClampedHi.size + colContinuous.size + 2L +
+        rowPremises.sumOf { (it?.vars?.size ?: 0).toLong() * 3L + (it?.boolLits?.size ?: 0) }
+
+    // Integer Lagrangian data remains valid after an integrality flag changes; deductions check their own lattice.
+    fun matchesIntegerAuthority(model: LpModel): Boolean = numericAuthority == LpNumericAuthority.LONG_EXACT &&
+        model.exactState == null && model.doubleView == null && n == model.n && m == model.m &&
+        matchesIntegerMatrix(model) && matchesIntegerVectors(model) && matchesIntegerSources(model)
+
+    private fun matchesIntegerMatrix(model: LpModel): Boolean = colPtr.contentEquals(model.csc.colPtr) &&
+        rowIdx.contentEquals(model.csc.rowIdx) && colVal.contentEquals(model.csc.colVal)
+
+    private fun matchesIntegerVectors(model: LpModel): Boolean = rhs.contentEquals(model.rhs) && cost.contentEquals(model.cost) &&
+        upper.contentEquals(model.upper) && hasUpper.contentEquals(model.hasUpper) &&
+        loShift.contentEquals(model.loShift) && objConstant == model.objConstant && sense == model.sense &&
+        flippedRhs.contentEquals(model.flippedRhs) && probeClampedLo.contentEquals(model.probeClampedLo) &&
+        probeClampedHi.contentEquals(model.probeClampedHi)
+
+    private fun matchesIntegerSources(model: LpModel): Boolean =
+        tag.contentEquals(model.tag) && rowGlobal.contentEquals(model.rowGlobal) &&
+        rowStrict.contentEquals(model.rowStrict) &&
+        rowPremises.size == model.rowPremises.size && rowPremises.indices.all { row ->
+            val before = rowPremises[row]
+            val after = model.rowPremises[row]
+            if (before == null) after == null else after != null && before.matches(after)
+        }
+
     fun copy(): LpCapturedModel = LpCapturedModel(
         n,
         m,
@@ -241,7 +273,15 @@ internal class LpCapturedModel(
             }
         }
 
-        fun capture(model: LpModel): LpCapturedModel {
+        fun capture(model: LpModel): LpCapturedModel = snapshot(model).also { it.validate() }
+
+        // Integer coefficients admit a Lagrangian over continuous columns without a replayable Long lattice.
+        fun snapshotIntegerAuthority(model: LpModel): LpCapturedModel {
+            require(model.doubleView == null)
+            return snapshot(model)
+        }
+
+        private fun snapshot(model: LpModel): LpCapturedModel {
             require(model.exactState == null) { "exact working state requires exact capture" }
             val dv = model.doubleView?.let {
                 LpCapturedDoubleView(
@@ -295,7 +335,7 @@ internal class LpCapturedModel(
                 model.colContinuous.copyOf(),
                 authority,
                 dv,
-            ).also { it.validate() }
+            )
         }
     }
 }

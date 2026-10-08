@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -12,6 +13,8 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
@@ -33,6 +36,50 @@ import kotlin.test.assertTrue
  * the exact basis-certificate; every literal it cites is false at the node.
  */
 class LpExplanationTest {
+    @Test
+    fun `projected global flags cannot erase exact row premises`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 9)),
+            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)))
+        val session = PropagationSession(problem)
+        session.pinBool(0, true)
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 9L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+        }.build(Sense.MINIMIZE)
+        source.rowGlobal[0] = false
+        source.rowPremises[0] = LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(Lit.make(0, true)))
+        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
+        val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0)))
+
+        model.rowGlobal[0] = true
+
+        assertEquals(listOf(Lit.make(0, false)), LpExplanation.objectiveBoundReason(relaxation, certificate, session)?.toList())
+    }
+
+    @Test
+    fun `legacy and retained row activators cannot be cited after native rollback`() {
+        for (retained in listOf(false, true)) {
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 9)),
+                arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)))
+            val session = PropagationSession(problem)
+            session.pinBool(0, true)
+            val source = LpBuilder().apply {
+                val x = addVar(0L, 9L, cost = 1L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+            }.build(Sense.MINIMIZE)
+            source.rowGlobal[0] = false
+            source.rowPremises[0] = LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(Lit.make(0, true)))
+            val model = if (retained) assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel()) else source
+            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
+            val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0)))
+            assertEquals(listOf(Lit.make(0, false)), LpExplanation.objectiveBoundReason(relaxation, certificate, session)?.toList())
+
+            session.popToLevel(0)
+
+            assertNull(LpExplanation.objectiveBoundReason(relaxation, certificate, session))
+        }
+    }
 
     @Test
     fun `retained objective explanations decline certificates from popped bounds`() {

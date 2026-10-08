@@ -22,6 +22,67 @@ import kotlin.test.assertTrue
  * [SafeObjectiveBoundTest] checks the float bound.
  */
 class IntegerDualBoundTest {
+    @Test
+    fun `malformed legacy row premises decline numerical certification and source conversion`() {
+        val premises = listOf(
+            LpRowPremises(intArrayOf(0), booleanArrayOf(), longArrayOf(0L)),
+            LpRowPremises(intArrayOf(0), booleanArrayOf(false), longArrayOf()),
+            LpRowPremises(intArrayOf(-1), booleanArrayOf(false), longArrayOf(0L)),
+            LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(-1)),
+        )
+        for (premise in premises) {
+            val model = LpBuilder().apply {
+                val x = addVar(0L, 9L, cost = 1L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+            }.build(Sense.MINIMIZE)
+            model.rowGlobal[0] = false
+            model.rowPremises[0] = premise
+
+            assertNull(integerCertify(model, doubleArrayOf(-1.0)))
+            assertNull(model.authoritativeModel())
+        }
+    }
+
+    @Test
+    fun `legacy certificates reject mutations to numeric authority and source premises`() {
+        val edits = listOf<Pair<String, (LpModel) -> Unit>>(
+            "cost" to { it.cost[0] = 0L },
+            "rhs" to { it.rhs[0] = 0L },
+            "upper" to { it.upper[0] = 4L },
+            "upper presence" to { it.hasUpper[0] = false },
+            "coefficient" to { it.csc.colVal[0] = -2L },
+            "matrix row" to { it.csc.rowIdx[0] = 1 },
+            "matrix column" to { it.csc.colPtr[1] = 0 },
+            "origin" to { it.loShift[0] = 1L },
+            "tag" to { it.tag[0] = 4 },
+            "source rhs" to { it.flippedRhs[0] = -2L },
+            "lower probe" to { it.probeClampedLo[0] = true },
+            "upper probe" to { it.probeClampedHi[0] = true },
+            "global row" to { it.rowGlobal[0] = true },
+            "strict row" to { it.rowStrict[0] = true },
+            "premise variable" to { assertNotNull(it.rowPremises[0]).vars[0] = 1 },
+            "premise side" to { assertNotNull(it.rowPremises[0]).isUpper[0] = true },
+            "premise bound" to { assertNotNull(it.rowPremises[0]).thresholds[0] = 2L },
+            "activator" to { assertNotNull(it.rowPremises[0]).boolLits[0] = 9 },
+            "premises" to { it.rowPremises[0] = null },
+        )
+        for ((name, edit) in edits) {
+            val model = LpBuilder().apply {
+                val x = addVar(0L, 9L, cost = 1L)
+                val y = addVar(0L, 9L, cost = 1L)
+                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+                addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 4L)
+            }.build(Sense.MINIMIZE)
+            model.rowGlobal[0] = false
+            model.rowPremises[0] = LpRowPremises(intArrayOf(0), booleanArrayOf(false), longArrayOf(0L), intArrayOf(7))
+            val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0, -1.0)))
+            assertTrue(certificate.belongsTo(model), name)
+
+            edit(model)
+
+            assertFalse(certificate.belongsTo(model), name)
+        }
+    }
 
     @Test
     fun `retained certificates bind immutable authority across equivalent views and reject later scopes`() {
@@ -329,7 +390,7 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `an integer certificate charges one pass over the model's entries`() {
+    fun `integer certification charges arithmetic and mutable authority snapshots`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 4L, cost = 1L)
         val y = builder.addVar(0L, 4L, cost = 1L)
@@ -344,10 +405,14 @@ class IntegerDualBoundTest {
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         }
 
-        integerCertify(model, doubleArrayOf(1.0), observer = observer)
+        val legacy = assertNotNull(integerCertify(model, doubleArrayOf(1.0), observer = observer))
+        assertTrue(legacy.belongsTo(model, observer))
+        val retained = assertNotNull(LpExactState(assertNotNull(model.authoritativeModel())).toWorkingModel())
+        val immutable = assertNotNull(integerCertify(retained, doubleArrayOf(1.0), observer = observer))
+        assertTrue(immutable.belongsTo(retained, observer))
 
-        // Two structural entries, three columns with the row's slack, one row.
-        assertEquals(listOf<LpCertifierCost>(LpCertifierCost.Metered(6L)), costs)
+        assertEquals(listOf<LpCertifierCost>(LpCertifierCost.Metered(39L), LpCertifierCost.Metered(33L),
+            LpCertifierCost.Metered(6L)), costs)
     }
 
     @Test
