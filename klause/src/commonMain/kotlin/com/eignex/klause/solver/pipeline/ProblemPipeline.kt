@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
+import com.eignex.klause.solver.hasFiniteIntegerRanges
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.LpRoute
@@ -144,10 +145,6 @@ private fun Problem.pipelineRouteObserved(
         SourceProblemRoute.OpenTheory(request)
     }
 }
-
-/** Whether every integer column states both of its sides. */
-private fun Problem.hasFiniteIntegerRanges(): Boolean =
-    (0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) }
 
 /**
  * This model with every open integer side replaced by a bound optimization-based tightening proves, or

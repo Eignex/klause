@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.isClausal
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 
@@ -15,11 +15,7 @@ class PropagationProblem(
     val problem: Problem,
 ) {
     /** Whether this projection can use the packed native-SAT propagation lane. */
-    val isNativeSatEligible: Boolean =
-        problem.numIntVars == 0 &&
-            problem.numBoolVars > 0 &&
-            problem.factors.isNotEmpty() &&
-            problem.factors.all { it is Clause }
+    val isNativeSatEligible: Boolean = problem.isClausal()
 
     /** One propagator per model factor. */
     val propagators: Array<out Propagator> = Array(problem.numFactors) { problem.factors[it].propagatorProjection() }
