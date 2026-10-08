@@ -649,8 +649,10 @@ class Portfolio(
         val instructions = stats?.ls?.moves?.sum ?: 0.0
         return when {
             claim.whole -> countedInstructions(claim, instructions)
+
             worker.acceptsInstructionBudget && worker.family == ArmFamily.LocalSearch ->
                 countedInstructions(claim, instructions)
+
             // ALNS charges its outer repair allowances independently of the inner solver's move count.
             else -> claim.sliceWork
         }
@@ -666,7 +668,9 @@ class Portfolio(
     }
 
     private fun solveSliceNodes(worker: PortfolioWorker, claim: Claim): Long =
-        if (claim.whole || !worker.acceptsInstructionBudget) claim.handleNodes else {
+        if (claim.whole || !worker.acceptsInstructionBudget) {
+            claim.handleNodes
+        } else {
             (instructionsOf(claim) / LS_INSTRUCTIONS_PER_WORK).toLong().coerceAtLeast(1L)
         }
 

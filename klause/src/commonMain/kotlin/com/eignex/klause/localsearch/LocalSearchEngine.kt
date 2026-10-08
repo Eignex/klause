@@ -208,7 +208,9 @@ internal class LocalSearchEngine(
                 }
                 val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE
                 if (available == 0L) return unknown(TerminationReason.BudgetExhausted)
-                token = if (sliceMillis == Long.MAX_VALUE) global else {
+                token = if (sliceMillis == Long.MAX_VALUE) {
+                    global
+                } else {
                     global or Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
                 }
                 val allowance = if (sliceNodes < 0L) {
