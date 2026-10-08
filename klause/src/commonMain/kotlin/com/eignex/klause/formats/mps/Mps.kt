@@ -32,10 +32,10 @@ internal fun mpsError(msg: String): Nothing = throw MpsFormatException(msg)
  * `RANGES`, `BOUNDS`, `INDICATORS` — into an [MpsModel]. Whitespace ("free") tokenisation is used, which handles the
  * common case; fixed-column files whose names embed spaces are not supported.
  *
- * Bound conventions: a variable defaults to `[0, +∞)`. `RANGES` and `RHS` follow the standard sign
- * rules (see [applyRange]). An integer column with no explicit bound keeps `[0, +∞)` — the MPS
- * standard is ambiguous here (some readers use `[0, 1]`), so the choice is made explicit and left to
- * the lowering step to reconcile with whichever oracle a benchmark uses.
+ * Bound conventions: a variable defaults to `[0, +∞)`. A marker-declared integer column with no
+ * `BOUNDS` entry defaults to `[0, 1]`, following the CPLEX convention used by SCIP and HiGHS.
+ * Explicit bound entries replace this binary default. `RANGES` and `RHS` follow the standard sign
+ * rules (see [applyRange]).
  */
 object Mps {
 
@@ -368,6 +368,11 @@ object Mps {
         vars: List<Var>,
         objectiveRow: Row?,
     ): MpsModel {
+        vars.forEach { v ->
+            if (v.integer && !v.explicitLower && !v.explicitUpper) {
+                v.upper = MpsSourceNumber.parsed(BigFraction.ONE)
+            }
+        }
         val variables = vars.map { MpsVar(it.name, it.integer, it.lower?.double, it.upper?.double) }
         val constraints = rows.filter { it.type == RowType.LE || it.type == RowType.GE || it.type == RowType.EQ }
             .map { row ->
