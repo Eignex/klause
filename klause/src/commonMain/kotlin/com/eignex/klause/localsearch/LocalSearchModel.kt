@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -38,14 +39,22 @@ class LocalSearchModel private constructor(
 
     /** The two ways a model reaches local search. */
     companion object {
-        /** The finite model [problem], over its root-propagated domains and under its root deductions. */
-        fun of(problem: BakedProblem): LocalSearchModel = LocalSearchModel(
-            problem = problem,
-            domains = problem.rootIntDomainsInPlace,
-            rootPins = { assumptions -> problem.rootPins(assumptions) },
-            refutesModel = true,
-            anchoredSampling = false,
-        )
+        /**
+         * The finite model [problem], over its root-propagated domains and under its root deductions. A scheduling
+         * factor's column whose domain is wide moves over its [scheduleWindow] instead, and then nothing local search
+         * concludes refutes the model: a refutation inside the window is not one of the model.
+         */
+        fun of(problem: BakedProblem): LocalSearchModel {
+            val root = problem.rootIntDomainsInPlace
+            val domains = scheduleWindows(problem, root)
+            return LocalSearchModel(
+                problem = problem,
+                domains = domains,
+                rootPins = { assumptions -> problem.rootPins(assumptions) },
+                refutesModel = domains === root,
+                anchoredSampling = false,
+            )
+        }
 
         /**
          * A model whose integer columns may be open, searched over [domains]: each column's declared range with
@@ -82,6 +91,14 @@ private fun Problem.declaredSearchDomain(v: Int): IntDomain {
     val lo = if (bounds.hasLower(v)) bounds.lower(v) else -OPEN_EDGE
     val hi = if (bounds.hasUpper(v)) bounds.upper(v) else OPEN_EDGE
     return IntDomain(lo, hi)
+}
+
+/** [domains] with every wide column of a [Cumulative] in its [scheduleWindow]; the same array when there is none. */
+private fun scheduleWindows(problem: Problem, domains: Array<IntDomain>): Array<IntDomain> {
+    val windowed = problem.factors.filterIsInstance<Cumulative>().flatMap { it.intVars.asIterable() }
+        .filter { !isNarrow(domains[it]) }
+    if (windowed.isEmpty()) return domains
+    return domains.copyOf().also { copy -> for (v in windowed) copy[v] = scheduleWindow(domains[v]) }
 }
 
 /**
