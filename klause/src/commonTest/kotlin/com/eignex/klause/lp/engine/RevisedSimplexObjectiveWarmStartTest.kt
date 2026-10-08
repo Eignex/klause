@@ -11,6 +11,51 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexObjectiveWarmStartTest {
     @Test
+    fun `unbounded objective candidates reuse feasible factors after objective adoption`() {
+        val builder = LpBuilder()
+        val x = builder.addOpenAboveVar(0, cost = -1)
+        val y = builder.addOpenAboveVar(0)
+        builder.addRow(intArrayOf(x, y), longArrayOf(1, -1), Relation.EQ, 1)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { solver ->
+            assertNull(solver.solvePrimal())
+            assertEquals(LpFloatTermination.UNBOUNDED_CANDIDATE, solver.lastTermination)
+            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(one, zero, zero))))
+            assertTrue(solver.adopt(trail.state, Cancellation.Never))
+
+            val result = assertNotNull(solver.resolveBounds())
+
+            assertEquals(1.0, result.objective)
+            assertEquals(1, solver.lastMetrics.objectiveWarmHits)
+            assertEquals(0, result.refactorizations)
+            assertEquals(BigFraction.ONE,
+                certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result).lowerBound)
+        }
+    }
+
+    @Test
+    fun `bounding an unbounded objective repairs its primal basis before reporting an optimum`() {
+        val builder = LpBuilder()
+        val x = builder.addOpenAboveVar(0, cost = -1)
+        val y = builder.addOpenAboveVar(0)
+        builder.addRow(intArrayOf(x, y), longArrayOf(1, -1), Relation.EQ, 1)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { solver ->
+            assertNull(solver.solvePrimal())
+            assertTrue(trail.assertBound(x, true, ExactLpSide(ExactLpNumber.of(3L)), 0L))
+            assertTrue(solver.adopt(trail.state, Cancellation.Never))
+
+            val result = assertNotNull(solver.resolveBounds())
+
+            assertEquals(-3.0, result.objective)
+            assertEquals(3.0, result.primal[x])
+            assertEquals(2.0, result.primal[y])
+            assertEquals(BigFraction.ofLong(-3L),
+                certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result).lowerBound)
+        }
+    }
+
+    @Test
     fun `mixed seats retain exact bounds and costs through repeated objective changes`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

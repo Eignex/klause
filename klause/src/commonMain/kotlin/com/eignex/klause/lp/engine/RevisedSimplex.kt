@@ -195,6 +195,7 @@ internal class RevisedSimplex(
         private set
     private var cachedBeta: DoubleArray? = null
     private var cachedModel: LpModel? = null
+    private var cachedPrimalOnly = false
     private var cachedNumerical: LpScalingView? = null
     private var cachedStatus: Array<VarStatus>? = null
     private var pivots = 0
@@ -1499,9 +1500,11 @@ internal class RevisedSimplex(
         val objectiveOnly = kept && before != null && after != null && before.sameMatrix(after) &&
             before.boundRevision == after.boundRevision && before.popRevision == after.popRevision &&
             before.rowRevision == after.rowRevision && before.model.objective != after.model.objective
-        if (objectiveOnly) {
-            objectiveWarmAttempts++
-            objectiveWarmHits++
+        if (objectiveOnly || (kept && before != null && cachedPrimalOnly)) {
+            if (before?.model?.objective != after?.model?.objective) {
+                objectiveWarmAttempts++
+                objectiveWarmHits++
+            }
             return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
         }
         val sameObjective = before?.model?.objective == after?.model?.objective
@@ -2117,10 +2120,11 @@ internal class RevisedSimplex(
         return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
     }
 
-    private fun retainBasicValues(beta: DoubleArray) {
+    private fun retainBasicValues(beta: DoubleArray, primalOnly: Boolean = false) {
         if (model.exactState == null) return
         cachedBeta = (cachedBeta ?: DoubleArray(m)).also { beta.copyInto(it) }
         cachedModel = model
+        cachedPrimalOnly = primalOnly
         cachedNumerical = numerical
         cachedStatus = cachedStatus?.also { status.copyInto(it) } ?: status.copyOf()
     }
@@ -2967,7 +2971,13 @@ internal class RevisedSimplex(
                     leavingVar = basicVar[i]
                 }
             }
-            if (tMax >= Double.MAX_VALUE) return stopped(LpFloatTermination.UNBOUNDED_CANDIDATE)
+            if (tMax >= Double.MAX_VALUE) {
+                // This basis is primal feasible; an unbounded objective does not make it dual feasible.
+                basisKept = true
+                retainBasicValues(beta, primalOnly = true)
+                solvedExactState = model.exactState
+                return stopped(LpFloatTermination.UNBOUNDED_CANDIDATE)
+            }
             if (leaving == -1) {
                 // The entering variable reaches its opposite bound first: flip it, no basis change.
                 status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
