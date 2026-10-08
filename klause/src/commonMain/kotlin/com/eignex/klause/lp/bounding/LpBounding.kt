@@ -7,8 +7,8 @@ import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
-import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.FarkasRoute
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpCertifier
@@ -22,13 +22,13 @@ import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
-import com.eignex.klause.lp.engine.exactConstant
 import com.eignex.klause.lp.engine.exactBounds
+import com.eignex.klause.lp.engine.exactConstant
 import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
-import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.hasIntegralObjective
+import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
@@ -128,8 +128,8 @@ internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): T
 }
 
 /*
- * Eligible CP nodes adopt exact bound changes into the retained scoped owner. A local row/layout
- * change replaces that owner. Legacy models without exact authority use a bounded fresh solve.
+ * Source nodes use their retained scoped owner. An external model installs separate exact authority;
+ * legacy models without that authority use a bounded fresh solve.
  * Warm hints apply only to a fresh solve; a retained scoped owner already has its basis factorized.
  */
 // Replacement cleanup must preserve arbitrary solve and close failures.
@@ -402,9 +402,9 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    val relaxation = nodeRelaxation(relaxer, session)
+    val relaxation = nodeRelaxation(relaxer, session) ?: return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null)
-    if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
+    if (relaxation.model.n == 0 && relaxation.model.m == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
     val model = relaxation.model
     // Measured only at the root: the pass is O(nnz), and the matrix a node solves is the root's, so a
@@ -918,8 +918,8 @@ internal fun LpEngine.sparseCertifiedPrune(
     if (!bound.isFinite()) return LpNodeOutcome(false, null) // no incumbent to prune against
     // Cut-free recovery: this path is reached because the cut-augmented build overflowed, and cuts are a
     // common overflow source, so the base relaxation (no cuts) is what yields a sound — if looser — bound.
-    val relaxation = nodeRelaxation(relaxer, session)
-    if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
+    val relaxation = nodeRelaxation(relaxer, session) ?: return LpNodeOutcome(false, null)
+    if (relaxation.model.n == 0 && relaxation.model.m == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
     noteNodeOverhead(relaxation.model.extent() * LpNodeOverhead.SETUP)
     val recoverySimplex = dualSimplex(relaxation.model, cancellation)
@@ -1175,9 +1175,11 @@ private fun LpEngine.strictSourcePrune(
     val model = relaxation.model
     val exact = model.authoritativeModel() ?: return null
     if (cancellation()) return LpNodeOutcome(false, null)
-    if (!propagator.install(model, exact)) return null
     nodeUsesTrail = true
-    cpAdapter.localModel()
+    if (cpAdapter.currentModel !== model) {
+        if (!propagator.install(model, exact)) return null
+        cpAdapter.localModel()
+    }
     val result = try {
         propagator.solve(cancellation)
     } finally {

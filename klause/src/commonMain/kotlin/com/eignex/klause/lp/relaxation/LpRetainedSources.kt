@@ -3,6 +3,8 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
+import com.eignex.klause.lp.engine.CutSource
+import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpModel
@@ -18,13 +20,18 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 
 internal class LpSourceEdit(
+    val sourceState: LpExactState,
     val retired: Set<Long>,
     val columns: List<LpStructuralColumn>,
     val rows: List<LpScopedRow>,
     val permanentRows: Set<Long>,
     val objective: ExactLpObjective?,
+    val bounds: List<ExactLpBounds>,
+    val emittedExtent: Long,
+    private val identify: (Int) -> CutSource?,
     private val publish: () -> Unit,
 ) {
+    fun source(column: Int): CutSource? = identify(column)
     fun commit() = publish()
 }
 
@@ -34,7 +41,7 @@ internal class LpRetainedSources(
     private val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
 ) {
     private sealed interface ColumnKey {
-        data class Source(val kind: Int, val variable: Int, val sign: Int = 1) : ColumnKey
+        data class Source(val kind: CutSourceKind, val variable: Int, val sign: Int = 1) : ColumnKey
         data class Defined(val definition: CutAuxiliaryDefinition) : ColumnKey
         data class Anonymous(val epoch: Long, val column: Int) : ColumnKey
     }
@@ -88,7 +95,10 @@ internal class LpRetainedSources(
         val expectedGeneration = generation
         val update = emissions.prepare(domains, state.depth, cancellation)
         if (update.changed.isEmpty()) {
-            return LpSourceEdit(emptySet(), emptyList(), emptyList(), emptySet(), null) {
+            return LpSourceEdit(
+                state, emptySet(), emptyList(), emptyList(), emptySet(), null, liveBounds(domains), 0L,
+                identify = { columns[it].cpSource() },
+            ) {
                 check(generation == expectedGeneration) { "stale source edit" }
                 update.commit()
                 generation++
@@ -107,11 +117,14 @@ internal class LpRetainedSources(
         var lastId = state.rows.lastId
         var epoch = columnEpoch
         var constant = state.model.objective.constant.value
+        var emittedExtent = 0L
         for (index in update.changed) {
             if (cancellation()) throw LpAssemblyCancelled()
             check(epoch < Long.MAX_VALUE)
             val emission = update.emissions[index]
             val fragment = emission.relaxation
+            emittedExtent += fragment.model.n.toLong() + fragment.model.m +
+                (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
             val source = requireNotNull(fragment.model.authoritativeModel())
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
             val mapped = IntArray(source.n)
@@ -119,8 +132,9 @@ internal class LpRetainedSources(
                 val key = columnKey(fragment, local, epoch)
                 val old = keys[key]
                 if (old != null) {
-                    check(staged[old].source.origin == source.column(local).origin)
-                    check(staged[old].cost == source.objective.cost(local))
+                    // Integer and mixed emitters can encode the same coordinate in Long and IEEE forms.
+                    check(staged[old].source.origin.value == source.column(local).origin.value)
+                    check(staged[old].cost.value == source.objective.cost(local).value)
                     mapped[local] = old
                 } else {
                     val definition = fragment.colPresence[local]
@@ -193,7 +207,10 @@ internal class LpRetainedSources(
                 List(state.model.m) { state.model.objective.cost(state.model.n + it) } + rows.map { it.cost },
             ExactLpNumber.of(constant), sense = Sense.MINIMIZE,
         )
-        return LpSourceEdit(retired, added, rows, permanent, objective) {
+        return LpSourceEdit(
+            state, retired, added, rows, permanent, objective, liveBounds(staged, domains), emittedExtent,
+            identify = { staged[it].cpSource() },
+        ) {
             check(generation == expectedGeneration) { "stale source edit" }
             update.commit()
             columns = staged.toList()
@@ -207,16 +224,24 @@ internal class LpRetainedSources(
         }
     }
 
+    private fun Column.cpSource(): CutSource? = if (variable < 0) null else {
+        CutSource(if (boolean) CutSourceKind.BOOLEAN else CutSourceKind.INTEGER, variable)
+    }
+
     private fun columnKey(fragment: LpRelaxation, column: Int, epoch: Long): ColumnKey = when {
         fragment.colVarId[column] >= 0 -> ColumnKey.Source(
-            if (fragment.colIsBool[column]) 1 else 0, fragment.colVarId[column],
+            if (fragment.colIsBool[column]) CutSourceKind.BOOLEAN else CutSourceKind.INTEGER, fragment.colVarId[column],
         )
-        fragment.colRealId[column] >= 0 -> ColumnKey.Source(2, fragment.colRealId[column], fragment.colRealSign[column])
+        fragment.colRealId[column] >= 0 -> ColumnKey.Source(
+            CutSourceKind.REAL, fragment.colRealId[column], fragment.colRealSign[column],
+        )
         fragment.colPresence[column] != null -> ColumnKey.Defined(requireNotNull(fragment.colPresence[column]))
         else -> ColumnKey.Anonymous(epoch, column)
     }
 
-    fun liveBounds(domains: RelaxationDomains): List<ExactLpBounds> = columns.map { column ->
+    fun liveBounds(domains: RelaxationDomains): List<ExactLpBounds> = liveBounds(columns, domains)
+
+    private fun liveBounds(columns: List<Column>, domains: RelaxationDomains): List<ExactLpBounds> = columns.map { column ->
         val origin = column.source.origin.value
         when {
             column.variable >= 0 && column.boolean -> {

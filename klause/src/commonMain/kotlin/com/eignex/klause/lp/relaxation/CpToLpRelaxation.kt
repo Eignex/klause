@@ -277,7 +277,7 @@ internal class RootDomains(private val problem: Problem) : RelaxationDomains {
 }
 
 /** [RelaxationDomains] backed by a live [PropagationSession]'s search state. */
-private class SessionDomains(private val session: PropagationSession) : RelaxationDomains {
+internal class SessionDomains(private val session: PropagationSession) : RelaxationDomains {
     override fun intDomain(varId: Int): IntDomain = session.intDomain(varId)
     override fun boolValue(varId: Int): Boolean? = session.boolValue(varId)
 }

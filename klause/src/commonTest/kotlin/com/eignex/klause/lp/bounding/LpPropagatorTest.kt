@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -32,6 +33,8 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpRetainedSources
+import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.basis.BasisArithmeticException
@@ -44,6 +47,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -53,12 +57,80 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `a source edit prepared before a trail transition declines without publication`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val domains = RootDomains(problem)
+        val sources = LpRetainedSources(
+            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            val stale = sources.prepare(assertNotNull(lp.state), domains)
+            assertTrue(lp.atLevel(1))
+            val before = lp.state
+            val metrics = lp.metrics
+
+            assertFalse(lp.editSources(stale))
+
+            assertSame(before, lp.state)
+            assertEquals(metrics, lp.metrics)
+            assertEquals(0, sources.depth)
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `source edits assert live bounds before numerical preparation and retain rollback`() {
+        val problem = Problem(
+            1, 1, arrayOf(IntDomain(3, 10)),
+            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8)),
+        )
+        var live = problem.finiteIntDomain(0).withMinAtLeast(4L)
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = live
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sources = LpRetainedSources(
+            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            val root = sources.prepare(assertNotNull(lp.state), domains)
+            assertTrue(lp.editSources(root) { _, _ -> SearchAtomPremise.All(emptyList()) })
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(lp.solve()).lowerBound)
+            assertEquals(1L, lp.metrics?.preparationAttempts)
+            assertTrue(assertIs<SearchAtomPremise.All>(lp.activeBoundPremise(0, false)).premises.isEmpty())
+            assertTrue(lp.atLevel(1))
+            live = live.withMinAtLeast(6L)
+            val child = sources.prepare(assertNotNull(lp.state), domains)
+
+            assertTrue(lp.editSources(child))
+
+            assertEquals(BigFraction.ofLong(6L), assertNotNull(lp.solve()).lowerBound)
+            assertEquals(2L, lp.metrics?.preparationAttempts)
+            assertEquals(SearchAtomPremise.Unavailable, lp.activeBoundPremise(0, false))
+            assertTrue(lp.atLevel(0))
+            sources.retract(0)
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(lp.solve()).lowerBound)
+            assertTrue(lp.resetRoot())
+            assertEquals(2L, lp.metrics?.createdOwners)
+            assertTrue(assertIs<SearchAtomPremise.All>(lp.activeBoundPremise(0, false)).premises.isEmpty())
+            live = problem.finiteIntDomain(0)
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
+            assertEquals(3L, lp.metrics?.createdOwners)
+        }
+    }
+
     @Test
     fun `a redundant bound batch spends no edit work`() {
         val zero = ExactLpNumber.of(0L)

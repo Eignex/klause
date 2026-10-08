@@ -131,6 +131,8 @@ internal class LpScopedSolver(
 
     fun pop(targetDepth: Int, token: Cancellation = cancellation): Boolean = edit(token) { it.pop(targetDepth, token) }
 
+    fun resetRoot(token: Cancellation = cancellation): Boolean = edit(token) { it.resetRoot(token) }
+
     fun resetRoot(initial: LpExactState, token: Cancellation = cancellation): Boolean {
         requireAvailable()
         editAttempts++
@@ -174,6 +176,7 @@ internal class LpScopedSolver(
         token: Cancellation = cancellation,
         permanentRows: Set<Long> = emptySet(),
         objective: ExactLpObjective? = null,
+        assertions: List<LpBoundAssertion> = emptyList(),
     ): Boolean = edit(token, rows.isNotEmpty() || columns.isNotEmpty()) {
         if (rows.size > maxRetainedRows - state.model.m) return@edit false
         val hidden = if (retired.isEmpty()) {
@@ -184,7 +187,8 @@ internal class LpScopedSolver(
             it.deactivate(retired, token)
         }
         hidden && it.append(columns, rows, scoped, token, permanentRows) &&
-            (objective == null || it.replaceObjective(objective, token))
+            (objective == null || it.replaceObjective(objective, token)) &&
+            it.assertBounds(assertions, token) !is LpBoundBatchResult.Declined
     }
 
     fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }

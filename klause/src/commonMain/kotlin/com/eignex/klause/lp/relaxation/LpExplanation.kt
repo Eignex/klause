@@ -3,20 +3,21 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.forEachRationalColumn
+import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.div
 import com.eignex.klause.util.isZero
 import com.eignex.klause.util.minus
@@ -262,6 +263,20 @@ internal object LpExplanation {
                 if (source.model !== session.problem || source.assumptions.isNotEmpty()) return false
                 for (fact in source.facts) {
                     if (!fact.global && !addSourcePremise(lits, seen, fact.premise, session)) return false
+                }
+                continue
+            }
+            if (model.exactState != null) {
+                val premises = model.exactState.model.row(r).premises ?: return false
+                for (bound in premises.boundEntries()) {
+                    val premise = CutPremise.Bound(
+                        CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, bound.variable) to BigFraction.ONE)),
+                        bound.upper, bound.threshold.value,
+                    )
+                    if (!addSourcePremise(lits, seen, premise, session)) return false
+                }
+                for (literal in premises.literalEntries()) {
+                    if (!addSourcePremise(lits, seen, CutPremise.Literal(literal), session)) return false
                 }
                 continue
             }

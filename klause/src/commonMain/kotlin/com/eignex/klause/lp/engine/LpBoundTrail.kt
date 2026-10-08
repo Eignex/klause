@@ -171,6 +171,28 @@ internal class LpBoundTrail(initial: LpExactState) {
         return commit(next, token)
     }
 
+    fun resetRoot(token: Cancellation = Cancellation.Never): Boolean {
+        if (token() || state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
+        val rows = state.rows.popped(0)
+        val changedRows = (0 until rows.size).filter { rows.row(it) != state.rows.row(it) }
+        if (changedRows.isNotEmpty() && state.rowRevision == Long.MAX_VALUE) return false
+        if (!canDeactivate(changedRows.filterTo(HashSet()) { !rows.row(it).active }, emptyList())) return false
+        return commit(
+            snapshot(
+                assertions = emptyList(),
+                scopes = emptyList(),
+                rows = rows,
+                rowRevision = state.rowRevision + if (changedRows.isEmpty()) 0L else 1L,
+                boundRevision = state.boundRevision + 1L,
+                popRevision = state.popRevision + 1L,
+                changedColumns = (
+                    state.assertions.map { it.column } + changedRows.map { state.model.n + it }
+                    ).distinct().sorted(),
+            ),
+            token,
+        )
+    }
+
     fun recenter(origins: List<ExactLpNumber>, token: Cancellation = Cancellation.Never): Boolean {
         if (token() || origins.size != state.model.n) return false
         if ((0 until state.model.n).all { origins[it] == state.model.column(it).origin }) return true

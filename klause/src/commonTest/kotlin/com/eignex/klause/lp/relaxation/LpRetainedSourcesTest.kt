@@ -25,6 +25,39 @@ import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
     @Test
+    fun `mixed emitters share integer coordinates and preserve IEEE row authority`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 5)),
+            arrayOf<Factor>(Linear(
+                intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 2.5,
+                strict = true,
+            )), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val domains = RootDomains(problem)
+        val sources = LpRetainedSources(
+            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+        )
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = sources.prepare(owner.state, domains)
+
+            assertTrue(owner.replaceRows(
+                edit.retired, edit.columns, edit.rows, false,
+                permanentRows = edit.permanentRows, objective = edit.objective,
+            ))
+            edit.commit()
+
+            val relaxation = sources.relaxation(owner.state, domains)
+            val column = relaxation.intColOf[0]
+            assertEquals(2, owner.state.model.n)
+            assertEquals(BigFraction.ZERO, owner.state.model.column(column).origin.value)
+            assertEquals(BigFraction.ONE, owner.state.model.objective.cost(column).value)
+            assertEquals(null, owner.state.model.objective.cost(column).ieeeBits)
+            assertTrue(owner.state.model.entries(column).all { it.number.ieeeBits != null })
+            assertTrue(owner.state.model.row(0).strict)
+        }
+    }
+
+    @Test
     fun `bound only source edits reuse emitted rows metadata and the numerical owner`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(3, 9)),

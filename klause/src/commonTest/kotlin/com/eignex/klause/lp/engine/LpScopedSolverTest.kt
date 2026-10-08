@@ -23,6 +23,89 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `new columns rows and bound assertions publish in one preparation`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val column = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L))), integral = true)
+        val row = LpScopedRow(
+            0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        val empty = ExactLpModel(emptyList(), emptyList(), emptyList(), emptyList(), ExactLpObjective(emptyList()))
+        LpScopedSolver(LpExactState(empty)).use { owner ->
+            assertTrue(owner.push())
+
+            assertTrue(owner.replaceRows(
+                emptySet(), listOf(LpStructuralColumn(column, one)), listOf(row), true,
+                assertions = listOf(LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(3L)), 0L, 1)),
+            ))
+
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
+            assertEquals(1L, owner.metrics.preparationAttempts)
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            assertEquals(1L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `an invalid bound in a structural batch preserves the original authority`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val row = LpScopedRow(
+            1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+            val before = owner.state
+            val preparations = owner.metrics.preparationAttempts
+
+            assertFalse(owner.replaceRows(
+                setOf(0L), emptyList(), listOf(row), true,
+                assertions = listOf(LpBoundAssertion(2, false, ExactLpSide(ExactLpNumber.of(2L)), 0L, 0)),
+            ))
+
+            assertSame(before, owner.state)
+            assertEquals(preparations, owner.metrics.preparationAttempts)
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `root reset preserves extended columns permanent rows and numerical ownership`() {
+        val source = LpBuilder().apply { addVar(0L, 5L, cost = 1L) }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val row = LpScopedRow(
+            0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 0L))
+            assertTrue(owner.push())
+            assertTrue(owner.replaceRows(
+                emptySet(), listOf(LpStructuralColumn(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))))),
+                listOf(row), true, permanentRows = setOf(0L),
+                assertions = listOf(LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(3L)), 1L, 1)),
+            ))
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
+            val owners = owner.metrics.createdOwners
+
+            assertTrue(owner.resetRoot())
+
+            assertEquals(0, owner.state.depth)
+            assertTrue(owner.state.assertions.isEmpty())
+            assertEquals(2, owner.state.model.n)
+            assertTrue(owner.state.rows.row(0).active)
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertEquals(owners, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
     fun `mixed row lifetimes prepare once and keep a permanent definition through pop`() {
         val source = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
         val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))
