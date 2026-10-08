@@ -27,6 +27,8 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 
 internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
+    // CP decisions reach the LP in a bound batch; its scopes are synchronized when that batch is assembled.
+    override val eagerAssertionScopes: Boolean get() = false
     private var native: PropagationSession? = null
     private var sharedNative: PropagationSession? = null
     private var shared: SearchContext? = null

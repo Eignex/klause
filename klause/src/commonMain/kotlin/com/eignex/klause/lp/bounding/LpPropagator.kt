@@ -53,6 +53,7 @@ internal data class LpEffortProfile(
 )
 
 internal interface LpSearchPolicy {
+    val eagerAssertionScopes: Boolean get() = true
     fun initialize(context: SearchContext) = Unit
     fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = ComponentResult.Consistent
     fun propagate(context: SearchContext): ComponentResult = ComponentResult.Consistent
@@ -409,7 +410,9 @@ internal class LpPropagator(
     internal fun assertWithin(decision: SearchDecision, context: SearchContext, token: Cancellation): ComponentResult {
         if (proofContext != null && proofContext !== context) return ComponentResult.Indeterminate
         proofContext = context
-        if (owner != null && !atLevel(context.decisionLevel, token)) return ComponentResult.Indeterminate
+        if (owner != null && policy.eagerAssertionScopes && !atLevel(context.decisionLevel, token)) {
+            return ComponentResult.Indeterminate
+        }
         sourcePremises?.record(decision, context)
         return policy.assert(decision, context)
     }

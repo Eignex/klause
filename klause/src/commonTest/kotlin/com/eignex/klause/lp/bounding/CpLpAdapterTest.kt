@@ -70,6 +70,55 @@ import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
     @Test
+    fun `CP decisions without an LP pass do not spend retained LP edit work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "deferred-scopes")).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val before = engine.totalSolveWork()
+
+            shared.push(SearchDecision.IntAtLeast(0, 3))
+
+            assertEquals(3L, cp.session.intDomain(0).min)
+            assertEquals(before, engine.totalSolveWork())
+        }
+    }
+
+    @Test
+    fun `an LP pass catches up skipped CP scopes and restores ancestor bounds`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "deferred-scopes")).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            shared.push(SearchDecision.IntAtLeast(0, 3))
+            shared.push(SearchDecision.IntAtLeast(0, 5))
+
+            val child = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val childValue = assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective
+            shared.popTo(1)
+            val ancestor = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val ancestorValue = assertNotNull(engine.solveNode(ancestor.model, null, Cancellation.Never)?.second).objective
+            shared.popTo(0)
+            val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val rootValue = assertNotNull(engine.solveNode(root.model, null, Cancellation.Never)?.second).objective
+
+            assertEquals(5.0, childValue)
+            assertEquals(3.0, ancestorValue)
+            assertEquals(0.0, rootValue)
+        }
+    }
+
+    @Test
     fun `fixed node relaxations reuse their owner projection without changing source origins`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), emptyArray())
         LpEngine(
