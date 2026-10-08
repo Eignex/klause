@@ -114,7 +114,8 @@ sealed interface SearchAtomPremise {
  *
  * The component must prove that [premise] implies [conclusion] (or contradiction when null) under the
  * immutable root. This function checks names and current assertion truth, not the arithmetic proof.
- * [maxNodes] bounds traversal including repeated DAG visits and the resulting literal count.
+ * Shared conjunctions are expanded once. [maxNodes] bounds visited references, including repeats, and
+ * the resulting literal count.
  */
 fun SearchContext.explainAtoms(
     premise: SearchAtomPremise,
@@ -126,6 +127,7 @@ fun SearchContext.explainAtoms(
     if (conclusion != null) literals.add(atomLiteral(conclusion) ?: return null)
     val pending = ArrayDeque<SearchAtomPremise>()
     pending.add(premise)
+    val expanded = HashSet<SearchAtomPremise.All>()
     var remaining = maxNodes
     while (pending.isNotEmpty()) {
         if (remaining-- <= 0) return null
@@ -137,6 +139,7 @@ fun SearchContext.explainAtoms(
             }
 
             is SearchAtomPremise.All -> {
+                if (!expanded.add(current)) continue
                 if (current.premises.size > remaining - pending.size) return null
                 pending.addAll(current.premises)
             }

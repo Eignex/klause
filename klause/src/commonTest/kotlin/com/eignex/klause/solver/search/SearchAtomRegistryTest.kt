@@ -205,6 +205,58 @@ class SearchAtomRegistryTest {
     }
 
     @Test
+    fun `shared premise graphs retain every active source leaf within the traversal budget`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.push(SearchDecision.Bool(0))
+        session.push(SearchDecision.Bool(2))
+        var premise: SearchAtomPremise = SearchAtomPremise.All(
+            listOf(
+                SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                SearchAtomPremise.Asserted(SearchDecision.Bool(2)),
+            ),
+        )
+        repeat(12) { premise = SearchAtomPremise.All(listOf(premise, premise)) }
+
+        val explanation = session.explainAtoms(premise)
+
+        assertEquals(setOf(1, 3), assertNotNull(explanation).literals.toSet())
+    }
+
+    @Test
+    fun `a shared premise graph with an unavailable leaf declines its whole explanation`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.push(SearchDecision.Bool(0))
+        var premise: SearchAtomPremise = SearchAtomPremise.All(
+            listOf(SearchAtomPremise.Unavailable, SearchAtomPremise.Asserted(SearchDecision.Bool(0))),
+        )
+        repeat(12) { premise = SearchAtomPremise.All(listOf(premise, premise)) }
+
+        val explanation = session.explainAtoms(premise)
+
+        assertNull(explanation)
+    }
+
+    @Test
+    fun `a shared premise graph rechecks source truth after rollback`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.push(SearchDecision.Bool(0))
+        session.push(SearchDecision.Bool(2))
+        var premise: SearchAtomPremise = SearchAtomPremise.All(
+            listOf(
+                SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                SearchAtomPremise.Asserted(SearchDecision.Bool(2)),
+            ),
+        )
+        repeat(12) { premise = SearchAtomPremise.All(listOf(premise, premise)) }
+        assertNotNull(session.explainAtoms(premise))
+        session.popTo(1)
+
+        val explanation = session.explainAtoms(premise)
+
+        assertNull(explanation)
+    }
+
+    @Test
     fun `foreign owners and rebuilt roots cannot reuse registered meaning`() {
         val registry = SearchAtomRegistry(1)
         val session = SearchSession(emptyList(), atoms = registry)
