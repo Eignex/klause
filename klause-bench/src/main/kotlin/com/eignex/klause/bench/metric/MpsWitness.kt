@@ -30,6 +30,10 @@ internal object MpsWitness {
     private const val GAP_REL = 1e-9
     private const val GAP_ABS = 1e-6
 
+    /** Floating-point error allowed in a row's activity, relative to the sum of its terms' magnitudes: a row of
+     *  large terms cancels to a value carrying their rounding, which is no violation of the model. */
+    private const val ROUNDING = 1e-12
+
     /** What a solver reports when it stops. */
     enum class Status { OPTIMAL, INFEASIBLE, LIMIT, UNKNOWN }
 
@@ -151,15 +155,21 @@ internal object MpsWitness {
             val indicator = c.indicator
             if (indicator != null && round(x[indicator.column]) != if (indicator.whenOne) 1.0 else 0.0) continue
             var activity = 0.0
-            for (k in c.indices.indices) activity += c.coeffs[k] * x[c.indices[k]]
-            row = max(row, excess(activity, c.lower, c.upper))
+            var magnitude = 0.0
+            for (k in c.indices.indices) {
+                val term = c.coeffs[k] * x[c.indices[k]]
+                activity += term
+                magnitude += abs(term)
+            }
+            row = max(row, excess(activity, c.lower, c.upper, rounding = ROUNDING * magnitude))
         }
         return Violations(bound, row, 0.0)
     }
 
-    private fun excess(value: Double, lower: Double?, upper: Double?): Double {
-        val below = lower?.let { (it - value) - tolerance(it) } ?: 0.0
-        val above = upper?.let { (value - it) - tolerance(it) } ?: 0.0
+    /** How far [value] lies outside [lower, upper] beyond the tolerance and the [rounding] its computation carries. */
+    private fun excess(value: Double, lower: Double?, upper: Double?, rounding: Double = 0.0): Double {
+        val below = lower?.let { (it - value) - tolerance(it) - rounding } ?: 0.0
+        val above = upper?.let { (value - it) - tolerance(it) - rounding } ?: 0.0
         return max(0.0, max(below, above))
     }
 

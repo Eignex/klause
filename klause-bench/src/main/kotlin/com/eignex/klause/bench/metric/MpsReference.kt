@@ -20,8 +20,8 @@ internal data class MpsAttempt(
 /**
  * The reference result of one or more [MpsAttempt]s on a model, shared by [ScipReference] and [HighsReference]. Only a
  * checked witness makes a problem feasible, and the best one across the attempts is the row's objective. An optimum
- * stays proven only when no other attempt's checked witness beats it, and an infeasibility claim only when no attempt
- * found a checked witness: a retry that contradicts the first run refutes it rather than being outvoted.
+ * stays proven only when no other attempt's checked witness beats it, and an infeasibility claim only when no other
+ * attempt claimed a solution at all: a retry that contradicts the first run refutes it rather than being outvoted.
  */
 internal object MpsReference {
     /** Judge [claim] on [model]; a model the bench cannot parse leaves every solution unchecked, so unknown. */
@@ -45,8 +45,13 @@ internal object MpsReference {
     ): SolverInvocation.Result {
         val witnesses = attempts.filter { it.verdict.feasible == true && it.verdict.objective != null }
         val best = witnesses.reduceOrNull { a, b -> if (better(b.verdict.objective!!, a.verdict.objective!!, maximize)) b else a }
-        val refuting = attempts.filter { it.claim.status == MpsWitness.Status.INFEASIBLE }.takeIf { best != null }.orEmpty()
-        val chosen = best ?: attempts.firstOrNull { it.verdict.feasible == false } ?: attempts.last()
+        val infeasible = attempts.filter { it.claim.status == MpsWitness.Status.INFEASIBLE }
+        val refuting = infeasible.takeIf { best != null }.orEmpty()
+        // A solver that claims a solution in one run and infeasibility in another contradicts itself: even when the
+        // solution fails the check, its infeasibility is not a proof to rely on.
+        val claimingSolution = attempts.filter { it.claim.status != MpsWitness.Status.INFEASIBLE && (it.claim.assignment != null || it.claim.status == MpsWitness.Status.OPTIMAL) }
+        val contradicted = best == null && infeasible.isNotEmpty() && claimingSolution.isNotEmpty()
+        val chosen = best ?: infeasible.firstOrNull()?.takeUnless { contradicted } ?: attempts.last { it.claim.status != MpsWitness.Status.INFEASIBLE }
         val beaten = best != null && best.verdict.proven &&
             witnesses.any { better(it.verdict.objective!!, best.verdict.objective!!, maximize) }
         val proven = chosen.verdict.proven && !beaten
@@ -63,6 +68,9 @@ internal object MpsReference {
         stats["attempts"] = attempts.joinToString("; ") { a -> "${a.label}: ${a.verdict.stats["claimedStatus"]}, ${a.verdict.stats["validation"]}" }
         if (refuting.isNotEmpty()) {
             stats["refuted"] = "${refuting.joinToString { it.label }} claimed infeasible; ${best!!.label} found a checked solution"
+        }
+        if (contradicted) {
+            stats["contradicted"] = "${infeasible.joinToString { it.label }} claimed infeasible; ${claimingSolution.joinToString { it.label }} claimed a solution"
         }
         if (beaten) stats["proof"] = "rejected: another attempt found a better checked solution"
         val outcome = chosen.verdict.outcome

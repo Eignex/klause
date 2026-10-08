@@ -135,6 +135,29 @@ class MpsWitnessTest {
     }
 
     @Test
+    fun `an infeasibility claim the same solver contradicts with a solution, even a rejected one, is not a proof`() {
+        fun attempt(label: String, claim: MpsWitness.Claim) =
+            MpsAttempt(label, "", 1_000, label, claim, MpsWitness.judge(link, claim, noRepair), emptyMap())
+        val infeasible = attempt("default", claim(MpsWitness.Status.INFEASIBLE, null, null, null))
+        val rejected = attempt("presolve off", claim(MpsWitness.Status.OPTIMAL, -0.8, -0.8, mapOf("b" to 8e-7, "f" to 0.8)))
+
+        val result = MpsReference.result(listOf(infeasible, rejected), link, maximize = false, "highs|test", "")
+
+        assertEquals(listOf(null, false), listOf(result.feasible, result.proven))
+        assertTrue(result.stats.getValue("contradicted").startsWith("default claimed infeasible"))
+    }
+
+    @Test
+    fun `a row of large terms allows for the rounding of their sum, and no more`() {
+        // 1e6 x - 1e6 w + y = 0.5 with x = w = 5: terms of 5e6 cancel, so 5e-6 is within their rounding, 1e-4 is not.
+        val within = MpsWitness.validate(equality, mapOf("x" to 5.0, "w" to 5.0, "y" to 0.5 + 5e-6), noRepair)
+        val beyond = MpsWitness.violations(equality, doubleArrayOf(5.0, 5.0, 0.5 + 1e-4))
+
+        assertIs<MpsWitness.Outcome.Valid>(within)
+        assertTrue(beyond.row > 0.0)
+    }
+
+    @Test
     fun `highs's summary and solution file give its claim`() {
         val stdout = "  Status            Optimal\n  Primal bound      924\n  Dual bound        924\n" +
             "  Gap               0% (tolerance: 0.01%)\n  Solution status   feasible\n"
