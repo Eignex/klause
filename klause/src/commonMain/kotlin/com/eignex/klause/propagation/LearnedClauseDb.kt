@@ -57,3 +57,7 @@ internal class LearnedClauseDb(
 
 /** The origin of a learned clause the session derived itself rather than imported. */
 internal const val OWN_ORIGIN = -1
+
+/** The origin of an order-atom channeling clause: structural, rebuilt by every session that allocates the atoms, so
+ *  never shared with another arm. */
+internal const val CHANNELING_ORIGIN = -2

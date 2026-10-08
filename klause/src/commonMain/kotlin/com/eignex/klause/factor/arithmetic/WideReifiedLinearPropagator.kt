@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.internals.reifiedAuxTail
 import com.eignex.klause.factor.arithmetic.internals.wideAlwaysHolds
 import com.eignex.klause.factor.arithmetic.internals.wideEnforceRow
 import com.eignex.klause.factor.arithmetic.internals.wideNeverHolds
+import com.eignex.klause.factor.arithmetic.internals.wideSideReason
 import com.eignex.klause.factor.arithmetic.internals.wideSumRange
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -15,6 +16,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.div
 import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.minus
@@ -51,15 +53,62 @@ internal class WideReifiedLinearPropagator(
         return if (op == LinearOp.EQ && vars.size == 1) {
             collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit, includeExtraLit = includeExtraLit)
         } else {
-            collectLinearTightenAntecedents(
-                state,
-                vars,
-                excludeIdx = -1,
-                extraLit = extraLit,
-                includeExtraLit = includeExtraLit,
-            )
+            // With the indicator set, the body (or its negation) fails on one side of the activity range.
+            val (sumLo, sumHi) = wideSumRange(state, vars, coeffs)
+            val side = auxValue?.let { wideSettlingSide(op, sumLo, sumHi, bound, holds = !it) }
+            if (side != null) {
+                wideSideReason(state, vars, coeffs, side, -1, if (includeExtraLit) extraLit else null)
+            } else {
+                collectLinearTightenAntecedents(
+                    state,
+                    vars,
+                    excludeIdx = -1,
+                    extraLit = extraLit,
+                    includeExtraLit = includeExtraLit,
+                )
+            }
         }
     }
+
+    /**
+     * The side of the activity range that settles the body: whether it holds ([holds]) or fails, read off the lower
+     * end (true) or the upper end (false); null when only both together settle it (an equality pinned on both
+     * ends, or a disequality).
+     */
+    private fun wideSettlingSide(op: LinearOp, sumLo: BigInt, sumHi: BigInt, bound: BigInt, holds: Boolean): Boolean? =
+        when (op) {
+            LinearOp.LE -> if (holds) false else true
+
+            LinearOp.GE -> if (holds) true else false
+
+            LinearOp.EQ -> if (holds) {
+                null
+            } else {
+                (
+                if (sumLo > bound) {
+                    true
+                } else if (sumHi < bound) {
+                    false
+                } else {
+                    null
+                }
+                )
+            }
+
+            LinearOp.NE -> if (holds) {
+                (
+                if (sumLo > bound) {
+                    true
+                } else if (sumHi < bound) {
+                    false
+                } else {
+                    null
+                }
+                )
+            } else {
+                null
+            }
+        }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val (sumLo, sumHi) = wideSumRange(state, vars, coeffs)
@@ -69,7 +118,13 @@ internal class WideReifiedLinearPropagator(
             auxBoolVar,
             always,
             never,
-            pinAntecedent = { state.composeIntVarAtomAntecedents(vars) },
+            pinAntecedent = {
+                val (sumLo, sumHi) = wideSumRange(state, vars, coeffs)
+                when (val side = wideSettlingSide(op, sumLo, sumHi, bound, holds = always)) {
+                    null -> state.composeIntVarAtomAntecedents(vars)
+                    else -> wideSideReason(state, vars, coeffs, side, -1, null)
+                }
+            },
             extraFalsePin = {
                 if (op == LinearOp.EQ && vars.size == 1 && eqTargetUnreachable(state)) {
                     state.pinBool(auxBoolVar, false, eqUnreachableReason(state))

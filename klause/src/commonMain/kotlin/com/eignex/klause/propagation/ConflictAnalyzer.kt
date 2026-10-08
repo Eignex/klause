@@ -199,10 +199,13 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
      * sit below the literal's level on this one.
      */
     private fun beginAnalysis() {
+        state.lazyReasonMemo.clear()
         val atomCount = state.atoms.intVar.size
         if (atomLevelStamp.size < atomCount) {
-            atomLevelStamp = IntArray(atomCount)
-            atomLevelMemo = IntArray(atomCount)
+            // Atoms keep materialising during search, so grow ahead of them rather than on every new one.
+            val capacity = maxOf(atomCount, atomLevelStamp.size * 2)
+            atomLevelStamp = IntArray(capacity)
+            atomLevelMemo = IntArray(capacity)
             atomLevelEpoch = 0 // fresh arrays read as epoch 0, so don't start at 0
         }
         atomLevelEpoch++
@@ -236,7 +239,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     fun analyzeDecisionConflict(conflictedVar: Int): AnalysisResult {
         beginAnalysis()
         val priorValue = state.boolValues[conflictedVar] ?: return AnalysisResult.NotApplicable
-        val priorAnt = state.boolAntecedents[conflictedVar]
+        val priorAnt = state.reasonOf(state.boolAntecedents[conflictedVar])
         // The just-attempted decision lit (currently false in state because the prior
         // pin still holds and pinBoolImpl rejected the new value).
         val decisionLit = Lit.make(conflictedVar, !priorValue)
@@ -287,10 +290,6 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
 
         resolvent.resolve(seedReason, currentLevel)
 
-        if (resolvent.liveAtCurrentLevel == 0) {
-            return resolvent.finalizeResult(currentLevel)
-        }
-
         // Pin-trail cursor for the 1UIP pivot scan. The pivot is always the most-recent still-seen
         // current-level literal (reverse-assignment order); under single establishment a
         // reason cites only earlier-established (lower-position) literals, so resolving the pivot at
@@ -320,7 +319,15 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                     break
                 }
             }
-            if (pivot >= 0) {
+            // A trail pivot with no reason is the level's decision, so it is the UIP only once nothing else at
+            // the level is live; a literal the cursor passed, or an atom off the trail, may still be, and
+            // resolving it first keeps the clause asserting.
+            val decisionTooSoon = pivot >= 0 && resolvent.liveAtCurrentLevel > 1 && antecedentsOf(pivot) == null
+            val offTrailFirst = if (decisionTooSoon) explainedPivot(resolvent, currentLevel, numBoolVars) else -1
+            if (offTrailFirst >= 0) {
+                pivot = offTrailFirst
+                rescanFromTop = true
+            } else if (pivot >= 0) {
                 // Trail pivot: its antecedents land strictly below `pivotPos`, so the next pivot is
                 // at or below it — descend the cursor and keep scanning from there.
                 pinCursor = pivotPos - 1
@@ -361,6 +368,24 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return resolvent.finalizeResult(currentLevel)
     }
 
+    // A live literal at [currentLevel] with a reason to resolve through, or -1: one on the trail that the
+    // descending cursor passed before a reason cited it, or an atom off the trail.
+    private fun explainedPivot(resolvent: ConflictResolvent, currentLevel: Int, numBoolVars: Int): Int {
+        for (i in state.boolPinOrder.size - 1 downTo 0) {
+            val v = state.boolPinOrder[i]
+            if (!resolvent.isFrontier(v)) continue
+            val lvl = if (v < numBoolVars) state.boolLevel[v] else cachedAtomLevel(v - numBoolVars)
+            if (lvl == currentLevel && antecedentsOf(v) != null) return v
+        }
+        val offTrail = resolvent.offTrailFrontier
+        for (k in 0 until offTrail.size) {
+            val v = offTrail[k]
+            if (!resolvent.isFrontier(v) || cachedAtomLevel(v - numBoolVars) != currentLevel) continue
+            if (antecedentsOf(v) != null) return v
+        }
+        return -1
+    }
+
     /** Antecedents of `v`, or null when `v` is a decision/leaf — or when `v` falls outside
      *  the current antecedent universe. Out-of-range atom ids can be reached only through the
      *  recursive antecedent walk in the [ClauseMinimizer] redundancy DFS (the 1UIP loop stays within `seen`/`resolved`
@@ -369,7 +394,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     override fun antecedentsOf(v: Int): IntArray? {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
-            if (v < 0) null else state.boolAntecedents[v]
+            if (v < 0) null else state.reasonOf(state.boolAntecedents[v])
         } else {
             val atomId = v - numBoolVars
             if (atomId < state.atoms.intVar.size) state.atomAntecedentsDerived(atomId) else null

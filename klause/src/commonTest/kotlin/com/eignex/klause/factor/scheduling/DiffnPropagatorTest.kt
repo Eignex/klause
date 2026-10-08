@@ -13,7 +13,9 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -238,5 +240,36 @@ class DiffnPropagatorTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `a sweep move cites only the compulsory parts in its way`() {
+        // Rectangle 0 sits at the origin and rectangle 1 cannot leave its rows, so 1 moves right of 0; rectangle
+        // 2, out at (6, 6), plays no part. Origins: xs = 0, 2, 4 and ys = 1, 3, 5, every side 2.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = Array(6) { IntDomain(0, 9) },
+            factors = arrayOf<Factor>(
+                Diffn(
+                    xs = intArrayOf(0, 2, 4),
+                    ys = intArrayOf(1, 3, 5),
+                    widths = longArrayOf(2, 2, 2),
+                    heights = longArrayOf(2, 2, 2),
+                ),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(0, 0) && state.tightenIntMax(1, 0) && state.tightenIntMax(3, 1))
+        check(state.tightenIntMin(4, 6) && state.tightenIntMin(5, 6))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        assertEquals(2, state.intDomains[2].min)
+        val cited = state.reasonOf(state.intMinAntecedents[2])!!.map { state.atoms.intVar[Lit.variable(it)] }.toSet()
+        assertEquals(setOf(0, 1, 3), cited)
     }
 }

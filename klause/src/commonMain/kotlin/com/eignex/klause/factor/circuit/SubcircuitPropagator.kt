@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.factor.circuit.internals.buildSuccWatches
-import com.eignex.klause.factor.circuit.internals.circuitReachesAll
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
 import com.eignex.klause.factor.circuit.internals.walkPredChain
@@ -9,6 +8,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -16,8 +16,7 @@ import com.eignex.klause.util.IntArrayList
  *
  * Every deduction carries the edges and bounds it rests on, so the clauses conflict analysis learns from it name
  * a few successors rather than the whole tour; a clause citing every successor describes one partial tour and
- * prunes almost nothing else. The strong-connectivity check has no such reason and leaves its failures to
- * chronological backtracking.
+ * prunes almost nothing else. A strong-connectivity failure cites the cut that separates two mandatory nodes.
  */
 internal class SubcircuitPropagator(private val succ: IntArray, private val n: Int) : Propagator {
 
@@ -26,6 +25,12 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
 
     // The reason the last failed [propagate] leaves for conflict analysis; null where it has no sharp one.
     private var failure: IntArray? = null
+
+    // The candidate predecessors of each node, rebuilt in place by every connectivity check: node `u`'s are
+    // `revArcs(revHead(u) until revHead(u + 1))`.
+    private val revHead = IntArray(n + 1)
+    private val revCursor = IntArray(n)
+    private var revArcs = IntArray(n)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = failure
 
@@ -177,6 +182,37 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             return this
         }
 
+        /** Node [u] can no longer move to [target]. */
+        fun lacks(u: Int, target: Int): Reason {
+            val literal = if (state.undoLogging) {
+                state.exclusionLiteral(succ[u], target.toLong(), state.undo.size)
+            } else if (target.toLong() in state.rootDomains[succ[u]]) {
+                Lit.make(state.atomVarEq(succ[u], target.toLong()), true)
+            } else {
+                Lit.NONE
+            }
+            if (literal != Lit.NONE) addLiteral(literal)
+            return this
+        }
+
+        /** Every node of [inside] lacks every target outside it: no arc leaves the set. */
+        fun closed(inside: BooleanArray): Reason {
+            for (u in 0 until n) {
+                if (!inside[u]) continue
+                for (t in 0 until n) if (!inside[t] && t.toLong() !in state.intDomains[succ[u]]) lacks(u, t)
+            }
+            return this
+        }
+
+        /** Every node outside [inside] lacks every target in it: no arc enters the set. */
+        fun unentered(inside: BooleanArray): Reason {
+            for (u in 0 until n) {
+                if (inside[u]) continue
+                for (t in 0 until n) if (inside[t] && t.toLong() !in state.intDomains[succ[u]]) lacks(u, t)
+            }
+            return this
+        }
+
         /** The bound that keeps one node outside [excluded] from opting out, which the cycle must then visit. */
         fun mandatoryOutside(mandatory: BooleanArray, excluded: BooleanArray): Reason {
             var chosen = -1
@@ -210,6 +246,10 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
      * every other such mandatory node over non-self candidate arcs — the cycle visits them all in
      * one strongly-connected loop. Optional nodes may serve as intermediate stops, so reachability
      * is taken over the full candidate graph. A correct sub-circuit never trips it.
+     *
+     * A mandatory node `m` the root cannot reach fails on the set `R` the root does reach: no arc leaves `R`, so
+     * the cycle through the root stays inside it and misses `m`; the reason is the two nodes' opt-outs being gone
+     * and every arc out of `R`. One that cannot reach the root mirrors it on the arcs into the root's ancestors.
      */
     private fun stronglyConnectedSubcircuit(state: PropagationState): Boolean {
         val mandatory = BooleanArray(n)
@@ -223,22 +263,60 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             }
         }
         if (mandCount < 2) return true
-        val rev = Array(n) { IntArrayList() }
+        buildPredecessors(state)
+        for (forward in booleanArrayOf(true, false)) {
+            val reached = reachable(state, root, forward)
+            val missed = (0 until n).firstOrNull { mandatory[it] && !reached[it] } ?: continue
+            val reason = Reason(state).lacks(root, root).lacks(missed, missed)
+            return fail(if (forward) reason.closed(reached) else reason.unentered(reached))
+        }
+        return true
+    }
+
+    // The nodes [root] reaches over non-self candidate arcs ([forward]), or that reach it.
+    private fun buildPredecessors(state: PropagationState) {
+        revHead.fill(0)
         for (i in 0 until n) {
             state.intDomains[succ[i]].values.forEach { j ->
-                if (j != i.toLong() && j in 0 until n) {
-                    rev[j.toInt()].add(
-                        i,
-                    )
+                if (j != i.toLong() && j in 0 until n) revHead[j.toInt() + 1]++
+            }
+        }
+        for (u in 0 until n) revHead[u + 1] += revHead[u]
+        if (revArcs.size < revHead[n]) revArcs = IntArray(maxOf(revHead[n], revArcs.size * 2))
+        revHead.copyInto(revCursor, 0, 0, n)
+        for (i in 0 until n) {
+            state.intDomains[succ[i]].values.forEach { j ->
+                if (j != i.toLong() && j in 0 until n) revArcs[revCursor[j.toInt()]++] = i
+            }
+        }
+    }
+
+    private fun reachable(state: PropagationState, root: Int, forward: Boolean): BooleanArray {
+        val seen = BooleanArray(n)
+        val stack = IntArrayList()
+        seen[root] = true
+        stack.add(root)
+        while (stack.size > 0) {
+            val u = stack[stack.size - 1]
+            stack.truncateTo(stack.size - 1)
+            if (forward) {
+                state.intDomains[succ[u]].values.forEach { t ->
+                    val v = t.toInt()
+                    if (t in 0 until n && v != u && !seen[v]) {
+                        seen[v] = true
+                        stack.add(v)
+                    }
+                }
+            } else {
+                for (k in revHead[u] until revHead[u + 1]) {
+                    val v = revArcs[k]
+                    if (!seen[v]) {
+                        seen[v] = true
+                        stack.add(v)
+                    }
                 }
             }
         }
-        // Only mandatory nodes must be mutually reachable; a self-loop (v == u) is an opt-out, not a
-        // tour edge, so it never carries reachability.
-        val arc = { u: Int, v: Int -> v != u && v in 0 until n }
-        val counts = { node: Int -> mandatory[node] }
-        fun reaches(forward: Boolean) =
-            state.circuitReachesAll(succ, n, root, forward, rev, target = mandCount, arcAllowed = arc, counts = counts)
-        return reaches(forward = true) && reaches(forward = false)
+        return seen
     }
 }

@@ -3,6 +3,7 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.arithmetic.internals.collectLinearDirAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearLiftedAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.factor.arithmetic.internals.explainLinearBound
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.ir.LinearOp
@@ -35,7 +36,10 @@ internal class LinearPropagator(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
-        propagateLinearBounds(state, coeffs, vars, op, bound)
+        propagateLinearBounds(state, coeffs, vars, op, bound, factorId = factorId)
+
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
+        explainLinearBound(state, coeffs, vars, payload, atTrail, atLevel)
 
     /** Reason set when [propagate] returns false. The conflict comes from exactly one sum
      *  extreme breaching `bound`: `LE` / `EQ`-with-`sumLo>bound` from the lo side (`Σ rLo`),

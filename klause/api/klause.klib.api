@@ -1048,6 +1048,7 @@ abstract interface com.eignex.klause.propagation/Propagator { // com.eignex.klau
         open fun <get-initialIntEventWatches>(): kotlin/IntArray? // com.eignex.klause.propagation/Propagator.initialIntEventWatches.<get-initialIntEventWatches>|<get-initialIntEventWatches>(){}[0]
 
     open fun conflictReason(com.eignex.klause.propagation/PropagationState, kotlin/Int): kotlin/IntArray? // com.eignex.klause.propagation/Propagator.conflictReason|conflictReason(com.eignex.klause.propagation.PropagationState;kotlin.Int){}[0]
+    open fun explain(com.eignex.klause.propagation/PropagationState, kotlin/Int, kotlin/IntArray, kotlin/Int, kotlin/Int): kotlin/IntArray? // com.eignex.klause.propagation/Propagator.explain|explain(com.eignex.klause.propagation.PropagationState;kotlin.Int;kotlin.IntArray;kotlin.Int;kotlin.Int){}[0]
     open fun propagate(com.eignex.klause.propagation/PropagationState, kotlin/Int): kotlin/Boolean // com.eignex.klause.propagation/Propagator.propagate|propagate(com.eignex.klause.propagation.PropagationState;kotlin.Int){}[0]
 }
 
@@ -4800,8 +4801,6 @@ final class com.eignex.klause.factor.scheduling/Cumulative : com.eignex.klause.f
         final fun <get-capacity>(): kotlin/Long // com.eignex.klause.factor.scheduling/Cumulative.capacity.<get-capacity>|<get-capacity>(){}[0]
     final val capacityVar // com.eignex.klause.factor.scheduling/Cumulative.capacityVar|{}capacityVar[0]
         final fun <get-capacityVar>(): kotlin/Int // com.eignex.klause.factor.scheduling/Cumulative.capacityVar.<get-capacityVar>|<get-capacityVar>(){}[0]
-    final val constantEnergyAndCap // com.eignex.klause.factor.scheduling/Cumulative.constantEnergyAndCap|{}constantEnergyAndCap[0]
-        final fun <get-constantEnergyAndCap>(): kotlin/Boolean // com.eignex.klause.factor.scheduling/Cumulative.constantEnergyAndCap.<get-constantEnergyAndCap>|<get-constantEnergyAndCap>(){}[0]
     final val durationVars // com.eignex.klause.factor.scheduling/Cumulative.durationVars|{}durationVars[0]
         final fun <get-durationVars>(): kotlin/IntArray // com.eignex.klause.factor.scheduling/Cumulative.durationVars.<get-durationVars>|<get-durationVars>(){}[0]
     final val durations // com.eignex.klause.factor.scheduling/Cumulative.durations|{}durations[0]
@@ -4814,8 +4813,6 @@ final class com.eignex.klause.factor.scheduling/Cumulative : com.eignex.klause.f
         final fun <get-resourceVars>(): kotlin/IntArray // com.eignex.klause.factor.scheduling/Cumulative.resourceVars.<get-resourceVars>|<get-resourceVars>(){}[0]
     final val resources // com.eignex.klause.factor.scheduling/Cumulative.resources|{}resources[0]
         final fun <get-resources>(): kotlin/LongArray // com.eignex.klause.factor.scheduling/Cumulative.resources.<get-resources>|<get-resources>(){}[0]
-    final val sharpReasonEligible // com.eignex.klause.factor.scheduling/Cumulative.sharpReasonEligible|{}sharpReasonEligible[0]
-        final fun <get-sharpReasonEligible>(): kotlin/Boolean // com.eignex.klause.factor.scheduling/Cumulative.sharpReasonEligible.<get-sharpReasonEligible>|<get-sharpReasonEligible>(){}[0]
     final val starts // com.eignex.klause.factor.scheduling/Cumulative.starts|{}starts[0]
         final fun <get-starts>(): kotlin/IntArray // com.eignex.klause.factor.scheduling/Cumulative.starts.<get-starts>|<get-starts>(){}[0]
     final val unary // com.eignex.klause.factor.scheduling/Cumulative.unary|{}unary[0]
@@ -12553,9 +12550,11 @@ final object com.eignex.klause.solver.pipeline/FinitePipeline { // com.eignex.kl
 final object com.eignex.klause.solver.pipeline/OpenTheoryPipeline { // com.eignex.klause.solver.pipeline/OpenTheoryPipeline|null[0]
     final fun canMinimize(com.eignex.klause.solver.pipeline/OpenTheoryRequest): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.canMinimize|canMinimize(com.eignex.klause.solver.pipeline.OpenTheoryRequest){}[0]
     final fun execute(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.execute|execute(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
+    final fun execute(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.solver.pipeline/TheoryParams, com.eignex.klause.solver.pipeline/FiniteEngine): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.execute|execute(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.solver.pipeline.TheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
     final fun executePortfolio(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.executePortfolio|executePortfolio(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
     final fun prepare(com.eignex.klause.solver.pipeline/OpenTheoryRequest): com.eignex.klause.solver.pipeline/OpenPreparation // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.prepare|prepare(com.eignex.klause.solver.pipeline.OpenTheoryRequest){}[0]
     final fun searchWithoutTheory(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/TheoryParams = ..., com.eignex.klause.solver.objective/LinearObjective? = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.searchWithoutTheory|searchWithoutTheory(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.TheoryParams;com.eignex.klause.solver.objective.LinearObjective?){}[0]
+    final fun searchWithoutTheory(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/TheoryParams, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.pipeline/FiniteEngine): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.searchWithoutTheory|searchWithoutTheory(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.TheoryParams;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 }
 
 final object com.eignex.klause.util/PermutationGroup { // com.eignex.klause.util/PermutationGroup|null[0]

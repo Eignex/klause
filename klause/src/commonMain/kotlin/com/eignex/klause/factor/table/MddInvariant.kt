@@ -31,21 +31,24 @@ internal class MddInvariant(
     override fun initialize(state: LocalSearchState, factorId: Int) {
         val st = buildState(state)
         state.refPayload[factorId] = st
-        state.factorDegree[factorId] = compressViolation(st.distance.toLong(), state.violationSoftCap)
+        state.factorDegree[factorId] =
+            compressViolation(st.distance.toLong() + costGap(state, -1, 0L), state.violationSoftCap)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
-        !mddPathExists(state, seq, layerStarts, transitions, recordStride, initial, accepting, -1, 0)
+        !mddPathExists(state, seq, layerStarts, transitions, recordStride, initial, accepting, -1, 0) ||
+            costGap(state, -1, 0L) != 0L
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
         val st = state.refPayload[factorId] as? MddLsState ?: return fullDegree(state)
-        return compressViolation(st.distance.toLong(), state.violationSoftCap)
+        return compressViolation(st.distance.toLong() + costGap(state, -1, 0L), state.violationSoftCap)
     }
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val st = state.refPayload[factorId] as MddLsState
-        val newDist = distanceWith(state, st, intVar, newValue)
-        return compressViolation(newDist.toLong(), state.violationSoftCap) - state.factorDegree[factorId]
+        val newDist = if (positionsByVar[intVar] == null) st.distance else distanceWith(state, st, intVar, newValue)
+        val degree = newDist.toLong() + costGap(state, intVar, newValue)
+        return compressViolation(degree, state.violationSoftCap) - state.factorDegree[factorId]
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
@@ -55,15 +58,51 @@ internal class MddInvariant(
         val before = state.factorDegree[factorId]
         val rebuilt = buildState(state)
         state.refPayload[factorId] = rebuilt
-        return compressViolation(rebuilt.distance.toLong(), state.violationSoftCap) - before
+        return compressViolation(rebuilt.distance.toLong() + costGap(state, -1, 0L), state.violationSoftCap) - before
     }
 
     private fun fullDegree(state: LocalSearchState): Int = compressViolation(
         mddAcceptDistance(seq, numStatesPerLayer, layerStarts, transitions, recordStride, initial, accepting) {
             state.assignment.intValue(seq[it])
-        }.toLong(),
+        }.toLong() + costGap(state, -1, 0L),
         state.violationSoftCap,
     )
+
+    /**
+     * How far the cost variable sits from the weight of the word's accepted path, with [intVar] set to [newValue]
+     * (-1 for the current assignment); zero without a cost, or while the word is not accepted, which the accept
+     * distance already charges.
+     */
+    private fun costGap(state: LocalSearchState, intVar: Int, newValue: Long): Long {
+        if (cost < 0) return 0L
+        val weight = acceptedWeight { i -> if (seq[i] == intVar) newValue else state.assignment.intValue(seq[i]) }
+            ?: return 0L
+        val c = if (intVar == cost) newValue else state.assignment.intValue(cost)
+        return if (c > weight) c - weight else weight - c
+    }
+
+    // The weight of the path the word [symbolAt] traces, or null when it is not accepted.
+    private inline fun acceptedWeight(symbolAt: (Int) -> Long): Long? {
+        var current = initial
+        var weight = 0L
+        for (i in seq.indices) {
+            val symbol = symbolAt(i)
+            var next = -1
+            var p = layerStarts[i]
+            val end = layerStarts[i + 1]
+            while (p < end) {
+                if (transitions[p].toInt() == current && transitions[p + 1] == symbol) {
+                    next = transitions[p + 2].toInt()
+                    if (recordStride == 4) weight += transitions[p + 3]
+                    break
+                }
+                p += recordStride
+            }
+            if (next < 0) return null
+            current = next
+        }
+        return if (accepting.any { it == current }) weight else null
+    }
 
     private fun buildState(state: LocalSearchState): MddLsState {
         val getSym = { i: Int -> state.assignment.intValue(seq[i]) }
@@ -126,7 +165,16 @@ internal class MddInvariant(
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (!isViolated(state, factorId) || seq.isEmpty()) return
+        if (!isViolated(state, factorId)) return
+        if (cost >= 0) {
+            // An accepted word whose cost is off is repaired by setting the cost to the path's weight.
+            val weight = acceptedWeight { state.assignment.intValue(seq[it]) }
+            if (weight != null) {
+                if (weight in state.rootDomains[cost]) sink.addChannelingIntSet(state, cost, weight)
+                return
+            }
+        }
+        if (seq.isEmpty()) return
         val path = IntArray(seq.size + 1)
         path[0] = initial
         for (i in 0 until seq.size) {

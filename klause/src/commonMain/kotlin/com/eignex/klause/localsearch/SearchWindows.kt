@@ -30,6 +30,21 @@ internal fun searchWindows(domains: Array<IntDomain>): Array<IntDomain> {
     return Array(domains.size) { searchWindow(domains[it]) }
 }
 
+/** Values in the window a scheduling factor's wide column moves over: a resource profile is a timeline as long as
+ *  its horizon, so the horizon has to stay short. */
+private const val SCHEDULE_WINDOW: Long = 1L shl 20
+
+/**
+ * The values local search moves a scheduling factor's column over: its domain when that is narrow, else its first
+ * [SCHEDULE_WINDOW] values. Schedules favour early starts, so the window opens at the domain's minimum. As with
+ * [searchWindow], a solution outside the window is one local search does not find, never one it misreports.
+ */
+internal fun scheduleWindow(domain: IntDomain): IntDomain {
+    if (isNarrow(domain)) return domain
+    val hi = domain.min + (SCHEDULE_WINDOW - 1)
+    return if (domain.max <= hi) domain else domain.withMaxAtMost(hi)
+}
+
 /** Whether every value of [domain] fits the 32-bit range and the values can be indexed by an `Int`. */
 internal fun isNarrow(domain: IntDomain): Boolean =
     domain.min >= Int.MIN_VALUE.toLong() && domain.max <= Int.MAX_VALUE.toLong() && domain.spanOrNull() != null

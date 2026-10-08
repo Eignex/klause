@@ -3,14 +3,20 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.FactorPropagationOracle
+import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.SolveResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -75,5 +81,42 @@ class IncreasingPropagatorTest {
         assertEquals(4, state.intDomains[2].min, "x2.min raised along the chain")
         assertEquals(4, state.intDomains[1].max, "x1.max lowered to x2.max-1")
         assertEquals(3, state.intDomains[0].max, "x0.max lowered along the chain")
+    }
+
+    @Test
+    fun `increasing deductions are implied by their reasons under carved holes`() {
+        val rng = Random(0x1C5)
+        repeat(300) { iter ->
+            val problem = chain(strict = rng.nextBoolean(), n = 4, hi = 5)
+            PropagationReasonOracle.assertReasonsImply(problem, "increasing#$iter") { state ->
+                (0 until 4).all {
+                    val v = rng.nextInt(4)
+                    when (rng.nextInt(3)) {
+                        0 -> state.excludeIntValue(v, rng.nextInt(6).toLong())
+                        1 -> state.tightenIntMin(v, rng.nextInt(4).toLong())
+                        else -> state.tightenIntMax(v, 2L + rng.nextInt(4))
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a chain bound cites only its neighbour's bound on the same side`() {
+        // x0 <= x1: raising x0 to 2 raises x1 to 2, citing x0 >= 2 alone; x0's upper bound plays no part.
+        val problem = chain(strict = false, n = 2, hi = 5)
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 2) && state.tightenIntMax(0, 4))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.intMinAntecedents[1])!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(listOf(Triple(0, AtomKind.GE, 2L)), cited)
     }
 }

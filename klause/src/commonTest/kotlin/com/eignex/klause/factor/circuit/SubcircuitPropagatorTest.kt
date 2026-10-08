@@ -94,6 +94,56 @@ class SubcircuitPropagatorTest {
     }
 
     @Test
+    fun `a mandatory node the root cannot reach cites the arcs out of the reached set`() {
+        // Nodes 0 and 3 cannot opt out. Node 0 reaches only {0, 1, 2}, whose successors all stay at or below 2.
+        val problem = problem(4)
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMin(0, 1))
+        check(state.tightenIntMax(0, 2))
+        check(state.tightenIntMax(1, 2))
+        check(state.tightenIntMax(2, 2))
+        check(state.tightenIntMax(3, 2))
+        state.currentFactor = 0
+
+        assertFalse(state.factorAt(0).propagate(state, 0))
+
+        val expected = setOf(
+            Lit.make(state.atomVarGe(0, 1), false),
+            Lit.make(state.atomVarLe(0, 2), false),
+            Lit.make(state.atomVarLe(1, 2), false),
+            Lit.make(state.atomVarLe(2, 2), false),
+            Lit.make(state.atomVarLe(3, 2), false),
+        )
+        assertEquals(expected, state.factorAt(0).conflictReason(state, 0)?.toSet())
+        ConflictReasonOracle.assertEntailed(problem, state, 0, "subcircuit-unreached")
+    }
+
+    @Test
+    fun `subcircuit conflict reasons are sound nogoods under carved holes`() {
+        val rng = Random(0x5CC)
+        var conflicts = 0
+        repeat(300) { iter ->
+            val problem = problem(5)
+            val state = PropagationState(problem, Assumptions.None)
+            state.undoLogging = true
+            state.currentLevel = 1
+            // Carving a node's own index makes it mandatory, which is what the connectivity check reads.
+            val carved = (0 until 10).all {
+                val v = rng.nextInt(5)
+                state.excludeIntValue(v, (if (rng.nextBoolean()) v else rng.nextInt(5)).toLong())
+            }
+            state.currentFactor = 0
+            if (carved && !state.factorAt(0).propagate(state, 0)) {
+                conflicts++
+                ConflictReasonOracle.assertEntailed(problem, state, 0, "subcircuit-conflict#$iter")
+            }
+        }
+        assertTrue(conflicts > 0)
+    }
+
+    @Test
     fun `BacktrackSolver matches brute oracle on restricted-domain subcircuits`() {
         // End-to-end: a false conflict from the strong-connectivity check would surface as a false
         // UNSAT here (a sub-circuit exists but the solver reports none). Brute-counts the solutions

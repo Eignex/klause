@@ -15,12 +15,16 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
+import com.eignex.klause.propagation.reasonOf
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -412,6 +416,88 @@ class ElementPropagatorTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `a constant-array element prunes a result value citing only the positions that held it`() {
+        // arr = [6, 5, 6, 5, 6, 6]: with positions 1, 3 and 4 carved out, 5 has lost both holders; position 4
+        // held a 6 and plays no part.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 5), IntDomain(5, 6)),
+            factors = arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = longArrayOf(6, 5, 6, 5, 6, 6), arrIsVars = false, indexOffset = 0),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.excludeIntValue(0, 1L) && state.excludeIntValue(0, 3L) && state.excludeIntValue(0, 4L))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.intMinAntecedents[1])!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(setOf(Triple(0, AtomKind.EQ, 1L), Triple(0, AtomKind.EQ, 3L)), cited.toSet())
+    }
+
+    @Test
+    fun `a constant-array element raises the result bound citing the positions below it not the holes it crossed`() {
+        // arr = [1, 2, 3, 4]: result value 2 is carved and index position 0 dropped, so the result's minimum
+        // climbs past the hole at 2 to 3. Every constant below 3 lost its positions to the index bound alone.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(1, 4)),
+            factors = arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = longArrayOf(1, 2, 3, 4), arrIsVars = false, indexOffset = 0),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.excludeIntValue(1, 2L) && state.tightenIntMin(0, 1L))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        assertEquals(3L, state.intDomains[1].min)
+        assertEquals(
+            listOf(Lit.make(state.atomVarGe(0, 2), false)),
+            state.reasonOf(state.intMinAntecedents[1])?.toList(),
+        )
+    }
+
+    @Test
+    fun `a variable-array element drops a position citing only how its cell misses the result`() {
+        // The result is at most 3 and cell 1 at least 5, so position 1 goes; cell 2's hole and cell 0's bound play
+        // no part.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
+            factors = arrayOf<Factor>(
+                Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
+            ),
+        )
+        val state = PropagationState(problem, Assumptions.None)
+        state.undoLogging = true
+        state.currentLevel = 1
+        check(state.tightenIntMax(1, 3) && state.tightenIntMin(3, 5) && state.excludeIntValue(4, 7))
+        check(state.tightenIntMin(2, 1))
+        state.currentFactor = 0
+
+        check(state.factorAt(0).propagate(state, 0))
+
+        val cited = state.reasonOf(state.holeReasonFor(0, 1L))!!.map { lit ->
+            val atom = Lit.variable(lit) - problem.numBoolVars
+            Triple(state.atoms.intVar[atom], state.atoms.kind[atom], state.atoms.threshold[atom])
+        }
+        assertEquals(setOf(Triple(1, AtomKind.LE, 3L), Triple(3, AtomKind.GE, 5L)), cited.toSet())
     }
 
     @Test

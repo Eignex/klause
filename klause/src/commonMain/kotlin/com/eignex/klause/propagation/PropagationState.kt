@@ -214,8 +214,24 @@ class PropagationState(
     // interior hole materialized after the carve reads its level/reason from here. Lazily
     // allocated, maintained while [undoLogging], truncated on backtrack via the undo log.
     internal val holeHistAnt: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
+
+    // Per int var, the undo-log positions of its bound-move records on the current path, oldest first, so a
+    // bound's history is searched without walking the whole log. Appended by [logIntChange], popped as the
+    // undo replay passes each record.
+    internal val boundMoves: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+
+    // Built lazy reasons, keyed by their marker array (identity); see [reasonOf].
+    internal val lazyReasonMemo = HashMap<IntArray, IntArray?>()
     internal val holeHistVal: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
     internal val holeHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+
+    // The undo-log size when each carve was recorded, so a lazy reason can tell a hole that predates its
+    // deduction from one carved after it ([carvedAt]).
+    internal val holeHistPos: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+
+    // Per Boolean variable, the undo-log size when its current pin was logged, so a lazy reason can tell a pin
+    // that predates its deduction from a later one ([boolPinnedAt]). Meaningful only while the variable is pinned.
+    internal val boolPinPos = IntArray(problem.numBoolVars)
 
     /**
      * Decision-var encoded per level: index `lvl-1` holds either a bool var id (0..numBoolVars-1)
@@ -271,6 +287,20 @@ class PropagationState(
 
     /** Level any pin created during the current factor invocation inherits. Set by the driver. */
     internal var currentLevel: Int = 0
+        set(value) {
+            field = value
+            deferredLevelClause = null
+        }
+
+    // An atom-literal clause's level is a scan of its literals, and most of its fires only check or move a watch,
+    // so the driver leaves it to [settleClauseLevel]: the clause calls it before it pins or fails, while the state
+    // is still the one it fired on. Until then [currentLevel] holds the live decision count, an upper bound.
+    private var deferredLevelClause: IntArray? = null
+
+    /** Settle the deferred level of the firing clause over [literals]; a no-op for any other fire. */
+    internal fun settleClauseLevel(literals: IntArray) {
+        if (deferredLevelClause === literals) currentLevel = maxLevelForClause(literals)
+    }
 
     /** Populated on contradiction; the driver reads it to form [PropagationResult.Unsat]. */
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on conflict
@@ -992,6 +1022,7 @@ class PropagationState(
             if (skipExpensiveBake && f.expensiveBake) continue
             work++
             currentLevel = effectiveLevelFor(f, fid)
+            if (f is ClausePropagator && !f.allLiteralsBool(problem.numBoolVars)) deferredLevelClause = f.literals
             currentFactor = fid
             conflictLevels = null
             if (!f.propagate(this, fid)) {
@@ -1038,14 +1069,10 @@ class PropagationState(
      * just went false at the current decision level (bools are only pinned by decisions or clause
      * propagation, all stamped at the current level), so its effective level is exactly the
      * current decision level — no scan at all. Atom-lit clauses can fire on an atom that flipped
-     * at a sub-decision level, so they keep the literal scan.
+     * at a sub-decision level, so they scan their literals, deferred to [settleClauseLevel].
      */
     private fun effectiveLevelFor(f: Propagator, fid: Int): Int = when {
-        f is ClausePropagator -> if (f.allLiteralsBool(problem.numBoolVars)) {
-            levelToDecisionVar.size
-        } else {
-            maxLevelForClause(f.literals)
-        }
+        f is ClausePropagator -> levelToDecisionVar.size
 
         // A learned non-clause constraint (a cutting-planes pseudo-Boolean nogood) lives in
         // the learned store, not [problem.factors] / [MidlifeFactors.factors]; read its var footprint off

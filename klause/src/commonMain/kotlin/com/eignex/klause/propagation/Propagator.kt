@@ -121,6 +121,14 @@ interface Propagator {
      * decisions and risks unsoundness if the dead-end is not implied by bool pins alone.
      */
     fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
+
+    /**
+     * Build the reason for a deduction this factor recorded lazily ([lazyReason]) at undo-log position [atTrail]
+     * and decision level [atLevel], from [payload]: clause-form literals, false now, that imply it. Called only
+     * by conflict analysis, through [reasonOf]; read bounds as they stood then with [boundAt].
+     */
+    fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int): IntArray? =
+        error("${this::class.simpleName} recorded a lazy reason it cannot explain")
 }
 
 /**

@@ -1,9 +1,15 @@
 package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.boundLiteral
+import com.eignex.klause.propagation.domainAt
+import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 
 /**
@@ -28,7 +34,91 @@ internal class DiffnPropagator(
 
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
+    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
+    private var failure: IntArray? = null
+
+    override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
+        Region(state, atTrail, atLevel, payload[0] == 0).apply {
+            val bound = (payload[3].toLong() shl 32) or (payload[4].toLong() and 0xFFFFFFFFL)
+            moved(payload[1], lower = payload[2] == 1, bound = bound)
+        }.literals()
+
+    /**
+     * Rectangle origins and compulsory parts as of [atTrail] along one axis ([xAxis] primary), with the literals a
+     * reason over them collects.
+     */
+    private inner class Region(val state: PropagationState, val atTrail: Int, val atLevel: Int, xAxis: Boolean) {
+        private val pos = if (xAxis) xs else ys
+        private val size = if (xAxis) widths else heights
+        private val opos = if (xAxis) ys else xs
+        private val osize = if (xAxis) heights else widths
+        private val seen = IntHashSet()
+        private val out = IntArrayList()
+
+        private fun add(lit: Int) {
+            if (lit != Lit.NONE && seen.add(lit)) out.add(lit)
+        }
+
+        private fun lo(v: Int) = state.domainAt(v, atTrail).min
+        private fun hi(v: Int) = state.domainAt(v, atTrail).max
+        private fun ge(v: Int, need: Long) = add(state.boundLiteral(v, true, need, atTrail, atLevel))
+        private fun le(v: Int, need: Long) = add(state.boundLiteral(v, false, need, atTrail, atLevel))
+
+        /**
+         * Rectangle [i] can take no origin in primary columns [from]..[to]: every such placement, at every
+         * orthogonal origin it has, meets the compulsory part of another rectangle. Cite those parts that meet
+         * the region it would sweep, and [i]'s orthogonal range.
+         */
+        fun blocked(i: Int, from: Long, to: Long) {
+            val pLo = from
+            val pHi = to + size[i] - 1
+            val oLo = lo(opos[i])
+            val oHi = hi(opos[i]) + osize[i] - 1
+            ge(opos[i], oLo)
+            le(opos[i], hi(opos[i]))
+            for (j in 0 until n) {
+                if (j == i || size[j] <= 0 || osize[j] <= 0) continue
+                val cpLo = hi(pos[j])
+                val cpHi = lo(pos[j]) + size[j] - 1
+                val coLo = hi(opos[j])
+                val coHi = lo(opos[j]) + osize[j] - 1
+                if (cpLo > cpHi || coLo > coHi) continue
+                if (cpHi < pLo || cpLo > pHi || coHi < oLo || coLo > oHi) continue
+                le(pos[j], cpLo)
+                ge(pos[j], lo(pos[j]))
+                le(opos[j], coLo)
+                ge(opos[j], lo(opos[j]))
+            }
+        }
+
+        /** [i]'s origin moved to [bound] ([lower]) past columns it could not take. */
+        fun moved(i: Int, lower: Boolean, bound: Long) {
+            if (lower) {
+                ge(pos[i], lo(pos[i]))
+                blocked(i, lo(pos[i]), bound - 1)
+            } else {
+                le(pos[i], hi(pos[i]))
+                blocked(i, bound + 1, hi(pos[i]))
+            }
+        }
+
+        /** [i] has no column left: every column of its range is blocked. */
+        fun stuck(i: Int) {
+            ge(pos[i], lo(pos[i]))
+            le(pos[i], hi(pos[i]))
+            blocked(i, lo(pos[i]), hi(pos[i]))
+        }
+
+        fun ownDomain(v: Int) {
+            ge(v, lo(v))
+            le(v, hi(v))
+        }
+
+        fun literals(): IntArray = out.toIntArray()
+    }
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
+        failure?.let { return it }
         // Sharp reason for the dominant constant-size conflict: a pair forced to overlap on both
         // axes. Those four origin variables' bounds alone imply the contradiction, so citing only
         // them is sound and far tighter than the whole scope. Any other failure (sweep dead-end,
@@ -68,13 +158,14 @@ internal class DiffnPropagator(
      * sound (never removes a feasible value) while LS does the heavy lifting on var-size diffn.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        failure = null
         if (varSize) return propagateVarSizeSoundOnly(state)
         // Sweep each axis: advance every rectangle's origin to the first column where some orthogonal
         // position escapes all other rectangles' compulsory parts. This subsumes pairwise reasoning
         // (a forced overlap gives both rectangles a compulsory part the sweep already sees) and also
         // catches multi-rectangle walls no single pair rules out.
-        if (!sweepAxis(state, xs, widths, ys, heights)) return false
-        if (!sweepAxis(state, ys, heights, xs, widths)) return false
+        if (!sweepAxis(state, xs, widths, ys, heights, xAxis = true)) return false
+        if (!sweepAxis(state, ys, heights, xs, widths, xAxis = false)) return false
         return true
     }
 
@@ -84,21 +175,44 @@ internal class DiffnPropagator(
      * column's feasibility only changes at the entry / exit of another rectangle's compulsory part,
      * so it is evaluated once per such breakpoint segment rather than per unit.
      */
-    @Suppress("ReturnCount", "NestedBlockDepth")
+    @Suppress("ReturnCount", "NestedBlockDepth", "LongParameterList")
     private fun sweepAxis(
         state: PropagationState,
         pos: IntArray,
         size: LongArray,
         opos: IntArray,
         osize: LongArray,
+        xAxis: Boolean,
     ): Boolean {
-        val ant = state.composeIntVarAtomAntecedents(intVars)
+        fun now() = Region(state, state.undo.size, state.currentLevel, xAxis)
+        fun failStuck(i: Int): Boolean {
+            failure = now().apply { stuck(i) }.literals()
+            return false
+        }
+
+        // An origin move, recorded for [explain]; it rests on the compulsory parts that blocked the skipped columns.
+        fun movedReason(i: Int, lower: Boolean, bound: Long): IntArray? {
+            val payload =
+                intArrayOf(if (xAxis) 0 else 1, i, if (lower) 1 else 0, (bound ushr 32).toInt(), bound.toInt())
+            return when {
+                state.currentLevel == 0 -> null
+                state.undoLogging -> state.lazyReason(payload)
+                else -> now().apply { moved(i, lower, bound) }.literals()
+            }
+        }
+        fun failMove(i: Int, lower: Boolean, bound: Long): Boolean {
+            failure = now().apply {
+                moved(i, lower, bound)
+                ownDomain(pos[i])
+            }.literals()
+            return false
+        }
         for (i in 0 until n) {
             if (size[i] <= 0 || osize[i] <= 0) continue
             val pMin = state.intDomains[pos[i]].min
             val pMax = state.intDomains[pos[i]].max
             if (pMin == pMax) {
-                if (!feasibleColumn(state, i, pMin, pos, size, opos, osize)) return false
+                if (!feasibleColumn(state, i, pMin, pos, size, opos, osize)) return failStuck(i)
                 continue
             }
             // Segment starts: pMin plus every compulsory-part entry/exit breakpoint inside (pMin, pMax].
@@ -124,8 +238,10 @@ internal class DiffnPropagator(
                     break
                 }
             }
-            if (newMin == Long.MIN_VALUE) return false
-            if (!state.tightenIntMin(pos[i], newMin, ant)) return false
+            if (newMin == Long.MIN_VALUE) return failStuck(i)
+            if (newMin > pMin && !state.tightenIntMin(pos[i], newMin, movedReason(i, true, newMin))) {
+                return failMove(i, true, newMin)
+            }
             // Last feasible segment → new upper bound (segment end clamped to pMax).
             var newMax = Long.MAX_VALUE
             for (k in starts.size - 1 downTo 0) {
@@ -139,8 +255,12 @@ internal class DiffnPropagator(
                     break
                 }
             }
-            if (newMax == Long.MAX_VALUE) return false
-            if (!state.tightenIntMax(pos[i], newMax, ant)) return false
+            if (newMax == Long.MAX_VALUE) return failStuck(i)
+            if (newMax < state.intDomains[pos[i]].max &&
+                !state.tightenIntMax(pos[i], newMax, movedReason(i, false, newMax))
+            ) {
+                return failMove(i, false, newMax)
+            }
         }
         return true
     }
@@ -207,7 +327,22 @@ internal class DiffnPropagator(
                     state.intDomains[xs[j]].max < state.intDomains[xs[i]].min + wI
                 val yMust = state.intDomains[ys[i]].max < state.intDomains[ys[j]].min + hJ &&
                     state.intDomains[ys[j]].max < state.intDomains[ys[i]].min + hI
-                if (xMust && yMust) return false
+                if (xMust && yMust) {
+                    // The pair overlaps on both axes even at the least sizes they allow.
+                    val r = IntArrayList()
+                    for (v in intArrayOf(xs[i], ys[i], xs[j], ys[j])) {
+                        collectLinearTightenAntecedents(state, intArrayOf(v), -1, 0)?.forEach { r.add(it) }
+                    }
+                    for (k in intArrayOf(i, j)) {
+                        for (sv in listOfNotNull(wvars?.get(k), hvars?.get(k))) {
+                            val least = state.intDomains[sv].min
+                            val lit = state.boundLiteral(sv, true, least, state.undo.size, state.currentLevel)
+                            if (lit != Lit.NONE) r.add(lit)
+                        }
+                    }
+                    failure = r.toIntArray()
+                    return false
+                }
             }
         }
         return true

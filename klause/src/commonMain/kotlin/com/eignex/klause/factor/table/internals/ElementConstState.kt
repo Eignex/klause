@@ -1,16 +1,21 @@
 package com.eignex.klause.factor.table.internals
 
 import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
-import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
+import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.excludeIntValues
+import com.eignex.klause.propagation.exclusionLiteral
+import com.eignex.klause.propagation.inDomainAt
+import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.propagation.restrictIntToSurvivors
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.toSortedLongArray
@@ -33,8 +38,8 @@ import com.eignex.klause.util.toSortedLongArray
  *
  * Each fire reaches the GAC fixpoint in ONE pass via an internal cascade worklist (an idx removal can
  * zero a result value's support → prune it → which kills idx positions holding that constant → …),
- * instead of relying on repeated re-fires. Reasons are identical to the full path
- * (collectHoleAndBoundAntecedents on idx / result). Soundness is gated by the brute-force assertGac
+ * instead of relying on repeated re-fires. A pruned result value cites the idx positions that held it,
+ * a pruned idx position the result value it held. Soundness is gated by the brute-force assertGac
  * oracle (AllFactorsOracle) and ElementTest across deep backtracking.
  */
 
@@ -222,13 +227,10 @@ internal class ElementConstState(
     /** Apply the seed exclusions (rebuild path), then cascade their removals to the GAC fixpoint. */
     private fun applyThenCascade(state: PropagationState, idxSeed: LongArrayList, resSeed: LongArrayList): Boolean {
         if (idxSeed.size > 0) {
-            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result))
-            if (!state.excludeIntValues(idx, sortedDistinct(idxSeed), ant)) return false
+            val ex = sortedDistinct(idxSeed)
+            if (!state.excludeIntValues(idx, ex, indexReason(state, ex))) return false
         }
-        if (resSeed.size > 0) {
-            val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx))
-            if (!state.excludeIntValues(result, sortedDistinct(resSeed), ant)) return false
-        }
+        if (resSeed.size > 0 && !pruneResult(state, sortedDistinct(resSeed))) return false
         return cascade(state, idxSeed, resSeed)
     }
 
@@ -269,13 +271,12 @@ internal class ElementConstState(
             var nextIdx = EMPTY
             var nextRes = EMPTY
             if (resultToExclude.size > 0) {
-                val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx))
-                if (!state.excludeIntValues(result, sortedDistinct(resultToExclude), ant)) return false
+                if (!pruneResult(state, sortedDistinct(resultToExclude))) return false
                 nextRes = resultToExclude
             }
             if (idxToExclude.size > 0) {
-                val ant = collectHoleAndBoundAntecedents(state, intArrayOf(result))
-                if (!state.excludeIntValues(idx, sortedDistinct(idxToExclude), ant)) return false
+                val ex = sortedDistinct(idxToExclude)
+                if (!state.excludeIntValues(idx, ex, indexReason(state, ex))) return false
                 nextIdx = idxToExclude
             }
             idxRem = nextIdx
@@ -286,7 +287,153 @@ internal class ElementConstState(
 
     private fun sortedDistinct(list: LongArrayList): LongArray = list.toSortedLongArray()
 
+    // Remove the ascending result values [ex]. Those taking an endpoint move it with a reason of its own: every
+    // constant past the new bound is gone ([passed]). Snapping the bound over the batch instead would explain it
+    // by the old bound and each hole crossed, and conflict analysis would carry those holes into the clause.
+    private fun pruneResult(state: PropagationState, ex: LongArray): Boolean {
+        val d = state.intDomains[result]
+        var lo = d.min
+        var i = 0
+        while (i < ex.size && ex[i] <= lo && lo <= d.max) {
+            if (ex[i] == lo) lo = if (lo == d.max) Long.MAX_VALUE else d.higher(lo)
+            i++
+        }
+        var hi = d.max
+        var j = ex.size - 1
+        while (j >= 0 && ex[j] >= hi && hi >= d.min) {
+            if (ex[j] == hi) hi = if (hi == d.min) Long.MIN_VALUE else d.lower(hi)
+            j--
+        }
+        // A batch that empties the domain is a conflict, which the batch exclusion reports with its reason.
+        if (lo > hi) return state.excludeIntValues(result, ex, resultReason(state, ex))
+        if (lo != d.min && !state.tightenIntMin(result, lo, boundReason(state, BELOW, lo))) return false
+        if (hi != d.max && !state.tightenIntMax(result, hi, boundReason(state, ABOVE, hi))) return false
+        var interior = 0
+        for (v in ex) if (v > lo && v < hi) interior++
+        if (interior == 0) return true
+        val rest = LongArray(interior)
+        var k = 0
+        for (v in ex) if (v > lo && v < hi) rest[k++] = v
+        return state.excludeIntValues(result, rest, resultReason(state, rest))
+    }
+
+    // A result value leaves because every position holding it left idx; a position leaves because its constant left
+    // result. One batch shares the union over its values, built only if conflict analysis reads it ([explain]).
+    private fun resultReason(state: PropagationState, values: LongArray): IntArray? = reason(state, RESULT, values)
+
+    private fun indexReason(state: PropagationState, positions: LongArray): IntArray? = reason(state, INDEX, positions)
+
+    private fun boundReason(state: PropagationState, side: Int, bound: Long): IntArray? = when {
+        state.currentLevel == 0 -> null
+        state.undoLogging -> state.lazyReason(intArrayOf(side, (bound ushr 32).toInt(), bound.toInt()))
+        else -> passed(state, side == BELOW, bound, state.undo.size)
+    }
+
+    private fun reason(state: PropagationState, side: Int, values: LongArray): IntArray? = when {
+        state.currentLevel == 0 -> null
+
+        state.undoLogging -> state.lazyReason(
+            IntArray(1 + 2 * values.size).also { p ->
+                p[0] = side
+                for (k in values.indices) {
+                    p[1 + 2 * k] = (values[k] ushr 32).toInt()
+                    p[2 + 2 * k] = values[k].toInt()
+                }
+            },
+        )
+
+        // Without the undo log nothing reads reasons, and the live domains stand in for the past ones.
+        else -> supports(state, side, values, state.undo.size)
+    }
+
+    /** The reason a batch recorded by [reason] rests on, from [payload], as of undo-log position [atTrail]. */
+    fun explain(state: PropagationState, payload: IntArray, atTrail: Int): IntArray? {
+        if (payload[0] == BELOW || payload[0] == ABOVE) {
+            val bound = (payload[1].toLong() shl 32) or (payload[2].toLong() and 0xFFFFFFFFL)
+            return passed(state, payload[0] == BELOW, bound, atTrail)
+        }
+        val values = LongArray((payload.size - 1) / 2) { k ->
+            (payload[1 + 2 * k].toLong() shl 32) or (payload[2 + 2 * k].toLong() and 0xFFFFFFFFL)
+        }
+        return supports(state, payload[0], values, atTrail)
+    }
+
+    // Each lost support cites why it was gone at [atTrail]: a bound it lay past, or its own carve. The cited side is
+    // one variable, so its past domain is read once and each bound's literal is looked up once.
+    private fun supports(state: PropagationState, side: Int, values: LongArray, atTrail: Int): IntArray? {
+        val out = LitSet()
+        val v = if (side == RESULT) idx else result
+        val d = state.domainAt(v, atTrail)
+        val root = state.rootDomains[v]
+        var belowCited = false
+        var aboveCited = false
+        fun cite(k: Long) {
+            if (k !in root) return
+            when {
+                k < d.min -> if (belowCited) return else belowCited = true
+                k > d.max -> if (aboveCited) return else aboveCited = true
+            }
+            val lit = state.exclusionLiteral(v, k, atTrail, d)
+            if (lit != Lit.NONE) out.add(lit)
+        }
+        for (value in values) {
+            if (side == RESULT) {
+                val id = idFor(value)
+                if (id >= 0) for (pos in positionsOfId[id]) cite(indexOffset + pos.toLong())
+            } else {
+                val pos = value - indexOffset
+                if (pos in 0 until len) cite(arr[pos.toInt()])
+            }
+        }
+        return out.toArrayOrNull()
+    }
+
+    // Why result held no constant below [bound] ([below]), or above it, at [atTrail]: each such constant had lost
+    // every position holding it from idx, or else had left result itself. The positions are preferred, since idx is
+    // what the search decides and what the result follows from.
+    private fun passed(state: PropagationState, below: Boolean, bound: Long, atTrail: Int): IntArray? {
+        val out = LitSet()
+        val dIdx = state.domainAt(idx, atTrail)
+        val dRes = state.domainAt(result, atTrail)
+        val rootIdx = state.rootDomains[idx]
+        val rootRes = state.rootDomains[result]
+        for (id in 0 until numValues) {
+            val w = valueOfId[id]
+            if (if (below) w >= bound else w <= bound) continue
+            if (w !in rootRes) continue
+            val positions = positionsOfId[id]
+            val gone = positions.none { state.inDomainAt(idx, indexOffset + it.toLong(), atTrail) }
+            if (gone) {
+                for (pos in positions) {
+                    val iv = indexOffset + pos.toLong()
+                    if (iv !in rootIdx) continue
+                    val lit = state.exclusionLiteral(idx, iv, atTrail, dIdx)
+                    if (lit != Lit.NONE) out.add(lit)
+                }
+            } else {
+                val lit = state.exclusionLiteral(result, w, atTrail, dRes)
+                if (lit != Lit.NONE) out.add(lit)
+            }
+        }
+        return out.toArrayOrNull()
+    }
+
+    private class LitSet {
+        private val seen = IntHashSet()
+        private val lits = IntArrayList()
+
+        fun add(lit: Int) {
+            if (seen.add(lit)) lits.add(lit)
+        }
+
+        fun toArrayOrNull(): IntArray? = if (lits.size == 0) null else lits.toIntArray()
+    }
+
     private companion object {
         val EMPTY = LongArrayList()
+        const val RESULT = 0
+        const val INDEX = 1
+        const val BELOW = 2
+        const val ABOVE = 3
     }
 }
