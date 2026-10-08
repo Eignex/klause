@@ -97,8 +97,8 @@ class LpPropagatorTest {
 
     @Test
     fun `source publication declines a stale compaction without discarding the live owner`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 6)),
-            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)))
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 60)),
+            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 50)))
         var live = problem.finiteIntDomain(0)
         val domains = object : RelaxationDomains {
             override fun intDomain(varId: Int): IntDomain = live
@@ -112,6 +112,10 @@ class LpPropagatorTest {
             assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
             live = live.withMinAtLeast(3L)
             assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            while (sources.prepareCompaction(assertNotNull(lp.state)) == null && live.max > live.min + 1L) {
+                live = live.withMaxAtMost(live.max - 1L)
+                assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            }
             val before = assertNotNull(lp.state)
             val plan = assertNotNull(sources.prepareCompaction(before))
             val cutPlan = assertNotNull(cuts.prepareCompaction(before, plan.remap))

@@ -201,28 +201,59 @@ private fun certifyAuthoritativeSolve(
     } finally {
         observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
     }
-    // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
-    if (floatAccept != null && result != null && result.optimal && !cancellation()) {
-        floatOptimum(model, result, floatAccept, floatOffset, cancellation)?.let { float ->
-            return@use CertifiedLpResult(float, null, null, null, null, false, { null }, floatOptimum = float)
-        }
+    LpCertificationSession(context, pricing).use { certification ->
+        certification.certify(model, solver, result, cancellation, observer, counterResults,
+            refinementLimits, floatAccept, floatOffset)
     }
-    val state = model.exactState
-    if (state == null || solver is ComponentLpSolverCapability) {
-        certifyLpResult(model, solver, result, cancellation, observer, context.certificationPolicy, counterResults)
-    } else {
-        LpScopedSolver(state, cancellation, context, pricing = pricing).use { anchor ->
-            certifyLpResult(
-                model,
-                solver,
-                result,
-                cancellation,
-                observer,
-                context.certificationPolicy,
-                counterResults,
-                refinement = LpRefinementRequest(anchor, anchor.refinementCache, refinementLimits),
-            )
+}
+
+internal class LpCertificationSession(
+    private val context: LpSolveContext,
+    private val pricing: LpPricingOptions,
+) : AutoCloseable {
+    private val continuation = LpExactContinuationCache()
+    private var anchor: LpScopedSolver? = null
+
+    fun certify(
+        model: LpModel,
+        solver: LpSolver,
+        result: FloatLpResult?,
+        cancellation: Cancellation,
+        observer: LpCertificationObserver?,
+        counterResults: LpCounterResults?,
+        refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+        floatAccept: ((FloatLpResult) -> Boolean)? = null,
+        floatOffset: Double = 0.0,
+    ): CertifiedLpResult {
+        // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
+        if (floatAccept != null && result != null && result.optimal && !cancellation()) {
+            floatOptimum(model, result, floatAccept, floatOffset, cancellation)?.let { float ->
+                return CertifiedLpResult(float, null, null, null, null, false, { null }, floatOptimum = float)
+            }
         }
+        val state = model.exactState
+        val refinement = if (state != null && solver !is ComponentLpSolverCapability && !cancellation()) {
+            val previous = anchor
+            val current = if (previous != null && previous.adopt(state, cancellation)) {
+                previous
+            } else {
+                anchor = null
+                previous?.close()
+                LpScopedSolver(state, context = context, pricing = pricing).also { anchor = it }
+            }
+            LpRefinementRequest(current, current.refinementCache, refinementLimits)
+        } else {
+            null
+        }
+        return certifyLpResult(model, solver, result, cancellation, observer, context.certificationPolicy,
+            counterResults, continuationCache = continuation, refinement = refinement)
+    }
+
+    override fun close() {
+        val previous = anchor
+        anchor = null
+        continuation.clear()
+        previous?.close()
     }
 }
 

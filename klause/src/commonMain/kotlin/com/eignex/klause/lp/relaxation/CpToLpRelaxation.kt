@@ -349,14 +349,24 @@ internal fun leafRealFeasibility(
         },
         floatOffset = relaxation.objectiveConstant.toDouble(),
     )
+    return relaxation.leafResult(certified, problem, objective, sample, sink)
+}
+
+internal fun LpRelaxation.leafResult(
+    certified: CertifiedLpResult,
+    problem: Problem,
+    objective: LinearObjective?,
+    sample: Sample,
+    sink: LpStatsSink?,
+): LeafRealResult {
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     certified.floatOptimum?.let { float ->
-        return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, relaxation.floatReals(float.primal, problem))
+        return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, floatReals(float.primal, problem))
     }
     if (certified.verdict == LpVerdict.INFEASIBLE) {
-        return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray, refutingFactors = relaxation.factorsOf(certified))
+        return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray, refutingFactors = factorsOf(certified))
     }
-    return relaxation.exactLeafResult(certified, problem, objective, sample)
+    return exactLeafResult(certified, problem, objective, sample)
 }
 
 /** The factors behind the rows [certified]'s infeasibility proof combines: its exact conflict, else its Farkas ray. */

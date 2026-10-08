@@ -309,22 +309,7 @@ internal class LpPropagator(
         ) {
             return@withOwner false
         }
-        val assertions = ArrayList<LpBoundAssertion>()
-        for (column in edit.bounds.indices) {
-            val previous = if (column < before.model.n) {
-                before.model.column(column).bounds
-            } else {
-                edit.columns[column - before.model.n].column.bounds
-            }
-            for (upper in listOf(false, true)) {
-                val side = if (upper) edit.bounds[column].upper else edit.bounds[column].lower
-                val active = if (upper) previous.upper else previous.lower
-                if (active != null && (side == null || active.strongerThan(side, upper))) return@withOwner false
-                if (side == null || (active != null && !side.strongerThan(active, upper))) continue
-                if (nextWitness > Long.MAX_VALUE - assertions.size - 1L || cancellation()) return@withOwner false
-                assertions.add(LpBoundAssertion(column, upper, side, nextWitness + assertions.size, before.depth))
-            }
-        }
+        val assertions = edit.boundAssertions(nextWitness, cancellation) ?: return@withOwner false
         if (edit.retired.isEmpty() && edit.columns.isEmpty() && edit.rows.isEmpty() && edit.objective == null &&
             assertions.isEmpty()
         ) {

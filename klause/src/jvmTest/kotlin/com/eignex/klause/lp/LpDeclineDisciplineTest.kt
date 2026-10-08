@@ -422,7 +422,7 @@ class LpDeclineDisciplineTest {
             LpPlan(bounding = true, realResidual = true),
         )
 
-        val leaf = engine.leafCertify(PropagationSession(problem))
+        val leaf = engine.use { it.leafCertify(PropagationSession(problem)) }
 
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, leafRealFeasibility(problem, null, sample).verdict)
         assertEquals(LpVerdict.INDETERMINATE, standalone.verdict)
@@ -430,13 +430,14 @@ class LpDeclineDisciplineTest {
         assertTrue(standalone.reals.isEmpty())
         assertTrue(leaf.reals.isEmpty())
         assertTrue(standaloneHarness.factory.calls.contains(DeclineCall.GENERAL))
-        assertTrue(engineHarness.factory.calls.contains(DeclineCall.GENERAL))
+        assertTrue(engineHarness.factory.calls.contains(DeclineCall.PERSISTENT))
+        assertEquals(0, engineHarness.factory.calls.count { it == DeclineCall.GENERAL })
         assertEquals(
             standaloneHarness.factory.calls.count { it == DeclineCall.GENERAL },
             standaloneHarness.factory.calls.count { it == DeclineCall.CLOSE },
         )
         assertEquals(
-            engineHarness.factory.calls.count { it == DeclineCall.GENERAL },
+            engineHarness.factory.calls.count { it == DeclineCall.PERSISTENT },
             engineHarness.factory.calls.count { it == DeclineCall.CLOSE },
         )
     }

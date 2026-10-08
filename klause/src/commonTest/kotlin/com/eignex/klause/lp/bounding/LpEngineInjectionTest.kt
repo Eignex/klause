@@ -332,7 +332,7 @@ class LpEngineInjectionTest {
             it.leafCertify(PropagationSession(problem))
         }
 
-        val construction = factory.calls.single { it.kind == EngineConstruction.GENERAL }
+        val construction = factory.calls.single { it.kind == EngineConstruction.PERSISTENT }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(47L, construction.tieSeed)
     }
@@ -409,7 +409,7 @@ class LpEngineInjectionTest {
 
         engine.use { it.leafCertify(PropagationSession(problem)) }
 
-        assertTrue(factory.calls.single { it.kind == EngineConstruction.GENERAL }.workLimit > 0L)
+        assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > 0L)
     }
 
     @Test

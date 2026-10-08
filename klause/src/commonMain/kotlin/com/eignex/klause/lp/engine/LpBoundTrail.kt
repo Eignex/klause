@@ -286,6 +286,29 @@ internal class LpBoundTrail(initial: LpExactState) {
         )
     }
 
+    fun replaceRows(
+        retired: Set<Long>,
+        columns: List<LpStructuralColumn>,
+        rows: List<LpScopedRow>,
+        scoped: Boolean,
+        token: Cancellation = Cancellation.Never,
+        permanentRows: Set<Long> = emptySet(),
+        objective: ExactLpObjective? = null,
+        assertions: List<LpBoundAssertion> = emptyList(),
+    ): Boolean {
+        val staged = LpBoundTrail(state)
+        val hidden = if (retired.isEmpty()) true else if (scoped) staged.suspend(retired, token)
+            else staged.deactivate(retired, token)
+        if (!hidden || !staged.append(columns, rows, scoped, token, permanentRows) ||
+            (objective != null && !staged.replaceObjective(objective, token)) ||
+            staged.assertBounds(assertions, token) is LpBoundBatchResult.Declined || token()
+        ) {
+            return false
+        }
+        state = staged.state
+        return true
+    }
+
     fun deactivate(id: Long, token: Cancellation = Cancellation.Never): Boolean = deactivate(setOf(id), token)
 
     fun deactivate(ids: Set<Long>, token: Cancellation = Cancellation.Never): Boolean {

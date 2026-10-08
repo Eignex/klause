@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpLayoutStorage
 import com.eignex.klause.lp.engine.LpLayoutWeight
@@ -20,6 +21,7 @@ import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpStructuralColumn
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 
@@ -39,6 +41,30 @@ internal class LpSourceEdit(
     fun source(column: Int): CutSource? = identify(column)
     fun isCurrent(): Boolean = valid()
     fun commit() = publish()
+
+    fun boundAssertions(nextWitness: Long, cancellation: Cancellation = Cancellation.Never): List<LpBoundAssertion>? {
+        val before = sourceState
+        if (nextWitness < 0L || bounds.size != before.model.n + columns.size || !isCurrent() || cancellation()) {
+            return null
+        }
+        val assertions = ArrayList<LpBoundAssertion>()
+        for (column in bounds.indices) {
+            val previous = if (column < before.model.n) {
+                before.model.column(column).bounds
+            } else {
+                columns[column - before.model.n].column.bounds
+            }
+            for (upper in listOf(false, true)) {
+                val side = if (upper) bounds[column].upper else bounds[column].lower
+                val active = if (upper) previous.upper else previous.lower
+                if (active != null && (side == null || active.strongerThan(side, upper))) return null
+                if (side == null || (active != null && !side.strongerThan(active, upper))) continue
+                if (nextWitness > Long.MAX_VALUE - assertions.size - 1L || cancellation()) return null
+                assertions.add(LpBoundAssertion(column, upper, side, nextWitness + assertions.size, before.depth))
+            }
+        }
+        return assertions.takeUnless { cancellation() }
+    }
 }
 
 internal class LpSourceCompaction(

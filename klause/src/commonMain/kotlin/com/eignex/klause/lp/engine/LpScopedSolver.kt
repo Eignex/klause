@@ -135,8 +135,14 @@ internal class LpScopedSolver(
 
     fun resetRoot(initial: LpExactState, token: Cancellation = cancellation): Boolean {
         requireAvailable()
+        if (initial.depth != 0) return false
+        return adopt(initial, token)
+    }
+
+    fun adopt(initial: LpExactState, token: Cancellation = cancellation): Boolean {
+        requireAvailable()
         editAttempts++
-        if (closed || token() || initial.depth != 0 || !state.sameMatrix(initial)) return false
+        if (closed || token() || !state.sameMatrix(initial)) return false
         val current = solver
         if (current != null && !current.adopt(initial, token)) return false
         if (current == null && token()) return false
@@ -179,16 +185,7 @@ internal class LpScopedSolver(
         assertions: List<LpBoundAssertion> = emptyList(),
     ): Boolean = edit(token, rows.isNotEmpty() || columns.isNotEmpty()) {
         if (rows.size > maxRetainedRows - state.model.m) return@edit false
-        val hidden = if (retired.isEmpty()) {
-            true
-        } else if (scoped) {
-            it.suspend(retired, token)
-        } else {
-            it.deactivate(retired, token)
-        }
-        hidden && it.append(columns, rows, scoped, token, permanentRows) &&
-            (objective == null || it.replaceObjective(objective, token)) &&
-            it.assertBounds(assertions, token) !is LpBoundBatchResult.Declined
+        it.replaceRows(retired, columns, rows, scoped, token, permanentRows, objective, assertions)
     }
 
     fun compact(token: Cancellation = cancellation): Boolean = compact(LpLayoutRemap(state.model.n, state.rows), token)

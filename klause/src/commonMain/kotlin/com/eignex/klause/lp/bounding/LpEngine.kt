@@ -30,6 +30,7 @@ import com.eignex.klause.lp.engine.LpCounterResults
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
@@ -112,6 +113,11 @@ internal class LpEngine(
             } catch (closeFailure: Throwable) {
                 failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
             }
+        }
+        try {
+            leafSolver?.releaseSolvers()
+        } catch (closeFailure: Throwable) {
+            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
         }
         try {
             propagator.releaseSolver()
@@ -549,6 +555,8 @@ internal class LpEngine(
     internal var lpCounterResults = LpCounterResults()
         private set
 
+    private var leafSolver: LpSolveSession? = null
+
     // Gated residual float filter (pure-real models): a structurally node-invariant relaxation whose
     // rows toggle by per-row enforcement alone, plus ONE simplex instance that re-solves it with its
     // kept LU factorization — the per-node build+factorize that dominated the satisfaction path
@@ -628,15 +636,14 @@ internal class LpEngine(
         val relaxation = nodeRelaxation(relaxer, session)
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val model = relaxation.model
-        val certified = solveAndCertify(
+        val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
+            .also { leafSolver = it }
+        val certified = solver.solve(
             model,
             cancellation = params.cancellation,
             workLimit = leafWorkBudget(model),
-            componentSplit = params.lpPlan.componentSplit,
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
-            context = solveContext,
             counterResults = lpCounterResults,
-            pricing = pricingOptions,
             floatAccept = toleranceCheck?.let { check ->
                 { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) }
             },
