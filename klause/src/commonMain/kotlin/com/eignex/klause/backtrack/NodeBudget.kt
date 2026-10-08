@@ -60,8 +60,10 @@ class NodeBudget(
 }
 
 /**
- * Local-search instructions that cost as much as one backtrack search node, LP work included: the median ratio of
- * local-search moves per second to backtrack work per second, each engine alone on one core for 10s, over the 28
- * MiniZinc models where both ran (spread 0.17 to 69, geometric mean 1.9).
+ * Local-search instructions that cost as much as one unit of backtrack work, propagation and LP work included: the
+ * median, over 618 portfolio runs of the status sweep set where both engines ran a sizeable segment, of local-search
+ * instructions per millisecond to backtrack work per millisecond (quartiles 0.26 and 2.5). Clausal models price
+ * local search higher than this and pseudo-Boolean ones lower; one rate keeps a segment of either engine about as
+ * long as the other.
  */
-internal const val LS_INSTRUCTIONS_PER_WORK: Double = 1.5
+internal const val LS_INSTRUCTIONS_PER_WORK: Double = 0.8

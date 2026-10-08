@@ -27,6 +27,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -194,10 +195,12 @@ internal class LocalSearchEngine(
             override val work: Long get() = (instructions / LS_INSTRUCTIONS_PER_WORK).toLong()
 
             override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+                // Rounded up: an instruction costs less than a unit of work, so a positive slice rounded down could
+                // allow no move at all and never progress.
                 val allowance = if (sliceNodes < 0L) {
                     Long.MAX_VALUE
                 } else {
-                    (sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong()
+                    ceil(sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong()
                 }
                 return runInstructionSlice(global, sliceMillis, allowance)
             }
