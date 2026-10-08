@@ -364,6 +364,7 @@ internal fun LpNeighborhood.rebindExact(state: LpExactState, token: Cancellation
     )
     if (!previous.sameMatrix(next)) return null
     next.inheritProjection(previous)
+    next.inheritScalars(previous)
     val working = next.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return null
     return LpNeighborhood(working, colMap, rows, cols)
 }

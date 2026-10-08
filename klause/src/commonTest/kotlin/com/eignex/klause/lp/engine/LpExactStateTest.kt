@@ -159,6 +159,8 @@ class LpExactStateTest {
                 assertEquals(fresh.upperD(j).toRawBits(), incremental.upperD(j).toRawBits())
                 assertEquals(fresh.hasFiniteUpper(j), incremental.hasFiniteUpper(j))
             }
+            assertEquals(fresh.objConstantD.toRawBits(), incremental.objConstantD.toRawBits())
+            assertEquals(fresh.objectiveD(3.0).toRawBits(), incremental.objectiveD(3.0).toRawBits())
             assertSame(state, incremental.exactState)
         }
     }
@@ -206,6 +208,231 @@ class LpExactStateTest {
 
         assertSame(trail.state, repeated.exactState)
         assertEquals(1, repeated.exactState?.depth)
+    }
+
+    @Test
+    fun `an objective edit projects within a budget too small for unchanged vectors`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val ten = ExactLpNumber.of(10L)
+        val premises = ExactLpPremises(listOf(ExactLpPremise(7, true, ten)), listOf(3))
+        val source = ExactLpModel(
+            List(128) { if (it == 7) listOf(ExactLpEntry(0, one)) else emptyList() },
+            listOf(ten),
+            List(129) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ten)), tag = it) },
+            listOf(ExactLpRow(strict = true, premises = premises)),
+            ExactLpObjective(List(129) { zero }),
+        )
+        val trail = LpBoundTrail(source)
+        val original = assertNotNull(trail.state.toWorkingModel())
+        assertTrue(trail.replaceObjective(ExactLpObjective(List(129) { if (it == 7) one else zero })))
+        val budget = LpProjectionMeter(workLimit = 140L, allocationLimit = 1800L)
+
+        val changed = assertNotNull(trail.state.ownerWorkingModel(budget))
+
+        assertEquals(1.0, changed.costD(7))
+        assertEquals(0.0, original.costD(7))
+        assertEquals(10.0, changed.rhsD(0))
+        assertEquals(10.0, changed.upperD(8))
+        assertEquals(8, changed.tag[8])
+        assertTrue(changed.rowStrict[0])
+        assertEquals(premises, trail.state.model.row(0).premises)
+        assertSame(trail.state, changed.exactState)
+        assertEquals(0L, budget.matrixWork)
+        assertNull(LpExactState(source.withObjective(trail.state.model.objective)).ownerWorkingModel(
+            LpProjectionMeter(workLimit = 140L, allocationLimit = 1800L),
+        ))
+    }
+
+    @Test
+    fun `objective metadata edits project without a vector sized allowance`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            List(128) { emptyList() },
+            emptyList(),
+            List(128) { ExactLpColumn(ExactLpBounds()) },
+            emptyList(),
+            ExactLpObjective(List(128) { zero }),
+        )
+        val trail = LpBoundTrail(source)
+        val original = assertNotNull(trail.state.ownerWorkingModel())
+        val negativeZero = ExactLpNumber.ofIeee(-0.0)
+        assertTrue(trail.replaceObjective(ExactLpObjective(
+            List(128) { zero }, constant = negativeZero, scale = ExactLpNumber.of(3L),
+            externalConstant = ExactLpNumber.of(5L), sense = Sense.MAXIMIZE,
+        )))
+
+        val changed = assertNotNull(trail.state.ownerWorkingModel(
+            LpProjectionMeter(workLimit = 8L, allocationLimit = 512L),
+        ))
+
+        assertEquals(Sense.MAXIMIZE, changed.sense)
+        assertEquals((-0.0).toRawBits(), changed.objConstantD.toRawBits())
+        assertEquals(13.0, changed.objectiveD(24.0))
+        assertEquals(24.0, original.objectiveD(24.0))
+        assertSame(trail.state, changed.exactState)
+    }
+
+    @Test
+    fun `objective revisions retain exact values and signed zero when rounding agrees`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(emptyList(), emptyList()), emptyList(),
+            List(2) { ExactLpColumn(ExactLpBounds()) }, emptyList(), ExactLpObjective(listOf(one, zero)),
+        )
+        val trail = LpBoundTrail(source)
+        val original = assertNotNull(trail.state.ownerWorkingModel())
+        val denominator = BIG_ONE shl 100
+        val roundedOne = ExactLpNumber.of(BigFraction.of(denominator + BIG_ONE, denominator))
+        val negativeZero = ExactLpNumber.ofIeee(-0.0)
+        assertTrue(trail.replaceObjective(ExactLpObjective(listOf(roundedOne, negativeZero))))
+
+        val changed = assertNotNull(trail.state.ownerWorkingModel())
+
+        assertEquals(original.costD(0).toRawBits(), changed.costD(0).toRawBits())
+        assertEquals((-0.0).toRawBits(), changed.costD(1).toRawBits())
+        assertEquals(roundedOne, assertNotNull(changed.exactState).model.objective.cost(0))
+        assertEquals(one, assertNotNull(original.exactState).model.objective.cost(0))
+        assertFalse(assertNotNull(original.exactState).fullAuthorityEquals(assertNotNull(changed.exactState)))
+    }
+
+    @Test
+    fun `objective nonzero checks follow added and removed costs`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            List(4) { emptyList() }, emptyList(), List(4) { ExactLpColumn(ExactLpBounds()) }, emptyList(),
+            ExactLpObjective(listOf(one, zero, one, zero)),
+        )
+        val trail = LpBoundTrail(source)
+        assertNotNull(trail.state.ownerWorkingModel())
+        val objectives = listOf(listOf(zero, one, zero, one), listOf(one, one, one, one), List(4) { zero })
+        for (costs in objectives) {
+            assertTrue(trail.replaceObjective(ExactLpObjective(costs)))
+            val changed = assertNotNull(trail.state.toWorkingModel())
+            assertNotNull(changed.doubleView).cost.fill(0.0)
+
+            val lost = trail.state.projectionLostNonzero(changed)
+
+            assertEquals(costs.any { !it.value.isZero }, lost)
+            val retry = assertNotNull(trail.state.toWorkingModel())
+            assertEquals(false, trail.state.projectionLostNonzero(retry))
+            for (column in costs.indices) assertEquals(costs[column].approximation, retry.costD(column))
+        }
+    }
+
+    @Test
+    fun `a declined objective projection preserves its predecessor and retry`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            List(4) { emptyList() }, emptyList(), List(4) { ExactLpColumn(ExactLpBounds()) }, emptyList(),
+            ExactLpObjective(List(4) { zero }),
+        )
+        val trail = LpBoundTrail(source)
+        val original = assertNotNull(trail.state.ownerWorkingModel())
+        assertTrue(trail.replaceObjective(ExactLpObjective(List(4) { one })))
+        var polls = 0
+
+        assertNull(trail.state.ownerWorkingModel(LpProjectionMeter(allocationLimit = 0L)))
+        assertNull(trail.state.ownerWorkingModel(LpProjectionMeter(cancellation = Cancellation { ++polls >= 8 })))
+
+        assertEquals(0.0, original.costD(0))
+        val retry = assertNotNull(trail.state.ownerWorkingModel())
+        assertEquals(1.0, retry.costD(0))
+        assertSame(trail.state, retry.exactState)
+    }
+
+    @Test
+    fun `an unprojectable objective leaves the preceding exact state authoritative`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())), emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val trail = LpBoundTrail(source)
+        val state = trail.state
+        val original = assertNotNull(state.ownerWorkingModel())
+        val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2048))
+
+        assertFalse(trail.replaceObjective(ExactLpObjective(listOf(tiny))))
+
+        assertSame(state, trail.state)
+        assertSame(original, assertNotNull(trail.state.ownerWorkingModel()))
+    }
+
+    @Test
+    fun `recaptured bounds and costs reuse the unchanged scalar region`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val ten = ExactLpNumber.of(10L)
+        val columns = List(129) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ten))) }
+        val source = ExactLpModel(
+            List(128) { if (it == 7) listOf(ExactLpEntry(0, one)) else emptyList() }, listOf(ten), columns,
+            listOf(ExactLpRow()), ExactLpObjective(List(129) { zero }),
+        )
+        val previous = LpExactState(source)
+        val original = assertNotNull(previous.ownerWorkingModel())
+        val changedColumns = columns.toMutableList().apply {
+            this[7] = this[7].copy(bounds = ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))
+        }
+        val recaptured = LpExactState(source.copy(
+            columns = changedColumns, objective = ExactLpObjective(List(129) { if (it == 7) one else zero }),
+        ))
+        recaptured.inheritProjection(previous)
+        recaptured.inheritScalars(previous)
+
+        val projected = assertNotNull(recaptured.ownerWorkingModel(
+            LpProjectionMeter(workLimit = 280L, allocationLimit = 3000L),
+        ))
+
+        assertEquals(1.0, projected.upperD(7))
+        assertEquals(1.0, projected.costD(7))
+        assertEquals(10.0, projected.rhsD(0))
+        assertEquals(10.0, original.upperD(7))
+        assertEquals(0.0, original.costD(7))
+        assertSame(recaptured, projected.exactState)
+        val fresh = assertNotNull(LpExactState(recaptured.baseModel).ownerWorkingModel())
+        for (column in 0 until fresh.numVars) {
+            assertEquals(fresh.costD(column).toRawBits(), projected.costD(column).toRawBits())
+            assertEquals(fresh.upperD(column).toRawBits(), projected.upperD(column).toRawBits())
+        }
+    }
+
+    @Test
+    fun `scalar region changes invalidate recaptured projections`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            List(128) { if (it == 0) listOf(ExactLpEntry(0, one)) else emptyList() }, listOf(one),
+            List(129) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
+            listOf(ExactLpRow()), ExactLpObjective(List(129) { zero }),
+        )
+        val previous = LpExactState(source)
+        assertNotNull(previous.ownerWorkingModel())
+        val changes = listOf(
+            source.copy(rhs = listOf(zero)),
+            source.copy(rows = listOf(ExactLpRow(strict = true))),
+            source.copy(columns = List(129) { source.column(it).copy(tag = it) }),
+            source.copy(columns = List(129) { source.column(it).copy(integral = false) }),
+            source.recentered(List(128) { if (it == 0) one else zero }),
+        )
+        for (changed in changes) {
+            val recaptured = LpExactState(changed)
+            recaptured.inheritProjection(previous)
+            recaptured.inheritScalars(previous)
+
+            assertNull(recaptured.ownerWorkingModel(LpProjectionMeter(workLimit = 8L, allocationLimit = 512L)))
+
+            val projected = assertNotNull(recaptured.ownerWorkingModel())
+            val fresh = assertNotNull(LpExactState(changed).ownerWorkingModel())
+            assertEquals(fresh.rhsD(0).toRawBits(), projected.rhsD(0).toRawBits())
+            assertEquals(fresh.loShiftD(0).toRawBits(), projected.loShiftD(0).toRawBits())
+            assertEquals(fresh.tag[0], projected.tag[0])
+            assertEquals(fresh.rowStrict[0], projected.rowStrict[0])
+            assertEquals(fresh.colContinuous[0], projected.colContinuous[0])
+        }
     }
 
     @Test

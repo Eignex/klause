@@ -1158,6 +1158,16 @@ internal class ExactLpModel private constructor(
         }
     }
 
+    fun withObjective(objective: ExactLpObjective): ExactLpModel {
+        require(objective.size == numVars)
+        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false).also {
+            it.storageCache = layoutStorage
+        }
+    }
+
+    internal fun sharesRegion(other: ExactLpModel): Boolean = matrix === other.matrix &&
+        rightHandSide === other.rightHandSide && columns === other.columns && rows === other.rows
+
     fun recentered(origins: List<ExactLpNumber>): ExactLpModel {
         require(origins.size == n)
         if ((0 until n).all { origins[it] == columns[it].origin }) return copy()

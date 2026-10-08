@@ -170,7 +170,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         }
         if (pricesInactiveRow) return false
         val next = snapshot(
-            baseModel = state.baseModel.copy(objective = objective),
+            baseModel = state.baseModel.withObjective(objective),
             objectiveRevision = state.objectiveRevision + 1L,
         )
         return commit(next, token)
