@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class BuildProvenanceTest {
     @Test
@@ -95,6 +96,120 @@ class BuildProvenanceTest {
 
             assertFailsWith<IllegalArgumentException> {
                 InstalledBuild.capture(launcher, File(root, "jdk"), emptyMap())
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `harness paths do not enter runtime identity and solver options remain intact`() {
+        val options = listOf(
+            "-Dklause.workspace.root=/first -Dklause.bench.cache=false -Xmx3g",
+            "'-Dklause.workspace.root=/second path' -Dklause.bench.corpusCache='/corpus path' -Xmx3g",
+            "-Dklause.workspace.root=\"/third path\" -Dklause.bench.corpusCache=/corpus -Xmx3g",
+        )
+
+        val normalized = options.map { runtimeOptions(mapOf("JAVA_OPTS" to it)) }
+
+        assertTrue(normalized.all { it == mapOf("JAVA_OPTS" to "-Xmx3g") })
+        assertNotEquals(normalized.first(), runtimeOptions(mapOf("JAVA_OPTS" to "-Xmx4g")))
+        assertEquals(mapOf("LD_LIBRARY_PATH" to "/vendor"), runtimeOptions(mapOf("LD_LIBRARY_PATH" to "/vendor")))
+        val inputOption = mapOf("JAVA_OPTS" to "-Dklause.bench.smtlib.strictBounds=true")
+        assertEquals(inputOption, runtimeOptions(inputOption))
+    }
+
+    @Test
+    fun `a manifest reuses captured hashes and binds each case runtime options`() {
+        val root = Files.createTempDirectory("provenance").toFile()
+        try {
+            val launcher = File(root, "dist/bin/klause-cli").apply {
+                parentFile.mkdirs()
+                writeText("launcher")
+            }
+            File(root, "dist/lib/solver.jar").apply {
+                parentFile.mkdirs()
+                writeText("solver")
+            }
+            File(root, "jdk/bin/java").apply {
+                parentFile.mkdirs()
+                writeText("java")
+            }
+            val runtime = File(root, "jdk")
+            val manifest = File(root, "provenance.json")
+            InstalledBuild.writeManifest(manifest, launcher, runtime)
+            val environment = mapOf("JAVA_OPTS" to "-Dklause.workspace.root=/work -Xmx3g")
+
+            val reused = InstalledBuild.readManifest(manifest, launcher, runtime, environment)
+            val fresh = InstalledBuild.capture(launcher, runtime, environment)
+            val changedRuntime = InstalledBuild.readManifest(
+                manifest,
+                launcher,
+                runtime,
+                mapOf("KLAUSE_CLI_OPTS" to "-XX:ActiveProcessorCount=2"),
+            )
+
+            assertEquals(fresh, reused)
+            assertEquals(fresh.fingerprint, reused.fingerprint)
+            assertNotEquals(reused.fingerprint, changedRuntime.fingerprint)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `manifest freshness rejects changed bytes with their modification time preserved`() {
+        val root = Files.createTempDirectory("provenance").toFile()
+        try {
+            val launcher = File(root, "dist/bin/klause-cli").apply {
+                parentFile.mkdirs()
+                writeText("launcher")
+            }
+            val jar = File(root, "dist/lib/solver.jar").apply {
+                parentFile.mkdirs()
+                writeText("solver")
+            }
+            File(root, "jdk/bin/java").apply {
+                parentFile.mkdirs()
+                writeText("java")
+            }
+            val manifest = File(root, "provenance.json")
+            InstalledBuild.writeManifest(manifest, launcher, File(root, "jdk"))
+            val timestamp = jar.lastModified()
+
+            jar.writeText("SOLVER")
+            jar.setLastModified(timestamp)
+
+            assertFailsWith<IllegalArgumentException> {
+                InstalledBuild.readManifest(manifest, launcher, File(root, "jdk"), emptyMap())
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `a manifest cannot claim another runtime`() {
+        val root = Files.createTempDirectory("provenance").toFile()
+        try {
+            val launcher = File(root, "dist/bin/klause-cli").apply {
+                parentFile.mkdirs()
+                writeText("launcher")
+            }
+            File(root, "dist/lib/solver.jar").apply {
+                parentFile.mkdirs()
+                writeText("solver")
+            }
+            File(root, "jdk/bin/java").apply {
+                parentFile.mkdirs()
+                writeText("java")
+            }
+            val manifest = File(root, "provenance.json")
+            InstalledBuild.writeManifest(manifest, launcher, File(root, "jdk"))
+            File(root, "jdk").copyRecursively(File(root, "other-jdk"))
+
+            assertFailsWith<IllegalArgumentException> {
+                InstalledBuild.readManifest(manifest, launcher, File(root, "other-jdk"), emptyMap())
             }
         } finally {
             root.deleteRecursively()

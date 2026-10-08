@@ -8,6 +8,7 @@ import com.eignex.klause.bench.catalog.ProblemSets
 import com.eignex.klause.bench.metric.ArmMining
 import com.eignex.klause.bench.metric.BenchCache
 import com.eignex.klause.bench.metric.ClaspReference
+import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.InstanceClassifier
 import com.eignex.klause.bench.metric.InstanceFeatures
 import com.eignex.klause.bench.metric.KlauseSearch
@@ -103,6 +104,12 @@ object BenchCli {
 
             "validate-solution" -> validateSolution(args.drop(1))
 
+            "provenance" -> {
+                val output = args.drop(1).singleOrNull()?.takeIf { it.startsWith("out=") }?.substringAfter('=')
+                require(!output.isNullOrBlank()) { "Use provenance out=<file>" }
+                InstalledBuild.writeManifest(File(output))
+            }
+
             "reference" -> reference(args.drop(1))
 
             "classify" -> classify(args.drop(1))
@@ -117,7 +124,7 @@ object BenchCli {
                 error(
                     "unknown command '$cmd' " +
                         "(commands: solve, solve-one, validate-solution, select, preview, reference, " +
-                        "classify, credit, mine, corpus, list)",
+                        "classify, credit, mine, corpus, provenance, list)",
                 )
         }
     }
@@ -445,7 +452,8 @@ object BenchCli {
         println("[${counter.incrementAndGet()}/$total] ${ref.name} = $verdict")
         // Decisive = a witness (SAT) or a proof (optimum / UNSAT). An undecided timeout still gets a row
         // — an honest "unknown" (feasible=null, no objective, unproven) — so every instance is covered;
-        // the virtual-best merge keeps it from ever displacing a decisive row.
+        // the virtual-best merge keeps it from displacing a decisive row of the same version, while one judged under
+        // another version ([ReferenceEntry.version]) gives way to it.
         if (r.feasible == true || r.proven) {
             ReferenceEntry(
                 ReferenceStore.suiteOf(ref),
@@ -457,9 +465,10 @@ object BenchCli {
                 elapsedMs,
                 solverId,
                 budget.timeoutMillis,
+                version = r.stats["referenceVersion"].orEmpty(),
             )
         } else {
-            unknownRow(ref, maximize, solverId, budget)
+            unknownRow(ref, maximize, solverId, budget, r.stats["referenceVersion"].orEmpty())
         }
     }.getOrElse {
         // An instance the reference couldn't even run (parse/solver error) is also uncovered — record an
@@ -470,18 +479,24 @@ object BenchCli {
 
     /** An "unknown" reference row for an instance the solver left undecided (timeout) or couldn't run:
      *  no objective, feasibility unknown, unproven, crediting the full budget as elapsed. */
-    private fun unknownRow(ref: ProblemRef, maximize: Boolean, solver: String, budget: Budget): ReferenceEntry =
-        ReferenceEntry(
-            suite = ReferenceStore.suiteOf(ref),
-            problem = ref.name,
-            maximize = maximize,
-            objective = null,
-            feasible = null,
-            proven = false,
-            elapsedMs = budget.timeoutMillis,
-            solver = solver,
-            budgetMs = budget.timeoutMillis,
-        )
+    private fun unknownRow(
+        ref: ProblemRef,
+        maximize: Boolean,
+        solver: String,
+        budget: Budget,
+        version: String = "",
+    ): ReferenceEntry = ReferenceEntry(
+        suite = ReferenceStore.suiteOf(ref),
+        problem = ref.name,
+        maximize = maximize,
+        objective = null,
+        feasible = null,
+        proven = false,
+        elapsedMs = budget.timeoutMillis,
+        solver = solver,
+        budgetMs = budget.timeoutMillis,
+        version = version,
+    )
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
      *  Returns null when none are set. Defaults: `engine` unset ⇒ no `-e`, so klause follows the cli's
@@ -647,6 +662,7 @@ object BenchCli {
             |  bench preview [filters…]              show what a run would cover
             |  bench select [filters…]               the selection as JSON lines (suite, problem, …)
             |  bench solve-one suite= problem= […]   solve one instance; out=<dir> for its record
+            |  bench provenance out=<file>           capture installed build/runtime once for immutable campaigns
             |  bench corpus compress [<dir>]         zstd-compress the plain instances in the corpus cache, in place
             |  bench list [<suite>]                  list suites, or problems in a suite
             |

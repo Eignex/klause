@@ -29,10 +29,7 @@ internal enum class ArmFamily(val observable: Boolean) {
  * given class before the run has shown anything. They stay under the fading evidence for the whole run, so a class
  * leans its families without ever shutting one out.
  */
-internal class FamilyPrior(
-    private val successes: DoubleArray,
-    private val failures: DoubleArray,
-) {
+internal class FamilyPrior(private val successes: DoubleArray, private val failures: DoubleArray) {
     init {
         require(successes.size == ArmFamily.entries.size && failures.size == ArmFamily.entries.size)
         require(successes.all { it > 0.0 } && failures.all { it > 0.0 }) { "Beta pseudo-counts must be positive" }
@@ -66,13 +63,9 @@ internal class FamilyPrior(
          */
         fun of(profile: ProblemProfile): FamilyPrior = when (profile.problemClass) {
             ProblemClass.Sat, ProblemClass.MixedInteger -> UNIFORM
-
             ProblemClass.PseudoBoolean -> leaning(backtrack = FAVOURED, localSearch = LEANING)
-
             ProblemClass.FiniteCp -> if (profile.optimizing) UNIFORM else leaning(localSearch = LEANING)
-
             ProblemClass.Continuous -> leaning(backtrack = FAVOURED, localSearch = 1.0 / LEANING)
-
             ProblemClass.Open -> leaning(backtrack = FAVOURED, localSearch = LEANING)
         }
 

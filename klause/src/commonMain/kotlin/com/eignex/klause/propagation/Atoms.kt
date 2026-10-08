@@ -399,20 +399,8 @@ internal fun PropagationState.propagateAtomsForVar(
     // mid-iteration insert into this var's atom index. Idempotent: usually already present.
     if (newMin > oldMin) atomVarGe(v, newMin)
     if (newMax < oldMax) atomVarLe(v, newMax)
-    if (newMin > oldMin) {
-        val near = antNear ?: decidedFrontier(idx.find(AtomKind.GE, newMin))
-        wakeMinCrossing(idx, oldMin, newMin, antFar) { id ->
-            recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] < reqMin, near, antFar)
-            wakeAtom(id, false)
-        }
-    }
-    if (newMax < oldMax) {
-        val near = antNear ?: decidedFrontier(idx.find(AtomKind.LE, newMax))
-        wakeMaxCrossing(idx, newMax, oldMax, antFar) { id ->
-            recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] > reqMax, near, antFar)
-            wakeAtom(id, false)
-        }
-    }
+    if (newMin > oldMin) wakeRaisedMin(v, idx, oldMin, newMin, reqMin, antNear, antFar)
+    if (newMax < oldMax) wakeLoweredMax(v, idx, newMax, oldMax, reqMax, antNear, antFar)
     if (carved != NO_CARVE && carved in (newMin + 1) until newMax) {
         atoms.pendingMoveAnt = antFar
         idx.eq.visitRange(carved, carved) { id -> wakeAtom(id, false) }
@@ -420,6 +408,42 @@ internal fun PropagationState.propagateAtomsForVar(
     if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
         atoms.pendingMoveAnt = antFar
         idx.eq.visitRange(newMin, newMin) { id -> wakeAtom(id, true) }
+    }
+}
+
+// Each side of a move is its own method: inlined together, the crossing visits and every [wakeAtom] they inline make
+// one body C2 compiles at many times the cost of the two apart.
+@Suppress("LongParameterList")
+private fun PropagationState.wakeRaisedMin(
+    v: Int,
+    idx: VarAtomIndex,
+    oldMin: Long,
+    newMin: Long,
+    reqMin: Long,
+    antNear: IntArray?,
+    antFar: IntArray?,
+) {
+    val near = antNear ?: decidedFrontier(idx.find(AtomKind.GE, newMin))
+    wakeMinCrossing(idx, oldMin, newMin, antFar) { id ->
+        recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] < reqMin, near, antFar)
+        wakeAtom(id, false)
+    }
+}
+
+@Suppress("LongParameterList")
+private fun PropagationState.wakeLoweredMax(
+    v: Int,
+    idx: VarAtomIndex,
+    newMax: Long,
+    oldMax: Long,
+    reqMax: Long,
+    antNear: IntArray?,
+    antFar: IntArray?,
+) {
+    val near = antNear ?: decidedFrontier(idx.find(AtomKind.LE, newMax))
+    wakeMaxCrossing(idx, newMax, oldMax, antFar) { id ->
+        recordEqDeath(v, atoms.threshold[id], near = atoms.threshold[id] > reqMax, near, antFar)
+        wakeAtom(id, false)
     }
 }
 

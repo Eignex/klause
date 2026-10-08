@@ -286,12 +286,25 @@ class LocalSearchState(
 
     /** Recompute cost and per-factor degrees from scratch. */
     fun recompute() {
+        clearViolationState()
+        initializeFactors()
+        // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
+        addAllBreakMake()
+        if (cost < bestCostSeen) bestCostSeen = cost
+    }
+
+    // The passes of [recompute] are separate methods: each loops over every factor or variable, and one body
+    // holding them all is compiled again on-stack for each loop it enters.
+    private fun clearViolationState() {
         for (i in 0 until problem.numFactors) violated.remove(i)
         cost = 0L
         for (v in boolBreakCount.indices) {
             boolBreakCount[v] = 0
             boolMakeCount[v] = 0
         }
+    }
+
+    private fun initializeFactors() {
         factors.forEachIndexed { id, factor ->
             factor.initialize(this, id)
             val deg = factor.violationDegree(this, id)
@@ -301,9 +314,10 @@ class LocalSearchState(
                 cost += deg
             }
         }
-        // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
+    }
+
+    private fun addAllBreakMake() {
         for (id in 0 until problem.numFactors) adjustBoolBreakMake(id, +1)
-        if (cost < bestCostSeen) bestCostSeen = cost
     }
 
     /**
@@ -601,43 +615,26 @@ class LocalSearchState(
     }
 
     /**
-     * Shared apply skeleton for the primitive moves: retract brute-force break/make over
-     * [touchedFactors], [commit] the assignment change, refresh each factor's payload and violation,
-     * then re-add brute-force / apply incremental break/make. Closes with the conf-change and
-     * tabu/activity bookkeeping for [slot]. Inline so the per-move-type lambdas fold away and the two
-     * callers keep their original allocation-free, single-pass shape.
+     * Shared apply skeleton for the primitive moves: [retract] brute-force break/make over
+     * [touchedFactors], [commit] the assignment change, [refresh] each factor's payload and violation,
+     * then [settle] the break/make vectors. Closes with the conf-change and tabu/activity bookkeeping
+     * for [slot]. Each phase is a per-move-type method holding one loop, so C2 compiles them apart
+     * instead of recompiling the whole move on-stack for each loop it enters.
      */
+    @Suppress("LongParameterList")
     private inline fun applyMove(
         touchedFactors: IntArray,
         slot: Int,
-        maintainsIncrementally: (Invariant) -> Boolean,
+        retract: () -> Unit,
         commit: () -> Unit,
-        applyToFactor: (factorId: Int) -> Unit,
-        updateIncremental: (factorId: Int) -> Unit,
+        refresh: () -> Unit,
+        settle: () -> Unit,
         markMovedVar: () -> Unit,
     ) {
-        // Phase 1: brute-force factors subtract pre-move break/make contributions; incremental factors
-        // fold the whole delta into their own update in phase 3.
-        for (factorId in touchedFactors) {
-            if (!maintainsIncrementally(factors[factorId])) adjustBoolBreakMake(factorId, -1)
-        }
-        // Phase 2: commit the change and let each factor update its own payload. Re-read
-        // violationDegree from the payload for the exact cost delta rather than the returned status
-        // delta, which is sometimes approximate.
+        retract()
         commit()
-        for (factorId in touchedFactors) {
-            applyToFactor(factorId)
-            updateViolation(factorId)
-        }
-        // Phase 3: incremental factors apply their O(1) / O(arity) update; brute-force factors add
-        // post-move contributions.
-        for (factorId in touchedFactors) {
-            if (maintainsIncrementally(factors[factorId])) {
-                updateIncremental(factorId)
-            } else {
-                adjustBoolBreakMake(factorId, +1)
-            }
-        }
+        refresh()
+        settle()
         if (!probeActive) {
             markNeighborConfChange(touchedFactors)
             markMovedVar()
@@ -648,40 +645,101 @@ class LocalSearchState(
         if (cost < bestCostSeen) bestCostSeen = cost
     }
 
-    private fun applyBoolFlip(boolVar: Int) = applyMove(
-        touchedFactors = projection.boolOccurrences[boolVar],
-        slot = boolVar,
-        maintainsIncrementally = { it.maintainsBreakMakeIncrementally },
-        commit = { assignment.flipBool(boolVar) },
-        applyToFactor = { factors[it].applyBoolFlip(this, it, boolVar) },
-        updateIncremental = { factors[it].updateBoolBreakMakeForFlip(this, it, boolVar) },
-        markMovedVar = { boolConfChange[boolVar] = false },
+    // Brute-force factors subtract their pre-move break/make contributions; incremental factors fold the whole
+    // delta into their own update once the move is committed.
+    private inline fun retractBruteForce(touchedFactors: IntArray, maintainsIncrementally: (Invariant) -> Boolean) {
+        for (factorId in touchedFactors) {
+            if (!maintainsIncrementally(factors[factorId])) adjustBoolBreakMake(factorId, -1)
+        }
+    }
+
+    // Each factor updates its own payload. The exact cost delta is re-read from violationDegree rather than the
+    // returned status delta, which is sometimes approximate.
+    private inline fun refreshFactors(touchedFactors: IntArray, applyToFactor: (factorId: Int) -> Unit) {
+        for (factorId in touchedFactors) {
+            applyToFactor(factorId)
+            updateViolation(factorId)
+        }
+    }
+
+    // Incremental factors apply their O(1) / O(arity) update; brute-force factors add post-move contributions.
+    private inline fun settleBreakMake(
+        touchedFactors: IntArray,
+        maintainsIncrementally: (Invariant) -> Boolean,
+        updateIncremental: (factorId: Int) -> Unit,
+    ) {
+        for (factorId in touchedFactors) {
+            if (maintainsIncrementally(factors[factorId])) {
+                updateIncremental(factorId)
+            } else {
+                adjustBoolBreakMake(factorId, +1)
+            }
+        }
+    }
+
+    private fun applyBoolFlip(boolVar: Int) {
+        val touched = projection.boolOccurrences[boolVar]
+        applyMove(
+            touchedFactors = touched,
+            slot = boolVar,
+            retract = { retractForBoolFlip(touched) },
+            commit = { assignment.flipBool(boolVar) },
+            refresh = { refreshForBoolFlip(touched, boolVar) },
+            settle = { settleForBoolFlip(touched, boolVar) },
+            markMovedVar = { boolConfChange[boolVar] = false },
+        )
+    }
+
+    private fun retractForBoolFlip(touched: IntArray) =
+        retractBruteForce(touched) { it.maintainsBreakMakeIncrementally }
+
+    private fun refreshForBoolFlip(touched: IntArray, boolVar: Int) =
+        refreshFactors(touched) { factors[it].applyBoolFlip(this, it, boolVar) }
+
+    private fun settleForBoolFlip(touched: IntArray, boolVar: Int) = settleBreakMake(
+        touched,
+        { it.maintainsBreakMakeIncrementally },
+        { factors[it].updateBoolBreakMakeForFlip(this, it, boolVar) },
     )
 
     private fun applyIntSet(intVar: Int, newValue: Long) {
         val old = assignment.intValue(intVar)
         if (old == newValue) return
+        val touched = projection.intOccurrences[intVar]
         applyMove(
-            touchedFactors = projection.intOccurrences[intVar],
+            touchedFactors = touched,
             slot = problem.numBoolVars + intVar,
-            maintainsIncrementally = { it.maintainsIntBreakMakeIncrementallyForIntSet },
+            retract = { retractForIntSet(touched) },
             commit = { assignment.setInt(intVar, newValue) },
-            applyToFactor = { factors[it].applyIntSet(this, it, intVar, old) },
-            updateIncremental = { factors[it].updateIntBreakMakeForIntSet(this, it, intVar, old) },
+            refresh = { refreshForIntSet(touched, intVar, old) },
+            settle = { settleForIntSet(touched, intVar, old) },
             markMovedVar = { intConfChange[intVar] = false },
         )
     }
 
+    private fun retractForIntSet(touched: IntArray) =
+        retractBruteForce(touched) { it.maintainsIntBreakMakeIncrementallyForIntSet }
+
+    private fun refreshForIntSet(touched: IntArray, intVar: Int, old: Long) =
+        refreshFactors(touched) { factors[it].applyIntSet(this, it, intVar, old) }
+
+    private fun settleForIntSet(touched: IntArray, intVar: Int, old: Long) = settleBreakMake(
+        touched,
+        { it.maintainsIntBreakMakeIncrementallyForIntSet },
+        { factors[it].updateIntBreakMakeForIntSet(this, it, intVar, old) },
+    )
+
     private fun applyRealSet(realVar: Int, newValue: Double) {
         val old = assignment.realValue(realVar)
         if (old.toRawBits() == newValue.toRawBits()) return
+        val touched = projection.realOccurrences[realVar]
         applyMove(
-            touchedFactors = projection.realOccurrences[realVar],
+            touchedFactors = touched,
             slot = problem.numBoolVars + problem.numIntVars + realVar,
-            maintainsIncrementally = { false },
+            retract = { retractBruteForce(touched) { false } },
             commit = { assignment.setReal(realVar, newValue) },
-            applyToFactor = { factors[it].applyRealSet(this, it, realVar, old) },
-            updateIncremental = {},
+            refresh = { refreshFactors(touched) { factors[it].applyRealSet(this, it, realVar, old) } },
+            settle = { settleBreakMake(touched, { false }, {}) },
             markMovedVar = {},
         )
         if (++realMovesSinceRefresh >= REAL_REFRESH_INTERVAL && !probeActive) refreshRealRows()
@@ -792,27 +850,14 @@ class LocalSearchState(
         probeTouchedList.clear()
         probeActive = true
         breakProbeActive = true
-        for (p in move.parts) apply(p)
+        applyParts(move.parts)
         breakProbeActive = false
 
-        var breakCount = 0
-        for (i in 0 until probeTouchedList.size) {
-            val fid = probeTouchedList[i]
-            if (factorDegree[fid] > 0 && !probeWasViolated[fid]) breakCount++
-            probeTouched[fid] = false
-        }
+        val breakCount = settleProbeBreaks()
         val netDelta: Long = cost - oldCost
-        var weightedNetDelta = netDelta.toDouble()
-        if (degBefore != null) {
-            val w = weights.factorWeights
-            weightedNetDelta = 0.0
-            for (i in degBefore.indices) {
-                val d = factorDegree[i] - degBefore[i]
-                if (d != 0) weightedNetDelta += w[i] * d
-            }
-        }
+        val weightedNetDelta = if (degBefore != null) weightedDegreeDelta(degBefore) else netDelta.toDouble()
 
-        for (i in inverses.indices.reversed()) apply(inverses[i])
+        revertParts(inverses)
         probeActive = false
 
         // Conf-change needs no restore — it was left untouched for the whole probe (see probeActive).
@@ -822,6 +867,37 @@ class LocalSearchState(
         bestCostSeen = oldBestCost
 
         return CompoundEval(breakScore = breakCount, netDelta = netDelta, weightedNetDelta = weightedNetDelta)
+    }
+
+    // The probe's passes are separate methods so each compiles on its own: inlined into one body, the apply path
+    // appears twice and the per-factor loop makes C2 compile the whole of it again on-stack.
+    private fun applyParts(parts: List<Move>) {
+        for (p in parts) apply(p)
+    }
+
+    private fun revertParts(inverses: List<Move>) {
+        for (i in inverses.indices.reversed()) apply(inverses[i])
+    }
+
+    // Factors the probe turned violated, clearing the probe's touched marks.
+    private fun settleProbeBreaks(): Int {
+        var breakCount = 0
+        for (i in 0 until probeTouchedList.size) {
+            val fid = probeTouchedList[i]
+            if (factorDegree[fid] > 0 && !probeWasViolated[fid]) breakCount++
+            probeTouched[fid] = false
+        }
+        return breakCount
+    }
+
+    private fun weightedDegreeDelta(degBefore: IntArray): Double {
+        val w = weights.factorWeights
+        var delta = 0.0
+        for (i in degBefore.indices) {
+            val d = factorDegree[i] - degBefore[i]
+            if (d != 0) delta += w[i] * d
+        }
+        return delta
     }
 
     private data class CompoundEval(val breakScore: Int, val netDelta: Long, val weightedNetDelta: Double)
