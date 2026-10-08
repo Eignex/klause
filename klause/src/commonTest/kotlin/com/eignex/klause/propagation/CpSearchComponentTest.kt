@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
@@ -27,8 +28,33 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class CpSearchComponentTest {
+    @Test
+    fun `an unnameable native antecedent declines its shared proof`() {
+        val cp = CpSearchComponent(
+            PropagationSession(
+                Problem(
+                    0,
+                    2,
+                    arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+                    arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
+                ),
+            ),
+        )
+        cp.rebase()
+        val session = SearchSession(listOf(cp))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtMost(1, 3L)))
+
+        assertEquals(3L, session.intUpperBound(0))
+        assertSame(SearchAtomPremise.Unavailable, session.intUpperBoundPremise(0))
+        assertNull(session.explainAtoms(session.intUpperBoundPremise(0)))
+    }
+
     @Test
     fun `native bound proofs preserve source integer remapping and rollback`() {
         val native = PropagationSession(

@@ -88,7 +88,9 @@ private fun PropagationState.sharedPremise(
         }
         val antecedents = atomAntecedentsDerived(atom)
         if (antecedents == null) {
-            proofs.put(literal, sharedIntegerLeaf(atom, Lit.isPositive(literal), context, sourceIntId))
+            val premise = sharedIntegerLeaf(atom, Lit.isPositive(literal), context, sourceIntId)
+            if (premise === SearchAtomPremise.Unavailable) return premise
+            proofs.put(literal, premise)
             continue
         }
         if (!visiting.add(literal)) return SearchAtomPremise.Unavailable
@@ -130,7 +132,12 @@ private fun PropagationState.sharedIntegerLeaf(
             return SearchAtomPremise.Unavailable
         }
     }
-    return SearchAtomPremise.All(decisions.map(context::sharedIntegerPremise))
+    val premises = decisions.map { decision ->
+        val premise = context.sharedIntegerPremise(decision)
+        if (premise === SearchAtomPremise.Unavailable) return premise
+        premise
+    }
+    return SearchAtomPremise.All(premises)
 }
 
 private fun SearchContext.sharedIntegerPremise(decision: SearchDecision): SearchAtomPremise {
