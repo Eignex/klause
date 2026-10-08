@@ -1,40 +1,35 @@
-# globals: problems with the globals theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# globals: problems with the globals theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
-# easy: 14
-hakank/M/M12
-hakank/car_painting/car_painting
-hakank/geost_test/geost_test
-mzn-bench/2012/project-planning
-mzn-bench/2016/java-auto-gen
-mzn-bench/2021/neighbours/neightbours-new-19
-mzn-bench/2025/mondoku/8-8-4
+# easy: 12
+hakank/picking_teams/picking_teams
+mzn-bench/2014/jp-encoding/data100
+mzn-bench/2014/ship-schedule/8ShipsMixed
+mzn-bench/2019/zephyrus/14__10__6__3
+mzn-bench/2022/nfc/18_3_12
 xcsp3-cop/AlteredStates-02_c25
-xcsp3-cop/ClockTriplet-03-12_c22
-xcsp3-cop/TSPTW1-n020w020-1_c23
-xcsp3-csp/ChainReaction-20-020_c25
-xcsp3-csp/Hamming-30-15-07-15_c24
-xcsp3-csp/MisteryShopper-5-10-3-6-0_c24
-xcsp3-csp/RamseyPartition-equ-4-0062_c25
-# medium: 20
-hakank/eyedrop_optimize/eyedrop_optimize2
-hakank/lights_out/lights_out
-hakank/lost_at_sea/lost_at_sea
+xcsp3-cop/ChampionsLeague-2024-09_c25
+xcsp3-cop/ProgressiveParty-rally-red12-05_c23
+xcsp3-csp/AnotherMagicSquare-02_c23
+xcsp3-csp/BlockedQueens-28-1449787798_c22
+xcsp3-csp/RotatingRostering-020-2-3_c25
+xcsp3-csp/Subisomorphism-g34-g36_c24
+# medium: 17
+hakank/bin_packing_me/bin_packing_me
 hakank/magic_square_water_retention/magic_square_water_retention
-hakank/or_matching/or_matching
-mzn-bench/2016/depot-placement/rat99_6
-mzn-bench/2020/sdn-chain/d24n600-3
-mzn-bench/2021/java-routing
-mzn-bench/2022/spot5/509
-mzn-bench/2024/concert-hall-cap/concert_200_20
-xcsp3-cop/BeerJugs-dec-01_c23
-xcsp3-cop/ButtonsScissors-02_c25
-xcsp3-cop/Charlotte-24-2_c24
-xcsp3-cop/Cutstock-14-0_c25
-xcsp3-cop/MultiAgentPathFinding-table-g16-p10-a05_c22
-xcsp3-csp/BlockedQueens-48-1721237798_c22
-xcsp3-csp/Hamming-20-10-03-08_c24
-xcsp3-csp/MisteryShopper-5-10-2-6-0_c24
-xcsp3-csp/Molnar-3-07_c22
-xcsp3-csp/SocialGolfers-cnt-08-04-11_c24
+mzn-bench/2011/depot-placement/ts225_6
+mzn-bench/2011/ship-schedule/8Ships
+mzn-bench/2012/amaze/2012-03-15
+mzn-bench/2013/league/model30-8-4
+mzn-bench/2020/sdn-chain/d30n600-5
+xcsp3-cop/Fortress1-10_c25
+xcsp3-cop/MaximumDensityOscillatingLife-5-3_c24
+xcsp3-cop/MultiAgentPathFinding-table-mks-g16-p10-a05_c22
+xcsp3-cop/RubiksCube-11-4-20-3_c24
+xcsp3-cop/Wordpress-04-10-500_c24
+xcsp3-csp/Cryptanalysis-5-10-128_c25
+xcsp3-csp/LangfordBin-010_c25
+xcsp3-csp/Molnar-3-08_c22
+xcsp3-csp/RamseyPartition-equ-3-0300_c25
+xcsp3-csp/SocialGolfers-cnt-06-06-07_c24
 # hard: 1
-xcsp3-cop/DC-midori-xor4-d1-t0-r08-v128_c22
+hakank/M/M12b

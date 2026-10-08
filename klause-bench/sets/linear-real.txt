@@ -1,40 +1,40 @@
-# linear-real: problems with the linear-real theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# linear-real: problems with the linear-real theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
 # easy: 14
 hakank/contiguity_mip/contiguity_mip2
 hakank/furniture/furniture
-hakank/product_configuration/product_configuration
-hakank/relief_mission/relief_mission
-smtlib-qflira/LCTES/fly-by-wire.locals
-smtlib-qflra/LassoRanker/Ultimate/CooperatingT2_consts1.bpl_Iteration1_Lasso_7-phaseTemplate
-smtlib-qflra/TM/p-2-bucket_s11
-smtlib-qflra/check/bignum_lra1
-smtlib-qflra/keymaera/bouncing-ball-inv-node1886
-smtlib-qflra/sc/sc-33.induction2.cvc
-smtlib-qfrdl/check/bignum_rdl2
-smtlib-qfrdl/sal/fischer9-mutex-5
+smtlib-qflira/LCTES/tdf.locals
+smtlib-qflra/DTP-Scheduling/constraints-temporal-machine-shop-2-3-A60
+smtlib-qflra/LassoRanker/CooperatingT2/broydn.c.i.broydn.pl.t2.fixed.t2.c_Iteration8_Loop_7-phaseTemplate
+smtlib-qflra/latendresse/ecoliFBAyicesTest-500
+smtlib-qflra/miplib/pp08a-2000
+smtlib-qflra/sc/sc-22.induction3.cvc
+smtlib-qflra/tta_startup/simple_startup_6nodes.synchro.induct
+smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/cooking15
+smtlib-qfrdl/check/bignum_rdl1
+smtlib-qfrdl/sal/fischer9-mutex-3
+smtlib-qfrdl/scheduling/orb07_330
 smtlib-qfrdl/skdmxa/skdmxa-3x3-5
-smtlib-qfrdl/skdmxa2/skdmxa-3x3-9.induction.cvc
 # medium: 20
-smtlib-qflra/2017-Heizmann-UltimateInvariantSynthesis/_gj2007.c.i_4_3_3.bpl_7
-smtlib-qflra/2019-ezsmt/Labyrinth/SCC_Strong/0003-labyrinth-11-0
-smtlib-qflra/2019-ezsmt/blending/6
-smtlib-qflra/DTP-Scheduling/constraints-tempo-width-60
-smtlib-qflra/LassoRanker/CooperatingT2/mc91test.t2.c_Iteration6_Loop_4-pieceTemplate
-smtlib-qflra/TM/p6-zenonumeric_s9
-smtlib-qflra/clock_synchro/clocksynchro_6clocks.main_invar.induct
-smtlib-qflra/clock_synchro/clocksynchro_7clocks.main_invar.induct
-smtlib-qflra/miplib/pp08a-11000
-smtlib-qflra/sc/sc-23.base.cvc
-smtlib-qflra/tta_startup/simple_startup_5nodes.abstract.induct
-smtlib-qflra/uart/uart-22.base.cvc
-smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/tms-2-3-light-60
+smtlib-qflra/2017-Heizmann-UltimateInvariantSynthesis/_standard_two_index_04.i_3_2_2.bpl_7
+smtlib-qflra/2019-ezsmt/blending/4
+smtlib-qflra/2019-ezsmt/travellingSalesperson/tsp_rand_70_300_1155482584_11.lp
+smtlib-qflra/DTP-Scheduling/constraints-tempo-width-40
+smtlib-qflra/LassoRanker/CooperatingT2/collatz.t2.c_Iteration1_Loop_4-pieceTemplate
+smtlib-qflra/LassoRanker/CooperatingT2/smagillc-fail.t2.c_Iteration1_Loop_7-phaseTemplate
+smtlib-qflra/TM/p7-driverlogNumeric_s8
+smtlib-qflra/clock_synchro/clocksynchro_4clocks.main_invar.induct
+smtlib-qflra/miplib/pp08a-4000
+smtlib-qflra/miplib/pp08a-9000
+smtlib-qflra/sc/sc-22.base.cvc
+smtlib-qflra/tta_startup/simple_startup_14nodes.synchro.induct
+smtlib-qflra/uart/uart-17.base.cvc
 smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/tms-2-3-light-70
-smtlib-qfrdl/sal/fischer6-mutex-17
-smtlib-qfrdl/sal/fischer6-mutex-18
-smtlib-qfrdl/scheduling/orb02_888
-smtlib-qfrdl/scheduling/orb10_944
+smtlib-qfrdl/SMT-Temporal-Planning-Benchmarks/tms-2-3-light-80
+smtlib-qfrdl/sal/fischer6-mutex-20
+smtlib-qfrdl/scheduling/orb04_1005
+smtlib-qfrdl/scheduling/yn2_750
 smtlib-qfrdl/skdmxa/skdmxa-3x3-15
-smtlib-qfrdl/skdmxa2/skdmxa-3x3-13.base.cvc
+smtlib-qfrdl/skdmxa2/skdmxa-3x3-18.induction.cvc
 # hard: 1
-smtlib-qflra/sc/sc-29.base.cvc
+smtlib-qfrdl/sal/fischer9-mutex-15

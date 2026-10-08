@@ -1,20 +1,25 @@
-# maxsat: problems with the maxsat theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# maxsat: problems with the maxsat theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
-# easy: 6
-maxsat-unweighted/ConsistentQueryAnswering-synthetic-3
-maxsat-unweighted/min-fill-MinFill_R0_myciel3
-maxsat-unweighted/vpa-UAutomizer_cll_search-alloca_false-termination.c.i_Abstraction1
-maxsat-weighted/auctions_wt-cat_paths_60_70_0007.txt
-maxsat-weighted/max-realizability_wt-power-distribution_9_4
-maxsat-weighted/pseudoBoolean_wt-normalized-factor-size=9-P=439-Q=509.opb
-# medium: 8
-maxsat-unweighted/causal-discovery-causal_n5_i5_N10000_uai13_constant_int
-maxsat-unweighted/logic-synthesis-normalized-9sym.b.opb.msat
-maxsat-unweighted/mqc-10tree715p
-maxsat-unweighted/program-disambiguation-Q6_YESNO_3
-maxsat-weighted/IMLIB-pima_44_4_16_1_6_5
-maxsat-weighted/dalculus_wt-f49-DC_TotalLoss.seq-B-3-combined-irEDCBA
-maxsat-weighted/metro_wt-metro_9_8_7_22_10_6_500_1_2.lp.sm-extracted
-maxsat-weighted/ramsey_wt-ram_k3_n11.ra1
+# easy: 8
+maxsat-unweighted/max-realizability-power-distribution_5_5
+maxsat-unweighted/privilege-escalation-cloud_access_control_repair_task-18
+maxsat-unweighted/protein_ins-1vii_.1cph_.g.wcnf.t
+maxsat-unweighted/vpa-UAutomizer_array08_alloca_true-termination.c.i_Abstraction1
+maxsat-weighted/metro_wt-inst2.lp.sm-extracted
+maxsat-weighted/preference_planning_wt-WCNF_storage_p06
+maxsat-weighted/pseudoBoolean_wt-normalized-factor-size=9-P=149-Q=163.opb
+maxsat-weighted/tcp_wt-tcp_students_91_it_8
+# medium: 11
+maxsat-unweighted/CircuitTraceCompaction-spi
+maxsat-unweighted/gen-hyper-tw-GenHyperTW_grid5
+maxsat-unweighted/packup-4ede8d96-c17a-11df-a7c5-00163e3d3b7c_l3
+maxsat-unweighted/program-disambiguation-Q29_YESNO_1
+maxsat-unweighted/rna-alignment-random-same-7.rna.pre
+maxsat-weighted/CSG_wt-CSGNaive140-140-0
+maxsat-weighted/auctions_wt-cat_paths_60_90_0005.txt
+maxsat-weighted/haplotyping-pedigrees_wt-ped2.B.recomb1-0.01-3
+maxsat-weighted/mpmcs_wt-test17--n-2500
+maxsat-weighted/planning-bnn-inventory_4_7
+maxsat-weighted/preference_planning_wt-WCNF_storage_p03
 # hard: 1
-maxsat-unweighted/treewidth-computation-TWComp_myciel4_N23
+maxsat-weighted/protein_ins_wt-1knt_.2knt_.g.wcnf.t

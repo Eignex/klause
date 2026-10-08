@@ -1,20 +1,25 @@
-# sat: problems with the sat theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# sat: problems with the sat theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
-# easy: 6
+# easy: 8
 satlib/ais8
-satlib/ai/hoos/Shortcuts/UF75.325.100/uf75-087
-satlib/UUF175.753.100/uuf175-060
-satlib/UUF250.1065.100/uuf250-039
-satlib/UUF50.218.1000/uuf50-0638
-satlib/UUF75.325.100/uuf75-043
-# medium: 8
+satlib/dubois21
+satlib/ai/hoos/Research/SAT/Formulae/UF175.753.100/uf175-064
+satlib/uf50-0491
+satlib/UUF125.538.100/uuf125-015
+satlib/UUF150.645.100/uuf150-055
+satlib/UUF225.960.100/uuf225-097
+satlib/UUF250.1065.100/uuf250-016
+# medium: 11
 satlib/hole9
 satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-0100
 satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-02
+satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-024
+satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-032
 satlib/ai/hoos/Shortcuts/UF250.1065.100/uf250-038
-satlib/UUF250.1065.100/uuf250-013
-satlib/UUF250.1065.100/uuf250-027
-satlib/UUF250.1065.100/uuf250-034
-satlib/UUF250.1065.100/uuf250-066
+satlib/UUF250.1065.100/uuf250-014
+satlib/UUF250.1065.100/uuf250-020
+satlib/UUF250.1065.100/uuf250-032
+satlib/UUF250.1065.100/uuf250-046
+satlib/UUF250.1065.100/uuf250-082
 # hard: 1
 satlib/hole10
