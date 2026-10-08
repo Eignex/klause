@@ -206,8 +206,13 @@ object OpenTheoryPipeline {
         when (engine) {
             FiniteEngine.MIXED -> executePortfolio(request, params, cores)
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
-            FiniteEngine.LOCAL_SEARCH ->
-                searchWithoutTheory(request.model, params, request.minimizedObjective, cores, searchesContinuousOnly = true)
+            FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(
+                request.model,
+                params,
+                request.minimizedObjective,
+                cores,
+                searchesContinuousOnly = true,
+            )
 
             FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
         }
