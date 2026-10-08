@@ -198,8 +198,7 @@ internal object PortfolioComposition {
     /**
      * The ordered arm list for [scenario]: [PortfolioScenario.arms] arms, and a hybrid-ALNS arm beside them in a
      * scheduled mixed optimization pool. The curated pools keep only
-     * the arms the model behind [facts] offers the needs of, and a mixed pool hands the local-search share to
-     * backtrack when the model cannot run local search. A pool the caller chose outright — an injected one, or
+     * the arms the model behind [facts] offers the needs of. A pool the caller chose outright — an injected one, or
      * a single-engine mix — is built as asked, so a model it cannot run is declined rather than replaced.
      */
     fun compose(
@@ -276,13 +275,9 @@ internal object PortfolioComposition {
 
     private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
-        // fast first-incumbent engine). A model local search cannot run gives every slot to backtrack.
+        // fast first-incumbent engine).
         val count = scenario.arms
-        val lsCount = if (facts.offers(ArmNeed.LocalSearch)) {
-            (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
-        } else {
-            0
-        }
+        val lsCount = (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
         val btCount = count - lsCount
         // Hybrid ALNS with CP repair joins a scheduled optimization pool whose model offers what it needs, on top
         // of the arms: the policy shares time by family, so an extra arm takes no time from the others. It works

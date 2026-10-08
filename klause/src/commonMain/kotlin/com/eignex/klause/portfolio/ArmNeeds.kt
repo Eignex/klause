@@ -1,7 +1,5 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.localsearch.LocalSearchModel
-import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -15,9 +13,6 @@ import com.eignex.klause.propagation.BakedProblem
 internal sealed interface ArmNeed {
     /** An objective: the arm steers by it, so on a satisfaction model it is a copy of its base arm. */
     data object Objective : ArmNeed
-
-    /** A model local search runs on soundly, a completion deciding any continuous column; see `localSearchSupports`. */
-    data object LocalSearch : ArmNeed
 
     /** An LP relaxation with some technique to enable at [emphasis] under the run's `--lp` ceiling; without
      *  one the arm is a copy of the conflict-driven arm it is built on. */
@@ -33,16 +28,13 @@ internal class ProblemFacts(
     val optimizing: Boolean,
     /** Whether the model has continuous columns, which reorders the backtrack pool; see [BacktrackCatalog]. */
     val realColumns: Boolean,
-    localSearch: () -> Boolean,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
-    private val localSearch by lazy(localSearch)
     private val relaxations = HashMap<LpEmphasis, Boolean>()
 
     /** Whether the model offers [need]. */
     fun offers(need: ArmNeed): Boolean = when (need) {
         ArmNeed.Objective -> optimizing
-        ArmNeed.LocalSearch -> localSearch
         is ArmNeed.Relaxation -> relaxations.getOrPut(need.emphasis) { relaxation(need.emphasis) }
     }
 
@@ -55,7 +47,6 @@ internal class ProblemFacts(
         fun of(problem: BakedProblem, kind: Kind, lpCeiling: LpConfig): ProblemFacts = ProblemFacts(
             optimizing = kind == Kind.COP,
             realColumns = problem.numRealVars > 0,
-            localSearch = { localSearchSupports(LocalSearchModel.of(problem), completes = true) },
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },
@@ -63,6 +54,6 @@ internal class ProblemFacts(
 
         /** Facts for composing without a model: every need is met except an objective a [kind] lacks. */
         fun assumed(kind: Kind, realColumns: Boolean = false): ProblemFacts =
-            ProblemFacts(kind == Kind.COP, realColumns, localSearch = { !realColumns }, relaxation = { true })
+            ProblemFacts(kind == Kind.COP, realColumns, relaxation = { true })
     }
 }
