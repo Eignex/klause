@@ -16,14 +16,16 @@ import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.div
-import com.eignex.klause.util.isZero
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 /**
  * Turns LP certificates into learned-clause material over absolute variable-bound atoms, read off the
@@ -53,6 +55,8 @@ import com.eignex.klause.util.rem
  * `implyInt*WithReason` records reasons whose literals are currently false.
  */
 internal object LpExplanation {
+    private val minimumLong = bigIntOf(Long.MIN_VALUE)
+    private val maximumLong = bigIntOf(Long.MAX_VALUE)
 
     /** [premiseLit] result: the premise holds over the whole declared box — cite nothing. */
     const val PREMISE_NONE: Int = -1
@@ -78,35 +82,8 @@ internal object LpExplanation {
         val side = if (lowerSide) model.exactBounds(col).lower else model.exactBounds(col).upper
         side ?: return PREMISE_AUX
         val value = model.exactShift(col) + side.number.value
-        // An integer source has the same feasible values after directed rounding of a strict side.
-        var threshold = value.num / value.den
-        val remainder = !(value.num % value.den).isZero()
-        if (lowerSide && value.signum() > 0 && remainder) threshold += BIG_ONE
-        if (!lowerSide && value.signum() < 0 && remainder) threshold -= BIG_ONE
-        if (side.strict && !remainder) {
-            threshold = if (lowerSide) threshold + BIG_ONE else threshold - BIG_ONE
-        }
-        val endpoint = ExactLpNumber.of(BigFraction.of(threshold, BIG_ONE)).legacyLong() ?: return PREMISE_AUX
-        if (relaxation.colIsBool[col]) {
-            return when {
-                lowerSide && endpoint == 1L && session.boolValue(varId) == true -> Lit.make(varId, false)
-
-                // premise b (pinned true), negated
-                !lowerSide && endpoint == 0L && session.boolValue(varId) == false -> Lit.make(varId, true)
-
-                // premise ¬b (pinned false), negated
-                (lowerSide && endpoint <= 0L) || (!lowerSide && endpoint >= 1L) -> PREMISE_NONE
-                else -> PREMISE_AUX
-            }
-        }
-        val domain = session.intDomain(varId)
-        return if (lowerSide) {
-            if (domain.min < endpoint) return PREMISE_AUX
-            session.boundGeLit(varId, endpoint, positive = false)
-        } else {
-            if (domain.max > endpoint) return PREMISE_AUX
-            session.boundLeLit(varId, endpoint, positive = false)
-        }
+        val kind = if (relaxation.colIsBool[col]) CutSourceKind.BOOLEAN else CutSourceKind.INTEGER
+        return boundLiteral(CutSource(kind, varId), value, !lowerSide, side.strict, session)
     }
 
     fun boundPremiseLits(
@@ -257,7 +234,7 @@ internal object LpExplanation {
         session: PropagationSession,
     ): Boolean {
         val model = relaxation.model
-        if (model.rowGlobal.size != model.m || model.rowPremises.size != model.m) return false
+        if (model.exactState == null && (model.rowGlobal.size != model.m || model.rowPremises.size != model.m)) return false
         for (r in rows) {
             if (r !in 0 until model.m || model.exactState?.rows?.row(r)?.active == false) return false
             if (model.exactState?.model?.row(r)?.global ?: model.rowGlobal[r]) continue
@@ -348,32 +325,13 @@ internal object LpExplanation {
 
             is CutPremise.Bound -> {
                 val term = premise.expression.terms.entries.singleOrNull() ?: return false
-                if (term.value.isZero || premise.strict) return false
+                if (term.value.isZero) return false
                 val threshold = (premise.value - premise.expression.constant) * term.value.reciprocal()
-                val value = ExactLpNumber.of(threshold).legacyLong() ?: return false
                 val upper = premise.upper == (term.value.signum() > 0)
-                when (term.key.kind) {
-                    CutSourceKind.INTEGER -> {
-                        if (term.key.id !in 0 until session.problem.numIntVars) return false
-                        val domain = session.intDomain(term.key.id)
-                        if (upper) {
-                            if (domain.max > value) return false
-                            session.boundLeLit(term.key.id, value, positive = false)
-                        } else {
-                            if (domain.min < value) return false
-                            session.boundGeLit(term.key.id, value, positive = false)
-                        }
-                    }
-
-                    CutSourceKind.BOOLEAN -> {
-                        if (term.key.id !in 0 until session.problem.numBoolVars) return false
-                        if ((upper && value >= 1L) || (!upper && value <= 0L)) return true
-                        if ((upper && value != 0L) || (!upper && value != 1L)) return false
-                        if (session.boolValue(term.key.id) != !upper) return false
-                        Lit.make(term.key.id, upper)
-                    }
-
-                    else -> return false
+                when (val literal = boundLiteral(term.key, threshold, upper, premise.strict, session)) {
+                    PREMISE_AUX -> return false
+                    PREMISE_NONE -> return true
+                    else -> literal
                 }
             }
 
@@ -381,5 +339,60 @@ internal object LpExplanation {
         }
         if (seen.add(literal)) lits.add(literal)
         return true
+    }
+
+    private fun boundLiteral(
+        source: CutSource,
+        value: BigFraction,
+        upper: Boolean,
+        strict: Boolean,
+        session: PropagationSession,
+    ): Int = when (source.kind) {
+        CutSourceKind.INTEGER -> integerBoundLiteral(source.id, integerEndpoint(value, upper, strict), upper, session)
+        CutSourceKind.BOOLEAN -> booleanBoundLiteral(source.id, value, upper, strict, session)
+        else -> PREMISE_AUX
+    }
+
+    private fun integerEndpoint(value: BigFraction, upper: Boolean, strict: Boolean): BigInt {
+        // Integer inequalities use floor for <= and ceil for >=; strict sides use the neighboring lattice point.
+        val rounded = when {
+            value.den.compareTo(BIG_ONE) == 0 -> value.num
+            upper == strict -> value.ceilInteger()
+            else -> -value.negated().ceilInteger()
+        }
+        return if (!strict) rounded else if (upper) rounded - BIG_ONE else rounded + BIG_ONE
+    }
+
+    private fun integerBoundLiteral(variable: Int, threshold: BigInt, upper: Boolean, session: PropagationSession): Int {
+        if (variable !in 0 until session.problem.numIntVars) return PREMISE_AUX
+        if (threshold < minimumLong) return if (upper) PREMISE_AUX else PREMISE_NONE
+        if (threshold > maximumLong) return if (upper) PREMISE_NONE else PREMISE_AUX
+        val endpoint = threshold.toLongExact()
+        val domain = session.intDomain(variable)
+        return if (upper) {
+            if (domain.max > endpoint) PREMISE_AUX else session.boundLeLit(variable, endpoint, positive = false)
+        } else {
+            if (domain.min < endpoint) PREMISE_AUX else session.boundGeLit(variable, endpoint, positive = false)
+        }
+    }
+
+    private fun booleanBoundLiteral(
+        variable: Int,
+        value: BigFraction,
+        upper: Boolean,
+        strict: Boolean,
+        session: PropagationSession,
+    ): Int {
+        if (variable !in 0 until session.problem.numBoolVars) return PREMISE_AUX
+        fun holds(point: BigFraction): Boolean = if (upper) {
+            point < value || (!strict && point == value)
+        } else {
+            point > value || (!strict && point == value)
+        }
+        val falseHolds = holds(BigFraction.ZERO)
+        val trueHolds = holds(BigFraction.ONE)
+        if (falseHolds && trueHolds) return PREMISE_NONE
+        if (falseHolds == trueHolds || session.boolValue(variable) != trueHolds) return PREMISE_AUX
+        return Lit.make(variable, !trueHolds)
     }
 }
