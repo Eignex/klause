@@ -3,6 +3,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -178,7 +179,12 @@ class Portfolio(
                 val workBefore = handle.work
                 val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
                 val outcome = runCatching {
-                    handle.runSlice(run.token, handleMillis(worker, run.token, claim), solveSliceNodes(worker, claim))
+                    val millis = handleMillis(worker, run.token, claim)
+                    if (worker.acceptsInstructionBudget && handle is InstructionSlicedSolve) {
+                        handle.runInstructionSlice(run.token, millis, instructionsOf(claim))
+                    } else {
+                        handle.runSlice(run.token, millis, claim.handleNodes)
+                    }
                 }
                 r = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
@@ -666,13 +672,6 @@ class Portfolio(
             else -> minOf(spent, claim.sliceWork)
         }
     }
-
-    private fun solveSliceNodes(worker: PortfolioWorker, claim: Claim): Long =
-        if (claim.whole || !worker.acceptsInstructionBudget) {
-            claim.handleNodes
-        } else {
-            (instructionsOf(claim) / LS_INSTRUCTIONS_PER_WORK).toLong().coerceAtLeast(1L)
-        }
 
     /**
      * The cancellation token bounding one non-resumable arm's segment: its time slice, or [probeSliceMillis] for a

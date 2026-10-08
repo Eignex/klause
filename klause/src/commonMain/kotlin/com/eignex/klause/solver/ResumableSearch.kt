@@ -129,6 +129,10 @@ interface ResumableSolve : AutoCloseable {
     override fun close() {}
 }
 
+internal interface InstructionSlicedSolve : ResumableSolve {
+    fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult?
+}
+
 /** A [Solver] that can hand out a [ResumableSolve], such as [com.eignex.klause.backtrack.BacktrackSolver]
  *  and [com.eignex.klause.localsearch.LocalSearchSolver]. */
 interface ResumableSolver<P : SolverParams> : Solver<P> {

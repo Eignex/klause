@@ -8,13 +8,16 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
@@ -35,6 +38,25 @@ class LocalSearchEngineTest {
 
     private fun engine(completion: CandidateCompletion) =
         LocalSearchEngine(LocalSearchModel.of(mixedProblem().bake()), completion = completion)
+
+    @Test
+    fun `cancellation during completion preserves the candidate`() {
+        val initial = Sample(BooleanArray(0), longArrayOf(2), reals = doubleArrayOf(0.5))
+        val search = engine { candidate, cancellation ->
+            if (cancellation()) Completion.Undecided() else Completion.Witness(candidate)
+        }
+        var polls = 0
+
+        search.resumableSolve(LocalSearchParams(maxFlips = 1L, initialAssignment = initial)).use { handle ->
+            val paused = handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L)
+
+            assertNull(paused)
+            assertFalse(handle.isDone)
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            assertEquals(initial, result.assignment)
+        }
+    }
 
     @Test
     fun `local search runs a nonlinear factor over wide domains`() {

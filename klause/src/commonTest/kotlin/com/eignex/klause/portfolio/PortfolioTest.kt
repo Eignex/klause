@@ -929,6 +929,38 @@ class PortfolioTest {
     }
 
     @Test
+    fun `resumed local search spends the exact counted instruction allowance`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            Array<Factor>(8) { mask -> Clause(IntArray(3) { v -> Lit.make(v, mask and (1 shl v) != 0) }) },
+        )
+        for ((price, instructions) in listOf(1.5 to 10L, 1.0 to 7L, 2.0 to 14L)) {
+            val arms = listOf(
+                PortfolioWorker.of(
+                    "ls",
+                    0,
+                    LocalSearchSolver(problem.bake()).session(),
+                    LocalSearchParams(maxFlips = 100L, randomSeed = 3L),
+                    withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit) },
+                ),
+                PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
+            )
+
+            val result = Portfolio(
+                arms,
+                DiscountedThompson(arms.size, Random(0), Portfolio.DEFAULT_HALF_LIFE),
+                baseSliceWork = 7L,
+                lsInstructionsPerWork = price,
+            ).use { it.solve() }
+
+            assertEquals(instructions.toDouble(), result.stats.ls.moves.sum, "price=$price")
+            assertEquals(7L, result.stats.portfolio.arms[0].work, "price=$price")
+        }
+    }
+
+    @Test
     fun `an ALNS segment charges its outer allowance rather than inner moves`() {
         val arms = listOf(
             PortfolioWorker.ofSolve("lns", 0, countsInstructions = true) { _, _ ->

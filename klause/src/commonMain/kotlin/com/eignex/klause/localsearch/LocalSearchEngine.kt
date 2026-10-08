@@ -17,6 +17,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -187,7 +188,7 @@ internal class LocalSearchEngine(
                 },
             ).iterator()
         }
-        return object : ResumableSolve {
+        return object : InstructionSlicedSolve {
             private var verdict: SolveResult? = null
             private var closed = false
 
@@ -196,6 +197,19 @@ internal class LocalSearchEngine(
             override val work: Long get() = (instructions / LS_INSTRUCTIONS_PER_WORK).toLong()
 
             override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+                val allowance = if (sliceNodes < 0L) {
+                    Long.MAX_VALUE
+                } else {
+                    (sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong()
+                }
+                return runInstructionSlice(global, sliceMillis, allowance)
+            }
+
+            override fun runInstructionSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceInstructions: Long,
+            ): SolveResult? {
                 check(!closed) { "the local-search handle is closed" }
                 verdict?.let { return it }
                 if (!supported) return unknown(TerminationReason.Unsupported)
@@ -214,12 +228,7 @@ internal class LocalSearchEngine(
                 } else {
                     global or Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
                 }
-                val allowance = if (sliceNodes < 0L) {
-                    Long.MAX_VALUE
-                } else {
-                    (sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong()
-                }
-                limit = instructions + minOf(allowance, available, Long.MAX_VALUE - instructions)
+                limit = instructions + minOf(sliceInstructions, available, Long.MAX_VALUE - instructions)
                 if (instructions >= limit || token()) return null
                 val live = checkNotNull(cursor)
                 if (!live.hasNext()) return unknown(TerminationReason.BudgetExhausted)
@@ -367,7 +376,7 @@ internal class LocalSearchEngine(
                     if (state.cost == 0L && state.intValuesInDomain()) {
                         if (completion != null) state.refreshRealRows()
                         if (state.cost != 0L) continue
-                        val solution = decide(
+                        val decided = decide(
                             state,
                             state.assignment.snapshot(),
                             params.cancellation,
@@ -376,7 +385,13 @@ internal class LocalSearchEngine(
                             moves += work
                             flipsSinceYield += work
                         }
-                        if (solution == null) {
+                        if (decided !is Completion.Witness) {
+                            if (checkpoint != null && decided is Completion.Undecided && params.cancellation()) {
+                                checkpoint.shouldPause(moves)
+                                reportProgress()
+                                yield(null)
+                                continue
+                            }
                             countedRestart(bestSnap)
                             if (checkpoint?.shouldPause(moves) == true) {
                                 reportProgress()
@@ -384,6 +399,7 @@ internal class LocalSearchEngine(
                             }
                             continue
                         }
+                        val solution = decided.sample
                         if (!everFeasible) {
                             everFeasible = true
                             // Record at first feasibility, not in `finally`: the `firstOrNull` consumer
@@ -583,19 +599,20 @@ internal class LocalSearchEngine(
                     objective.evaluate(state.assignment)
                 }
                 if (obj < bestObj && state.intValuesInDomain()) {
-                    val solution = decide(
+                    val decided = decide(
                         state,
                         state.assignment.snapshot(),
                         params.cancellation,
                         sink.ls,
                     ) { work -> totalFlips += work }
-                    if (solution == null) {
+                    if (decided !is Completion.Witness) {
                         restartAndRepair(state, restartAnchor(null))
                         restartCount++
                         flipsSinceRestart = 0
                         totalFlips++
                         continue
                     }
+                    val solution = decided.sample
                     if (completion != null) adoptReals(state, solution)
                     val solved = if (completion != null || wideObjective) objective.evaluate(solution) else obj
                     if (solved < bestObj) {
@@ -807,33 +824,23 @@ internal class LocalSearchEngine(
         return state
     }
 
-    /**
-     * The solution [candidate] stands for, or null when it is none. A model without continuous columns scores every
-     * row exactly, so its candidate is its own solution; otherwise the [completion] decides it, the work that took
-     * goes to [charge], and the rows a refutation names gain weight so the search steers away from the same failure.
-     */
+    // Zero violation over continuous columns needs completion; refuting rows gain weight to steer the search.
     private fun decide(
         state: LocalSearchState,
         candidate: Sample,
         cancellation: Cancellation,
         stats: LocalSearchStatsSink?,
         charge: (Long) -> Unit,
-    ): Sample? {
-        val completion = completion ?: return candidate
+    ): Completion {
+        val completion = completion ?: return Completion.Witness(candidate)
         val decided = completion.complete(candidate, cancellation)
         charge(decided.work)
         stats?.recordCompletion(refuted = decided is Completion.Refuted, undecided = decided is Completion.Undecided)
-        return when (decided) {
-            is Completion.Witness -> decided.sample
-
-            is Completion.Refuted -> {
-                val weights = state.weights.factorWeights
-                for (f in decided.factors) weights[f] += 1.0
-                null
-            }
-
-            is Completion.Undecided -> null
+        if (decided is Completion.Refuted) {
+            val weights = state.weights.factorWeights
+            for (f in decided.factors) weights[f] += 1.0
         }
+        return decided
     }
 
     /** Move [state]'s continuous columns onto [solution]'s completed values, so the search goes on from the exact
