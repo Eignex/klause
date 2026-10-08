@@ -67,7 +67,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *    per-solver tables (see [reference]); the gap-to-optimum reward + a soundness oracle.
  *  - `credit [--by structure|format] <a.csv> <b.csv> …` — win-share + greedy set-cover credit between
  *    per-run result CSVs, keyed by (suite, problem), sliceable by a feature column (see [credit]).
- *  - `mine [by=config|suite|family|format|category|kind] <cases.json> …` — rank portfolio arms from lab
+ *  - `mine [by=config|suite|family|format|category|kind|class] <cases.json> …` — rank portfolio arms from lab
  *    case records (`deploy/lab cases <id>`) by wins and by the scheduler's per-arm credit (see [ArmMining]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
  *  - `select [filters…]` — the same selection as JSON lines naming each instance exactly, for `solve-one`.

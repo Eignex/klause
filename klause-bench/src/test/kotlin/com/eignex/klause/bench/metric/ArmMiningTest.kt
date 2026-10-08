@@ -148,4 +148,26 @@ class ArmMiningTest {
         assertEquals(listOf("s/p"), cases.map { it.name })
         assertEquals("f", cases.single().slice["family"])
     }
+
+    @Test
+    fun `a case is sliced by the class the portfolio reported for its model`() {
+        val file = File.createTempFile("cases", ".json").apply { deleteOnExit() }
+        file.writeText(
+            """
+            [
+              {"index": 0, "problem": {"suite": "s", "problem": "p"}, "arm": "base",
+               "record": {"problem": "p", "solver": "klause", "engine": null, "processors": 1, "search": "free",
+                 "seed": 1, "budgetMs": 1000, "kind": "satisfy", "maximize": false, "feasible": true,
+                 "objective": null, "timeToBestMs": null, "proven": false,
+                 "stats": {"profile": "MixedInteger optimizing=false wide=false scheduling=false",
+                   "arm.a": "work=5 reward=1.0 FirstSolution=1.0"}, "attribution": [],
+                 "gitSha": null, "timestamp": "t", "command": "c"}}
+            ]
+            """.trimIndent(),
+        )
+
+        val cases = ArmMining.load(listOf(file))
+
+        assertEquals("MixedInteger", cases.single().slice["class"])
+    }
 }

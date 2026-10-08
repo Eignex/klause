@@ -58,7 +58,7 @@ internal object ArmMining {
     private val ACCOUNTING = setOf("segments", "work", "reward", "failures", "faults")
 
     /** The slicing columns `by=` accepts. */
-    val SLICES: List<String> = listOf("config", "suite", "family", "format", "category", "kind")
+    val SLICES: List<String> = listOf("config", "suite", "family", "format", "category", "kind", "class")
 
     @Serializable
     private data class LabProblem(
@@ -87,6 +87,8 @@ internal object ArmMining {
                     "format" to (p.format ?: "?"),
                     "category" to (p.category ?: "?"),
                     "kind" to record.kind,
+                    // The portfolio's own classification of the model (`profile=<class> …`), when it printed one.
+                    "class" to (record.stats["profile"]?.substringBefore(' ') ?: "?"),
                 ),
                 record = record,
             )
