@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -33,6 +34,7 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpRetainedCuts
 import com.eignex.klause.lp.relaxation.LpRetainedSources
 import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
@@ -64,6 +66,97 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `a published cut refresh invalidates prior preparations without invalidating numerical state`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val before = assertNotNull(lp.state)
+            val first = assertNotNull(cuts.prepare(before, base))
+            val stale = assertNotNull(cuts.prepare(before, base))
+            assertTrue(lp.editCuts(first))
+
+            assertFalse(lp.editCuts(stale))
+
+            assertSame(before, lp.state)
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a published source refresh invalidates prior preparations without invalidating numerical state`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val domains = RootDomains(problem)
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(
+            problem, LinearObjective(intCoefficients = longArrayOf(1)),
+        ))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            val before = assertNotNull(lp.state)
+            val first = sources.prepare(before, domains)
+            val stale = sources.prepare(before, domains)
+            assertTrue(lp.editSources(first))
+
+            assertFalse(lp.editSources(stale))
+
+            assertSame(before, lp.state)
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a cut edit prepared before a trail transition declines without publication`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        var work = 0L
+        LpPropagator(object : LpSearchPolicy {}, onEdit = { work += it }).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val cut = Cut(base.intColOf, longArrayOf(1), Relation.GE, 0, global = true)
+            val stale = assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(cut)))
+            assertTrue(lp.atLevel(1))
+            val before = lp.state
+            val metrics = lp.metrics
+            val beforeWork = work
+
+            assertFalse(lp.editCuts(stale))
+
+            assertSame(before, lp.state)
+            assertEquals(metrics, lp.metrics)
+            assertEquals(beforeWork, work)
+            assertEquals(0, cuts.depth)
+            assertTrue(lp.editCuts(assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(cut)))))
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a declined cut batch retains numerical state and source publication`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val edit = assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(
+                Cut(base.intColOf, longArrayOf(1), Relation.GE, 0, global = true),
+                Cut(base.intColOf, longArrayOf(1), Relation.LE, 3, global = true),
+            )))
+            val before = lp.state
+
+            assertFalse(lp.editCuts(edit))
+
+            assertSame(before, lp.state)
+            assertTrue(cuts.parentRows(assertNotNull(lp.state)).isEmpty())
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
     @Test
     fun `a source edit prepared before a trail transition declines without publication`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())

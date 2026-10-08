@@ -84,6 +84,7 @@ internal class LpScopedRow(
     val cost: ExactLpNumber = ExactLpNumber.of(0L),
 ) {
     private val terms = coefficients.toList()
+    val coefficientCount: Int get() = terms.size
     fun coefficients(): List<Pair<Int, ExactLpNumber>> = terms.toList()
 
     fun validFor(model: ExactLpModel): Boolean = validFor(model.n)

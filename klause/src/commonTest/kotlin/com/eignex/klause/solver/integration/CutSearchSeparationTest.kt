@@ -80,10 +80,8 @@ class CutSearchSeparationTest {
 
     @Test
     fun `the during-search separation path executes`() {
-        // An AllDifferent COP that branches; opening the depth gate separates nodes with the cuts their
-        // LP point violates, changing the LP-solve count from the root-only (cutSearchMaxDepth = 0) run
-        // while preserving the optimum. This proves the separation path runs rather than being skipped
-        // (the separated run may issue fewer *total* solves: tighter nodes prune harder).
+        // Opening the depth gate must emit additional cut candidates while preserving the optimum.
+        // Retained rows can make total solve counts equal even when separation runs at child nodes.
         val saved = KlauseConfig.current
         try {
             KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
@@ -113,11 +111,11 @@ class CutSearchSeparationTest {
             val b = BacktrackSolver(problem.bake()).minimize(obj, withSearch)
             assertTrue(a is MinimizeResult.Optimal && b is MinimizeResult.Optimal)
             assertEquals(a.objective, b.objective, 1e-9, "search separation changed the optimum")
-            val rootSolves = a.stats.lp.solves.sum
-            val searchSolves = b.stats.lp.solves.sum
+            val rootCandidates = a.stats.lp.cutCandidates.sum
+            val searchCandidates = b.stats.lp.cutCandidates.sum
             assertTrue(
-                searchSolves != rootSolves,
-                "during-search separation did not change the search: $searchSolves vs $rootSolves",
+                searchCandidates > rootCandidates,
+                "during-search separation emitted no additional candidates: $searchCandidates vs $rootCandidates",
             )
         } finally {
             KlauseConfig.current = saved

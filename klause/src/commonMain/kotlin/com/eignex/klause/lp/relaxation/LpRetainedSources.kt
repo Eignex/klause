@@ -29,16 +29,18 @@ internal class LpSourceEdit(
     val bounds: List<ExactLpBounds>,
     val emittedExtent: Long,
     private val identify: (Int) -> CutSource?,
+    private val valid: () -> Boolean,
     private val publish: () -> Unit,
 ) {
     fun source(column: Int): CutSource? = identify(column)
+    fun isCurrent(): Boolean = valid()
     fun commit() = publish()
 }
 
 internal class LpRetainedSources(
     private val problem: Problem,
     relaxer: CpToLpRelaxation,
-    private val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
+    private val auxiliarySources: LpAuxiliarySources = relaxer.auxiliarySources,
 ) {
     private sealed interface ColumnKey {
         data class Source(val kind: CutSourceKind, val variable: Int, val sign: Int = 1) : ColumnKey
@@ -98,6 +100,7 @@ internal class LpRetainedSources(
             return LpSourceEdit(
                 state, emptySet(), emptyList(), emptyList(), emptySet(), null, liveBounds(domains), 0L,
                 identify = { columns[it].cpSource() },
+                valid = { generation == expectedGeneration },
             ) {
                 check(generation == expectedGeneration) { "stale source edit" }
                 update.commit()
@@ -210,6 +213,7 @@ internal class LpRetainedSources(
         return LpSourceEdit(
             state, retired, added, rows, permanent, objective, liveBounds(staged, domains), emittedExtent,
             identify = { staged[it].cpSource() },
+            valid = { generation == expectedGeneration },
         ) {
             check(generation == expectedGeneration) { "stale source edit" }
             update.commit()

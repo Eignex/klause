@@ -241,7 +241,10 @@ internal fun LpRelaxation.withModel(
     gatedAux = gatedAux,
     gatedWhenTrue = gatedWhenTrue,
     sourceMap = sources,
-    rowFactorIds = rowFactorIds,
+    rowFactorIds = if (reboundModel.m == model.m) rowFactorIds else {
+        require(reboundModel.m >= model.m) { "row removal requires a metadata remap" }
+        IntArray(reboundModel.m) { rowFactorIds.getOrElse(it) { -1 } }
+    },
     realUpperRows = realUpperRows,
 )
 
@@ -558,7 +561,7 @@ internal class CpToLpRelaxation(
      *  (`LpEngine.pruneIneffectiveHulls`) fills this with the per-factor hulls it found add no root
      *  strength, so they contribute only their CORE rows (if any). */
     private val suppressedHullFactors: Set<Int> = emptySet(),
-    private val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
+    internal val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
 ) {
     private val linearProjection = LinearLpProjection()
 

@@ -57,12 +57,18 @@ internal class GccSeparator : CutSeparator {
             for (c in cols) lpSum += ctx.primalOf(c)
             if (lpSum < bounds[0] - tol) {
                 cuts.add(
-                    Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.GE, bounds[0], global),
+                    ctx.withIntervalPremises(
+                        Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.GE, bounds[0], global),
+                        countVars ?: intArrayOf(),
+                    ),
                 )
             }
             if (lpSum > bounds[1] + tol) {
                 cuts.add(
-                    Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, bounds[1], global),
+                    ctx.withIntervalPremises(
+                        Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, bounds[1], global),
+                        countVars ?: intArrayOf(),
+                    ),
                 )
             }
         }

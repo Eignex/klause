@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
@@ -9,6 +10,7 @@ import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.LpRetainedCuts
 import com.eignex.klause.lp.relaxation.LpRetainedSources
 import com.eignex.klause.lp.relaxation.LpSourceEdit
 import com.eignex.klause.lp.relaxation.SessionDomains
@@ -31,6 +33,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     private var persistentState = false
     private var sourceRelaxer: CpToLpRelaxation? = null
     private var sources: LpRetainedSources? = null
+    private var cuts = LpRetainedCuts()
     var branching: ((SearchContext) -> List<SearchDecision>?)? = null
     var fractional: ((SearchContext) -> LpFractionalBranch?)? = null
     var currentModel: LpModel? = null
@@ -61,6 +64,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     override fun retract(decisionLevel: Int) {
         currentModel = null
         sources?.let { it.retract(minOf(it.depth, decisionLevel)) }
+        cuts.retract(minOf(cuts.depth, decisionLevel))
         if (!persistentState) engine.propagator.reset()
     }
 
@@ -69,6 +73,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         currentModel = null
         sourceRelaxer = null
         sources = null
+        cuts = LpRetainedCuts()
     }
 
     fun resetRoot() {
@@ -77,6 +82,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             reset()
         } else {
             sources?.retract(0)
+            cuts.retract(0)
         }
     }
 
@@ -85,6 +91,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         persistentState = false
         sourceRelaxer = null
         sources = null
+        cuts = LpRetainedCuts()
         currentModel = null
         engine.propagator.reset()
     }
@@ -115,6 +122,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
                 return null
             }
             retained.retract(minOf(retained.depth, target))
+            cuts.retract(minOf(cuts.depth, target))
             if (!core.atLevel(depth)) return null
             edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation)
             engine.noteNodeOverhead(edit.emittedExtent * LpNodeOverhead.BUILD)
@@ -174,6 +182,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (base.model.hasContinuous || base.model.doubleView != null || base.model.exactState != null) return null
         if (native !== session) {
             engine.propagator.reset()
+            cuts = LpRetainedCuts()
             native = session
         }
         val core = engine.propagator
@@ -198,7 +207,12 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         // Standalone callers may replace a root or sibling without delivering shared retract events.
         if (weakens) {
-            if (!core.resetRoot() && !core.install(base, base.model.authoritativeModel() ?: return null)) return null
+            if (!core.resetRoot()) {
+                cuts = LpRetainedCuts()
+                if (!core.install(base, base.model.authoritativeModel() ?: return null)) return null
+            } else {
+                cuts.retract(0)
+            }
             if (!core.atLevel(depth)) return null
         }
         val initial = requireNotNull(core.state).model
@@ -212,12 +226,39 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         )
         if (result !is LpBoundBatchResult.Applied) return null
         // CP certifiers read shifted Long arrays. Translation preserves row duals and source primals.
-        val authority = requireNotNull(core.state).model
-        val proof = authority.recentered(lower.map(ExactLpNumber::of)).toLegacy() ?: return null
+        val state = requireNotNull(core.state)
+        val authority = state.model
+        val proof = if (authority.m == base.model.m) {
+            authority.recentered(lower.map(ExactLpNumber::of)).toLegacy()
+        } else {
+            null
+        } ?: state.ownerWorkingModel() ?: return null
         val sources = base.sourceMap?.withCpBounds(proof, session)
         val rebound = base.withModel(proof, sources)
         currentModel = proof
         persistentState = true
+        return rebound
+    }
+
+    fun cutRelaxation(
+        base: LpRelaxation,
+        session: PropagationSession,
+        selected: List<Cut>? = null,
+    ): LpRelaxation? {
+        if (currentModel !== base.model || native !== session) return null
+        val core = engine.propagator
+        val before = core.state ?: return null
+        if (cuts.depth > before.depth) cuts.retract(before.depth)
+        val map = base.sourceMap?.withCpBounds(base.model, session) ?: return null
+        val edit = cuts.prepare(before, base.withModel(base.model, map), selected, engine.params.cancellation)
+            ?: return null
+        engine.noteNodeOverhead(edit.emittedExtent * LpNodeOverhead.BUILD)
+        if (!core.editCuts(edit)) return null
+        val state = requireNotNull(core.state)
+        val model = if (state === before) base.model else state.ownerWorkingModel() ?: return null
+        val parents = cuts.parentRows(state)
+        val rebound = base.withModel(model, map.withParentRows(parents))
+        currentModel = rebound.model
         return rebound
     }
 }

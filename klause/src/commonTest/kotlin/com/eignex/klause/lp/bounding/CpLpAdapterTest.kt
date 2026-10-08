@@ -64,6 +64,111 @@ import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
     @Test
+    fun `retained cut infeasibility is certified and explained against the augmented model`() {
+        val problem = Problem(
+            0, 4, Array(4) { IntDomain(2, 3) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 2, domainSize = 2)),
+        )
+        val sink = SolveStatsSink(backend = "retained-cut-conflict")
+        LpEngine(
+            problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)), sink,
+        ).use { engine ->
+            val session = PropagationSession(problem)
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            val point = assertNotNull(engine.solveNode(base.model, null, Cancellation.Never)?.second)
+            val cut = AllDifferentSeparator().separate(CutContext(problem, base, point.primal, session)).single()
+            assertEquals(Relation.LE, cut.rel)
+            assertTrue(engine.cutPool.add(cut, base))
+
+            val outcome = engine.sparseSafePrune(
+                relaxer, session, 12.0, sink, Cancellation.Never, -1, true, learn = true,
+            )
+
+            assertTrue(outcome.prune)
+            assertContentEquals(
+                IntArray(4) { session.boundGeLit(it, 2, positive = false) }, assertNotNull(outcome.explanation),
+            )
+            assertEquals(1, assertNotNull(engine.propagator.state).rows.activeCount)
+        }
+    }
+
+    @Test
+    fun `pooled cuts tighten a retained node and survive bound changes without fresh owners`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(2, 6) },
+            arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 2, domainSize = 5)),
+        )
+        val sink = SolveStatsSink(backend = "retained-cuts")
+        LpEngine(
+            problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)), sink,
+        ).use { engine ->
+            val session = PropagationSession(problem)
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            val cut = Cut(base.intColOf, longArrayOf(1, 1), Relation.GE, 5, global = true)
+            assertTrue(engine.cutPool.add(cut, base))
+
+            val outcome = engine.sparseSafePrune(relaxer, session, 4.5, sink, Cancellation.Never, -1, true)
+
+            assertTrue(outcome.prune)
+            val loaded = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            assertSame(engine.propagator.state, loaded.model.exactState)
+            val owners = assertNotNull(engine.propagator.metrics).createdOwners
+            assertTrue(session.pinIntAtLeast(0, 3) !is com.eignex.klause.propagation.PropagationResult.Unsat)
+            val child = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            val removed = assertNotNull(engine.cpAdapter.cutRelaxation(child, session, emptyList()))
+            assertNotNull(engine.solveNode(removed.model, null, Cancellation.Never)?.second)
+            session.popToLevel(0)
+            val restored = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            val result = assertNotNull(engine.solveNode(restored.model, null, Cancellation.Never)?.second)
+            val expected = RevisedSimplex(relaxer.build(session, listOf(cut)).model).use { simplex ->
+                assertNotNull(simplex.solve()).objective
+            }
+
+            assertEquals(expected, result.objective)
+            assertEquals(5L, assertNotNull(integerCertify(restored.model, result.duals)).objectiveBoundCeil(0))
+            assertEquals(owners, engine.propagator.metrics?.createdOwners)
+            assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
+            assertTrue((0 until restored.model.m).any { restored.sourceMap?.parent(it)?.global == true })
+        }
+    }
+
+    @Test
+    fun `retained local cut bound reasons cite their source interval premises`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(2, 6) },
+            arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 2, domainSize = 5)),
+        )
+        LpEngine(
+            problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "retained-cut-proof"),
+        ).use { engine ->
+            val session = PropagationSession(problem)
+            session.pinIntAtLeast(0, 3)
+            session.implyIntAtLeast(1, 3)
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            val point = assertNotNull(engine.solveNode(base.model, null, Cancellation.Never)?.second)
+            val cut = AllDifferentSeparator().separate(CutContext(problem, base, point.primal, session)).single()
+            val tightened = assertNotNull(engine.cpAdapter.cutRelaxation(base, session, listOf(cut)))
+            val result = assertNotNull(engine.solveNode(tightened.model, null, Cancellation.Never)?.second)
+            val certificate = assertNotNull(integerCertify(tightened.model, result.duals))
+            val reason = assertNotNull(LpExplanation.objectiveBoundReason(tightened, certificate, session))
+
+            assertEquals(7L, certificate.objectiveBoundCeil(0))
+            assertTrue(reason.isNotEmpty())
+            session.popToLevel(0)
+            val sibling = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            val siblingResult = assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second)
+            assertEquals(4.0, siblingResult.objective)
+            assertTrue((0 until sibling.model.m).all { sibling.sourceMap?.parent(it) == null })
+        }
+    }
+
+    @Test
     fun `live source rows match fresh bounds through same level edits and nested pops`() {
         val problem = Problem(
             1, 1, arrayOf(IntDomain(0, 10)),
@@ -653,7 +758,7 @@ class CpLpAdapterTest {
     }
 
     @Test
-    fun `generated local Hall cut is absent from the pool and sibling`() {
+    fun `generated local Hall cut is pooled while all source interval guards hold`() {
         val problem = Problem(
             0,
             3,
@@ -683,10 +788,18 @@ class CpLpAdapterTest {
                 .single { it.rel == Relation.GE }
             assertEquals(12L, emitted.rhs)
             assertFalse(emitted.global)
-            assertTrue(emitted.provenance == null)
+            val proof = assertNotNull(emitted.provenance)
+            for (variable in 0..2) {
+                assertTrue(proof.facts.contains(CutProofFact(
+                    CutPremise.Bound(
+                        CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE)),
+                        false, BigFraction.ofLong(3),
+                    ), false,
+                )))
+            }
             engine.recordSearchCuts(listOf(emitted), base.primal, local, cp.session)
-            assertTrue(engine.cutPool.cuts().isEmpty())
-            assertEquals(0, engine.cutPool.size)
+            assertEquals(1, engine.cutPool.cuts().size)
+            assertEquals(1, engine.cutPool.size)
             val localApplied = relaxer.build(cp.session, listOf(emitted))
             assertEquals(local.model.m + 1, localApplied.model.m)
             assertFalse(localApplied.model.rowGlobal.last())

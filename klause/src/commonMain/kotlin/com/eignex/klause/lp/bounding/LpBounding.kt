@@ -4,6 +4,8 @@ import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.cut.SharedCut
+import com.eignex.klause.lp.cut.SourceCut
+import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
@@ -265,44 +267,65 @@ internal fun LpEngine.lpBoundAndFix(
  * [CutPool.select] ranks the pool by efficacy (normalised violation) at [res], drops the
  * cuts the point already satisfies, and keeps a mutually-orthogonal subset — so only cuts that actually
  * move this point are loaded, bounding the per-node cut count by efficacy rather than the whole pool.
- * Returns the tightened `(relaxation, result)` when a cut subset re-solves, else [base]/[res] unchanged
- * (empty pool, nothing violated, an overflowing build, or a failed re-solve). Sound: the selected cuts
- * are a subset of the globally-valid pool, so the augmented relaxation excludes no feasible point.
+ * The scoped owner loads selected rows in source coordinates and retains its basis. A failed solve
+ * keeps the preceding immutable model and its result; infeasibility requires an exact certificate.
  */
 private fun LpEngine.foldSelectedCuts(
-    relaxer: CpToLpRelaxation,
     session: PropagationSession,
     base: LpRelaxation,
     res: FloatLpResult,
     cancellation: Cancellation,
     sink: SolveStatsSink,
-): Pair<LpRelaxation, FloatLpResult> {
-    if (cutPool.size == 0) return base to res
-    base.sourceMap?.withCpBounds(base.model, session)?.let(cutPool::remap)
+    learn: Boolean,
+): LpCutOutcome {
+    if (cutPool.size == 0) return LpCutOutcome.Solved(base, res)
+    base.sourceMap?.let(cutPool::remap)
     cutPool.observe(res.primal)
     cutPool.retainMostActive()
     val selected = cutPool.select(res.primal, objectiveCoefficients(base.model), cutPool.maxCuts)
-    if (selected.isEmpty()) return base to res
-    val tightened = try {
-        sink.lp.observeCutBuild(selected.size) { relaxer.build(session, selected, cancellation) }
-            .also { noteNodeOverhead(it.model.extent() * LpNodeOverhead.BUILD) }
-    } catch (_: CheckedLongOverflowException) {
-        return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
-    }
-    noteNodeOverhead(tightened.model.extent() * LpNodeOverhead.SETUP)
-    val cutSimplex = dualSimplex(tightened.model, cancellation)
-    val r = try {
-        cutSimplex.solve()
+    return solveSelectedCuts(session, LpCutOutcome.Solved(base, res), selected, cancellation, sink, learn)
+}
+
+private sealed interface LpCutOutcome {
+    class Solved(val relaxation: LpRelaxation, val result: FloatLpResult) : LpCutOutcome
+    class Pruned(val explanation: IntArray?) : LpCutOutcome
+}
+
+private fun LpEngine.solveSelectedCuts(
+    session: PropagationSession,
+    previous: LpCutOutcome.Solved,
+    selected: List<Cut>,
+    cancellation: Cancellation,
+    sink: SolveStatsSink,
+    learn: Boolean,
+): LpCutOutcome {
+    if (selected.isEmpty() || cancellation()) return previous
+    val base = previous.relaxation
+    val tightened = sink.lp.observeCutBuild(selected.size) { cpAdapter.cutRelaxation(base, session, selected) }
+        ?: return previous
+    if (tightened.model === base.model) return previous
+    val attempt = try {
+        solveNode(tightened.model, null, cancellation)
     } finally {
         sink.lp.observeSolve()
-        try {
-            observeSolveCost(sink, cutSimplex)
-        } finally {
-            cutSimplex.close()
-        }
+        sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
+        noteSolveOps(propagator.lastMetrics.workOps)
     }
-    if (r == null) return base to res
-    return tightened to r
+    if (attempt == null || cancellation()) return previous
+    attempt.second?.let { return LpCutOutcome.Solved(tightened, it) }
+    if (lpCounterResults.read(tightened.model, solveContext.certificationPolicy)?.witness != null) return previous
+    val floatRay = attempt.first.infeasibleRay ?: return previous
+    val ray = solveContext.certificationPolicy.acceptNullable(
+        LpCertifier.EXACT_FARKAS,
+        certifyLpFarkas(tightened.model.alsoCharged(this), floatRay, onRoute = {
+            sink.lp.observeFarkasRoute(
+                it == FarkasRoute.RECONSTRUCTED, it == FarkasRoute.EXACT_BASIS,
+                it == FarkasRoute.ROUNDED, it == FarkasRoute.NONE,
+            )
+        }, observer = sink.lp.certificationObserver(LpRoute.NODE)),
+    ) ?: return previous
+    sink.lp.observeInfeasiblePrune()
+    return LpCutOutcome.Pruned(if (learn) LpExplanation.infeasibilityClause(tightened, ray, session) else null)
 }
 
 /**
@@ -480,8 +503,7 @@ internal fun LpEngine.sparseSafePrune(
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
     // advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal, result.duals)
-    // The optimal basis is cached by the caller and reused to warm-start this node's children.
-    // It is the basis of the un-tightened persistent relaxation, which the children re-solve.
+    // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     val optimalBasis = result.basis
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
@@ -490,21 +512,22 @@ internal fun LpEngine.sparseSafePrune(
     }
     // During-search separation: at a gated shallow node, tighten this node's relaxation with the
     // cuts its LP point violates. Global cuts are persisted into the pool (descendants inherit them);
-    // node-local cuts tighten only this solve, so they never leak to a sibling and the bound stays sound.
-    // The bound, certificate and reduced-cost fixing below read the tightened relaxation; the cached
-    // warm-start basis stays the cut-free one for the children.
+    // node-local cuts retain their complete source proof and follow the owner's row trail.
+    // The bound, certificate and reduced-cost fixing below read the tightened immutable relaxation.
     // The pooled global cuts this node's LP point violates are folded in first: the
     // most-effective, mutually-orthogonal subset chosen by CutPool.select, re-solved once. A subset of
     // globally-valid cuts only tightens the bound, and selecting against the live point loads just the
     // cuts that move it — bounding the per-node cut count by efficacy instead of the whole pool.
-    val (cutRel, cutRes) = foldSelectedCuts(relaxer, session, relaxation, result, cancellation, sink)
+    val cutOutcome = foldSelectedCuts(session, relaxation, result, cancellation, sink, learn)
+    if (cutOutcome is LpCutOutcome.Pruned) return LpNodeOutcome(true, null, cutOutcome.explanation)
+    val cutSolved = cutOutcome as LpCutOutcome.Solved
     if (cancellation()) return LpNodeOutcome(false, null)
-    var boundRel = cutRel
-    var boundRes = cutRes
+    var boundRel = cutSolved.relaxation
+    var boundRes = cutSolved.result
     if (cutsAllowed && session.decisionLevel in 1..params.lpPlan.cutSearchMaxDepth &&
         lpSeparators.isNotEmpty()
     ) {
-        val localCuts = ArrayList<Cut>()
+        val localCuts = ArrayList<SourceCut>()
         var rounds = 0
         while (rounds++ < SEARCH_CUT_ROUNDS && !cancellation()) {
             val ctx = CutContext(problem, boundRel, boundRes.primal, session)
@@ -520,33 +543,24 @@ internal fun LpEngine.sparseSafePrune(
             sink.lp.observeCutAccounting(fresh.size, 0, 0)
             if (fresh.isEmpty()) break
             recordSearchCuts(fresh, boundRes.primal, boundRel, session)
-            for (c in fresh) if (!c.global) localCuts.add(c)
+            for (c in fresh) if (!c.global) {
+                SourceCut.fromCut(c, boundRel).orNull()?.let(localCuts::add)
+            }
             val selectedCuts = cutPool.select(
                 boundRes.primal,
                 objectiveCoefficients(boundRel.model),
                 cutPool.maxCuts,
-            ) + localCuts
-            val tightened = try {
-                sink.lp.observeCutBuild(selectedCuts.size) { relaxer.build(session, selectedCuts, cancellation) }
-                    .also { noteNodeOverhead(it.model.extent() * LpNodeOverhead.BUILD) }
-            } catch (_: CheckedLongOverflowException) {
-                break // overflow in the cut-augmented build: keep the prior (sound) relaxation
-            }
-            noteNodeOverhead(tightened.model.extent() * LpNodeOverhead.SETUP)
-            val roundSimplex = dualSimplex(tightened.model, cancellation)
-            val r = try {
-                roundSimplex.solve()
-            } finally {
-                sink.lp.observeSolve()
-                try {
-                    observeSolveCost(sink, roundSimplex)
-                } finally {
-                    roundSimplex.close()
+            ) + localCuts.mapNotNull { source -> boundRel.sourceMap?.let { source.toCut(it).orNull() } }
+            val previous = LpCutOutcome.Solved(boundRel, boundRes)
+            val outcome = solveSelectedCuts(session, previous, selectedCuts, cancellation, sink, learn)
+            when (outcome) {
+                is LpCutOutcome.Pruned -> return LpNodeOutcome(true, null, outcome.explanation)
+                is LpCutOutcome.Solved -> {
+                    if (outcome.relaxation.model === boundRel.model) break
+                    boundRel = outcome.relaxation
+                    boundRes = outcome.result
                 }
             }
-            if (r == null) break
-            boundRel = tightened
-            boundRes = r
         }
     }
     // The exact basis-certificate backs the prune bound, the learnable objective-bound reason and the

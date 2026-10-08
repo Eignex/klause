@@ -524,8 +524,9 @@ internal class LpEngine(
     )
 
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
-        val relaxation = buildNodeRelaxation(relaxer, session) ?: return null
-        relaxation.sourceMap?.withCpBounds(relaxation.model, session)?.let(cutPool::remap)
+        val base = buildNodeRelaxation(relaxer, session) ?: return null
+        val relaxation = cpAdapter.cutRelaxation(base, session) ?: return null
+        relaxation.sourceMap?.let(cutPool::remap)
         return relaxation
     }
 

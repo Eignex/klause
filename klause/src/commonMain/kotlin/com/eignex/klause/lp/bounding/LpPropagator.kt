@@ -23,6 +23,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.strongerThan
+import com.eignex.klause.lp.relaxation.LpCutEdit
 import com.eignex.klause.lp.relaxation.LpSourceEdit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
@@ -261,12 +262,27 @@ internal class LpPropagator(
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
 
+    fun editCuts(edit: LpCutEdit): Boolean = withOwner { current ->
+        val before = current.state
+        if (edit.sourceState !== before || !edit.isCurrent() || cancellation()) return@withOwner false
+        if (edit.retired.isNotEmpty() || edit.rows.isNotEmpty()) {
+            onEdit(before.model.numVars.toLong() + edit.rows.size)
+            if (!current.replaceRows(edit.retired, emptyList(), edit.rows, before.depth > 0)) return@withOwner false
+            retainWitnesses()
+            lastMetrics = LpSolveMetrics()
+        }
+        edit.commit()
+        true
+    } == true
+
     fun editSources(
         edit: LpSourceEdit,
         premise: (Int, Boolean) -> SearchAtomPremise = { _, _ -> SearchAtomPremise.Unavailable },
     ): Boolean = withOwner { current ->
         val before = current.state
-        if (edit.sourceState !== before || edit.bounds.size != before.model.n + edit.columns.size || cancellation()) {
+        if (edit.sourceState !== before || !edit.isCurrent() ||
+            edit.bounds.size != before.model.n + edit.columns.size || cancellation()
+        ) {
             return@withOwner false
         }
         val assertions = ArrayList<LpBoundAssertion>()

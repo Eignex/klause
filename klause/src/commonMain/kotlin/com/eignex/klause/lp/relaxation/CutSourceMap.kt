@@ -113,6 +113,11 @@ internal class CutSourceMap(
         parentSnapshot,
         auxiliarySnapshot,
     )
+
+    fun withParentRows(parents: Map<Int, CutProvenance>): CutSourceMap = CutSourceMap(
+        model, epoch, columnSnapshot, globalSnapshot, activeSnapshot, fixedSnapshot, assumptionSnapshot,
+        parents, auxiliarySnapshot,
+    )
 }
 
 internal fun CutSourceMap.withCpBounds(
