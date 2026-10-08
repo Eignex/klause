@@ -32,7 +32,11 @@ internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
     fun row(index: Int): LpRowIdentity = identities[index]
     fun index(id: Long): Int = indices[id] ?: -1
     fun entries(): List<LpRowIdentity> = identities.toList()
-    fun sameIdentities(other: LpScopedRows): Boolean = identities.map { it.id } == other.identities.map { it.id }
+    fun sameIdentities(other: LpScopedRows): Boolean {
+        if (this === other) return true
+        if (identities.size != other.identities.size) return false
+        return identities.indices.all { identities[it].id == other.identities[it].id }
+    }
     fun sameAuthority(other: LpScopedRows): Boolean = lastId == other.lastId && identities == other.identities
 
     fun storageWeight(storage: LpLayoutStorage): LpLayoutWeight {

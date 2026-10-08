@@ -53,6 +53,8 @@ internal data class LpBoundAssertion(
 
 internal data class LpBoundConflict(val column: Int, val lower: LpBoundAssertion, val upper: LpBoundAssertion)
 
+internal class LpProjectedScalarChanges(val bounds: IntArray, val costs: IntArray)
+
 internal class LpExactState internal constructor(
     val baseModel: ExactLpModel,
     assertions: List<LpBoundAssertion> = emptyList(),
@@ -85,6 +87,9 @@ internal class LpExactState internal constructor(
     private var projectionColumns = intArrayOf()
     private var projectionCosts = intArrayOf()
     private var projectionObjective = false
+    // Tokens identify adjacent scalar revisions without retaining a predecessor's state or cached vectors.
+    private val scalarIdentity = Any()
+    private var scalarPredecessor: Any? = null
 
     // Whether every right-hand side, cost, bound and origin projects to a finite double; null until checked.
     private var scalarsProjectable: Boolean? = null
@@ -286,6 +291,8 @@ internal class LpExactState internal constructor(
     }
 
     private fun deriveVectors(previous: LpExactState, columns: IntArray) {
+        scalarPredecessor = previous.scalarIdentity
+        projectionColumns = columns
         projectionObjective = previous.model.objective !== model.objective
         projectionCosts = if (projectionObjective) {
             (0 until model.numVars).filter {
@@ -298,7 +305,6 @@ internal class LpExactState internal constructor(
             vectors = previous.vectors
         } else {
             inheritedVectors = previous.vectors
-            projectionColumns = columns
         }
         if (previous.scalarsProjectable == true) {
             scalarsProjectable = columns.all { boundsProject(it) } &&
@@ -310,6 +316,14 @@ internal class LpExactState internal constructor(
     val matrixProjectionStatus: LpMatrixProjectionStatus? get() = projection?.status
     val matrixProjectionDeclined: Boolean get() = projectionAttempted && projection == null
     fun projectionLostNonzero(working: LpModel): Boolean? = vectors?.lostNonzero(working)
+
+    fun projectedScalarChanges(previous: LpModel, working: LpModel): LpProjectedScalarChanges? {
+        val before = previous.exactState ?: return null
+        if (ownerView !== working || before.ownerView !== previous) return null
+        if (before === this) return LpProjectedScalarChanges(intArrayOf(), intArrayOf())
+        if (scalarPredecessor !== before.scalarIdentity || projection !== before.projection) return null
+        return LpProjectedScalarChanges(projectionColumns, projectionCosts)
+    }
 
     fun toWorkingModel(meter: LpProjectionMeter = LpProjectionMeter()): LpModel? = try {
         projectWorkingModel(meter, copyVectors = true)
