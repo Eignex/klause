@@ -236,6 +236,28 @@ class LocalSearchSolverTest {
     }
 
     @Test
+    fun `a gradient view that disagrees with the linear objective only guides moves`() {
+        // The view reads p = x0·x1 alone; the linear objective p + x0 is the rewrite presolve left behind.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(0, 20)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 1)),
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(arrayOf(Product(a = 0, b = 1, result = 2)), numIntVars = 3))
+        val gradient = sweep.functionalObjective(intArrayOf(2), longArrayOf(1L), constant = 0L, minimize = true)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 1L))
+
+        val incumbents = LocalSearchSolver(problem.bake(), definitionalSweep = sweep, perMoveInvariants = true)
+            .improvements(objective, LocalSearchParams(maxFlips = 2_000, randomSeed = 3, lsObjective = gradient))
+            .filterIsInstance<MinimizeResult.WithSample>()
+            .toList()
+
+        assertTrue(incumbents.isNotEmpty())
+        for (r in incumbents) assertEquals(objective.evaluate(r.sample), r.objectiveValue, "sample ${r.sample}")
+    }
+
+    @Test
     fun `a satisfy run starts from a supplied assignment`() {
         val problem = Problem(
             0,

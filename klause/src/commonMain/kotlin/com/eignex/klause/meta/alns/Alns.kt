@@ -13,7 +13,6 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.IntHashSet
@@ -148,14 +147,13 @@ internal class Alns(
     @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally") // cleanup never replaces a primary failure
     override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
         _iterationLog.clear()
-        // Score with the caller's gradient view when one is supplied (it agrees with the linear
-        // objective at every feasible point); the inner solves resolve the same view from params.
-        val scoring: Objective = params.lsObjective ?: objective
+        // Every incumbent is valued by the linear objective, the one the portfolio checks it against: the caller's
+        // gradient view reads definitions presolve may have eliminated. The inner solves still descend that view.
         // Initial incumbent for the destroy/repair loop (LS-first, backtrack-fallback — see below).
         val initialResult = bootstrapIncumbent(objective, params)
         val initialSample = initialResult.assignment ?: return initialResult
         var bestSample: Sample = initialSample
-        var bestObj = scoring.evaluate(bestSample)
+        var bestObj = objective.evaluate(bestSample)
         var incumbent = bestSample
         var incumbentObj = bestObj
         // Cross-engine solution flow: offer every new best to the shared exchange, and adopt a
@@ -164,7 +162,7 @@ internal class Alns(
         val pooled = PooledIncumbents(
             exchange = pooledIncumbents,
             importEnabled = params.assumptions.isEmpty,
-            evaluate = { scoring.evaluate(it) },
+            evaluate = { objective.evaluate(it) },
         )
         pooled.publish(bestSample, bestObj)
         // Build the acceptance policy once the initial objective is known, so a simulated-annealing
@@ -246,7 +244,7 @@ internal class Alns(
                     iter++
                     continue
                 }
-                val repairedObj = scoring.evaluate(repaired)
+                val repairedObj = objective.evaluate(repaired)
 
                 val isNewBest = repairedObj < bestObj
                 val accept = isNewBest || acceptancePolicy.accept(repairedObj, incumbentObj, rng)
