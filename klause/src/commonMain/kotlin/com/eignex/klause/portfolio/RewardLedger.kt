@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.PortfolioStats
+import com.eignex.klause.solver.result.SharingStats
 import com.eignex.klause.solver.result.SolveStats
 
 /**
@@ -227,6 +228,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                     failures = failures[arm],
                     faults = faults[arm],
                     credit = ledger.creditOf(arm),
+                    sharing = workers[arm].sharingMeter?.snapshot() ?: SharingStats(),
                 )
             },
         )

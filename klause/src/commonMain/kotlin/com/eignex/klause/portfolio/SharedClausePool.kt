@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
+import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
@@ -146,19 +147,27 @@ internal class PoolClauseExchange(
     /** Publish globally-valid nogoods (LP Farkas) via [publishGlobal]. An LNS-repair arm derives Farkas
      *  certificates under its pins, so they are not globally valid there — it disables this. */
     private val shareGlobalNogoods: Boolean = true,
+    /** Where this arm's clause traffic is recorded; null records nothing. */
+    private val meter: SharingMeter? = null,
 ) : ClauseExchange {
     private var cursor = 0L
     private val seen = LongHashSet()
 
-    override fun onRestart(session: PropagationSession) {
+    override fun onRestart(session: PropagationSession) = metered {
         val drained = pool.drainSince(cursor)
         cursor = drained.cursor
+        var imported = 0
         for (i in drained.clauses.indices) {
             val c = drained.clauses[i]
             // An arm's own clause, re-imported into a rebuilt session, earns it nothing.
             val from = drained.origins[i].takeIf { it != origin } ?: SharedClausePool.NO_ORIGIN
-            if (seen.add(c.key)) session.importClause(c, from)
+            if (seen.add(c.key)) {
+                session.importClause(c, from)
+                imported++
+            }
         }
+        meter?.imported(SharingChannel.Clauses, imported)
+        meter?.duplicates(SharingChannel.Clauses, drained.clauses.size - imported)
         countUses(session)
         export(session)
     }
@@ -173,7 +182,7 @@ internal class PoolClauseExchange(
         onRestart(session)
     }
 
-    override fun onSearchEnd(session: PropagationSession) {
+    override fun onSearchEnd(session: PropagationSession) = metered {
         countUses(session)
         export(session)
     }
@@ -187,7 +196,12 @@ internal class PoolClauseExchange(
      *  `seen` set so this arm neither double-publishes it nor re-imports its own. */
     override fun publishGlobal(clause: SharedClause) {
         if (!shareGlobalNogoods) return
-        if (seen.add(clause.key)) pool.publish(listOf(clause), origin, isGlobal = true)
+        metered {
+            if (seen.add(clause.key)) {
+                pool.publish(listOf(clause), origin, isGlobal = true)
+                meter?.exported(SharingChannel.Clauses, 1)
+            }
+        }
     }
 
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
@@ -195,6 +209,12 @@ internal class PoolClauseExchange(
     private fun export(session: PropagationSession) {
         val fresh = session.exportGlueClauses(maxLbd, maxLen, skipPermanent).filter { seen.add(it.key) }
         if (fresh.isNotEmpty()) pool.publish(fresh, origin)
+        meter?.exported(SharingChannel.Clauses, fresh.size)
+    }
+
+    private inline fun metered(crossinline block: () -> Unit) {
+        val m = meter
+        if (m == null) block() else m.timed(SharingChannel.Clauses) { block() }
     }
 
     internal companion object {

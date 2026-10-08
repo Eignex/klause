@@ -46,6 +46,9 @@ class PortfolioWorker private constructor(
     /** The contributions this worker publishes through [sharedPools], each earning it that contribution's signal. */
     internal var sharing: Set<Contribution> = emptySet()
 
+    /** Where this worker's sharing traffic is recorded, or null when it is not measured. */
+    internal var sharingMeter: SharingMeter? = null
+
     /** The reward signals this worker can earn: its engine's own and those of the channels it shares through. */
     internal val signals: Set<Signal>
         get() = (if (withInstructions) COUNTED_SIGNALS else SEARCH_SIGNALS) + sharing.map { it.signal }

@@ -25,6 +25,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.util.Cancellation
 
@@ -290,6 +291,11 @@ data class BacktrackParams(
      * the side — so a portfolio can credit the arm that proved it. `null` (default) reports nothing.
      */
     val globalVarImportSink: ((varId: Int, lower: Boolean) -> Unit)? = null,
+    /**
+     * Told the nanoseconds each exchange of the objective floor or shared variable bounds took, by channel, so a
+     * portfolio can report what sharing costs this arm. `null` (default) measures nothing.
+     */
+    val sharingTimer: ((channel: SharingChannel, nanos: Long) -> Unit)? = null,
     /**
      * The emphasis-driven LP-relaxation selector: an [LpEmphasis] cost ceiling + per-technique
      * overrides (see [LpConfig]), resolved against the problem's structure by [LpAutoConfig.resolve]

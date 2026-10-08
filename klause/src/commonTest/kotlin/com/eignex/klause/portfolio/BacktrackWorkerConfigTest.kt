@@ -8,8 +8,12 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.SharingChannel
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class BacktrackWorkerConfigTest {
 
@@ -78,5 +82,31 @@ class BacktrackWorkerConfigTest {
         val signals = signalsOf(BacktrackCatalog.byLabel("conflictDriven"), objective = null, allPools())
 
         assertEquals(SEARCH_SIGNALS + Signal.ClauseUses, signals)
+    }
+
+    @Test
+    fun `a materialized arm records the clause traffic of its search`() {
+        val problem = Problem(
+            numBoolVars = 6,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Cardinality(IntArray(6) { Lit.make(it, true) }, min = 3, max = 6)),
+        ).bake()
+        val worker = BacktrackWorkerConfig(BacktrackCatalog.byLabel("conflictDriven")).materialize(
+            problem,
+            index = 0,
+            armId = 0,
+            seed = 0L,
+            lsLambda = 1.0,
+            objective = LinearObjective(boolWeights = longArrayOf(4L, 1L, 6L, 2L, 5L, 3L)),
+            lsObjective = null,
+            definitionalSweep = null,
+            onEvent = null,
+            pools = allPools(),
+        )
+
+        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+
+        assertTrue(SharingChannel.Clauses in assertNotNull(worker.sharingMeter).snapshot().channels)
     }
 }

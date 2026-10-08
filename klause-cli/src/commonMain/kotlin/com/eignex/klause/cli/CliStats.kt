@@ -310,10 +310,16 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
  */
 internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> = stats.portfolio.arms.map { arm ->
     val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
+    val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
+        " share$channel=us:${t.nanos / NANOS_PER_MICRO},out:${t.exported},in:${t.imported},dup:${t.duplicates}"
+    }
     "arm.${arm.label}" to
         "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
-        "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} initMs=${arm.initializationMillis}$credit"
+        "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} initMs=${arm.initializationMillis}" +
+        "$credit$sharing"
 }
+
+private const val NANOS_PER_MICRO = 1_000L
 
 /** Exact deterministic open-theory accounting pairs for `-s`. */
 internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> =
