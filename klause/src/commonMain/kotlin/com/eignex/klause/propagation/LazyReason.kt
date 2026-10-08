@@ -112,11 +112,9 @@ internal fun PropagationState.boundAt(v: Int, lower: Boolean, atTrail: Int): Lon
     return if (lower) d.min else d.max
 }
 
-/** Whether `k` was in [v]'s domain at undo-log position [atTrail]. */
-internal fun PropagationState.inDomainAt(v: Int, k: Long, atTrail: Int): Boolean {
-    val d = domainAt(v, atTrail)
-    return k in d || (k in d.min..d.max && carvedAt(v, k) > atTrail)
-}
+/** Whether `k` was in [v]'s domain at undo-log position [atTrail]; [d] is that domain, for a caller that read it. */
+internal fun PropagationState.inDomainAt(v: Int, k: Long, atTrail: Int, d: IntDomain = domainAt(v, atTrail)): Boolean =
+    k in d || (k in d.min..d.max && carvedAt(v, k) > atTrail)
 
 /**
  * The literal, false at undo-log position [atTrail], that says `k` was out of [v]'s domain then: the bound it lay
