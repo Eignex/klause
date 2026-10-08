@@ -88,6 +88,19 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
+    fun `closed heads do not consume the refutation budget`() {
+        val rows = (0..64).map { row(it, (it + 1) % 65, it, 0L) } + row(65, 64, 0, -1L)
+        val problem = problemOf(numBools = 66, numInts = 65, rows = rows)
+        val state = stateOf(problem)
+        for (aux in 0..64) assertTrue(state.pinLit(Lit.make(aux, true)))
+
+        assertTrue(runSystem(problem, state))
+
+        assertEquals(false, state.boolValues[65])
+        assertEquals(listOf(Lit.make(64, false)), state.boolAntecedents[65]?.toList())
+    }
+
+    @Test
     fun `a deferred head is visited after a decision without new graph assertions`() {
         val rows = (1..64).map { row(it - 1, it, 0, 0L) } + row(64, 0, 64, -1L)
         val problem = problemOf(numBools = 65, numInts = 65, rows = rows, domains = boxed(65, 2L))

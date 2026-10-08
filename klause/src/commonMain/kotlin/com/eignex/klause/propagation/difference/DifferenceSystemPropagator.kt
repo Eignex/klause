@@ -11,15 +11,16 @@ import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
 /**
- * Heads a single refutation sweep visits before yielding.
+ * Open heads a single refutation sweep visits before yielding.
  *
- * A sweep costs one shortest-path search per head, and this window is what bounds that — measured, not
+ * An open head costs at most one shortest-path search, and this window bounds that work — measured, not
  * assumed. On a fully bounded model every sweep offers all 1403 heads and every one of 8000 sweeps
  * exceeded the window, because [DifferenceSystemPropagator.headsToSweep] narrows nothing there: the
  * distances through the constant node move on each sweep, which widens the head set back to all of them.
  * Removing the window costs 2.3-2.7x at an identical 4000 nodes.
  *
- * Keeping deferred heads queued still reaches every head across successive decisions — a refutation is deferred,
+ * Closed guards need only a bucket scan, so they do not consume the window. Keeping deferred heads queued
+ * still reaches every open head across successive decisions — a refutation is deferred,
  * never dropped, and a deferred one only leaves an edge open that the Boolean layer may still decide, so
  * the verdict is unaffected either way.
  */
@@ -201,8 +202,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      * head that reaches no newly-asserted tail therefore cannot have gained a refutation, and searching
      * from it again would repeat the previous answer.
      *
-     * Retraction is deliberately not a trigger: it only lengthens paths, so it can retire a refutation but
-     * never create one, and the pins already made stand until the search backtracks past them.
+     * Retraction uses the full head set: it can release implied pins when the search backtracks past them.
      */
     private fun headsToSweep(session: Session): IntArray {
         if (session.newTails.size == 0) return bucketVertex
@@ -289,8 +289,8 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      */
     private fun refuteOpenEdges(state: PropagationState, session: Session): Boolean {
         val graph = session.graph
-        val budget = minOf(session.heads.size, HEAD_SWEEP_BUDGET)
-        repeat(budget) {
+        var openHeads = 0
+        while (!session.heads.isEmpty() && openHeads < HEAD_SWEEP_BUDGET) {
             val v = session.nextHead()
             session.pending.clear()
             session.pendingTails.clear()
@@ -300,7 +300,8 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
                 session.pending.add(e)
                 session.pendingTails.add(tail[e])
             }
-            if (session.pending.size == 0) return@repeat
+            if (session.pending.size == 0) continue
+            openHeads++
             // The route through the constant node is already measured, so it refutes without a search and
             // spares the search from settling that edge's tail at all.
             var open = false
@@ -314,7 +315,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
                 }
                 open = true
             }
-            if (!open) return@repeat
+            if (!open) continue
             graph.shortestPathsFrom(v, session.pendingTails.toIntArray())
             for (k in 0 until session.pending.size) {
                 val e = session.pending[k]
