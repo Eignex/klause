@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
@@ -62,8 +63,7 @@ internal class BacktrackWorkerConfig(
         }
         pools?.cuts?.let {
             params = params.copy(cutExchange = PoolCutExchange(it, origin = index, tally = pools.contributions))
-            // Only an arm that builds a relaxation separates cuts to publish.
-            if (params.lpConfig != null || params.lpPlan.bounding) sharing += Contribution.Cut
+            if (params.separatesCuts()) sharing += Contribution.Cut
         }
         // Wire this arm to the shared objective lower-bound manager when optimising: publish
         // the bounds it proves and tighten its objective floor to the cross-arm maximum.
@@ -150,6 +150,14 @@ internal class BacktrackWorkerConfig(
             }
         }
     }
+}
+
+// Whether this arm runs a cut separator, the only source of cuts it publishes: the plan's own cut or circuit
+// rounds, or a config whose emphasis and overrides admit them for the relaxation to switch on.
+private fun BacktrackParams.separatesCuts(): Boolean {
+    val config = lpConfig
+    return lpPlan.cuts || lpPlan.circuit ||
+        config != null && (config.resolved(LpTechnique.CUTS) || config.resolved(LpTechnique.CIRCUIT))
 }
 
 /** Cap this recipe under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
