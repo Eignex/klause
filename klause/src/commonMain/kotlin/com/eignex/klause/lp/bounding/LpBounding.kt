@@ -29,12 +29,14 @@ import com.eignex.klause.lp.engine.exactConstant
 import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
+import com.eignex.klause.lp.engine.floorLong
 import com.eignex.klause.lp.engine.hasIntegralObjective
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
+import com.eignex.klause.lp.engine.sourceObjective
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpExplanation
@@ -692,7 +694,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     learn: Boolean = false,
     cancellation: Cancellation = Cancellation.Never,
 ): Boolean {
-    if (cancellation()) return false
+    if (cancellation() || !cert.belongsTo(relaxation.model)) return false
     if (sourceObjectiveRange(relaxation) == null) return false
     val ceiling = enclosingCutoff(bound)?.ceilLong() ?: return false
     if (ceiling == Long.MIN_VALUE) return false
@@ -803,23 +805,9 @@ internal fun reducedCostFixingReasons(
     objectiveVar: Int,
     improvingMax: Long,
 ): ReducedCostFixingReasons? {
-    val objectiveCol = relaxation.intColOf.getOrNull(objectiveVar) ?: return null
-    if (objectiveCol !in relaxation.colVarId.indices || relaxation.colVarId[objectiveCol] != objectiveVar ||
-        relaxation.colIsBool[objectiveCol]
-    ) {
-        return null
-    }
-    val objectiveCoefficient = relaxation.model.cost[objectiveCol]
-    if (objectiveCoefficient <= 0L || relaxation.model.cost.indices.any {
-            it != objectiveCol && relaxation.model.cost[it] != 0L
-        }
-    ) {
-        return null
-    }
-    val cutoffNumerator = Int128().also { it.addLong(improvingMax) }
-    val sourceConstant = Int128().also { it.addLong(relaxation.objectiveConstant) }
-    cutoffNumerator.subtract(sourceConstant)
-    val objectiveVarMax = cutoffNumerator.floorDivPositive(objectiveCoefficient) ?: return null
+    if (!cert.belongsTo(relaxation.model)) return null
+    val objectiveVarMax = relaxation.objectiveVariableValue(objectiveVar, BigFraction.ofLong(improvingMax))
+        ?.floorLong() ?: return null
     if (session.intDomain(objectiveVar).max > objectiveVarMax) return null
     val supportCols = IntArrayList()
     val supportLits = IntArrayList()
@@ -908,16 +896,20 @@ private fun enclosingCutoff(bound: Double): BigFraction? {
     return BigFraction.ofDouble(if (abs(bound) >= EXACT_INTEGER_DOUBLE_LIMIT) bound.nextUp() else bound)
 }
 
-private fun LpRelaxation.objectiveVariableLowerBound(variable: Int, lower: BigFraction): Long? {
+private fun LpRelaxation.objectiveVariableLowerBound(variable: Int, lower: BigFraction): Long? =
+    objectiveVariableValue(variable, lower)?.ceilLong()
+
+private fun LpRelaxation.objectiveVariableValue(variable: Int, value: BigFraction): BigFraction? {
     val column = intColOf.getOrNull(variable) ?: return null
     if (column !in 0 until model.n || colVarId[column] != variable || colIsBool[column]) return null
     val coefficient = model.exactCost(column)
     if (coefficient.signum() <= 0 || (0 until model.numVars).any { it != column && !model.exactCost(it).isZero }) {
         return null
     }
-    val constant = BigFraction.ofLong(objectiveConstant) + model.exactConstant() -
-        coefficient * model.exactShift(column)
-    return ((lower - constant) * coefficient.reciprocal()).ceilLong()
+    val constant = BigFraction.ofLong(objectiveConstant) +
+        model.sourceObjective(model.exactConstant() - coefficient * model.exactShift(column))
+    val scale = model.exactState?.model?.objective?.scale?.value ?: BigFraction.ONE
+    return (value - constant) * scale * coefficient.reciprocal()
 }
 
 private const val EXACT_INTEGER_DOUBLE_LIMIT = 9007199254740992.0

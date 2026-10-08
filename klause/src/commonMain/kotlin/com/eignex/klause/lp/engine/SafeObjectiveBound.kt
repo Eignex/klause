@@ -25,7 +25,7 @@ internal fun safeObjectiveLowerBound(
 
 private fun safeObjectiveLowerBoundUnchecked(model: LpModel, y: DoubleArray, scans: LpScanCount): Double? {
     if (y.size != model.m || y.any { !it.isFinite() }) return null
-    if (!model.hasContinuous) {
+    if (model.exactState != null || !model.hasContinuous) {
         scans.scan()
         val certificate = integerCertify(model, y)
         val numerator = certificate?.objectiveNumerator()
@@ -65,7 +65,8 @@ internal fun BigFraction.lowerBoundDouble(): Double? {
  * else its **min** — from an already-solved primal [result], or null when the variable is genuinely
  * unbounded in that direction. The model's objective must be that single column with cost `±1` and no
  * constant (max is set up as minimizing `−x`). Rigorous under float error via [safeObjectiveLowerBound],
- * then floored (max) / ceiled (min) to an integer. **Reject-at-cap:** an optimum that only rode the
+ * then floored (max) / ceiled (min) to an integer. Retained models read live endpoints in their exact
+ * source coordinates. **Reject-at-cap:** an optimum that only rode the
  * column to its [LP_UNBOUNDED_PROBE] frontier — the private stand-in for `±∞` on a [LpBuilder.addFreeVar]
  * side — is reported unbounded (null), never as a spurious bound at the probe magnitude. [clamped]
  * overrides which probe flag guards that rejection — a variable represented split (`x = x⁺ − x⁻`)
@@ -78,7 +79,6 @@ internal fun LpModel.safeVariableBound(
     clamped: Boolean? = null,
     observer: LpCertificationObserver? = null,
 ): Long? {
-    if (exactState != null) return null
     if (!hasIntegralObjective()) return null
     val objMin = safeObjectiveLowerBound(this, result.duals, observer) ?: return null
     val ceilMin = ceil(objMin)
@@ -100,7 +100,6 @@ internal fun LpModel.exactVariableBound(
     clamped: Boolean? = null,
     observer: LpCertificationObserver? = null,
 ): Long? {
-    if (exactState != null) return null
     val ceilMin = exactObjectiveLowerBoundCeil(result.duals, observer) ?: return null
     return orientedVariableBound(ceilMin, objectiveCol, maximize, clamped)
 }
@@ -162,11 +161,15 @@ internal fun LpModel.tightVariableBound(
  * retain supported scaling. The ceiling requires a verified integer source objective lattice;
  * otherwise this helper declines, since a ceiling may exceed a continuous objective's optimum. Null on a
  * 128-bit certification overflow or a
- * model that does not rationalize.
+ * model that does not rationalize. Retained models evaluate their exact authority directly, including
+ * objective scaling and external constants, without a legacy conversion.
  */
 internal fun LpModel.exactObjectiveLowerBoundCeil(y: DoubleArray, observer: LpCertificationObserver? = null): Long? =
     if (!hasIntegralObjective()) {
         null
+    } else if (exactState != null) {
+        integerDualLowerBoundCeil(this, y, observer = observer)
+            ?: certifyLpBound(this, y, observer)?.value?.ceilLong()
     } else if (hasContinuous) {
         rationalizedDualLowerBoundCeil(this, y, observer = observer)
     } else {
@@ -201,7 +204,7 @@ internal fun tightObjectiveLowerBound(
     observer: LpCertificationObserver? = null,
 ): Double? = tighterLowerBound(
     safeObjectiveLowerBound(model, y, observer),
-    certificate?.takeIf { model.exactState == null && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
+    certificate?.takeIf { it.belongsTo(model) && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
 )
 
 /** The larger of two sound lower bounds on the same objective, either of which may be unavailable. */

@@ -27,6 +27,22 @@ private class RecordingCertificationPolicy(private val accept: Boolean) : LpCert
 class LpCertificationPolicyTest {
 
     @Test
+    fun `forced decline rejects supplied certificates on legacy and retained models`() {
+        val source = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val retained = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+        for (model in listOf(source, retained)) {
+            val certificate = assertNotNull(integerCertify(model, doubleArrayOf()))
+            val policy = RecordingCertificationPolicy(accept = false)
+
+            val bound = certifiedTightObjectiveLowerBound(model, doubleArrayOf(), certificate, null, policy)
+
+            assertNull(bound)
+            assertEquals(listOf(LpCertifier.SAFE_OBJECTIVE, LpCertifier.INTEGER), policy.attempts.map { it.first })
+            assertTrue(policy.attempts.all { it.second })
+        }
+    }
+
+    @Test
     fun `forced decline reaches rational fallback and stays indeterminate`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 1L)

@@ -14,6 +14,7 @@ import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.shl
 import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -731,14 +732,7 @@ internal fun LpModel.exactConflictSupport(conflict: BigRationalConflict): LpExac
 
 private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Boolean): LpExactSupport? {
     val state = exactState ?: return null
-    val y = multipliers.mapIndexed { row, value ->
-        val slack = slackCol(row)
-        if (objective && hasFiniteLower(slack) && !hasFiniteUpper(slack) && value > exactCost(slack)) {
-            exactCost(slack)
-        } else {
-            value
-        }
-    }
+    val y = if (objective) objectiveMultipliers(multipliers) else multipliers
     val sides = ArrayList<LpExactCitedSide>()
     for (j in 0 until numVars) {
         var coefficient = if (objective) exactCost(j).negated() else BigFraction.ZERO
@@ -759,25 +753,27 @@ private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Bool
     return LpExactSupport(state, rows.map { it to state.model.row(it) }, sides)
 }
 
+private fun LpModel.objectiveMultipliers(multipliers: List<BigFraction>): List<BigFraction> {
+    var repaired: MutableList<BigFraction>? = null
+    for (row in 0 until m) {
+        val slack = slackCol(row)
+        val candidate = multipliers[row]
+        val cost = exactCost(slack)
+        if ((!hasFiniteLower(slack) && candidate < cost) || (!hasFiniteUpper(slack) && candidate > cost)) {
+            val target = repaired ?: multipliers.toMutableList().also { repaired = it }
+            target[row] = cost
+        }
+    }
+    return repaired ?: multipliers
+}
+
 internal fun exactLagrangian(
     model: LpModel,
     multipliers: List<BigFraction>,
     cancellation: Cancellation = Cancellation.Never,
 ): BigFraction? {
     if (multipliers.size != model.m || !model.finiteExactInput()) return null
-    val y = List(model.m) { row ->
-        val candidate = multipliers[row]
-        val slackCost = model.exactCost(model.slackCol(row))
-        val slack = model.slackCol(row)
-        if (model.hasFiniteLower(
-                slack,
-            ) && !model.hasFiniteUpper(slack) && candidate > slackCost
-        ) {
-            slackCost
-        } else {
-            candidate
-        }
-    }
+    val y = model.objectiveMultipliers(multipliers)
     var value = model.exactConstant()
     for (i in 0 until model.m) value += y[i] * model.exactRhs(i)
     for (j in 0 until model.numVars) {
@@ -1158,6 +1154,12 @@ internal fun BigFraction.ceilLong(): Long? {
     val ceiling = ceilInteger()
     if (ceiling < bigIntOf(Long.MIN_VALUE) || ceiling > bigIntOf(Long.MAX_VALUE)) return null
     return ceiling.toLongExact()
+}
+
+internal fun BigFraction.floorLong(): Long? {
+    val floor = -negated().ceilInteger()
+    if (floor < bigIntOf(Long.MIN_VALUE) || floor > bigIntOf(Long.MAX_VALUE)) return null
+    return floor.toLongExact()
 }
 
 // A bounded value snapshot prevents sibling, objective and premise changes from reusing counters.

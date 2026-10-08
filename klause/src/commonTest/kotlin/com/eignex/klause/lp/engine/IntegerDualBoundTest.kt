@@ -24,6 +24,26 @@ import kotlin.test.assertTrue
 class IntegerDualBoundTest {
 
     @Test
+    fun `retained certificates bind immutable authority across equivalent views and reject later scopes`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L, cost = 1L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
+        val certificate = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf()))
+
+        assertTrue(certificate.belongsTo(assertNotNull(trail.state.toWorkingModel())))
+        assertFalse(certificate.belongsTo(assertNotNull(LpExactState(trail.state.model).toWorkingModel())))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 8L))
+        assertFalse(certificate.belongsTo(assertNotNull(trail.state.toWorkingModel())))
+        assertTrue(trail.pop(0))
+        val parent = assertNotNull(trail.state.toWorkingModel())
+        assertFalse(certificate.belongsTo(parent))
+        assertEquals(3.0, tightObjectiveLowerBound(parent, doubleArrayOf(), certificate))
+    }
+
+    @Test
     fun `retained integral IEEE data certifies without losing its source representation`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 3L, cost = 1L)

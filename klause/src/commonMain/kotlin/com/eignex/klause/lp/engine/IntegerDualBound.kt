@@ -120,6 +120,7 @@ internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT
  * integer multipliers, so rounding only weakens it — never makes it unsound (see [integerCertify]).
  */
 internal class IntegerCertificate(
+    model: LpModel,
     private val scaleBits: Int,
     private val scale: Long,
     /** Scaled integer duals `2ᵏ·yᵢ`, one per row. */
@@ -130,6 +131,13 @@ internal class IntegerCertificate(
     /** `N = 2ᵏ · objective` (the Lagrangian lower bound, including `model.objConstant`). */
     private val numerator: Int128,
 ) {
+    // Row weights and endpoint support cannot be reinterpreted after a pop or an objective edit.
+    private val authority = model.exactState
+    private val legacyModel = model.takeIf { authority == null }
+
+    fun belongsTo(model: LpModel): Boolean = model.m == mult.size && model.numVars == reduced.size &&
+        if (authority == null) model === legacyModel else model.exactState === authority
+
     /** The scale exponent `k`: the objective is `objectiveNumerator / 2ᵏ`. Lets a caller summing several
      *  certificates' objectives bring them to a common denominator. */
     val objectiveScaleBits: Int get() = scaleBits
@@ -245,7 +253,7 @@ private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: I
     // Re-add the lower-bound-shift constant the relaxation folded out (`c·lo`), scaled by 2ᵏ.
     acc.addProduct(integers.constant() ?: return null, scale)
     if (acc.overflow) return null
-    return IntegerCertificate(rd.scaleBits, scale, mult, reduced, acc)
+    return IntegerCertificate(model, rd.scaleBits, scale, mult, reduced, acc)
 }
 
 // Each logical is a unit column, so its reduced cost is scaledCost - multiplier. Moving a

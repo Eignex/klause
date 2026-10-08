@@ -35,6 +35,24 @@ import kotlin.test.assertTrue
 class LpExplanationTest {
 
     @Test
+    fun `retained objective explanations decline certificates from popped bounds`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), arrayOf<Factor>())
+        val session = PropagationSession(problem)
+        val relaxation = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))).build(session)
+        val trail = LpBoundTrail(assertNotNull(relaxation.model.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
+        val child = relaxation.withModel(assertNotNull(trail.state.toWorkingModel()))
+        val certificate = assertNotNull(integerCertify(child.model, doubleArrayOf()))
+        assertTrue(trail.pop(0))
+        val parent = relaxation.withModel(assertNotNull(trail.state.toWorkingModel()))
+
+        assertNull(LpExplanation.objectiveBoundReason(parent, certificate, session))
+        val fresh = assertNotNull(integerCertify(parent.model, doubleArrayOf()))
+        assertEquals(listOf(session.boundGeLit(0, 3L, false)), LpExplanation.objectiveBoundReason(parent, fresh, session)?.toList())
+    }
+
+    @Test
     fun `retained objective explanations cite live absolute endpoints in root coordinates`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), arrayOf<Factor>())
         val session = PropagationSession(problem)

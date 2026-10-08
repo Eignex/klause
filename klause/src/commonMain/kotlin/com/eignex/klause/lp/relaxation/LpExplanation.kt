@@ -305,6 +305,7 @@ internal object LpExplanation {
         cert: IntegerCertificate,
         session: PropagationSession,
     ): Boolean {
+        if (!cert.belongsTo(relaxation.model)) return false
         val rows = (0 until relaxation.model.m).filter { cert.dualNonzeroRow(it) }.toIntArray()
         return addRowPremiseLits(lits, seen, relaxation, rows, session)
     }
