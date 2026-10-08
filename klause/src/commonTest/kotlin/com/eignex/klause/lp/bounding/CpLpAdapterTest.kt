@@ -107,7 +107,9 @@ class CpLpAdapterTest {
             val childValue = assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective
             shared.popTo(1)
             val ancestor = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val ancestorValue = assertNotNull(engine.solveNode(ancestor.model, null, Cancellation.Never)?.second).objective
+            val ancestorValue = assertNotNull(
+                engine.solveNode(ancestor.model, null, Cancellation.Never)?.second,
+            ).objective
             shared.popTo(0)
             val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
             val rootValue = assertNotNull(engine.solveNode(root.model, null, Cancellation.Never)?.second).objective
