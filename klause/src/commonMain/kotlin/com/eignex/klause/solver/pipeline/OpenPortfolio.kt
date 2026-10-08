@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.relaxation.lpSeed
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.WitnessCheck
 import com.eignex.klause.portfolio.kind
@@ -32,7 +33,6 @@ import com.eignex.klause.util.toDouble
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 import kotlin.math.abs
-import kotlin.math.floor
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -117,8 +117,16 @@ internal class OpenPortfolio(
             return minimizer?.minimize(theoryParams)
                 ?: OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY)
         }
+        val incumbents = PortfolioIncumbents<BigFraction>(
+            valueOf = { candidate ->
+                witnessOf(candidate.sample)?.value?.asFraction() ?: objective.exactValue(candidate.sample)
+            },
+            improves = { candidate, standing -> candidate < standing },
+            approximateValue = { it.toDouble() },
+            gain = { standing, candidate -> (standing - candidate).toDouble() },
+        )
         val workers = buildList {
-            minimizer?.let { add(descentWorker(it, armId = 0)) }
+            minimizer?.let { add(descentWorker(it, armId = 0) { incumbents.exchange.integerBound() }) }
             addAll(localSearch)
         }
         // A descent rebuilt for making no progress would prepare the model again and lose the round it was proving.
@@ -133,40 +141,36 @@ internal class OpenPortfolio(
             witnessCheck = witnessCheck(objective),
             minShares = DoubleArray(workers.size).also { if (minimizer != null) it[0] = DESCENT_SHARE },
         )
-        val result = portfolio.use { it.minimize(cancellation) }
-        return optimumOf(result, objective)
+        val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents) }
+        return optimumOf(result, incumbents)
     }
 
-    // The pool's verdict with the exact witness behind it: the theory's own where the pool holds its stand-in, and
-    // the better of the pool's and the descent's best where a value rounded in the pool hid which is lower.
-    private fun optimumOf(result: MinimizeResult, objective: LinearObjective): OpenTheoryOptimum = when (result) {
-        is MinimizeResult.Optimal -> best(result.sample, objective).let { (witness, value) ->
-            OpenTheoryOptimum.Optimal(witness, value, result.stats)
+    private fun optimumOf(result: MinimizeResult, incumbents: PortfolioIncumbents<BigFraction>): OpenTheoryOptimum =
+        when (result) {
+            is MinimizeResult.Optimal -> {
+                val incumbent = checkNotNull(incumbents.exchange.current())
+                OpenTheoryOptimum.Optimal(assignmentOf(incumbent.assignment), incumbent.objective, result.stats)
+            }
+
+            is MinimizeResult.BestFound -> {
+                val incumbent = checkNotNull(incumbents.exchange.current())
+                OpenTheoryOptimum.Bounded(
+                    assignmentOf(incumbent.assignment),
+                    incumbent.objective,
+                    result.reason,
+                    result.stats,
+                )
+            }
+
+            // Only the descent finds a ray.
+            is MinimizeResult.Unbounded -> checkNotNull(descentVerdict as? OpenTheoryOptimum.Unbounded) {
+                "an unbounded verdict no descent reached"
+            }.copy(stats = result.stats)
+
+            is MinimizeResult.Infeasible -> OpenTheoryOptimum.Infeasible(result.stats)
+
+            is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
         }
-
-        is MinimizeResult.BestFound -> best(result.sample, objective).let { (witness, value) ->
-            OpenTheoryOptimum.Bounded(witness, value, result.reason, result.stats)
-        }
-
-        // Only the descent finds a ray.
-        is MinimizeResult.Unbounded -> checkNotNull(descentVerdict as? OpenTheoryOptimum.Unbounded) {
-            "an unbounded verdict no descent reached"
-        }.copy(stats = result.stats)
-
-        is MinimizeResult.Infeasible -> OpenTheoryOptimum.Infeasible(result.stats)
-
-        is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
-    }
-
-    private fun best(sample: Sample, objective: LinearObjective): Pair<OpenTheoryAssignment, BigFraction> {
-        val pooled = witnessOf(sample)
-        val pool = (pooled?.assignment ?: OpenTheoryAssignment.Sampled(sample)) to
-            (pooled?.value?.asFraction() ?: objective.exactValue(sample))
-        val descent = lock.withLock { theoryWitnesses.toList() }
-            .mapNotNull { w -> w.value?.let { w.assignment to it.asFraction() } }
-            .reduceOrNull { best, next -> if (next.second < best.second) next else best }
-        return if (descent != null && descent.second < pool.second) descent else pool
-    }
 
     private fun assignmentOf(sample: Sample): OpenTheoryAssignment =
         witnessOf(sample)?.assignment ?: OpenTheoryAssignment.Sampled(sample)
@@ -215,17 +219,17 @@ internal class OpenPortfolio(
         TheoryWitness(assignment.toSampleOrPlaceholder(model), assignment, value)
             .also { lock.withLock { theoryWitnesses += it } }
 
-    private fun descentWorker(minimizer: OpenTheoryMinimizer, armId: Int): PortfolioWorker = PortfolioWorker.ofMinimize(
-        "theory/${minimizer.theoryPipeline.name.lowercase()}",
-        armId,
-        resumable = { readBound -> descentSlices(minimizer, readBound) },
-    ) { _, _, _, _ -> error("the descent runs only by slice") }
+    private fun descentWorker(minimizer: OpenTheoryMinimizer, armId: Int, readBound: () -> BigInt?): PortfolioWorker =
+        PortfolioWorker.ofMinimize(
+            "theory/${minimizer.theoryPipeline.name.lowercase()}",
+            armId,
+            resumable = { descentSlices(minimizer, readBound) },
+        ) { _, _, _, _ -> error("the descent runs only by slice") }
 
-    // The descent paused and resumed by slice. Each round reads the pool's bound, but only where a Double states it
-    // exactly: a rounded bound could refute a value the pool's witness does not reach.
-    private fun descentSlices(minimizer: OpenTheoryMinimizer, readBound: () -> Double): ResumableSearch =
+    // An integral descent reads the attained value directly, including beyond floating-point and 64-bit ranges.
+    private fun descentSlices(minimizer: OpenTheoryMinimizer, readBound: () -> BigInt?): ResumableSearch =
         object : ResumableSearch {
-            private val descent = minimizer.descent(theoryParams) { exactInteger(readBound()) }
+            private val descent = minimizer.descent(theoryParams, readBound)
             override val isDone: Boolean get() = descent.isDone
             override val stats: SolveStats get() = descent.stats
             override val work: Long get() = descent.work
@@ -368,12 +372,6 @@ private const val OBJECTIVE_TOLERANCE = 1e-6
 
 // Every integer up to this magnitude is a Double exactly.
 private const val EXACT_DOUBLE_INTEGER: Long = 1L shl 53
-
-// [bound] as an exact integer, or null where a Double does not state one exactly.
-private fun exactInteger(bound: Double): BigInt? {
-    if (abs(bound) > EXACT_DOUBLE_INTEGER.toDouble() || bound != floor(bound)) return null
-    return bigIntOf(bound.toLong())
-}
 
 // [sample] moved into [searchModel]'s windows, so it seeds a search whose invariants were sized for them.
 private fun inWindows(sample: Sample, searchModel: LocalSearchModel): Sample {
