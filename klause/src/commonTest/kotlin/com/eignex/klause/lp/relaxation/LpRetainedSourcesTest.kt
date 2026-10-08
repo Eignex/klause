@@ -75,7 +75,8 @@ class LpRetainedSourcesTest {
         val problem = Problem(1, 0, emptyArray(), emptyArray())
         val session = PropagationSession(problem)
         val domains = SessionDomains(session)
-        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, LinearObjective(boolWeights = longArrayOf(1L))))
+        val sources = LpRetainedSources(problem,
+            CpToLpRelaxation(problem, LinearObjective(boolWeights = longArrayOf(1L))))
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val edit = sources.prepare(owner.state, domains)
             assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
