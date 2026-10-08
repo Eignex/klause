@@ -10,6 +10,9 @@ import com.eignex.klause.lp.engine.CutRoundingRule
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.CutWeightedRow
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpPremise
+import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.exactRhs
@@ -395,29 +398,33 @@ private class SourceCutMapper(
                 } else if (row.global) {
                     facts.add(CutProofFact(rowFact, true))
                 } else {
-                    val premises = row.premises ?: decline(CutMappingDecline.MISSING_PROVENANCE)
-                    if (premises.vars.isEmpty() && premises.boolLits.isEmpty()) {
-                        decline(
-                            CutMappingDecline.MISSING_PROVENANCE,
+                    val premises = row.exactPremises ?: run {
+                        val legacy = row.premises ?: decline(CutMappingDecline.MISSING_PROVENANCE)
+                        if (legacy.vars.size != legacy.isUpper.size || legacy.vars.size != legacy.thresholds.size ||
+                            legacy.vars.any { it < 0 }
+                        ) {
+                            decline(CutMappingDecline.MISSING_PROVENANCE)
+                        }
+                        ExactLpPremises(
+                            legacy.vars.indices.map {
+                                ExactLpPremise(legacy.vars[it], legacy.isUpper[it], ExactLpNumber.of(legacy.thresholds[it]))
+                            },
+                            legacy.boolLits.toList(),
                         )
                     }
-                    if (premises.vars.size != premises.isUpper.size || premises.vars.size != premises.thresholds.size ||
-                        premises.vars.any { it < 0 }
-                    ) {
-                        decline(CutMappingDecline.MISSING_PROVENANCE)
-                    }
-                    for (i in premises.vars.indices) {
+                    if (premises.size == 0L) decline(CutMappingDecline.MISSING_PROVENANCE)
+                    for (premise in premises.boundEntries()) {
                         val expr = CutExpression(
-                            mapOf(CutSource(CutSourceKind.INTEGER, premises.vars[i]) to BigFraction.ONE),
+                            mapOf(CutSource(CutSourceKind.INTEGER, premise.variable) to BigFraction.ONE),
                         )
                         facts.add(
                             CutProofFact(
-                                CutPremise.Bound(expr, premises.isUpper[i], BigFraction.ofLong(premises.thresholds[i])),
+                                CutPremise.Bound(expr, premise.upper, premise.threshold.value),
                                 false,
                             ),
                         )
                     }
-                    for (literal in premises.boolLits) facts.add(CutProofFact(CutPremise.Literal(literal), false))
+                    for (literal in premises.literalEntries()) facts.add(CutProofFact(CutPremise.Literal(literal), false))
                 }
                 weightedRows.add(CutWeightedRow(rowFact, row.multiplier))
             }

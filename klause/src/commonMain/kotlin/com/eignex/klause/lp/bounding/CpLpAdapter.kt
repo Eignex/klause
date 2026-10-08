@@ -226,14 +226,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             },
         )
         if (result !is LpBoundBatchResult.Applied) return null
-        // CP certifiers read shifted Long arrays. Translation preserves row duals and source primals.
         val state = requireNotNull(core.state)
-        val authority = state.model
-        val proof = if (authority.m == base.model.m) {
-            authority.recentered(lower.map(ExactLpNumber::of)).toLegacy()
-        } else {
-            null
-        } ?: state.ownerWorkingModel() ?: return null
+        val proof = state.ownerWorkingModel() ?: return null
         val sources = base.sourceMap?.withCpBounds(proof, session)
         val rebound = base.withModel(proof, sources)
         currentModel = proof

@@ -280,7 +280,7 @@ private fun repairedMultipliers(model: IntegerLpView, mult: LongArray, scale: Lo
     return repaired ?: mult
 }
 
-private class IntegerLpView(private val model: LpModel) {
+internal class IntegerLpView private constructor(private val model: LpModel) {
     private val source = model.exactState?.model
     val n: Int get() = model.n
     val m: Int get() = model.m
@@ -289,6 +289,7 @@ private class IntegerLpView(private val model: LpModel) {
     fun rhs(row: Int): Long? = if (source == null) model.rhs[row] else source.rhs(row).exactLong()
     fun cost(column: Int): Long? = if (source == null) model.cost[column] else source.objective.cost(column).exactLong()
     fun constant(): Long? = if (source == null) model.objConstant else source.objective.constant.exactLong()
+    fun origin(column: Int): Long? = if (source == null) model.loShift[column] else source.column(column).origin.exactLong()
 
     fun hasLower(column: Int): Boolean = if (source == null) {
         column >= n || !model.probeClampedLo[column]
@@ -329,11 +330,11 @@ private class IntegerLpView(private val model: LpModel) {
     }
 
     companion object {
-        fun create(model: LpModel): IntegerLpView? {
+        fun create(model: LpModel, requireObjectiveUnits: Boolean = true): IntegerLpView? {
             if (!model.finiteExactInput()) return null
             val source = model.exactState?.model
             if (source == null && model.hasContinuous) return null
-            if (source != null && (source.objective.scale.value != BigFraction.ONE ||
+            if (requireObjectiveUnits && source != null && (source.objective.scale.value != BigFraction.ONE ||
                     !source.objective.externalConstant.value.isZero)
             ) {
                 return null

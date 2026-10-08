@@ -36,9 +36,14 @@ import com.eignex.klause.lp.engine.TableauCutProvenance
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.exactBounds
+import com.eignex.klause.lp.engine.exactConstant
+import com.eignex.klause.lp.engine.exactCost
+import com.eignex.klause.lp.engine.exactRhs
 import com.eignex.klause.lp.engine.exactShift
+import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.integerFarkasRay
+import com.eignex.klause.lp.engine.sourceObjective
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.cpCutSources
@@ -64,6 +69,34 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
+    @Test
+    fun `fixed node relaxations reuse their owner projection without changing source origins`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), emptyArray())
+        LpEngine(
+            problem, LinearObjective(intCoefficients = longArrayOf(1L)),
+            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "retained-projection"),
+        ).use { engine ->
+            val session = PropagationSession(problem)
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val root = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            assertEquals(3.0, assertNotNull(engine.solveNode(root.model, null, Cancellation.Never)?.second).objective)
+            assertSame(engine.propagator.state?.ownerWorkingModel(), root.model)
+            assertSame(root.model, assertNotNull(engine.nodeRelaxation(relaxer, session)).model)
+            session.pinIntAtLeast(0, 5L)
+
+            val child = assertNotNull(engine.nodeRelaxation(relaxer, session))
+
+            assertEquals(5.0, assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective)
+            assertSame(engine.propagator.state?.ownerWorkingModel(), child.model)
+            assertSame(child.model, assertNotNull(engine.nodeRelaxation(relaxer, session)).model)
+            assertEquals(BigFraction.ofLong(3L), root.model.exactShift(0))
+            assertEquals(BigFraction.ofLong(3L), child.model.exactShift(0))
+            assertEquals(3L, assertNotNull(integerCertify(root.model, doubleArrayOf())).objectiveBoundCeil(0L))
+            assertEquals(5L, assertNotNull(integerCertify(child.model, doubleArrayOf())).objectiveBoundCeil(0L))
+            assertEquals(1L, engine.propagator.metrics?.createdOwners)
+        }
+    }
+
     @Test
     fun `source nodes reclaim discarded rows and restore fresh bounds on nested pop`() {
         val problem = Problem(1, 3, Array(3) { IntDomain(0, 12) },
@@ -1102,15 +1135,19 @@ class CpLpAdapterTest {
             for (x in 0L..7L) {
                 for (y in -3L..7L) {
                     val column = child.intColOf[0]
-                    assertEquals(BigFraction.ZERO, child.model.exactShift(column))
-                    assertEquals(BigFraction.ofLong(7), child.model.exactBounds(column).upper?.number?.value)
-                    val shifted = longArrayOf(x - child.model.loShift[0], y - child.model.loShift[1])
-                    var activity = 0L
-                    for (j in shifted.indices) child.model.forEachInColumn(j) { _, a -> activity += a * shifted[j] }
-                    assertEquals(x + y >= 1L, activity <= child.model.rhs[0])
-                    val objectiveValue = child.model.objConstant + child.objectiveConstant +
-                        shifted.indices.sumOf { child.model.cost[it] * shifted[it] }
-                    assertEquals(2 * x + y + 5, objectiveValue)
+                    val origin = child.model.exactShift(column)
+                    assertEquals(authority.column(column).origin.value, origin)
+                    assertEquals(BigFraction.ZERO, origin + assertNotNull(child.model.exactBounds(column).lower).number.value)
+                    assertEquals(BigFraction.ofLong(7), origin + assertNotNull(child.model.exactBounds(column).upper).number.value)
+                    val shifted = listOf(BigFraction.ofLong(x) - origin, BigFraction.ofLong(y) - child.model.exactShift(1))
+                    var activity = BigFraction.ZERO
+                    var objectiveValue = child.model.exactConstant()
+                    for (j in shifted.indices) {
+                        child.model.forEachRationalColumn(j) { _, a -> activity += a * shifted[j] }
+                        objectiveValue += child.model.exactCost(j) * shifted[j]
+                    }
+                    assertEquals(x + y >= 1L, activity <= child.model.exactRhs(0))
+                    assertEquals(BigFraction.ofLong(2 * x + y + 5), child.model.sourceObjective(objectiveValue) + BigFraction.ofLong(child.objectiveConstant))
                 }
             }
             assertEquals(1.0, result.objective)
@@ -1175,12 +1212,15 @@ class CpLpAdapterTest {
             val session = PropagationSession(problem)
             val relaxer = assertNotNull(engine.lpRelaxer)
             session.pinIntAtLeast(0, 3)
-            assertEquals(3L, assertNotNull(engine.nodeRelaxation(relaxer, session)).model.loShift[0])
+            val child = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            assertEquals(BigFraction.ofLong(-5L), child.model.exactShift(0))
+            assertEquals(BigFraction.ofLong(3L), child.model.exactShift(0) + assertNotNull(child.model.exactBounds(0).lower).number.value)
             session.popToLevel(0)
             session.pinIntAtMost(0, -2)
             val sibling = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            assertEquals(-5L, sibling.model.loShift[0])
-            assertEquals(3L, sibling.model.upper[0])
+            assertEquals(BigFraction.ofLong(-5L), sibling.model.exactShift(0))
+            assertEquals(BigFraction.ofLong(-5L), sibling.model.exactShift(0) + assertNotNull(sibling.model.exactBounds(0).lower).number.value)
+            assertEquals(BigFraction.ofLong(-2L), sibling.model.exactShift(0) + assertNotNull(sibling.model.exactBounds(0).upper).number.value)
             assertEquals(
                 -5.0,
                 assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second).objective,
@@ -1301,7 +1341,7 @@ class CpLpAdapterTest {
             val auxiliary = root.colReq.indices.first { column ->
                 root.colReq[column]?.toList() == listOf(0L, 2L, 1L, 2L)
             }
-            assertEquals(1L, root.model.upper[auxiliary])
+            assertEquals(BigFraction.ONE, root.model.exactBounds(auxiliary).upper?.number?.value)
             shared.push(SearchDecision.IntEqual(2, 2))
 
             val child = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
@@ -1309,9 +1349,9 @@ class CpLpAdapterTest {
             assertEquals(0L, cp.session.intDomain(0).min)
             assertEquals(4L, cp.session.intDomain(0).max)
             assertTrue(!cp.session.intDomain(0).contains(2L))
-            assertEquals(0L, child.model.upper[auxiliary])
+            assertEquals(BigFraction.ZERO, child.model.exactBounds(auxiliary).upper?.number?.value)
             shared.popTo(0)
-            assertEquals(1L, assertNotNull(engine.nodeRelaxation(relaxer, cp.session)).model.upper[auxiliary])
+            assertEquals(BigFraction.ONE, assertNotNull(engine.nodeRelaxation(relaxer, cp.session)).model.exactBounds(auxiliary).upper?.number?.value)
         }
     }
 
@@ -1338,7 +1378,9 @@ class CpLpAdapterTest {
             shared.resetRootFacts()
             shared.initialize()
             val after = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            assertEquals(1L, after.model.loShift[0])
+            assertEquals(BigFraction.ZERO, after.model.exactShift(0))
+            assertEquals(BigFraction.ONE, assertNotNull(after.model.exactBounds(0).lower).number.value)
+            assertEquals(BigFraction.ONE, assertNotNull(after.model.exactBounds(0).upper).number.value)
             assertEquals(1.0, assertNotNull(engine.solveNode(after.model, null, Cancellation.Never)?.second).objective)
             assertEquals(1L, assertNotNull(engine.propagator.metrics).createdOwners)
             assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)

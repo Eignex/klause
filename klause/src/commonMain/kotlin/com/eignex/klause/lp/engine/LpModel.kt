@@ -934,21 +934,14 @@ private fun Long.roundsInBinary64(): Boolean {
 
 // This foundation deliberately does not implement ExactSimplexModel: legacy solvers require a
 // checked projection before they can see any of its values.
-internal class ExactLpNumber private constructor(val value: BigFraction, val ieeeBits: Long?) {
+internal class ExactLpNumber private constructor(val value: BigFraction, val ieeeBits: Long?, private val integer: Long?) {
     val approximation: Double by lazy(LazyThreadSafetyMode.PUBLICATION) {
         ieeeBits?.let { Double.fromBits(it) } ?: value.toDouble()
     }
 
     fun legacyLong(): Long? = if (ieeeBits == null) exactLong() else null
 
-    fun exactLong(): Long? {
-        if (value.den != BIG_ONE ||
-            value.num < minimumLong || value.num > maximumLong
-        ) {
-            return null
-        }
-        return value.num.toLongExact()
-    }
+    fun exactLong(): Long? = integer
 
     override fun equals(other: Any?): Boolean =
         other is ExactLpNumber && value == other.value && ieeeBits == other.ieeeBits
@@ -957,12 +950,20 @@ internal class ExactLpNumber private constructor(val value: BigFraction, val iee
     companion object {
         private val minimumLong = bigIntOf(Long.MIN_VALUE)
         private val maximumLong = bigIntOf(Long.MAX_VALUE)
-        fun of(value: Long): ExactLpNumber = ExactLpNumber(BigFraction.ofLong(value), null)
-        fun of(value: BigFraction): ExactLpNumber = ExactLpNumber(value, null)
-        fun ofIeee(value: Double): ExactLpNumber = ExactLpNumber(
-            requireNotNull(BigFraction.ofDouble(value)) { "exact input must be finite" },
-            value.toRawBits(),
-        )
+        fun of(value: Long): ExactLpNumber = ExactLpNumber(BigFraction.ofLong(value), null, value)
+        fun of(value: BigFraction): ExactLpNumber = ExactLpNumber(value, null, integerOf(value))
+        fun ofIeee(value: Double): ExactLpNumber {
+            val exact = requireNotNull(BigFraction.ofDouble(value)) { "exact input must be finite" }
+            return ExactLpNumber(exact, value.toRawBits(), integerOf(exact))
+        }
+
+        private fun integerOf(value: BigFraction): Long? = if (value.den != BIG_ONE ||
+            value.num < minimumLong || value.num > maximumLong
+        ) {
+            null
+        } else {
+            value.num.toLongExact()
+        }
     }
 }
 

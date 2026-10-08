@@ -79,6 +79,7 @@ internal class LpExactState internal constructor(
     private var projection: LpMatrixProjection? = null
     private var projectionAttempted = false
     private var vectors: LpVectorProjection? = null
+    private var ownerView: LpModel? = null
     private var inheritedVectors: LpVectorProjection? = null
     private var projectionColumns = intArrayOf()
 
@@ -266,7 +267,10 @@ internal class LpExactState internal constructor(
     // Numerical owners only read projected inputs. Caller-owned views copy the vectors because their arrays
     // may be edited independently of source authority and of any retained owner.
     fun ownerWorkingModel(meter: LpProjectionMeter = LpProjectionMeter()): LpModel? = try {
-        projectWorkingModel(meter, copyVectors = false)
+        ownerView?.let {
+            meter.reserve(1L, 0L, matrix = false)
+            it
+        } ?: projectWorkingModel(meter, copyVectors = false)?.also { ownerView = it }
     } catch (_: LpProjectionStop) {
         null
     }

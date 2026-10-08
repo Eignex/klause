@@ -95,6 +95,7 @@ internal class CutInputRow(
     columns: IntArray,
     coefficients: LongArray,
     premises: LpRowPremises?,
+    val exactPremises: ExactLpPremises? = null,
 ) {
     private val columnSnapshot = columns.copyOf()
     private val coefficientSnapshot = coefficients.copyOf()

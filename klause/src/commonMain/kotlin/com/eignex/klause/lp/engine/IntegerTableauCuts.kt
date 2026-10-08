@@ -48,11 +48,12 @@ internal fun integerTableauCuts(
     val m = model.m
     val n = model.n
     if (m == 0 || n == 0 || maxCuts <= 0) return emptyList()
-    if (model.hasContinuous || model.colContinuous.any { it } || model.rowStrict.any { it } ||
-        model.probeClampedLo.any { it } || primal.size != n
+    if (primal.size != n || primal.any { !it.isFinite() } || basis.basicVars.size != m ||
+        basis.basicVars.any { it !in 0 until model.numVars }
     ) {
         return emptyList()
     }
+    val input = IntegerTableauInput.create(model) ?: return emptyList()
 
     // Float LU of the basis `B` (its column `t` is the basic column `basic[t]`, which may be a slack);
     // btran gives the tableau rows.
@@ -60,7 +61,7 @@ internal fun integerTableauCuts(
         val col = basis.basicVars[t]
         if (col < n) {
             val entries = ArrayList<Pair<Int, Double>>()
-            model.forEachInColumn(col) { i, v -> entries.add(i to v.toDouble()) }
+            input.forEachCoefficient(col) { i, v -> entries.add(i to v.toDouble()) }
             entries
         } else {
             listOf((col - n) to 1.0) // slack column is the unit vector e_{col−n}
@@ -70,8 +71,8 @@ internal fun integerTableauCuts(
     try {
         if (!solver.refactorize(IntArray(m) { it })) return emptyList()
 
-        val isLeRow = BooleanArray(m) { !model.hasUpper[model.slackCol(it)] } // ≤-row slack is free above
-        val zStar = DoubleArray(n) { primal[it] - model.loShift[it].toDouble() } // shifted LP point
+        val isLeRow = BooleanArray(m) { !model.hasFiniteUpper(model.slackCol(it)) }
+        val zStar = DoubleArray(n) { primal[it] - input.origins[it].toDouble() }
 
         val cuts = ArrayList<Cut>()
         val unit = IndexedVector(m)
@@ -89,6 +90,7 @@ internal fun integerTableauCuts(
                 return emptyList()
             }
             val w = roundDuals(model, unit.gather(tableauRow))?.mult ?: continue
+            for (row in 0 until m) if (!input.supportedRows[row]) w[row] = 0L
 
             var anyWeight = false
             for (r in 0 until m) {
@@ -97,7 +99,7 @@ internal fun integerTableauCuts(
             }
             if (!anyWeight) continue
 
-            val cut = bestRoundedCut(model, w, isLeRow, zStar, mir) ?: continue
+            val cut = bestRoundedCut(input, w, isLeRow, zStar, mir) ?: continue
             cuts.add(cut)
         }
         return cuts
@@ -106,10 +108,59 @@ internal fun integerTableauCuts(
     }
 }
 
+private class IntegerTableauInput(
+    val model: LpModel,
+    private val integers: IntegerLpView,
+    val origins: LongArray,
+    val rhs: LongArray,
+    val supportedRows: BooleanArray,
+) {
+    fun forEachCoefficient(column: Int, action: (Int, Long) -> Unit) {
+        check(integers.forEachCoefficient(column, action))
+    }
+
+    companion object {
+        fun create(model: LpModel): IntegerTableauInput? {
+            val integers = IntegerLpView.create(model, requireObjectiveUnits = false) ?: return null
+            val origins = LongArray(model.n)
+            val rightHandSide = Array(model.m) { row ->
+                Int128().also { it.addLong(integers.rhs(row) ?: return null) }
+            }
+            val product = Int128()
+            for (column in 0 until model.n) {
+                if (!integers.integralColumn(column) || model.colContinuous[column]) return null
+                val lower = integers.lower(column) ?: return null
+                val origin = integers.origin(column) ?: return null
+                val shiftedOrigin = Int128().also {
+                    it.addLong(lower)
+                    it.addLong(origin)
+                }
+                if (!shiftedOrigin.fitsLong()) return null
+                origins[column] = shiftedOrigin.toLong()
+                if (!integers.forEachCoefficient(column) { row, coefficient ->
+                        product.clear()
+                        product.addProduct(coefficient, lower)
+                        rightHandSide[row].subtract(product)
+                    }
+                ) {
+                    return null
+                }
+            }
+            if (rightHandSide.any { !it.fitsLong() }) return null
+            val rows = BooleanArray(model.m) { row ->
+                val bounds = model.exactBounds(model.slackCol(row))
+                bounds.lower?.let { !it.strict && it.number.value.isZero } == true &&
+                    bounds.upper?.let { !it.strict && it.number.value.isZero } != false
+            }
+            return IntegerTableauInput(model, integers, origins, LongArray(model.m) { rightHandSide[it].toLong() }, rows)
+        }
+    }
+}
+
 /** Aggregated coefficient `gₖ = Σ_r w_r·A_{rk}` of structural column [k] (exact, [Int128]). */
-private fun aggregatedColumn(model: LpModel, w: LongArray, k: Int): Int128 {
+private fun aggregatedColumn(input: IntegerTableauInput, w: LongArray, k: Int): Int128 {
     val g = Int128()
-    model.forEachInColumn(k) { r, a -> g.addProduct(w[r], a) }
+    input.forEachCoefficient(k) { r, a -> g.addProduct(w[r], a) }
     return g
 }
 
@@ -131,21 +182,22 @@ private fun superAdditive(a: Int128, d: Long, f0: Long, mir: Boolean): Long? {
 /** Build the most-violated valid cut over all candidate divisors for the aggregation [w], or null. */
 @Suppress("LongMethod", "ReturnCount")
 private fun bestRoundedCut(
-    model: LpModel,
+    input: IntegerTableauInput,
     w: LongArray,
     isLeRow: BooleanArray,
     zStar: DoubleArray,
     mir: Boolean,
 ): Cut? {
+    val model = input.model
     val m = model.m
     val n = model.n
 
     // H = Σ_r w_r·rhs_r, and the touched structural columns with their aggregated coefficient.
     val hAgg = Int128()
-    for (r in 0 until m) if (w[r] != 0L) hAgg.addProduct(w[r], model.rhs[r])
+    for (r in 0 until m) if (w[r] != 0L) hAgg.addProduct(w[r], input.rhs[r])
     // The aggregated coefficient gₖ for EVERY structural column: a ≤-row slack back-substitution can put
     // a nonzero coefficient on a column whose gₖ = 0, so the cut loop below must visit all columns.
-    val colG = Array(n) { aggregatedColumn(model, w, it) }
+    val colG = Array(n) { aggregatedColumn(input, w, it) }
     val divisorSeen = LongHashSet()
     // Trial order is the column order, so membership and order are tracked separately.
     val divisorSet = LongArrayList()
@@ -200,7 +252,7 @@ private fun bestRoundedCut(
         // Cₖ = f(gₖ) − Σ_{≤-row r ∋ k} f(w_r)·A_{rk}; D = f(H) − Σ_{≤-row r} f(w_r)·rhs_r.
         val dAcc = Int128()
         dAcc.addLong(fH)
-        for (r in 0 until m) if (fw[r] != 0L) dAcc.addProduct(-fw[r], model.rhs[r])
+        for (r in 0 until m) if (fw[r] != 0L) dAcc.addProduct(-fw[r], input.rhs[r])
         if (!dAcc.fitsLong()) continue
         val rhsLe = dAcc.toLong()
 
@@ -216,7 +268,7 @@ private fun bestRoundedCut(
             if (!ok) break
             val cAcc = Int128()
             cAcc.addLong(fg)
-            model.forEachInColumn(k) { r, a -> if (fw[r] != 0L) cAcc.addProduct(-fw[r], a) }
+            input.forEachCoefficient(k) { r, a -> if (fw[r] != 0L) cAcc.addProduct(-fw[r], a) }
             if (!cAcc.fitsLong()) {
                 ok = false
                 break
@@ -238,7 +290,7 @@ private fun bestRoundedCut(
         val score = if (norm > 0.0) violation / norm else 0.0
         if (score <= bestScore) continue
 
-        val cut = emitGeCut(model, cutCols, cutVals, rhsLe, tableauProvenance(model, w, d, mir)) ?: continue
+        val cut = emitGeCut(input, cutCols, cutVals, rhsLe, tableauProvenance(input, w, d, mir)) ?: continue
         best = cut
         bestScore = score
     }
@@ -248,7 +300,7 @@ private fun bestRoundedCut(
 /** Turn the `≤` cut `Σ vals_k·z_k ≤ rhsLe` (shifted columns) into klause's `Σ a_k·x_k ≥ b` form,
  *  unshifting `z_k = x_k − lo_k` and gcd-reducing; null if a coefficient or the rhs overflows `Long`. */
 private fun emitGeCut(
-    model: LpModel,
+    input: IntegerTableauInput,
     cols: IntArrayList,
     leVals: LongArrayList,
     rhsLe: Long,
@@ -257,7 +309,7 @@ private fun emitGeCut(
     // Σ vals_k z_k ≤ rhsLe ⇔ Σ (−vals_k) x_k ≥ −rhsLe − Σ vals_k·lo_k.
     val rhsAcc = Int128()
     rhsAcc.addLong(rhsLe)
-    for (idx in 0 until cols.size) rhsAcc.addProduct(leVals[idx], model.loShift[cols[idx]])
+    for (idx in 0 until cols.size) rhsAcc.addProduct(leVals[idx], input.origins[cols[idx]])
     // rhsAcc = rhsLe + Σ vals_k·lo_k; the GE rhs is its negation.
     if (!rhsAcc.fitsLong()) return null
     if (rhsAcc.toLong() == Long.MIN_VALUE) return null
@@ -290,33 +342,35 @@ private fun ceilDiv(a: Long, b: Long): Long {
     return if (r > 0L) q + 1L else q
 }
 
-private fun tableauProvenance(model: LpModel, weights: LongArray, divisor: Long, mir: Boolean): TableauCutProvenance {
+private fun tableauProvenance(input: IntegerTableauInput, weights: LongArray, divisor: Long, mir: Boolean): TableauCutProvenance {
+    val model = input.model
     val touched = HashSet<Int>()
     val rows = weights.indices.filter { weights[it] != 0L }.map { row ->
         val cols = ArrayList<Int>()
         val values = ArrayList<Long>()
-        var rhs = BigFraction.ofLong(model.rhs[row])
+        var rhs = BigFraction.ofLong(input.rhs[row])
         for (col in 0 until model.n) {
-            model.forEachInColumn(col) { r, value ->
+            input.forEachCoefficient(col) { r, value ->
                 if (r == row) {
                     cols.add(col)
                     touched.add(col)
                     values.add(value)
-                    rhs += BigFraction.ofLong(value) * BigFraction.ofLong(model.loShift[col])
+                    rhs += BigFraction.ofLong(value) * BigFraction.ofLong(input.origins[col])
                 }
             }
         }
         CutInputRow(
             row,
-            model.rowGlobal[row],
+            model.exactState?.model?.row(row)?.global ?: model.rowGlobal[row],
             weights[row],
             rhs,
-            if (model.hasUpper[model.slackCol(row)]) Relation.EQ else Relation.LE,
+            if (model.hasFiniteUpper(model.slackCol(row))) Relation.EQ else Relation.LE,
             cols.toIntArray(),
             values.toLongArray(),
             model.rowPremises[row],
+            model.exactState?.model?.row(row)?.premises,
         )
     }
-    val columns = touched.sorted().map { CutColumnPremise(it, model.loShift[it], integral = true) }
+    val columns = touched.sorted().map { CutColumnPremise(it, input.origins[it], integral = true) }
     return TableauCutProvenance(model, columns, rows, divisor, mir)
 }

@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,6 +14,25 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpExactStateTest {
+    @Test
+    fun `cached owner views respect cancellation and caller projection isolation`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L) }.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(source)
+        val owner = assertNotNull(state.ownerWorkingModel())
+        val caller = assertNotNull(state.toWorkingModel())
+        assertNotNull(caller.doubleView).upper[0] = -1.0
+        val meter = LpProjectionMeter(workLimit = 1L, allocationLimit = 0L)
+
+        val repeated = assertNotNull(state.ownerWorkingModel(meter))
+
+        assertSame(owner, repeated)
+        assertEquals(6.0, repeated.upperD(0))
+        assertEquals(1L, meter.work)
+        assertEquals(0L, meter.allocation)
+        assertNull(state.ownerWorkingModel(LpProjectionMeter(cancellation = Cancellation { true })))
+        assertSame(owner, assertNotNull(state.ownerWorkingModel()))
+    }
+
     @Test
     fun `editing a caller projection cannot change later projections of its source`() {
         val one = ExactLpNumber.of(1L)

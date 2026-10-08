@@ -2589,7 +2589,6 @@ internal class RevisedSimplex(
      *  last solve was not optimal. Integer-multiplier row aggregation + super-additive rounding in 128
      *  bits ([integerTableauCuts]), so the cuts are rigorously valid. */
     override fun gomoryCuts(maxCuts: Int): List<Cut> {
-        if (model.hasContinuous) return emptyList() // integer tableau cuts need an integer matrix
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = false)
@@ -2597,7 +2596,6 @@ internal class RevisedSimplex(
 
     /** Gomory mixed-integer (MIR) cuts from the last optimal basis, up to [maxCuts]. */
     override fun mirCuts(maxCuts: Int): List<Cut> {
-        if (model.hasContinuous) return emptyList() // integer tableau cuts need an integer matrix
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = true)
