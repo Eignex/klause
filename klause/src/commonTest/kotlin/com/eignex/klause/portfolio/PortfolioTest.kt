@@ -19,6 +19,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableOptimizer
@@ -29,6 +30,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -37,6 +39,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1
+import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -619,6 +622,22 @@ class PortfolioTest {
     }
 
     @Test
+    fun `a resumed local search arm respects session pins`() {
+        val session = LocalSearchSolver(Problem(1, 0, emptyArray(), emptyArray()).bake()).session()
+        session.push(Assumptions(bools = mapOf(0 to true)))
+        val worker = PortfolioWorker.of(
+            "ls",
+            0,
+            session,
+            LocalSearchParams(initialAssignment = Sample(booleanArrayOf(false), longArrayOf()), randomSeed = 3L),
+        )
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.solve() }
+
+        assertTrue(assertIs<SolveResult.Sat>(result).assignment.bools[0])
+    }
+
+    @Test
     fun `replicas of one arm are reported under numbered labels`() {
         val workers = List(3) { index ->
             PortfolioWorker.of("bt", index, CountingResumableSolver(slicesToVerdict = 20).session(), BacktrackParams())
@@ -888,6 +907,75 @@ class PortfolioTest {
             withBound = { p, supplier -> p.copy(objectiveBoundSupplier = supplier) },
         ),
     )
+
+    @Test
+    fun `a counted local search segment reports the work it spent`() {
+        val cases = listOf(Triple(100L, 0L, 0L), Triple(100L, 75L, 50L), Triple(7L, 10L, 7L))
+        for ((allowance, moves, expected) in cases) {
+            val arms = listOf(
+                PortfolioWorker.ofSolve("ls", 0, countsInstructions = true) { _, _ ->
+                    SolveResult.Unknown(
+                        TerminationReason.BudgetExhausted,
+                        SolveStats(ls = LocalSearchStats(moves = SumResult(moves.toDouble()))),
+                    )
+                },
+                PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
+            )
+
+            val result = Portfolio.thompson(arms, baseSliceWork = allowance).use { it.solve() }
+
+            assertEquals(expected, result.stats.portfolio.arms[0].work)
+        }
+    }
+
+    @Test
+    fun `resumed local search spends the exact counted instruction allowance`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            Array<Factor>(8) { mask -> Clause(IntArray(3) { v -> Lit.make(v, mask and (1 shl v) != 0) }) },
+        )
+        for ((price, instructions) in listOf(1.5 to 10L, 1.0 to 7L, 2.0 to 14L)) {
+            val arms = listOf(
+                PortfolioWorker.of(
+                    "ls",
+                    0,
+                    LocalSearchSolver(problem.bake()).session(),
+                    LocalSearchParams(maxFlips = 100L, randomSeed = 3L),
+                    withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit) },
+                ),
+                PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
+            )
+
+            val result = Portfolio(
+                arms,
+                DiscountedThompson(arms.size, Random(0), Portfolio.DEFAULT_HALF_LIFE),
+                baseSliceWork = 7L,
+                lsInstructionsPerWork = price,
+            ).use { it.solve() }
+
+            assertEquals(instructions.toDouble(), result.stats.ls.moves.sum, "price=$price")
+            assertEquals(7L, result.stats.portfolio.arms[0].work, "price=$price")
+        }
+    }
+
+    @Test
+    fun `an ALNS segment charges its outer allowance rather than inner moves`() {
+        val arms = listOf(
+            PortfolioWorker.ofSolve("lns", 0, countsInstructions = true) { _, _ ->
+                SolveResult.Unknown(
+                    TerminationReason.BudgetExhausted,
+                    SolveStats(ls = LocalSearchStats(moves = SumResult(75.0))),
+                )
+            }.also { it.family = ArmFamily.Lns },
+            PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
+        )
+
+        val result = Portfolio.thompson(arms, baseSliceWork = 100L).use { it.solve() }
+
+        assertEquals(100L, result.stats.portfolio.arms[0].work)
+    }
 
     @Test
     fun `mixed sequential run bounds LS work to its counted segment allowance`() {

@@ -76,6 +76,17 @@ class CblsStallChainTest {
     }
 
     @Test
+    fun `reused chain pools respect a newly frozen variable`() {
+        val state = stateAt(chainProblem(), intArrayOf(0, 2))
+        state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = MoveSink())
+        state.assumptions = Assumptions(ints = mapOf(1 to 2))
+
+        val emitted = state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = MoveSink())
+
+        assertEquals(0, emitted)
+    }
+
+    @Test
     fun `default stallChainCap 0 never emits a chain compound`() {
         val problem = Problem(
             numBoolVars = 0,

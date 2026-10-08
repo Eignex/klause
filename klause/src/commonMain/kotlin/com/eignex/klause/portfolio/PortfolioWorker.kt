@@ -3,7 +3,6 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
-import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
@@ -33,7 +32,7 @@ class PortfolioWorker private constructor(
     private val improvementsFn: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
     private val resumableFn: ((readBound: () -> Double) -> ResumableSearch)?,
-    private val resumableSolveFn: (() -> ResumableSolve)?,
+    private val resumableSolveFn: (() -> ResumableSolve?)?,
     private val withInstructions: Boolean,
     private val closeFn: () -> Unit,
 ) : AutoCloseable {
@@ -61,7 +60,7 @@ class PortfolioWorker private constructor(
 
     /**
      * Open a fresh pause/resume handle over this worker's satisfaction search, or `null` when the engine can't be
-     * paused (local search, which restarts each segment instead). The satisfaction counterpart of
+     * paused. Local-search handles retain their walk across segments. The satisfaction counterpart of
      * [newResumableSearch]: [Portfolio.solve] resumes it each segment rather than restarting the arm.
      */
     fun newResumableSolve(): ResumableSolve? = resumableSolveFn?.invoke()
@@ -147,8 +146,6 @@ class PortfolioWorker private constructor(
                 } else {
                     null
                 }
-            // The satisfaction counterpart, resumed each segment by the sequential portfolio.
-            val resumableSolver = session.solver as? ResumableSolver<P>
             return PortfolioWorker(
                 label = label,
                 armId = armId,
@@ -166,7 +163,7 @@ class PortfolioWorker private constructor(
                 },
                 samplesFn = { c -> session.samples(withCancel(c)) },
                 resumableFn = resumableFn,
-                resumableSolveFn = resumableSolver?.let { solver -> { solver.resumableSolve(params) } },
+                resumableSolveFn = { session.resumableSolve(params) },
                 withInstructions = withInstructionBudget != null,
                 closeFn = { session.close() },
             )

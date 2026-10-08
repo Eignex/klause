@@ -11,6 +11,8 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Optimizer
+import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
@@ -72,7 +74,7 @@ class LocalSearchSolver(
      *  floating point. Without one such a model is declined; a model without continuous columns never consults
      *  it. */
     val completion: CandidateCompletion? = null,
-) : Solver<LocalSearchParams>,
+) : ResumableSolver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
 
     /** Solve a [CompiledSchema]'s problem with the default local-search configuration. */
@@ -107,6 +109,12 @@ class LocalSearchSolver(
     override fun describe(params: LocalSearchParams): String = engine.describe(params)
 
     override fun solve(params: LocalSearchParams): SolveResult = engine.solve(params, warm = null)
+
+    /**
+     * Open a satisfaction walk whose assignment, RNG and restart state persist between slices. Consume and close
+     * the handle before another search uses this solver's strategy and restart policy.
+     */
+    override fun resumableSolve(params: LocalSearchParams): ResumableSolve = engine.resumableSolve(params)
 
     override fun samples(params: LocalSearchParams): Sequence<Sample> = engine.samples(params, warm = null)
 

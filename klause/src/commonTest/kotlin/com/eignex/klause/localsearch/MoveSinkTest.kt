@@ -8,6 +8,25 @@ import kotlin.test.assertTrue
 class MoveSinkTest {
 
     @Test
+    fun `indexed moves retain filtered primitives and compound order across clear`() {
+        val sink = MoveSink(Assumptions(bools = mapOf(1 to true)))
+        sink.setOwners(intArrayOf(-1, 7))
+        repeat(2) {
+            sink.addBoolFlip(0)
+            sink.addCompound(listOf(Move.BoolFlip(2), Move.IntSet(0, Long.MIN_VALUE)))
+            sink.addBoolFlip(1)
+            sink.addIntSet(1, 42)
+            sink.addIntSet(0, Long.MAX_VALUE)
+            sink.addRealSet(0, -0.0)
+
+            assertEquals(sink.list, List(sink.size) { sink.moveAt(it) })
+            assertEquals(4, sink.size)
+            sink.clear()
+            assertEquals(0, sink.size)
+        }
+    }
+
+    @Test
     fun `bool flip round-trips through packed lane`() {
         val sink = MoveSink()
         sink.addBoolFlip(0)

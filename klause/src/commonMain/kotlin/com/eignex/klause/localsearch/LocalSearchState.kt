@@ -3,6 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.randomValue
@@ -102,6 +103,15 @@ class LocalSearchState(
 
     /** Buffer that strategies push candidate moves into. */
     val moveSink: MoveSink = MoveSink(assumptions)
+
+    internal val repairChainDegrees: RepairChainDegrees by lazy(LazyThreadSafetyMode.NONE) { RepairChainDegrees() }
+    internal val repairChainFirsts: MoveSink by lazy(LazyThreadSafetyMode.NONE) { MoveSink() }
+    internal val repairChainProposals: MoveSink by lazy(LazyThreadSafetyMode.NONE) { MoveSink() }
+
+    // Clause degrees are binary, so their maintained break/make counts sum the exact raw delta.
+    internal val repairChainClauseOnly: Boolean by lazy(LazyThreadSafetyMode.NONE) {
+        problem.factors.all { it is Clause }
+    }
 
     /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */
     val factors: Array<out Invariant> = projection.invariants
