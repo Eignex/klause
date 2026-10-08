@@ -21,7 +21,7 @@ internal fun runRootPropagation(
     cancellation: Cancellation,
     skipExpensiveBake: Boolean,
 ): PropagationResult {
-    val state = PropagationState(PropagationProblem(problem), assumptions)
+    val state = PropagationState(PropagationProblem(problem), assumptions, nativeSat = true)
     if (!state.seeded) {
         val levels = state.conflictLevels ?: EmptyIntArray
         return PropagationResult.Unsat(

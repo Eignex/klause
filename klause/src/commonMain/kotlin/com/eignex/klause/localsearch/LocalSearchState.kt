@@ -86,7 +86,8 @@ class LocalSearchState(
     /** Per-factor `Long` scratch, the wide counterpart to [intPayload]. The weighted-sum
      *  family ([Linear], [ReifiedLinear], `PseudoBoolean`, `ReifiedPseudoBoolean`) keeps its
      *  running `Σ coeff·value` here so large coefficients / wide domains can't wrap a 32-bit
-     *  accumulator and silently corrupt `isViolated` / `violationDegree`. */
+     *  accumulator and silently corrupt `isViolated` / `violationDegree`. Clauses pack their two
+     *  watched literal indices into this slot. */
     val longPayload: LongArray = LongArray(problem.numFactors)
     val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
 

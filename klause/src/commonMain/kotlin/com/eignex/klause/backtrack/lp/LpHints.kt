@@ -18,23 +18,26 @@ import kotlin.math.roundToLong
  * in which case ordering is left untouched.
  */
 internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
-    private val intVal = DoubleArray(numIntVars) { Double.NaN }
-    private val boolVal = DoubleArray(numBoolVars) { Double.NaN }
+    private val intVal by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numIntVars) { Double.NaN } }
+    private val boolVal by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numBoolVars) { Double.NaN } }
 
     // Freshness stamps: hints are consulted only when written by the latest LP solve. Values are
     // never invalidated on backtrack, so without the stamp a hint recorded in an abandoned subtree
     // would keep steering value order at unrelated nodes.
-    private val intStamp = IntArray(numIntVars) { -1 }
-    private val boolStamp = IntArray(numBoolVars) { -1 }
+    private val intStamp by lazy(LazyThreadSafetyMode.NONE) { IntArray(numIntVars) { -1 } }
+    private val boolStamp by lazy(LazyThreadSafetyMode.NONE) { IntArray(numBoolVars) { -1 } }
     private var solveStamp = 0
 
     // Decayed running average of `|reduced cost|` each variable showed while nonbasic, a
     // reduced-cost pseudo-cost (an estimate of the objective's sensitivity to the variable). NaN = the
     // variable has never been nonbasic, so there is no estimate yet. Read by [branchScore]; advisory.
-    private val intRc = DoubleArray(numIntVars) { Double.NaN }
-    private val boolRc = DoubleArray(numBoolVars) { Double.NaN }
+    private val intRc by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numIntVars) { Double.NaN } }
+    private val boolRc by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numBoolVars) { Double.NaN } }
+
+    private var recorded = false
 
     override fun clear() {
+        if (!recorded) return
         intVal.fill(Double.NaN)
         boolVal.fill(Double.NaN)
         intRc.fill(Double.NaN)
@@ -42,6 +45,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
         intStamp.fill(-1)
         boolStamp.fill(-1)
         solveStamp = 0
+        recorded = false
     }
 
     /**
@@ -52,6 +56,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
      * ([branchScore]) selection, never feasibility or the optimum.
      */
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+        recorded = true
         val model = relaxation.model
         solveStamp++
         for (col in relaxation.colVarId.indices) {
@@ -86,6 +91,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
      * value scores `NaN` (the selector falls back). Higher = branch here first.
      */
     fun branchScore(varRef: VarRef): Double {
+        if (!recorded) return Double.NaN
         val isBool = varRef is VarRef.Bool
         val id = when (varRef) {
             is VarRef.IntVar -> varRef.varId
@@ -113,6 +119,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
      * domain costs O(consumed), not a full sort.
      */
     fun order(varRef: VarRef, values: Sequence<Long>): Sequence<Long> {
+        if (!recorded) return values
         val id = when (varRef) {
             is VarRef.IntVar -> varRef.varId
             is VarRef.Bool -> varRef.varId

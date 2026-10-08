@@ -6,6 +6,7 @@ import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
@@ -48,6 +49,7 @@ import kotlin.time.ComparableTimeMark
 class BacktrackSolver internal constructor(
     override val problem: BakedProblem,
     internal val lpSolveContext: LpSolveContext,
+    private val nativeProjection: PropagationProblem? = null,
 ) : Solver<BacktrackParams>,
     Optimizer<BacktrackParams>,
     ResumableOptimizer<BacktrackParams>,
@@ -55,6 +57,16 @@ class BacktrackSolver internal constructor(
 
     /** Solve a baked problem with production LP dependencies. */
     constructor(problem: BakedProblem) : this(problem, LpSolveContext.Production)
+
+    internal constructor(problem: BakedProblem, nativeProjection: PropagationProblem) :
+        this(problem, LpSolveContext.Production, nativeProjection)
+
+    internal fun propagationProjection(nativeSat: Boolean, model: BakedProblem = problem): PropagationProblem =
+        if (nativeSat && nativeProjection?.isNativeSatEligible == true && nativeProjection.problem === model) {
+            nativeProjection
+        } else {
+            PropagationProblem(model)
+        }
 
     /** Solve a [CompiledSchema]'s problem. */
     constructor(compiled: CompiledSchema) : this(compiled.problem.bake(), LpSolveContext.Production)

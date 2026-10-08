@@ -29,6 +29,20 @@ class NativeSatForgetTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `relocated watches propagate after backtracking`() {
+        val session = session(3, intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
+
+        session.pinBool(0, false)
+        session.pinBool(1, false)
+        assertEquals(true, session.boolValue(2))
+        session.popToLevel(0)
+        session.pinBool(2, false)
+        session.pinBool(1, false)
+
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
     fun `forget renumbers survivors and preserves their propagation`() {
         // One trivial base clause keeps the problem non-empty; learned clauses drive the test.
         val session = session(4, intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)))

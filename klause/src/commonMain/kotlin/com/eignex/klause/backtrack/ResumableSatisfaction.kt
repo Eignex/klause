@@ -34,6 +34,7 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
         sink,
         solver.lpSolveContext,
         propagationCancellation = Cancellation { globalToken() },
+        projection = solver.propagationProjection(params.nativeSat ?: true),
         slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = {
             slice.charge()
             slice.workExpired()

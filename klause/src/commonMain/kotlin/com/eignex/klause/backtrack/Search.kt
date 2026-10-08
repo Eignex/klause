@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
@@ -142,11 +143,12 @@ internal class CpSatisfactionTraversal(
     solveContext: LpSolveContext,
     propagationCancellation: Cancellation = params.cancellation,
     private val slice: TraversalSlice? = null,
+    projection: PropagationProblem = PropagationProblem(problem),
 ) {
     private val lpResources = ArrayList<LpSearchResource>()
     private val cp = CpSearchComponent(
         PropagationSession(
-            problem,
+            projection,
             propagationCancellation,
             params.propagationCancelFloor,
             nativeSat = params.nativeSat ?: true,

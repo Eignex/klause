@@ -95,6 +95,21 @@ class RootPropagationTest {
     }
 
     @Test
+    fun `a clause conflict reports the factors that forced its false literals`() {
+        val p = boolProblem(
+            3,
+            intArrayOf(lit(0, true)),
+            intArrayOf(lit(0, false), lit(1, true)),
+            intArrayOf(lit(1, false)),
+            intArrayOf(lit(2, true)),
+        )
+
+        val result = assertIs<PropagationResult.Unsat>(p.propagate())
+
+        assertEquals(setOf(0, 1, 2), result.conflictFactors.toSet())
+    }
+
+    @Test
     fun `Implied result is disjoint from input assumptions`() {
         val p = boolProblem(2, intArrayOf(lit(0, false), lit(1, true)))
         val r = implied(p.propagate(Assumptions(bools = mapOf(0 to true))))

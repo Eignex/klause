@@ -4,10 +4,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
 
-/** Mutable two-watch index pair for a clause. Stored in [LocalSearchState.refPayload] and
- *  also shared by the CP path via [PropagationState.refPayload]. */
-internal class ClauseWatches(var w1: Int, var w2: Int)
-
 /** True iff `literals[idx]` evaluates to true under [state]'s CP assignment. */
 internal fun litTrueInPropState(state: PropagationState, literals: IntArray, idx: Int): Boolean =
     state.litTrue(literals[idx])

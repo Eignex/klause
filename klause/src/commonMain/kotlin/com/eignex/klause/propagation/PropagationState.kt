@@ -94,6 +94,8 @@ class PropagationState(
     /** Immutable model data addressed by this state. */
     val problem: Problem get() = projection.problem
 
+    private val usesNativeSat = nativeSat && projection.isNativeSatEligible
+
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
      *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than an `Array<Boolean?>`
@@ -158,8 +160,8 @@ class PropagationState(
     // pin. A factor is queued iff `propStamp[fid] == propGen`; dequeuing writes `propGen - 1`
     // (any value ≠ propGen) so a factor can still re-enqueue itself within the same run.
     internal val propQueue: IntArrayDeque =
-        IntArrayDeque(initialCapacity = problem.numFactors.coerceAtLeast(8))
-    private var propStamp: IntArray = IntArray(problem.numFactors.coerceAtLeast(8))
+        IntArrayDeque(initialCapacity = if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8))
+    private var propStamp: IntArray = IntArray(if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8))
     private var propGen: Int = 0
 
     /** Reset the worklist for a new propagation run over [factorCount] factors. Grows
@@ -384,8 +386,8 @@ class PropagationState(
 
     /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
      *  alongside the learned-clause registry without copying the full array. */
-    internal val refPayloadStore: ArrayList<Any?> = ArrayList<Any?>(problem.numFactors).apply {
-        repeat(problem.numFactors) { add(null) }
+    internal val refPayloadStore: ArrayList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
+        ArrayList<Any?>(problem.numFactors).apply { repeat(problem.numFactors) { add(null) } }
     }
 
     /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every
@@ -398,10 +400,18 @@ class PropagationState(
 
     /** Per-factor mutable payload slots (reference-typed). Writes route through this view so
      *  [snapshottableIndices] stays in sync; reads and structural ops delegate to [refPayloadStore]. */
-    val refPayload: MutableList<Any?> = object : MutableList<Any?> by refPayloadStore {
-        override fun set(index: Int, element: Any?): Any? {
-            if (element is SnapshottablePayload) snapshottableIndices.add(index) else snapshottableIndices.remove(index)
-            return refPayloadStore.set(index, element)
+    val refPayload: MutableList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
+        object : MutableList<Any?> by refPayloadStore {
+            override fun set(index: Int, element: Any?): Any? {
+                if (element is SnapshottablePayload) {
+                    snapshottableIndices.add(
+                        index,
+                    )
+                } else {
+                    snapshottableIndices.remove(index)
+                }
+                return refPayloadStore.set(index, element)
+            }
         }
     }
 
@@ -415,18 +425,17 @@ class PropagationState(
         },
     )
 
-    // Cached base factor table — `problem.factors` is immutable after construction, so hoist
-    // the array reference and its size out of the per-call `problem.factors` / `.size` getters
-    // that [factorAt] (a top BCP-loop method) pays on every watcher fire.
-    internal val baseFactors: Array<out Propagator> = projection.propagators
+    // The native SAT lane does not use CP propagators or occurrence indices. Keep their tables
+    // deferred so a clause-only state does not retain both representations of every factor.
+    internal val baseFactors: Array<out Propagator> by lazy(LazyThreadSafetyMode.NONE) { projection.propagators }
     internal val baseFactorCount: Int = problem.factors.size
 
-    // Occurrence-list wakeup arrays cached off [problem] once at construction: they are lazily
-    // built on `Problem` (deferred entirely for a presolve pass-view), so read them here — where a
-    // state is always over a fully-baked problem — to force them once instead of paying a delegated
-    // lazy access on every wakeup in the BCP hot loop.
-    private val nonBoolWatcherOcc: Array<IntArray> = projection.nonBoolWatcherBoolOccurrences
-    private val nonIntEventWatcherOcc: Array<IntArray> = projection.nonIntEventWatcherIntOccurrences
+    private val nonBoolWatcherOcc: Array<IntArray> by lazy(LazyThreadSafetyMode.NONE) {
+        projection.nonBoolWatcherBoolOccurrences
+    }
+    private val nonIntEventWatcherOcc: Array<IntArray> by lazy(LazyThreadSafetyMode.NONE) {
+        projection.nonIntEventWatcherIntOccurrences
+    }
 
     /** Constraints learned during conflict analysis (clause-only today; see [LearnedClauseDb]). */
     internal val learnedClauses: List<LearnedPropagator> get() = learned.store
@@ -443,7 +452,7 @@ class PropagationState(
 
     /** Per-literal bool watcher index (watch lists, blockers, back-pointers) —
      *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
-    internal val watches: BoolWatcherIndex = BoolWatcherIndex(problem.numBoolVars)
+    internal val watches: BoolWatcherIndex by lazy(LazyThreadSafetyMode.NONE) { BoolWatcherIndex(problem.numBoolVars) }
 
     /**
      * Per-bool-var antecedent literals — the literal-form reason why this variable's
@@ -736,7 +745,7 @@ class PropagationState(
      *  general LCG path. Its construction reads [boolPinOrder] and the clause arena (both live above),
      *  so it is declared after them. */
     internal val nativeEngine: NativeSatState? =
-        if (nativeSat && projection.isNativeSatEligible) NativeSatState(this) else null
+        if (usesNativeSat) NativeSatState(this) else null
 
     /** Seed reason (all-false clause literals) stashed by [NativeSatState] on a conflict, so
      *  [PropagationSession] can drive 1UIP through [ConflictAnalyzer.analyzeConflictClause] without a

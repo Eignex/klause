@@ -43,6 +43,7 @@ class SearchSession(
         add(MutableIntObjectMap())
     }
     private val pendingAssertions = ArrayDeque<PendingAssertion>()
+    private var selfPublicationsPending = false
     private val learned = WatchedClauseStore()
     private val boolTrail = IntArrayList()
     private val trailStartAtLevel = IntArrayList().apply { add(0) }
@@ -171,9 +172,15 @@ class SearchSession(
                 } else {
                     activeComponent?.let { boolPublisher.put(variable, it) }
                 }
-                pendingAssertions.addLast(
-                    PendingAssertion(SearchDecision.Bool(literal), if (publishedTheory) null else activeComponent),
-                )
+                if (!publishedTheory && singleComponent != null && singleComponent === activeComponent) {
+                    // The sole component already applied its consequence. Keep the fixpoint signal
+                    // without buffering a delivery that would only be skipped as a self-publication.
+                    selfPublicationsPending = true
+                } else {
+                    pendingAssertions.addLast(
+                        PendingAssertion(SearchDecision.Bool(literal), if (publishedTheory) null else activeComponent),
+                    )
+                }
                 ComponentResult.Consistent
             }
 
@@ -346,6 +353,7 @@ class SearchSession(
     /** Run all components until each has observed the current shared state once. */
     fun propagate(): ComponentResult {
         while (true) {
+            selfPublicationsPending = false
             while (pendingAssertions.isNotEmpty()) {
                 val pending = pendingAssertions.removeFirst()
                 if (singleComponent != null) {
@@ -370,7 +378,7 @@ class SearchSession(
             if (result !is ComponentResult.Consistent) return result
             val learned = propagateLearnedClauses()
             if (learned !is ComponentResult.Consistent) return learned
-            if (pendingAssertions.isEmpty()) return ComponentResult.Consistent
+            if (pendingAssertions.isEmpty() && !selfPublicationsPending) return ComponentResult.Consistent
         }
     }
 

@@ -419,11 +419,14 @@ class FactorPropertyTest {
                 state.intPayload[0],
                 "${factor::class.simpleName}: intPayload drift after $move on iter=$i",
             )
-            assertEquals(
-                sibling.longPayload[0],
-                state.longPayload[0],
-                "${factor::class.simpleName}: longPayload drift after $move on iter=$i",
-            )
+            // Clause watch positions may differ while tracking the same truth.
+            if (factor !is Clause) {
+                assertEquals(
+                    sibling.longPayload[0],
+                    state.longPayload[0],
+                    "${factor::class.simpleName}: longPayload drift after $move on iter=$i",
+                )
+            }
             assertEquals(
                 sibling.cost,
                 state.cost,

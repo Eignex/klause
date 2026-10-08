@@ -16,6 +16,27 @@ import kotlin.test.assertTrue
 class PropagationProblemTest {
 
     @Test
+    fun `sessions sharing a native projection keep their decisions independent`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))),
+        )
+        val projection = PropagationProblem(problem)
+        val first = PropagationSession(projection, nativeSat = true)
+        val second = PropagationSession(projection, nativeSat = true)
+
+        first.pinBool(0, false)
+        first.pinBool(1, false)
+        second.pinBool(2, false)
+        second.pinBool(1, false)
+
+        assertEquals(listOf(false, false, true), (0..2).map(first::boolValue))
+        assertEquals(listOf(true, false, false), (0..2).map(second::boolValue))
+    }
+
+    @Test
     fun `a variable's occurrence list names every factor mentioning it`() {
         val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val c1 = Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true)))
@@ -60,6 +81,29 @@ class PropagationProblemTest {
         assertTrue(occ.nonIntEventWatcherIntOccurrences[0].isEmpty(), "the subscriber wakes on var 0 via its events")
         assertEquals(listOf(1), occ.nonIntEventWatcherIntOccurrences[1].toList())
         assertEquals(listOf(1), occ.nonIntEventWatcherIntOccurrences[2].toList())
+    }
+
+    @Test
+    fun `a projection supports native propagation followed by general propagation`() {
+        val projection = PropagationProblem(
+            Problem(
+                3,
+                0,
+                emptyArray(),
+                listOf(
+                    Clause(intArrayOf(Lit.make(0, true))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                ),
+            ),
+        )
+
+        for (nativeSat in listOf(true, false)) {
+            val state = PropagationState(projection, Assumptions.None, nativeSat = nativeSat)
+            state.runToFixpoint(allFactors = true)
+
+            assertEquals(listOf(0, 1), projection.boolOccurrences[0].toList())
+            assertEquals(listOf(true, true, null), List(3) { state.boolValues[it] })
+        }
     }
 
     @Test

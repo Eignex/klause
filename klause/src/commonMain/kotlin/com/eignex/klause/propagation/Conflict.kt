@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -11,6 +12,7 @@ import com.eignex.klause.util.IntHashSet
 private fun PropagationState.factorBoolVars(fid: Int): IntArray = when {
     fid < baseFactorCount -> problem.factors[fid].boolVars
     incremental -> midlife.factors[fid - baseFactorCount].boolVars
+    nativeEngine != null -> nativeEngine.literalsOf(fid - baseFactorCount).litVars()
     else -> learned.store[fid - baseFactorCount].boolVars
 }
 
@@ -18,6 +20,7 @@ private fun PropagationState.factorBoolVars(fid: Int): IntArray = when {
 private fun PropagationState.factorIntVars(fid: Int): IntArray = when {
     fid < baseFactorCount -> problem.factors[fid].intVars
     incremental -> midlife.factors[fid - baseFactorCount].intVars
+    nativeEngine != null -> EmptyIntArray
     else -> learned.store[fid - baseFactorCount].intVars
 }
 

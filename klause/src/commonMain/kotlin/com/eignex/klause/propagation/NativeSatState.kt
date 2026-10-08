@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.OriginCounts
@@ -21,7 +22,7 @@ import com.eignex.klause.util.OriginCounts
  *
  * Watches are advisory mutable state, rebuilt per session and allowed to drift across backtrack: the
  * two watched literals of clause `h` sit at within-clause indices `watchPos[2h]` / `watchPos[2h+1]`, and
- * `watchClauses[L]` lists the clauses watching literal `L`. Base-clause literals live in the shared,
+ * `watchEntries[L]` lists the clauses watching literal `L`. Base-clause literals live in the shared,
  * immutable [ClauseArena]; learned clauses append into a growable side buffer. Watch relocation moves
  * indices, never the literals, so the arena stays shareable read-only.
  */
@@ -52,14 +53,24 @@ internal class NativeSatState(private val state: PropagationState) {
     /** Uses of imported learned clauses, by origin. */
     val importUses = OriginCounts()
 
-    // Within-clause indices of the two watched literals per clause handle: watchPos[2h], watchPos[2h+1].
+    // Keep learned positions separate so the first learned clause cannot double the base allocation.
     // A single-literal clause watches nothing (its unit is pinned at root and never unassigned).
-    private val watchPos = IntArrayList()
+    private val watchPos = IntArray(2 * baseCount)
+    private val learnedWatchPos = IntArrayList()
 
-    // Per-literal watch lists (clause handles) with a parallel blocker literal: if the blocker
-    // is already true the clause is satisfied and the wake is skipped. Indexed by literal id.
-    private val watchClauses: Array<IntArrayList> = Array(2 * numBoolVars) { IntArrayList(initialCapacity = 2) }
-    private val watchBlockers: Array<IntArrayList> = Array(2 * numBoolVars) { IntArrayList(initialCapacity = 2) }
+    // Pack each handle and blocker into one word. Exact initial capacities avoid millions of empty
+    // list objects and growth copies; literals with no watcher share the empty array.
+    private val watchSizes = IntArray(2 * numBoolVars)
+    private val watchEntries: Array<LongArray> = run {
+        for (h in 0 until baseCount) {
+            if (arena.length(h) < 2) continue
+            watchSizes[arena.lits[arena.start(h)]]++
+            watchSizes[arena.lits[arena.start(h) + 1]]++
+        }
+        Array(watchSizes.size) { lit ->
+            if (watchSizes[lit] == 0) EmptyLongArray else LongArray(watchSizes[lit])
+        }.also { watchSizes.fill(0) }
+    }
 
     // Base unit clauses, pinned once at root during the initial full propagation.
     private val baseUnits = IntArrayList()
@@ -72,7 +83,6 @@ internal class NativeSatState(private val state: PropagationState) {
     private var pendingConflict = false
 
     init {
-        watchPos.growTo(2 * baseCount)
         for (h in 0 until baseCount) {
             val len = arena.length(h)
             if (len == 1) {
@@ -98,20 +108,33 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun litOf(h: Int, k: Int): Int =
         if (h < baseCount) arena.lits[arena.start(h) + k] else learnedLits[learnedStarts[h - baseCount] + k]
 
+    private fun packWatch(handle: Int, blocker: Int): Long =
+        (blocker.toLong() shl 32) or (handle.toLong() and 0xFFFFFFFFL)
+
+    private fun watchPosition(h: Int, slot: Int): Int =
+        if (h < baseCount) watchPos[2 * h + slot] else learnedWatchPos[2 * (h - baseCount) + slot]
+
+    private fun setWatchPosition(h: Int, slot: Int, position: Int) {
+        if (h < baseCount) watchPos[2 * h + slot] = position else learnedWatchPos[2 * (h - baseCount) + slot] = position
+    }
+
     private fun addWatch(lit: Int, handle: Int, blocker: Int) {
-        watchClauses[lit].add(handle)
-        watchBlockers[lit].add(blocker)
+        var entries = watchEntries[lit]
+        val size = watchSizes[lit]
+        if (size == entries.size) {
+            entries = entries.copyOf((entries.size * 2).coerceAtLeast(2))
+            watchEntries[lit] = entries
+        }
+        entries[size] = packWatch(handle, blocker)
+        watchSizes[lit] = size + 1
     }
 
     /** Swap-pop the watcher at [idx] in literal [lit]'s lists. The caller re-processes [idx]. */
     private fun removeWatchAt(lit: Int, idx: Int) {
-        val wc = watchClauses[lit]
-        val wb = watchBlockers[lit]
-        val last = wc.size - 1
-        wc[idx] = wc[last]
-        wb[idx] = wb[last]
-        wc.truncateTo(last)
-        wb.truncateTo(last)
+        val entries = watchEntries[lit]
+        val last = watchSizes[lit] - 1
+        entries[idx] = entries[last]
+        watchSizes[lit] = last
     }
 
     /** The clause's literals as a fresh array (the seed reason for conflict analysis). */
@@ -132,6 +155,7 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     private fun recordConflict(h: Int) {
+        state.conflictSeedFactors.add(h)
         state.nativeConflictReason = clauseLits(h)
         val levels = IntHashSet()
         val len = clauseLen(h)
@@ -175,8 +199,8 @@ internal class NativeSatState(private val state: PropagationState) {
         if (w0 < 0) {
             // Every literal false — an immediate conflict. Watch the first two so a later backtrack
             // leaves the clause with valid watches.
-            watchPos[2 * h] = 0
-            watchPos[2 * h + 1] = 1
+            setWatchPosition(h, 0, 0)
+            setWatchPosition(h, 1, 1)
             addWatch(litOf(h, 0), h, litOf(h, 1))
             addWatch(litOf(h, 1), h, litOf(h, 0))
             recordConflict(h)
@@ -190,8 +214,8 @@ internal class NativeSatState(private val state: PropagationState) {
         } else {
             0
         }
-        watchPos[2 * h] = w0
-        watchPos[2 * h + 1] = second
+        setWatchPosition(h, 0, w0)
+        setWatchPosition(h, 1, second)
         addWatch(litOf(h, w0), h, litOf(h, second))
         addWatch(litOf(h, second), h, litOf(h, w0))
         if (w1 < 0 && !pinUnit(h, w0)) pendingConflict = true // exactly one open literal — assert it
@@ -208,8 +232,8 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedUsed.add(0)
         learnedOrigin.add(origin)
         learnedCount++
-        watchPos.add(0)
-        watchPos.add(0)
+        learnedWatchPos.add(0)
+        learnedWatchPos.add(0)
         return baseCount + i
     }
 
@@ -230,6 +254,16 @@ internal class NativeSatState(private val state: PropagationState) {
 
     /** Literals of learned clause [i] as a fresh array, for glue export and introspection. */
     fun literalsOf(i: Int): IntArray = clauseLits(baseCount + i)
+
+    fun forEachBinaryPartner(lit: Int, action: (Int) -> Unit) {
+        val entries = watchEntries[lit]
+        for (i in 0 until watchSizes[lit]) {
+            val h = entries[i].toInt()
+            if (clauseLen(h) != 2) continue
+            val first = litOf(h, 0)
+            action(if (first == lit) litOf(h, 1) else first)
+        }
+    }
 
     /** Mark learned clause forced by factor id [fid] (if it is one) as reused since the last
      *  reduction — drives three-tier promotion, mirroring `PropagationState.noteLearnedUse`. */
@@ -256,23 +290,20 @@ internal class NativeSatState(private val state: PropagationState) {
         if (survivors == learnedCount) return // nothing dropped
 
         // Remap/prune watch-list entries that name a learned handle; base handles pass through.
-        for (lit in watchClauses.indices) {
-            val wc = watchClauses[lit]
-            val wb = watchBlockers[lit]
+        for (lit in watchEntries.indices) {
+            val entries = watchEntries[lit]
             var w = 0
-            for (r in 0 until wc.size) {
-                val h = wc[r]
+            for (r in 0 until watchSizes[lit]) {
+                val entry = entries[r]
+                val h = entry.toInt()
                 val newH = if (h < baseCount) h else remap[h - baseCount].let { if (it < 0) -1 else baseCount + it }
                 if (newH < 0) continue // dropped clause — skip
-                wc[w] = newH
-                wb[w] = wb[r]
-                w++
+                entries[w++] = packWatch(newH, (entry ushr 32).toInt())
             }
-            wc.truncateTo(w)
-            wb.truncateTo(w)
+            watchSizes[lit] = w
         }
 
-        // Rebuild the learned literal buffer, starts, policy columns, and watchPos for survivors.
+        // Rebuild the learned literal buffer, starts, policy columns, and watch positions for survivors.
         val newLits = IntArrayList()
         val newStarts = IntArrayList()
         val newLbd = IntArrayList()
@@ -280,12 +311,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val newTier = IntArrayList()
         val newUsed = IntArrayList()
         val newOrigin = IntArrayList()
-        val newWatchPos = IntArrayList()
-        newWatchPos.growTo(2 * baseCount)
-        for (h in 0 until baseCount) {
-            newWatchPos[2 * h] = watchPos[2 * h]
-            newWatchPos[2 * h + 1] = watchPos[2 * h + 1]
-        }
+        val newWatchPos = IntArrayList(initialCapacity = 2 * survivors)
         for (i in 0 until learnedCount) {
             if (remap[i] < 0) continue
             val h = baseCount + i
@@ -297,8 +323,8 @@ internal class NativeSatState(private val state: PropagationState) {
             newTier.add(learnedTier[i])
             newUsed.add(learnedUsed[i])
             newOrigin.add(learnedOrigin[i])
-            newWatchPos.add(watchPos[2 * h])
-            newWatchPos.add(watchPos[2 * h + 1])
+            newWatchPos.add(watchPosition(h, 0))
+            newWatchPos.add(watchPosition(h, 1))
         }
         learnedLits.replaceWith(newLits)
         learnedStarts.replaceWith(newStarts)
@@ -307,7 +333,7 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedTier.replaceWith(newTier)
         learnedUsed.replaceWith(newUsed)
         learnedOrigin.replaceWith(newOrigin)
-        watchPos.replaceWith(newWatchPos)
+        learnedWatchPos.replaceWith(newWatchPos)
         learnedCount = survivors
     }
 
@@ -339,6 +365,7 @@ internal class NativeSatState(private val state: PropagationState) {
             pendingConflict = false
             return state.conflictLevels
         }
+        state.conflictSeedFactors.clear()
         if (allFactors && !initialized) {
             initialized = true
             state.currentLevel = 0
@@ -380,32 +407,32 @@ internal class NativeSatState(private val state: PropagationState) {
 
     /** Process every clause watching [falseLit] (which just became false). Returns false on conflict. */
     private fun propagateFalse(falseLit: Int): Boolean {
-        val wc = watchClauses[falseLit]
-        val wb = watchBlockers[falseLit]
+        val entries = watchEntries[falseLit]
         var wi = 0
-        while (wi < wc.size) {
+        while (wi < watchSizes[falseLit]) {
             state.work++
-            val h = wc[wi]
-            val blocker = wb[wi]
+            val entry = entries[wi]
+            val h = entry.toInt()
+            val blocker = (entry ushr 32).toInt()
             if (state.litTrue(blocker)) {
                 wi++
                 continue
             }
-            val i0 = watchPos[2 * h]
-            val i1 = watchPos[2 * h + 1]
+            val i0 = watchPosition(h, 0)
+            val i1 = watchPosition(h, 1)
             val slot0IsFalse = litOf(h, i0) == falseLit
             val lIdx = if (slot0IsFalse) i0 else i1
             val otherIdx = if (slot0IsFalse) i1 else i0
             val otherLit = litOf(h, otherIdx)
             if (state.litTrue(otherLit)) {
-                wb[wi] = otherLit // refresh the blocker to the satisfying literal
+                entries[wi] = packWatch(h, otherLit) // refresh the blocker to the satisfying literal
                 wi++
                 continue
             }
             val replacement = findNonFalse(h, lIdx, otherIdx)
             if (replacement >= 0) {
                 val newLit = litOf(h, replacement)
-                if (slot0IsFalse) watchPos[2 * h] = replacement else watchPos[2 * h + 1] = replacement
+                setWatchPosition(h, if (slot0IsFalse) 0 else 1, replacement)
                 removeWatchAt(falseLit, wi) // swap-pop; re-process wi without advancing
                 addWatch(newLit, h, otherLit)
                 continue
