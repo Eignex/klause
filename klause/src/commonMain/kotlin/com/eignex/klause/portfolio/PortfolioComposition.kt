@@ -275,15 +275,22 @@ internal object PortfolioComposition {
 
     private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
-        // fast first-incumbent engine).
+        // fast first-incumbent engine). Over continuous columns every slot goes to backtrack: local search
+        // proposes only the discrete part there, and its share of the time starves the relaxation arms
+        // those models are solved by.
         val count = scenario.arms
-        val lsCount = (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
+        val lsCount = if (facts.realColumns) {
+            0
+        } else {
+            (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
+        }
         val btCount = count - lsCount
         // Hybrid ALNS with CP repair joins a scheduled optimization pool whose model offers what it needs, on top
         // of the arms: the policy shares time by family, so an extra arm takes no time from the others. It works
         // around an incumbent, so a satisfaction model has nothing for it, and a pool with a core per arm keeps
         // its cores.
-        val alns = scenario.kind == Kind.COP && scenario.cores < count && facts.offersAll(AlnsWorkerConfig.NEEDS)
+        val alns = scenario.kind == Kind.COP && scenario.cores < count && lsCount > 0 &&
+            facts.offersAll(AlnsWorkerConfig.NEEDS)
         val arms = ArrayList<WorkerConfig>(count + 1)
         val local =
             if (lsCount > 0) lsArms(scenario.kind, lsCount, scenario.lsPool, scenario.nodeBudget) else emptyList()
