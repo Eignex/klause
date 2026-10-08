@@ -1,40 +1,40 @@
-# open-int: problems with the open-int theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# open-int: problems with the open-int theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
 # easy: 14
 hakank/1d_rubiks_cube/1d_rubiks_cube
-hakank/movie_stars/movie_stars
-hakank/shopping_basket/shopping_basket
-mzn-bench/2014/openshop/gp10-4
-mzn-bench/2015/gfd-schedule/n30f3d30m7k4
-mzn-bench/2017/routing-flexible
-smtlib-qfidl/20220214-jobshop-BohanLi/jobshop2-4-1-1-4-4-32
-smtlib-qfidl/RTCL/b13_tf_20/ckt_PROP2_tf_20
-smtlib-qfidl/queens_bench/super_queen/super_queen17-1
-smtlib-qflia/20231117-c_inference/30_30_18_8_sat
-smtlib-qflia/CIRC/multiplier_prime/MULTIPLIER_PRIME_16.msat
-smtlib-qflia/bofill-scheduling/SMT_real_LIA/ex8740_2400_100
-smtlib-qflia/dillig/20-13
-smtlib-qflira/LCTES/cruise-control
+hakank/set_covering_deployment/set_covering_deployment
+mzn-bench/2013/radiation/i6-11
+mzn-bench/2016/filters/dct_1_3
+mzn-bench/2017/hrc/exp1-1-945
+mzn-bench/2020/stable-goods/s-d6
+smtlib-qfidl/20220214-jobshop-BohanLi/jobshop4-4-2-2-4-4-32
+smtlib-qfidl/Averest/buble_sort/BubbleSort_live_bgmc000
+smtlib-qfidl/asp/HamiltonianPath/gryzzles.32.lp
+smtlib-qflia/check/int_incompleteness3
+smtlib-qflia/dillig/45-19
+smtlib-qflia/pb2010/normalized-j3024_4-sat
+smtlib-qflia/slacks/45-4.slack
+smtlib-qflira/LCTES/fly-by-wire.locals
 # medium: 20
-hakank/coins/coins3b
-hakank/coins_problem/coins_problem
 hakank/euler/euler_52
-hakank/golf_puzzle/golf_puzzle
+hakank/kqueens/kqueens
 hakank/rotation/rotation2
-mzn-bench/2014/elitserien/handball12
-mzn-bench/2018/gfd-schedule/n100f7d50m20k10
-mzn-bench/2020/sdn-chain/d26n600-2
-mzn-bench/2022/gfd-schedule/n85f3d50m8k20_10124
-mzn-bench/2025/EchoSched/15-15-0-1_3
+mzn-bench/2010/filters/dct_2_3
+mzn-bench/2016/gbac/reduced_UD6-gbac
+mzn-bench/2017/gbac/UD4-gbac
+mzn-bench/2018/neighbours/neighbours3
+mzn-bench/2020/tower_challenge/tower_070_070_15_070-04
+mzn-bench/2023/evm-super-compilation/isolated_block_6_0_input
 smtlib-qfidl/20210312-Bouvier/vlsat3_c05
 smtlib-qfidl/20220214-jobshop-BohanLi/jobshop26-2-13-13-4-4-16
-smtlib-qfidl/Averest/buble_sort/BubbleSort_safe_blmc016
-smtlib-qfidl/mathsat/fischer/FISCHER10-10-ninc
-smtlib-qfidl/schedulingIDL/j8_per0_2_mkspan1041
-smtlib-qflia/arctic-matrix/constraint-363570
-smtlib-qflia/nec-smt/large/getoption_group/prp-12-46
-smtlib-qflia/pidgeons/pigeon-hole-10
-smtlib-qflia/rings_preprocessed/ring_2exp10_9vars_5ite_unsat
-smtlib-qflia/slacks/25-21.slack
+smtlib-qfidl/Averest/buble_sort/BubbleSort_safe_blmc014
+smtlib-qfidl/asp/SchurNumbers/20.11.schur.lp
+smtlib-qfidl/mathsat/fischer/FISCHER13-9-ninc
+smtlib-qflia/20180326-Bromberger/unbd-sage/unbd050v55c/unbd-sage21
+smtlib-qflia/20231117-c_inference/40_40_78_12_sat
+smtlib-qflia/RWS/Example_12.txt
+smtlib-qflia/nec-smt/large/checkpass_pwd/prp-47-42
+smtlib-qflia/rings/ring_2exp8_7vars_6ite_unsat
+smtlib-qflia/tropical-matrix/constraint-396616
 # hard: 1
-hakank/scene_allocation/scene_allocation
+mzn-bench/2025/tower/tower_070_070_30_100-02
