@@ -22,7 +22,7 @@ import kotlin.math.roundToLong
  * floating-point [safeObjectiveLowerBound]: instead of solving the dual system exactly in rationals it
  * takes the *approximate* float duals [y], **rounds them to integer multipliers** at a power-of-two
  * scale `2ᵏ`, and evaluates the Lagrangian
- * `L(y) = y·rhs + Σⱼ min_{[0,uⱼ]} dⱼ·zⱼ` exactly with a 128-bit accumulator ([Int128]).
+ * `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` exactly with a 128-bit accumulator ([Int128]).
  *
  * Soundness rests on the fact that the slack-form constraints are equalities, so `L(y)` is a valid
  * lower bound on the optimum for **any** `y` — there is no need to solve for, or even approximate, the
@@ -193,7 +193,7 @@ internal class IntegerCertificate(
  * Certify a node LP optimum from the float duals [y] (e.g. [RevisedSimplex] `duals`), as an
  * [IntegerCertificate] over exact scaled integers. Rounds the duals to integer multipliers and evaluates
  * the Lagrangian
- * `L(y) = y·rhs + Σⱼ min_{[0,uⱼ]} dⱼ·zⱼ` and every reduced cost in a 128-bit accumulator. Sound for
+ * `L(y) = y·rhs + Σⱼ min_{[lⱼ,uⱼ]} dⱼ·zⱼ` and every reduced cost in a 128-bit accumulator. Sound for
  * **any** integer multipliers (the slack-form constraints are equalities), so this never needs the
  * optimal dual; rounding only weakens the bound / reduced costs. Every error path returns null (the
  * caller keeps the node / falls back), exactly like the rational certifier:
@@ -212,75 +212,127 @@ internal fun integerCertify(
 }
 
 private fun integerCertifyUnchecked(model: LpModel, y: DoubleArray, scaleBits: Int): IntegerCertificate? {
-    if (model.hasContinuous || !model.finiteExactInput()) return null
+    val integers = IntegerLpView.create(model) ?: return null
     val rd = roundDuals(model, y, scaleBits) ?: return null
     val m = model.m
     val n = model.n
     val scale = rd.scale
-    val mult = repairedMultipliers(model, rd.mult, scale)
+    val mult = repairedMultipliers(integers, rd.mult, scale) ?: return null
     val acc = Int128() // N = 2ᵏ · (objective − objConstant), accumulated exactly
-    for (i in 0 until m) acc.addProduct(mult[i], model.rhs[i])
+    for (i in 0 until m) acc.addProduct(mult[i], integers.rhs(i) ?: return null)
     val reduced = LongArray(model.numVars)
     val dAcc = Int128() // scaled reduced cost Dⱼ = 2ᵏ·cⱼ − Σᵢ mᵢ·Aᵢⱼ, reused per column
+    val dot = Int128()
     for (j in 0 until model.numVars) {
+        if (!integers.integralColumn(j)) return null
         dAcc.clear()
-        dAcc.addProduct(model.cost[j], scale) // 2ᵏ·cⱼ
+        dot.clear()
+        dAcc.addProduct(integers.cost(j) ?: return null, scale) // 2ᵏ·cⱼ
         if (j >= n) {
-            dAcc.addProduct(-mult[j - n], 1L) // slack column j is the unit vector e_{j−n}
+            dot.addLong(mult[j - n]) // slack column j is the unit vector e_{j−n}
         } else {
-            model.forEachInColumn(j) { i, a -> dAcc.addProduct(-mult[i], a) }
+            if (!integers.forEachCoefficient(j) { i, a -> dot.addProduct(mult[i], a) }) return null
         }
+        dAcc.subtract(dot)
         if (!dAcc.fitsLong()) return null // reduced cost too large to evaluate ⇒ keep node (sound)
         val dj = dAcc.toLong()
         reduced[j] = dj
-        if (dj > 0L && j < n && model.probeClampedLo[j]) return null
+        if (dj > 0L) acc.addProduct(dj, integers.lower(j) ?: return null)
         if (dj < 0L) {
-            if (!model.hasUpper[j] || (j < n && model.probeClampedHi[j])) return null
-            acc.addProduct(dj, model.upper[j]) // min over [0,uⱼ] of dⱼ·zⱼ is dⱼ·uⱼ (scaled)
+            acc.addProduct(dj, integers.upper(j) ?: return null)
         }
     }
     // Re-add the lower-bound-shift constant the relaxation folded out (`c·lo`), scaled by 2ᵏ.
-    acc.addProduct(model.objConstant, scale)
+    acc.addProduct(integers.constant() ?: return null, scale)
     if (acc.overflow) return null
     return IntegerCertificate(rd.scaleBits, scale, mult, reduced, acc)
 }
 
-/**
- * [mult] with each row multiplier moved to where its own slack's reduced cost is zero, for the rows
- * where it had gone the other way; [mult] itself when none had.
- *
- * The Lagrangian is valid for **any** multipliers, so one is free to be moved, and moving it is worth
- * far more than the alternative. A slack column carries no upper bound, so `min dⱼ·zⱼ` over its box is
- * `−∞` the moment `dⱼ` is negative and the whole certificate is abandoned. What sends it negative is
- * not a dual worth respecting: an approximate `y` leaves a multiplier whose exact value is zero
- * rounded to a hair below it. Declining over that loses every bound on a model whose columns are all
- * open, which is exactly where a bound is wanted.
- *
- * This mirrors the repair the float bound already makes ([safeObjectiveLowerBound]), so the exact
- * bound no longer declines where the cheap one succeeds. It is not a tolerance: the moved multiplier
- * is used for the whole certificate, so what comes back is the true Lagrangian of a different, equally
- * valid choice. A multiplier that was genuinely wrong rather than merely rounded is moved just the
- * same, and only costs the bound some tightness.
- *
- * A structural column with no finite upper cannot be repaired this way — its reduced cost reads every
- * multiplier at once — so one left negative still abandons the certificate.
- */
-private fun repairedMultipliers(model: LpModel, mult: LongArray, scale: Long): LongArray {
+// Each logical is a unit column, so its reduced cost is scaledCost - multiplier. Moving a
+// multiplier to scaledCost makes a free logical harmless, and repairs a one-sided logical only
+// when its reduced cost points toward an absent endpoint. The complete Lagrangian is evaluated
+// with the repaired vector; no tolerance or feasibility claim is involved.
+private fun repairedMultipliers(model: IntegerLpView, mult: LongArray, scale: Long): LongArray? {
     var repaired: LongArray? = null
     for (i in 0 until model.m) {
         val slack = model.n + i
-        if (model.hasUpper[slack]) continue
+        val lower = model.hasLower(slack)
+        val upper = model.hasUpper(slack)
+        if (lower && upper) continue
         // A slack column is the unit column eᵢ, so its scaled reduced cost is `2ᵏ·c_slack − mᵢ`.
         val scaled = Int128()
-        scaled.addProduct(model.cost[slack], scale)
+        scaled.addProduct(model.cost(slack) ?: return null, scale)
         if (!scaled.fitsLong()) continue // the moved multiplier is not expressible; leave it to decline
         val target = scaled.toLong()
         // `target − mult[i] < 0` without risking the subtraction overflowing.
-        if (target >= mult[i]) continue
+        if ((lower && target >= mult[i]) || (upper && target <= mult[i]) || target == mult[i]) continue
         val fix = repaired ?: mult.copyOf().also { repaired = it }
         fix[i] = target
     }
     return repaired ?: mult
+}
+
+private class IntegerLpView(private val model: LpModel) {
+    private val source = model.exactState?.model
+    val n: Int get() = model.n
+    val m: Int get() = model.m
+
+    fun integralColumn(column: Int): Boolean = source == null || column >= n || source.column(column).integral
+    fun rhs(row: Int): Long? = if (source == null) model.rhs[row] else source.rhs(row).legacyLong()
+    fun cost(column: Int): Long? = if (source == null) model.cost[column] else source.objective.cost(column).legacyLong()
+    fun constant(): Long? = if (source == null) model.objConstant else source.objective.constant.legacyLong()
+
+    fun hasLower(column: Int): Boolean = if (source == null) {
+        column >= n || !model.probeClampedLo[column]
+    } else {
+        source.column(column).bounds.lower != null
+    }
+
+    fun hasUpper(column: Int): Boolean = if (source == null) {
+        model.hasUpper[column] && (column >= n || !model.probeClampedHi[column])
+    } else {
+        source.column(column).bounds.upper != null
+    }
+
+    // The Lagrangian uses each interval's infimum/supremum; strictness affects attainability only.
+    fun lower(column: Int): Long? = if (source == null) {
+        if (hasLower(column)) 0L else null
+    } else {
+        source.column(column).bounds.lower?.number?.legacyLong()
+    }
+
+    fun upper(column: Int): Long? = if (source == null) {
+        if (hasUpper(column)) model.upper[column] else null
+    } else {
+        source.column(column).bounds.upper?.number?.legacyLong()
+    }
+
+    inline fun forEachCoefficient(column: Int, action: (Int, Long) -> Unit): Boolean {
+        val exact = source
+        if (exact == null) {
+            model.forEachInColumn(column, action)
+        } else {
+            for (entry in exact.columnEntries(column)) {
+                val integer = entry.number.legacyLong() ?: return false
+                action(entry.row, integer)
+            }
+        }
+        return true
+    }
+
+    companion object {
+        fun create(model: LpModel): IntegerLpView? {
+            if (!model.finiteExactInput()) return null
+            val source = model.exactState?.model
+            if (source == null && model.hasContinuous) return null
+            if (source != null && (source.objective.scale.value != BigFraction.ONE ||
+                    !source.objective.externalConstant.value.isZero)
+            ) {
+                return null
+            }
+            return IntegerLpView(model)
+        }
+    }
 }
 
 /** Which route produced a Farkas certificate, for a caller measuring where the chain earns its keep. */
@@ -311,7 +363,7 @@ internal fun integerFarkasRay(
         scans?.scan()
         return farkasCertifies(model, rho)
     }
-    if (model.exactState != null || cancellation()) {
+    if (cancellation()) {
         onRoute?.invoke(FarkasRoute.NONE)
         return null
     }
@@ -319,7 +371,7 @@ internal fun integerFarkasRay(
         onRoute?.invoke(FarkasRoute.NONE)
         return null
     }
-    if (model.hasContinuous) {
+    if (model.doubleView != null && model.exactState == null) {
         // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
         // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
         scans?.scan()

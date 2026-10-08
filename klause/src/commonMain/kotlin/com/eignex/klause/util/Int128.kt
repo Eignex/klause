@@ -94,11 +94,14 @@ internal class Int128 {
 
     /** Subtract another 128-bit value (propagating its [overflow] latch). */
     fun subtract(other: Int128) {
-        // Add the two's-complement negation of `other`'s 128-bit value.
-        val negLo = 0uL - other.lo.toULong()
-        val borrow = if (other.lo != 0L) 1uL else 0uL
-        val negHi = other.hi.toULong().inv() + (1uL - borrow)
-        add128(negHi.toLong(), negLo.toLong())
+        // Subtract directly: the minimum signed value has no representable negation.
+        val newLo = lo - other.lo
+        val borrow = if (lo.toULong() < other.lo.toULong()) 1L else 0L
+        val oldHi = hi
+        val newHi = oldHi - other.hi - borrow
+        if (((oldHi xor other.hi) and (oldHi xor newHi)) < 0L) overflow = true
+        lo = newLo
+        hi = newHi
         if (other.overflow) overflow = true
     }
 

@@ -12,6 +12,8 @@ import com.eignex.klause.util.MutableIntDoubleMap
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
@@ -939,7 +941,7 @@ internal class ExactLpNumber private constructor(val value: BigFraction, val iee
 
     fun legacyLong(): Long? {
         if (ieeeBits != null || value.den != BIG_ONE ||
-            value < BigFraction.ofLong(Long.MIN_VALUE) || value > BigFraction.ofLong(Long.MAX_VALUE)
+            value.num < minimumLong || value.num > maximumLong
         ) {
             return null
         }
@@ -951,6 +953,8 @@ internal class ExactLpNumber private constructor(val value: BigFraction, val iee
     override fun hashCode(): Int = 31 * value.hashCode() + (ieeeBits?.hashCode() ?: 0)
 
     companion object {
+        private val minimumLong = bigIntOf(Long.MIN_VALUE)
+        private val maximumLong = bigIntOf(Long.MAX_VALUE)
         fun of(value: Long): ExactLpNumber = ExactLpNumber(BigFraction.ofLong(value), null)
         fun of(value: BigFraction): ExactLpNumber = ExactLpNumber(value, null)
         fun ofIeee(value: Double): ExactLpNumber = ExactLpNumber(
@@ -1100,6 +1104,9 @@ internal class ExactLpModel private constructor(
     fun row(i: Int): ExactLpRow = rows[i]
     fun rhs(i: Int): ExactLpNumber = rightHandSide[i]
     fun entries(j: Int): List<ExactLpEntry> = matrix[j].toList()
+
+    // Engine kernels read the owned immutable list; caller snapshots go through entries.
+    internal fun columnEntries(j: Int): List<ExactLpEntry> = matrix[j]
 
     fun copy(
         rhs: List<ExactLpNumber> = this.rightHandSide,

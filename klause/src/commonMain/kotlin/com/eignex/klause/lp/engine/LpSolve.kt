@@ -1122,7 +1122,7 @@ internal inline fun LpModel.forEachRationalColumn(j: Int, action: (Int, BigFract
     } else {
         val source = exactState?.model
         if (source != null) {
-            for (entry in source.entries(j)) action(entry.row, entry.number.value)
+            for (entry in source.columnEntries(j)) action(entry.row, entry.number.value)
             return
         }
         val dv = doubleView

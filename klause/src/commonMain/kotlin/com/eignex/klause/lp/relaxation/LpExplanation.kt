@@ -8,12 +8,20 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.integerFarkasRay
-import com.eignex.klause.lp.engine.rationalizeToIntegerModel
+import com.eignex.klause.lp.engine.exactBounds
+import com.eignex.klause.lp.engine.exactShift
+import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.div
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
 
 /**
  * Turns LP certificates into learned-clause material over absolute variable-bound atoms, read off the
@@ -65,23 +73,37 @@ internal object LpExplanation {
         val varId = relaxation.colVarId[col]
         if (varId < 0) return presencePremise(relaxation, session, col, lowerSide)
         val model = relaxation.model
-        val lo = model.loShift[col]
-        val hi = lo + model.upper[col]
+        val side = if (lowerSide) model.exactBounds(col).lower else model.exactBounds(col).upper
+        side ?: return PREMISE_AUX
+        val value = model.exactShift(col) + side.number.value
+        // An integer source has the same feasible values after directed rounding of a strict side.
+        var threshold = value.num / value.den
+        val remainder = !(value.num % value.den).isZero()
+        if (lowerSide && value.signum() > 0 && remainder) threshold += BIG_ONE
+        if (!lowerSide && value.signum() < 0 && remainder) threshold -= BIG_ONE
+        if (side.strict && !remainder) {
+            threshold = if (lowerSide) threshold + BIG_ONE else threshold - BIG_ONE
+        }
+        val endpoint = ExactLpNumber.of(BigFraction.of(threshold, BIG_ONE)).legacyLong() ?: return PREMISE_AUX
         if (relaxation.colIsBool[col]) {
             return when {
-                lowerSide && lo == 1L -> Lit.make(varId, false)
+                lowerSide && endpoint == 1L && session.boolValue(varId) == true -> Lit.make(varId, false)
 
                 // premise b (pinned true), negated
-                !lowerSide && hi == 0L -> Lit.make(varId, true)
+                !lowerSide && endpoint == 0L && session.boolValue(varId) == false -> Lit.make(varId, true)
 
                 // premise ¬b (pinned false), negated
-                else -> PREMISE_NONE // b ≥ 0 / b ≤ 1: vacuous
+                (lowerSide && endpoint <= 0L) || (!lowerSide && endpoint >= 1L) -> PREMISE_NONE
+                else -> PREMISE_AUX
             }
         }
+        val domain = session.intDomain(varId)
         return if (lowerSide) {
-            session.boundGeLit(varId, lo, positive = false)
+            if (domain.min < endpoint) return PREMISE_AUX
+            session.boundGeLit(varId, endpoint, positive = false)
         } else {
-            session.boundLeLit(varId, hi, positive = false)
+            if (domain.max > endpoint) return PREMISE_AUX
+            session.boundLeLit(varId, endpoint, positive = false)
         }
     }
 
@@ -105,10 +127,15 @@ internal object LpExplanation {
         val required = relaxation.colReq.getOrNull(column) ?: return PREMISE_AUX
         if (required.size % 2 != 0 || relaxation.colPresentUpper[column] < 0L) return PREMISE_AUX
         val model = relaxation.model
-        if (model.loShift[column] != 0L || !model.hasUpper[column]) return PREMISE_AUX
-        if (lowerSide) return PREMISE_NONE
-        if (model.upper[column] == relaxation.colPresentUpper[column]) return PREMISE_NONE
-        if (model.upper[column] != 0L) return PREMISE_AUX
+        if (!model.exactShift(column).isZero) return PREMISE_AUX
+        val bounds = model.exactBounds(column)
+        if (lowerSide) {
+            return if (bounds.lower?.number?.value?.isZero == true && !bounds.lower.strict) PREMISE_NONE else PREMISE_AUX
+        }
+        val upper = bounds.upper ?: return PREMISE_AUX
+        if (upper.strict) return PREMISE_AUX
+        if (upper.number.value == BigFraction.ofLong(relaxation.colPresentUpper[column])) return PREMISE_NONE
+        if (!upper.number.value.isZero) return PREMISE_AUX
         for (index in required.indices step 2) {
             val variable = required[index]
             if (variable !in 0L until session.problem.numIntVars.toLong()) return PREMISE_AUX
@@ -159,36 +186,33 @@ internal object LpExplanation {
      */
     fun infeasibilityClause(relaxation: LpRelaxation, ray: LongArray, session: PropagationSession): IntArray? {
         val model = relaxation.model
-        // A real model's ray is certified against its real coefficients, which the integer store does not
-        // hold: a real row is all zeros there. Signing ρ·A_j from that store would drop every real row's
-        // share, seat columns on the wrong side, and leave out bounds the proof rests on. The scaled-integer
-        // rationalization the certificate was checked on has the same signs, since its scale is positive.
-        val coefficients = if (model.doubleView == null) {
-            model
-        } else {
-            rationalizeToIntegerModel(model, outwardRealUppers = true)?.model ?: return null
-        }
+        if (ray.size != model.m) return null
         val lits = IntArrayList()
         val seen = IntHashSet()
         val rows = (0 until model.m).filter { ray[it] != 0L }.toIntArray()
         if (!addRowPremiseLits(lits, seen, relaxation, rows, session)) return null
         for (col in relaxation.colVarId.indices) {
-            val ajAcc = Int128()
-            coefficients.forEachInColumn(col) { i, a -> ajAcc.addProduct(ray[i], a) }
-            if (ajAcc.overflow) return null // can't determine the premise side ⇒ inexpressible
-            val sign = if (ajAcc.hi == 0L && ajAcc.lo == 0L) {
-                0
-            } else if (ajAcc.isNonNegative()) {
-                1
-            } else {
-                -1
-            }
+            val sign = rayColumnSign(model, ray, col) ?: return null
             if (sign == 0) continue
             // ρ·A_j > 0 ⇒ the column's upper bound is load-bearing (upper side); < 0 ⇒ lower side.
             val premises = boundPremiseLits(relaxation, session, col, lowerSide = sign < 0) ?: return null
             for (lit in premises) if (seen.add(lit)) lits.add(lit)
         }
         return if (lits.isEmpty()) null else lits.toIntArray()
+    }
+
+    private fun rayColumnSign(model: LpModel, ray: LongArray, column: Int): Int? {
+        if (model.exactState != null || model.doubleView != null) {
+            var dot = BigFraction.ZERO
+            model.forEachRationalColumn(column) { row, value ->
+                if (ray[row] != 0L) dot += BigFraction.ofLong(ray[row]) * value
+            }
+            return dot.signum()
+        }
+        val dot = Int128()
+        model.forEachInColumn(column) { row, value -> dot.addProduct(ray[row], value) }
+        if (dot.overflow) return null
+        return if (dot.hi == 0L && dot.lo == 0L) 0 else if (dot.isNonNegative()) 1 else -1
     }
 
     /**
@@ -231,6 +255,7 @@ internal object LpExplanation {
     ): Boolean {
         val model = relaxation.model
         for (r in rows) {
+            if (r !in 0 until model.m || model.exactState?.rows?.row(r)?.active == false) return false
             if (model.rowGlobal[r]) continue
             val source = relaxation.sourceMap?.parent(r)
             if (source != null) {

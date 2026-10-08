@@ -12,6 +12,8 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -20,6 +22,151 @@ import kotlin.test.assertTrue
  * [SafeObjectiveBoundTest] checks the float bound.
  */
 class IntegerDualBoundTest {
+
+    @Test
+    fun `retained certificates use the live shifted lower endpoint`() {
+        val source = LpBuilder().apply { addVar(3L, 9L, cost = 2L) }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
+        val retained = assertNotNull(trail.state.toWorkingModel())
+
+        val certificate = assertNotNull(integerCertify(retained, doubleArrayOf(), scaleBits = 0))
+
+        assertEquals(10L, certificate.objectiveBoundCeil(0L))
+        assertEquals(1L, certificate.fixSteps(0, 13L, 0L))
+        assertTrue(trail.pop(0))
+        val parent = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf()))
+        assertEquals(6L, parent.objectiveBoundCeil(0L))
+    }
+
+    @Test
+    fun `retained certificates use the live shifted upper endpoint`() {
+        val source = LpBuilder().apply { addVar(-3L, 9L, cost = -2L) }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(8L)), 8L))
+
+        val certificate = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf()))
+
+        assertEquals(-10L, certificate.objectiveBoundCeil(0L))
+        assertEquals(1L, certificate.fixSteps(0, -7L, 0L))
+    }
+
+    @Test
+    fun `retained certificates remove inactive row weight and recover parent support after pop`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 4L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.suspend(setOf(0L)))
+        val row = LpScopedRow(
+            1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+        )
+        assertTrue(trail.append(row, true))
+
+        val child = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf(999.0, -1.0)))
+
+        assertEquals(2L, child.objectiveBoundCeil(0L))
+        assertFalse(child.dualNonzeroRow(0))
+        assertTrue(child.dualNonzeroRow(1))
+        assertTrue(trail.pop(0))
+        val parent = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf(-1.0, 999.0)))
+        assertEquals(1L, parent.objectiveBoundCeil(0L))
+        assertTrue(parent.dualNonzeroRow(0))
+        assertFalse(parent.dualNonzeroRow(1))
+    }
+
+    @Test
+    fun `retained certificates repair upper only logicals against their actual cost`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 2L, cost = -1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
+        }.build(Sense.MINIMIZE)
+        val source = assertNotNull(model.authoritativeModel())
+        val zero = ExactLpNumber.of(0L)
+        val columns = MutableList(source.numVars) { source.column(it) }
+        columns[1] = columns[1].copy(bounds = ExactLpBounds(upper = ExactLpSide(zero)))
+        val state = LpExactState(source.copy(columns = columns))
+
+        val certificate = assertNotNull(integerCertify(assertNotNull(state.toWorkingModel()), doubleArrayOf(-999.0)))
+
+        assertEquals(-2L, certificate.objectiveBoundCeil(0L))
+        assertFalse(certificate.dualNonzeroRow(0))
+    }
+
+    @Test
+    fun `retained integral certification declines fractional source coefficients and continuous columns`() {
+        val fractional = LpBuilder().apply {
+            val x = addVar(0L, 2L)
+            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.5)
+        }.build(Sense.MINIMIZE)
+        val continuous = LpBuilder().apply { addRealVar(0.0, 2.0, cost = 1.0) }.build(Sense.MINIMIZE)
+
+        val fractionalModel = assertNotNull(LpExactState(assertNotNull(fractional.authoritativeModel())).toWorkingModel())
+        val continuousModel = assertNotNull(LpExactState(assertNotNull(continuous.authoritativeModel())).toWorkingModel())
+        assertNull(integerCertify(fractionalModel, doubleArrayOf(0.0)))
+        assertNull(integerCertify(continuousModel, doubleArrayOf()))
+    }
+
+    @Test
+    fun `retained logical multiplier repair handles the minimum signed cost without negating it`() {
+        val source = assertNotNull(LpBuilder().apply {
+            addVar(0L, 0L)
+            addRow(intArrayOf(), longArrayOf(), Relation.LE, 0L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val columns = List(source.numVars) {
+            if (it == source.n) source.column(it).copy(bounds = ExactLpBounds()) else source.column(it)
+        }
+        val objective = ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(Long.MIN_VALUE)))
+        val retained = assertNotNull(LpExactState(source.copy(columns = columns, objective = objective)).toWorkingModel())
+
+        val certificate = assertNotNull(integerCertify(retained, doubleArrayOf(1.0), scaleBits = 0))
+
+        assertEquals(0L, certificate.objectiveBoundCeil(0L))
+        assertEquals(0, certificate.reducedCostSign(1))
+    }
+
+    @Test
+    fun `retained strict Farkas rays certify a zero margin contradiction`() {
+        val source = assertNotNull(LpBuilder().apply {
+            val x = addVar(0L, 2L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 0L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val model = assertNotNull(LpExactState(source.copy(rows = listOf(ExactLpRow(strict = true)))).toWorkingModel())
+
+        val ray = assertNotNull(integerFarkasRay(model, doubleArrayOf(-1.0)))
+
+        assertTrue(sourceFarkasValid(model, ray))
+    }
+
+    @Test
+    fun `retained Farkas rays use exact rational rows and reject inactive support after pop`() {
+        val source = LpBuilder().apply { addRealVar(0.0, 2.0) }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.push())
+        val coefficient = ExactLpNumber.of(BigFraction.ofLong(3L).reciprocal())
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))
+        assertTrue(trail.append(emptyList(), listOf(
+            LpScopedRow(0L, listOf(0 to coefficient), ExactLpNumber.of(0L), logical),
+            LpScopedRow(
+                1L, listOf(0 to ExactLpNumber.of(coefficient.value.negated())),
+                ExactLpNumber.of(coefficient.value.negated()), logical,
+            ),
+        ), true))
+        val child = assertNotNull(trail.state.toWorkingModel())
+
+        val ray = assertNotNull(integerFarkasRay(child, doubleArrayOf(-1.0, -1.0)))
+
+        assertTrue(sourceFarkasValid(child, ray))
+        assertTrue(trail.pop(0))
+        val parent = assertNotNull(trail.state.toWorkingModel())
+        assertFalse(sourceFarkasValid(parent, ray))
+        assertNull(integerFarkasRay(parent, doubleArrayOf(-1.0, -1.0)))
+    }
 
     private fun randomModel(m: Int, n: Int, rng: Random): LpModel {
         val b = LpBuilder()

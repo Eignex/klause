@@ -90,6 +90,33 @@ class Int128Test {
     }
 
     @Test
+    fun `subtracting the minimum signed value reports overflow only outside the signed range`() {
+        for (value in longArrayOf(-1L, 0L, 1L, Long.MIN_VALUE)) {
+            val minimum = Int128().apply { repeat(4) { addProduct(Long.MIN_VALUE, 1L shl 62) } }
+            val acc = Int128().apply { addLong(value) }
+            val expected = big(value) + BigInteger.ONE.shiftLeft(127)
+
+            acc.subtract(minimum)
+
+            assertEquals(value >= 0L, acc.overflow, "subtract minimum from $value")
+            if (value < 0L) assertEquals(expected, acc.toBig())
+        }
+    }
+
+    @Test
+    fun `subtraction detects negative overflow and preserves a representable signed difference`() {
+        for (value in longArrayOf(-1L, 0L, 1L)) {
+            val acc = Int128().apply { repeat(4) { addProduct(Long.MIN_VALUE, 1L shl 62) } }
+            val other = Int128().apply { addLong(value) }
+
+            acc.subtract(other)
+
+            assertEquals(value > 0L, acc.overflow, "subtract $value from minimum")
+            if (value <= 0L) assertEquals(-BigInteger.ONE.shiftLeft(127) - big(value), acc.toBig())
+        }
+    }
+
+    @Test
     fun `ceilDivPow2 matches the oracle`() {
         val rng = Random(99)
         for (k in intArrayOf(0, 1, 5, 20, 40, 62)) {
