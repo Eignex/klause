@@ -947,7 +947,11 @@ private fun Long.roundsInBinary64(): Boolean {
 
 // This foundation deliberately does not implement ExactSimplexModel: legacy solvers require a
 // checked projection before they can see any of its values.
-internal class ExactLpNumber private constructor(val value: BigFraction, val ieeeBits: Long?, private val integer: Long?) {
+internal class ExactLpNumber private constructor(
+    val value: BigFraction,
+    val ieeeBits: Long?,
+    private val integer: Long?,
+) {
     val approximation: Double by lazy(LazyThreadSafetyMode.PUBLICATION) {
         ieeeBits?.let { Double.fromBits(it) } ?: value.toDouble()
     }

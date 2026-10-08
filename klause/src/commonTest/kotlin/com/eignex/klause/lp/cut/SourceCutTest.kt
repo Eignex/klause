@@ -380,7 +380,10 @@ class SourceCutTest {
         }.build(Sense.MINIMIZE).authoritativeModel())
         val threshold = assertNotNull(BigFraction.ofDouble(1.5))
         val premises = ExactLpPremises(listOf(ExactLpPremise(1, true, ExactLpNumber.of(threshold))), listOf(2))
-        val model = assertNotNull(LpExactState(source.copy(rows = listOf(ExactLpRow(global = false, premises = premises)))).toWorkingModel())
+        val model = assertNotNull(LpExactState(source.copy(rows = listOf(ExactLpRow(
+            global = false,
+            premises = premises,
+        )))).toWorkingModel())
         val integral = CutPremise.Integral(CutExpression(mapOf(x to BigFraction.ONE)))
         val guardVariable = CutSource(CutSourceKind.INTEGER, 1)
         val bound = CutPremise.Bound(CutExpression(mapOf(guardVariable to BigFraction.ONE)), true, threshold)
@@ -390,8 +393,22 @@ class SourceCutTest {
             modelToken, 0, listOf(CutColumnSource(x)), activePremises = setOf(bound, literal),
             globalPremises = setOf(integral, lower),
         )
-        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf(), sourceMap = map)
-        val raw = integerTableauCuts(model, Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }), doubleArrayOf(1.5), 1, false).single()
+        val relaxation = LpRelaxation(
+            model,
+            intArrayOf(0),
+            booleanArrayOf(false),
+            0L,
+            intArrayOf(0),
+            intArrayOf(),
+            sourceMap = map,
+        )
+        val raw = integerTableauCuts(
+            model,
+            Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }),
+            doubleArrayOf(1.5),
+            1,
+            false,
+        ).single()
 
         val cut = assertNotNull(SourceCut.fromCut(raw, relaxation).orNull())
 

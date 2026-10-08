@@ -61,6 +61,7 @@ internal class ComponentLpSolver(
         solver.resolveBounds(allowance)
     }
 
+    @Suppress("TooGenericExceptionCaught") // Retire every child when adoption fails, including native failures.
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
         val previous = model.exactState ?: return false
         if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
@@ -70,7 +71,10 @@ internal class ComponentLpSolver(
         if (token()) return false
         try {
             for (index in solvers.indices) {
-                if (!(solvers[index] as RetainedLpSolver).adopt(checkNotNull(nextParts[index].model.exactState), token)) {
+                if (!(solvers[index] as RetainedLpSolver).adopt(
+                    checkNotNull(nextParts[index].model.exactState),
+                    token,
+                )) {
                     close()
                     return false
                 }
@@ -394,6 +398,7 @@ internal fun componentLpSolverOrNull(
     engine: (LpModel, Cancellation) -> LpSolver,
 ): ComponentLpSolverCapability? = componentLpSolverOrNull(model, cancellation, engine, ::ComponentLpSolver)
 
+@Suppress("TooGenericExceptionCaught") // Construction owns every child it created, including after native failures.
 internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     model: LpModel,
     cancellation: Cancellation,
@@ -474,7 +479,11 @@ private fun closeComponentSolvers(solvers: List<LpSolver>, primary: Throwable? =
         try {
             solver.close()
         } catch (closeFailure: Throwable) {
-            if (failure == null) failure = closeFailure else if (failure !== closeFailure) failure.addSuppressed(closeFailure)
+            if (failure == null) {
+                failure = closeFailure
+            } else if (failure !== closeFailure) {
+                failure.addSuppressed(closeFailure)
+            }
         }
     }
     if (primary == null && failure != null) throw failure

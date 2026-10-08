@@ -166,13 +166,19 @@ class IntegerDualBoundTest {
         )
         assertTrue(trail.append(row, true))
 
-        val child = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf(999.0, -1.0)))
+        val child = assertNotNull(integerCertify(
+            assertNotNull(trail.state.toWorkingModel()),
+            doubleArrayOf(999.0, -1.0),
+        ))
 
         assertEquals(2L, child.objectiveBoundCeil(0L))
         assertFalse(child.dualNonzeroRow(0))
         assertTrue(child.dualNonzeroRow(1))
         assertTrue(trail.pop(0))
-        val parent = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf(-1.0, 999.0)))
+        val parent = assertNotNull(integerCertify(
+            assertNotNull(trail.state.toWorkingModel()),
+            doubleArrayOf(-1.0, 999.0),
+        ))
         assertEquals(1L, parent.objectiveBoundCeil(0L))
         assertTrue(parent.dualNonzeroRow(0))
         assertFalse(parent.dualNonzeroRow(1))
@@ -204,8 +210,12 @@ class IntegerDualBoundTest {
         }.build(Sense.MINIMIZE)
         val continuous = LpBuilder().apply { addRealVar(0.0, 2.0, cost = 1.0) }.build(Sense.MINIMIZE)
 
-        val fractionalModel = assertNotNull(LpExactState(assertNotNull(fractional.authoritativeModel())).toWorkingModel())
-        val continuousModel = assertNotNull(LpExactState(assertNotNull(continuous.authoritativeModel())).toWorkingModel())
+        val fractionalModel = assertNotNull(
+            LpExactState(assertNotNull(fractional.authoritativeModel())).toWorkingModel(),
+        )
+        val continuousModel = assertNotNull(
+            LpExactState(assertNotNull(continuous.authoritativeModel())).toWorkingModel(),
+        )
         assertNull(integerCertify(fractionalModel, doubleArrayOf(0.0)))
         assertNull(integerCertify(continuousModel, doubleArrayOf()))
     }
@@ -220,7 +230,10 @@ class IntegerDualBoundTest {
             if (it == source.n) source.column(it).copy(bounds = ExactLpBounds()) else source.column(it)
         }
         val objective = ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(Long.MIN_VALUE)))
-        val retained = assertNotNull(LpExactState(source.copy(columns = columns, objective = objective)).toWorkingModel())
+        val retained = assertNotNull(LpExactState(source.copy(
+            columns = columns,
+            objective = objective,
+        )).toWorkingModel())
 
         val certificate = assertNotNull(integerCertify(retained, doubleArrayOf(1.0), scaleBits = 0))
 

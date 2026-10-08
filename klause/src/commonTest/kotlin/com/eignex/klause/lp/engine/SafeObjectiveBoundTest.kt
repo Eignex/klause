@@ -35,7 +35,10 @@ class SafeObjectiveBoundTest {
         val bound = assertNotNull(tightObjectiveLowerBound(model, current, certificate))
 
         assertTrue(bound <= 4.0 && bound > 3.0)
-        assertEquals(bound, certifiedTightObjectiveLowerBound(model, current, certificate, null, ProductionLpCertificationPolicy))
+        assertEquals(
+            bound,
+            certifiedTightObjectiveLowerBound(model, current, certificate, null, ProductionLpCertificationPolicy),
+        )
     }
 
 
@@ -86,7 +89,12 @@ class SafeObjectiveBoundTest {
             listOf(ExactLpNumber.of(2L)), source.objective.constant, scale = ExactLpNumber.of(2L),
         )
         val trail = LpBoundTrail(source.copy(objective = objective))
-        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(1.5))), true), 7L))
+        assertTrue(trail.assertBound(
+            0,
+            false,
+            ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(1.5))), true),
+            7L,
+        ))
         val model = assertNotNull(trail.state.toWorkingModel())
         val result = assertNotNull(RevisedSimplex(model).solvePrimal())
 
@@ -107,11 +115,23 @@ class SafeObjectiveBoundTest {
         val certificate = assertNotNull(integerCertify(model, duals))
 
         assertEquals(1.0, tightObjectiveLowerBound(model, duals, certificate))
-        assertEquals(1.0, certifiedTightObjectiveLowerBound(model, duals, certificate, null, ProductionLpCertificationPolicy))
+        assertEquals(
+            1.0,
+            certifiedTightObjectiveLowerBound(model, duals, certificate, null, ProductionLpCertificationPolicy),
+        )
         assertTrue(trail.replaceObjective(ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(0L)))))
         val unpriced = assertNotNull(trail.state.toWorkingModel())
         assertEquals(0.0, tightObjectiveLowerBound(unpriced, doubleArrayOf(0.0), certificate))
-        assertEquals(0.0, certifiedTightObjectiveLowerBound(unpriced, doubleArrayOf(0.0), certificate, null, ProductionLpCertificationPolicy))
+        assertEquals(
+            0.0,
+            certifiedTightObjectiveLowerBound(
+                unpriced,
+                doubleArrayOf(0.0),
+                certificate,
+                null,
+                ProductionLpCertificationPolicy,
+            ),
+        )
     }
 
     private fun randomModel(m: Int, n: Int, rng: Random): LpModel {

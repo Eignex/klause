@@ -99,7 +99,10 @@ class LeafRealSolverTest {
             numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
         )
         LeafRealSolver(problem, null).use { owner ->
-            assertEquals(listOf(BigFraction.ofLong(2L)), owner.solve(Sample(booleanArrayOf(), longArrayOf(0))).exactReals)
+            assertEquals(
+                listOf(BigFraction.ofLong(2L)),
+                owner.solve(Sample(booleanArrayOf(), longArrayOf(0))).exactReals,
+            )
             assertEquals(LpVerdict.INDETERMINATE,
                 owner.solve(Sample(booleanArrayOf(), longArrayOf(2)), Cancellation { true }).verdict)
             owner.releaseSolvers()

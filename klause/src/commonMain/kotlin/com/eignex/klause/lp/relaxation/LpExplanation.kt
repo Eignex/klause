@@ -109,7 +109,11 @@ internal object LpExplanation {
         if (!model.exactShift(column).isZero) return PREMISE_AUX
         val bounds = model.exactBounds(column)
         if (lowerSide) {
-            return if (bounds.lower?.number?.value?.isZero == true && !bounds.lower.strict) PREMISE_NONE else PREMISE_AUX
+            return if (bounds.lower?.number?.value?.isZero == true && !bounds.lower.strict) {
+                PREMISE_NONE
+            } else {
+                PREMISE_AUX
+            }
         }
         val upper = bounds.upper ?: return PREMISE_AUX
         if (upper.strict) return PREMISE_AUX
@@ -234,7 +238,9 @@ internal object LpExplanation {
         session: PropagationSession,
     ): Boolean {
         val model = relaxation.model
-        if (model.exactState == null && (model.rowGlobal.size != model.m || model.rowPremises.size != model.m)) return false
+        if (model.exactState == null && (model.rowGlobal.size != model.m || model.rowPremises.size != model.m)) {
+            return false
+        }
         for (r in rows) {
             if (r !in 0 until model.m || model.exactState?.rows?.row(r)?.active == false) return false
             if (model.exactState?.model?.row(r)?.global ?: model.rowGlobal[r]) continue
@@ -363,7 +369,12 @@ internal object LpExplanation {
         return if (!strict) rounded else if (upper) rounded - BIG_ONE else rounded + BIG_ONE
     }
 
-    private fun integerBoundLiteral(variable: Int, threshold: BigInt, upper: Boolean, session: PropagationSession): Int {
+    private fun integerBoundLiteral(
+        variable: Int,
+        threshold: BigInt,
+        upper: Boolean,
+        session: PropagationSession,
+    ): Int {
         if (variable !in 0 until session.problem.numIntVars) return PREMISE_AUX
         if (threshold < minimumLong) return if (upper) PREMISE_AUX else PREMISE_NONE
         if (threshold > maximumLong) return if (upper) PREMISE_NONE else PREMISE_AUX

@@ -22,8 +22,20 @@ class LpModelTest {
             addRealVar(0.1, 0.3)
             addRealVar(null, null)
         }
-        val expectedLower = listOf(BigFraction.ofLong(2L), null, BigFraction.ofLong(-3L), BigFraction.ofDouble(0.1), null)
-        val expectedUpper = listOf(BigFraction.ofLong(5L), BigFraction.ofLong(7L), null, BigFraction.ofDouble(0.3), null)
+        val expectedLower = listOf(
+            BigFraction.ofLong(2L),
+            null,
+            BigFraction.ofLong(-3L),
+            BigFraction.ofDouble(0.1),
+            null,
+        )
+        val expectedUpper = listOf(
+            BigFraction.ofLong(5L),
+            BigFraction.ofLong(7L),
+            null,
+            BigFraction.ofDouble(0.3),
+            null,
+        )
         val bounds = List(builder.varCount) { builder.sourceBounds(it) }
         val model = builder.build(Sense.MINIMIZE)
 

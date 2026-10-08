@@ -56,8 +56,11 @@ class LpSolveTest {
             addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.5)
         }.build(Sense.MINIMIZE).authoritativeModel())
         val columns = List(source.numVars) {
-            if (it == source.n) source.column(it).copy(bounds = ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L))))
-            else source.column(it)
+            if (it == source.n) {
+                source.column(it).copy(bounds = ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L))))
+            } else {
+                source.column(it)
+            }
         }
         val model = assertNotNull(LpExactState(source.copy(columns = columns)).toWorkingModel())
 

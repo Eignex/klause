@@ -429,7 +429,11 @@ private class SourceCutMapper(
                         }
                         ExactLpPremises(
                             legacy.vars.indices.map {
-                                ExactLpPremise(legacy.vars[it], legacy.isUpper[it], ExactLpNumber.of(legacy.thresholds[it]))
+                                ExactLpPremise(
+                                    legacy.vars[it],
+                                    legacy.isUpper[it],
+                                    ExactLpNumber.of(legacy.thresholds[it]),
+                                )
                             },
                             legacy.boolLits.toList(),
                         )
@@ -446,7 +450,10 @@ private class SourceCutMapper(
                             ),
                         )
                     }
-                    for (literal in premises.literalEntries()) facts.add(CutProofFact(CutPremise.Literal(literal), false))
+                    for (literal in premises.literalEntries()) facts.add(CutProofFact(
+                        CutPremise.Literal(literal),
+                        false,
+                    ))
                 }
                 weightedRows.add(CutWeightedRow(rowFact, row.multiplier))
             }

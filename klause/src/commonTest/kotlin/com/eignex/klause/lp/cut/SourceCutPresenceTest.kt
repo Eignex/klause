@@ -53,7 +53,12 @@ class SourceCutPresenceTest {
         assertNotEquals(old, catalog.source(b))
         val replacement = catalog.source(a)
         assertNotEquals(old, replacement)
-        val current = CutSourceMap(root, 1L, listOf(CutColumnSource(replacement)), auxiliaryDefinitions = mapOf(replacement to a))
+        val current = CutSourceMap(
+            root,
+            1L,
+            listOf(CutColumnSource(replacement)),
+            auxiliaryDefinitions = mapOf(replacement to a),
+        )
         assertNotNull(cut.toCut(original).orNull())
         val rebound = assertNotNull(cut.toCut(current).orNull())
         assertEquals(mapOf(replacement to a), assertNotNull(rebound.provenance).auxiliaryDefinitions)
@@ -77,7 +82,11 @@ class SourceCutPresenceTest {
         val definition = assertNotNull(original.colPresence[column])
         val expression = CutExpression(mapOf(source to BigFraction.ONE))
         val proof = CutProvenance(problem, 0L, emptyList(),
-            conclusion = CutPremise.Row(expression, Relation.GE, BigFraction.ONE), auxiliaryDefinitions = mapOf(source to definition))
+            conclusion = CutPremise.Row(
+                expression,
+                Relation.GE,
+                BigFraction.ONE,
+            ), auxiliaryDefinitions = mapOf(source to definition))
         val stale = Cut(intArrayOf(999), longArrayOf(7L), Relation.LE, 999L, global = true, provenance = proof)
         catalog.retain(emptySet())
         catalog.source(CutAuxiliaryDefinition(listOf(-1L), emptyList(), 1L, true))
@@ -90,7 +99,10 @@ class SourceCutPresenceTest {
         assertNotEquals(source, current)
         val parent = assertNotNull(assertNotNull(rebuilt.sourceMap).parent(original.model.m))
         assertEquals(mapOf(current to definition), parent.auxiliaryDefinitions)
-        assertEquals(CutPremise.Row(CutExpression(mapOf(current to BigFraction.ONE)), Relation.GE, BigFraction.ONE), parent.conclusion)
+        assertEquals(
+            CutPremise.Row(CutExpression(mapOf(current to BigFraction.ONE)), Relation.GE, BigFraction.ONE),
+            parent.conclusion,
+        )
         var coefficient = 0L
         rebuilt.model.forEachInColumn(mappedColumn) { row, value -> if (row == original.model.m) coefficient = value }
         assertEquals(-1L, coefficient)
@@ -109,7 +121,11 @@ class SourceCutPresenceTest {
         val b = CutAuxiliaryDefinition(listOf(2L), emptyList(), 4L, false)
         val oldExpression = CutExpression(mapOf(oldA to BigFraction.ofLong(2L)))
         val newExpression = CutExpression(mapOf(newA to BigFraction.ofLong(2L)))
-        val oldRow = CutPremise.Row(CutExpression(mapOf(oldA to BigFraction.ONE, oldB to BigFraction.ONE)), Relation.LE, BigFraction.ofLong(2L))
+        val oldRow = CutPremise.Row(
+            CutExpression(mapOf(oldA to BigFraction.ONE, oldB to BigFraction.ONE)),
+            Relation.LE,
+            BigFraction.ofLong(2L),
+        )
         val newRow = oldRow.copy(expression = CutExpression(mapOf(newA to BigFraction.ONE, newB to BigFraction.ONE)))
         val oldFacts = listOf(
             CutProofFact(CutPremise.Bound(oldExpression, true, BigFraction.ONE, strict = true), false),

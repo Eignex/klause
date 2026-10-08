@@ -109,7 +109,11 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         val retained = requireNotNull(sources)
         val domains = SessionDomains(session)
-        val depth = if (session === sharedNative) shared?.decisionLevel ?: session.decisionLevel else session.decisionLevel
+        val depth = if (session === sharedNative) {
+            shared?.decisionLevel ?: session.decisionLevel
+        } else {
+            session.decisionLevel
+        }
         if (!core.atLevel(depth)) return null
         if (retained.depth > depth) retained.retract(depth)
         var edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation)

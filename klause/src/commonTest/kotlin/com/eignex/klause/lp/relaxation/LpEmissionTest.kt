@@ -131,7 +131,15 @@ class LpEmissionTest {
         val problem = Problem(
             1, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
             arrayOf<Factor>(
-                ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(), LinearOp.GE, 8.0),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    LinearOp.GE,
+                    8.0,
+                ),
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 2),
             ),
         )
@@ -155,7 +163,11 @@ class LpEmissionTest {
     fun `retract restores the ancestor emission before visiting a sibling`() {
         val problem = Problem(
             1, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf<Factor>(ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(), LinearOp.GE, 8.0)),
+            arrayOf<Factor>(
+                ReifiedRealLinear(
+                    0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(), LinearOp.GE, 8.0,
+                ),
+            ),
         )
         var pin: Boolean? = null
         val domains = object : RelaxationDomains {
@@ -178,7 +190,11 @@ class LpEmissionTest {
     fun `cancelled refresh leaves the published ancestor unchanged`() {
         val problem = Problem(
             1, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf<Factor>(ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(), LinearOp.GE, 8.0)),
+            arrayOf<Factor>(
+                ReifiedRealLinear(
+                    0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(), doubleArrayOf(), LinearOp.GE, 8.0,
+                ),
+            ),
         )
         var pin: Boolean? = null
         val domains = object : RelaxationDomains {

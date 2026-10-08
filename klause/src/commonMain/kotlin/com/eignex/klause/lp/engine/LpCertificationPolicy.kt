@@ -45,7 +45,10 @@ internal fun certifiedTightObjectiveLowerBound(
         safe,
         policy.acceptNullable(
             LpCertifier.INTEGER,
-            certificate?.takeIf { it.belongsTo(model, observer) && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
+            certificate?.takeIf { it.belongsTo(
+                model,
+                observer,
+            ) && model.hasIntegralObjective() }?.objectiveBoundCeil(0L),
         ),
     )
 }

@@ -152,7 +152,13 @@ private class IntegerTableauInput(
                 bounds.lower?.let { !it.strict && it.number.value.isZero } == true &&
                     bounds.upper?.let { !it.strict && it.number.value.isZero } != false
             }
-            return IntegerTableauInput(model, integers, origins, LongArray(model.m) { rightHandSide[it].toLong() }, rows)
+            return IntegerTableauInput(
+                model,
+                integers,
+                origins,
+                LongArray(model.m) { rightHandSide[it].toLong() },
+                rows,
+            )
         }
     }
 }
@@ -342,7 +348,12 @@ private fun ceilDiv(a: Long, b: Long): Long {
     return if (r > 0L) q + 1L else q
 }
 
-private fun tableauProvenance(input: IntegerTableauInput, weights: LongArray, divisor: Long, mir: Boolean): TableauCutProvenance {
+private fun tableauProvenance(
+    input: IntegerTableauInput,
+    weights: LongArray,
+    divisor: Long,
+    mir: Boolean,
+): TableauCutProvenance {
     val model = input.model
     val touched = HashSet<Int>()
     val rows = weights.indices.filter { weights[it] != 0L }.map { row ->

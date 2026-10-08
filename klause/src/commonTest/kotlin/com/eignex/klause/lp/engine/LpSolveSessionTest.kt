@@ -85,7 +85,10 @@ class LpSolveSessionTest {
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
             val factory = RecordingLpEngineFactory()
             LpSolveSession(LpSolveContext(factory), componentSplit = split).use { owner ->
-                assertEquals(BigFraction.ofLong(2L), owner.solve(assertNotNull(trail.state.ownerWorkingModel())).lowerBound)
+                assertEquals(
+                    BigFraction.ofLong(2L),
+                    owner.solve(assertNotNull(trail.state.ownerWorkingModel())).lowerBound,
+                )
                 assertTrue(trail.push())
                 assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), 7L))
                 assertTrue(trail.push())

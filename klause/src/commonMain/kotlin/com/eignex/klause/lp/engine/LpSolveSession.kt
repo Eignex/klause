@@ -46,7 +46,11 @@ internal class LpSolveSession(
             return certification.certify(model, current, result, cancellation, observer, counterResults,
                 refinementLimits, floatAccept, floatOffset)
         } catch (primary: Throwable) {
-            try { releaseSolvers() } catch (cleanup: Throwable) { if (cleanup !== primary) primary.addSuppressed(cleanup) }
+            try {
+                releaseSolvers()
+            } catch (cleanup: Throwable) {
+                if (cleanup !== primary) primary.addSuppressed(cleanup)
+            }
             throw primary
         }
     }

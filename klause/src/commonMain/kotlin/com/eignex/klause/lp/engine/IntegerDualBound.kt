@@ -301,7 +301,11 @@ internal class IntegerLpView private constructor(private val model: LpModel) {
     fun rhs(row: Int): Long? = if (source == null) model.rhs[row] else source.rhs(row).exactLong()
     fun cost(column: Int): Long? = if (source == null) model.cost[column] else source.objective.cost(column).exactLong()
     fun constant(): Long? = if (source == null) model.objConstant else source.objective.constant.exactLong()
-    fun origin(column: Int): Long? = if (source == null) model.loShift[column] else source.column(column).origin.exactLong()
+    fun origin(column: Int): Long? = if (source == null) {
+        model.loShift[column]
+    } else {
+        source.column(column).origin.exactLong()
+    }
 
     fun hasLower(column: Int): Boolean = if (source == null) {
         column >= n || !model.probeClampedLo[column]

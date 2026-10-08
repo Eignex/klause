@@ -123,7 +123,8 @@ internal class LpCapturedModel(
     private fun matchesIntegerMatrix(model: LpModel): Boolean = colPtr.contentEquals(model.csc.colPtr) &&
         rowIdx.contentEquals(model.csc.rowIdx) && colVal.contentEquals(model.csc.colVal)
 
-    private fun matchesIntegerVectors(model: LpModel): Boolean = rhs.contentEquals(model.rhs) && cost.contentEquals(model.cost) &&
+    private fun matchesIntegerVectors(model: LpModel): Boolean =
+        rhs.contentEquals(model.rhs) && cost.contentEquals(model.cost) &&
         upper.contentEquals(model.upper) && hasUpper.contentEquals(model.hasUpper) &&
         loShift.contentEquals(model.loShift) && objConstant == model.objConstant && sense == model.sense &&
         flippedRhs.contentEquals(model.flippedRhs) && probeClampedLo.contentEquals(model.probeClampedLo) &&

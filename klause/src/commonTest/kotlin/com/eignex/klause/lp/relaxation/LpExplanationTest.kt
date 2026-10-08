@@ -86,7 +86,12 @@ class LpExplanationTest {
             val source = CutSource(CutSourceKind.INTEGER, 0)
             val coefficient = BigFraction.ofLong(sign)
             val expression = CutExpression(mapOf(source to coefficient), BigFraction.ONE)
-            val premise = CutPremise.Bound(expression, upper == (sign > 0L), threshold * coefficient + BigFraction.ONE, strict)
+            val premise = CutPremise.Bound(
+                expression,
+                upper == (sign > 0L),
+                threshold * coefficient + BigFraction.ONE,
+                strict,
+            )
             val proof = CutProvenance(problem, 0L, listOf(CutProofFact(premise, false)))
             val model = LpBuilder().apply {
                 addVar(-6L, 6L)
@@ -127,7 +132,12 @@ class LpExplanationTest {
             val source = CutSource(CutSourceKind.BOOLEAN, 0)
             val coefficient = BigFraction.ofLong(sign)
             val expression = CutExpression(mapOf(source to coefficient), BigFraction.ONE)
-            val premise = CutPremise.Bound(expression, bound.upper == (sign > 0L), bound.value * coefficient + BigFraction.ONE, bound.strict)
+            val premise = CutPremise.Bound(
+                expression,
+                bound.upper == (sign > 0L),
+                bound.value * coefficient + BigFraction.ONE,
+                bound.strict,
+            )
             val proof = CutProvenance(problem, 0L, listOf(CutProofFact(premise, false)))
             val model = LpBuilder().apply {
                 addVar(0L, 1L)
@@ -138,7 +148,10 @@ class LpExplanationTest {
                 sourceMap = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)), parentRows = mapOf(0 to proof)))
             val literals = IntArrayList()
 
-            assertEquals(accepted, LpExplanation.addRowPremiseLits(literals, IntHashSet(), relaxation, intArrayOf(0), session))
+            assertEquals(
+                accepted,
+                LpExplanation.addRowPremiseLits(literals, IntHashSet(), relaxation, intArrayOf(0), session),
+            )
 
             assertEquals(if (pin == null) emptyList() else listOf(Lit.make(0, !pin)), literals.toIntArray().toList())
         }
@@ -162,8 +175,11 @@ class LpExplanationTest {
                 sourceMap = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)), parentRows = mapOf(0 to proof)))
             val literals = IntArrayList()
 
-            assertEquals(upper == (threshold == high), LpExplanation.addRowPremiseLits(literals, IntHashSet(), relaxation,
-                intArrayOf(0), PropagationSession(problem)))
+            assertEquals(
+                upper == (threshold == high),
+                LpExplanation.addRowPremiseLits(literals, IntHashSet(), relaxation,
+                    intArrayOf(0), PropagationSession(problem)),
+            )
 
             assertTrue(literals.toIntArray().isEmpty())
         }
@@ -180,14 +196,22 @@ class LpExplanationTest {
             addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
         }.build(Sense.MINIMIZE)
         source.rowGlobal[0] = false
-        source.rowPremises[0] = LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(Lit.make(0, true)))
+        source.rowPremises[0] = LpRowPremises(
+            intArrayOf(),
+            booleanArrayOf(),
+            longArrayOf(),
+            intArrayOf(Lit.make(0, true)),
+        )
         val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
         val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
         val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0)))
 
         model.rowGlobal[0] = true
 
-        assertEquals(listOf(Lit.make(0, false)), LpExplanation.objectiveBoundReason(relaxation, certificate, session)?.toList())
+        assertEquals(
+            listOf(Lit.make(0, false)),
+            LpExplanation.objectiveBoundReason(relaxation, certificate, session)?.toList(),
+        )
     }
 
     @Test
@@ -202,11 +226,23 @@ class LpExplanationTest {
                 addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
             }.build(Sense.MINIMIZE)
             source.rowGlobal[0] = false
-            source.rowPremises[0] = LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(Lit.make(0, true)))
-            val model = if (retained) assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel()) else source
+            source.rowPremises[0] = LpRowPremises(
+                intArrayOf(),
+                booleanArrayOf(),
+                longArrayOf(),
+                intArrayOf(Lit.make(0, true)),
+            )
+            val model = if (retained) {
+                assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+            } else {
+                source
+            }
             val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
             val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0)))
-            assertEquals(listOf(Lit.make(0, false)), LpExplanation.objectiveBoundReason(relaxation, certificate, session)?.toList())
+            assertEquals(
+                listOf(Lit.make(0, false)),
+                LpExplanation.objectiveBoundReason(relaxation, certificate, session)?.toList(),
+            )
 
             session.popToLevel(0)
 
@@ -229,7 +265,10 @@ class LpExplanationTest {
 
         assertNull(LpExplanation.objectiveBoundReason(parent, certificate, session))
         val fresh = assertNotNull(integerCertify(parent.model, doubleArrayOf()))
-        assertEquals(listOf(session.boundGeLit(0, 3L, false)), LpExplanation.objectiveBoundReason(parent, fresh, session)?.toList())
+        assertEquals(
+            listOf(session.boundGeLit(0, 3L, false)),
+            LpExplanation.objectiveBoundReason(parent, fresh, session)?.toList(),
+        )
     }
 
     @Test
@@ -277,7 +316,10 @@ class LpExplanationTest {
         for (strict in listOf(false, true)) {
             val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), arrayOf<Factor>())
             val session = PropagationSession(problem)
-            val relaxation = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))).build(session)
+            val relaxation = CpToLpRelaxation(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1L)),
+            ).build(session)
             val trail = LpBoundTrail(assertNotNull(relaxation.model.authoritativeModel()))
             val lo = if (strict) 6L else 5L
             val hi = if (strict) 6L else 7L

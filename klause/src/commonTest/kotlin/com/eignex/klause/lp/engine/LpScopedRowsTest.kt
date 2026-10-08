@@ -199,7 +199,10 @@ class LpScopedRowsTest {
         assertEquals(one, trail.state.model.column(2).bounds.upper?.number)
         assertEquals(third, trail.state.model.entries(1).single().number)
         assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO, third.value)))
-        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE, third.value)))
+        assertNotNull(checkedLpWitness(
+            assertNotNull(trail.state.toWorkingModel()),
+            listOf(BigFraction.ONE, third.value),
+        ))
         assertTrue(trail.pop(0))
         assertFalse(trail.state.rows.row(1).active)
         assertEquals(one, trail.state.model.column(2).bounds.upper?.number)

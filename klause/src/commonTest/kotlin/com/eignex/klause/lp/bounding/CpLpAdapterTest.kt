@@ -116,7 +116,11 @@ class CpLpAdapterTest {
             var previousRows = rootRows
             var reclaimed = false
             for (lower in 1L..96L) {
-                if (lower == 1L) shared.push(SearchDecision.IntAtLeast(1, lower)) else cp.session.implyIntAtLeast(1, lower)
+                if (lower == 1L) {
+                    shared.push(SearchDecision.IntAtLeast(1, lower))
+                } else {
+                    cp.session.implyIntAtLeast(1, lower)
+                }
                 val current = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
                 reclaimed = reclaimed || current.model.m < previousRows
                 if (lower <= 8L || reclaimed) {
@@ -124,7 +128,10 @@ class CpLpAdapterTest {
                     val fresh = relaxer.build(cp.session)
                     val expected = RevisedSimplex(fresh.model).use { assertNotNull(it.solve()).objective }
                     assertEquals(expected, result.objective)
-                    assertEquals(lower, assertNotNull(integerCertify(current.model, result.duals)).objectiveBoundCeil(0))
+                    assertEquals(
+                        lower,
+                        assertNotNull(integerCertify(current.model, result.duals)).objectiveBoundCeil(0),
+                    )
                 }
                 assertTrue(current.model.m <= previousRows + rootRows)
                 previousRows = current.model.m
@@ -151,7 +158,12 @@ class CpLpAdapterTest {
             arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 1)),
         )
         val sink = SolveStatsSink(backend = "constant-cut")
-        LpEngine(problem, LinearObjective(), LpParams(lpPlan = LpPlan(bounding = true, cuts = true)), sink).use { engine ->
+        LpEngine(
+            problem,
+            LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+            sink,
+        ).use { engine ->
             val session = PropagationSession(problem)
             val relaxer = assertNotNull(engine.lpRelaxer)
             val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
@@ -1144,9 +1156,18 @@ class CpLpAdapterTest {
                     val column = child.intColOf[0]
                     val origin = child.model.exactShift(column)
                     assertEquals(authority.column(column).origin.value, origin)
-                    assertEquals(BigFraction.ZERO, origin + assertNotNull(child.model.exactBounds(column).lower).number.value)
-                    assertEquals(BigFraction.ofLong(7), origin + assertNotNull(child.model.exactBounds(column).upper).number.value)
-                    val shifted = listOf(BigFraction.ofLong(x) - origin, BigFraction.ofLong(y) - child.model.exactShift(1))
+                    assertEquals(
+                        BigFraction.ZERO,
+                        origin + assertNotNull(child.model.exactBounds(column).lower).number.value,
+                    )
+                    assertEquals(
+                        BigFraction.ofLong(7),
+                        origin + assertNotNull(child.model.exactBounds(column).upper).number.value,
+                    )
+                    val shifted = listOf(
+                        BigFraction.ofLong(x) - origin,
+                        BigFraction.ofLong(y) - child.model.exactShift(1),
+                    )
                     var activity = BigFraction.ZERO
                     var objectiveValue = child.model.exactConstant()
                     for (j in shifted.indices) {
@@ -1154,7 +1175,10 @@ class CpLpAdapterTest {
                         objectiveValue += child.model.exactCost(j) * shifted[j]
                     }
                     assertEquals(x + y >= 1L, activity <= child.model.exactRhs(0))
-                    assertEquals(BigFraction.ofLong(2 * x + y + 5), child.model.sourceObjective(objectiveValue) + BigFraction.ofLong(child.objectiveConstant))
+                    assertEquals(
+                        BigFraction.ofLong(2 * x + y + 5),
+                        child.model.sourceObjective(objectiveValue) + BigFraction.ofLong(child.objectiveConstant),
+                    )
                 }
             }
             assertEquals(1.0, result.objective)
@@ -1221,13 +1245,22 @@ class CpLpAdapterTest {
             session.pinIntAtLeast(0, 3)
             val child = assertNotNull(engine.nodeRelaxation(relaxer, session))
             assertEquals(BigFraction.ofLong(-5L), child.model.exactShift(0))
-            assertEquals(BigFraction.ofLong(3L), child.model.exactShift(0) + assertNotNull(child.model.exactBounds(0).lower).number.value)
+            assertEquals(
+                BigFraction.ofLong(3L),
+                child.model.exactShift(0) + assertNotNull(child.model.exactBounds(0).lower).number.value,
+            )
             session.popToLevel(0)
             session.pinIntAtMost(0, -2)
             val sibling = assertNotNull(engine.nodeRelaxation(relaxer, session))
             assertEquals(BigFraction.ofLong(-5L), sibling.model.exactShift(0))
-            assertEquals(BigFraction.ofLong(-5L), sibling.model.exactShift(0) + assertNotNull(sibling.model.exactBounds(0).lower).number.value)
-            assertEquals(BigFraction.ofLong(-2L), sibling.model.exactShift(0) + assertNotNull(sibling.model.exactBounds(0).upper).number.value)
+            assertEquals(
+                BigFraction.ofLong(-5L),
+                sibling.model.exactShift(0) + assertNotNull(sibling.model.exactBounds(0).lower).number.value,
+            )
+            assertEquals(
+                BigFraction.ofLong(-2L),
+                sibling.model.exactShift(0) + assertNotNull(sibling.model.exactBounds(0).upper).number.value,
+            )
             assertEquals(
                 -5.0,
                 assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second).objective,
@@ -1358,7 +1391,11 @@ class CpLpAdapterTest {
             assertTrue(!cp.session.intDomain(0).contains(2L))
             assertEquals(BigFraction.ZERO, child.model.exactBounds(auxiliary).upper?.number?.value)
             shared.popTo(0)
-            assertEquals(BigFraction.ONE, assertNotNull(engine.nodeRelaxation(relaxer, cp.session)).model.exactBounds(auxiliary).upper?.number?.value)
+            assertEquals(
+                BigFraction.ONE,
+                assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+                    .model.exactBounds(auxiliary).upper?.number?.value,
+            )
         }
     }
 

@@ -41,27 +41,55 @@ class LpRetainedCutsTest {
         val old = CutSource(CutSourceKind.AUXILIARY, 0)
         val next = CutSource(CutSourceKind.AUXILIARY, 1)
         val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true)
-        val original = CutSourceMap(problem, 0L, listOf(CutColumnSource(old)), auxiliaryDefinitions = mapOf(old to definition))
-        val current = CutSourceMap(problem, 1L, listOf(CutColumnSource(next)), auxiliaryDefinitions = mapOf(next to definition))
+        val original = CutSourceMap(
+            problem,
+            0L,
+            listOf(CutColumnSource(old)),
+            auxiliaryDefinitions = mapOf(old to definition),
+        )
+        val current = CutSourceMap(
+            problem,
+            1L,
+            listOf(CutColumnSource(next)),
+            auxiliaryDefinitions = mapOf(next to definition),
+        )
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
-        val base = LpRelaxation(model, intArrayOf(-1), BooleanArray(1), 0L, intArrayOf(), intArrayOf(), sourceMap = original)
+        val base = LpRelaxation(
+            model,
+            intArrayOf(-1),
+            BooleanArray(1),
+            0L,
+            intArrayOf(),
+            intArrayOf(),
+            sourceMap = original,
+        )
         val source = SourceCut(CutExpression(mapOf(old to BigFraction.ONE)), Relation.LE, BigFraction.ONE,
             CutProvenance(problem, 0L, emptyList(), auxiliaryDefinitions = mapOf(old to definition)))
         val cuts = LpRetainedCuts()
         LpScopedSolver(LpExactState(assertNotNull(model.authoritativeModel()))).use { owner ->
-            val initial = assertNotNull(cuts.prepare(owner.state, base, listOf(assertNotNull(source.toCut(original).orNull()))))
+            val initial = assertNotNull(cuts.prepare(
+                owner.state,
+                base,
+                listOf(assertNotNull(source.toCut(original).orNull())),
+            ))
             assertTrue(owner.replaceRows(initial.retired, emptyList(), initial.rows, false))
             initial.commit()
             val before = owner.state
             val id = before.rows.row(0).id
-            val edit = assertNotNull(cuts.prepare(before, base.withModel(assertNotNull(before.ownerWorkingModel()), current)))
+            val edit = assertNotNull(cuts.prepare(
+                before,
+                base.withModel(assertNotNull(before.ownerWorkingModel()), current),
+            ))
             assertTrue(edit.rows.isEmpty() && edit.retired.isEmpty())
 
             edit.commit()
 
             val proof = cuts.parentRows(owner.state).values.single()
             assertEquals(mapOf(next to definition), proof.auxiliaryDefinitions)
-            assertEquals(CutPremise.Row(CutExpression(mapOf(next to BigFraction.ONE)), Relation.LE, BigFraction.ONE), proof.conclusion)
+            assertEquals(
+                CutPremise.Row(CutExpression(mapOf(next to BigFraction.ONE)), Relation.LE, BigFraction.ONE),
+                proof.conclusion,
+            )
             assertSame(before, owner.state)
             assertEquals(id, owner.state.rows.row(0).id)
         }

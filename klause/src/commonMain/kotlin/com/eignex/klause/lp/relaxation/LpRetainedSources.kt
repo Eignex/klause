@@ -435,7 +435,10 @@ internal class LpRetainedSources(
 
     fun liveBounds(domains: RelaxationDomains): List<ExactLpBounds> = liveBounds(columns, domains)
 
-    private fun liveBounds(columns: List<Column>, domains: RelaxationDomains): List<ExactLpBounds> = columns.map { column ->
+    private fun liveBounds(
+        columns: List<Column>,
+        domains: RelaxationDomains,
+    ): List<ExactLpBounds> = columns.map { column ->
         val origin = column.source.origin.value
         when {
             column.variable >= 0 && column.boolean -> {

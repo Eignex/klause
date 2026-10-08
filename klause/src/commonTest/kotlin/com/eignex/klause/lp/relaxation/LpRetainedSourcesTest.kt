@@ -32,7 +32,11 @@ class LpRetainedSourcesTest {
     fun `catalog compaction rejects stale plans and preserves numerical authority`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val catalog = LpAuxiliarySources()
-        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)), auxiliarySources = catalog)
+        val relaxer = CpToLpRelaxation(
+            problem,
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            auxiliarySources = catalog,
+        )
         val sources = LpRetainedSources(problem, relaxer)
         val domains = RootDomains(problem)
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
@@ -146,7 +150,13 @@ class LpRetainedSourcesTest {
             LinearObjective(intCoefficients = longArrayOf(1, 0, 0)), linMaxTightFace = true))
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val initial = sources.prepare(owner.state, domains)
-            assertTrue(owner.replaceRows(initial.retired, initial.columns, initial.rows, false, objective = initial.objective))
+            assertTrue(owner.replaceRows(
+                initial.retired,
+                initial.columns,
+                initial.rows,
+                false,
+                objective = initial.objective,
+            ))
             initial.commit()
             val rootColumns = owner.state.model.n
             val rootRows = owner.state.model.m

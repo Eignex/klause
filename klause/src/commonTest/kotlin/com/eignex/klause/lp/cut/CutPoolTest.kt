@@ -28,7 +28,12 @@ class CutPoolTest {
         val lower = CutPremise.Bound(expression, false, BigFraction.ONE)
         val upper = CutPremise.Bound(CutExpression(mapOf(y to BigFraction.ONE)), true, BigFraction.ofLong(2L))
         val weaker = lower.copy(value = BigFraction.ZERO)
-        val map = CutSourceMap(root, 0L, listOf(CutColumnSource(x), CutColumnSource(y)), activePremises = setOf(lower, upper))
+        val map = CutSourceMap(
+            root,
+            0L,
+            listOf(CutColumnSource(x), CutColumnSource(y)),
+            activePremises = setOf(lower, upper),
+        )
         val first = SourceCut(expression, Relation.LE, BigFraction.ofLong(5L),
             CutProvenance(root, 0L, listOf(CutProofFact(lower, false), CutProofFact(upper, false))))
         val reversed = SourceCut(expression, Relation.LE, BigFraction.ofLong(5L),

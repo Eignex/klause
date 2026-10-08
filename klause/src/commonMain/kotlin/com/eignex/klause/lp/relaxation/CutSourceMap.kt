@@ -77,7 +77,9 @@ internal class CutSourceMap(
     private val assumptionSnapshot = assumptions.toSet()
     private val parentSnapshot = parentRows.toMap()
     private val auxiliarySnapshot = auxiliaryDefinitions.toMap()
-    private val auxiliaryByDefinition: Map<CutAuxiliaryDefinition, CutSource?> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    private val auxiliaryByDefinition: Map<CutAuxiliaryDefinition, CutSource?> by lazy(
+        LazyThreadSafetyMode.PUBLICATION,
+    ) {
         val unique = HashMap<CutAuxiliaryDefinition, CutSource?>()
         for ((source, definition) in auxiliarySnapshot) {
             if (source.kind != CutSourceKind.AUXILIARY) continue

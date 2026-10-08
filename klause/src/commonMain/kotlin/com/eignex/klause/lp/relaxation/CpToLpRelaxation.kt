@@ -244,7 +244,11 @@ internal fun LpRelaxation.withModel(
         hullFactorIds = hullFactorIds,
         colRealId = colRealId,
         colRealSign = colRealSign,
-        gatedRows = if (gates == null) gatedRows else gates.map { requireNotNull(remap).row(gatedRows[it]) }.toIntArray(),
+        gatedRows = if (gates == null) {
+            gatedRows
+        } else {
+            gates.map { requireNotNull(remap).row(gatedRows[it]) }.toIntArray()
+        },
         gatedAux = if (gates == null) gatedAux else gates.map { gatedAux[it] }.toIntArray(),
         gatedWhenTrue = if (gates == null) gatedWhenTrue else BooleanArray(gates.size) { gatedWhenTrue[gates[it]] },
         sourceMap = sources,

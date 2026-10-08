@@ -25,7 +25,12 @@ class LpCaptureTest {
             LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L), logical),
         )
         val capture = LpExactCapture.capture(
-            source, LpReplaySettings("mixed-rows", 1L, componentSplit = false, solverKind = LpReplaySolverKind.PERSISTENT),
+            source, LpReplaySettings(
+                "mixed-rows",
+                1L,
+                componentSplit = false,
+                solverKind = LpReplaySolverKind.PERSISTENT,
+            ),
             listOf(
                 LpExactReplayEvent.Push(), LpExactReplayEvent.Extend(emptyList(), rows, true, setOf(0L)),
                 LpExactReplayEvent.Solve(), LpExactReplayEvent.Pop(0), LpExactReplayEvent.Solve(),
@@ -59,7 +64,10 @@ class LpCaptureTest {
             rowHeader.indices.all { encoded[start + it] == rowHeader[it] }
         }
         val suspensionOffset = rowOffset + rowHeader.size
-        val legacy = (encoded.copyOfRange(0, suspensionOffset) + encoded.copyOfRange(suspensionOffset + 4, encoded.size))
+        val legacy = (encoded.copyOfRange(
+            0,
+            suspensionOffset,
+        ) + encoded.copyOfRange(suspensionOffset + 4, encoded.size))
             .also { it[11] = 2 }
 
         val decoded = LpExactCapture.decode(legacy)
@@ -94,7 +102,12 @@ class LpCaptureTest {
         )
         val capture = LpExactCapture.capture(
             source,
-            LpReplaySettings("structural-extension", 1L, componentSplit = false, solverKind = LpReplaySolverKind.PERSISTENT),
+            LpReplaySettings(
+                "structural-extension",
+                1L,
+                componentSplit = false,
+                solverKind = LpReplaySolverKind.PERSISTENT,
+            ),
             listOf(LpExactReplayEvent.Push(), LpExactReplayEvent.Extend(listOf(column), listOf(row), true)),
         )
 
@@ -121,7 +134,12 @@ class LpCaptureTest {
         assertTrue(trail.suspend(setOf(0)))
         val capture = LpExactCapture.capture(
             trail.state,
-            LpReplaySettings("suspended-parent", 1L, componentSplit = false, solverKind = LpReplaySolverKind.PERSISTENT),
+            LpReplaySettings(
+                "suspended-parent",
+                1L,
+                componentSplit = false,
+                solverKind = LpReplaySolverKind.PERSISTENT,
+            ),
             listOf(
                 LpExactReplayEvent.Pop(0),
                 LpExactReplayEvent.Push(),

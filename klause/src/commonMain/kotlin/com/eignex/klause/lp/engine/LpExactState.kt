@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.binarySearchInt
 
 internal data class LpMatrixProjectionStatus(val underflows: Int, val overflows: Int)
 
@@ -117,7 +118,9 @@ internal class LpExactState internal constructor(
             if (source.baseModel.objective !== baseModel.objective) validateRowCosts()
             val shared = sharedPrefix(source.activeAssertions)
             var storage = source.trailStorageUnits - source.scopeMarks.size + scopeMarks.size
-            for (index in shared until source.activeAssertions.size) storage -= source.activeAssertions[index].storageUnits()
+            for (index in shared until source.activeAssertions.size) {
+                storage -= source.activeAssertions[index].storageUnits()
+            }
             for (index in shared until activeAssertions.size) storage += activeAssertions[index].storageUnits()
             trailStorageUnits = storage
             validateAssertions(shared)
@@ -245,7 +248,8 @@ internal class LpExactState internal constructor(
     }
 
     private fun objectiveProjects(): Boolean = model.objective.constant.project() != null &&
-        model.objective.scale.project(nonzeroRequired = true) != null && model.objective.externalConstant.project() != null
+        model.objective.scale.project(nonzeroRequired = true) != null &&
+        model.objective.externalConstant.project() != null
 
     fun activeSide(column: Int, upper: Boolean): LpBoundAssertion? = if (upper) this.upper[column] else lower[column]
 
@@ -516,7 +520,7 @@ private class LpProjectionNonzero(
         var changed = false
         for (column in columns) {
             meter.poll()
-            val present = costs.binarySearch(column) >= 0
+            val present = costs.binarySearchInt(column) >= 0
             val required = !model.objective.cost(column).value.isZero
             if (present != required) {
                 changed = true

@@ -43,7 +43,10 @@ class LpLayoutStorageTest {
                 List(16) { zero },
                 List(17) { ExactLpColumn(ExactLpBounds()) },
                 List(16) { row ->
-                    ExactLpRow(premises = if (row == 0) ExactLpPremises(emptyList(), List(premiseCount) { it }) else null)
+                    ExactLpRow(premises = if (row == 0) ExactLpPremises(
+                        emptyList(),
+                        List(premiseCount) { it },
+                    ) else null)
                 },
                 ExactLpObjective(List(17) { zero }),
             )
@@ -94,7 +97,10 @@ class LpLayoutStorageTest {
 
         assertNotSame(storage, changed.layoutStorage)
         assertEquals(source.keySize + 2L, changed.keySize)
-        assertSame(changed.layoutStorage, changed.copy(rows = listOf(changed.row(0).copy(global = false))).layoutStorage)
+        assertSame(
+            changed.layoutStorage,
+            changed.copy(rows = listOf(changed.row(0).copy(global = false))).layoutStorage,
+        )
         assertEquals(54L, source.keySize)
     }
 }
