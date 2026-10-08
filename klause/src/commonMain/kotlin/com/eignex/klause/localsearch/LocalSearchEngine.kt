@@ -301,9 +301,11 @@ internal class LocalSearchEngine(
         // The caller's gradient view reads the objective's defined variables off their definitions, so it
         // agrees with the linear objective only while per-move invariants hold them there. Without them a
         // defined variable is searched like any other and can sit wherever the model lets it, and the view
-        // would score an incumbent better than its own assignment.
+        // would score an incumbent better than its own assignment. Even with them, presolve may have
+        // eliminated a definition the view reads, so the view only guides moves: every incumbent is valued
+        // by the linear objective, the one the portfolio checks it against.
         val gradient = params.lsObjective?.takeIf { perMoveInvariants && definitionalSweep != null }
-        runMinimizeStream(gradient ?: objective, params, eff, warm, sink)
+        runMinimizeStream(gradient ?: objective, objective, params, eff, warm, sink)
     }
 
     // The moves one run may make: its own caps, and what is left of the solve's node budget.
@@ -474,14 +476,17 @@ internal class LocalSearchEngine(
      * the objective), restart and try again. Best-feasible-objective state lives across
      * restarts so we monotonically improve.
      */
+    // [guide] scores moves; [objective] values every incumbent this stream reports.
+    @Suppress("LongParameterList")
     private suspend fun SequenceScope<MinimizeResult>.runMinimizeStream(
+        guide: Objective,
         objective: Objective,
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
         warm: WarmState?,
         sink: SolveStatsSink,
     ) {
-        val state = newMinimizeState(objective, params, effectiveAssumptions, warm)
+        val state = newMinimizeState(guide, params, effectiveAssumptions, warm)
         // An objective whose sum can pass the 64-bit range is scored from snapshots, which sum it exactly; the live
         // assignment's Long evaluation would wrap.
         val wideObjective = objective is LinearObjective && objective.isWideOver(state.rootDomains)
