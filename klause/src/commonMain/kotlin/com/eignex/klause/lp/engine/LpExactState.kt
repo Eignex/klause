@@ -145,6 +145,7 @@ internal class LpExactState internal constructor(
 
     private fun validateRows() {
         require(rows.entries().all { !it.active || it.depth == null || it.depth <= depth })
+        require(rows.entries().all { it.suspendedAt == null || it.suspendedAt <= depth })
         require(
             (0 until rows.size).all { rows.row(it).active || baseModel.objective.cost(baseModel.n + it).value.isZero },
         )

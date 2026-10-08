@@ -766,6 +766,12 @@ internal object LpExactReplay {
 
                 is LpExactReplayEvent.Deactivate -> trail.deactivate(event.id)
 
+                is LpExactReplayEvent.Suspend -> trail.suspend(event.ids)
+
+                is LpExactReplayEvent.Extend ->
+                    event.rows.size <= capture.maxRetainedRows - trail.state.model.m &&
+                        trail.append(event.columns, event.rows, event.scoped)
+
                 is LpExactReplayEvent.Compact -> trail.compact()
 
                 is LpExactReplayEvent.Solve -> {
@@ -786,6 +792,8 @@ private fun LpScopedSolver.applyEdit(event: LpExactReplayEvent): Boolean = when 
     is LpExactReplayEvent.Recenter -> recenter(event.origins)
     is LpExactReplayEvent.Append -> append(event.row, event.scoped)
     is LpExactReplayEvent.Deactivate -> deactivate(event.id)
+    is LpExactReplayEvent.Suspend -> suspend(event.ids)
+    is LpExactReplayEvent.Extend -> append(event.columns, event.rows, event.scoped)
     is LpExactReplayEvent.Compact -> compact()
     is LpExactReplayEvent.Solve -> false
 }

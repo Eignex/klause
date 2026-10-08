@@ -152,7 +152,18 @@ internal class LpScopedSolver(
         state.model.m < maxRetainedRows && it.append(row, scoped, token)
     }
 
+    fun append(
+        columns: List<LpStructuralColumn>,
+        rows: List<LpScopedRow>,
+        scoped: Boolean,
+        token: Cancellation = cancellation,
+    ): Boolean = edit(token, true) {
+        rows.size <= maxRetainedRows - state.model.m && it.append(columns, rows, scoped, token)
+    }
+
     fun deactivate(id: Long, token: Cancellation = cancellation): Boolean = edit(token) { it.deactivate(id, token) }
+
+    fun suspend(ids: Set<Long>, token: Cancellation = cancellation): Boolean = edit(token) { it.suspend(ids, token) }
 
     fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }
 

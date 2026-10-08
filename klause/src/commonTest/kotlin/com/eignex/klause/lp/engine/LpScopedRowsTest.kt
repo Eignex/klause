@@ -14,6 +14,158 @@ import kotlin.test.assertTrue
 
 class LpScopedRowsTest {
     @Test
+    fun `surviving logical bounds prevent suspension of their row`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 2L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 2L)
+        }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.assertBound(1, true, ExactLpSide(ExactLpNumber.of(1L)), 7))
+        assertTrue(trail.push())
+        val before = trail.state
+
+        assertFalse(trail.suspend(setOf(0)))
+
+        assertSame(before, trail.state)
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO)))
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE)))
+    }
+
+    @Test
+    fun `appended structural columns preserve logical assertions and source coordinates through pop`() {
+        val one = ExactLpNumber.of(1L)
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
+        val zero = ExactLpNumber.of(0L)
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 2L)
+        }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.assertBound(1, true, ExactLpSide(one), 7))
+        assertTrue(trail.push())
+        val column = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), third, false, 8)
+        val metadata = ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(3)))
+        val row = LpScopedRow(9, listOf(0 to one, 1 to third), one, ExactLpColumn(ExactLpBounds()), metadata)
+
+        assertTrue(trail.append(listOf(LpStructuralColumn(column, third)), listOf(row), true))
+
+        assertEquals(column, trail.state.baseModel.column(1))
+        assertEquals(third, trail.state.model.objective.cost(1))
+        assertEquals(metadata, trail.state.model.row(1))
+        assertEquals(2, trail.state.assertions.single().column)
+        assertEquals(7L, trail.state.assertions.single().witness)
+        assertEquals(one, trail.state.model.column(2).bounds.upper?.number)
+        assertEquals(third, trail.state.model.entries(1).single().number)
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO, third.value)))
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE, third.value)))
+        assertTrue(trail.pop(0))
+        assertFalse(trail.state.rows.row(1).active)
+        assertEquals(one, trail.state.model.column(2).bounds.upper?.number)
+        assertEquals(2, trail.state.model.n)
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO, third.value)))
+    }
+
+    @Test
+    fun `invalid structural batches leave every prior assertion and row unchanged`() {
+        val one = ExactLpNumber.of(1L)
+        val source = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        val row = LpScopedRow(2, listOf(1 to one), one, ExactLpColumn(ExactLpBounds()))
+        val before = trail.state
+
+        assertFalse(trail.append(emptyList(), listOf(row), false))
+        assertFalse(trail.append(listOf(LpStructuralColumn(ExactLpColumn(ExactLpBounds()))), listOf(row, row), false))
+        assertFalse(trail.append(emptyList(), emptyList(), false, Cancellation { true }))
+
+        assertSame(before, trail.state)
+    }
+
+    @Test
+    fun `row replacements restore the enclosing relaxation on nested and sibling pops`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        val zero = ExactLpNumber.of(0L)
+        val negativeOne = ExactLpNumber.of(-1L)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        assertTrue(trail.push())
+        assertTrue(trail.suspend(setOf(0)))
+        assertTrue(trail.append(LpScopedRow(1, listOf(0 to negativeOne), ExactLpNumber.of(-3L), logical), true))
+        assertTrue(trail.push())
+        assertTrue(trail.suspend(setOf(1)))
+        assertTrue(trail.append(LpScopedRow(2, listOf(0 to negativeOne), ExactLpNumber.of(-5L), logical), true))
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ofLong(4))))
+
+        assertTrue(trail.pop(1))
+
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ofLong(3))))
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ofLong(2))))
+        assertTrue(trail.pop(0))
+        assertTrue(trail.push())
+        assertTrue(trail.suspend(setOf(0)))
+        assertTrue(trail.append(LpScopedRow(3, listOf(0 to negativeOne), ExactLpNumber.of(-7L), logical), true))
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ofLong(6))))
+        assertTrue(trail.pop(0))
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE)))
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO)))
+    }
+
+    @Test
+    fun `compaction retains suspended rows until their enclosing scope is restored`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 10L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 9L)
+        }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.deactivate(1))
+        assertTrue(trail.push())
+        assertTrue(trail.suspend(setOf(0)))
+
+        assertTrue(trail.compact())
+
+        assertEquals(1, trail.state.model.m)
+        assertEquals(0L, trail.state.rows.row(0).id)
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO)))
+        assertTrue(trail.pop(0))
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO)))
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE)))
+    }
+
+    @Test
+    fun `suspension restores strictness and declines invalid or cancelled edits atomically`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(listOf(ExactLpEntry(0, one))),
+            listOf(one),
+            listOf(
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), integral = false),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ),
+            listOf(ExactLpRow(strict = true)),
+            ExactLpObjective(listOf(zero, zero)),
+        )
+        val trail = LpBoundTrail(source)
+        assertFalse(trail.suspend(setOf(0)))
+        assertTrue(trail.push())
+        val before = trail.state
+        assertFalse(trail.suspend(setOf(0, 7)))
+        assertFalse(trail.suspend(setOf(0), Cancellation { true }))
+        assertSame(before, trail.state)
+        assertTrue(trail.suspend(setOf(0)))
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE)))
+
+        assertTrue(trail.pop(0))
+
+        assertTrue(trail.state.model.row(0).strict)
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE)))
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO)))
+    }
+
+    @Test
     fun `persistent rows survive interleaved scopes and compaction preserves exact source maps`() {
         val zero = ExactLpNumber.of(0L)
         val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))

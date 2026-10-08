@@ -23,6 +23,62 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `suspending and restoring a source row reuses its numerical owner`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 2L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+            assertTrue(owner.suspend(setOf(0)))
+
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.pop(0))
+
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertEquals(1L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `a structural batch prepares once and preserves the enclosing certified optimum after pop`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        val rows = listOf(
+            LpScopedRow(1, listOf(0 to minusOne, 1 to minusOne), ExactLpNumber.of(-3L), logical),
+            LpScopedRow(2, listOf(0 to one), ExactLpNumber.of(2L), logical),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+
+            assertTrue(
+                owner.append(
+                    listOf(LpStructuralColumn(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))))),
+                    rows,
+                    true,
+                ),
+            )
+
+            val child = assertNotNull(owner.solve())
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, child.verdict)
+            assertEquals(BigFraction.ofLong(2L), child.lowerBound)
+            assertTrue(owner.pop(0))
+            val parent = assertNotNull(owner.solve())
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, parent.verdict)
+            assertEquals(BigFraction.ONE, parent.lowerBound)
+            assertEquals(2L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
     fun `failed adoption cannot reuse a prior work stop`() {
         val state = LpExactState(lowerBoundModel())
         var reject = false
