@@ -191,7 +191,10 @@ internal class LpScopedSolver(
             it.assertBounds(assertions, token) !is LpBoundBatchResult.Declined
     }
 
-    fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }
+    fun compact(token: Cancellation = cancellation): Boolean = compact(LpLayoutRemap(state.model.n, state.rows), token)
+
+    fun compact(remap: LpLayoutRemap, token: Cancellation = cancellation): Boolean =
+        edit(token, compaction = remap) { it.compact(remap, token) }
 
     val basisLifecycleWork: BasisOperationWork? get() = solver?.basisLifecycleWork
 
@@ -273,7 +276,12 @@ internal class LpScopedSolver(
         return current to result
     }
 
-    private inline fun edit(token: Cancellation, append: Boolean = false, change: (LpBoundTrail) -> Boolean): Boolean {
+    private inline fun edit(
+        token: Cancellation,
+        append: Boolean = false,
+        compaction: LpLayoutRemap? = null,
+        change: (LpBoundTrail) -> Boolean,
+    ): Boolean {
         requireAvailable()
         editAttempts++
         if (closed || token()) return false
@@ -284,7 +292,7 @@ internal class LpScopedSolver(
             return true
         }
         if (next.state.matrixRevision != state.matrixRevision) {
-            return replace(next, token, append)
+            return replace(next, token, append, compaction)
         }
         val current = solver
         if (current != null && !current.adopt(next.state, token)) return false
@@ -377,16 +385,20 @@ internal class LpScopedSolver(
         editSuccesses++
     }
 
-    private fun replace(next: LpBoundTrail, token: Cancellation, append: Boolean): Boolean {
+    private fun replace(
+        next: LpBoundTrail,
+        token: Cancellation,
+        append: Boolean,
+        compaction: LpLayoutRemap? = null,
+    ): Boolean {
         if (append) solver?.let { recordPendingAppendSolve(it) }
         val warm = if (append) solver?.retainedBasis()?.extended(state.model, next.state.model) else null
-        val expected = if (next.state.model.m < state.model.m) {
+        val expected = if (compaction != null) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
             var failure: Throwable? = null
             try {
-                val remap = LpRowRemap(state.model.n, state.rows)
-                staging.second.basicVars.map { remap.column(it) }.filter { it >= 0 }.toIntArray()
+                staging.second.basicVars.map { compaction.column(it) }.filter { it >= 0 }.toIntArray()
             } catch (primary: Throwable) {
                 failure = primary
                 throw primary

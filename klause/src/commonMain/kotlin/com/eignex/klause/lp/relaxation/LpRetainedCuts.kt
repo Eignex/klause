@@ -10,6 +10,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.simplex.exact.BigFraction
@@ -29,7 +30,10 @@ internal class LpCutEdit(
 }
 
 internal class LpRetainedCuts {
-    private class Binding(val id: Long, val source: SourceCut, val numericKey: String, val proof: CutProvenance)
+    private class Binding(val id: Long, val source: SourceCut, val numeric: Cut) {
+        val numericKey: String = numeric.key()
+        val proof: CutProvenance get() = requireNotNull(numeric.provenance)
+    }
     private class Change(val depth: Int, val previous: List<Binding>)
     private var bindings = emptyList<Binding>()
     private val trail = ArrayList<Change>()
@@ -54,6 +58,43 @@ internal class LpRetainedCuts {
             val row = requireNotNull(indices[binding.id])
             check(state.rows.row(row).active)
             row to binding.proof
+        }
+    }
+
+    fun prepareCompaction(
+        state: LpExactState,
+        remap: LpLayoutRemap,
+        cancellation: Cancellation = Cancellation.Never,
+    ): LpCutEdit? {
+        require(remap.matches(state.model, state.rows))
+        check(generation < Long.MAX_VALUE)
+        val expectedGeneration = generation
+        val mapped = HashMap<Binding, Binding>()
+        fun binding(previous: Binding): Binding = mapped.getOrPut(previous) {
+            val row = state.rows.index(previous.id)
+            check(row >= 0 && remap.row(row) >= 0)
+            val cut = previous.numeric
+            val columns = IntArray(cut.cols.size) { remap.column(cut.cols[it]).also { column -> check(column >= 0) } }
+            if (columns.contentEquals(cut.cols)) previous else {
+                Binding(previous.id, previous.source, Cut(columns, cut.coeffs, cut.rel, cut.rhs,
+                    cut.global, previous.proof))
+            }
+        }
+        val next = bindings.map {
+            if (cancellation()) return null
+            binding(it)
+        }
+        val changes = trail.map { change ->
+            if (cancellation()) return null
+            Change(change.depth, change.previous.map(::binding))
+        }
+        if (cancellation()) return null
+        return LpCutEdit(state, emptySet(), emptyList(), valid = { generation == expectedGeneration }) {
+            check(generation == expectedGeneration) { "stale cut compaction" }
+            bindings = next
+            trail.clear()
+            trail.addAll(changes)
+            generation++
         }
     }
 
@@ -102,7 +143,7 @@ internal class LpRetainedCuts {
             val id = ++lastId
             val proof = requireNotNull(cut.provenance)
             rows.add(row(state, id, cut, proof))
-            next.add(Binding(id, source, cut.key(), proof))
+            next.add(Binding(id, source, cut))
         }
         val kept = next.mapTo(HashSet()) { it.id }
         val retired = bindings.map { it.id }.filterTo(HashSet()) { it !in kept }

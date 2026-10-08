@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -24,6 +25,105 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
+    @Test
+    fun `source bound mode changes reclaim anonymous columns without changing fresh bounds`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 6) },
+            arrayOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
+        val root = problem.finiteIntDomain(1)
+        var live = root
+        var honors = true
+        val domains = object : RelaxationDomains {
+            override val honorsOpenSides: Boolean get() = honors
+            override fun intDomain(varId: Int): IntDomain = if (varId == 1) live else problem.finiteIntDomain(varId)
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
+            linMaxTightFace = true)
+        val sources = LpRetainedSources(problem, relaxer)
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            for (lower in 0L..3L) {
+                live = root.withMinAtLeast(lower)
+                honors = lower % 2L == 0L
+                val edit = sources.prepare(owner.state, domains)
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+                edit.commit()
+                val variable = sources.relaxation(owner.state, domains).intColOf[1]
+                assertTrue(owner.assertBound(variable, false, assertNotNull(edit.bounds[variable].lower), lower))
+                if (lower > 0) {
+                    val compaction = assertNotNull(sources.prepareCompaction(owner.state))
+                    assertTrue(owner.compact(compaction.remap))
+                    compaction.commit()
+                }
+                val retained = sources.relaxation(owner.state, domains)
+                val fresh = relaxer.build(domains)
+                val expected = RevisedSimplex(fresh.model).use { assertNotNull(it.solve()).objective }
+
+                assertEquals(BigFraction.ofLong(lower), assertNotNull(owner.solve()).lowerBound)
+                assertEquals(lower.toDouble(), expected)
+                assertEquals(fresh.model.n, retained.model.n)
+                assertEquals(fresh.model.m, retained.model.m)
+                assertEquals(fresh.rowFactorIds.toList(), retained.rowFactorIds.toList())
+                assertEquals(fresh.colVarId.toList(), retained.colVarId.toList())
+            }
+        }
+    }
+
+    @Test
+    fun `source compaction preserves ancestor bindings through same scope replacements and pop`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 6) },
+            arrayOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
+        val root = problem.finiteIntDomain(1)
+        var live = root
+        var honors = true
+        val domains = object : RelaxationDomains {
+            override val honorsOpenSides: Boolean get() = honors
+            override fun intDomain(varId: Int): IntDomain = if (varId == 1) live else problem.finiteIntDomain(varId)
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
+            LinearObjective(intCoefficients = longArrayOf(1, 0, 0)), linMaxTightFace = true))
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val initial = sources.prepare(owner.state, domains)
+            assertTrue(owner.replaceRows(initial.retired, initial.columns, initial.rows, false, objective = initial.objective))
+            initial.commit()
+            val rootColumns = owner.state.model.n
+            val rootRows = owner.state.model.m
+            val rootIds = owner.state.rows.entries().map { it.id }
+            assertTrue(owner.push())
+            for (lower in 1L..3L) {
+                live = root.withMinAtLeast(lower)
+                honors = lower % 2L == 0L
+                val edit = sources.prepare(owner.state, domains)
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, true, objective = edit.objective))
+                edit.commit()
+                val variable = sources.relaxation(owner.state, domains).intColOf[1]
+                assertTrue(owner.assertBound(variable, false, assertNotNull(edit.bounds[variable].lower), lower))
+            }
+            val compaction = assertNotNull(sources.prepareCompaction(owner.state))
+
+            assertTrue(owner.compact(compaction.remap))
+            compaction.commit()
+
+            assertEquals(rootColumns + 2, owner.state.model.n)
+            assertEquals(rootRows * 2, owner.state.model.m)
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.pop(0))
+            sources.retract(0)
+            live = root
+            honors = true
+            val restored = sources.prepare(owner.state, domains)
+            assertTrue(restored.rows.isEmpty() && restored.columns.isEmpty() && restored.retired.isEmpty())
+            restored.commit()
+            val rootCompaction = assertNotNull(sources.prepareCompaction(owner.state))
+            assertTrue(owner.compact(rootCompaction.remap))
+            rootCompaction.commit()
+            assertEquals(rootColumns, owner.state.model.n)
+            assertEquals(rootRows, owner.state.model.m)
+            assertEquals(rootIds, owner.state.rows.entries().map { it.id })
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
     @Test
     fun `mixed emitters share integer coordinates and preserve IEEE row authority`() {
         val problem = Problem(

@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpStructuralColumn
 import com.eignex.klause.lp.engine.Sense
@@ -33,6 +34,17 @@ internal class LpSourceEdit(
     private val publish: () -> Unit,
 ) {
     fun source(column: Int): CutSource? = identify(column)
+    fun isCurrent(): Boolean = valid()
+    fun commit() = publish()
+}
+
+internal class LpSourceCompaction(
+    val sourceState: LpExactState,
+    val remap: LpLayoutRemap,
+    val extent: Long,
+    private val valid: () -> Boolean,
+    private val publish: () -> Unit,
+) {
     fun isCurrent(): Boolean = valid()
     fun commit() = publish()
 }
@@ -66,6 +78,8 @@ internal class LpRetainedSources(
     private val emissions = LpEmissionCache(relaxer)
     private var columns = emptyList<Column>()
     private var handles = emptyMap<ColumnKey, Int>()
+    private var columnUses = IntArray(0)
+    private var unusedColumns = 0
     private var realDefinitions = emptyMap<Int, Long>()
     private val bindings = arrayOfNulls<Binding>(relaxer.emissionRegions.size)
     private val trail = ArrayList<Change>()
@@ -80,6 +94,10 @@ internal class LpRetainedSources(
         check(generation < Long.MAX_VALUE)
         while (trail.isNotEmpty() && trail.last().depth > targetDepth) {
             val change = trail.removeAt(trail.lastIndex)
+            bindings[change.index]?.columns?.forEach { column ->
+                check(columnUses[column] > 0)
+                if (--columnUses[column] == 0 && columns[column].reclaimable()) unusedColumns++
+            }
             bindings[change.index] = change.previous
         }
         emissions.retract(targetDepth)
@@ -205,6 +223,25 @@ internal class LpRetainedSources(
             next[index] = Binding(emission, mapped, rowIds)
         }
         if (cancellation()) throw LpAssemblyCancelled()
+        val uses = columnUses.copyOf(staged.size)
+        var unused = unusedColumns + (columns.size until staged.size).count { staged[it].reclaimable() }
+        fun reference(binding: Binding?, delta: Int) {
+            binding?.columns?.forEach { column ->
+                val previous = uses[column]
+                val next = previous + delta
+                check(next >= 0)
+                if (staged[column].reclaimable()) {
+                    if (previous == 0) unused--
+                    if (next == 0) unused++
+                }
+                uses[column] = next
+            }
+        }
+        for (index in update.changed) {
+            reference(bindings[index], -1)
+            reference(next[index], 1)
+        }
+        changes.forEach { reference(it.previous, 1) }
         val objective = if (added.isEmpty()) null else ExactLpObjective(
             List(state.model.n) { state.model.objective.cost(it) } + added.map { it.cost } +
                 List(state.model.m) { state.model.objective.cost(state.model.n + it) } + rows.map { it.cost },
@@ -219,10 +256,75 @@ internal class LpRetainedSources(
             update.commit()
             columns = staged.toList()
             handles = keys.toMap()
+            columnUses = uses
+            unusedColumns = unused
             realDefinitions = definitions.toMap()
             next.copyInto(bindings)
             trail.addAll(changes)
             columnEpoch = epoch
+            generation++
+            cached = null
+        }
+    }
+
+    private fun Column.reclaimable(): Boolean = variable < 0 && real < 0 && cost.value.isZero
+
+    fun prepareCompaction(
+        state: LpExactState,
+        cancellation: Cancellation = Cancellation.Never,
+    ): LpSourceCompaction? {
+        require(state.model.n == columns.size && state.depth == depth)
+        val rows = state.rows
+        // Reclaiming at least as much discarded state as live state pays for the full remap by amortization.
+        if (!((rows.retiredCount > 0 && rows.retiredCount >= rows.retainedCount) ||
+                (unusedColumns > 0 && unusedColumns >= columns.size - unusedColumns))
+        ) {
+            return null
+        }
+        if (cancellation()) return null
+        check(generation < Long.MAX_VALUE)
+        val expectedGeneration = generation
+        val kept = ArrayList<Int>()
+        var extent = rows.size.toLong() + columns.size
+        for (column in columns.indices) {
+            if (cancellation()) return null
+            val entries = state.model.entries(column)
+            extent += entries.size
+            if (!columns[column].reclaimable() || columnUses[column] > 0 || entries.any {
+                    !it.number.value.isZero && (rows.row(it.row).active || rows.row(it.row).suspendedAt != null)
+                }
+            ) {
+                kept.add(column)
+            }
+        }
+        val remap = LpLayoutRemap(columns.size, rows, kept)
+        if (remap.unchanged) return null
+        val indices = (0 until rows.size).associateBy { rows.row(it).id }
+        fun binding(previous: Binding?): Binding? = previous?.let {
+            extent += it.columns.size + it.rows.size
+            check(it.rows.all { id -> indices[id]?.let { row -> remap.row(row) >= 0 } == true })
+            Binding(it.emission, IntArray(it.columns.size) { index ->
+                remap.column(it.columns[index]).also { column -> check(column >= 0) }
+            }, it.rows)
+        }
+        val next = Array(bindings.size) { binding(bindings[it]) }
+        val changes = trail.map { Change(it.depth, it.index, binding(it.previous)) }
+        val descriptors = kept.map { columns[it] }
+        val keys = handles.mapNotNull { (key, column) ->
+            remap.column(column).takeIf { it >= 0 }?.let { key to it }
+        }.toMap()
+        val uses = kept.map { columnUses[it] }.toIntArray()
+        val unused = descriptors.indices.count { descriptors[it].reclaimable() && uses[it] == 0 }
+        if (cancellation()) return null
+        return LpSourceCompaction(state, remap, extent, valid = { generation == expectedGeneration }) {
+            check(generation == expectedGeneration) { "stale source compaction" }
+            columns = descriptors
+            handles = keys
+            columnUses = uses
+            unusedColumns = unused
+            next.copyInto(bindings)
+            trail.clear()
+            trail.addAll(changes)
             generation++
             cached = null
         }

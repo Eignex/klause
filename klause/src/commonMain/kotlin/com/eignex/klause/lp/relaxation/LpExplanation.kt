@@ -199,7 +199,7 @@ internal object LpExplanation {
             val premises = boundPremiseLits(relaxation, session, col, lowerSide = sign < 0) ?: return null
             for (lit in premises) if (seen.add(lit)) lits.add(lit)
         }
-        return if (lits.isEmpty()) null else lits.toIntArray()
+        return lits.toIntArray()
     }
 
     private fun rayColumnSign(model: LpModel, ray: LongArray, column: Int): Int? {
@@ -238,7 +238,7 @@ internal object LpExplanation {
                 for (literal in premises) if (seen.add(literal)) lits.add(literal)
             }
         }
-        return if (lits.size > 0) lits.toIntArray() else null
+        return lits.toIntArray()
     }
 
     /**

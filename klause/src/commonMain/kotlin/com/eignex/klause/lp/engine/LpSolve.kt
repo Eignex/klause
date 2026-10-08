@@ -11,12 +11,8 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.isZero
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
 import com.eignex.klause.util.shl
-import com.eignex.klause.util.signum
 import com.eignex.klause.util.toLongExact
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -1159,8 +1155,7 @@ internal fun LpModel.hasIntegralObjective(): Boolean {
 }
 
 internal fun BigFraction.ceilLong(): Long? {
-    var ceiling = num / den
-    if (num.signum() > 0 && !(num % den).isZero()) ceiling += BIG_ONE
+    val ceiling = ceilInteger()
     if (ceiling < bigIntOf(Long.MIN_VALUE) || ceiling > bigIntOf(Long.MAX_VALUE)) return null
     return ceiling.toLongExact()
 }

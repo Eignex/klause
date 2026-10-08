@@ -16,6 +16,47 @@ import kotlin.test.assertTrue
 
 class LpReplayTest {
     @Test
+    fun `column compaction replay preserves exact bounds and rollback after retired rows`() {
+        val source = LpBuilder().apply {
+            addVar(0L, 4L)
+            addVar(0L, 4L, cost = 1L)
+        }.build(Sense.MINIMIZE)
+        val one = ExactLpNumber.of(1L)
+        val zero = ExactLpNumber.of(0L)
+        val events = listOf(
+            LpExactReplayEvent.Assert(0, false, ExactLpSide(one), 10L),
+            LpExactReplayEvent.Push(),
+            LpExactReplayEvent.Assert(1, false, ExactLpSide(one), 11L),
+            LpExactReplayEvent.Append(LpScopedRow(0L, listOf(0 to one), one,
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), true),
+            LpExactReplayEvent.Suspend(setOf(0L)),
+            LpExactReplayEvent.Solve(),
+            LpExactReplayEvent.CompactColumns(listOf(1)),
+            LpExactReplayEvent.Solve(),
+            LpExactReplayEvent.Pop(0),
+            LpExactReplayEvent.Solve(),
+        )
+        val capture = LpExactCapture.capture(assertNotNull(source.authoritativeModel()),
+            persistentSettings("compact columns"), events)
+        val decoded = LpExactCapture.decode(capture.encode())
+
+        val report = LpExactReplay.replay(decoded)
+
+        assertNull(report.declinedEventIndex)
+        assertTrue(report.steps.all { it.accepted })
+        assertEquals(listOf(BigFraction.ONE, BigFraction.ONE, BigFraction.ZERO),
+            report.steps.mapNotNull { it.result?.lowerBound })
+        val compacted = report.steps[7].state
+        assertEquals(1, compacted.model.n)
+        assertEquals(0, compacted.model.m)
+        assertEquals(listOf(0), compacted.scopes)
+        assertEquals(11L, compacted.activeSide(0, false)?.witness)
+        assertEquals(listOf(BigFraction.ONE), report.steps[7].result?.exactPrimal)
+        assertEquals(listOf(BigFraction.ZERO), report.steps.last().result?.exactPrimal)
+        assertEquals(0L, assertNotNull(report.rowMetrics).currentOwners)
+    }
+
+    @Test
     fun `replay exhausts one continuation allowance across unchanged and changing bases`() {
         for (changing in listOf(false, true)) {
             val model = LpBuilder().apply {

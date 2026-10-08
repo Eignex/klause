@@ -13,6 +13,28 @@ import kotlin.test.assertTrue
  */
 class CutPoolSelectTest {
 
+    @Test
+    fun `constant contradictions precede ordinary violated cuts`() {
+        val pool = CutPool()
+        pool.add(cut(Relation.GE, 100, 0 to 1L))
+        val contradiction = cut(Relation.GE, 1)
+        pool.add(contradiction)
+
+        val selected = pool.select(doubleArrayOf(0.0), doubleArrayOf(1.0), max = 1)
+
+        assertTrue(selected.single() === contradiction)
+    }
+
+    @Test
+    fun `constant tautologies are excluded from selection`() {
+        val pool = CutPool()
+        pool.add(cut(Relation.GE, 0))
+
+        val selected = pool.select(doubleArrayOf(), doubleArrayOf(), max = 1)
+
+        assertTrue(selected.isEmpty())
+    }
+
     private fun cut(rel: Relation, rhs: Long, vararg terms: Pair<Int, Long>): Cut =
         Cut(terms.map { it.first }.toIntArray(), terms.map { it.second }.toLongArray(), rel, rhs, global = true)
 

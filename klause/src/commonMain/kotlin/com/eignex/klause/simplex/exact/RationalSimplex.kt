@@ -11,6 +11,7 @@ import com.eignex.klause.util.gcd
 import com.eignex.klause.util.isZero
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
 import com.eignex.klause.util.shl
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
@@ -183,6 +184,12 @@ class BigFraction private constructor(
 
     /** Returns the additive inverse of this fraction. */
     fun negated(): BigFraction = if (isZero) this else BigFraction(-num, den)
+
+    internal fun ceilInteger(): BigInt {
+        if (den.isOne) return num
+        val quotient = num / den
+        return if (num.signum() > 0 && !(num % den).isZero()) quotient + BIG_ONE else quotient
+    }
 
     /** Returns this fraction converted to a [Double]. */
     fun toDouble(): Double = num.toDouble() / den.toDouble()

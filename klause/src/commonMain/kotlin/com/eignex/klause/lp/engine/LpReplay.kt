@@ -774,6 +774,9 @@ internal object LpExactReplay {
 
                 is LpExactReplayEvent.Compact -> trail.compact()
 
+                is LpExactReplayEvent.CompactColumns ->
+                    trail.compact(LpLayoutRemap(trail.state.model.n, trail.state.rows, event.columns))
+
                 is LpExactReplayEvent.Solve -> {
                     event.warm?.let { requireValidExactWarm(it, trail.state.model) }
                     true
@@ -795,6 +798,7 @@ private fun LpScopedSolver.applyEdit(event: LpExactReplayEvent): Boolean = when 
     is LpExactReplayEvent.Suspend -> suspend(event.ids)
     is LpExactReplayEvent.Extend -> append(event.columns, event.rows, event.scoped, permanentRows = event.permanentRows)
     is LpExactReplayEvent.Compact -> compact()
+    is LpExactReplayEvent.CompactColumns -> compact(LpLayoutRemap(state.model.n, state.rows, event.columns))
     is LpExactReplayEvent.Solve -> false
 }
 

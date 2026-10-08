@@ -22,6 +22,7 @@ import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -38,6 +39,7 @@ import com.eignex.klause.lp.relaxation.LpRetainedCuts
 import com.eignex.klause.lp.relaxation.LpRetainedSources
 import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisSolver
@@ -66,6 +68,68 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `compaction declines a cut edit that would publish uninstalled rows`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            assertTrue(lp.atLevel(1))
+            assertTrue(lp.append(LpScopedRow(0L, emptyList(), ExactLpNumber.of(0L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), true))
+            assertTrue(lp.atLevel(0))
+            val before = assertNotNull(lp.state)
+            val remap = LpLayoutRemap(before.model.n, before.rows)
+            val current = base.withModel(assertNotNull(before.ownerWorkingModel()))
+            val replacement = assertNotNull(cuts.prepare(before, current,
+                listOf(Cut(base.intColOf, longArrayOf(1L), Relation.GE, 0L, global = true))))
+
+            assertFalse(lp.compact(before, remap, replacement))
+
+            assertSame(before, lp.state)
+            assertTrue(cuts.parentRows(before).isEmpty())
+            assertTrue(replacement.isCurrent())
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `source publication declines a stale compaction without discarding the live owner`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 6)),
+            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)))
+        var live = problem.finiteIntDomain(0)
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = live
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
+            LinearObjective(intCoefficients = longArrayOf(1))))
+        val cuts = LpRetainedCuts()
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            live = live.withMinAtLeast(3L)
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            val before = assertNotNull(lp.state)
+            val plan = assertNotNull(sources.prepareCompaction(before))
+            val cutPlan = assertNotNull(cuts.prepareCompaction(before, plan.remap))
+            assertTrue(lp.editSources(sources.prepare(before, domains)))
+            assertSame(before, lp.state)
+
+            assertFalse(lp.compact(before, plan.remap, cutPlan, plan))
+
+            assertSame(before, lp.state)
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
+            val current = assertNotNull(sources.prepareCompaction(before))
+            assertTrue(lp.compact(before, current.remap,
+                assertNotNull(cuts.prepareCompaction(before, current.remap)), current))
+            assertEquals(1L, lp.metrics?.currentOwners)
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
     @Test
     fun `a published cut refresh invalidates prior preparations without invalidating numerical state`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())

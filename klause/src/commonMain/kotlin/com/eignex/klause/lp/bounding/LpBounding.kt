@@ -427,7 +427,7 @@ internal fun LpEngine.sparseSafePrune(
     }
     val relaxation = nodeRelaxation(relaxer, session) ?: return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null)
-    if (relaxation.model.n == 0 && relaxation.model.m == 0) return LpNodeOutcome(false, null)
+    if (relaxation.model.n == 0 && relaxation.model.m == 0 && cutPool.size == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
     val model = relaxation.model
     // Measured only at the root: the pass is O(nnz), and the matrix a node solves is the root's, so a
@@ -508,7 +508,13 @@ internal fun LpEngine.sparseSafePrune(
     val canPrune = bound.isFinite()
     val canPropagate = objectiveVar >= 0 && objectiveAscending
     if (!canPrune && !canPropagate) {
-        return LpNodeOutcome(false, optimalBasis) // feasible, nothing more to deduce
+        val constant = cutPool.constantContradiction() ?: return LpNodeOutcome(false, optimalBasis)
+        return when (val outcome = solveSelectedCuts(
+            session, LpCutOutcome.Solved(relaxation, result), listOf(constant), cancellation, sink, learn,
+        )) {
+            is LpCutOutcome.Pruned -> LpNodeOutcome(true, null, outcome.explanation)
+            is LpCutOutcome.Solved -> LpNodeOutcome(false, outcome.result.basis)
+        }
     }
     // During-search separation: at a gated shallow node, tighten this node's relaxation with the
     // cuts its LP point violates. Global cuts are persisted into the pool (descendants inherit them);

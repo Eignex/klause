@@ -5,6 +5,7 @@ import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundBatchResult
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.strongerThan
@@ -258,7 +259,31 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val model = if (state === before) base.model else state.ownerWorkingModel() ?: return null
         val parents = cuts.parentRows(state)
         val rebound = base.withModel(model, map.withParentRows(parents))
-        currentModel = rebound.model
-        return rebound
+        val compacted = compactRelaxation(rebound, session)
+        currentModel = compacted.model
+        return compacted
+    }
+
+    private fun compactRelaxation(base: LpRelaxation, session: PropagationSession): LpRelaxation {
+        val core = engine.propagator
+        val before = requireNotNull(core.state)
+        val source = sources
+        val edit = source?.prepareCompaction(before, engine.params.cancellation)
+        val remap = edit?.remap ?: if (source == null && before.rows.retiredCount > 0 &&
+            before.rows.retiredCount >= before.rows.retainedCount
+        ) {
+            LpLayoutRemap(before.model.n, before.rows)
+        } else {
+            return base
+        }
+        val cutEdit = cuts.prepareCompaction(before, remap, engine.params.cancellation) ?: return base
+        engine.noteNodeOverhead((edit?.extent ?: before.model.numVars.toLong()) * LpNodeOverhead.BUILD)
+        if (!core.compact(before, remap, cutEdit, edit)) return base
+        val state = requireNotNull(core.state)
+        val model = requireNotNull(state.ownerWorkingModel())
+        val rebound = source?.relaxation(state, SessionDomains(session)) ?: base.withModel(model, remap = remap)
+        val map = rebound.sourceMap?.withCpBounds(model, session)?.withParentRows(cuts.parentRows(state))
+        if (map != null) engine.cutPool.remap(map)
+        return rebound.withModel(model, map)
     }
 }

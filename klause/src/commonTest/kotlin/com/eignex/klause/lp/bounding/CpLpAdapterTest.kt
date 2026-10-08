@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -63,6 +64,72 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
+    @Test
+    fun `source nodes reclaim discarded rows and restore fresh bounds on nested pop`() {
+        val problem = Problem(1, 3, Array(3) { IntDomain(0, 12) },
+            arrayOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)))
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
+            LpParams(lpPlan = LpPlan(bounding = true, linMaxTightFace = true)),
+            SolveStatsSink(backend = "source-compaction")).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val rootRows = root.model.m
+            val rootColumns = root.model.n
+            for (lower in 1L..8L) {
+                if (lower == 1L) shared.push(SearchDecision.IntAtLeast(1, lower)) else cp.session.implyIntAtLeast(1, lower)
+                val current = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+                val result = assertNotNull(engine.solveNode(current.model, null, Cancellation.Never)?.second)
+                val fresh = relaxer.build(cp.session)
+                val expected = RevisedSimplex(fresh.model).use { assertNotNull(it.solve()).objective }
+
+                assertEquals(expected, result.objective)
+                assertEquals(lower, assertNotNull(integerCertify(current.model, result.duals)).objectiveBoundCeil(0))
+                assertTrue(current.model.m < rootRows * 2 + 4)
+                assertEquals(rootColumns, current.model.n)
+                assertEquals(current.model.m, current.rowFactorIds.size)
+            }
+            shared.popTo(0)
+            val restored = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val result = assertNotNull(engine.solveNode(restored.model, null, Cancellation.Never)?.second)
+            assertTrue(restored.model.m < rootRows * 2)
+            assertEquals(rootColumns, restored.model.n)
+            assertEquals(0L, assertNotNull(integerCertify(restored.model, result.duals)).objectiveBoundCeil(0))
+            assertEquals(rootRows, assertNotNull(restored.model.exactState).rows.activeCount)
+            assertEquals(root.rowFactorIds.toList(), restored.rowFactorIds.take(rootRows))
+        }
+    }
+
+    @Test
+    fun `empty source nodes load and certify pooled constant contradictions`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 0) },
+            arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 1)),
+        )
+        val sink = SolveStatsSink(backend = "constant-cut")
+        LpEngine(problem, LinearObjective(), LpParams(lpPlan = LpPlan(bounding = true, cuts = true)), sink).use { engine ->
+            val session = PropagationSession(problem)
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
+            assertEquals(0, base.model.n)
+            assertEquals(0, base.model.m)
+            assertTrue(engine.cutPool.add(Cut(intArrayOf(), longArrayOf(), Relation.GE, 1, global = true), base))
+
+            val outcome = engine.sparseSafePrune(
+                relaxer, session, Double.POSITIVE_INFINITY, sink, Cancellation.Never, -1, true, learn = true,
+            )
+
+            assertTrue(outcome.prune)
+            assertContentEquals(intArrayOf(), assertNotNull(outcome.explanation))
+            assertEquals(1, engine.propagator.state?.rows?.activeCount)
+            assertEquals(1.0, sink.lp.snapshot().infeasible.sum)
+        }
+    }
+
     @Test
     fun `retained cut infeasibility is certified and explained against the augmented model`() {
         val problem = Problem(
@@ -185,6 +252,7 @@ class CpLpAdapterTest {
             val relaxer = assertNotNull(engine.lpRelaxer)
             assertFalse(relaxer.build(cp.session).persistentEligible)
             var owners = 0L
+            var previousRows = 0
             for (step in 0..5) {
                 when (step) {
                     1 -> shared.push(SearchDecision.IntAtLeast(0, 2L))
@@ -207,12 +275,16 @@ class CpLpAdapterTest {
                     assertNotNull(integerCertify(retained.model, result.duals))
                         .objectiveBoundCeil(retained.objectiveConstant),
                 )
-                if (step < 4) {
-                    owners = assertNotNull(engine.propagator.metrics).createdOwners
-                } else {
+                if (step >= 4 && retained.model.m == previousRows) {
                     assertEquals(owners, engine.propagator.metrics?.createdOwners)
                     assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
+                } else if (step >= 4) {
+                    assertTrue(retained.model.m < previousRows)
+                    assertEquals(owners + 2, engine.propagator.metrics?.createdOwners)
+                    assertEquals(1L, engine.propagator.metrics?.currentOwners)
                 }
+                owners = assertNotNull(engine.propagator.metrics).createdOwners
+                previousRows = retained.model.m
                 val before = engine.propagator.metrics
                 assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
                 assertEquals(before, engine.propagator.metrics)

@@ -13,6 +13,11 @@ import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpLayoutRemap
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.authoritativeModel
@@ -27,6 +32,67 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedCutsTest {
+    @Test
+    fun `column compaction remaps cut geometry for repeated loads and ancestor restoration`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(2, 6)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)))
+        val session = PropagationSession(problem)
+        val model = LpBuilder().apply {
+            addVar(0L, 1L)
+            val x = addVar(2L, 6L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+        }.build(Sense.MINIMIZE)
+        val variables = intArrayOf(-1, 0)
+        val kinds = BooleanArray(2)
+        val reals = intArrayOf(-1, -1)
+        val signs = intArrayOf(1, 1)
+        val base = LpRelaxation(model, variables, kinds, 0L, intArrayOf(1), intArrayOf(),
+            sourceMap = cpCutSources(model, problem, variables, kinds, reals, signs, emptyMap()))
+        val cuts = LpRetainedCuts()
+        LpScopedSolver(LpExactState(assertNotNull(model.authoritativeModel()))).use { owner ->
+            val root = assertNotNull(cuts.prepare(owner.state, base,
+                listOf(Cut(intArrayOf(1), longArrayOf(1), Relation.GE, 3L, global = true))))
+            assertTrue(owner.replaceRows(root.retired, emptyList(), root.rows, false))
+            root.commit()
+            val rootProof = cuts.parentRows(owner.state).values.single()
+            assertTrue(owner.push())
+            session.pinIntAtLeast(0, 4L)
+            assertTrue(owner.assertBound(1, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
+            val point = assertNotNull(owner.state.ownerWorkingModel())
+            val map = assertNotNull(base.sourceMap).withCpBounds(point, session)
+            val fact = CutPremise.Bound(CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, 0) to BigFraction.ONE)),
+                false, BigFraction.ofLong(4L))
+            val local = Cut(intArrayOf(1), longArrayOf(1), Relation.GE, 4L,
+                provenance = CutProvenance(map.model, map.epoch, listOf(CutProofFact(fact, false))))
+            val child = assertNotNull(cuts.prepare(owner.state, base.withModel(point, map), listOf(local)))
+            assertTrue(owner.replaceRows(child.retired, emptyList(), child.rows, true))
+            child.commit()
+            val remap = LpLayoutRemap(2, owner.state.rows, listOf(1))
+            val compaction = assertNotNull(cuts.prepareCompaction(owner.state, remap))
+
+            assertTrue(owner.compact(remap))
+            compaction.commit()
+
+            val compacted = assertNotNull(owner.state.ownerWorkingModel())
+            val remapped = LpRelaxation(compacted, intArrayOf(0), BooleanArray(1), 0L, intArrayOf(0), intArrayOf(),
+                sourceMap = cpCutSources(compacted, problem, intArrayOf(0), BooleanArray(1), intArrayOf(-1),
+                    intArrayOf(1), cuts.parentRows(owner.state)).withCpBounds(compacted, session))
+            val repeated = assertNotNull(cuts.prepare(owner.state, remapped))
+            assertTrue(repeated.rows.isEmpty() && repeated.retired.isEmpty())
+            repeated.commit()
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(owner.solve()).lowerBound)
+            assertEquals(7L, owner.state.activeSide(0, false)?.witness)
+            assertTrue(owner.pop(0))
+            cuts.retract(0)
+            session.popToLevel(0)
+            assertSame(rootProof, cuts.parentRows(owner.state).values.single())
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
+            val restored = remapped.withModel(assertNotNull(owner.state.ownerWorkingModel()))
+            val repeatRoot = assertNotNull(cuts.prepare(owner.state, restored))
+            assertTrue(repeatRoot.rows.isEmpty() && repeatRoot.retired.isEmpty())
+        }
+    }
+
     @Test
     fun `selected cuts use exact origins and repeated loads retain their rows`() {
         val problem = Problem(

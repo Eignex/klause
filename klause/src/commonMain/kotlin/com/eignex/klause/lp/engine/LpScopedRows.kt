@@ -9,8 +9,11 @@ internal data class LpRowIdentity(
 
 internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
     private val identities = entries.toList()
+    private val indices by lazy { identities.withIndex().associate { it.value.id to it.index } }
     val size: Int get() = identities.size
-    val activeCount: Int get() = identities.count { it.active }
+    val activeCount: Int = identities.count { it.active }
+    val retainedCount: Int = identities.count { it.active || it.suspendedAt != null }
+    val retiredCount: Int get() = size - retainedCount
 
     init {
         require(lastId >= -1L)
@@ -25,7 +28,7 @@ internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
     }
 
     fun row(index: Int): LpRowIdentity = identities[index]
-    fun index(id: Long): Int = identities.indexOfFirst { it.id == id }
+    fun index(id: Long): Int = indices[id] ?: -1
     fun entries(): List<LpRowIdentity> = identities.toList()
     fun sameIdentities(other: LpScopedRows): Boolean = identities.map { it.id } == other.identities.map { it.id }
     fun sameAuthority(other: LpScopedRows): Boolean = lastId == other.lastId && identities == other.identities
@@ -97,17 +100,29 @@ internal class LpScopedRow(
 
 internal data class LpStructuralColumn(val column: ExactLpColumn, val cost: ExactLpNumber = ExactLpNumber.of(0L))
 
-internal class LpRowRemap(n: Int, rows: LpScopedRows) {
+internal class LpLayoutRemap(
+    private val n: Int,
+    private val rows: LpScopedRows,
+    retainedColumns: List<Int> = List(n) { it },
+) {
     private val rowMap = IntArray(rows.size) { -1 }
-    private val columnMap = IntArray(n + rows.size) { if (it < n) it else -1 }
-    val retained: List<Int> = (0 until rows.size).filter { rows.row(it).active || rows.row(it).suspendedAt != null }
+    private val columnMap = IntArray(n + rows.size) { -1 }
+    val retainedColumns: List<Int> = retainedColumns.toList()
+    val retainedRows: List<Int> = (0 until rows.size).filter { rows.row(it).active || rows.row(it).suspendedAt != null }
+    val unchanged: Boolean get() = retainedColumns.size == n && retainedRows.size == rows.size
 
     init {
-        retained.forEachIndexed { next, previous ->
+        require(this.retainedColumns.all { it in 0 until n })
+        require(this.retainedColumns.zipWithNext().all { (a, b) -> a < b })
+        this.retainedColumns.forEachIndexed { next, previous -> columnMap[previous] = next }
+        retainedRows.forEachIndexed { next, previous ->
             rowMap[previous] = next
-            columnMap[n + previous] = n + next
+            columnMap[n + previous] = this.retainedColumns.size + next
         }
     }
+
+    fun matches(model: ExactLpModel, identities: LpScopedRows): Boolean =
+        n == model.n && rows.sameAuthority(identities)
 
     fun row(previous: Int): Int = rowMap[previous]
     fun column(previous: Int): Int = columnMap[previous]
@@ -137,17 +152,19 @@ internal fun ExactLpModel.appendScopedRows(
 
 internal fun ExactLpModel.appendScopedRow(row: LpScopedRow): ExactLpModel = appendScopedRows(emptyList(), listOf(row))
 
-internal fun ExactLpModel.compactScopedRows(remap: LpRowRemap): ExactLpModel = ExactLpModel(
-    List(n) { column ->
+internal fun ExactLpModel.compactLayout(remap: LpLayoutRemap): ExactLpModel = ExactLpModel(
+    remap.retainedColumns.map { column ->
         entries(column).mapNotNull { entry ->
             val next = remap.row(entry.row)
             if (next < 0) null else ExactLpEntry(next, entry.number)
         }
     },
-    remap.retained.map { rhs(it) },
-    List(n) { column(it) } + remap.retained.map { column(n + it) },
-    remap.retained.map { row(it) },
-    objective.withCosts(List(n) { objective.cost(it) } + remap.retained.map { objective.cost(n + it) }),
+    remap.retainedRows.map { rhs(it) },
+    remap.retainedColumns.map { column(it) } + remap.retainedRows.map { column(n + it) },
+    remap.retainedRows.map { row(it) },
+    objective.withCosts(
+        remap.retainedColumns.map { objective.cost(it) } + remap.retainedRows.map { objective.cost(n + it) },
+    ),
 )
 
 private fun ExactLpObjective.withCosts(costs: List<ExactLpNumber>): ExactLpObjective = ExactLpObjective(

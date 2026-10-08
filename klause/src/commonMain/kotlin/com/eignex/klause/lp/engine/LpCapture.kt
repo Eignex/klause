@@ -1030,6 +1030,9 @@ internal sealed class LpExactReplayEvent(val eventVersion: Int = LP_EXACT_EVENT_
         val permanentRows: Set<Long> = permanentRows.toSet()
     }
     class Compact : LpExactReplayEvent()
+    class CompactColumns(columns: List<Int>) : LpExactReplayEvent() {
+        val columns: List<Int> = columns.toList()
+    }
     class Push : LpExactReplayEvent()
     class Assert(val column: Int, val upper: Boolean, val side: ExactLpSide, val witness: Long) : LpExactReplayEvent()
     class Pop(val targetDepth: Int) : LpExactReplayEvent()
@@ -1398,6 +1401,7 @@ private fun CaptureWriter.exactEvent(event: LpExactReplayEvent) {
             is LpExactReplayEvent.Compact -> 9
             is LpExactReplayEvent.Suspend -> 10
             is LpExactReplayEvent.Extend -> if (event.permanentRows.isEmpty()) 11 else 12
+            is LpExactReplayEvent.CompactColumns -> 13
         },
     )
     int(event.eventVersion)
@@ -1444,6 +1448,8 @@ private fun CaptureWriter.exactEvent(event: LpExactReplayEvent) {
         }
 
         is LpExactReplayEvent.Compact -> Unit
+
+        is LpExactReplayEvent.CompactColumns -> ints(event.columns.toIntArray())
     }
 }
 
@@ -1481,6 +1487,11 @@ private fun CaptureReader.exactEvent(captureVersion: Int): LpExactReplayEvent {
             val scoped = bool()
             val permanent = if (code == 12) longs().toSet() else emptySet()
             LpExactReplayEvent.Extend(columns, rows, scoped, permanent)
+        }
+
+        13 -> {
+            require(captureVersion >= 3) { "column compaction requires exact LP capture version 3" }
+            LpExactReplayEvent.CompactColumns(ints().toList())
         }
 
         else -> error("unknown exact LP event type $code")

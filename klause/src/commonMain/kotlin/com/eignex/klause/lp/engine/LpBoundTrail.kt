@@ -1,6 +1,11 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.unaryMinus
 
 internal sealed interface LpBoundBatchResult {
     val count: Int
@@ -326,16 +331,29 @@ internal class LpBoundTrail(initial: LpExactState) {
         return indices.takeIf { it.size == ids.size }
     }
 
-    fun compact(token: Cancellation = Cancellation.Never): Boolean {
-        if (token()) return false
-        if (state.rows.activeCount == state.rows.size) return true
+    fun compact(token: Cancellation = Cancellation.Never): Boolean =
+        compact(LpLayoutRemap(state.model.n, state.rows), token)
+
+    fun compact(remap: LpLayoutRemap, token: Cancellation = Cancellation.Never): Boolean {
+        if (token() || !remap.matches(state.model, state.rows)) return false
+        if (remap.unchanged) return true
         if (!structuralRevisionAvailable()) return false
-        val remap = LpRowRemap(state.model.n, state.rows)
-        if (remap.retained.size == state.rows.size) return true
+        for (column in 0 until state.model.n) {
+            if (token()) return false
+            if (remap.column(column) < 0 && !canRemoveColumn(column, remap)) return false
+        }
+        val assertions = ArrayList<LpBoundAssertion>()
+        val marks = IntArray(state.assertions.size + 1)
+        state.assertions.forEachIndexed { index, assertion ->
+            val column = remap.column(assertion.column)
+            if (column >= 0) assertions.add(assertion.copy(column = column))
+            marks[index + 1] = assertions.size
+        }
         return commit(
             snapshot(
-                baseModel = state.baseModel.compactScopedRows(remap),
-                assertions = state.assertions.map { it.copy(column = remap.column(it.column)) },
+                baseModel = state.baseModel.compactLayout(remap),
+                assertions = assertions,
+                scopes = state.scopes.map { marks[it] },
                 rows = state.rows.compact(),
                 matrixRevision = state.matrixRevision + 1L,
                 boundRevision = state.boundRevision + 1L,
@@ -344,6 +362,27 @@ internal class LpBoundTrail(initial: LpExactState) {
             ),
             token,
         )
+    }
+
+    private fun canRemoveColumn(column: Int, remap: LpLayoutRemap): Boolean {
+        val model = state.model
+        if (!model.objective.cost(column).value.isZero ||
+            model.columnEntries(column).any { remap.row(it.row) >= 0 && !it.number.value.isZero }
+        ) {
+            return false
+        }
+        val source = model.column(column)
+        if (!source.bounds.consistent) return false
+        if (!source.integral) return true
+        val lower = source.bounds.lower ?: return true
+        val upper = source.bounds.upper ?: return true
+        val lo = lower.number.value + source.origin.value
+        val hi = upper.number.value + source.origin.value
+        var minimum = lo.ceilInteger()
+        var maximum = -hi.negated().ceilInteger()
+        if (lower.strict && lo.den == BIG_ONE) minimum += BIG_ONE
+        if (upper.strict && hi.den == BIG_ONE) maximum -= BIG_ONE
+        return minimum <= maximum
     }
 
     private fun structuralRevisionAvailable(): Boolean = listOf(

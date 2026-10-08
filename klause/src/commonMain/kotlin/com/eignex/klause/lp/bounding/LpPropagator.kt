@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -24,6 +25,7 @@ import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.lp.relaxation.LpCutEdit
+import com.eignex.klause.lp.relaxation.LpSourceCompaction
 import com.eignex.klause.lp.relaxation.LpSourceEdit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
@@ -261,6 +263,28 @@ internal class LpPropagator(
 
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
+
+    fun compact(
+        before: LpExactState,
+        remap: LpLayoutRemap,
+        cuts: LpCutEdit,
+        sources: LpSourceCompaction? = null,
+    ): Boolean = withOwner { current ->
+        if (current.state !== before || cuts.sourceState !== before || !cuts.isCurrent() ||
+            cuts.retired.isNotEmpty() || cuts.rows.isNotEmpty() ||
+            (sources != null && (sources.sourceState !== before || sources.remap !== remap || !sources.isCurrent())) ||
+            cancellation()
+        ) {
+            return@withOwner false
+        }
+        onEdit(before.model.numVars.toLong())
+        if (!current.compact(remap)) return@withOwner false
+        retainWitnesses()
+        lastMetrics = LpSolveMetrics()
+        sources?.commit()
+        cuts.commit()
+        true
+    } == true
 
     fun editCuts(edit: LpCutEdit): Boolean = withOwner { current ->
         val before = current.state

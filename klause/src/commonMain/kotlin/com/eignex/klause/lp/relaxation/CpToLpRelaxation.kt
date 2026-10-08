@@ -33,6 +33,7 @@ import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -222,31 +223,40 @@ internal fun LpRelaxation.columnBounds(session: PropagationSession): Pair<LongAr
 internal fun LpRelaxation.withModel(
     reboundModel: LpModel,
     sources: CutSourceMap? = sourceMap?.withBounds(reboundModel),
-): LpRelaxation = LpRelaxation(
-    model = reboundModel,
-    colVarId = colVarId,
-    colIsBool = colIsBool,
-    objectiveConstant = objectiveConstant,
-    intColOf = intColOf,
-    boolColOf = boolColOf,
-    circuitArcs = circuitArcs,
-    persistentEligible = persistentEligible,
-    colReq = colReq,
-    colPresentUpper = colPresentUpper,
-    colPresence = colPresence,
-    hullFactorIds = hullFactorIds,
-    colRealId = colRealId,
-    colRealSign = colRealSign,
-    gatedRows = gatedRows,
-    gatedAux = gatedAux,
-    gatedWhenTrue = gatedWhenTrue,
-    sourceMap = sources,
-    rowFactorIds = if (reboundModel.m == model.m) rowFactorIds else {
-        require(reboundModel.m >= model.m) { "row removal requires a metadata remap" }
-        IntArray(reboundModel.m) { rowFactorIds.getOrElse(it) { -1 } }
-    },
-    realUpperRows = realUpperRows,
-)
+    remap: LpLayoutRemap? = null,
+): LpRelaxation {
+    require(remap == null || remap.retainedColumns.size == model.n) { "column removal requires source metadata" }
+    val gates = remap?.let { gatedRows.indices.filter { index -> it.row(gatedRows[index]) >= 0 } }
+    return LpRelaxation(
+        model = reboundModel,
+        colVarId = colVarId,
+        colIsBool = colIsBool,
+        objectiveConstant = objectiveConstant,
+        intColOf = intColOf,
+        boolColOf = boolColOf,
+        circuitArcs = circuitArcs,
+        persistentEligible = persistentEligible,
+        colReq = colReq,
+        colPresentUpper = colPresentUpper,
+        colPresence = colPresence,
+        hullFactorIds = hullFactorIds,
+        colRealId = colRealId,
+        colRealSign = colRealSign,
+        gatedRows = if (gates == null) gatedRows else gates.map { requireNotNull(remap).row(gatedRows[it]) }.toIntArray(),
+        gatedAux = if (gates == null) gatedAux else gates.map { gatedAux[it] }.toIntArray(),
+        gatedWhenTrue = if (gates == null) gatedWhenTrue else BooleanArray(gates.size) { gatedWhenTrue[gates[it]] },
+        sourceMap = sources,
+        rowFactorIds = if (remap != null) {
+            remap.retainedRows.map { rowFactorIds.getOrElse(it) { -1 } }.toIntArray()
+        } else if (reboundModel.m == model.m) rowFactorIds else {
+            require(reboundModel.m >= model.m) { "row removal requires a metadata remap" }
+            IntArray(reboundModel.m) { rowFactorIds.getOrElse(it) { -1 } }
+        },
+        realUpperRows = if (remap == null) realUpperRows else realUpperRows.mapNotNull { (row, variable) ->
+            remap.row(row).takeIf { it >= 0 }?.let { it to variable }
+        }.toMap(),
+    )
+}
 
 /**
  * The per-variable bounds the relaxation reads to size its columns: an integer variable's live domain
