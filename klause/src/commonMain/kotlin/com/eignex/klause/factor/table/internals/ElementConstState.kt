@@ -397,25 +397,46 @@ internal class ElementConstState(
         val dRes = state.domainAt(result, atTrail)
         val rootIdx = state.rootDomains[idx]
         val rootRes = state.rootDomains[result]
+        // Each side's past domain is read once, and a position or value past that domain's bound cites the bound's
+        // one literal, looked up once however many lie past it.
+        val idxCite = BoundOnce(state, idx, atTrail, dIdx)
+        val resCite = BoundOnce(state, result, atTrail, dRes)
         for (id in 0 until numValues) {
             val w = valueOfId[id]
             if (if (below) w >= bound else w <= bound) continue
             if (w !in rootRes) continue
             val positions = positionsOfId[id]
-            val gone = positions.none { state.inDomainAt(idx, indexOffset + it.toLong(), atTrail) }
+            val gone = positions.none { state.inDomainAt(idx, indexOffset + it.toLong(), atTrail, dIdx) }
             if (gone) {
                 for (pos in positions) {
                     val iv = indexOffset + pos.toLong()
-                    if (iv !in rootIdx) continue
-                    val lit = state.exclusionLiteral(idx, iv, atTrail, dIdx)
-                    if (lit != Lit.NONE) out.add(lit)
+                    if (iv in rootIdx) idxCite.cite(iv, out)
                 }
             } else {
-                val lit = state.exclusionLiteral(result, w, atTrail, dRes)
-                if (lit != Lit.NONE) out.add(lit)
+                resCite.cite(w, out)
             }
         }
         return out.toArrayOrNull()
+    }
+
+    // Cites why a value of [v] was out of its past domain [d] at [atTrail], each bound's literal at most once.
+    private class BoundOnce(
+        private val state: PropagationState,
+        private val v: Int,
+        private val atTrail: Int,
+        private val d: IntDomain,
+    ) {
+        private var belowCited = false
+        private var aboveCited = false
+
+        fun cite(k: Long, out: LitSet) {
+            when {
+                k < d.min -> if (belowCited) return else belowCited = true
+                k > d.max -> if (aboveCited) return else aboveCited = true
+            }
+            val lit = state.exclusionLiteral(v, k, atTrail, d)
+            if (lit != Lit.NONE) out.add(lit)
+        }
     }
 
     private class LitSet {
