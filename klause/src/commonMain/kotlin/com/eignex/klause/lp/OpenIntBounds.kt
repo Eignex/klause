@@ -2,8 +2,6 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.engine.Basis
-import com.eignex.klause.lp.engine.ComponentLpSolverCapability
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpModel
@@ -13,7 +11,6 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.certifiedTightVariableBound
 import com.eignex.klause.lp.engine.columnNeighborhood
-import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.lp.engine.rowIndex
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -61,10 +58,9 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  *
  * That LP relaxation is built **once** and every remaining open side is a re-solve of that one model with
  * a single ±1 cost swapped onto its column ([LpModel.withSingleColumnObjective]) — the matrix, rows and
- * bounds never change, so the previous optimal basis stays primal-feasible and the primal simplex
- * warm-starts from it ([com.eignex.klause.lp.engine.LpSolver.solvePrimal]) in a few pivots rather than
- * refactorizing a freshly-built
- * model per side. Each side's LP bound is derived over the prefiltered (but not further-OBBT-tightened)
+ * bounds never change, so the previous optimal basis stays primal-feasible and each retained numerical
+ * owner reuses its factorization across objectives. Each side's LP bound is derived over the prefiltered
+ * (but not further-OBBT-tightened)
  * bounds, so — unlike a sequential pass that feeds each closed side into later solves — an LP bound is
  * never sharpened by an earlier LP bound; every bound is still individually sound (the relaxation contains
  * every solution), only potentially looser, which never removes a feasible point.
@@ -129,53 +125,38 @@ internal fun tightenOpenIntBounds(
         )
     }
 
-    var warm: Basis? = null
     var solves = 0
-    for (v in 0 until n) {
-        if (cancellation() || solves >= OBBT_MAX_SIDE_SOLVES) break
-        val cur = work[v]
-        if (cur.lo != null && cur.hi != null) continue
-        var newHi = cur.hi
-        var newLo = cur.lo
-        // maximize x_v bounds the open upper side; minimize bounds the open lower side.
-        for (maximize in booleanArrayOf(true, false)) {
-            if (if (maximize) cur.hi != null else cur.lo != null) continue
-            solves++
-            cancellation.charge(LP_CERTIFY_WORK_WEIGHT * certifyUnits(base))
-            val model = base.withSingleColumnObjective(
-                posCol[v],
-                if (maximize) -1L else 1L,
-                negCol = negCol[v],
-            )
-            val solver = newLpSolver(model, cancellation, factory = context.engineFactory)
-            val result = try {
-                solver.solvePrimal(warm)
-            } catch (_: CheckedLongOverflowException) {
-                null
-            } finally {
-                try {
-                    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
-                } finally {
-                    solver.close()
+    LpProbeSolver(base, cancellation, observer, context).use { probes ->
+        for (v in 0 until n) {
+            if (cancellation() || solves >= OBBT_MAX_SIDE_SOLVES) break
+            val cur = work[v]
+            if (cur.lo != null && cur.hi != null) continue
+            var newHi = cur.hi
+            var newLo = cur.lo
+            // maximize x_v bounds the open upper side; minimize bounds the open lower side.
+            for (maximize in booleanArrayOf(true, false)) {
+                if (if (maximize) cur.hi != null else cur.lo != null) continue
+                solves++
+                cancellation.charge(LP_CERTIFY_WORK_WEIGHT * certifyUnits(base))
+                val probe = probes.probe(posCol[v], maximize, negCol[v])
+                if (probe != null) {
+                    val (model, result) = probe
+                    // The open direction's probe: the upper probe of x⁺ when maximizing, of x⁻ (whose growth
+                    // is x's descent) when minimizing an open-below variable.
+                    val probeCol = if (maximize || negCol[v] < 0) posCol[v] else negCol[v]
+                    val bound = model.certifiedTightVariableBound(
+                        result,
+                        v,
+                        maximize,
+                        base.probeClampedHi[probeCol],
+                        observer,
+                        context.certificationPolicy,
+                    )
+                    if (maximize) newHi = bound else newLo = bound
                 }
             }
-            if (result != null) {
-                warm = result.basis
-                // The open direction's probe: the upper probe of x⁺ when maximizing, of x⁻ (whose growth
-                // is x's descent) when minimizing an open-below variable.
-                val probeCol = if (maximize || negCol[v] < 0) posCol[v] else negCol[v]
-                val bound = model.certifiedTightVariableBound(
-                    result,
-                    v,
-                    maximize,
-                    model.probeClampedHi[probeCol],
-                    observer,
-                    context.certificationPolicy,
-                )
-                if (maximize) newHi = bound else newLo = bound
-            }
+            work[v] = probedBounds(cur, newLo, newHi)
         }
-        work[v] = probedBounds(cur, newLo, newHi)
     }
     return TightenedIntBounds(work)
 }
@@ -209,34 +190,25 @@ private fun tightenByNeighborhoodProbes(
         val q = if (negCol[v] >= 0) nb.colOf(negCol[v]) else -1
         var newHi = cur.hi
         var newLo = cur.lo
-        for (maximize in booleanArrayOf(true, false)) {
-            if (if (maximize) cur.hi != null else cur.lo != null) continue
-            solves++
-            cancellation.charge(LP_CERTIFY_WORK_WEIGHT * certifyUnits(nb.model))
-            val model = nb.model.withSingleColumnObjective(p, if (maximize) -1L else 1L, negCol = q)
-            val solver = newLpSolver(model, cancellation, factory = context.engineFactory)
-            val result = try {
-                solver.solvePrimal(null)
-            } catch (_: CheckedLongOverflowException) {
-                null
-            } finally {
-                try {
-                    observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
-                } finally {
-                    solver.close()
+        LpProbeSolver(nb.model, cancellation, observer, context).use { probes ->
+            for (maximize in booleanArrayOf(true, false)) {
+                if (if (maximize) cur.hi != null else cur.lo != null) continue
+                solves++
+                cancellation.charge(LP_CERTIFY_WORK_WEIGHT * certifyUnits(nb.model))
+                val probe = probes.probe(p, maximize, q)
+                if (probe != null) {
+                    val (model, result) = probe
+                    val probeCol = if (maximize || q < 0) p else q
+                    val bound = model.certifiedTightVariableBound(
+                        result,
+                        p,
+                        maximize,
+                        nb.model.probeClampedHi[probeCol],
+                        observer,
+                        context.certificationPolicy,
+                    )
+                    if (maximize) newHi = bound else newLo = bound
                 }
-            }
-            if (result != null) {
-                val probeCol = if (maximize || q < 0) p else q
-                val bound = model.certifiedTightVariableBound(
-                    result,
-                    p,
-                    maximize,
-                    model.probeClampedHi[probeCol],
-                    observer,
-                    context.certificationPolicy,
-                )
-                if (maximize) newHi = bound else newLo = bound
             }
         }
         work[v] = probedBounds(cur, newLo, newHi)

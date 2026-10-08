@@ -23,11 +23,11 @@ import com.eignex.klause.util.IntArrayList
  * pivot path, never the result).
  */
 internal class ComponentLpSolver(
-    private val model: LpModel,
-    private val parts: List<LpNeighborhood>,
+    private var model: LpModel,
+    private var parts: List<LpNeighborhood>,
     private val solvers: List<LpSolver>,
     private val isolated: IntArray,
-) : ComponentLpSolverCapability {
+) : RetainedComponentLpSolverCapability {
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
@@ -48,12 +48,59 @@ internal class ComponentLpSolver(
     override fun close() {
         if (closed) return
         closed = true
+        clearEvidence()
         closeComponentSolvers(solvers)
     }
 
     override fun solve(warm: Basis?): FloatLpResult? = invoke { s -> s.solve(null) }
 
     override fun solvePrimal(warm: Basis?): FloatLpResult? = invoke { s -> s.solvePrimal(null) }
+
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = invoke { solver ->
+        check(solver is RetainedLpSolver)
+        solver.resolveBounds(allowance)
+    }
+
+    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+        val previous = model.exactState ?: return false
+        if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
+        val nextModel = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
+        val nextParts = ArrayList<LpNeighborhood>(parts.size)
+        for (part in parts) nextParts += part.rebindExact(state, token) ?: return false
+        if (token()) return false
+        try {
+            for (index in solvers.indices) {
+                if (!(solvers[index] as RetainedLpSolver).adopt(checkNotNull(nextParts[index].model.exactState), token)) {
+                    close()
+                    return false
+                }
+            }
+            if (token()) {
+                close()
+                return false
+            }
+        } catch (primary: Throwable) {
+            if (!closed) {
+                closed = true
+                clearEvidence()
+                closeComponentSolvers(solvers, primary)
+            }
+            throw primary
+        }
+        model = nextModel
+        parts = nextParts
+        clearEvidence()
+        return true
+    }
+
+    private fun clearEvidence() {
+        blockResults = null
+        solvedExactState = null
+        stoppedBasis = null
+        recessionDirection = null
+        infeasibleRay = null
+        lastTermination = null
+    }
 
     @Suppress("TooGenericExceptionCaught") // Clear the invocation reason for any child failure.
     private inline fun invoke(op: (LpSolver) -> FloatLpResult?): FloatLpResult? = try {
@@ -345,9 +392,14 @@ internal fun componentLpSolverOrNull(
     model: LpModel,
     cancellation: Cancellation,
     engine: (LpModel, Cancellation) -> LpSolver,
-    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> ComponentLpSolverCapability =
-        ::ComponentLpSolver,
-): ComponentLpSolverCapability? {
+): ComponentLpSolverCapability? = componentLpSolverOrNull(model, cancellation, engine, ::ComponentLpSolver)
+
+internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
+    model: LpModel,
+    cancellation: Cancellation,
+    engine: (LpModel, Cancellation) -> LpSolver,
+    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
+): T? {
     val n = model.n
     val m = model.m
     if (n == 0 || m < 2) return null

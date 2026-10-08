@@ -413,7 +413,7 @@ class LpEngineInjectionTest {
     }
 
     @Test
-    fun `open bound probes use the injected general factory and policy`() {
+    fun `open bound probes use one injected retained owner and preserve proof policy`() {
         val rows = listOf(
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
@@ -430,6 +430,7 @@ class LpEngineInjectionTest {
 
         assertEquals(null, rejected.bounds[0].hi)
         assertEquals(5L, accepted.bounds[0].hi)
-        assertTrue(factory.calls.any { it.kind == EngineConstruction.GENERAL })
+        assertEquals(1, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        assertEquals(0, factory.calls.count { it.kind == EngineConstruction.GENERAL })
     }
 }

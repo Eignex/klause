@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.addExact
@@ -332,6 +333,39 @@ private fun LpExactState.restrictTo(
         "restriction of a projected exact model must project"
     }
     return LpNeighborhood(working, colMap, rows.toIntArray(), columns.toIntArray())
+}
+
+internal fun LpNeighborhood.rebindExact(state: LpExactState, token: Cancellation): LpNeighborhood? {
+    val previous = model.exactState ?: return null
+    val source = state.model
+    val indices = cols + IntArray(rows.size) { source.n + rows[it] }
+    val columns = ArrayList<ExactLpColumn>(indices.size)
+    for ((local, original) in indices.withIndex()) {
+        if (token()) return null
+        val column = source.column(original)
+        if (column.origin != previous.model.column(local).origin) return null
+        columns += column
+    }
+    val identities = LpScopedRows(
+        List(rows.size) { LpRowIdentity(it.toLong(), null, active = state.rows.row(rows[it]).active) },
+        rows.size - 1L,
+    )
+    val next = LpExactState(
+        previous.baseModel.copy(
+            rhs = rows.map { source.rhs(it) }, columns = columns, rows = rows.map { source.row(it) },
+            objective = ExactLpObjective(indices.map { source.objective.cost(it) }),
+        ),
+        matrixRevision = previous.matrixRevision,
+        boundRevision = state.boundRevision,
+        objectiveRevision = state.objectiveRevision,
+        popRevision = state.popRevision,
+        rows = identities,
+        rowRevision = state.rowRevision,
+    )
+    if (!previous.sameMatrix(next)) return null
+    next.inheritProjection(previous)
+    val working = next.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return null
+    return LpNeighborhood(working, colMap, rows, cols)
 }
 
 // A row keeps its parent's exact right-hand side: the shifts of every column it reads are already folded into it.

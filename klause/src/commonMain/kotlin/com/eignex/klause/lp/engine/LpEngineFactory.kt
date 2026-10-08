@@ -36,6 +36,13 @@ internal interface LpEngineFactory {
         isolated: IntArray,
     ): ComponentLpSolverCapability
 
+    fun newRetainedComponentSolver(
+        model: LpModel,
+        parts: List<LpNeighborhood>,
+        solvers: List<LpSolver>,
+        isolated: IntArray,
+    ): RetainedComponentLpSolverCapability
+
     fun newTableauSolver(
         model: LpModel,
         cancellation: Cancellation,
@@ -70,6 +77,9 @@ internal object ProductionLpEngineFactory : LpEngineFactory {
         solvers: List<LpSolver>,
         isolated: IntArray,
     ): ComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
+
+    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
+        isolated: IntArray): RetainedComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
 
     override fun newTableauSolver(
         model: LpModel,

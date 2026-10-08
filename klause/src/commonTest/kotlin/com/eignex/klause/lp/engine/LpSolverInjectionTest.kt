@@ -50,6 +50,12 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
         return delegate.newComponentSolver(model, parts, solvers, isolated)
     }
 
+    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
+        isolated: IntArray): RetainedComponentLpSolverCapability {
+        calls += EngineConstructionCall(EngineConstruction.COMPONENT)
+        return delegate.newRetainedComponentSolver(model, parts, solvers, isolated)
+    }
+
     override fun newTableauSolver(
         model: LpModel,
         cancellation: Cancellation,

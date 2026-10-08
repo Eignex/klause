@@ -9,6 +9,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
+import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
@@ -83,6 +84,10 @@ private class TerminalRecordingFactory : LpEngineFactory {
         solvers: List<LpSolver>,
         isolated: IntArray,
     ): ComponentLpSolverCapability = ProductionLpEngineFactory.newComponentSolver(model, parts, solvers, isolated)
+
+    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
+        isolated: IntArray): RetainedComponentLpSolverCapability =
+        ProductionLpEngineFactory.newRetainedComponentSolver(model, parts, solvers, isolated)
 
     override fun newTableauSolver(
         model: LpModel,

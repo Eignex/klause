@@ -289,11 +289,20 @@ internal data class LpFloatAllowance(val work: Long, val iterations: Int) {
     }
 }
 
+internal interface RetainedLpSolver : LpSolver {
+    // A declined adoption requires the caller to discard this owner; a composite may retire partially edited children.
+    fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
+
+    fun resolveBounds(allowance: LpFloatAllowance? = null): FloatLpResult?
+}
+
+internal interface RetainedComponentLpSolverCapability : ComponentLpSolverCapability, RetainedLpSolver
+
 /**
  * An [LpSolver] retaining its basis and factorization across exact bound and objective adoption.
  * Monolithic ownership is required: a component solve has no single basis to retain.
  */
-internal interface PersistentLpSolver : LpSolver {
+internal interface PersistentLpSolver : RetainedLpSolver {
     // Builds an all-logical basis without claiming feasibility; null means unsupported or declined.
     fun prepareLogicals(token: Cancellation = Cancellation.Never): Basis? = null
 
@@ -301,15 +310,13 @@ internal interface PersistentLpSolver : LpSolver {
 
     fun retainedBasis(): Basis? = null
 
-    fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
-
     val basisLifecycleWork: BasisOperationWork? get() = null
 
     /**
      * Re-solve with retained factors. Null [allowance] uses construction limits; explicit zero work
      * is unbounded and zero iterations uses the size-derived limit. Neither zero means exhausted.
      */
-    fun resolveBounds(allowance: LpFloatAllowance? = null): FloatLpResult?
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult?
 
     /**
      * Re-solve with per-row enforcement, continuing from the kept basis and factorization. A row with
@@ -394,6 +401,23 @@ internal fun newPersistentLpSolver(
     pricing,
 )
 
+internal fun newRetainedLpSolver(
+    model: LpModel,
+    cancellation: Cancellation = Cancellation.Never,
+    componentSplit: Boolean = true,
+    factory: LpEngineFactory = ProductionLpEngineFactory,
+    pricing: LpPricingOptions = LpPricingOptions(),
+    workLimit: Long = 0L,
+): RetainedLpSolver {
+    require(model.exactState != null)
+    if (componentSplit) {
+        componentLpSolverOrNull(model, cancellation,
+            { part, token -> newPersistentLpSolver(part, token, factory = factory, pricing = pricing,
+                workLimit = workLimit) }, factory::newRetainedComponentSolver)?.let { return it }
+    }
+    return newPersistentLpSolver(model, cancellation, factory = factory, pricing = pricing, workLimit = workLimit)
+}
+
 /** Explicit rollback factory for callers comparing or recovering with the unscaled float view. */
 internal object UnscaledLpEngineFactory : LpEngineFactory {
     private val disabled = LpScalingOptions(enabled = false)
@@ -417,6 +441,9 @@ internal object UnscaledLpEngineFactory : LpEngineFactory {
         solvers: List<LpSolver>,
         isolated: IntArray,
     ): ComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
+
+    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
+        isolated: IntArray): RetainedComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
 
     override fun newTableauSolver(
         model: LpModel,
