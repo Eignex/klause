@@ -100,8 +100,10 @@ internal object HighsReference {
         try {
             val model = File(dir, "fixed.mps").apply { writeText(lp) }
             val solution = File(dir, "solution.sol")
+            // Tighter than the check, so the completion it returns passes the check on its own numbers.
+            val options = File(dir, "options.txt").apply { writeText(REPAIR_OPTIONS + "log_file = ${File(dir, "highs.log").absolutePath}\n") }
             val cmd = listOf(
-                BINARY, "--model_file", model.absolutePath, "--solution_file", solution.absolutePath,
+                BINARY, "--model_file", model.absolutePath, "--options_file", options.absolutePath, "--solution_file", solution.absolutePath,
                 "--time_limit", "${REPAIR_TIMEOUT_MS / MS_PER_SEC}", "--parallel", "off",
             )
             val (stdout, _) = NativeReference.exec(cmd, REPAIR_TIMEOUT_MS)
@@ -169,4 +171,5 @@ internal object HighsReference {
     /** A retry with less than this left would only time out. */
     private const val MIN_RETRY_MS = 5_000L
     private const val REPAIR_TIMEOUT_MS = 30_000L
+    private const val REPAIR_OPTIONS = "primal_feasibility_tolerance = 1e-09\ndual_feasibility_tolerance = 1e-09\n"
 }
