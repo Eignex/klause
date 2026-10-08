@@ -110,7 +110,10 @@ class LocalSearchSolver(
 
     override fun solve(params: LocalSearchParams): SolveResult = engine.solve(params, warm = null)
 
-    /** Open a satisfaction walk whose assignment, RNG and restart state persist between slices. */
+    /**
+     * Open a satisfaction walk whose assignment, RNG and restart state persist between slices. Consume and close
+     * the handle before another search uses this solver's strategy and restart policy.
+     */
     override fun resumableSolve(params: LocalSearchParams): ResumableSolve = engine.resumableSolve(params)
 
     override fun samples(params: LocalSearchParams): Sequence<Sample> = engine.samples(params, warm = null)

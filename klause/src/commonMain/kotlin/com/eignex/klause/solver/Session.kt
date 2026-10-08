@@ -54,6 +54,12 @@ interface Session<P : SolverParams> : AutoCloseable {
     /** Solve once under the current assumption stack. */
     fun solve(params: P): SolveResult
 
+    /**
+     * Open a satisfaction handle under the current session state, or null when this session cannot resume.
+     * Retain exclusive use of the session until the handle is closed.
+     */
+    fun resumableSolve(params: P): ResumableSolve? = null
+
     /** Default implementation drains [samples] for one yield. Wraps it in
      *  [SampleResult.Found] when the sequence yields, [SampleResult.Unknown] when it
      *  doesn't. Mirrors [Solver.sample]'s contract. */
@@ -153,6 +159,10 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     }
 
     override fun solve(params: P): SolveResult = solver.solve(applyStack(params))
+
+    override fun resumableSolve(params: P): ResumableSolve? =
+        (solver as? ResumableSolver<P>)?.resumableSolve(applyStack(params))
+
     override fun samples(params: P): Sequence<Sample> = solver.samples(applyStack(params))
     override fun enumerate(params: P): Sequence<Sample> = solver.enumerate(applyStack(params))
 

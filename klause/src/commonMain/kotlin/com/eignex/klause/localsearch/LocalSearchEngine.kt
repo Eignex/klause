@@ -166,7 +166,7 @@ internal class LocalSearchEngine(
         return streamImpl(params, eff, warm).filterNotNull()
     }
 
-    fun resumableSolve(params: LocalSearchParams): ResumableSolve {
+    fun resumableSolve(params: LocalSearchParams, warm: WarmState? = null): ResumableSolve {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
         val supported = localSearchSupports(model, completion != null)
@@ -179,6 +179,7 @@ internal class LocalSearchEngine(
             streamImpl(
                 params.copy(cancellation = Cancellation { token() }),
                 it,
+                warm = warm,
                 sink = sink,
                 checkpoint = SatisfyCheckpoint { spent ->
                     instructions = spent
@@ -340,6 +341,7 @@ internal class LocalSearchEngine(
                     sink?.ls?.recordWork(moves = moves, restarts = restartCount, stalls = 0L)
                     sink?.ls?.recordIncumbent(objective = Double.NaN, violation = bestCost.toDouble(), foundAtMs = -1L)
                 }
+                warm?.captureFrom(state)
             }
 
             // A restart transition consumes one unit of the maxFlips/maxInstructions allowance, same as
@@ -444,7 +446,6 @@ internal class LocalSearchEngine(
             } finally {
                 // Sync learned weights back into warm state on natural exit or consumer cancel.
                 // Abandoned sequences may not fire this; accepted loss.
-                warm?.captureFrom(state)
                 reportProgress()
             }
         }

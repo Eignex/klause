@@ -19,6 +19,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableOptimizer
@@ -618,6 +619,22 @@ class PortfolioTest {
         assertIs<SolveResult.Sat>(r)
         assertEquals(1, solver.opened.size, "the arm must resume, not reopen")
         assertEquals(4, solver.opened.single().slices)
+    }
+
+    @Test
+    fun `a resumed local search arm respects session pins`() {
+        val session = LocalSearchSolver(Problem(1, 0, emptyArray(), emptyArray()).bake()).session()
+        session.push(Assumptions(bools = mapOf(0 to true)))
+        val worker = PortfolioWorker.of(
+            "ls",
+            0,
+            session,
+            LocalSearchParams(initialAssignment = Sample(booleanArrayOf(false), longArrayOf()), randomSeed = 3L),
+        )
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.solve() }
+
+        assertTrue(assertIs<SolveResult.Sat>(result).assignment.bools[0])
     }
 
     @Test

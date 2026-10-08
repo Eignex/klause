@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -59,6 +60,31 @@ class LocalSearchSessionTest {
         assertNotNull(captured, "session should capture factorWeights")
         assertEquals(problem.numFactors, captured.size)
         assertTrue(captured.any { it != 1.0 }, "CBLS should learn non-default weights")
+    }
+
+    @Test
+    fun `paused satisfaction exports learned weights to the session`() {
+        val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem().bake()))
+
+        session.resumableSolve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).use { handle ->
+            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1_000L))
+
+            val captured = assertNotNull(session.warmState.factorWeights)
+            assertTrue(captured.any { it != 1.0 })
+        }
+    }
+
+    @Test
+    fun `resumed satisfaction imports the session learned weights`() {
+        val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem().bake()))
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        val learned = assertNotNull(session.warmState.factorWeights).copyOf()
+
+        session.resumableSolve(LocalSearchParams(maxFlips = 0L, randomSeed = 2L)).use { handle ->
+            handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+        }
+
+        assertTrue(learned.contentEquals(assertNotNull(session.warmState.factorWeights)))
     }
 
     @Test
