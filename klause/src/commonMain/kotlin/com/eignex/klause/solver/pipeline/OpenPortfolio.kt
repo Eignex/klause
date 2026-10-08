@@ -56,6 +56,7 @@ internal class OpenPortfolio(
     private val localSearchArms: Int = DEFAULT_LS_ARMS,
     private val seed: Long = 0L,
     private val lanes: Int = 1,
+    private val searchesContinuousOnly: Boolean = false,
 ) {
     // The theory arm's witnesses as the pool saw them: each may hold integers past the 64-bit range a Sample cannot
     // carry, so the pool's copy is only a stand-in for it. The witness check reads them from every lane while the
@@ -272,8 +273,9 @@ internal class OpenPortfolio(
         objective: LinearObjective?,
     ): List<PortfolioWorker> {
         // On a model of continuous columns alone with no Boolean to choose, the completion of any candidate is the
-        // whole LP: local search would only hand the theory the problem it already solves.
-        if (model.numIntVars == 0 && model.numBoolVars == 0) return emptyList()
+        // whole LP: local search would only hand the theory the problem it already solves, so it runs there only
+        // when asked for by name.
+        if (!searchesContinuousOnly && model.numIntVars == 0 && model.numBoolVars == 0) return emptyList()
         val searchModel = LocalSearchModel.open(model)
         // An open model's rows can be strict, which only the theory certifies; it decides each candidate's residual.
         val completion = if (model.numRealVars > 0) TheoryCompletion(model, theoryParams) else null
