@@ -18,6 +18,47 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `integer probes expose complete domains until popped`() {
+        val session = PropagationSession(
+            Problem(
+                0,
+                2,
+                arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
+            ),
+        )
+
+        assertIs<PropagationResult.Implied>(session.probeInt(1, 3L))
+
+        assertEquals(3L, session.intDomain(0).max)
+        assertEquals(3L, session.intDomain(1).min)
+        assertEquals(3L, session.intDomain(1).max)
+        session.popLast()
+        assertEquals(10L, session.intDomain(0).max)
+        assertEquals(0L, session.intDomain(1).min)
+        assertEquals(10L, session.intDomain(1).max)
+    }
+
+    @Test
+    fun `Boolean probes retain native deductions until popped`() {
+        val session = PropagationSession(
+            Problem(
+                2,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+            ),
+        )
+
+        assertIs<PropagationResult.Implied>(session.probeBool(0, true))
+
+        assertEquals(true, session.boolValue(1))
+        session.popLast()
+        assertNull(session.boolValue(0))
+        assertNull(session.boolValue(1))
+    }
+
+    @Test
     fun `repeated endpoint tightening publishes the final bound`() {
         for (upper in listOf(false, true)) {
             val coefficients = if (upper) listOf(2, 1) else listOf(1, 2)

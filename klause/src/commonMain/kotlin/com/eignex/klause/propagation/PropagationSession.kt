@@ -344,10 +344,12 @@ class PropagationSession private constructor(
     }
 
     /** [pinBool] as a probe — see [probeFixpoint]. */
-    internal fun probeBool(v: Int, value: Boolean): PropagationResult? = probeFixpoint { pushBool(v, value) }
+    internal fun probeBool(v: Int, value: Boolean): PropagationResult? =
+        probeFixpoint { pushBool(v, value, reportImplied = false) }
 
     /** [pinInt] as a probe — see [probeFixpoint]. */
-    internal fun probeInt(v: Int, value: Long): PropagationResult? = probeFixpoint { pushInt(v, value) }
+    internal fun probeInt(v: Int, value: Long): PropagationResult? =
+        probeFixpoint { pushInt(v, value, reportImplied = false) }
 
     /**
      * One probe pin: the fixpoint polls the deadline from its first fire (no [PROPAGATION_CANCEL_FLOOR]
@@ -696,7 +698,7 @@ class PropagationSession private constructor(
         state.nativeEngine?.importUses?.drain(action)
     }
 
-    private fun pushBool(v: Int, value: Boolean): PropagationResult {
+    private fun pushBool(v: Int, value: Boolean, reportImplied: Boolean = true): PropagationResult {
         val want = if (value) 1 else 0
         if (boolPinned[v] == want) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
@@ -706,10 +708,10 @@ class PropagationSession private constructor(
         boolPinned[v] = want
         trail.add(encBool(v))
         levelPush(state.mark())
-        return impliedSince(base)
+        return if (reportImplied) impliedSince(base) else PropagationResult.Implied.EMPTY
     }
 
-    private fun pushInt(v: Int, value: Long): PropagationResult {
+    private fun pushInt(v: Int, value: Long, reportImplied: Boolean = true): PropagationResult {
         if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
@@ -719,7 +721,7 @@ class PropagationSession private constructor(
         intPinnedVal[v] = value
         trail.add(encInt(v))
         levelPush(state.mark())
-        return impliedSince(base)
+        return if (reportImplied) impliedSince(base) else PropagationResult.Implied.EMPTY
     }
 
     /**
