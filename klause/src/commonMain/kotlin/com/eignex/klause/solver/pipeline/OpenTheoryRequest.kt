@@ -165,14 +165,17 @@ object OpenTheoryPipeline {
     /**
      * Search [model], an open model no theory decides, with local search alone. It can show the model satisfiable
      * and find incumbents for [objective], minimized, and never shows the model unsatisfiable or an incumbent optimal.
+     * A model of continuous columns alone is searched only when [searchesContinuousOnly].
      */
     fun searchWithoutTheory(
         model: Problem,
         params: TheoryParams = TheoryParams(),
         objective: LinearObjective? = null,
         cores: Int = 1,
+        searchesContinuousOnly: Boolean = false,
     ): OpenTheoryExecution {
-        val portfolio = OpenPortfolio(model, request = null, params, lanes = cores)
+        val portfolio =
+            OpenPortfolio(model, request = null, params, lanes = cores, searchesContinuousOnly = searchesContinuousOnly)
         val stop = params.cancellation or params.timeout
         if (objective == null) return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizer = null, stop))
@@ -203,14 +206,16 @@ object OpenTheoryPipeline {
         when (engine) {
             FiniteEngine.MIXED -> executePortfolio(request, params, cores)
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
-            FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(request.model, params, request.minimizedObjective, cores)
+            FiniteEngine.LOCAL_SEARCH ->
+                searchWithoutTheory(request.model, params, request.minimizedObjective, cores, searchesContinuousOnly = true)
+
             FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
         }
 
     /**
      * Search [model], an open model no theory decides, the way [engine] asks: local search under
-     * [FiniteEngine.MIXED] and [FiniteEngine.LOCAL_SEARCH]. A complete engine has nothing to run on it, so the
-     * answer is unknown.
+     * [FiniteEngine.MIXED] and [FiniteEngine.LOCAL_SEARCH], the latter also over continuous columns alone. A complete
+     * engine has nothing to run on it, so the answer is unknown.
      */
     fun searchWithoutTheory(
         model: Problem,
@@ -219,7 +224,9 @@ object OpenTheoryPipeline {
         engine: FiniteEngine,
         cores: Int = 1,
     ): OpenTheoryExecution = when (engine) {
-        FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective, cores)
+        FiniteEngine.MIXED -> searchWithoutTheory(model, params, objective, cores)
+
+        FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective, cores, searchesContinuousOnly = true)
 
         FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> {
             val stats = SolveStats.EMPTY

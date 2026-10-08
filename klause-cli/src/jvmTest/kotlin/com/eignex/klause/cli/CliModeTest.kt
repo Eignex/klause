@@ -550,6 +550,28 @@ class CliModeTest {
     }
 
     @Test
+    fun `local search finds a witness to an open model of continuous columns alone`() {
+        val smt = File.createTempFile("cliopenreals", ".smt2").apply {
+            writeText(
+                """
+                (set-logic QF_LRA)
+                (declare-const x Real)
+                (declare-const y Real)
+                (assert (> (+ x y) 2.5))
+                (assert (<= (+ x y) 10))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+        var code = -1
+        val out = capture { code = runCli(arrayOf("-e", "ls", smt.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertEquals("sat", out.lines().firstOrNull(), out)
+    }
+
+    @Test
     fun `alns is refused on an open model`() {
         var code = -1
         val err = captureErr { code = runCli(arrayOf("-e", "alns", openSmt().absolutePath)) }
