@@ -781,6 +781,21 @@ class PortfolioTest {
     }
 
     @Test
+    fun `an improving family runs again before a losing family's other variants are probed`() {
+        val order = ArrayList<Int>()
+        val workers = (0 until 5).map { arm ->
+            val search = ScriptedSearch({ arm == 0 }) { order += arm }
+            trackingWorker("arm$arm", arm, search).also { if (arm > 0) it.family = ArmFamily.LocalSearch }
+        }
+        var polls = 0
+
+        Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 40 }) }
+
+        val secondTurn = order.withIndex().filter { it.value == 0 }.map { it.index }[1]
+        assertTrue((2..4).any { it !in order.take(secondTurn) }, "order=$order")
+    }
+
+    @Test
     fun `an arm whose shared clauses others use takes more of the run than one sharing nothing`() {
         val slices = IntArray(3)
         val pools = SharedPools(clauses = null, cuts = null)
