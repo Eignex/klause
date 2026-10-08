@@ -4,12 +4,14 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.portfolio.ArmFault
+import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.WitnessCheck
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -29,6 +31,7 @@ fun FinitePipeline.portfolioExecutor(
     onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     onFault: ((ArmFault) -> Unit)? = null,
 ): PortfolioExecutor {
+    val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
     val workers = PortfolioBuilder.build(
         problem,
         scenario,
@@ -36,11 +39,13 @@ fun FinitePipeline.portfolioExecutor(
         lsObjective = lsObjective,
         definitionalSweep = definitionalSweep,
         onEvent = onEvent,
+        profile = profile,
     )
     return Portfolio.thompson(
         workers,
         lanes = scenario.cores,
         baseSliceWork = scenario.sliceWork,
+        profile = profile,
         witnessCheck = witnessCheck(problem, objective),
         onFault = onFault,
     )

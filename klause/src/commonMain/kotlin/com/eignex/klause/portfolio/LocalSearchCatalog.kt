@@ -22,6 +22,7 @@ import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.localsearch.strategy.WalkSat
+import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.util.ArmCatalog
 
 /**
@@ -213,6 +214,19 @@ object LocalSearchCatalog {
         Kind.CSP -> cspOrder
     }
 
+    // [rankedArms] led by the arms written for [problemClass]: on a pseudo-Boolean model, the flip walk over violated
+    // constraints and the jump moves that read its linear rows. Clausal and mixed-integer models keep the credit
+    // order, whose general CBLS arms find their solutions and improvements; leading with these displaced them.
+    private fun rankedArms(kind: Kind, problemClass: ProblemClass): List<LocalSearchArm> {
+        val lead = when (problemClass) {
+            ProblemClass.PseudoBoolean -> listOf(LocalSearchArm.ProbsatBanditFixed, LocalSearchArm.FeasibilityJumpFixed)
+
+            else -> emptyList()
+        }
+        val order = rankedArms(kind)
+        return lead.filter { it in order } + order.filter { it !in lead }
+    }
+
     private val catalog = ArmCatalog(LocalSearchArm.entries, LocalSearchArm::label, ::make)
 
     /** A fresh recipe for the arm named [label] (the single string boundary). */
@@ -233,9 +247,9 @@ object LocalSearchCatalog {
 
     /** The top-[count] prefix of [kind]'s credit-ordered pool (wrapping past the pool size). Every slot
      *  is a fresh instance even when arms repeat. */
-    fun diverse(kind: Kind, count: Int): List<LocalSearchRecipe> {
+    fun diverse(kind: Kind, count: Int, problemClass: ProblemClass = ProblemClass.FiniteCp): List<LocalSearchRecipe> {
         require(count >= 1) { "count must be ≥ 1" }
-        val order = rankedArms(kind)
+        val order = rankedArms(kind, problemClass)
         return List(count) { make(order[it % order.size]) }
     }
 }

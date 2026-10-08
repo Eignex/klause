@@ -4,6 +4,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.InstructionSlicedSolve
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -126,6 +127,8 @@ class Portfolio(
      * itself carries over whole. Applies to [thompson]'s policy; another policy keeps its evidence.
      */
     private val phaseRetention: Double = DEFAULT_PHASE_RETENTION,
+    /** The model's classification, which sets the lean each engine family starts from; null leans none. */
+    private val profile: ProblemProfile? = null,
     /** Checks every result an arm claims before it is accepted; null trusts the arms. See [WitnessCheck]. */
     private val witnessCheck: WitnessCheck? = null,
     /** Told about each arm the run quarantines for a refuted claim; see [ArmFault]. */
@@ -468,7 +471,7 @@ class Portfolio(
         private var totalNanos = 0L
         private var slice = baseSliceMillis
         private var sliceWork = baseSliceWork
-        private val families = FamilyPolicy(bandit.random)
+        private val families = FamilyPolicy(bandit.random, profile?.let(FamilyPrior::of) ?: FamilyPrior.UNIFORM)
         private var improving = false
 
         /** Whether every arm has retired. */
@@ -638,7 +641,7 @@ class Portfolio(
 
         /** The pool's total counters, every arm that did work included, with the schedule attached. */
         fun folded(): SolveStats = perArm.filterNotNull().fold(SolveStats.EMPTY) { acc, s -> acc.mergedWith(s) }
-            .copy(portfolio = log.stats(ledger))
+            .copy(portfolio = log.stats(ledger).copy(profile = profile))
 
         private fun closeAll(primaryFailure: Throwable?) {
             var closeFailure: Throwable? = null
@@ -769,6 +772,7 @@ class Portfolio(
             baseSliceWork: Long = 5_000,
             probeSliceMillis: Long = 1_000,
             phaseRetention: Double = DEFAULT_PHASE_RETENTION,
+            profile: ProblemProfile? = null,
             witnessCheck: WitnessCheck? = null,
             onFault: ((ArmFault) -> Unit)? = null,
             minShares: DoubleArray = DoubleArray(0),
@@ -783,6 +787,7 @@ class Portfolio(
             baseSliceWork = baseSliceWork,
             probeSliceMillis = probeSliceMillis,
             phaseRetention = phaseRetention,
+            profile = profile,
             witnessCheck = witnessCheck,
             onFault = onFault,
             minShares = minShares,

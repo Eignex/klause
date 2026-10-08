@@ -6,11 +6,12 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.relaxation.lpSeed
-import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.WitnessCheck
+import com.eignex.klause.portfolio.kind
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -83,6 +84,7 @@ internal class OpenPortfolio(
             workers,
             lanes = lanes.coerceIn(1, workers.size),
             seed = seed,
+            profile = ProblemProfile.of(model, optimizing = false),
             witnessCheck = witnessCheck(null),
             minShares = DoubleArray(workers.size).also { if (request != null) it[0] = THEORY_SHARE },
         )
@@ -123,6 +125,7 @@ internal class OpenPortfolio(
             lanes = lanes.coerceIn(1, workers.size),
             seed = seed,
             reseedStaleThreshold = 0,
+            profile = ProblemProfile.of(model, optimizing = true),
             witnessCheck = witnessCheck(objective),
             minShares = DoubleArray(workers.size).also { if (minimizer != null) it[0] = DESCENT_SHARE },
         )
@@ -278,8 +281,8 @@ internal class OpenPortfolio(
         // Every arm starts from the relaxation's optimum inside the search windows rather than near zero; an LP
         // that finds no point in its slice of the budget leaves the arms to their own random starts.
         val start = model.lpSeed(searchModel.domains, cancellation or Cancellation.after(SEED_BUDGET))
-        val kind = if (objective != null) Kind.COP else Kind.CSP
-        return LocalSearchCatalog.diverse(kind, localSearchArms).mapIndexed { i, recipe ->
+        val profile = ProblemProfile.of(model, optimizing = objective != null)
+        return LocalSearchCatalog.diverse(profile.kind, localSearchArms, profile.problemClass).mapIndexed { i, recipe ->
             val engine = LocalSearchEngine(
                 searchModel,
                 strategy = recipe.strategy,
