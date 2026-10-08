@@ -319,7 +319,9 @@ class Portfolio(
                 val workBefore = handle.work
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
-                    handle.runSlice(run.token, handleMillis(worker, run.token, claim), claim.handleNodes) { accept(claim, it) }
+                    handle.runSlice(run.token, handleMillis(worker, run.token, claim), claim.handleNodes) {
+                        accept(claim, it)
+                    }
                 }
                 terminal = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
@@ -647,7 +649,8 @@ class Portfolio(
         val instructions = stats?.ls?.moves?.sum ?: 0.0
         return when {
             claim.whole -> countedInstructions(claim, instructions)
-            worker.acceptsInstructionBudget && worker.family == ArmFamily.LocalSearch -> countedInstructions(claim, instructions)
+            worker.acceptsInstructionBudget && worker.family == ArmFamily.LocalSearch ->
+                countedInstructions(claim, instructions)
             // ALNS charges its outer repair allowances independently of the inner solver's move count.
             else -> claim.sliceWork
         }

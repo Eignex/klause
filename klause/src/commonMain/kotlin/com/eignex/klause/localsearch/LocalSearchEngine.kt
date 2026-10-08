@@ -211,7 +211,11 @@ internal class LocalSearchEngine(
                 token = if (sliceMillis == Long.MAX_VALUE) global else {
                     global or Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
                 }
-                val allowance = if (sliceNodes < 0L) Long.MAX_VALUE else (sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong()
+                val allowance = if (sliceNodes < 0L) {
+                    Long.MAX_VALUE
+                } else {
+                    (sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong()
+                }
                 limit = instructions + minOf(allowance, available, Long.MAX_VALUE - instructions)
                 if (instructions >= limit || token()) return null
                 val live = checkNotNull(cursor)
