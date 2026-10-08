@@ -10,10 +10,14 @@ import kotlin.time.TimeSource
  *
  * A work budget makes the pause point a property of the search rather than of machine load, which is what
  * lets two identical invocations report identical counters. A unit is one search node, and LP work is charged
- * against the same budget at [LP_WORK_PER_NODE] per node so an LP-heavy slice pauses about as late in wall time
- * as a CP one. [nodeCount] is the search's own work in nodes, inprocessing included; see [searchWork].
+ * against the same budget at [LP_WORK_PER_NODE] per node. Propagation dispatches and visits are charged at
+ * [PROPAGATION_WORK_PER_NODE] per node. [nodeCount] is the search's own work in nodes, inprocessing included; see [searchWork].
  */
-internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork: () -> Long) {
+internal class SliceBudget(
+    private val nodeCount: () -> Long,
+    private val lpWork: () -> Long,
+    private val propagationWork: () -> Long = { 0L },
+) {
     /** The armed slice's wall-clock end; null before the first slice. */
     var deadline: TimeSource.Monotonic.ValueTimeMark? = null
         private set
@@ -29,6 +33,7 @@ internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork
     // LP work already turned into slice nodes. It runs across slices, so work done between two slices, the root LP
     // included, is charged to the next one.
     private var lpWorkMark = 0L
+    private var propagationWorkMark = 0L
 
     // Nodes an earlier slice spent past its budget. One LP solve can cost many slices' worth of nodes, and a slice
     // cannot stop inside it, so the excess is repaid from the slices that follow.
@@ -52,26 +57,30 @@ internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork
         return false
     }
 
-    /** Work spent so far: every node plus the LP work at [LP_WORK_PER_NODE] per node, charged or not. */
-    fun spent(): Long = nodeCount() + lpWork() / LP_WORK_PER_NODE
+    /** Work spent so far: nodes plus LP and propagation work, charged or not. */
+    fun spent(): Long = nodeCount() + lpWork() / LP_WORK_PER_NODE + propagationWork() / PROPAGATION_WORK_PER_NODE
 
     /** Whether the armed slice has spent its allowance. */
-    fun expired(): Boolean = (workBounded && nodeCount() >= nodeEnd) || deadline?.hasPassedNow() == true
+    fun expired(): Boolean = workExpired() || deadline?.hasPassedNow() == true
+
+    fun workExpired(): Boolean = workBounded && nodeCount() >= nodeEnd
 
     /**
-     * Spend the LP work done since the last charge from the slice's budget. The charge lands at a node boundary
-     * and only moves the slice end, so the slice pauses at its next poll exactly as if it had explored that many
+     * Spend the LP and propagation work done since the last charge from the slice's budget. The charge lands at a
+     * node boundary and only moves the slice end, so the slice pauses at its next poll as if it had explored that many
      * nodes; it stays a function of the search, and runs remain reproducible.
      */
     fun charge() {
         if (!workBounded) return
         val nodes = (lpWork() - lpWorkMark) / LP_WORK_PER_NODE
-        if (nodes <= 0L) return
         nodeEnd -= nodes
         lpWorkMark += nodes * LP_WORK_PER_NODE
+        val propagationNodes = (propagationWork() - propagationWorkMark) / PROPAGATION_WORK_PER_NODE
+        nodeEnd -= propagationNodes
+        propagationWorkMark += propagationNodes * PROPAGATION_WORK_PER_NODE
     }
 
-    /** Carry what the slice spent past its budget, the LP work since the last charge included, into the next. */
+    /** Carry what the slice spent past its budget, including uncharged work, into the next. */
     fun noteOverspend() {
         if (!workBounded) return
         charge()
@@ -83,6 +92,10 @@ internal class SliceBudget(private val nodeCount: () -> Long, private val lpWork
 // node: the median ratio of LP work per second with the default LP arm to conflictDriven's nodes per second, over
 // 13 MIPLIB 2017 models with continuous columns, was 519 (spread 58 to 8145, geometric mean 629).
 internal const val LP_WORK_PER_NODE = 600L
+
+// Propagation visits per cheap search node: median measured rate ratio 3936 over four controls
+// (range 2192 to 7135). The rate converts work; it does not change the scheduler's slice sizes.
+internal const val PROPAGATION_WORK_PER_NODE = 4_000L
 
 /** The search work a slice is charged, in nodes: every node, plus inprocessing at its measured rates. */
 internal val SearchStatsSink.searchWork: Long

@@ -153,8 +153,12 @@ internal class ResumableMinimize(
     // which is the solve start for that path.
     private val startMark = TimeSource.Monotonic.markNow()
 
-    // Where the current slice pauses. Its work bound counts the LP work this search charges per node.
-    private val slice = SliceBudget({ sink.search.searchWork }, { lpEngine.totalSolveWork() })
+    // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
+    private val slice = SliceBudget(
+        { sink.search.searchWork },
+        { lpEngine.totalSolveWork() + sink.lp.standaloneWork },
+        { session.work },
+    )
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
 
@@ -241,7 +245,13 @@ internal class ResumableMinimize(
             pbLearning = params.pbLearning ?: true,
         ),
         branching = CpBranching.None,
-    ).also { it.conflictStats = sink.ca }
+    ).also {
+        it.conflictStats = sink.ca
+        sink.search.propagationWork = { it.session.work }
+        sink.search.rootPropagationWork = { it.session.rootWork }
+        sink.search.propagationNanos = { it.session.propagationNanos }
+        sink.search.rootPropagationNanos = { it.session.rootPropagationNanos }
+    }
     private val session: PropagationSession get() = cp.session
     private val restart = RestartSchedule.from(params)
     private var decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
@@ -286,6 +296,8 @@ internal class ResumableMinimize(
 
     override val work: Long get() = slice.spent()
 
+    override val initialWork: Long
+
     init {
         try {
             val seeded = session.seed(params.assumptions)
@@ -303,6 +315,7 @@ internal class ResumableMinimize(
                 }
             }
             run = searchSession.openRun(problem.numBoolVars, traversal)
+            initialWork = slice.spent()
         } catch (primary: Throwable) {
             closeAfter(primary)
             throw primary
@@ -318,7 +331,7 @@ internal class ResumableMinimize(
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = global
-        if (!slice.begin(sliceMillis, sliceNodes)) return null
+        if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
@@ -890,6 +903,7 @@ internal class ResumableMinimize(
     private inner class LpNodePolicy : SearchNodePolicy {
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
             slice.charge()
+            if (pausable && slice.workExpired()) return SearchNodeDisposition.Pause
             val externalBound = externalCutoff()
             val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
             if (rebindable && discreteObjective) {
@@ -1079,6 +1093,10 @@ internal class ResumableMinimize(
             SearchModelContinuation.BlockAtRoot
         }
         override val modelPolicy: SearchModelPolicy = IncumbentPolicy()
+        override val pauseBeforeDecision: () -> Boolean = {
+            slice.charge()
+            pausable && slice.workExpired()
+        }
         override val nodePolicy: SearchNodePolicy = LpNodePolicy()
         override val lifecycle: SearchRunLifecycle get() = this
 

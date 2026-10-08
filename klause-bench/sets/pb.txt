@@ -1,20 +1,25 @@
-# pb: problems with the pb theme, drawn 2026-10-06 by klause-lab deploy/make-sets.py
+# pb: problems with the pb theme, drawn 2026-10-08 by klause-lab deploy/make-sets.py
 # tiers by the reference's time to prove: easy < 1 s, medium < 10 s, hard < 60 s
-# easy: 6
-pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/area_delay/normalized-fir02_area_delay
-pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/trarea_ac/normalized-fir01_trarea_ac
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/bsg/normalized-bsg_10_4_3
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_50_25_4
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mis/normalized-mis_10_4_4
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=7-P0=61-P1=127-P2=131-P3=107-P4=47-B
-# medium: 8
+# easy: 8
+pb-comp/normalized-PB06/DEC-LIN/submitted-PB06/manquiho/Aardal_1/normalized-cuww3
+pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948
+pb-comp-2025/normalized-PB25/DEC-LIN/koops/normalized-mat10_8_triangular
+pb-comp-2025/normalized-PB25/DEC-LIN/wallon/normalized-Soccer-22-18-20-1_c24
+pb-comp-wbo/WBO/PARTIAL-LIN/wcsp/academics/normalized-4queens_wcsp
+pb-comp-wbo/WBO/PARTIAL-LIN/wcsp/mprime/normalized-mprime04ac_wcsp
+pb07-opb/OPT-SMALLINT-LIN/submittedPB07/aksoy/area_opers/normalized-fir01_area_opers
+pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_200_10_2_15
+# medium: 11
+pb-comp/normalized-PB15eval/DEC-LIN/pbfvmc-formulae/hw128/normalized-hw128-vm25p-dec.opb.negationfix
+pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix
+pb-comp/normalized-PB24/DEC-LIN/nordstrom/CombinatorialBenchmarksPBsolvers/sumineq/sumineq_pyr_5_shuffle/normalized-sumineqArity5pyramidP055.shuf-3
+pb-comp-2025/normalized-PB25/DEC-LIN/koops/normalized-mat12_11_triangular
+pb-comp-2025/normalized-PB25/DEC-LIN/wallon/normalized-Hamming-20-10-03-08_c24
+pb-comp-2025/normalized-PB25/OPT-LIN/sakai/PB25-bnn-verification-20250419/instances/normalized-bnn_mnist_rot_16_label5_adversarial_norm_inf
+pb-comp-wbo/WBO/PARTIAL-LIN/PB06/submitted-PB06/namasivayam/tsp/normalized-t3002.11tsp11.1900670675--soft-33-100-0
+pb-comp-wbo/WBO/SOFT-LIN/PB06/submitted-PB06/namasivayam/tsp/normalized-t3002.11tsp11.1900551347--soft-0-100-0
+pb-comp-wbo/WBO/SOFT-LIN/PB10/oliveras/j30/normalized-j308_1-unsat--soft-0-100-0
 pb07-opb/OPT-SMALLINT-LIN/submittedPB07/poldner/PB/testset/normalized-10_20
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_100_25_2
 pb07-opb/OPT-SMALLINT-NLC/submittedPB07/manquinho/mds/normalized-mds_100_25_3
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=137-P1=127-P2=347-B
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=149-P1=191-P2=199-B
-pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=19-P1=337-P2=467-P3=53-B
-pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_500_60_5_15
-pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_50_25_2_15
 # hard: 1
-pb07-opb/SATUNSAT-SMALLINT-NLC/submittedPB07/manquinho/dbsg/normalized-dbsg_500_10_3_80
+pb07-opb/OPT-SMALLINT-NLC/submittedPB07/roussel/factor-mod-B/factor-mod-size=9-P0=251-P1=139-P2=89-P3=173-P4=107-B

@@ -171,12 +171,17 @@ class Portfolio(
         run.execute { claim ->
             val arm = claim.arm
             val worker = workers[arm]
-            val handle = run.handles[arm] ?: worker.newResumableSolve()?.also { run.handles[arm] = it }
+            val opening = run.handles[arm] == null
+            val setup = TimeSource.Monotonic.markNow()
+            val handle = run.handles[arm] ?: worker.newResumableSolve()?.also {
+                run.handles[arm] = it
+                run.log.initialized(arm, setup.elapsedNow().inWholeMilliseconds)
+            }
             val r: SolveResult?
             val failure: Throwable?
             val work: Long
             if (handle != null) {
-                val workBefore = handle.work
+                val workBefore = handle.work - if (opening) handle.initialWork else 0L
                 val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
                 val outcome = runCatching {
                     val millis = handleMillis(worker, run.token, claim)
@@ -317,12 +322,17 @@ class Portfolio(
             val arm = claim.arm
             val worker = workers[arm]
             claim.hadIncumbent = incumbent.current() != null
-            val handle = run.handles[arm] ?: worker.newResumableSearch(readBound)?.also { run.handles[arm] = it }
+            val opening = run.handles[arm] == null
+            val setup = TimeSource.Monotonic.markNow()
+            val handle = run.handles[arm] ?: worker.newResumableSearch(readBound)?.also {
+                run.handles[arm] = it
+                run.log.initialized(arm, setup.elapsedNow().inWholeMilliseconds)
+            }
             var terminal: MinimizeResult? = null
             val failure: Throwable?
             val work: Long
             if (handle != null) {
-                val workBefore = handle.work
+                val workBefore = handle.work - if (opening) handle.initialWork else 0L
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
                     handle.runSlice(run.token, handleMillis(worker, run.token, claim), claim.handleNodes) {
@@ -443,7 +453,7 @@ class Portfolio(
         val token: Cancellation = cancellation.alsoStoppedBy(stopped)
         val ledger = RewardLedger(workers.size) { arm, signal -> signal.earnableBy(workers[arm]) }
         private val progress = ProgressCredit(workers.size)
-        private val log = ScheduleLog(workers)
+        val log = ScheduleLog(workers)
 
         // A handle's counters are cumulative, so its entry is replaced; a fresh segment's are merged.
         private val perArm = arrayOfNulls<SolveStats>(workers.size)

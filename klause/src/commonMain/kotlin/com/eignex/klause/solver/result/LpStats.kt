@@ -516,6 +516,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var rootPasses = 0L
     private var standalonePivots = 0L
     private var standaloneWorkOps = 0L
+
+    internal val standaloneWork: Long get() = standaloneWorkOps
     private var componentPivots = 0L
     private var componentWorkOps = 0L
     private var rootPivots = 0L

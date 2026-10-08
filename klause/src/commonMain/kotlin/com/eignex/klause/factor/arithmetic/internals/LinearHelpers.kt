@@ -64,12 +64,14 @@ internal fun collectHoleAndBoundAntecedents(
     }
     var anyAboveRoot = false
     for (v in vars) {
+        state.work++
         if (state.intLevel[v] > 0) {
             anyAboveRoot = true
             break
         }
     }
     for (v in vars) {
+        state.work++
         if (anyAboveRoot && state.intLevel[v] <= 0) continue
         val d = state.intDomains[v]
         val orig = state.rootDomains[v]
@@ -139,6 +141,7 @@ internal fun collectLinearDirAntecedents(
     }
     var anyAboveRoot = false
     for (j in vars.indices) {
+        state.work++
         if (j == excludeIdx) continue
         if (state.intLevel[vars[j]] > 0) {
             anyAboveRoot = true
@@ -146,6 +149,7 @@ internal fun collectLinearDirAntecedents(
         }
     }
     for (j in vars.indices) {
+        state.work++
         if (j == excludeIdx) continue
         val c = coeffs[j]
         if (c == 0L) continue
@@ -199,6 +203,7 @@ internal fun collectLinearLiftedAntecedents(
     val lift = BooleanArray(n)
     val aboveRoot = BooleanArray(n)
     for (j in 0 until n) {
+        state.work++
         val v = vars[j]
         val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
         val d = state.intDomains[v]
@@ -247,6 +252,7 @@ internal fun explainLinearBound(
     val decisions = state.levelToDecisionVar
     val numBools = state.problem.numBoolVars
     for (j in 0 until n) {
+        state.work++
         if (j == excludeIdx || coeffs[j] == 0L) continue
         val v = vars[j]
         val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
@@ -323,6 +329,7 @@ private fun liftedAntecedents(
 ): IntArray? {
     var anyAboveRoot = false
     for (j in vars.indices) {
+        state.work++
         if (j != excludeIdx && aboveRoot[j]) {
             anyAboveRoot = true
             break
@@ -330,6 +337,7 @@ private fun liftedAntecedents(
     }
     val cited = IntArrayList()
     for (j in vars.indices) {
+        state.work++
         if (j == excludeIdx) continue
         val c = coeffs[j]
         if (c == 0L) continue
@@ -350,6 +358,7 @@ private fun liftedAntecedents(
     }
     var remaining = slack
     for (k in order) {
+        state.work++
         val j = cited[k]
         val c = coeffs[j]
         val v = vars[j]
@@ -395,6 +404,7 @@ internal fun collectLinearTightenAntecedents(
     }
     var anyAboveRoot = false
     for (j in vars.indices) {
+        state.work++
         if (j == excludeIdx) continue
         if (state.intLevel[vars[j]] > 0) {
             anyAboveRoot = true
@@ -402,6 +412,7 @@ internal fun collectLinearTightenAntecedents(
         }
     }
     for (j in vars.indices) {
+        state.work++
         if (j == excludeIdx) continue
         val v = vars[j]
         if (anyAboveRoot && state.intLevel[v] <= 0) continue
@@ -436,6 +447,7 @@ private fun linearFeasible128(
     val lo = Int128()
     val hi = Int128()
     for (i in vars.indices) {
+        state.work++
         val d = state.intDomains[vars[i]]
         val c = coeffs[i]
         if (c >= 0L) {
@@ -523,6 +535,7 @@ internal fun propagateLinearBounds(
     var loOverflow = false
     var hiOverflow = false
     for (i in 0 until n) {
+        state.work++
         val d = state.intDomains[vars[i]]
         val c = coeffs[i]
         if (mulOverflows(c, d.min) || mulOverflows(c, d.max)) {
@@ -558,6 +571,7 @@ internal fun propagateLinearBounds(
     if (op == LinearOp.NE) {
         if (loOverflow || hiOverflow) return true
         for (i in 0 until n) {
+            state.work++
             val c = coeffs[i]
             if (c == 0L) continue
             val v = vars[i]
@@ -607,6 +621,7 @@ internal fun propagateLinearBounds(
     fun loReason(i: Int, budget: Long) = reason(i, useLo = true, budget)
     fun hiReason(i: Int, budget: Long) = reason(i, useLo = false, budget)
     for (i in 0 until n) {
+        state.work++
         val c = coeffs[i]
         if (c == 0L) continue
         val v = vars[i]
@@ -650,6 +665,7 @@ internal fun linearSumRange(state: PropagationState, coeffs: LongArray, vars: In
     var lo = 0L
     var hi = 0L
     for (i in vars.indices) {
+        state.work++
         val d = state.intDomains[vars[i]]
         val c = coeffs[i]
         // A wrapped product or sum weakens the range to the full Long interval: consumers treat the

@@ -2,6 +2,7 @@ package com.eignex.klause.solver.integration
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.LP_WORK_PER_NODE
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -165,5 +166,70 @@ class ResumableNodeSliceTest {
         }
 
         assertTrue(idle > 0, "every one-node slice explored a node")
+    }
+
+    @Test
+    fun `propagation charged slices preserve the optimum and decision count`() {
+        val whole = handle()
+        val expected = whole.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        val search = handle()
+        var terminal: MinimizeResult? = null
+        var slices = 0
+
+        while (terminal == null && slices++ < 1_000) {
+            terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+        }
+
+        assertEquals(
+            assertIs<MinimizeResult.Optimal>(expected).objective,
+            assertIs<MinimizeResult.Optimal>(terminal).objective,
+        )
+        assertEquals(whole.stats.search.nodes, search.stats.search.nodes)
+        assertEquals(whole.stats.search.propagationWork, search.stats.search.propagationWork)
+        assertTrue(search.stats.search.propagationWork.sum > 0.0)
+    }
+
+    @Test
+    fun `leaf LP completions spend work even without a node LP arm`() {
+        val reals = 20
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1)),
+            numRealVars = reals,
+            realLower = DoubleArray(reals),
+            realUpper = DoubleArray(reals) { 2.0 },
+            factors = Array<Factor>(reals) { v ->
+                Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(v), LinearOp.GE, 1L)
+            },
+        ).bake()
+        val search = BacktrackSolver(problem).resumable(
+            LinearObjective(realCoefficients = DoubleArray(reals) { 1.0 }),
+            BacktrackParams(randomSeed = 0L),
+        )
+
+        search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+        val leafWork = search.stats.lp.standaloneWorkOps.sum.toLong() / LP_WORK_PER_NODE
+
+        assertTrue(leafWork > 0L)
+        assertTrue(search.work >= search.stats.search.nodes.sum.toLong() + leafWork)
+    }
+
+    @Test
+    fun `a constructor refutation returns when root work consumes the slice`() {
+        val variables = 5_000
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = variables,
+            intDomains = Array(variables) { IntDomain(0, 1) },
+            factors = arrayOf<Factor>(
+                Linear(LongArray(variables) { 1L }, IntArray(variables) { it }, LinearOp.GE, variables + 1L),
+            ),
+        ).bake()
+        val search = BacktrackSolver(problem).resumable(LinearObjective(), BacktrackParams(randomSeed = 0L))
+
+        val verdict = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+
+        assertIs<MinimizeResult.Infeasible>(verdict)
     }
 }

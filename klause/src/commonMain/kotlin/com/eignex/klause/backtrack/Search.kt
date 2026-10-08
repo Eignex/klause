@@ -123,7 +123,7 @@ internal fun BacktrackSolver.driveSearch(
  * How a pausable [CpSatisfactionTraversal] meets its slice boundary: whether a fired cancellation is the slice
  * ending rather than the run, and the hook each node runs before it branches.
  */
-internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () -> Unit)
+internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () -> Boolean)
 
 /**
  * Satisfaction path for a CP/theory search, advanced one outcome at a time.
@@ -138,7 +138,7 @@ internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () ->
 internal class CpSatisfactionTraversal(
     private val problem: BakedProblem,
     params: BacktrackParams,
-    sink: SolveStatsSink?,
+    private val sink: SolveStatsSink?,
     solveContext: LpSolveContext,
     propagationCancellation: Cancellation = params.cancellation,
     private val slice: TraversalSlice? = null,
@@ -153,7 +153,15 @@ internal class CpSatisfactionTraversal(
             pbLearning = params.pbLearning ?: true,
         ),
         branching = CpBranching.None,
-    ).also { it.conflictStats = sink?.ca }
+    ).also {
+        it.conflictStats = sink?.ca
+        sink?.search?.let { search ->
+            search.propagationWork = { it.session.work }
+            search.rootPropagationWork = { it.session.rootWork }
+            search.propagationNanos = { it.session.propagationNanos }
+            search.rootPropagationNanos = { it.session.rootPropagationNanos }
+        }
+    }
     private val traversal = CpSatisfactionTraversalPolicy(
         cp.session,
         params,
@@ -166,6 +174,7 @@ internal class CpSatisfactionTraversal(
 
     // The verdict the root reached before any search, handed out by the first [next].
     private var rootOutcome: SearchOutcome? = null
+    val hasRootOutcome: Boolean get() = rootOutcome != null
     private var closed = false
 
     init {
@@ -219,7 +228,9 @@ internal class CpSatisfactionTraversal(
     fun rootFixedVariableCount(): Int = cp.session.rootFixedVariableCount()
 
     /** LP work the traversal's relaxations have done, for a slice that charges it against its budget. */
-    fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() }
+    fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() } + (sink?.lp?.standaloneWork ?: 0L)
+
+    fun propagationWork(): Long = cp.session.work
 
     /**
      * Advance to the next outcome, or null when a pausable traversal reached its slice boundary with search still
@@ -343,12 +354,11 @@ private class CpSatisfactionTraversalPolicy(
     override val observer: SearchRunObserver = brancher
     override val modelContinuation = SearchModelContinuation.BlockAtRoot
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
+    override val pauseBeforeDecision: () -> Boolean = slice?.beforeBranch ?: { false }
     override val nodePolicy: SearchNodePolicy = slice?.let { s ->
         object : SearchNodePolicy {
-            override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
-                s.beforeBranch()
-                return SearchNodeDisposition.Expand
-            }
+            override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                if (s.beforeBranch()) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
         }
     } ?: SearchNodePolicy.ExpandAll
     override val lifecycle: SearchRunLifecycle get() = this
