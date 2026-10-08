@@ -4146,7 +4146,8 @@ public final class com/eignex/klause/localsearch/movesource/Frontier$Companion {
 
 public final class com/eignex/klause/localsearch/movesource/GreedyInit {
 	public fun <init> ()V
-	public final fun run (Lcom/eignex/klause/localsearch/LocalSearchState;)V
+	public final fun run (Lcom/eignex/klause/localsearch/LocalSearchState;Lkotlin/jvm/functions/Function0;)V
+	public static synthetic fun run$default (Lcom/eignex/klause/localsearch/movesource/GreedyInit;Lcom/eignex/klause/localsearch/LocalSearchState;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
 }
 
 public abstract interface class com/eignex/klause/localsearch/movesource/MoveSource {

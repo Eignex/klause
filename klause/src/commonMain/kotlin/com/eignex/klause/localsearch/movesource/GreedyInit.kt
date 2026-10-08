@@ -15,12 +15,12 @@ import com.eignex.klause.localsearch.Move
  * sink. The satisfy and optimize restart paths share it.
  *
  * The point isn't to reach feasibility (the LS strategies handle that) but to start the search from
- * a low-violation pose.
+ * a low-violation pose, so a pass stopped early leaves a valid, partly repaired start.
  */
 class GreedyInit {
 
-    /** Run one greedy-repair pass over [state], mutating its assignment in place. */
-    fun run(state: LocalSearchState) {
+    /** Run one greedy-repair pass over [state], mutating its assignment in place, until [stop] says to end it. */
+    fun run(state: LocalSearchState, stop: () -> Boolean = { false }) {
         val problem = state.problem
         val varCount = problem.numBoolVars + problem.numIntVars
         if (varCount == 0) return
@@ -32,7 +32,9 @@ class GreedyInit {
             order[i] = order[j]
             order[j] = tmp
         }
-        for (v in order) {
+        for ((visited, v) in order.withIndex()) {
+            // The pass runs inside one segment of a scheduled arm, so it answers that segment's deadline too.
+            if (visited and STOP_POLL_MASK == 0 && stop()) return
             if (v < problem.numBoolVars) {
                 val boolId = v
                 if (state.assumptions.isFrozenBool(boolId)) continue
@@ -79,5 +81,10 @@ class GreedyInit {
         // Reset tabu / activity tracking so the repair pass's apply-then-revert churn doesn't leave
         // the main loop with every var freshly blocked.
         state.resetStepCounters()
+    }
+
+    private companion object {
+        // Variables visited between two polls of the stop check.
+        const val STOP_POLL_MASK = 255
     }
 }

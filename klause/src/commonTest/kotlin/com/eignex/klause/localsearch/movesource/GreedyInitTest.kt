@@ -42,4 +42,13 @@ class GreedyInitTest {
         assertEquals(a.assignment.intValue(0), b.assignment.intValue(0))
         assertEquals(a.assignment.intValue(1), b.assignment.intValue(1))
     }
+
+    @Test
+    fun `a pass told to stop leaves the assignment as it was`() {
+        val state = freshState(problem(), 7L)
+
+        GreedyInit().run(state) { true }
+
+        assertEquals(listOf(0L, 0L), listOf(state.assignment.intValue(0), state.assignment.intValue(1)))
+    }
 }

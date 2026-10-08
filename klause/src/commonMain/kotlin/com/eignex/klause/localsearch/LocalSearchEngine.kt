@@ -603,7 +603,7 @@ internal class LocalSearchEngine(
                         sink.ls,
                     ) { work -> totalFlips += work }
                     if (decided !is Completion.Witness) {
-                        restartAndRepair(state, restartAnchor(null))
+                        restartAndRepair(state, restartAnchor(null), params)
                         restartCount++
                         flipsSinceRestart = 0
                         totalFlips++
@@ -640,7 +640,7 @@ internal class LocalSearchEngine(
                             continue
                         }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restartAndRepair(state, restartAnchor(null))
+                        restartAndRepair(state, restartAnchor(null), params)
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -676,7 +676,7 @@ internal class LocalSearchEngine(
                         }
                         feasibleMisses = 0
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restartAndRepair(state, restartAnchor(null))
+                        restartAndRepair(state, restartAnchor(null), params)
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -686,7 +686,7 @@ internal class LocalSearchEngine(
                 }
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
-                restartAndRepair(state, restartAnchor(bestCostSnap))
+                restartAndRepair(state, restartAnchor(bestCostSnap), params)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -698,7 +698,7 @@ internal class LocalSearchEngine(
             val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restartAndRepair(state, restartAnchor(bestCostSnap))
+                restartAndRepair(state, restartAnchor(bestCostSnap), params)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -788,7 +788,7 @@ internal class LocalSearchEngine(
         // already feasible, and the repair sweep is objective-blind (it accepts any flip that doesn't
         // raise cost), so on a cost-0 seed it would wander across equal-cost feasibles and discard the
         // seed's objective — defeating the warm start.
-        if (greedyRepairOnRestart && isLargeEnoughForGreedy() && !seeded) greedyRepairPass(state)
+        if (greedyRepairOnRestart && isLargeEnoughForGreedy() && !seeded) greedyRepairPass(state, params)
         return state
     }
 
@@ -851,9 +851,9 @@ internal class LocalSearchEngine(
 
     /** Restart [state] from [anchor] and re-run the greedy repair sweep under the same size gate as
      *  the initial restart — the pairing every minimize restart site must preserve. */
-    private fun restartAndRepair(state: LocalSearchState, anchor: Sample?) {
+    private fun restartAndRepair(state: LocalSearchState, anchor: Sample?, params: LocalSearchParams) {
         restarts.restart(state, anchor)
-        if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state)
+        if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params)
     }
 
     /** True when the problem is big enough that the post-restart greedy-repair sweep pays for
@@ -887,7 +887,8 @@ internal class LocalSearchEngine(
      * The point isn't to reach feasibility (LS strategies handle that) but to start from a
      * low-violation pose so the feasibility-fight phase has fewer hard constraints to chase.
      */
-    private fun greedyRepairPass(state: LocalSearchState) = greedyInit.run(state)
+    private fun greedyRepairPass(state: LocalSearchState, params: LocalSearchParams) =
+        greedyInit.run(state) { params.cancellation() }
 
     /** Undo [move] on [state] so it matches [baselineSnap] again. BoolFlip self-inverts;
      *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */
