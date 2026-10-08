@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.solver.ProblemClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -23,8 +24,8 @@ class PortfolioCompositionTest {
         for (kind in Kind.entries) {
             val scenario = PortfolioScenario.sequential(kind, engine = EngineMix.BACKTRACK, arms = 6)
 
-            val backtrack = PortfolioComposition.compose(scenario, ProblemFacts.assumed(kind, realColumns = true))
-                .filterIsInstance<BacktrackWorkerConfig>()
+            val facts = ProblemFacts.assumed(kind, ProblemClass.MixedInteger)
+            val backtrack = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
 
             assertEquals(
                 listOf("satOptimized", "conflictDriven", "lp-default"),
@@ -46,7 +47,7 @@ class PortfolioCompositionTest {
     @Test
     fun `a model with nothing to relax builds no LP arm and keeps the pool full`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 6)
-        val facts = ProblemFacts(optimizing = true, realColumns = false, relaxation = { false })
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, relaxation = { false })
 
         val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
 
@@ -58,7 +59,7 @@ class PortfolioCompositionTest {
     fun `an edited curated pool still builds no LP arm on a model with nothing to relax`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 6)
             .copy(btEdit = { it.copy(lubyRestartBase = 7L) })
-        val facts = ProblemFacts(optimizing = true, realColumns = false, relaxation = { false })
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, relaxation = { false })
 
         val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
 
@@ -79,7 +80,7 @@ class PortfolioCompositionTest {
     fun `an injected backtrack pool is built as asked whatever the model offers`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 2)
             .copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") })
-        val facts = ProblemFacts(optimizing = true, realColumns = false, relaxation = { false })
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, relaxation = { false })
 
         val labels = PortfolioComposition.compose(scenario, facts).map { it.label }
 

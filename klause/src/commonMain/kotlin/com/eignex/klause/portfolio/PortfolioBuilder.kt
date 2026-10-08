@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -31,6 +32,8 @@ object PortfolioBuilder {
      * [definitionalSweep] is threaded into every LS worker (per-move invariants). [onEvent]
      * threads the [SearchEvent] seam through to every worker tagged with its label; workers run
      * concurrently under a parallel `Portfolio`, so the listener must be thread-safe and cheap.
+     *
+     * [profile] classifies [problem]; the arms each family gets are the ones its class calls for.
      */
     fun build(
         problem: BakedProblem,
@@ -39,8 +42,9 @@ object PortfolioBuilder {
         lsObjective: IncrementalObjective? = null,
         definitionalSweep: DefinitionalSweep? = null,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
+        profile: ProblemProfile = ProblemProfile.of(problem, scenario.kind == Kind.COP),
     ): List<PortfolioWorker> {
-        val facts = ProblemFacts.of(problem, scenario.kind, scenario.lpCeiling)
+        val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling)
         val composed = PortfolioComposition.compose(scenario, facts)
         // Expand the composed arms to one entry per lane. A lane is a worker slot; a parallel track
         // wants one per core, the sequential track one per arm — so laneCount is maxOf(arms, cores).

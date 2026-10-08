@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ProblemProfile
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -26,7 +27,8 @@ class ArmNeedsTest {
 
     @Test
     fun `a linear row offers a relaxation`() {
-        val facts = ProblemFacts.of(linearModel(), Kind.COP, LpConfig.AGGRESSIVE)
+        val model = linearModel()
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, optimizing = true), LpConfig.AGGRESSIVE)
 
         assertTrue(facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)))
     }
@@ -40,14 +42,15 @@ class ArmNeedsTest {
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         ).bake()
 
-        val facts = ProblemFacts.of(problem, Kind.CSP, LpConfig.AGGRESSIVE)
+        val facts = ProblemFacts.of(problem, ProblemProfile.of(problem, optimizing = false), LpConfig.AGGRESSIVE)
 
         assertFalse(facts.offers(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE)))
     }
 
     @Test
     fun `an lp ceiling of off leaves nothing to relax`() {
-        val facts = ProblemFacts.of(linearModel(), Kind.COP, LpConfig(LpEmphasis.OFF))
+        val model = linearModel()
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, optimizing = true), LpConfig(LpEmphasis.OFF))
 
         assertFalse(facts.offers(ArmNeed.Relaxation(LpEmphasis.DEFAULT)))
     }

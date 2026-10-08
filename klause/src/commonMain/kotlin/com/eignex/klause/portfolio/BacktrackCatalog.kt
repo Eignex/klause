@@ -223,7 +223,7 @@ object BacktrackCatalog {
 
     /** One fresh recipe for every arm of [kind] the model behind [facts] offers the needs of, in credit order. */
     internal fun ranked(kind: Kind, facts: ProblemFacts): List<BacktrackRecipe> =
-        catalog.ranked(rankedArms(kind, facts.realColumns).filter { facts.offersAll(it.needs) })
+        catalog.ranked(rankedArms(kind, facts.profile.realColumns).filter { facts.offersAll(it.needs) })
 
     /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
      *  shape a campaign or the CLI feeds to `PortfolioScenario.btPool`). */

@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.isClausal
 
 /**
  * Flat, arena-packed store of the clauses of a pure-Boolean (native-SAT) problem. Every clause
@@ -45,12 +46,7 @@ internal class ClauseArena private constructor(
     companion object {
         /** Pack [problem]'s clauses into a flat arena. Requires a native-SAT-eligible problem. */
         fun of(problem: Problem): ClauseArena {
-            require(
-                problem.numIntVars == 0 &&
-                    problem.numBoolVars > 0 &&
-                    problem.factors.isNotEmpty() &&
-                    problem.factors.all { it is Clause },
-            ) {
+            require(problem.isClausal()) {
                 "ClauseArena requires a pure-Boolean clause-only problem"
             }
             val factors = problem.factors
