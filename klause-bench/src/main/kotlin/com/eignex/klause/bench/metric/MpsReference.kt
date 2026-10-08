@@ -31,8 +31,14 @@ internal object MpsReference {
         } else {
             val infeasible = claim.status == MpsWitness.Status.INFEASIBLE
             MpsWitness.Verdict(
-                if (infeasible) false else null, null, infeasible, null,
-                mapOf("claimedStatus" to claim.status.name.lowercase(), "validation" to "unresolved: the model did not parse"),
+                if (infeasible) false else null,
+                null,
+                infeasible,
+                null,
+                mapOf(
+                    "claimedStatus" to claim.status.name.lowercase(),
+                    "validation" to "unresolved: the model did not parse",
+                ),
             )
         }
 
@@ -43,51 +49,68 @@ internal object MpsReference {
         identity: String,
         options: String,
     ): SolverInvocation.Result {
-        val witnesses = attempts.filter { it.verdict.feasible == true && it.verdict.objective != null }
-        val best = witnesses.reduceOrNull { a, b -> if (better(b.verdict.objective!!, a.verdict.objective!!, maximize)) b else a }
+        val witnesses = attempts.mapNotNull { a ->
+            a.verdict.objective?.takeIf { a.verdict.feasible == true }?.let { a to it }
+        }
+        val best = witnesses.reduceOrNull { a, b -> if (better(b.second, a.second, maximize)) b else a }
         val infeasible = attempts.filter { it.claim.status == MpsWitness.Status.INFEASIBLE }
-        val refuting = infeasible.takeIf { best != null }.orEmpty()
         // A solver that claims a solution in one run and infeasibility in another contradicts itself: even when the
         // solution fails the check, its infeasibility is not a proof to rely on.
-        val claimingSolution = attempts.filter { it.claim.status != MpsWitness.Status.INFEASIBLE && (it.claim.assignment != null || it.claim.status == MpsWitness.Status.OPTIMAL) }
+        val claimingSolution = attempts.filter { it !in infeasible && claimsSolution(it.claim) }
         val contradicted = best == null && infeasible.isNotEmpty() && claimingSolution.isNotEmpty()
-        val chosen = best ?: infeasible.firstOrNull()?.takeUnless { contradicted } ?: attempts.last { it.claim.status != MpsWitness.Status.INFEASIBLE }
-        val beaten = best != null && best.verdict.proven &&
-            witnesses.any { better(it.verdict.objective!!, best.verdict.objective!!, maximize) }
-        val proven = chosen.verdict.proven && !beaten
-        val totalMs = attempts.sumOf { it.elapsedMs }
-        val firstFeasibleMs = best?.let { attempts.takeWhile { a -> a !== best }.sumOf { a -> a.elapsedMs } + best.elapsedMs }
+        val chosen = best?.first
+            ?: infeasible.firstOrNull()?.takeUnless { contradicted }
+            ?: attempts.last { it !in infeasible }
+        val beaten = best != null && best.first.verdict.proven &&
+            witnesses.any { better(it.second, best.second, maximize) }
         val stats = LinkedHashMap<String, String>()
-        stats["solveTime"] = (totalMs / MS_PER_SEC).toString()
+        stats["solveTime"] = (attempts.sumOf { it.elapsedMs } / MS_PER_SEC).toString()
         stats["maximize"] = maximize.toString()
         stats["referenceVersion"] = identity
         stats["options"] = options
         stats += chosen.reported
         stats += chosen.verdict.stats
         stats["attempt"] = chosen.label
-        stats["attempts"] = attempts.joinToString("; ") { a -> "${a.label}: ${a.verdict.stats["claimedStatus"]}, ${a.verdict.stats["validation"]}" }
-        if (refuting.isNotEmpty()) {
-            stats["refuted"] = "${refuting.joinToString { it.label }} claimed infeasible; ${best!!.label} found a checked solution"
+        stats["attempts"] = attempts.joinToString("; ") { a ->
+            "${a.label}: ${a.verdict.stats["claimedStatus"]}, ${a.verdict.stats["validation"]}"
+        }
+        if (best != null && infeasible.isNotEmpty()) {
+            stats["refuted"] = "${labels(infeasible)} claimed infeasible; ${best.first.label} found a checked solution"
         }
         if (contradicted) {
-            stats["contradicted"] = "${infeasible.joinToString { it.label }} claimed infeasible; ${claimingSolution.joinToString { it.label }} claimed a solution"
+            val claimants = labels(claimingSolution)
+            stats["contradicted"] = "${labels(infeasible)} claimed infeasible; $claimants claimed a solution"
         }
         if (beaten) stats["proof"] = "rejected: another attempt found a better checked solution"
-        val outcome = chosen.verdict.outcome
+        val firstFeasibleMs = best?.let { (found, _) ->
+            attempts.takeWhile { it !== found }.sumOf { it.elapsedMs } + found.elapsedMs
+        }
         return SolverInvocation.Result(
             feasible = chosen.verdict.feasible,
             objective = chosen.verdict.objective,
             timeToBestMs = firstFeasibleMs,
             timeToFirstFeasibleMs = firstFeasibleMs,
-            proven = proven,
+            proven = chosen.verdict.proven && !beaten,
             stats = stats,
             rawOutput = attempts.joinToString("\n") { "### ${it.label}: ${it.command}\n${it.stdout}" },
             command = attempts.joinToString(" ; ") { it.command },
-            assignment = when {
-                outcome is MpsWitness.Outcome.Valid && model != null -> MpsWitness.assignmentText(model, outcome.values)
-                else -> chosen.claim.assignment?.entries?.joinToString("\n", postfix = "\n") { "${it.key} ${it.value}" }
-            },
+            assignment = assignment(chosen, model),
         )
+    }
+
+    private fun claimsSolution(claim: MpsWitness.Claim) =
+        claim.assignment != null || claim.status == MpsWitness.Status.OPTIMAL
+
+    private fun labels(attempts: List<MpsAttempt>) = attempts.joinToString { it.label }
+
+    /** The checked solution as `name value` lines, or the one the solver claimed when it did not check. */
+    private fun assignment(chosen: MpsAttempt, model: MpsModel?): String? {
+        val outcome = chosen.verdict.outcome
+        return if (outcome is MpsWitness.Outcome.Valid && model != null) {
+            MpsWitness.assignmentText(model, outcome.values)
+        } else {
+            chosen.claim.assignment?.entries?.joinToString("\n", postfix = "\n") { "${it.key} ${it.value}" }
+        }
     }
 
     /** Whether [x] is a better objective than [than] beyond the checker's tolerance. */

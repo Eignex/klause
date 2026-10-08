@@ -73,7 +73,14 @@ internal object ScipReference {
     /** The image a result came from, by id, so a rebuilt SCIP never replays an older build's results. */
     private val image: String by lazy {
         runCatching {
-            val p = ProcessBuilder("docker", "image", "inspect", "--format", "{{.Id}}", IMAGE).redirectErrorStream(true).start()
+            val p = ProcessBuilder(
+                "docker",
+                "image",
+                "inspect",
+                "--format",
+                "{{.Id}}",
+                IMAGE,
+            ).redirectErrorStream(true).start()
             val id = p.inputStream.bufferedReader().readText().trim()
             p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS)
             id.takeIf { p.exitValue() == 0 }
@@ -81,7 +88,7 @@ internal object ScipReference {
     }
 
     /** What a cached result depends on: the image, the options and the validation rules. */
-    fun identity(): String = "$IMAGE@$image|$OPTIONS|${MpsWitness.VERSION}"
+    fun identity(build: String = image): String = "$IMAGE@$build|$OPTIONS|${MpsWitness.VERSION}"
 
     /** Solve [ref] (an MPS instance) with SCIP under [budget], single-threaded. The instance is piped on
      *  stdin and read as MPS; SCIP's objective sense (from the model's `OBJSENSE`) orients the reported
@@ -165,7 +172,13 @@ internal object ScipReference {
             command = cmd.joinToString(" "),
             claim = claim,
             verdict = MpsReference.judge(model, claim, HighsReference.repair.takeIf { HighsReference.available() }),
-            reported = lines(stdout).lastOrNull { it.startsWith("SCIP Status") }?.let { mapOf("solverStatus" to it.substringAfter(':').trim()) }.orEmpty(),
+            reported = lines(
+                stdout,
+            ).lastOrNull {
+                it.startsWith(
+                    "SCIP Status",
+                )
+            }?.let { mapOf("solverStatus" to it.substringAfter(':').trim()) }.orEmpty(),
         )
         return MpsReference.result(listOf(attempt), model, maximize, identity(), OPTIONS)
     }
@@ -184,8 +197,9 @@ internal object ScipReference {
         val assignment = if (start < 0) {
             null
         } else {
-            lines.drop(start + 1).takeWhile { SOLUTION_LINE.matches(it) }.associate { line ->
-                val (name, value) = SOLUTION_LINE.matchEntire(line)!!.destructured
+            val values = lines.drop(start + 1).map { SOLUTION_LINE.matchEntire(it) }.takeWhile { it != null }
+            values.filterNotNull().associate { match ->
+                val (name, value) = match.destructured
                 name to value.toDouble()
             }
         }

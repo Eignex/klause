@@ -60,7 +60,8 @@ internal data class ReferenceEntry(
  * written. Merges are **virtual-best**: a proven optimum always wins, and among unproven bounds the tighter
  * objective (lower for minimize, higher for maximize) wins, so references only ever tighten and unproven bounds
  * stay honest. A row produced another way ([ReferenceEntry.version]) replaces a solver's own row whatever their
- * strengths: a proof the old way judged wrongly must not outlive its correction. Regenerable and incremental via `bench reference`.
+ * strengths: a proof the old way judged wrongly must not outlive its correction. Regenerable and incremental via
+ * `bench reference`.
  */
 internal object ReferenceStore {
     // No `solver` column: each row's solver is the file it lives in (`<solver>.csv` for a reference

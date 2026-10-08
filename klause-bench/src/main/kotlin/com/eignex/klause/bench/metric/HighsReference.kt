@@ -35,12 +35,17 @@ internal object HighsReference {
 
     /** The build, as `highs --version` prints it. */
     private val version: String by lazy {
-        runCatching { NativeReference.exec(listOf(BINARY, "--version"), VERSION_WAIT_MS).first.lineSequence().first().trim() }
+        runCatching {
+            NativeReference.exec(
+                listOf(BINARY, "--version"),
+                VERSION_WAIT_MS,
+            ).first.lineSequence().first().trim()
+        }
             .getOrDefault("").ifEmpty { "unknown" }
     }
 
     /** What a cached result depends on: the build, the options, the retry and the validation rules. */
-    fun identity(): String = "$version|${options()}|retry=presolve-off|${MpsWitness.VERSION}"
+    fun identity(build: String = version): String = "$build|${options()}|retry=presolve-off|${MpsWitness.VERSION}"
 
     private fun options() = OPTIONS.entries.joinToString(",") { "${it.key}=${it.value}" }
 
@@ -50,7 +55,12 @@ internal object HighsReference {
             val maximize = model?.sense == ObjectiveDirection.MAXIMIZE
             val attempts = mutableListOf(attempt(file, model, budget.timeoutMillis, presolve = null))
             val left = budget.timeoutMillis - attempts.first().elapsedMs
-            if (doubtful(attempts.first()) && left >= MIN_RETRY_MS) attempts += attempt(file, model, left, presolve = "off")
+            if (doubtful(
+                    attempts.first(),
+                ) && left >= MIN_RETRY_MS
+            ) {
+                attempts += attempt(file, model, left, presolve = "off")
+            }
             MpsReference.result(attempts, model, maximize, identity(), options())
         }
 
@@ -67,7 +77,10 @@ internal object HighsReference {
         try {
             val solution = File(dir, "solution.sol")
             val options = File(dir, "options.txt")
-            val settings = OPTIONS + listOfNotNull("log_file" to File(dir, "highs.log").absolutePath, presolve?.let { "presolve" to it })
+            val settings = OPTIONS + listOfNotNull(
+                "log_file" to File(dir, "highs.log").absolutePath,
+                presolve?.let { "presolve" to it },
+            )
             options.writeText(settings.entries.joinToString("\n", postfix = "\n") { "${it.key} = ${it.value}" })
             val cmd = listOf(
                 BINARY,
@@ -93,7 +106,7 @@ internal object HighsReference {
         }
     }
 
-    /** The continuous repair [MpsWitness] asks for: HiGHS on the fixed-integer LP, its status and solution read back. */
+    /** The continuous repair [MpsWitness] asks for: HiGHS on the fixed-integer LP, its solution read back. */
     val repair = MpsWitness.Repair { lp ->
         if (!available()) return@Repair MpsWitness.RepairResult.Failed("highs is not available")
         val dir = Files.createTempDirectory("klause-highs-repair").toFile()
@@ -101,16 +114,24 @@ internal object HighsReference {
             val model = File(dir, "fixed.mps").apply { writeText(lp) }
             val solution = File(dir, "solution.sol")
             // Tighter than the check, so the completion it returns passes the check on its own numbers.
-            val options = File(dir, "options.txt").apply { writeText(REPAIR_OPTIONS + "log_file = ${File(dir, "highs.log").absolutePath}\n") }
+            val options = File(dir, "options.txt")
+            options.writeText(REPAIR_OPTIONS + "log_file = ${File(dir, "highs.log").absolutePath}\n")
             val cmd = listOf(
-                BINARY, "--model_file", model.absolutePath, "--options_file", options.absolutePath, "--solution_file", solution.absolutePath,
+                BINARY,
+                "--model_file", model.absolutePath,
+                "--options_file", options.absolutePath,
+                "--solution_file", solution.absolutePath,
                 "--time_limit", "${REPAIR_TIMEOUT_MS / MS_PER_SEC}", "--parallel", "off",
             )
             val (stdout, _) = NativeReference.exec(cmd, REPAIR_TIMEOUT_MS)
             val claim = parseClaim(stdout, solution.takeIf { it.isFile }?.readText())
             when {
                 claim.status == MpsWitness.Status.INFEASIBLE -> MpsWitness.RepairResult.Infeasible
-                claim.status == MpsWitness.Status.OPTIMAL && claim.assignment != null -> MpsWitness.RepairResult.Solved(claim.assignment)
+
+                claim.status == MpsWitness.Status.OPTIMAL && claim.assignment != null -> MpsWitness.RepairResult.Solved(
+                    claim.assignment,
+                )
+
                 else -> MpsWitness.RepairResult.Failed("highs ended ${status(stdout) ?: "without a status"}")
             }
         } finally {
@@ -120,8 +141,8 @@ internal object HighsReference {
 
     /**
      * A MIP's summary has `Status <status>`, `Primal bound`, `Dual bound` and `Gap`; an LP's has `Model status :
-     * <status>` and `Objective value :`, an optimal LP's objective being its own dual bound. The solution comes from the
-     * solution file's `# Columns` section, absent when HiGHS wrote none.
+     * <status>` and `Objective value :`, an optimal LP's objective being its own dual bound. The solution comes from
+     * the solution file's `# Columns` section, absent when HiGHS wrote none.
      */
     internal fun parseClaim(stdout: String, solution: String?): MpsWitness.Claim {
         val lines = stdout.lineSequence().map { it.trim() }.toList()

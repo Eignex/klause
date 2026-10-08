@@ -64,9 +64,16 @@ internal object MpsWitness {
 
     sealed interface Outcome {
         /** The assignment (rounded, possibly repaired) satisfies the model; [objective] is recomputed from it. */
-        data class Valid(val objective: Double, val values: DoubleArray, val repaired: Boolean, val claimed: Violations) : Outcome
+        data class Valid(
+            val objective: Double,
+            val values: DoubleArray,
+            val repaired: Boolean,
+            val claimed: Violations,
+        ) : Outcome
+
         /** The model rejects the assignment, and no continuous completion of its integers exists. */
         data class Invalid(val why: String, val claimed: Violations) : Outcome
+
         /** Neither confirmed nor refuted: no assignment, or the repair could not decide. */
         data class Unresolved(val why: String) : Outcome
     }
@@ -94,7 +101,11 @@ internal object MpsWitness {
         claim.gap?.let { stats["gap"] = it.toString() }
         if (claim.status == Status.INFEASIBLE) return Verdict(false, null, true, null, stats)
         val values = claim.assignment ?: run {
-            if (claim.primal != null) stats["validation"] = "unresolved: the solver reported a primal bound without a solution"
+            if (claim.primal !=
+                null
+            ) {
+                stats["validation"] = "unresolved: the solver reported a primal bound without a solution"
+            }
             return Verdict(null, null, false, null, stats)
         }
         val outcome = validate(model, values, repair)
@@ -104,40 +115,89 @@ internal object MpsWitness {
         val matchesPrimal = claim.primal != null && close(valid.objective, claim.primal, GAP_REL * 100, GAP_ABS)
         val dual = claim.dual
         // A dual bound that excludes the solution it was reported with contradicts itself.
-        val bounded = dual == null || if (maximize) dual >= valid.objective - tolerance(valid.objective) else dual <= valid.objective + tolerance(valid.objective)
+        val bounded = dual == null || if (maximize) {
+            dual >= valid.objective - tolerance(
+                valid.objective,
+            )
+        } else {
+            dual <= valid.objective + tolerance(valid.objective)
+        }
         val closed = claim.primal != null && dual != null && close(claim.primal, dual, GAP_REL, GAP_ABS)
         val proven = claim.status == Status.OPTIMAL && matchesPrimal && bounded && closed
         when {
             claim.status != Status.OPTIMAL -> {}
-            !bounded -> stats["proof"] = "rejected: the dual bound $dual excludes the checked solution ${valid.objective}"
-            !matchesPrimal -> stats["proof"] = "rejected: the checked objective ${valid.objective} differs from the reported ${claim.primal}"
-            !closed -> stats["proof"] = "gap-limited: stopped within its gap tolerance, primal ${claim.primal}, dual $dual"
+
+            !bounded -> stats["proof"] =
+                "rejected: the dual bound $dual excludes the checked solution ${valid.objective}"
+
+            !matchesPrimal -> stats["proof"] =
+                "rejected: the checked objective ${valid.objective} differs from the reported ${claim.primal}"
+
+            !closed -> stats["proof"] =
+                "gap-limited: stopped within its gap tolerance, primal ${claim.primal}, dual $dual"
+
             else -> stats["proof"] = "optimal"
         }
         return Verdict(true, valid.objective, proven, outcome, stats)
     }
 
-    /** Check [values] on [model]: rounded integers first, then a continuous repair when the rounded assignment fails. */
+    /** Check [values] on [model]: rounded integers first, then a continuous repair when they fail. */
     fun validate(model: MpsModel, values: Map<String, Double>, repair: Repair?): Outcome {
         val x = DoubleArray(model.variables.size) { values[model.variables[it].name] ?: 0.0 }
-        val integrality = model.variables.indices.filter { model.variables[it].integer }.maxOfOrNull { abs(x[it] - round(x[it])) } ?: 0.0
+        val integrality = model.variables.indices.filter { model.variables[it].integer }.maxOfOrNull {
+            abs(
+                x[it] - round(x[it]),
+            )
+        } ?: 0.0
         for (i in model.variables.indices) if (model.variables[i].integer) x[i] = round(x[i])
         val claimed = violations(model, x).copy(integrality = integrality)
         if (claimed.ok) return Outcome.Valid(objective(model, x), x, repaired = false, claimed = claimed)
-        if (model.variables.indices.any { model.variables[it].integer && !within(x[it], model.variables[it].lower, model.variables[it].upper) }) {
+        if (model.variables.indices.any {
+                model.variables[it].integer && !within(
+                    x[it],
+                    model.variables[it].lower,
+                    model.variables[it].upper,
+                )
+            }
+        ) {
             return Outcome.Invalid("a rounded integer lies outside its bounds", claimed)
         }
-        if (model.variables.none { !it.integer }) return Outcome.Invalid("the rounded integers violate a row and there is no continuous variable to repair", claimed)
-        repair ?: return Outcome.Unresolved("the rounded assignment violates the model and no LP solver is available to repair it")
+        if (model.variables.none { !it.integer }) {
+            return Outcome.Invalid(
+                "the rounded integers violate a row and there is no continuous variable to repair",
+                claimed,
+            )
+        }
+        repair ?: return Outcome.Unresolved(
+            "the rounded assignment violates the model and no LP solver is available to repair it",
+        )
         return when (val repaired = repair.solve(fixedLp(model, x))) {
-            is RepairResult.Infeasible -> Outcome.Invalid("no continuous completion of the rounded integers exists", claimed)
+            is RepairResult.Infeasible -> Outcome.Invalid(
+                "no continuous completion of the rounded integers exists",
+                claimed,
+            )
+
             is RepairResult.Failed -> Outcome.Unresolved("the repair LP did not decide: ${repaired.why}")
+
             is RepairResult.Solved -> {
                 val y = x.copyOf()
-                for (i in model.variables.indices) if (!model.variables[i].integer) y[i] = repaired.values[col(i)] ?: 0.0
+                for (i in model.variables.indices) {
+                    if (!model.variables[i].integer) {
+                        y[i] = repaired.values[
+                            col(
+                                i,
+                            ),
+                        ] ?: 0.0
+                    }
+                }
                 val after = violations(model, y)
-                if (after.ok) Outcome.Valid(objective(model, y), y, repaired = true, claimed = claimed)
-                else Outcome.Unresolved("the repaired assignment still violates the model (row ${after.row}, bound ${after.bound})")
+                if (after.ok) {
+                    Outcome.Valid(objective(model, y), y, repaired = true, claimed = claimed)
+                } else {
+                    Outcome.Unresolved(
+                        "the repaired assignment still violates the model (row ${after.row}, bound ${after.bound})",
+                    )
+                }
             }
         }
     }
@@ -177,7 +237,9 @@ internal object MpsWitness {
 
     private fun tolerance(bound: Double) = FEAS_TOL * max(1.0, abs(bound))
 
-    private fun close(a: Double, b: Double, rel: Double, absolute: Double) = abs(a - b) <= max(absolute, rel * max(abs(a), abs(b)))
+    private fun close(a: Double, b: Double, rel: Double, absolute: Double) = abs(
+        a - b,
+    ) <= max(absolute, rel * max(abs(a), abs(b)))
 
     private fun objective(model: MpsModel, x: DoubleArray): Double {
         var sum = model.objective.constant
@@ -190,7 +252,9 @@ internal object MpsWitness {
             "validation" to if (outcome.repaired) "repaired" else "valid",
             "checkedObjective" to outcome.objective.toString(),
         ) + claimedViolations(outcome.claimed)
+
         is Outcome.Invalid -> mapOf("validation" to "invalid: ${outcome.why}") + claimedViolations(outcome.claimed)
+
         is Outcome.Unresolved -> mapOf("validation" to "unresolved: ${outcome.why}")
     }
 
@@ -225,11 +289,20 @@ internal object MpsWitness {
         appendLine(" N obj")
         for ((r, c) in rows) appendLine(" ${type(c)} r$r")
         val entries = Array(model.variables.size) { ArrayList<String>() }
-        for (k in model.objective.indices.indices) entries[model.objective.indices[k]] += "obj ${model.objective.coeffs[k]}"
+        for (k in model.objective.indices.indices) {
+            entries[model.objective.indices[k]] +=
+                "obj ${model.objective.coeffs[k]}"
+        }
         for ((r, c) in rows) for (k in c.indices.indices) entries[c.indices[k]] += "r$r ${c.coeffs[k]}"
         appendLine("COLUMNS")
         for (i in model.variables.indices) {
-            if (entries[i].isEmpty()) appendLine("    ${col(i)} obj 0") else for (e in entries[i]) appendLine("    ${col(i)} $e")
+            if (entries[i].isEmpty()) {
+                appendLine(
+                    "    ${col(i)} obj 0",
+                )
+            } else {
+                for (e in entries[i]) appendLine("    ${col(i)} $e")
+            }
         }
         appendLine("RHS")
         for ((r, c) in rows) {
@@ -240,13 +313,15 @@ internal object MpsWitness {
         val ranged = rows.filter { (_, c) -> c.lower != null && c.upper != null && c.lower != c.upper }
         if (ranged.isNotEmpty()) {
             appendLine("RANGES")
-            for ((r, c) in ranged) appendLine("    rng r$r ${c.upper!! - c.lower!!}")
+            for ((r, c) in ranged) appendLine("    rng r$r ${(c.upper ?: 0.0) - (c.lower ?: 0.0)}")
         }
         appendLine("BOUNDS")
         for ((i, v) in model.variables.withIndex()) {
             when {
                 v.integer -> appendLine(" FX bnd ${col(i)} ${x[i]}")
+
                 v.lower == null && v.upper == null -> appendLine(" FR bnd ${col(i)}")
+
                 else -> {
                     if (v.lower == null) appendLine(" MI bnd ${col(i)}") else appendLine(" LO bnd ${col(i)} ${v.lower}")
                     v.upper?.let { appendLine(" UP bnd ${col(i)} $it") }
