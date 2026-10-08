@@ -34,6 +34,8 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = failure
 
+    // Each pass is its own method: one method holding every loop is compiled again for each loop it enters
+    // on-stack, and each such compile of the whole body costs C2 more than many solves' propagation.
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         failure = null
         if (state.cpGateShouldSkip(factorId)) return true
@@ -41,6 +43,17 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         if (n == 1) return true
         val claimed = IntArray(n) { -1 }
         val pred = IntArray(n) { -1 }
+        if (!claimFixed(state, claimed, pred)) return false
+        if (!shaveClaimed(state, claimed)) return false
+        val mandatory = BooleanArray(n)
+        val includedCount = markMandatory(state, mandatory)
+        if (!noShortFixedCycle(state, mandatory, includedCount)) return false
+        if (!shaveChainClosures(state, pred, mandatory, includedCount)) return false
+        return stronglyConnectedSubcircuit(state)
+    }
+
+    // Record which successor claims each fixed target, and each target's predecessor; two claims on one target fail.
+    private fun claimFixed(state: PropagationState, claimed: IntArray, pred: IntArray): Boolean {
         for (i in succ.indices) {
             val d = state.intDomains[succ[i]]
             if (d.min != d.max) continue
@@ -50,8 +63,12 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             claimed[target] = i
             if (target != i) pred[target] = i
         }
-        if (!shaveClaimed(state, claimed)) return false
-        val mandatory = BooleanArray(n)
+        return true
+    }
+
+    // Mark the nodes whose own index has left their successor's bounds, so they must lie on the cycle; returns
+    // how many there are.
+    private fun markMandatory(state: PropagationState, mandatory: BooleanArray): Int {
         var includedCount = 0
         for (i in succ.indices) {
             val d = state.intDomains[succ[i]]
@@ -60,6 +77,11 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
                 includedCount++
             }
         }
+        return includedCount
+    }
+
+    // Fail on a cycle of fixed successors shorter than the nodes that must be on it.
+    private fun noShortFixedCycle(state: PropagationState, mandatory: BooleanArray, includedCount: Int): Boolean {
         val visited = BooleanArray(n)
         val posOnPath = IntArray(n) { -1 }
         val path = IntArrayList()
@@ -91,6 +113,16 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
                 posOnPath[path[k]] = -1
             }
         }
+        return true
+    }
+
+    // Shave the endpoint that would close a fixed chain into a cycle too short for the nodes that must be on it.
+    private fun shaveChainClosures(
+        state: PropagationState,
+        pred: IntArray,
+        mandatory: BooleanArray,
+        includedCount: Int,
+    ): Boolean {
         for (i in succ.indices) {
             val v = succ[i]
             val d = state.intDomains[v]
@@ -119,7 +151,6 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
                 if (!state.tightenIntMax(v, d.max - 1, ant)) return fail(Reason(state).add(ant).lower(v))
             }
         }
-        if (!stronglyConnectedSubcircuit(state)) return false
         return true
     }
 
