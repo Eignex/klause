@@ -125,11 +125,11 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
         lpPlan = LpPlan(componentSplit = false),
     )
 
-    fun assertVisitedLeaves() {
+    fun assertVisitedLeaves(ownersReleased: Boolean = true) {
         assertEquals(if (withIncumbent) 2 else 1, visited)
         assertEquals(0, factory.calls.count { it.kind == EngineConstruction.GENERAL })
         assertTrue(attempts.any { it.first == (if (withIncumbent) 2 else 1) && it.second })
-        assertEquals(opened, closed)
+        assertEquals(if (ownersReleased) opened else 0, closed)
     }
 
     fun assertIncumbent(sample: Sample) {
@@ -659,16 +659,17 @@ class ResumableMinimizeTest {
             assertEquals(TerminationReason.Unsupported, result.reason)
             assertEquals(listOf(0.5), offered)
             assertEquals(0.5, result.sample.reals.single())
-            fixture.assertVisitedLeaves()
+            fixture.assertVisitedLeaves(ownersReleased = false)
             assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) { error("duplicate incumbent") })
             search.rebind(Assumptions.None, 256L)
             fixture.acceptProof = { _, _ -> false }
             assertIs<MinimizeResult.Unknown>(
                 search.runSlice(Cancellation.Never, 1000L, 256L) { error("stale incumbent") },
             )
-            assertEquals(2, fixture.opened)
-            assertEquals(fixture.opened, fixture.closed)
+            assertEquals(1, fixture.opened)
+            assertEquals(0, fixture.closed)
         }
+        assertEquals(fixture.opened, fixture.closed)
     }
 
     @Test
@@ -676,7 +677,7 @@ class ResumableMinimizeTest {
         val fixture = UnresolvedRealLeafFixture(true)
         ResumableMinimize(fixture.solver, fixture.objective, fixture.params, rebindable = true).use { search ->
             assertIs<MinimizeResult.BestFound>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
-            fixture.assertVisitedLeaves()
+            fixture.assertVisitedLeaves(ownersReleased = false)
             search.rebind(Assumptions.None.withInt(0, 1L), 256L)
             fixture.acceptProof = { _, _ -> true }
             val offered = ArrayList<Double>()
@@ -689,9 +690,10 @@ class ResumableMinimizeTest {
             assertEquals(1L, result.sample.ints.single())
             assertEquals(0.5, result.sample.reals.single())
             assertEquals(3, fixture.visited)
-            assertEquals(2, fixture.opened)
-            assertEquals(fixture.opened, fixture.closed)
+            assertEquals(1, fixture.opened)
+            assertEquals(0, fixture.closed)
         }
+        assertEquals(fixture.opened, fixture.closed)
     }
 
     @Test

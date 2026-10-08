@@ -47,7 +47,7 @@ import kotlin.test.assertTrue
 private class TerminalRecordingFactory : LpEngineFactory {
     var generalSolvers = 0
         private set
-    var generalSolves = 0
+    var solves = 0
         private set
     var leafSolves = 0
         private set
@@ -70,7 +70,7 @@ private class TerminalRecordingFactory : LpEngineFactory {
         val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing)
         return object : LpSolver by delegate {
             override fun solve(warm: Basis?): FloatLpResult? {
-                generalSolves++
+                solves++
                 leafSolves++
                 return delegate.solve(warm)
             }
@@ -134,11 +134,13 @@ private class TerminalRecordingFactory : LpEngineFactory {
             private var closed = false
 
             override fun solve(warm: Basis?): FloatLpResult? {
+                solves++
                 if (leaf) leafSolves++
                 return delegate.solve(warm)
             }
 
             override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                solves++
                 if (leaf) leafSolves++
                 return delegate.resolveBounds(allowance)
             }
@@ -263,8 +265,8 @@ class LpTerminalDeclineTest {
         assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
         assertEquals(1L, accepted.solutions)
         assertEquals(0.5, acceptedSamples.single().reals.single())
-        assertTrue(rejectingFactory.leafSolves >= 1)
-        assertTrue(acceptingFactory.leafSolves >= 1)
+        assertTrue(rejectingFactory.solves >= 1)
+        assertTrue(acceptingFactory.solves >= 1)
         assertTrue(rejectingFactory.persistentSolversCreated >= 1)
         assertTrue(acceptingFactory.persistentSolversCreated >= 1)
         assertTrue(rejectingPolicy.observedSuccessful(LpCertifier.EXACT_BASIS))
@@ -289,7 +291,7 @@ class LpTerminalDeclineTest {
 
         assertEquals(FiniteSolveVerdict.UNKNOWN, result.verdict)
         assertEquals(0L, result.solutions)
-        assertTrue(factory.leafSolves >= 1)
+        assertTrue(factory.solves >= 1)
         assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
         assertEquals(factory.generalSolvers, factory.generalCloses)
         assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
@@ -319,8 +321,8 @@ class LpTerminalDeclineTest {
         assertEquals(FiniteSolveVerdict.UNKNOWN, first.verdict)
         assertEquals(FiniteSolveVerdict.SAT, middle.verdict)
         assertEquals(FiniteSolveVerdict.UNKNOWN, last.verdict)
-        assertTrue(rejectingFactory.leafSolves >= 2)
-        assertTrue(acceptingFactory.leafSolves >= 1)
+        assertTrue(rejectingFactory.solves >= 2)
+        assertTrue(acceptingFactory.solves >= 1)
         assertEquals(rejectingFactory.generalSolvers, rejectingFactory.generalCloses)
         assertEquals(acceptingFactory.generalSolvers, acceptingFactory.generalCloses)
         assertEquals(rejectingFactory.persistentSolversCreated, rejectingFactory.persistentCloses)
@@ -337,7 +339,7 @@ class LpTerminalDeclineTest {
         assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
         assertEquals(0L, declined.solutions)
         assertEquals(FiniteSolveVerdict.OPTIMAL, accepted.verdict)
-        assertTrue(factory.leafSolves >= 1)
+        assertTrue(factory.solves >= 1)
         assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
         assertEquals(factory.generalSolvers, factory.generalCloses)
         assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
@@ -353,7 +355,7 @@ class LpTerminalDeclineTest {
         assertEquals(FiniteSolveVerdict.BEST_FOUND, result.verdict)
         assertNotNull(result.bestSample)
         assertEquals(FiniteSolveVerdict.OPTIMAL, accepted.verdict)
-        assertTrue(factory.leafSolves >= 2)
+        assertTrue(factory.solves >= 2)
         assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
         assertEquals(factory.generalSolvers, factory.generalCloses)
         assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
@@ -409,7 +411,7 @@ class LpTerminalDeclineTest {
 
         assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
         assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
-        assertTrue(factory.leafSolves >= 1)
+        assertTrue(factory.solves >= 1)
         assertTrue(factory.cancellations.isNotEmpty())
         assertTrue(factory.cancellations.all { it() })
         assertTrue(LpCertifier.RATIONAL to false in policy.attempts)

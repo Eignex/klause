@@ -24,9 +24,31 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineInjectionTest {
+    @Test
+    fun `a fixed fractional real leaf retains its exact contradiction`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(0.1),
+                LinearOp.EQ, 0.010000000000000002)),
+            numRealVars = 1, realLower = doubleArrayOf(0.1), realUpper = doubleArrayOf(0.1),
+        )
+        val sink = SolveStatsSink(backend = "fractional-leaf")
+        val session = PropagationSession(problem)
+
+        LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)), sink).use { engine ->
+            val relaxation = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), session))
+            assertNotNull(relaxation.model.exactState)
+            val result = engine.leafCertify(session)
+
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict, "LP evidence: ${sink.snapshot().lp}")
+        }
+    }
+
 
     private val decline = LpCertificationPolicy { _, _ -> false }
 

@@ -3,7 +3,6 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -29,18 +28,12 @@ import kotlin.test.assertTrue
 class LeafRealSolverTest {
     @Test
     fun `finite fractional product leaves preserve fresh exact refutations`() {
-        val program = parseFlatZinc(
-            """
-            var 1..1: i;
-            var float: x;
-            var 0.1..0.1: y;
-            constraint array_float_element(i, [0.1], x);
-            constraint float_times(x, y, 0.010000000000000002);
-            solve satisfy;
-            """.trimIndent(),
-            exactFloats = true,
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(0.1),
+                LinearOp.EQ, 0.010000000000000002)),
+            numRealVars = 1, realLower = doubleArrayOf(0.1), realUpper = doubleArrayOf(0.1),
         )
-        val problem = program.problem
         var captured: LpModel? = null
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(

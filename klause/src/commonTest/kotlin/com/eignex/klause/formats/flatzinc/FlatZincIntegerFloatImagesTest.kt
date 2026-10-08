@@ -82,6 +82,6 @@ class FlatZincIntegerFloatImagesTest {
 
         val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
 
-        assertIs<SolveResult.Unsat>(result)
+        assertIs<SolveResult.Unsat>(result, "LP evidence: ${result.stats.lp}")
     }
 }
