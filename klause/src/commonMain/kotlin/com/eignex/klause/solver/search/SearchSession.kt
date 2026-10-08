@@ -1051,8 +1051,10 @@ class SearchRun internal constructor(
                                 // cut that check short. Such a check costs far more than the nodes the polling cadence
                                 // was tuned on, so a skip polls at once rather than after the cadence's next interval.
                                 if (session.cancelled()) {
-                                    return lifecycle.onCancellation(session).toEvent()
+                                    val event = lifecycle.onCancellation(session).toEvent()
                                         ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+                                    if (event == SearchRunEvent.Paused) pendingAdvance = true
+                                    return event
                                 }
                                 if (!backtrack()) return stopAfterBacktrack()
                             }

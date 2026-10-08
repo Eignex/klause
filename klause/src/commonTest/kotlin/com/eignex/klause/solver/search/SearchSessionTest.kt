@@ -727,6 +727,61 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `a skipped root model is exhausted after a cancellation pause`() {
+        var cancelled = false
+        var checked = 0
+        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        val run = session.openRun(
+            numBoolVars = 0,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+                    checked++
+                    cancelled = true
+                    return SearchModelDisposition.Skip
+                }
+            },
+            lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            },
+        )
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        cancelled = false
+        val result = run.next()
+
+        assertIs<SearchRunEvent.Exhausted>(result)
+        assertEquals(1, checked)
+    }
+
+    @Test
+    fun `a skipped model resumes at its sibling after a cancellation pause`() {
+        var cancelled = false
+        var checked = 0
+        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        val run = session.openRun(
+            numBoolVars = 1,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+                    checked++
+                    if (checked > 1) return SearchModelDisposition.Surface
+                    cancelled = true
+                    return SearchModelDisposition.Skip
+                }
+            },
+            lifecycle = object : SearchRunLifecycle {
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            },
+        )
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        cancelled = false
+        val result = assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(true, result.model.valueOf<Boolean>(SearchBoolValue(0)))
+        assertEquals(2, checked)
+    }
+
+    @Test
     fun `node policy prunes through the shared frame stack`() {
         var calls = 0
         val session = SearchSession(emptyList())
