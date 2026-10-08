@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -100,7 +101,12 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
 
         /** The top-[count] prefix of [kind]'s credit-ordered pool (wrapping past the pool size) —
          *  `-p <n>` maps straight onto this. Every slot is a fresh instance even when arms repeat. */
-        fun diverse(kind: Kind, count: Int, nodeBudget: NodeBudget? = null): List<LocalSearchWorkerConfig> =
-            LocalSearchCatalog.diverse(kind, count).map { LocalSearchWorkerConfig(it, nodeBudget) }
+        fun diverse(
+            kind: Kind,
+            count: Int,
+            nodeBudget: NodeBudget? = null,
+            problemClass: ProblemClass = ProblemClass.FiniteCp,
+        ): List<LocalSearchWorkerConfig> =
+            LocalSearchCatalog.diverse(kind, count, problemClass).map { LocalSearchWorkerConfig(it, nodeBudget) }
     }
 }

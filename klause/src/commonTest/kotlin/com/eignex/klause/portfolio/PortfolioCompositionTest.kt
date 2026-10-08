@@ -36,6 +36,16 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `a pseudo-Boolean model leads its local search with the flip and jump walks`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.LOCAL_SEARCH, arms = 3)
+
+        val labels = PortfolioComposition.compose(scenario, ProblemFacts.assumed(Kind.COP, ProblemClass.PseudoBoolean))
+            .map { it.label }
+
+        assertEquals(listOf("probsat-bandit/fixed", "fjump/fixed"), labels.take(2))
+    }
+
+    @Test
     fun `a model without continuous columns keeps the curated backtrack order`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.MIXED, arms = 6)
 

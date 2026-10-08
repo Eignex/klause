@@ -7138,7 +7138,8 @@ public final class com/eignex/klause/portfolio/Kind : java/lang/Enum {
 public final class com/eignex/klause/portfolio/LocalSearchCatalog {
 	public static final field INSTANCE Lcom/eignex/klause/portfolio/LocalSearchCatalog;
 	public final fun byLabel (Ljava/lang/String;)Lcom/eignex/klause/localsearch/strategy/LocalSearchRecipe;
-	public final fun diverse (Lcom/eignex/klause/portfolio/Kind;I)Ljava/util/List;
+	public final fun diverse (Lcom/eignex/klause/portfolio/Kind;ILcom/eignex/klause/solver/ProblemClass;)Ljava/util/List;
+	public static synthetic fun diverse$default (Lcom/eignex/klause/portfolio/LocalSearchCatalog;Lcom/eignex/klause/portfolio/Kind;ILcom/eignex/klause/solver/ProblemClass;ILjava/lang/Object;)Ljava/util/List;
 	public final fun factories (Lcom/eignex/klause/portfolio/Kind;)Ljava/util/List;
 	public final fun labels ()Ljava/util/List;
 	public final fun labels (Lcom/eignex/klause/portfolio/Kind;)Ljava/util/List;
@@ -7149,8 +7150,8 @@ public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/por
 	public static final field Companion Lcom/eignex/klause/portfolio/Portfolio$Companion;
 	public static final field DEFAULT_HALF_LIFE D
 	public static final field DEFAULT_PHASE_RETENTION D
-	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[D)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[D)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;IJJDJJJDIDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public final fun getWorkers ()Ljava/util/List;
 	public fun minimize (Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -7158,14 +7159,14 @@ public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/por
 }
 
 public final class com/eignex/klause/portfolio/Portfolio$Companion {
-	public final fun thompson (Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[D)Lcom/eignex/klause/portfolio/Portfolio;
-	public static synthetic fun thompson$default (Lcom/eignex/klause/portfolio/Portfolio$Companion;Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DILjava/lang/Object;)Lcom/eignex/klause/portfolio/Portfolio;
+	public final fun thompson (Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[D)Lcom/eignex/klause/portfolio/Portfolio;
+	public static synthetic fun thompson$default (Lcom/eignex/klause/portfolio/Portfolio$Companion;Ljava/util/List;IJDJJDIJJDLcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/portfolio/WitnessCheck;Lkotlin/jvm/functions/Function1;[DILjava/lang/Object;)Lcom/eignex/klause/portfolio/Portfolio;
 }
 
 public final class com/eignex/klause/portfolio/PortfolioBuilder {
 	public static final field INSTANCE Lcom/eignex/klause/portfolio/PortfolioBuilder;
-	public final fun build (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Ljava/util/List;
-	public static synthetic fun build$default (Lcom/eignex/klause/portfolio/PortfolioBuilder;Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Ljava/util/List;
+	public final fun build (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/ProblemProfile;)Ljava/util/List;
+	public static synthetic fun build$default (Lcom/eignex/klause/portfolio/PortfolioBuilder;Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/ProblemProfile;ILjava/lang/Object;)Ljava/util/List;
 	public final fun buildExplicit (Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/List;ILcom/eignex/klause/portfolio/Kind;JDLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Ljava/util/List;
 	public static synthetic fun buildExplicit$default (Lcom/eignex/klause/portfolio/PortfolioBuilder;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/List;ILcom/eignex/klause/portfolio/Kind;JDLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Ljava/util/List;
 }
@@ -8340,6 +8341,47 @@ public final class com/eignex/klause/solver/Optimizer$DefaultImpls {
 	public static fun sample (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public static fun samples (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public static fun session (Lcom/eignex/klause/solver/Optimizer;)Lcom/eignex/klause/solver/Session;
+}
+
+public final class com/eignex/klause/solver/ProblemClass : java/lang/Enum {
+	public static final field Continuous Lcom/eignex/klause/solver/ProblemClass;
+	public static final field FiniteCp Lcom/eignex/klause/solver/ProblemClass;
+	public static final field MixedInteger Lcom/eignex/klause/solver/ProblemClass;
+	public static final field Open Lcom/eignex/klause/solver/ProblemClass;
+	public static final field PseudoBoolean Lcom/eignex/klause/solver/ProblemClass;
+	public static final field Sat Lcom/eignex/klause/solver/ProblemClass;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/ProblemClass;
+	public static fun values ()[Lcom/eignex/klause/solver/ProblemClass;
+}
+
+public final class com/eignex/klause/solver/ProblemProfile {
+	public static final field Companion Lcom/eignex/klause/solver/ProblemProfile$Companion;
+	public fun <init> (Lcom/eignex/klause/solver/ProblemClass;ZZZ)V
+	public final fun component1 ()Lcom/eignex/klause/solver/ProblemClass;
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/ProblemClass;ZZZ)Lcom/eignex/klause/solver/ProblemProfile;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/ProblemProfile;Lcom/eignex/klause/solver/ProblemClass;ZZZILjava/lang/Object;)Lcom/eignex/klause/solver/ProblemProfile;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOptimizing ()Z
+	public final fun getProblemClass ()Lcom/eignex/klause/solver/ProblemClass;
+	public final fun getRealColumns ()Z
+	public final fun getScheduling ()Z
+	public final fun getWide ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/ProblemProfile$Companion {
+	public final fun classOf (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/ProblemClass;
+	public final fun of (Lcom/eignex/klause/ir/Problem;Z)Lcom/eignex/klause/solver/ProblemProfile;
+}
+
+public final class com/eignex/klause/solver/ProblemProfileKt {
+	public static final fun hasFiniteIntegerRanges (Lcom/eignex/klause/ir/Problem;)Z
+	public static final fun isClausal (Lcom/eignex/klause/ir/Problem;)Z
 }
 
 public abstract interface class com/eignex/klause/solver/ResumableOptimizer : com/eignex/klause/solver/Optimizer {
@@ -10190,13 +10232,15 @@ public final class com/eignex/klause/solver/result/OpenTheoryWorkStats {
 
 public final class com/eignex/klause/solver/result/PortfolioStats {
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;)V
-	public synthetic fun <init> (Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
-	public final fun copy (Ljava/util/List;)Lcom/eignex/klause/solver/result/PortfolioStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/PortfolioStats;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/PortfolioStats;
+	public final fun component2 ()Lcom/eignex/klause/solver/ProblemProfile;
+	public final fun copy (Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;)Lcom/eignex/klause/solver/result/PortfolioStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/PortfolioStats;Ljava/util/List;Lcom/eignex/klause/solver/ProblemProfile;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/PortfolioStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getArms ()Ljava/util/List;
+	public final fun getProfile ()Lcom/eignex/klause/solver/ProblemProfile;
 	public fun hashCode ()I
 	public final fun mergedWith (Lcom/eignex/klause/solver/result/PortfolioStats;)Lcom/eignex/klause/solver/result/PortfolioStats;
 	public fun toString ()Ljava/lang/String;

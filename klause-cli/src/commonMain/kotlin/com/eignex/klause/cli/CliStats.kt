@@ -305,18 +305,24 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
 }
 
 /**
- * A sequential portfolio's schedule for `-s`, one `arm.<label>` pair per arm: segments run, work and time spent, mean
- * reward, failures, and the credit earned by each kind of contribution. Empty outside a sequential portfolio.
+ * A sequential portfolio's schedule for `-s`: the model's classification as one `profile` pair, then one
+ * `arm.<label>` pair per arm with segments run, work and time spent, mean reward, failures, the credit earned by each
+ * kind of contribution, and what each sharing channel cost and moved. Empty outside a sequential portfolio.
  */
-internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> = stats.portfolio.arms.map { arm ->
-    val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
-    val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
-        " share$channel=us:${t.nanos / NANOS_PER_MICRO},out:${t.exported},in:${t.imported},dup:${t.duplicates}"
+internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
+    val profile = stats.portfolio.profile?.let {
+        "profile" to "${it.problemClass} optimizing=${it.optimizing} wide=${it.wide} scheduling=${it.scheduling}"
     }
-    "arm.${arm.label}" to
-        "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
-        "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} initMs=${arm.initializationMillis}" +
-        "$credit$sharing"
+    return listOfNotNull(profile) + stats.portfolio.arms.map { arm ->
+        val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
+        val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
+            " share$channel=us:${t.nanos / NANOS_PER_MICRO},out:${t.exported},in:${t.imported},dup:${t.duplicates}"
+        }
+        "arm.${arm.label}" to
+            "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
+            "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} initMs=${arm.initializationMillis}" +
+            "$credit$sharing"
+    }
 }
 
 private const val NANOS_PER_MICRO = 1_000L

@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.klause.solver.ProblemProfile
+
 /**
  * What a sequential portfolio scheduled, one [ArmSchedule] per arm: how often it ran, what that cost, and what
  * the scheduler credited it for. Empty for any other solve. See [SolveStats].
@@ -7,9 +9,11 @@ package com.eignex.klause.solver.result
 data class PortfolioStats(
     /** Per-arm schedule, in the portfolio's arm order. */
     val arms: List<ArmSchedule> = emptyList(),
+    /** The classification the portfolio was built for; null when it was given none. */
+    val profile: ProblemProfile? = null,
 ) {
-    /** Combine two runs' schedules: the arms of both, in order. */
-    fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(arms + o.arms)
+    /** Combine two runs' schedules: the arms of both, in order, under the first one's classification. */
+    fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(arms + o.arms, profile ?: o.profile)
 }
 
 /** One arm of a sequential portfolio's schedule; see [PortfolioStats]. */

@@ -1,5 +1,7 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.ProblemProfile
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,6 +49,32 @@ class FamilyPolicyTest {
         repeat(8) { policy.record(ArmFamily.LocalSearch, progressed = true, plateau = true) }
 
         assertTrue(choicesOf(policy, ArmFamily.LocalSearch) > 600)
+    }
+
+    @Test
+    fun `a continuous model's prior leans towards backtrack before any evidence`() {
+        val profile = ProblemProfile(ProblemClass.Continuous, optimizing = true, wide = false, scheduling = false)
+        val policy = FamilyPolicy(Random(3), FamilyPrior.of(profile))
+
+        assertTrue(choicesOf(policy, ArmFamily.Backtrack) > 800)
+    }
+
+    @Test
+    fun `a leaning prior still gives the other family turns`() {
+        val profile = ProblemProfile(ProblemClass.Continuous, optimizing = true, wide = false, scheduling = false)
+        val policy = FamilyPolicy(Random(3), FamilyPrior.of(profile))
+
+        assertTrue(choicesOf(policy, ArmFamily.LocalSearch) > 30)
+    }
+
+    @Test
+    fun `a finite optimization model leans no family`() {
+        val profile = ProblemProfile(ProblemClass.FiniteCp, optimizing = true, wide = false, scheduling = false)
+        val prior = FamilyPrior.of(profile)
+
+        for (family in ArmFamily.entries) {
+            assertEquals(1.0 to 1.0, prior.successes(family) to prior.failures(family), "$family")
+        }
     }
 
     @Test
