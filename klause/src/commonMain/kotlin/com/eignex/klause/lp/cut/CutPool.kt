@@ -74,12 +74,7 @@ internal class CutPool(
         val key: Any = if (source == null) {
             checkNotNull(cut).key()
         } else {
-            listOf(
-                source.key,
-                source.provenance.model,
-                source.provenance.facts.filter { !it.global },
-                source.provenance.assumptions,
-            )
+            source.poolKey
         }
         if (key in seen) return false
         val mixed = if (cut?.global == true) {

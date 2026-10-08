@@ -26,6 +26,8 @@ import com.eignex.klause.lp.LpAuxiliaryColumn
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
+import com.eignex.klause.lp.cut.SourceCut
+import com.eignex.klause.lp.cut.orNull
 import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
@@ -1194,17 +1196,41 @@ internal class CpToLpRelaxation(
             if (booleanRlt && emits(LpEmissionKind.BOOLEAN_RLT)) buildBooleanRlt()
             attributeRows(-1)
 
-            // Separator-produced cuts, over already-created columns. A cut referencing an absent
-            // column is dropped (defensive — separators should only emit over existing columns).
-            val cutParents = HashMap<Int, CutProvenance>()
-            for (cut in extraCuts) {
-                if (cut.provenance?.auxiliaryDefinitions?.any { (source, definition) ->
-                        !auxiliarySources.matches(source, definition) || definition !in colPresence
-                    } == true
-                ) {
-                    continue
+            val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
+            val colVarIds = IntArray(colVarId.size) { colVarId[it] }
+            val reals = IntArray(colRealId.size) { colRealId[it] }
+            val signs = IntArray(colRealSign.size) { colRealSign[it] }
+            val presence = colPresence.toList()
+            val cutSources = if (region == null && extraCuts.any { it.provenance?.conclusion != null }) {
+                cpCutSources(problem, colVarIds, kinds, reals, signs, emptyMap(), presence, auxiliarySources, domains) {
+                    builder.sourceBounds(it) to BigFraction.ZERO
                 }
-                if (cut.provenance?.let { !cutProofApplies(it, problem, domains) } == true) continue
+            } else {
+                null
+            }
+            val cutParents = HashMap<Int, CutProvenance>()
+            for (candidate in extraCuts) {
+                val proof = candidate.provenance
+                val conclusion = proof?.conclusion
+                val cut = if (conclusion != null) {
+                    val sources = cutSources ?: continue
+                    if (candidate.global != proof.global) continue
+                    val active = if (!proof.global && cutProofApplies(proof, problem, domains)) {
+                        sources.withActivePremises(proof.facts.filter { !it.global }.mapTo(HashSet()) { it.premise })
+                    } else {
+                        sources
+                    }
+                    SourceCut(conclusion.expression, conclusion.relation, conclusion.rhs, proof).toCut(active).orNull()
+                        ?: continue
+                } else {
+                    if (proof?.auxiliaryDefinitions?.any { (source, definition) ->
+                        !auxiliarySources.matches(source, definition) || definition !in colPresence
+                        } == true || proof?.let { !cutProofApplies(it, problem, domains) } == true
+                    ) {
+                        continue
+                    }
+                    candidate
+                }
                 if (cut.cols.all { it in 0 until builder.varCount }) {
                     cut.provenance?.let { cutParents[builder.rowCount] = it }
                     builder.addRow(cut.cols, cut.coeffs, cut.rel, cut.rhs, cut.global)
@@ -1213,8 +1239,6 @@ internal class CpToLpRelaxation(
 
             attributeRows(-1)
             val model = builder.build(Sense.MINIMIZE)
-            val kinds = BooleanArray(colIsBool.size) { colIsBool[it] == 1 }
-            val colVarIds = IntArray(colVarId.size) { colVarId[it] }
             val reqs = colReq.toTypedArray()
             val presentUpper = LongArray(colPresentUpper.size) { colPresentUpper[it] }
             // Persistent re-binding needs each column re-derivable from the live session: either
@@ -1233,21 +1257,21 @@ internal class CpToLpRelaxation(
                 circuitArcs = circuitModels,
                 persistentEligible = eligible,
                 colReq = reqs,
-                colPresence = colPresence.toList(),
+                colPresence = presence,
                 colPresentUpper = presentUpper,
                 hullFactorIds = hullFactorIds.toIntArray(),
                 rowFactorIds = rowFactor.toIntArray(),
-                colRealId = IntArray(colRealId.size) { colRealId[it] },
-                colRealSign = IntArray(colRealSign.size) { colRealSign[it] },
-                sourceMap = if (region == null) cpCutSources(
+                colRealId = reals,
+                colRealSign = signs,
+                sourceMap = cutSources?.withParentRows(cutParents) ?: if (region == null) cpCutSources(
                     model,
                     problem,
                     colVarIds,
                     kinds,
-                    IntArray(colRealId.size) { colRealId[it] },
-                    IntArray(colRealSign.size) { colRealSign[it] },
+                    reals,
+                    signs,
                     cutParents,
-                    colPresence.toList(),
+                    presence,
                     auxiliarySources,
                     domains,
                 ) else null,

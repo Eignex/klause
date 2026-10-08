@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.RevisedSimplex
@@ -19,6 +20,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -26,6 +28,40 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
+    @Test
+    fun `catalog compaction rejects stale plans and preserves numerical authority`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val catalog = LpAuxiliarySources()
+        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)), auxiliarySources = catalog)
+        val sources = LpRetainedSources(problem, relaxer)
+        val domains = RootDomains(problem)
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = sources.prepare(owner.state, domains)
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            val before = owner.state
+            val owners = owner.metrics.createdOwners
+            for (id in 0L until 64L) catalog.source(CutAuxiliaryDefinition(listOf(id), emptyList(), 1L, true))
+            val stale = assertNotNull(sources.prepareCompaction(before))
+            catalog.source(CutAuxiliaryDefinition(listOf(64L), emptyList(), 1L, true))
+            assertFalse(stale.isCurrent())
+            assertFailsWith<IllegalStateException> { stale.commit() }
+            assertSame(before, owner.state)
+            val current = assertNotNull(sources.prepareCompaction(before))
+            assertTrue(current.remap.unchanged)
+
+            assertTrue(owner.compact(current.remap))
+            current.commit()
+
+            assertEquals(0, catalog.size)
+            assertEquals(0L, catalog.storageUnits)
+            assertSame(before, owner.state)
+            assertEquals(owners, owner.metrics.createdOwners)
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
     @Test
     fun `source bound mode changes reclaim anonymous columns without changing fresh bounds`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 6) },

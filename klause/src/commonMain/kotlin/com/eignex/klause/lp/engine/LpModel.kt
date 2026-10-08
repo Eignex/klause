@@ -536,6 +536,19 @@ internal class LpBuilder {
      *  which rows a given producer emitted (the relaxation cache). */
     val rowCount: Int get() = rows.size
 
+    fun sourceBounds(column: Int): ExactLpBounds {
+        require(column in 0 until varCount)
+        fun number(upper: Boolean): ExactLpNumber = if (column in continuousCols) {
+            ExactLpNumber.ofIeee(if (upper) contHi.getOrDefault(column, 0.0) else contLo.getOrDefault(column, 0.0))
+        } else {
+            ExactLpNumber.of(if (upper) hi[column] else lo[column])
+        }
+        return ExactLpBounds(
+            if (column in clampedLoCols) null else ExactLpSide(number(false)),
+            if (column in clampedHiCols || column in openAboveCols) null else ExactLpSide(number(true)),
+        )
+    }
+
     /**
      * Add a structural variable with domain `[lower, upper]` and objective coefficient [cost].
      * [tag] is an opaque caller identifier (e.g. an encoded `(varId, value)`) carried through to

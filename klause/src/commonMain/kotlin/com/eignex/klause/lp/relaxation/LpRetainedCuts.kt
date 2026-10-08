@@ -149,7 +149,10 @@ internal class LpRetainedCuts {
             if (previous != null && priorCut != null && priorCut.key() == cut.key() &&
                 previous.numericKey == cut.key()
             ) {
-                next.add(previous)
+                val proof = requireNotNull(priorCut.provenance)
+                next.add(if (previous.proof.auxiliaryDefinitions == proof.auxiliaryDefinitions) previous else {
+                    Binding(previous.id, previous.source, priorCut)
+                })
                 continue
             }
             check(lastId < Long.MAX_VALUE)

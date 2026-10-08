@@ -22,6 +22,16 @@ internal class CutExpression(terms: Map<CutSource, BigFraction>, val constant: B
 
     fun value(assignment: (CutSource) -> BigFraction): BigFraction =
         coefficients.entries.fold(constant) { value, (source, coefficient) -> value + coefficient * assignment(source) }
+
+    fun remapSources(mapping: Map<CutSource, CutSource>): CutExpression {
+        if (coefficients.keys.none { mapping[it]?.let { next -> next != it } == true }) return this
+        val remapped = LinkedHashMap<CutSource, BigFraction>()
+        for ((source, coefficient) in coefficients) {
+            val next = mapping[source] ?: source
+            remapped[next] = (remapped[next] ?: BigFraction.ZERO) + coefficient
+        }
+        return CutExpression(remapped, constant)
+    }
 }
 
 internal sealed interface CutPremise {
@@ -37,6 +47,16 @@ internal sealed interface CutPremise {
     data class ObjectiveCutoff(val expression: CutExpression, val upper: BigFraction) : CutPremise
     data class Literal(val literal: Int) : CutPremise
     data class Row(val expression: CutExpression, val relation: Relation, val rhs: BigFraction) : CutPremise
+}
+
+internal fun CutPremise.remapSources(mapping: Map<CutSource, CutSource>): CutPremise = when (this) {
+    is CutPremise.Bound -> copy(expression = expression.remapSources(mapping))
+    is CutPremise.Integral -> copy(expression = expression.remapSources(mapping))
+    is CutPremise.Excluded -> copy(source = mapping[source] ?: source)
+    is CutPremise.Fixed -> copy(source = mapping[source] ?: source)
+    is CutPremise.ObjectiveCutoff -> copy(expression = expression.remapSources(mapping))
+    is CutPremise.Literal -> this
+    is CutPremise.Row -> copy(expression = expression.remapSources(mapping))
 }
 
 internal data class CutProofFact(val premise: CutPremise, val global: Boolean)
@@ -57,6 +77,10 @@ internal class CutAuxiliaryDefinition(
 ) {
     private val roleSnapshot = role.toList()
     private val requiredSnapshot = required.toList()
+    val identityKey: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        "${roleSnapshot.joinToString(",")}|${requiredSnapshot.joinToString(",")}|$presentUpper|$integralExtension"
+    }
+    private val hash = listOf(roleSnapshot, requiredSnapshot, presentUpper, integralExtension).hashCode()
     val storageUnits: Long get() = roleSnapshot.size.toLong() + requiredSnapshot.size + 2L
     val role: List<Long> get() = roleSnapshot.toList()
     val required: List<Long> get() = requiredSnapshot.toList()
@@ -64,7 +88,7 @@ internal class CutAuxiliaryDefinition(
     override fun equals(other: Any?): Boolean = other is CutAuxiliaryDefinition &&
         roleSnapshot == other.roleSnapshot && requiredSnapshot == other.requiredSnapshot &&
         presentUpper == other.presentUpper && integralExtension == other.integralExtension
-    override fun hashCode(): Int = listOf(roleSnapshot, requiredSnapshot, presentUpper, integralExtension).hashCode()
+    override fun hashCode(): Int = hash
 }
 
 internal class CutProvenance(
@@ -88,6 +112,28 @@ internal class CutProvenance(
     val rules: List<CutRoundingRule> get() = ruleSnapshot.toList()
     val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> get() = auxiliarySnapshot.toMap()
     val global: Boolean get() = assumptionSnapshot.isEmpty() && factSnapshot.all { it.global }
+
+    fun remapSources(mapping: Map<CutSource, CutSource>): CutProvenance {
+        if (mapping.all { (previous, next) -> previous == next }) return this
+        val definitions = LinkedHashMap<CutSource, CutAuxiliaryDefinition>()
+        for ((source, definition) in auxiliarySnapshot) {
+            val next = mapping[source] ?: source
+            require(definitions[next]?.let { it == definition } != false) { "incompatible auxiliary definitions" }
+            definitions[next] = definition
+        }
+        return CutProvenance(
+            model, epoch,
+            factSnapshot.map { it.copy(premise = it.premise.remapSources(mapping)) },
+            assumptionSnapshot,
+            ruleSnapshot.map { rule ->
+                CutRoundingRule(rule.divisor, rule.mir, rule.reduction, rule.rows.map {
+                    it.copy(row = it.row.copy(expression = it.row.expression.remapSources(mapping)))
+                })
+            },
+            conclusion?.let { it.copy(expression = it.expression.remapSources(mapping)) },
+            definitions,
+        )
+    }
 }
 
 private fun CutPremise.storageUnits(): Long = when (this) {

@@ -93,7 +93,19 @@ internal class LpRetainedSources(
         val kept: List<Int>,
         val weight: LpLayoutWeight,
         val removedDescriptors: Long,
-    )
+        val definitions: Set<CutAuxiliaryDefinition>,
+    ) {
+        private var catalogGeneration = -1L
+        private var catalogWeight = LpLayoutWeight(0L, 0L)
+
+        fun weight(catalog: LpAuxiliarySources): LpLayoutWeight {
+            if (catalogGeneration != catalog.generation) {
+                catalogWeight = catalog.storageWeight(definitions)
+                catalogGeneration = catalog.generation
+            }
+            return LpLayoutWeight(weight.retained + catalogWeight.retained, weight.retired + catalogWeight.retired)
+        }
+    }
 
     private val emissions = LpEmissionCache(relaxer)
     private var columns = emptyList<Column>()
@@ -306,20 +318,21 @@ internal class LpRetainedSources(
         require(state.model.n == columns.size && state.depth == depth)
         require(retainedOverhead >= 0L)
         val rows = state.rows
-        if (rows.retiredCount == 0 && unusedColumns == 0) return null
+        if (rows.retiredCount == 0 && unusedColumns == 0 && auxiliarySources.size == 0) return null
         if (cancellation()) return null
         check(generation < Long.MAX_VALUE)
         val expectedGeneration = generation
+        val catalogGeneration = auxiliarySources.generation
         val view = compactionView?.takeIf {
             it.columns === columns && it.uses === columnUses && it.rows === rows &&
                 it.storage === state.model.layoutStorage
         } ?: compactionView(state, cancellation)?.also { compactionView = it } ?: return null
         val overhead = ownedStorageUnits - view.removedDescriptors + retainedOverhead + state.trailStorageUnits
-        if (!view.weight.warrantsCompaction(overhead)) return null
+        if (!view.weight(auxiliarySources).warrantsCompaction(overhead)) return null
         val kept = view.kept
-        var extent = state.model.layoutStorage.total + ownedStorageUnits + retainedOverhead + state.trailStorageUnits
+        var extent = state.model.layoutStorage.total + ownedStorageUnits + retainedOverhead + state.trailStorageUnits +
+            auxiliarySources.storageUnits
         val remap = LpLayoutRemap(columns.size, rows, kept)
-        if (remap.unchanged) return null
         val indices = (0 until rows.size).associateBy { rows.row(it).id }
         fun binding(previous: Binding?): Binding? = previous?.let {
             extent += it.columns.size + it.rows.size
@@ -337,8 +350,12 @@ internal class LpRetainedSources(
         val uses = kept.map { columnUses[it] }.toIntArray()
         val unused = descriptors.indices.count { descriptors[it].reclaimable() && uses[it] == 0 }
         if (cancellation()) return null
-        return LpSourceCompaction(state, remap, extent, valid = { generation == expectedGeneration }) {
+        return LpSourceCompaction(state, remap, extent, valid = {
+            generation == expectedGeneration && auxiliarySources.generation == catalogGeneration
+        }) {
             check(generation == expectedGeneration) { "stale source compaction" }
+            check(auxiliarySources.generation == catalogGeneration) { "stale auxiliary compaction" }
+            auxiliarySources.retain(view.definitions)
             columns = descriptors
             handles = keys
             columnUses = uses
@@ -371,7 +388,8 @@ internal class LpRetainedSources(
         val storage = state.model.layoutStorage
         val numeric = rows.storageWeight(storage).retireColumns(columns.size - kept.size)
         return CompactionView(columns, columnUses, rows, storage, kept,
-            LpLayoutWeight(numeric.retained, numeric.retired + removed), removed)
+            LpLayoutWeight(numeric.retained, numeric.retired + removed), removed,
+            kept.mapNotNullTo(HashSet()) { columns[it].definition })
     }
 
     private fun Column.cpSource(): CutSource? = if (variable < 0) null else {
