@@ -213,9 +213,10 @@ internal class LpBoundTrail(initial: LpExactState) {
         rows: List<LpScopedRow>,
         scoped: Boolean,
         token: Cancellation = Cancellation.Never,
+        permanentRows: Set<Long> = emptySet(),
     ): Boolean {
         if (token()) return false
-        if (columns.isEmpty() && rows.isEmpty()) return true
+        if (columns.isEmpty() && rows.isEmpty()) return permanentRows.isEmpty()
         val newN = state.model.n.toLong() + columns.size
         val newM = state.model.m.toLong() + rows.size
         if (newN + newM >= Int.MAX_VALUE || !structuralRevisionAvailable() ||
@@ -224,10 +225,15 @@ internal class LpBoundTrail(initial: LpExactState) {
         ) {
             return false
         }
+        if (!rows.map { it.id }.containsAll(permanentRows) ||
+            rows.any { it.id in permanentRows && (!it.metadata.global || it.metadata.premises != null) }
+        ) {
+            return false
+        }
         val nnz = (0 until state.model.n).sumOf { state.model.entries(it).size.toLong() } +
             rows.sumOf { it.coefficients().size.toLong() }
         if (nnz + newM > Int.MAX_VALUE || token()) return false
-        val identities = state.rows.append(rows.map { it.id }, if (scoped) state.depth else null)
+        val identities = state.rows.append(rows.map { it.id }, if (scoped) state.depth else null, permanentRows)
         val assertions = if (columns.isEmpty()) {
             state.assertions
         } else {

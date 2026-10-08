@@ -278,9 +278,9 @@ private class IntegerLpView(private val model: LpModel) {
     val m: Int get() = model.m
 
     fun integralColumn(column: Int): Boolean = source == null || column >= n || source.column(column).integral
-    fun rhs(row: Int): Long? = if (source == null) model.rhs[row] else source.rhs(row).legacyLong()
-    fun cost(column: Int): Long? = if (source == null) model.cost[column] else source.objective.cost(column).legacyLong()
-    fun constant(): Long? = if (source == null) model.objConstant else source.objective.constant.legacyLong()
+    fun rhs(row: Int): Long? = if (source == null) model.rhs[row] else source.rhs(row).exactLong()
+    fun cost(column: Int): Long? = if (source == null) model.cost[column] else source.objective.cost(column).exactLong()
+    fun constant(): Long? = if (source == null) model.objConstant else source.objective.constant.exactLong()
 
     fun hasLower(column: Int): Boolean = if (source == null) {
         column >= n || !model.probeClampedLo[column]
@@ -298,13 +298,13 @@ private class IntegerLpView(private val model: LpModel) {
     fun lower(column: Int): Long? = if (source == null) {
         if (hasLower(column)) 0L else null
     } else {
-        source.column(column).bounds.lower?.number?.legacyLong()
+        source.column(column).bounds.lower?.number?.exactLong()
     }
 
     fun upper(column: Int): Long? = if (source == null) {
         if (hasUpper(column)) model.upper[column] else null
     } else {
-        source.column(column).bounds.upper?.number?.legacyLong()
+        source.column(column).bounds.upper?.number?.exactLong()
     }
 
     inline fun forEachCoefficient(column: Int, action: (Int, Long) -> Unit): Boolean {
@@ -313,7 +313,7 @@ private class IntegerLpView(private val model: LpModel) {
             model.forEachInColumn(column, action)
         } else {
             for (entry in exact.columnEntries(column)) {
-                val integer = entry.number.legacyLong() ?: return false
+                val integer = entry.number.exactLong() ?: return false
                 action(entry.row, integer)
             }
         }

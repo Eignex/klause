@@ -157,8 +157,9 @@ internal class LpScopedSolver(
         rows: List<LpScopedRow>,
         scoped: Boolean,
         token: Cancellation = cancellation,
+        permanentRows: Set<Long> = emptySet(),
     ): Boolean = edit(token, true) {
-        rows.size <= maxRetainedRows - state.model.m && it.append(columns, rows, scoped, token)
+        rows.size <= maxRetainedRows - state.model.m && it.append(columns, rows, scoped, token, permanentRows)
     }
 
     fun deactivate(id: Long, token: Cancellation = cancellation): Boolean = edit(token) { it.deactivate(id, token) }
@@ -171,6 +172,8 @@ internal class LpScopedSolver(
         rows: List<LpScopedRow>,
         scoped: Boolean,
         token: Cancellation = cancellation,
+        permanentRows: Set<Long> = emptySet(),
+        objective: ExactLpObjective? = null,
     ): Boolean = edit(token, rows.isNotEmpty() || columns.isNotEmpty()) {
         if (rows.size > maxRetainedRows - state.model.m) return@edit false
         val hidden = if (retired.isEmpty()) {
@@ -180,7 +183,8 @@ internal class LpScopedSolver(
         } else {
             it.deactivate(retired, token)
         }
-        hidden && it.append(columns, rows, scoped, token)
+        hidden && it.append(columns, rows, scoped, token, permanentRows) &&
+            (objective == null || it.replaceObjective(objective, token))
     }
 
     fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }

@@ -24,6 +24,23 @@ import kotlin.test.assertTrue
 class IntegerDualBoundTest {
 
     @Test
+    fun `retained integral IEEE data certifies without losing its source representation`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 2.0)
+        }.build(Sense.MINIMIZE)
+        val authority = assertNotNull(source.authoritativeModel())
+        val model = assertNotNull(LpExactState(authority).toWorkingModel())
+
+        val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0)))
+
+        assertEquals(2L, certificate.objectiveBoundCeil(0L))
+        assertNotNull(authority.entries(0).single().number.ieeeBits)
+        assertNull(authority.entries(0).single().number.legacyLong())
+        assertEquals(-1L, authority.entries(0).single().number.exactLong())
+    }
+
+    @Test
     fun `retained certificates use the live shifted lower endpoint`() {
         val source = LpBuilder().apply { addVar(3L, 9L, cost = 2L) }.build(Sense.MINIMIZE)
         val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))

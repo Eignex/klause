@@ -14,6 +14,24 @@ import kotlin.test.assertTrue
 
 class LpScopedRowsTest {
     @Test
+    fun `a mixed batch rejects missing or conditional permanent rows without changing authority`() {
+        val source = LpBuilder().apply { addVar(0L, 3L) }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.push())
+        val before = trail.state
+        val row = LpScopedRow(
+            0L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))), ExactLpRow(global = false),
+        )
+
+        assertFalse(trail.append(emptyList(), listOf(row), true, permanentRows = setOf(1L)))
+        assertFalse(trail.append(emptyList(), listOf(row), true, permanentRows = setOf(0L)))
+        assertFalse(trail.append(emptyList(), emptyList(), true, permanentRows = setOf(0L)))
+
+        assertSame(before, trail.state)
+    }
+
+    @Test
     fun `compaction retires replaced rows created in the current scope`() {
         val source = LpBuilder().apply { addVar(0L, 3L) }.build(Sense.MINIMIZE)
         val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
@@ -292,7 +310,9 @@ class LpScopedRowsTest {
         assertNotNull(checkedLpWitness(model, listOf(BigFraction.ONE)))
         assertNull(exactLagrangian(model, listOf(BigFraction.ONE)))
         assertFalse(sourceFarkasValid(model, longArrayOf(1)))
-        assertNull(integerCertify(model, doubleArrayOf(1.0)))
+        val certificate = assertNotNull(integerCertify(model, doubleArrayOf(1.0)))
+        assertEquals(0L, certificate.objectiveBoundCeil(0L))
+        assertFalse(certificate.dualNonzeroRow(0))
         assertTrue(trail.state.baseModel.row(0).strict)
         assertTrue(trail.state.baseModel.column(1).integral)
     }

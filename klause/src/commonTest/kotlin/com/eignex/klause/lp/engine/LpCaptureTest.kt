@@ -16,6 +16,32 @@ import kotlin.test.assertTrue
 
 class LpCaptureTest {
     @Test
+    fun `mixed structural capture restores scoped rows without dropping permanent definitions`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 3L, cost = 1L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))
+        val rows = listOf(
+            LpScopedRow(0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L), logical),
+            LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L), logical),
+        )
+        val capture = LpExactCapture.capture(
+            source, LpReplaySettings("mixed-rows", 1L, componentSplit = false, solverKind = LpReplaySolverKind.PERSISTENT),
+            listOf(
+                LpExactReplayEvent.Push(), LpExactReplayEvent.Extend(emptyList(), rows, true, setOf(0L)),
+                LpExactReplayEvent.Solve(), LpExactReplayEvent.Pop(0), LpExactReplayEvent.Solve(),
+            ),
+        )
+
+        val decoded = LpExactCapture.decode(capture.encode())
+        val report = LpExactReplay.replay(decoded)
+
+        assertContentEquals(capture.encode(), decoded.encode())
+        assertEquals(setOf(0L), (decoded.events[1] as LpExactReplayEvent.Extend).permanentRows)
+        assertTrue(report.steps.all { it.accepted })
+        assertEquals(listOf(BigFraction.ofLong(2L), BigFraction.ONE), report.steps.mapNotNull { it.result?.lowerBound })
+    }
+
+    @Test
     fun `version two captures retain row authority when upgraded`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 1L)

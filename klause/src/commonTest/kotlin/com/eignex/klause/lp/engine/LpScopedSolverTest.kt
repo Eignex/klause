@@ -23,6 +23,31 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `mixed row lifetimes prepare once and keep a permanent definition through pop`() {
+        val source = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))
+        val rows = listOf(
+            LpScopedRow(0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L), logical),
+            LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L), logical),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+
+            assertTrue(owner.replaceRows(emptySet(), emptyList(), rows, true, permanentRows = setOf(0L)))
+
+            assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
+            assertEquals(2L, owner.metrics.createdOwners)
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.state.rows.row(0).active)
+            assertFalse(owner.state.rows.row(1).active)
+            assertTrue(owner.compact())
+            assertEquals(1, owner.state.model.m)
+        }
+    }
+
+    @Test
     fun `adding a redundant row preserves the solved parent basis`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 3L, cost = 1L)

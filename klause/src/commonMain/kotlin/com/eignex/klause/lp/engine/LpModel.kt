@@ -939,8 +939,10 @@ internal class ExactLpNumber private constructor(val value: BigFraction, val iee
         ieeeBits?.let { Double.fromBits(it) } ?: value.toDouble()
     }
 
-    fun legacyLong(): Long? {
-        if (ieeeBits != null || value.den != BIG_ONE ||
+    fun legacyLong(): Long? = if (ieeeBits == null) exactLong() else null
+
+    fun exactLong(): Long? {
+        if (value.den != BIG_ONE ||
             value.num < minimumLong || value.num > maximumLong
         ) {
             return null

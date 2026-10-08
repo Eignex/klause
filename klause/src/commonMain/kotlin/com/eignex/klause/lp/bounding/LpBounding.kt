@@ -8,6 +8,7 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpResult
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.FarkasRoute
+import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpCertifier
@@ -22,10 +23,12 @@ import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
 import com.eignex.klause.lp.engine.exactConstant
+import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactCost
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.finiteExactInput
 import com.eignex.klause.lp.engine.integerCertify
+import com.eignex.klause.lp.engine.hasIntegralObjective
 import com.eignex.klause.lp.engine.lowerBoundDouble
 import com.eignex.klause.lp.engine.lpConditioning
 import com.eignex.klause.lp.engine.newPersistentLpSolver
@@ -705,8 +708,11 @@ internal fun LpEngine.applySparseReducedCostFixing(
         val res = when {
             // A positive reduced cost is minimized at the certificate model's lower endpoint.
             sign > 0 -> {
+                val side = relaxation.model.exactBounds(col).lower ?: continue
+                val endpoint = ExactLpNumber.of(relaxation.model.exactShift(col) + side.number.value).exactLong()
+                    ?: continue
                 val hi = try {
-                    addExact(relaxation.model.loShift[col], dMax)
+                    addExact(endpoint, dMax)
                 } catch (_: CheckedLongOverflowException) {
                     continue
                 }
@@ -720,9 +726,11 @@ internal fun LpEngine.applySparseReducedCostFixing(
 
             // A negative reduced cost is minimized at the certificate model's upper endpoint.
             sign < 0 -> {
+                val side = relaxation.model.exactBounds(col).upper ?: continue
+                val endpoint = ExactLpNumber.of(relaxation.model.exactShift(col) + side.number.value).exactLong()
+                    ?: continue
                 val lo = try {
-                    val certificateMax = addExact(relaxation.model.loShift[col], relaxation.model.upper[col])
-                    subExact(certificateMax, dMax)
+                    subExact(endpoint, dMax)
                 } catch (_: CheckedLongOverflowException) {
                     continue
                 }
@@ -821,28 +829,37 @@ internal fun reducedCostFixingReasons(
 
 private fun LpEngine.sourceObjectiveRange(relaxation: LpRelaxation): LongRange? {
     val model = relaxation.model
-    if (!model.finiteExactInput() || model.cost.size != model.numVars || model.loShift.size != model.n) return null
-    if (model.exactConstant() != BigFraction.ofLong(model.objConstant)) return null
+    if (!model.finiteExactInput() || !model.hasIntegralObjective()) return null
+    val source = model.exactState?.model
+    source?.objective?.let {
+        if (it.scale.value != BigFraction.ONE || !it.externalConstant.value.isZero) return null
+    }
+    if (source == null && model.exactConstant() != BigFraction.ofLong(model.objConstant)) return null
+    val objectiveConstant = ExactLpNumber.of(model.exactConstant()).exactLong() ?: return null
+    fun costAt(column: Int): Long? = if (source != null) {
+        source.objective.cost(column).exactLong()
+    } else if (model.doubleView == null) {
+        model.cost[column]
+    } else {
+        model.cost[column].takeIf { model.exactCost(column) == BigFraction.ofLong(it) }
+    }
     val constant = Int128().also {
-        it.addLong(model.objConstant)
+        it.addLong(objectiveConstant)
         it.addLong(relaxation.objectiveConstant)
     }
     for (j in 0 until model.numVars) {
-        val cost = model.cost[j]
-        if (model.exactCost(j) != BigFraction.ofLong(cost)) return null
+        val cost = costAt(j) ?: return null
         if (cost == 0L) continue
-        if (j >= model.n || model.colContinuous[j] ||
-            model.exactShift(j) != BigFraction.ofLong(model.loShift[j])
-        ) {
-            return null
-        }
-        val shift = Int128().also { it.addProduct(cost, model.loShift[j]) }
+        if (j >= model.n || model.colContinuous[j]) return null
+        if (source == null && model.exactShift(j) != BigFraction.ofLong(model.loShift[j])) return null
+        val origin = ExactLpNumber.of(model.exactShift(j)).exactLong() ?: return null
+        val shift = Int128().also { it.addProduct(cost, origin) }
         constant.subtract(shift)
     }
     val minimum = constant.copy()
     val maximum = constant.copy()
     for (j in 0 until model.n) {
-        val cost = model.cost[j]
+        val cost = costAt(j) ?: return null
         if (cost == 0L) continue
         val source = relaxation.colVarId.getOrNull(j) ?: return null
         val isBool = relaxation.colIsBool.getOrNull(j) ?: return null

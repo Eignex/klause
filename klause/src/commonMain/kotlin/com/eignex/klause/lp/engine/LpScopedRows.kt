@@ -32,10 +32,10 @@ internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
 
     fun append(id: Long, depth: Int?): LpScopedRows = append(listOf(id), depth)
 
-    fun append(ids: List<Long>, depth: Int?): LpScopedRows = if (ids.isEmpty()) {
+    fun append(ids: List<Long>, depth: Int?, permanent: Set<Long> = emptySet()): LpScopedRows = if (ids.isEmpty()) {
         this
     } else {
-        LpScopedRows(identities + ids.map { LpRowIdentity(it, depth) }, ids.last())
+        LpScopedRows(identities + ids.map { id -> LpRowIdentity(id, if (id in permanent) null else depth) }, ids.last())
     }
 
     fun deactivate(indices: Set<Int>): LpScopedRows = LpScopedRows(

@@ -1023,9 +1023,11 @@ internal sealed class LpExactReplayEvent(val eventVersion: Int = LP_EXACT_EVENT_
         columns: List<LpStructuralColumn>,
         rows: List<LpScopedRow>,
         val scoped: Boolean,
+        permanentRows: Set<Long> = emptySet(),
     ) : LpExactReplayEvent() {
         val columns: List<LpStructuralColumn> = columns.toList()
         val rows: List<LpScopedRow> = rows.toList()
+        val permanentRows: Set<Long> = permanentRows.toSet()
     }
     class Compact : LpExactReplayEvent()
     class Push : LpExactReplayEvent()
@@ -1395,7 +1397,7 @@ private fun CaptureWriter.exactEvent(event: LpExactReplayEvent) {
             is LpExactReplayEvent.Deactivate -> 8
             is LpExactReplayEvent.Compact -> 9
             is LpExactReplayEvent.Suspend -> 10
-            is LpExactReplayEvent.Extend -> 11
+            is LpExactReplayEvent.Extend -> if (event.permanentRows.isEmpty()) 11 else 12
         },
     )
     int(event.eventVersion)
@@ -1438,6 +1440,7 @@ private fun CaptureWriter.exactEvent(event: LpExactReplayEvent) {
             int(event.rows.size)
             event.rows.forEach { scopedRow(it) }
             bool(event.scoped)
+            if (event.permanentRows.isNotEmpty()) longs(event.permanentRows.sorted().toLongArray())
         }
 
         is LpExactReplayEvent.Compact -> Unit
@@ -1471,11 +1474,13 @@ private fun CaptureReader.exactEvent(captureVersion: Int): LpExactReplayEvent {
             LpExactReplayEvent.Suspend(longs().toSet())
         }
 
-        11 -> {
+        11, 12 -> {
             require(captureVersion >= 3) { "structural extension requires exact LP capture version 3" }
             val columns = List(collectionCount()) { LpStructuralColumn(exactColumn(), exactNumber()) }
             val rows = List(collectionCount()) { scopedRow() }
-            LpExactReplayEvent.Extend(columns, rows, bool())
+            val scoped = bool()
+            val permanent = if (code == 12) longs().toSet() else emptySet()
+            LpExactReplayEvent.Extend(columns, rows, scoped, permanent)
         }
 
         else -> error("unknown exact LP event type $code")
