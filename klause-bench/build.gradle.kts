@@ -157,6 +157,23 @@ tasks.register<JavaExec>("bench") {
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
+tasks.register<JavaExec>("solveCampaign") {
+    group = "bench"
+    description = "Build the JVM CLI and run a solve or solve-one campaign."
+    dependsOn(":klause-cli:installJvmDist")
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.eignex.klause.bench.target.BenchCli")
+    val workspaceRoot = rootDir.absolutePath
+    forwardBenchProps()
+    doFirst {
+        require(args?.firstOrNull() in listOf("solve", "solve-one")) {
+            "Use --args=\"solve ...\" or --args=\"solve-one ...\""
+        }
+        systemProperty("klause.workspace.root", workspaceRoot)
+        environment("JAVA_HOME", javaLauncher.get().metadata.installationPath.asFile.absolutePath)
+    }
+}
+
 tasks.register<JavaExec>("intDomainMicrobench") {
     group = "bench"
     description = "Run host-sensitive IntDomain representation timing probes."

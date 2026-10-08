@@ -13,6 +13,9 @@ import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
+internal const val PINNED_SOURCE_POLICY = "minizinc-pinned-source-v1"
+internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
+
 @Serializable
 internal data class SourceValidation(val status: String, val reason: String)
 
