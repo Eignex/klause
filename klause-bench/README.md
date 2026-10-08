@@ -188,7 +188,22 @@ Klause cache keys include SHA-256 hashes of every installed distribution file (l
 all dependency jars), the selected Java runtime files, OS/architecture and inherited Java/runtime
 options. Hashes use relative paths and file contents, so a byte-identical rebuild reuses results;
 a replaced jar invalidates results even if the launcher timestamp and source commit are unchanged.
-One campaign captures one installed build; keep its distribution and runtime fixed while it runs.
+Keep the installed distribution and runtime fixed while a campaign runs. For a campaign that starts a
+bench JVM per case, capture their hashes once after installing the CLI and bench:
+
+```bash
+cd klause-bench
+./build/install/klause-bench/bin/klause-bench provenance out=build/provenance.json
+export KLAUSE_BENCH_PROVENANCE="$PWD/build/provenance.json"
+```
+
+Each bench process validates the manifest's absolute roots, file set, identities, sizes, modification
+and change times before reusing the hashes. Manifests require Unix file metadata; changed files or a
+copied installation are refused. Generate a fresh manifest after installing or restoring a build on
+each host. Without the environment variable, the bench hashes the installed trees itself.
+Inherited runtime options are captured for each case. The harness-only `-Dklause.bench.cache`,
+`-Dklause.bench.corpusCache` and `-Dklause.workspace.root` properties are excluded from the
+fingerprint; solver JVM options and input-processing properties remain.
 
 Per-problem JSON records carry `buildProvenance`, `buildFingerprint` and `validationPolicy`.
 `gitSha` describes the harness checkout and does not identify the installed solver. Cache keys also

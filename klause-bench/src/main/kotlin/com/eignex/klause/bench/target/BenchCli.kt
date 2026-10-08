@@ -8,6 +8,7 @@ import com.eignex.klause.bench.catalog.ProblemSets
 import com.eignex.klause.bench.metric.ArmMining
 import com.eignex.klause.bench.metric.BenchCache
 import com.eignex.klause.bench.metric.ClaspReference
+import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.InstanceClassifier
 import com.eignex.klause.bench.metric.InstanceFeatures
 import com.eignex.klause.bench.metric.KlauseSearch
@@ -103,6 +104,12 @@ object BenchCli {
 
             "validate-solution" -> validateSolution(args.drop(1))
 
+            "provenance" -> {
+                val output = args.drop(1).singleOrNull()?.takeIf { it.startsWith("out=") }?.substringAfter('=')
+                require(!output.isNullOrBlank()) { "Use provenance out=<file>" }
+                InstalledBuild.writeManifest(File(output))
+            }
+
             "reference" -> reference(args.drop(1))
 
             "classify" -> classify(args.drop(1))
@@ -117,7 +124,7 @@ object BenchCli {
                 error(
                     "unknown command '$cmd' " +
                         "(commands: solve, solve-one, validate-solution, select, preview, reference, " +
-                        "classify, credit, mine, corpus, list)",
+                        "classify, credit, mine, corpus, provenance, list)",
                 )
         }
     }
@@ -647,6 +654,7 @@ object BenchCli {
             |  bench preview [filters…]              show what a run would cover
             |  bench select [filters…]               the selection as JSON lines (suite, problem, …)
             |  bench solve-one suite= problem= […]   solve one instance; out=<dir> for its record
+            |  bench provenance out=<file>           capture installed build/runtime once for immutable campaigns
             |  bench corpus compress [<dir>]         zstd-compress the plain instances in the corpus cache, in place
             |  bench list [<suite>]                  list suites, or problems in a suite
             |
