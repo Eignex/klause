@@ -149,10 +149,14 @@ object OpenTheoryPipeline {
     /**
      * Execute [request] on the open portfolio: its theory route as one arm — the descent when it optimizes — and
      * local-search arms over the source columns beside it, every local-search witness checked against the source
-     * model.
+     * model. The arms run on up to [cores] lanes at once.
      */
-    fun executePortfolio(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
-        val portfolio = OpenPortfolio(request.model, request, params)
+    fun executePortfolio(
+        request: OpenTheoryRequest,
+        params: TheoryParams = TheoryParams(),
+        cores: Int = 1,
+    ): OpenTheoryExecution {
+        val portfolio = OpenPortfolio(request.model, request, params, lanes = cores)
         val stop = params.cancellation or params.timeout
         val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizerFor(request, objective), stop))
@@ -166,8 +170,9 @@ object OpenTheoryPipeline {
         model: Problem,
         params: TheoryParams = TheoryParams(),
         objective: LinearObjective? = null,
+        cores: Int = 1,
     ): OpenTheoryExecution {
-        val portfolio = OpenPortfolio(model, request = null, params)
+        val portfolio = OpenPortfolio(model, request = null, params, lanes = cores)
         val stop = params.cancellation or params.timeout
         if (objective == null) return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizer = null, stop))
@@ -187,13 +192,18 @@ object OpenTheoryPipeline {
      * Execute [request] the way [engine] asks: [FiniteEngine.MIXED] on the open portfolio, the theory beside local
      * search; [FiniteEngine.BACKTRACK] and [FiniteEngine.FIXED] through the theory alone; [FiniteEngine.LOCAL_SEARCH]
      * with local search alone, which never refutes the model or proves an optimum. [FiniteEngine.ALNS] has no open
-     * route.
+     * route. A portfolio runs on up to [cores] lanes.
      */
-    fun execute(request: OpenTheoryRequest, params: TheoryParams, engine: FiniteEngine): OpenTheoryExecution =
+    fun execute(
+        request: OpenTheoryRequest,
+        params: TheoryParams,
+        engine: FiniteEngine,
+        cores: Int = 1,
+    ): OpenTheoryExecution =
         when (engine) {
-            FiniteEngine.MIXED -> executePortfolio(request, params)
+            FiniteEngine.MIXED -> executePortfolio(request, params, cores)
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> execute(request, params)
-            FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(request.model, params, request.minimizedObjective)
+            FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(request.model, params, request.minimizedObjective, cores)
             FiniteEngine.ALNS -> throw IllegalArgumentException("engine `${engine.id}` has no open-model route")
         }
 
@@ -207,8 +217,9 @@ object OpenTheoryPipeline {
         params: TheoryParams,
         objective: LinearObjective?,
         engine: FiniteEngine,
+        cores: Int = 1,
     ): OpenTheoryExecution = when (engine) {
-        FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective)
+        FiniteEngine.MIXED, FiniteEngine.LOCAL_SEARCH -> searchWithoutTheory(model, params, objective, cores)
 
         FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> {
             val stats = SolveStats.EMPTY

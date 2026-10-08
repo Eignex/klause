@@ -50,14 +50,15 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `the theory arm refutes an unsatisfiable open model`() {
+    fun `the theory arm refutes an unsatisfiable open model on one lane or several`() {
         // 2·x0 = 1 has no integer solution, which local search can never show.
         val model = openColumns(1, Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1))
         val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
+        for (cores in listOf(1, 4)) {
+            val result = satisfied(OpenTheoryPipeline.executePortfolio(request, params(), cores))
 
-        val result = satisfied(OpenTheoryPipeline.executePortfolio(request, params()))
-
-        assertIs<OpenTheoryResult.Unsat>(result)
+            assertIs<OpenTheoryResult.Unsat>(result, "cores=$cores")
+        }
     }
 
     @Test
@@ -82,7 +83,7 @@ class OpenPortfolioTest {
     }
 
     @Test
-    fun `the portfolio proves the optimum of an open model`() {
+    fun `the portfolio proves the optimum of an open model on one lane or several`() {
         // Minimize x0 + x1 with x0 ≥ 7 and x1 ≥ x0 − 2 over open columns: 7 + 5.
         val model = openColumns(
             2,
@@ -90,10 +91,11 @@ class OpenPortfolioTest {
             Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.GE, -2),
         )
         val request = OpenTheoryRequest(model, LinearObjective(intCoefficients = longArrayOf(1, 1)))
+        for (cores in listOf(1, 4)) {
+            val result = optimum(OpenTheoryPipeline.executePortfolio(request, params(), cores))
 
-        val result = optimum(OpenTheoryPipeline.executePortfolio(request, params()))
-
-        assertEquals(bigIntOf(12), assertIs<OpenTheoryOptimum.Optimal>(result).value)
+            assertEquals(bigIntOf(12), assertIs<OpenTheoryOptimum.Optimal>(result, "cores=$cores").value)
+        }
     }
 
     @Test

@@ -82,13 +82,16 @@ internal object SolveCore {
             it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch
         }
         if (open && engine == FiniteEngine.ALNS) usageError("engine `${engine.id}` has no open-model route")
+        // `-p N` gives the open portfolio a lane per core, as it does the finite one.
+        val openCores = common.parallel ?: 1
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenLocalSearch -> {
                 val params = TheoryParams(cancellation = deadlineCancel, timeout = deadlineCancel)
                 val objective = pipeline.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = pipeline.maximize)
-                    val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, objective, engine)
+                    val execution =
+                        OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, objective, engine, openCores)
                     reportOpenTheoryOptimum(
                         (execution as OpenTheoryExecution.Optimize).result,
                         pipeline.maximize,
@@ -103,7 +106,7 @@ internal object SolveCore {
                     return
                 }
                 output.begin(optimize = false, maximize = false)
-                val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, null, engine)
+                val execution = OpenTheoryPipeline.searchWithoutTheory(pipeline.model, params, null, engine, openCores)
                 val result = (execution as OpenTheoryExecution.Satisfy).result
                 output.onVerdictContext(
                     VerdictContext(
@@ -175,7 +178,7 @@ internal object SolveCore {
                 val objective = request.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = request.maximize)
-                    val execution = OpenTheoryPipeline.execute(request, theoryParams, engine)
+                    val execution = OpenTheoryPipeline.execute(request, theoryParams, engine, openCores)
                     reportOpenTheoryOptimum(
                         (execution as OpenTheoryExecution.Optimize).result,
                         request.maximize,
@@ -191,7 +194,7 @@ internal object SolveCore {
                     return
                 }
                 output.begin(optimize = false, maximize = false)
-                val execution = OpenTheoryPipeline.execute(request, theoryParams, engine)
+                val execution = OpenTheoryPipeline.execute(request, theoryParams, engine, openCores)
                 val result = (execution as OpenTheoryExecution.Satisfy).result
                 val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(rawSolvable.routingLpStats))
                 output.onVerdictContext(

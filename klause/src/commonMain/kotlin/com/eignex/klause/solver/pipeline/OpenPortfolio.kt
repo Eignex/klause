@@ -27,6 +27,8 @@ import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toDouble
+import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.stream.lock
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.Duration
@@ -43,6 +45,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * Local search proposes witnesses only, never refuting an open model or proving a bound, and every witness it
  * proposes is checked against the source model before it counts. A model no theory decides ([request] null) runs
  * local search alone, so it can be shown satisfiable and never shown unsatisfiable or optimal.
+ *
+ * The arms run on up to [lanes] threads, each arm on at most one at a time.
  */
 internal class OpenPortfolio(
     private val model: Problem,
@@ -50,10 +54,13 @@ internal class OpenPortfolio(
     private val theoryParams: TheoryParams,
     private val localSearchArms: Int = DEFAULT_LS_ARMS,
     private val seed: Long = 0L,
+    private val lanes: Int = 1,
 ) {
     // The theory arm's witnesses as the pool saw them: each may hold integers past the 64-bit range a Sample cannot
-    // carry, so the pool's copy is only a stand-in for it.
+    // carry, so the pool's copy is only a stand-in for it. The witness check reads them from every lane while the
+    // theory arm adds to them, so both go through [lock].
     private val theoryWitnesses = ArrayList<TheoryWitness>()
+    private val lock = (if (lanes > 1) Concurrency.Strict else Concurrency.None).lock()
     private var descentVerdict: OpenTheoryOptimum? = null
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
@@ -74,7 +81,7 @@ internal class OpenPortfolio(
         // local search's early finds talk the policy out of it, so the theory is owed most of the time outright.
         val portfolio = Portfolio.thompson(
             workers,
-            lanes = 1,
+            lanes = lanes.coerceIn(1, workers.size),
             seed = seed,
             witnessCheck = witnessCheck(null),
             minShares = DoubleArray(workers.size).also { if (request != null) it[0] = THEORY_SHARE },
@@ -113,7 +120,7 @@ internal class OpenPortfolio(
         // policy, which local search's frequent improvements would otherwise talk out of scheduling it.
         val portfolio = Portfolio.thompson(
             workers,
-            lanes = 1,
+            lanes = lanes.coerceIn(1, workers.size),
             seed = seed,
             reseedStaleThreshold = 0,
             witnessCheck = witnessCheck(objective),
@@ -145,16 +152,22 @@ internal class OpenPortfolio(
     }
 
     private fun best(sample: Sample, objective: LinearObjective): Pair<OpenTheoryAssignment, BigInt> {
-        val pooled = theoryWitnesses.firstOrNull { it.sample === sample }
+        val pooled = witnessOf(sample)
         val pool = (pooled?.assignment ?: OpenTheoryAssignment.Sampled(sample)) to
             (pooled?.value ?: objective.exactValue(sample))
-        val descent = theoryWitnesses.mapNotNull { w -> w.value?.let { w.assignment to it } }
+        val descent = lock.withLock { theoryWitnesses.toList() }.mapNotNull { w -> w.value?.let { w.assignment to it } }
             .reduceOrNull { best, next -> if (next.second < best.second) next else best }
         return if (descent != null && descent.second < pool.second) descent else pool
     }
 
     private fun assignmentOf(sample: Sample): OpenTheoryAssignment =
-        theoryWitnesses.firstOrNull { it.sample === sample }?.assignment ?: OpenTheoryAssignment.Sampled(sample)
+        witnessOf(sample)?.assignment ?: OpenTheoryAssignment.Sampled(sample)
+
+    private fun witnessOf(sample: Sample): TheoryWitness? =
+        lock.withLock { theoryWitnesses.firstOrNull { it.sample === sample } }
+
+    private fun installedWitnessOf(assignment: OpenTheoryAssignment): TheoryWitness? =
+        lock.withLock { theoryWitnesses.firstOrNull { it.assignment === assignment } }
 
     // The theory exactly as the default open route decides it.
     private fun decide(request: OpenTheoryRequest, params: TheoryParams): OpenTheoryResult =
@@ -192,7 +205,7 @@ internal class OpenPortfolio(
     // The pool's stand-in for a theory witness, remembered so the exact witness can be read back.
     private fun pooled(assignment: OpenTheoryAssignment, value: BigInt?): TheoryWitness =
         TheoryWitness(assignment.toSampleOrPlaceholder(model), assignment, value)
-            .also { theoryWitnesses += it }
+            .also { lock.withLock { theoryWitnesses += it } }
 
     private fun descentWorker(minimizer: OpenTheoryMinimizer, armId: Int): PortfolioWorker = PortfolioWorker.ofMinimize(
         "theory/${minimizer.theoryPipeline.name.lowercase()}",
@@ -245,7 +258,7 @@ internal class OpenPortfolio(
 
             // The descent reports a verdict on a witness it installed, so the pool already holds its stand-in.
             private fun standIn(assignment: OpenTheoryAssignment, value: BigInt): Sample =
-                (theoryWitnesses.firstOrNull { it.assignment === assignment } ?: pooled(assignment, value)).sample
+                (installedWitnessOf(assignment) ?: pooled(assignment, value)).sample
 
             override fun close() = descent.close()
         }
@@ -298,7 +311,7 @@ internal class OpenPortfolio(
     // A local-search witness is re-derived from the source model, and its objective must be the one it claims
     // wherever a Double states that exactly; the theory arm's witnesses are exact by construction.
     private fun witnessCheck(objective: LinearObjective?): WitnessCheck = WitnessCheck { sample, claimed ->
-        if (theoryWitnesses.any { it.sample === sample }) return@WitnessCheck null
+        if (witnessOf(sample) != null) return@WitnessCheck null
         refuteOpenWitness(model, sample)?.let { return@WitnessCheck it }
         if (objective == null || claimed == null) return@WitnessCheck null
         val exact = objective.exactValue(sample)
