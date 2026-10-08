@@ -58,7 +58,7 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `a domain past the 32-bit range offers no local search to a mixed pool`() {
+    fun `a domain past the 32-bit range offers local search to a mixed pool`() {
         val wide = 1L shl 40
         val problem = Problem(
             numBoolVars = 0,
@@ -67,6 +67,6 @@ class ArmNeedsTest {
             factors = arrayOf<Factor>(Linear(longArrayOf(1L), intArrayOf(0), LinearOp.GE, 3L)),
         ).bake()
 
-        assertFalse(ProblemFacts.of(problem, Kind.CSP, LpConfig.AGGRESSIVE).offers(ArmNeed.LocalSearch))
+        assertTrue(ProblemFacts.of(problem, Kind.CSP, LpConfig.AGGRESSIVE).offers(ArmNeed.LocalSearch))
     }
 }
