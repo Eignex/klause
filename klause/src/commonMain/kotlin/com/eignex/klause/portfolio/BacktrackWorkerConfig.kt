@@ -157,7 +157,7 @@ internal class BacktrackWorkerConfig(
 private fun BacktrackParams.separatesCuts(): Boolean {
     val config = lpConfig
     return lpPlan.cuts || lpPlan.circuit ||
-        config != null && (config.resolved(LpTechnique.CUTS) || config.resolved(LpTechnique.CIRCUIT))
+        (config != null && (config.resolved(LpTechnique.CUTS) || config.resolved(LpTechnique.CIRCUIT)))
 }
 
 /** Cap this recipe under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
