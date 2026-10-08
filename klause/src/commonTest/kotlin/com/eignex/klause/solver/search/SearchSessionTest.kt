@@ -709,6 +709,24 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `a skipped model stops the run once the deadline has passed`() {
+        var skipped = 0
+        val session = SearchSession(emptyList(), cancellation = Cancellation { skipped > 0 })
+        val run = session.openRun(
+            numBoolVars = 10,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition {
+                    skipped++
+                    return SearchModelDisposition.Skip
+                }
+            },
+        )
+
+        assertIs<SearchRunEvent.Indeterminate>(run.next())
+        assertEquals(1, skipped)
+    }
+
+    @Test
     fun `node policy prunes through the shared frame stack`() {
         var calls = 0
         val session = SearchSession(emptyList())
