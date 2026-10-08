@@ -2434,7 +2434,7 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.stats.<get-stats>|<get-stats>(){}[0]
 
     final class Bounded : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment?, com.ionspin.kotlin.bignum.integer/BigInteger?, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.ionspin.kotlin.bignum.integer.BigInteger?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment?, com.eignex.klause.simplex.exact/BigFraction?, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.klause.simplex.exact.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
 
         final val incumbent // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.incumbent|{}incumbent[0]
             final fun <get-incumbent>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
@@ -2443,13 +2443,13 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value|{}value[0]
-            final fun <get-value>(): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value.<get-value>|<get-value>(){}[0]
+            final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value.<get-value>|<get-value>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component1|component1(){}[0]
-        final fun component2(): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component2|component2(){}[0]
+        final fun component2(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component4|component4(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment? = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.ionspin.kotlin.bignum.integer.BigInteger?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment? = ..., com.eignex.klause.simplex.exact/BigFraction? = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.klause.simplex.exact.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.toString|toString(){}[0]
@@ -2469,38 +2469,38 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
     }
 
     final class Optimal : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.ionspin.kotlin.bignum.integer/BigInteger, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.ionspin.kotlin.bignum.integer.BigInteger;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats){}[0]
 
         final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.assignment.<get-assignment>|<get-assignment>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value|{}value[0]
-            final fun <get-value>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value.<get-value>|<get-value>(){}[0]
+            final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value.<get-value>|<get-value>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component1|component1(){}[0]
-        final fun component2(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component2|component2(){}[0]
+        final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.ionspin.kotlin.bignum.integer/BigInteger = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.ionspin.kotlin.bignum.integer.BigInteger;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.toString|toString(){}[0]
     }
 
     final class Unbounded : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.ionspin.kotlin.bignum.integer/BigInteger, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.ionspin.kotlin.bignum.integer.BigInteger;com.eignex.klause.solver.result.SolveStats){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats){}[0]
 
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value|{}value[0]
-            final fun <get-value>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value.<get-value>|<get-value>(){}[0]
+            final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value.<get-value>|<get-value>(){}[0]
         final val witness // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.witness|{}witness[0]
             final fun <get-witness>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.witness.<get-witness>|<get-witness>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component1|component1(){}[0]
-        final fun component2(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component2|component2(){}[0]
+        final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.ionspin.kotlin.bignum.integer/BigInteger = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.ionspin.kotlin.bignum.integer.BigInteger;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.toString|toString(){}[0]
@@ -10567,7 +10567,7 @@ final class com.eignex.klause.solver.pipeline/PortfolioPlanRequest { // com.eign
 }
 
 final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klause.solver.pipeline/TheoryParams|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.backtrack/NodeBudget? = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?){}[0]
 
     final val cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
@@ -10579,6 +10579,8 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
         final fun <get-maxLearnedClauses>(): kotlin/Int? // com.eignex.klause.solver.pipeline/TheoryParams.maxLearnedClauses.<get-maxLearnedClauses>|<get-maxLearnedClauses>(){}[0]
     final val maxLeaves // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves|{}maxLeaves[0]
         final fun <get-maxLeaves>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves.<get-maxLeaves>|<get-maxLeaves>(){}[0]
+    final val nodeBudget // com.eignex.klause.solver.pipeline/TheoryParams.nodeBudget|{}nodeBudget[0]
+        final fun <get-nodeBudget>(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/TheoryParams.nodeBudget.<get-nodeBudget>|<get-nodeBudget>(){}[0]
     final val openBranching // com.eignex.klause.solver.pipeline/TheoryParams.openBranching|{}openBranching[0]
         final fun <get-openBranching>(): com.eignex.klause.solver.pipeline/OpenBranching // com.eignex.klause.solver.pipeline/TheoryParams.openBranching.<get-openBranching>|<get-openBranching>(){}[0]
     final val openHintFlips // com.eignex.klause.solver.pipeline/TheoryParams.openHintFlips|{}openHintFlips[0]
@@ -10595,6 +10597,7 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
     final fun component1(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component1|component1(){}[0]
     final fun component10(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component10|component10(){}[0]
     final fun component11(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component11|component11(){}[0]
+    final fun component12(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/TheoryParams.component12|component12(){}[0]
     final fun component2(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component3|component3(){}[0]
     final fun component4(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component4|component4(){}[0]
@@ -10603,7 +10606,7 @@ final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klaus
     final fun component7(): kotlin/Long? // com.eignex.klause.solver.pipeline/TheoryParams.component7|component7(){}[0]
     final fun component8(): com.eignex.klause.solver.pipeline/OpenBranching // com.eignex.klause.solver.pipeline/TheoryParams.component8|component8(){}[0]
     final fun component9(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component9|component9(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Int = ..., kotlin/Long? = ..., com.eignex.klause.solver.pipeline/OpenBranching = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.backtrack/NodeBudget? = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long?;kotlin.Int?;kotlin.Int;kotlin.Long?;com.eignex.klause.solver.pipeline.OpenBranching;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TheoryParams.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TheoryParams.toString|toString(){}[0]

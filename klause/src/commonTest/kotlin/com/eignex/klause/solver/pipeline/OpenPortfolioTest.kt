@@ -6,10 +6,10 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -94,7 +94,7 @@ class OpenPortfolioTest {
         for (cores in listOf(1, 4)) {
             val result = optimum(OpenTheoryPipeline.executePortfolio(request, params(), cores))
 
-            assertEquals(bigIntOf(12), assertIs<OpenTheoryOptimum.Optimal>(result, "cores=$cores").value)
+            assertEquals(BigFraction.ofLong(12), assertIs<OpenTheoryOptimum.Optimal>(result, "cores=$cores").value)
         }
     }
 
@@ -111,6 +111,6 @@ class OpenPortfolioTest {
 
         val result = optimum(OpenTheoryPipeline.searchWithoutTheory(model, params, objective))
 
-        assertEquals(bigIntOf(12), assertIs<OpenTheoryOptimum.Bounded>(result).value)
+        assertEquals(BigFraction.ofLong(12), assertIs<OpenTheoryOptimum.Bounded>(result).value)
     }
 }

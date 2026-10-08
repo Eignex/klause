@@ -107,8 +107,7 @@ internal object SmtLibMode : CliMode {
     }
 }
 
-// An open model searched by local search alone, minimizing [objective] when there is one. An open optimum is
-// integral, so an objective weighting a continuous column is refused.
+// An open model searched by local search alone, minimizing [objective] when there is one.
 @Suppress("LongParameterList")
 private fun openLocalSearchSmt(
     model: Problem,
@@ -120,9 +119,6 @@ private fun openLocalSearchSmt(
     routingLpStats: LpStats,
     routingElapsedMs: Long,
 ): Solvable {
-    if (objective?.realCoefficients?.any { it != 0.0 } == true) {
-        throw UnsupportedSmtException("open optimization over a continuous objective is unsupported")
-    }
     val maximize = sense == ObjectiveSense.MAXIMIZE
     return openLocalSearchSolvable(
         model,

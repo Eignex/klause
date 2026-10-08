@@ -11,6 +11,7 @@ import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.WitnessCheck
 import com.eignex.klause.portfolio.kind
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -107,7 +108,9 @@ internal class OpenPortfolio(
         minimizer: OpenTheoryMinimizer?,
         cancellation: Cancellation,
     ): OpenTheoryOptimum {
-        require(objective.realCoefficients.none { it != 0.0 }) { "an open optimum weights no continuous column" }
+        require(minimizer == null || objective.realCoefficients.none { it != 0.0 }) {
+            "the theory's descent minimizes no continuous column"
+        }
         val firstLocalArm = if (minimizer != null) 1 else 0
         val localSearch = localSearchWorkers(firstLocalArm, cancellation, objective)
         if (localSearch.isEmpty()) {
@@ -155,11 +158,12 @@ internal class OpenPortfolio(
         is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
     }
 
-    private fun best(sample: Sample, objective: LinearObjective): Pair<OpenTheoryAssignment, BigInt> {
+    private fun best(sample: Sample, objective: LinearObjective): Pair<OpenTheoryAssignment, BigFraction> {
         val pooled = witnessOf(sample)
         val pool = (pooled?.assignment ?: OpenTheoryAssignment.Sampled(sample)) to
-            (pooled?.value ?: objective.exactValue(sample))
-        val descent = lock.withLock { theoryWitnesses.toList() }.mapNotNull { w -> w.value?.let { w.assignment to it } }
+            (pooled?.value?.asFraction() ?: objective.exactValue(sample))
+        val descent = lock.withLock { theoryWitnesses.toList() }
+            .mapNotNull { w -> w.value?.let { w.assignment to it.asFraction() } }
             .reduceOrNull { best, next -> if (next.second < best.second) next else best }
         return if (descent != null && descent.second < pool.second) descent else pool
     }
@@ -240,7 +244,7 @@ internal class OpenPortfolio(
                 descentVerdict = verdict
                 return when (verdict) {
                     is OpenTheoryOptimum.Optimal -> MinimizeResult.Optimal(
-                        standIn(verdict.assignment, verdict.value),
+                        standIn(verdict.assignment, verdict.value.num),
                         verdict.value.toDouble(),
                         verdict.stats,
                     )
@@ -248,7 +252,7 @@ internal class OpenPortfolio(
                     is OpenTheoryOptimum.Infeasible -> MinimizeResult.Infeasible(stats = verdict.stats)
 
                     is OpenTheoryOptimum.Unbounded -> MinimizeResult.Unbounded(
-                        standIn(verdict.witness, verdict.value),
+                        standIn(verdict.witness, verdict.value.num),
                         verdict.value.toDouble(),
                         direction = emptyList(),
                         stats = verdict.stats,
@@ -260,7 +264,8 @@ internal class OpenPortfolio(
                 }
             }
 
-            // The descent reports a verdict on a witness it installed, so the pool already holds its stand-in.
+            // The descent reports a verdict on a witness it installed, so the pool already holds its stand-in. Its
+            // objective is integral, so the value's numerator is the value.
             private fun standIn(assignment: OpenTheoryAssignment, value: BigInt): Sample =
                 (installedWitnessOf(assignment) ?: pooled(assignment, value)).sample
 
@@ -278,7 +283,17 @@ internal class OpenPortfolio(
         if (!searchesContinuousOnly && model.numIntVars == 0 && model.numBoolVars == 0) return emptyList()
         val searchModel = LocalSearchModel.open(model)
         // An open model's rows can be strict, which only the theory certifies; it decides each candidate's residual.
-        val completion = if (model.numRealVars > 0) TheoryCompletion(model, theoryParams) else null
+        // An objective over continuous columns is minimized over that residual first.
+        val completion = if (model.numRealVars > 0) {
+            val theory = TheoryCompletion(model, theoryParams)
+            if (objective != null && objective.realCoefficients.any { it != 0.0 }) {
+                OptimizingCompletion(model, objective, theory)
+            } else {
+                theory
+            }
+        } else {
+            null
+        }
         if (!localSearchSupports(searchModel, completes = completion != null)) return emptyList()
         // Every arm starts from the relaxation's optimum inside the search windows rather than near zero; an LP
         // that finds no point in its slice of the budget leaves the arms to their own random starts.
@@ -297,6 +312,7 @@ internal class OpenPortfolio(
                 maxInstructions = budget,
                 cancellation = slice,
                 initialAssignment = from,
+                nodeBudget = theoryParams.nodeBudget,
             )
             val label = "ls/${recipe.label}"
             if (objective == null) {
@@ -313,16 +329,21 @@ internal class OpenPortfolio(
         }
     }
 
-    // A local-search witness is re-derived from the source model, and its objective must be the one it claims
-    // wherever a Double states that exactly; the theory arm's witnesses are exact by construction.
+    // A local-search witness is re-derived from the source model, and its objective must be the one it claims: exactly
+    // wherever a Double states an integral value exactly, and within a relative tolerance where continuous terms make
+    // the claim a floating-point sum. The theory arm's witnesses are exact by construction.
     private fun witnessCheck(objective: LinearObjective?): WitnessCheck = WitnessCheck { sample, claimed ->
         if (witnessOf(sample) != null) return@WitnessCheck null
         refuteOpenWitness(model, sample)?.let { return@WitnessCheck it }
         if (objective == null || claimed == null) return@WitnessCheck null
         val exact = objective.exactValue(sample)
-        val stated = exact.abs() <= bigIntOf(EXACT_DOUBLE_INTEGER)
-        if (!stated || exact.toDouble() == claimed) return@WitnessCheck null
-        "objective $claimed, but the assignment scores $exact"
+        val value = exact.toDouble()
+        val agrees = if (objective.realCoefficients.any { it != 0.0 }) {
+            abs(value - claimed) <= OBJECTIVE_TOLERANCE * maxOf(1.0, abs(value))
+        } else {
+            exact.num.abs() > bigIntOf(EXACT_DOUBLE_INTEGER) || value == claimed
+        }
+        if (agrees) null else "objective $claimed, but the assignment scores $exact"
     }
 
     private class TheoryWitness(val sample: Sample, val assignment: OpenTheoryAssignment, val value: BigInt?)
@@ -342,6 +363,9 @@ internal class OpenPortfolio(
     }
 }
 
+// Relative slack between a local-search arm's claimed objective and the exact one when continuous terms weigh in.
+private const val OBJECTIVE_TOLERANCE = 1e-6
+
 // Every integer up to this magnitude is a Double exactly.
 private const val EXACT_DOUBLE_INTEGER: Long = 1L shl 53
 
@@ -359,8 +383,9 @@ private fun inWindows(sample: Sample, searchModel: LocalSearchModel): Sample {
     return sample.copy(ints = LongArray(domains.size) { domains[it].clamp(sample.ints[it]) })
 }
 
-// The exact value of this objective at [sample], over the integer and Boolean terms an open optimum weights.
-private fun LinearObjective.exactValue(sample: Sample): BigInt {
+// The exact value of this objective at [sample]. A continuous term reads the certified rational value an open witness
+// carries, and its coefficient as the binary rational the Double states.
+private fun LinearObjective.exactValue(sample: Sample): BigFraction {
     var total = bigIntOf(constant)
     for (v in intCoefficients.indices) {
         if (intCoefficients[v] == 0L) continue
@@ -369,5 +394,12 @@ private fun LinearObjective.exactValue(sample: Sample): BigInt {
     for (b in boolWeights.indices) {
         if (boolWeights[b] != 0L && sample.bools[b]) total += bigIntOf(boolWeights[b])
     }
-    return total
+    var value = total.asFraction()
+    for (r in realCoefficients.indices) {
+        val c = realCoefficients[r]
+        if (c == 0.0) continue
+        val x = sample.exactReals?.get(r) ?: checkNotNull(BigFraction.ofDouble(sample.reals[r]))
+        value += checkNotNull(BigFraction.ofDouble(c)) * x
+    }
+    return value
 }

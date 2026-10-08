@@ -10,6 +10,7 @@ import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -32,7 +33,7 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.toLongExact
@@ -86,7 +87,14 @@ internal object SolveCore {
         val openCores = common.parallel ?: 1
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenLocalSearch -> {
-                val params = TheoryParams(cancellation = deadlineCancel, timeout = deadlineCancel)
+                // Local search proves no optimum, so a run without a deadline ends where its node allowance does.
+                val nodeBudget = takeOpenNodeLimit(common)?.let(::NodeBudget)
+                val stop = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
+                val params = TheoryParams(
+                    cancellation = stop,
+                    timeout = deadlineCancel,
+                    nodeBudget = nodeBudget,
+                )
                 val objective = pipeline.objective
                 if (objective != null) {
                     output.begin(optimize = true, maximize = pipeline.maximize)
@@ -882,10 +890,13 @@ private fun reportOpenTheoryOptimum(
     budgetExhausted: (Boolean) -> Boolean,
 ) {
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
-    val reported: (BigInt) -> Long? = { value ->
-        val signed = if (maximize) -value else value
-        // An objective past 64 bits is reported as absent rather than as a wrapped number.
-        if (signed >= LONG_MIN_BIG && signed <= LONG_MAX_BIG) signed.toLongExact() else null
+    // An integral value is reported exactly, and as absent past 64 bits rather than as a wrapped number; a fractional
+    // one, from an objective over continuous columns, as the continuous objective.
+    fun solution(rendered: String, value: BigFraction?) {
+        val signed = if (maximize) value?.negated() else value
+        val integral = signed?.takeIf { it.den == BIG_ONE }?.num
+        val exact = integral?.takeIf { it >= LONG_MIN_BIG && it <= LONG_MAX_BIG }?.toLongExact()
+        output.onSolution(rendered, exact, if (signed != null && integral == null) signed.toDouble() else null)
     }
     output.onVerdictContext(
         VerdictContext(
@@ -895,7 +906,7 @@ private fun reportOpenTheoryOptimum(
     )
     when (result) {
         is OpenTheoryOptimum.Optimal -> {
-            output.onSolution(render(result.assignment), reported(result.value))
+            solution(render(result.assignment), result.value)
             output.onComplete(Verdict.OPTIMAL)
         }
 
@@ -904,7 +915,7 @@ private fun reportOpenTheoryOptimum(
         // The witness is reported like any other solution: it is one, and the verdict beside it says the
         // objective reaches past it without limit rather than that this is the best value found.
         is OpenTheoryOptimum.Unbounded -> {
-            output.onSolution(render(result.witness), reported(result.value))
+            solution(render(result.witness), result.value)
             output.onComplete(Verdict.UNBOUNDED)
         }
 
@@ -913,7 +924,7 @@ private fun reportOpenTheoryOptimum(
             if (incumbent == null) {
                 output.onComplete(Verdict.UNKNOWN)
             } else {
-                output.onSolution(render(incumbent), result.value?.let(reported))
+                solution(render(incumbent), result.value)
                 output.onComplete(Verdict.BEST_FOUND)
             }
         }
