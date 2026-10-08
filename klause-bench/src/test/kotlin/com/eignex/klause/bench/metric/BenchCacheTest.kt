@@ -6,8 +6,55 @@ import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class BenchCacheTest {
+
+    @Test
+    fun `cache reuse requires the same executed build and validation policy`() {
+        val root = Files.createTempDirectory("benchcache").toFile()
+        try {
+            val model = File(root, "model.fzn").apply { writeText("solve satisfy;") }
+            val build = BuildProvenance(mapOf("lib/solver.jar" to "abc"), emptyMap(), emptyMap(), "Linux", "amd64")
+            val budget = Budget(1_000)
+            val baseline = BenchCache.keyFor(model, null, "klause", budget, build)
+
+            for (changed in listOf(
+                build.copy(distribution = mapOf("lib/solver.jar" to "def")),
+                build.copy(runtime = mapOf("bin/java" to "def")),
+                build.copy(runtimeOptions = mapOf("JAVA_OPTS" to "--add-modules=jdk.incubator.vector")),
+            )) {
+                assertNotEquals(baseline, BenchCache.keyFor(model, null, "klause", budget, changed))
+            }
+            assertNotEquals(
+                baseline,
+                BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = PINNED_SOURCE_POLICY),
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `settings with colliding output labels retain separate cache entries`() {
+        val root = Files.createTempDirectory("benchcache").toFile()
+        try {
+            val model = File(root, "model.fzn").apply { writeText("solve satisfy;") }
+            val build = BuildProvenance(emptyMap(), emptyMap(), emptyMap(), "Linux", "amd64")
+            val budget = Budget(1_000)
+            val first = SolverInvocation.Settings(params = listOf("arm=a/b"))
+            val second = SolverInvocation.Settings(params = listOf("arm=a_b"))
+            val tag = SolveMetric.configTag("klause", first, budget)
+            assertEquals(tag, SolveMetric.configTag("klause", second, budget))
+
+            val firstKey = BenchCache.keyFor(model, null, tag, budget, build, first)
+            val secondKey = BenchCache.keyFor(model, null, tag, budget, build, second)
+
+            assertNotEquals(firstKey, secondKey)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 
     @Test
     fun `keyFor is the same for a plain and a compressed copy of an instance`() {

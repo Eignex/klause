@@ -30,7 +30,7 @@ An existing output can be checked without solving again:
 
 ```
 ./gradlew :klause-bench:bench --args="list"                       suites + usage
-./gradlew :klause-bench:bench --args="solve suite=core"           klause solves the in-process core
+./gradlew :klause-bench:solveCampaign --args="solve suite=core"   build the CLI, then solve the core
 ./gradlew :klause-bench:bench --args="solve suite=core backend=choco"  a reference baseline to diff against
 ./gradlew :klause-bench:intDomainMicrobench                        host-sensitive IntDomain timing probes
 ```
@@ -173,11 +173,46 @@ Wave 2 acceptance remains separate.
 
 Tune any knob with `-Dklause.*` properties (forwarded to the run JVM), e.g. `-Dklause.bench.mzn.timeoutSec=30`.
 
-Solving with klause needs `./gradlew :klause-cli:installJvmDist`, and that dist runs only on a JDK 25
-or newer — the bench launches it as a subprocess, so a machine whose default `java` is older reports
+`:klause-bench:solveCampaign --args="solve ..."` (or `solve-one ...`) depends on
+`:klause-cli:installJvmDist` and selects Gradle's Java toolchain for the subprocess launcher.
+The generic `bench` task remains available for selection, analysis and reference-only runs.
+When using `bench` to solve with klause, build with `./gradlew :klause-cli:installJvmDist` first.
+That dist runs only on a JDK 25 or newer — the bench launches it as a subprocess, so a machine whose default `java` is older reports
 every klause instance as a crash (`UnsupportedClassVersionError: … class file version 69.0`) while
 Gradle itself builds fine. See `klause-cli/README.md` for the `JAVA_HOME` fix. Note also that
 `installDist` is a *different*, no-op task that leaves a stale binary in place.
+
+### Installed-build provenance
+
+Klause cache keys include SHA-256 hashes of every installed distribution file (launcher and
+all dependency jars), the selected Java runtime files, OS/architecture and inherited Java/runtime
+options. Hashes use relative paths and file contents, so a byte-identical rebuild reuses results;
+a replaced jar invalidates results even if the launcher timestamp and source commit are unchanged.
+One campaign captures one installed build; keep its distribution and runtime fixed while it runs.
+
+Per-problem JSON records carry `buildProvenance`, `buildFingerprint` and `validationPolicy`.
+`gitSha` describes the harness checkout and does not identify the installed solver. Cache keys also
+include the original solver settings, before output-label sanitization, and the validation policy.
+Legacy records decode with absent provenance; they cannot supply the installed-build identity.
+Reference build provenance remains outside this contract.
+
+Launcher hashes include the default Vector API/native-access flags; runtime options capture inherited
+overrides. These identify the requested kernel environment. They do not identify the vendor BLAS
+library actually selected by a solve, external native libraries, or MiniZinc's compilation toolchain.
+Those measurements and broader acceptance records remain separate work. A passing gate or a cache
+hit does not establish performance or LP certification.
+
+Bounded opt-in checks use existing fixtures:
+
+```
+./gradlew :klause-bench:solveCampaign --args="solve suite=dimacs-core name=implication-chain timeout=1000 label=acceptance"
+./gradlew :klause:basisTrace --args="verify"
+./gradlew :klause:basisTrace --args="replay"
+```
+
+The solve writes its verdict and provenance beside the raw stream. The basis tasks emit their own
+verification/replay records; missing fixtures and numerical declines retain their existing semantics.
+None of these campaigns run as part of `check`.
 
 ## Commands
 
