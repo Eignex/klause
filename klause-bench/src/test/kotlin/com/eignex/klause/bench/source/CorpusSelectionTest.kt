@@ -122,6 +122,61 @@ class CorpusSelectionTest {
     }
 
     @Test
+    fun `MznChallengeAllYears excludes model-only 2026 families before capping`() {
+        val root = Files.createTempDirectory("mznyears").toFile()
+        try {
+            File(root, "2026/atp-stage2").mkdirs()
+            File(root, "2026/atp-stage2/stage2_disjunctive_search.mzn").writeText("int: n;")
+            File(root, "2020/bnn-planner").mkdirs()
+            File(root, "2020/bnn-planner/model.mzn").writeText("int: n = 1;")
+
+            val found = Layout.MznChallengeAllYears.discover(root)
+            val selected = CorpusSelection.applySelection(found, Selection(maxInstances = 1))
+
+            assertEquals(listOf("2020/bnn-planner"), selected.map { it.name })
+            assertEquals(listOf("2020/bnn-planner"), found.map { it.name })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `MznChallenge layout includes 2026 families with instance data`() {
+        val root = Files.createTempDirectory("mznyears").toFile()
+        try {
+            File(root, "2026/atp-stage2").mkdirs()
+            File(root, "2026/atp-stage2/stage2_disjunctive_search.mzn").writeText("int: n;")
+            File(root, "2026/atp-stage2/i1.dzn").writeText("n=1;")
+            File(root, "2026/atp-stage2/i2.json").writeText("{\"n\":2}")
+
+            val found = Layout.MznChallenge("2026").discover(root)
+
+            assertEquals(listOf("atp-stage2/i1", "atp-stage2/i2"), found.map { it.name })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `MznChallenge layout excludes the incompatible 2010 depot placement family`() {
+        val root = Files.createTempDirectory("mznyears").toFile()
+        try {
+            File(root, "2010/depot_placement").mkdirs()
+            File(root, "2010/depot_placement/depot_placement.mzn").writeText("% model")
+            File(root, "2010/depot_placement/st70_5.dzn").writeText("n=5;")
+            File(root, "2010/alpha").mkdirs()
+            File(root, "2010/alpha/alpha.mzn").writeText("% model")
+            File(root, "2010/alpha/i1.dzn").writeText("n=1;")
+
+            val found = Layout.MznChallenge("2010").discover(root)
+
+            assertEquals(listOf("alpha/i1"), found.map { it.name })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `Flat layout groups by familyOf so per-family samples across series`() {
         val root = Files.createTempDirectory("xcspsel").toFile()
         try {

@@ -377,6 +377,10 @@ Suites and problems are declared in `catalog/Suites.kt`. Add a problem with `ven
 
 Vendored problems live in `smoke-corpus/` — small, fast instances meant to exercise parsers and cross-check solvers, not to stress them (see `smoke-corpus/PROVENANCE.md`). Non-redistributable collections (MiniZinc Challenge, libminizinc, hakank, SATLIB, SMT-LIB, XCSP3, PB, MaxSAT, MIPLIB) are fetched on first use into `~/.cache/klause-bench/corpus/` (`$XDG_CACHE_HOME`, or `-Dklause.bench.corpusCache`) and declared with license + reason in `ExternalCollections`; the large corpora are exposed as discovered suites selected by the family-aware machinery in `source/CorpusSelection.kt`. For parallel sweeps, `-Dklause.bench.shard=i/n` keeps every n-th selected instance (applied before resolution, so shards never race on the mzn→fzn cache).
 
+MiniZinc Challenge discovery excludes 2026 families without `.dzn` or `.json` instance data and
+`2010/depot_placement`, whose legacy `is_output` annotation fails with current MiniZinc.
+Exclusions apply before sampling and caps; 2026 families become eligible when their data files are available.
+
 ### Compressed corpus
 
 The cache stores fetched instances zstd-compressed as `<name>.<ext>.zst` (`.cnf`, `.wcnf`, `.opb`, `.wbo`, `.xml`, `.smt2`, `.mps`), which makes these text formats 5-15x smaller. MiniZinc sources (`.mzn`/`.dzn`/`.json`) and git-cloned collections stay plain, since `minizinc` reads them as real files. zstd is chosen because a klause solve receives the `.zst` path and decompresses it inside the measured time, and zstd decodes at about 1 GB/s. The `zstd` binary must be on `PATH` for the bench and for `klause-cli`.
