@@ -112,6 +112,8 @@ data class PortfolioScenario(
      * applies, so this cannot overrun it.
      */
     val sliceWork: Long = DEFAULT_SLICE_WORK,
+    /** Share of the arm bandit's evidence kept across the first incumbent; see [Portfolio.DEFAULT_PHASE_RETENTION]. */
+    val phaseRetention: Double = Portfolio.DEFAULT_PHASE_RETENTION,
     /** Optional solve-spanning decision-node allowance, applied here rather than by the caller so that
      *  every arm that runs a backtrack engine spends the one counter — including the ones that build
      *  their own [BacktrackParams] instead of drawing a [BacktrackRecipe] from a pool. Editing the pools
@@ -123,6 +125,7 @@ data class PortfolioScenario(
         require(cores >= 1) { "cores must be ≥ 1" }
         require(arms >= 1) { "arms must be ≥ 1" }
         require(clauseShareMaxLbd >= 0 && clauseShareMaxLen >= 0) { "clause-share filter bounds must be ≥ 0" }
+        require(phaseRetention in 0.0..1.0) { "phaseRetention must be in [0, 1]" }
     }
 
     /** Factories for the two execution shapes a scenario can take. */

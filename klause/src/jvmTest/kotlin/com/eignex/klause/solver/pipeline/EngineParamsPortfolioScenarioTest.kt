@@ -4,6 +4,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -83,6 +84,12 @@ class EngineParamsPortfolioScenarioTest {
         val tuned = scenario(cores = 2, params = listOf("clause-share-lbd=6", "clause-share-len=12"))
         assertEquals(6, tuned.clauseShareMaxLbd)
         assertEquals(12, tuned.clauseShareMaxLen)
+    }
+
+    @Test
+    fun `phase-retention sets the evidence kept across the first incumbent and defaults to the policy's`() {
+        assertEquals(Portfolio.DEFAULT_PHASE_RETENTION, scenario(cores = 1).phaseRetention)
+        assertEquals(0.5, scenario(cores = 1, params = listOf("phase-retention=0.5")).phaseRetention)
     }
 
     @Test

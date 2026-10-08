@@ -45,6 +45,7 @@ fun FinitePipeline.portfolioExecutor(
         workers,
         lanes = scenario.cores,
         baseSliceWork = scenario.sliceWork,
+        phaseRetention = scenario.phaseRetention,
         profile = profile,
         witnessCheck = witnessCheck(problem, objective),
         onFault = onFault,
