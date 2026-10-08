@@ -506,6 +506,29 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open SMT objective over a continuous column is searched by local search`() {
+        val smt = File.createTempFile("cliopenrealobjective", ".smt2").apply {
+            writeText(
+                """
+                (set-logic QF_LIRA)
+                (declare-const x Int)
+                (declare-const y Real)
+                (assert (>= x 3))
+                (assert (>= y (to_real x)))
+                (minimize y)
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+        var code = -1
+        val out = capture { code = runCli(arrayOf("-e", "ls", "--param", "node-limit=100", smt.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertEquals("sat", out.lines().firstOrNull(), out)
+    }
+
+    @Test
     fun `an open SMT exact LIA model is solved without finite lowering`() {
         val smt = File.createTempFile("cliopen", ".smt2").apply {
             writeText(

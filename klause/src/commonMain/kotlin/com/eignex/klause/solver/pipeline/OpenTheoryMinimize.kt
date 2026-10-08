@@ -54,7 +54,7 @@ sealed interface OpenTheoryOptimum {
         /** The optimal assignment. */
         val assignment: OpenTheoryAssignment,
         /** Its objective value. */
-        val value: BigInt,
+        val value: BigFraction,
         override val stats: SolveStats,
     ) : OpenTheoryOptimum
 
@@ -72,7 +72,7 @@ sealed interface OpenTheoryOptimum {
         /** An assignment proving the model feasible. */
         val witness: OpenTheoryAssignment,
         /** The objective value at [witness]; every value below it is attained as well. */
-        val value: BigInt,
+        val value: BigFraction,
         override val stats: SolveStats,
     ) : OpenTheoryOptimum
 
@@ -85,12 +85,15 @@ sealed interface OpenTheoryOptimum {
         /** Best assignment proved feasible, or null when none was. */
         val incumbent: OpenTheoryAssignment?,
         /** Objective value of [incumbent], or null when there is none. */
-        val value: BigInt?,
+        val value: BigFraction?,
         /** Why the descent stopped before an optimum proof. */
         val reason: TerminationReason,
         override val stats: SolveStats,
     ) : OpenTheoryOptimum
 }
+
+/** This integer as an exact rational, the form an [OpenTheoryOptimum] states its value in. */
+internal fun BigInt.asFraction(): BigFraction = BigFraction.of(this, BIG_ONE)
 
 /** Retain a round's outcome while reporting the enclosing optimization's elapsed time. */
 internal fun SolveStats.withOptimizationEnvelope(envelope: SolveStats): SolveStats = copy(
@@ -388,7 +391,7 @@ class OpenTheoryMinimizer internal constructor(
                             unboundedBelow(opened.prepared.problem, installed.assignment, params, state) ->
                                 OpenTheoryOptimum.Unbounded(
                                     installed.assignment,
-                                    installed.objective,
+                                    installed.objective.asFraction(),
                                     finish(result.stats),
                                 )
 
@@ -424,7 +427,7 @@ class OpenTheoryMinimizer internal constructor(
 
         private fun standing(reason: TerminationReason, stats: SolveStats): OpenTheoryOptimum {
             val standing = incumbents.current()
-            return OpenTheoryOptimum.Bounded(standing?.assignment, standing?.objective, reason, stats)
+            return OpenTheoryOptimum.Bounded(standing?.assignment, standing?.objective?.asFraction(), reason, stats)
         }
 
         /**
@@ -437,7 +440,7 @@ class OpenTheoryMinimizer internal constructor(
          */
         private fun proven(stats: SolveStats): OpenTheoryOptimum {
             val standing = incumbents.current() ?: return OpenTheoryOptimum.Infeasible(stats)
-            return OpenTheoryOptimum.Optimal(standing.assignment, standing.objective, stats)
+            return OpenTheoryOptimum.Optimal(standing.assignment, standing.objective.asFraction(), stats)
         }
 
         private fun finish(round: SolveStats): SolveStats {

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.util.Cancellation
 
 /** Which Boolean branching a complete open-model traversal uses. */
@@ -69,6 +70,8 @@ data class TheoryParams(
     val timeout: Cancellation = Cancellation.Never,
     /** Cooperative cancellation token. */
     val cancellation: Cancellation = Cancellation.Never,
+    /** Solve-wide node allowance the local-search arms of an open portfolio charge their moves to, or null for none. */
+    val nodeBudget: NodeBudget? = null,
 ) {
     init {
         require(maxDecisions >= 0) { "maximum decisions must not be negative" }

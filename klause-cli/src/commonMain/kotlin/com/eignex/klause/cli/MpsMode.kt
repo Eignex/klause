@@ -146,13 +146,10 @@ internal object MpsMode : CliMode {
 private fun unsupportedOpenMpsModel(): Nothing =
     throw MpsLoweringException("open MPS models require a supported theory pipeline")
 
-// An open route reads the lowered model exactly and optimizes an integral objective, so both must hold.
+// An open route reads the lowered model exactly.
 private fun requireOpenMpsSource(compiled: MpsCompiled) {
     if (!compiled.sourceExact) {
         throw MpsLoweringException("open MPS source differs from the lowered model at ${compiled.sourceDifference}")
-    }
-    if (compiled.objective?.realCoefficients?.any { it != 0.0 } == true) {
-        throw MpsLoweringException("open MPS optimization over a continuous objective is unsupported")
     }
 }
 
