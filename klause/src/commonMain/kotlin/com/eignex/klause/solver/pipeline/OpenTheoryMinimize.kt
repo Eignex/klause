@@ -244,8 +244,12 @@ class OpenTheoryMinimizer internal constructor(
         /** Work spent so far, in `openWork` units. */
         val work: Long get() = state.work.spent
 
-        /** The verdict's stats once decided, else the work counters so far. */
-        val stats: SolveStats get() = verdict?.stats ?: SolveStats(openTheory = state.work.snapshot())
+        /** The verdict's stats once decided, else the work and progress counters so far. */
+        val stats: SolveStats
+            get() = verdict?.stats ?: SolveStats(
+                openTheory = state.work.snapshot(),
+                search = round?.progress ?: state.progress(null),
+            )
 
         /**
          * Advance until a verdict, [global] firing, or the slice ending: after [sliceWork] `openWork` units when

@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.search
 
+import com.eignex.klause.solver.result.GLUE_LBD
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
@@ -65,6 +66,7 @@ class SearchSession(
     private var reductions = 0L
     private var droppedClauses = 0L
     private var peakLearnedClauses = 0L
+    private var glueClauses = 0L
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.size
@@ -676,6 +678,12 @@ class SearchSession(
     /** Number of sound clause-form explanations retained by the shared Boolean engine. */
     val learnedClauseCount: Int get() = learned.size
 
+    /** Distinct learned clauses with a literal block distance of at most two: the short, reusable ones. */
+    internal val glueClauseCount: Long get() = glueClauses
+
+    /** Booleans assigned at the root, however deep the search stands: progress no later search undoes. */
+    internal val rootFixedCount: Int get() = valuesAtLevel[0].size
+
     /** Snapshot learned-clause telemetry for a completed open-theory solve. */
     fun learnedClauseStats(): OpenTheoryClauseStats = OpenTheoryClauseStats(
         learnedClauses,
@@ -696,9 +704,11 @@ class SearchSession(
 
     private fun learn(literals: IntArray) {
         if (literals.isEmpty()) return
-        val index = learned.add(literals.copyOf(), lbdOf(literals))
+        val lbd = lbdOf(literals)
+        val index = learned.add(literals.copyOf(), lbd)
         if (index >= 0) {
             learnedClauses++
+            if (lbd <= GLUE_LBD) glueClauses++
             peakLearnedClauses = maxOf(peakLearnedClauses, learned.size.toLong())
             pendingAttach.addLast(index)
         } else {
