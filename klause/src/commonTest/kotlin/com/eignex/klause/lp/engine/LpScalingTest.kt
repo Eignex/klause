@@ -370,6 +370,23 @@ class LpScalingTest {
     }
 
     @Test
+    fun `dense refresh retains entries before its first changed cost`() {
+        for (enabled in listOf(false, true)) {
+            val model = mixedScaleModel()
+            val view = LpScalingView.create(model, LpScalingOptions(enabled = enabled))
+            val oldCosts = List(model.numVars) { view.costD(it) }
+            assertNotNull(model.doubleView).cost[model.numVars - 1] = 4.0
+
+            val next = assertNotNull(view.refresh(model))
+
+            for (column in 0 until model.numVars) {
+                assertEquals(model.costD(column) * 2.0.pow(view.columnExponents[column]), next.costD(column))
+                assertEquals(oldCosts[column], view.costD(column))
+            }
+        }
+    }
+
+    @Test
     fun `refresh reads mutated numerical inputs while older views retain their vectors`() {
         for (enabled in listOf(false, true)) {
             for (exact in listOf(false, true)) {

@@ -107,28 +107,37 @@ internal class LpScalingView private constructor(
         var nextCost = cost
         var nextLower = lower
         var nextUpper = upper
+        var copied = 0L
         if (!applied) {
-            for (i in rhs.indices) nextRhs = refreshedValue(rhs, nextRhs, i, next.rhsD(i))
-            for (j in cost.indices) nextCost = refreshedValue(cost, nextCost, j, next.costD(j))
-            for (j in lower.indices) nextLower = refreshedValue(lower, nextLower, j, next.lowerD(j))
-            for (j in upper.indices) nextUpper = refreshedValue(upper, nextUpper, j, next.upperD(j))
+            for (i in rhs.indices) {
+                nextRhs = refreshedValue(rhs, nextRhs, i, next.rhsD(i), prefixOnly = true) { copied += it }
+            }
+            for (j in cost.indices) {
+                nextCost = refreshedValue(cost, nextCost, j, next.costD(j), prefixOnly = true) { copied += it }
+            }
+            for (j in lower.indices) {
+                nextLower = refreshedValue(lower, nextLower, j, next.lowerD(j), prefixOnly = true) { copied += it }
+            }
+            for (j in upper.indices) {
+                nextUpper = refreshedValue(upper, nextUpper, j, next.upperD(j), prefixOnly = true) { copied += it }
+            }
         } else {
             if (projectionLostNonzero(next) || !next.objConstantD.isFinite()) return null
             for (i in rhs.indices) {
                 val value = checkedScale(next.rhsD(i), rowExponents[i]) ?: return null
-                nextRhs = refreshedValue(rhs, nextRhs, i, value)
+                nextRhs = refreshedValue(rhs, nextRhs, i, value, prefixOnly = true) { copied += it }
             }
             for (j in cost.indices) {
                 val costValue = checkedScale(next.costD(j), columnExponents[j]) ?: return null
-                nextCost = refreshedValue(cost, nextCost, j, costValue)
+                nextCost = refreshedValue(cost, nextCost, j, costValue, prefixOnly = true) { copied += it }
                 val lowerValue = checkedScale(next.lowerD(j), -columnExponents[j]) ?: return null
-                nextLower = refreshedValue(lower, nextLower, j, lowerValue)
+                nextLower = refreshedValue(lower, nextLower, j, lowerValue, prefixOnly = true) { copied += it }
                 val upperValue = if (next.hasFiniteUpper(j)) {
                     checkedScale(next.upperD(j), -columnExponents[j]) ?: return null
                 } else {
                     0.0
                 }
-                nextUpper = refreshedValue(upper, nextUpper, j, upperValue)
+                nextUpper = refreshedValue(upper, nextUpper, j, upperValue, prefixOnly = true) { copied += it }
             }
         }
         return LpScalingView(
@@ -146,9 +155,7 @@ internal class LpScalingView private constructor(
                 sourcePrimalResidual = 0.0,
                 sourceBoundViolation = 0.0,
                 sourceBasicDualResidual = 0.0,
-                work = vectorWork(next) + (if (applied) next.m.toLong() + next.numVars else 0L) +
-                    copiedValues(rhs, nextRhs) + copiedValues(cost, nextCost) +
-                    copiedValues(lower, nextLower) + copiedValues(upper, nextUpper),
+                work = vectorWork(next) + (if (applied) next.m.toLong() + next.numVars else 0L) + copied,
             ),
         )
     }
@@ -397,9 +404,25 @@ private fun sourceMatrixUnchecked(model: LpModel): NumericalMatrix {
     return NumericalMatrix(pointers, rows, values)
 }
 
-private fun refreshedValue(previous: DoubleArray, current: DoubleArray, index: Int, value: Double): DoubleArray {
+private inline fun refreshedValue(
+    previous: DoubleArray,
+    current: DoubleArray,
+    index: Int,
+    value: Double,
+    prefixOnly: Boolean = false,
+    onCopy: (Int) -> Unit = {},
+): DoubleArray {
     if (current[index].toRawBits() == value.toRawBits()) return current
-    val next = if (current === previous) previous.copyOf() else current
+    val next = if (current === previous) {
+        // A dense refresh writes the remaining suffix, so only its already-visited prefix needs copying.
+        val copied = if (prefixOnly) index else previous.size
+        val allocated = if (prefixOnly) DoubleArray(previous.size) else previous.copyOf()
+        if (prefixOnly) previous.copyInto(allocated, endIndex = copied)
+        onCopy(copied)
+        allocated
+    } else {
+        current
+    }
     next[index] = value
     return next
 }
