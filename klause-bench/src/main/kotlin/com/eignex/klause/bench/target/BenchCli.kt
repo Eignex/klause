@@ -472,19 +472,24 @@ object BenchCli {
 
     /** An "unknown" reference row for an instance the solver left undecided (timeout) or couldn't run:
      *  no objective, feasibility unknown, unproven, crediting the full budget as elapsed. */
-    private fun unknownRow(ref: ProblemRef, maximize: Boolean, solver: String, budget: Budget, version: String = ""): ReferenceEntry =
-        ReferenceEntry(
-            suite = ReferenceStore.suiteOf(ref),
-            problem = ref.name,
-            maximize = maximize,
-            objective = null,
-            feasible = null,
-            proven = false,
-            elapsedMs = budget.timeoutMillis,
-            solver = solver,
-            budgetMs = budget.timeoutMillis,
-            version = version,
-        )
+    private fun unknownRow(
+        ref: ProblemRef,
+        maximize: Boolean,
+        solver: String,
+        budget: Budget,
+        version: String = "",
+    ): ReferenceEntry = ReferenceEntry(
+        suite = ReferenceStore.suiteOf(ref),
+        problem = ref.name,
+        maximize = maximize,
+        objective = null,
+        feasible = null,
+        proven = false,
+        elapsedMs = budget.timeoutMillis,
+        solver = solver,
+        budgetMs = budget.timeoutMillis,
+        version = version,
+    )
 
     /** The klause-side search for a `solve` run, from `engine=` / `processors=` / `fixed=` / `param=`.
      *  Returns null when none are set. Defaults: `engine` unset ⇒ no `-e`, so klause follows the cli's

@@ -15,7 +15,10 @@ class ScipReferenceTest {
 
         val claim = ScipReference.parseClaim(out)
 
-        assertEquals(MpsWitness.Claim(MpsWitness.Status.OPTIMAL, 924.0, 924.0, 0.0, mapOf("x243" to 1.0, "x282" to 1.5e-7)), claim)
+        assertEquals(
+            MpsWitness.Claim(MpsWitness.Status.OPTIMAL, 924.0, 924.0, 0.0, mapOf("x243" to 1.0, "x282" to 1.5e-7)),
+            claim,
+        )
     }
 
     @Test
@@ -29,5 +32,12 @@ class ScipReferenceTest {
 
         assertEquals(MpsWitness.Claim(MpsWitness.Status.INFEASIBLE, null, null, null, null), infeasible)
         assertEquals(MpsWitness.Claim(MpsWitness.Status.LIMIT, null, 4.0, null, null), limited)
+    }
+
+    @Test
+    fun `scip's cache identity names its image, its options and the validation rules`() {
+        val identity = ScipReference.identity("sha256:abc")
+
+        assertEquals("${ScipReference.IMAGE}@sha256:abc|${ScipReference.OPTIONS}|${MpsWitness.VERSION}", identity)
     }
 }

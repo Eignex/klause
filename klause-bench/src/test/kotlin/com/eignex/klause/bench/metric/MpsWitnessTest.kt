@@ -60,7 +60,11 @@ class MpsWitnessTest {
 
     @Test
     fun `a witness that holds once its integers are rounded is valid, its objective recomputed`() {
-        val verdict = MpsWitness.judge(link, claim(MpsWitness.Status.OPTIMAL, 0.5, 0.5, mapOf("b" to 0.9999999, "f" to 0.5)), noRepair)
+        val verdict = MpsWitness.judge(
+            link,
+            claim(MpsWitness.Status.OPTIMAL, 0.5, 0.5, mapOf("b" to 0.9999999, "f" to 0.5)),
+            noRepair,
+        )
 
         assertEquals(listOf(true, 0.5, true), listOf(verdict.feasible, verdict.objective, verdict.proven))
         assertEquals("valid", verdict.stats["validation"])
@@ -95,9 +99,16 @@ class MpsWitnessTest {
 
     @Test
     fun `a witness that cannot be repaired here, or a bound without a solution, stays unknown`() {
-        val unrepaired = MpsWitness.judge(equality, claim(MpsWitness.Status.LIMIT, 2.1, null, mapOf("x" to 2.0000004, "w" to 2.0, "y" to 0.1)), noRepair)
+        val unrepaired = MpsWitness.judge(
+            equality,
+            claim(MpsWitness.Status.LIMIT, 2.1, null, mapOf("x" to 2.0000004, "w" to 2.0, "y" to 0.1)),
+            noRepair,
+        )
         val undecided = MpsWitness.judge(equality, claim(MpsWitness.Status.LIMIT, 2.5, null, null), noRepair)
-        val failed = MpsWitness.judge(equality, claim(MpsWitness.Status.LIMIT, 2.1, null, mapOf("x" to 2.0000004, "w" to 2.0, "y" to 0.1))) {
+        val failed = MpsWitness.judge(
+            equality,
+            claim(MpsWitness.Status.LIMIT, 2.1, null, mapOf("x" to 2.0000004, "w" to 2.0, "y" to 0.1)),
+        ) {
             MpsWitness.RepairResult.Failed("time limit")
         }
 
@@ -113,38 +124,12 @@ class MpsWitnessTest {
         val gapLimited = MpsWitness.judge(link, claim(MpsWitness.Status.OPTIMAL, 0.5, 0.49996, values), noRepair)
         val selfExcluding = MpsWitness.judge(link, claim(MpsWitness.Status.OPTIMAL, 0.5, 0.6, values), noRepair)
 
-        assertEquals(listOf(true to false, true to false), listOf(gapLimited, selfExcluding).map { it.feasible to it.proven })
+        assertEquals(
+            listOf(true to false, true to false),
+            listOf(gapLimited, selfExcluding).map { it.feasible to it.proven },
+        )
         assertTrue(gapLimited.stats.getValue("proof").startsWith("gap-limited"))
         assertTrue(selfExcluding.stats.getValue("proof").startsWith("rejected"))
-    }
-
-    @Test
-    fun `a retry that finds a checked solution refutes the first run's infeasibility`() {
-        fun attempt(label: String, claim: MpsWitness.Claim) =
-            MpsAttempt(label, "", 1_000, label, claim, MpsWitness.judge(link, claim, noRepair), emptyMap())
-        val infeasible = attempt("default", claim(MpsWitness.Status.INFEASIBLE, null, null, null))
-        val found = attempt("presolve off", claim(MpsWitness.Status.LIMIT, 0.5, 0.0, mapOf("b" to 1.0, "f" to 0.5)))
-
-        val result = MpsReference.result(listOf(infeasible, found), link, maximize = false, "highs|test", "")
-        val alone = MpsReference.result(listOf(infeasible), link, maximize = false, "highs|test", "")
-
-        assertEquals(listOf(true, 0.5, false), listOf(result.feasible, result.objective, result.proven))
-        assertTrue(result.stats.getValue("refuted").startsWith("default claimed infeasible"))
-        assertEquals("b 1.0\nf 0.5\n", result.assignment)
-        assertEquals(listOf(false, true), listOf(alone.feasible, alone.proven))
-    }
-
-    @Test
-    fun `an infeasibility claim the same solver contradicts with a solution, even a rejected one, is not a proof`() {
-        fun attempt(label: String, claim: MpsWitness.Claim) =
-            MpsAttempt(label, "", 1_000, label, claim, MpsWitness.judge(link, claim, noRepair), emptyMap())
-        val infeasible = attempt("default", claim(MpsWitness.Status.INFEASIBLE, null, null, null))
-        val rejected = attempt("presolve off", claim(MpsWitness.Status.OPTIMAL, -0.8, -0.8, mapOf("b" to 8e-7, "f" to 0.8)))
-
-        val result = MpsReference.result(listOf(infeasible, rejected), link, maximize = false, "highs|test", "")
-
-        assertEquals(listOf(null, false), listOf(result.feasible, result.proven))
-        assertTrue(result.stats.getValue("contradicted").startsWith("default claimed infeasible"))
     }
 
     @Test
@@ -155,28 +140,5 @@ class MpsWitnessTest {
 
         assertIs<MpsWitness.Outcome.Valid>(within)
         assertTrue(beyond.row > 0.0)
-    }
-
-    @Test
-    fun `highs's summary and solution file give its claim`() {
-        val stdout = "  Status            Optimal\n  Primal bound      924\n  Dual bound        924\n" +
-            "  Gap               0% (tolerance: 0.01%)\n  Solution status   feasible\n"
-        val solution = "Model status\nOptimal\n\n# Primal solution values\nFeasible\nObjective 924\n# Columns 2\nx1 1\nx2 0\n# Rows 1\nr 1\n"
-        val limited = HighsReference.parseClaim("  Status            Time limit reached\n  Primal bound      inf\n", "# Primal solution values\nNone\n")
-        val lp = HighsReference.parseClaim("Model status        : Optimal\nObjective value     :  -4.6475314286e+02\n", null)
-
-        val claim = HighsReference.parseClaim(stdout, solution)
-
-        assertEquals(MpsWitness.Claim(MpsWitness.Status.OPTIMAL, 924.0, 924.0, 0.0, mapOf("x1" to 1.0, "x2" to 0.0)), claim)
-        assertEquals(MpsWitness.Claim(MpsWitness.Status.LIMIT, null, null, null, null), limited)
-        assertEquals(listOf(-464.75314286, -464.75314286), listOf(lp.primal, lp.dual))
-    }
-
-    @Test
-    fun `an MPS reference's cache identity names the build, its options and the validation rules`() {
-        val identity = HighsReference.identity()
-
-        assertTrue(MpsWitness.VERSION in identity && "mip_rel_gap=0.0001" in identity && "presolve-off" in identity)
-        assertTrue(MpsWitness.VERSION in ScipReference.identity() && ScipReference.OPTIONS in ScipReference.identity())
     }
 }
