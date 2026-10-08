@@ -126,20 +126,15 @@ internal enum class Signal {
     BoundUses,
 }
 
+/** What a counted arm, local search or ALNS, earns: it finds and improves solutions and lowers violation. */
+internal val COUNTED_SIGNALS: Set<Signal> = setOf(Signal.FirstSolution, Signal.Improvement, Signal.Violation)
+
 /**
- * Whether [worker]'s engine can earn this signal. A counted arm is local search or ALNS: it lowers violation and
- * shares nothing. Any other arm runs a complete search, backtrack or open theory: it fixes variables at its root,
- * proves bounds and shares clauses, cuts and bounds, and has no violation to lower. Both find and improve
- * solutions.
+ * What a complete search, backtrack or open theory, earns on its own: it finds and improves solutions, fixes
+ * variables at its root and learns clauses. What it shares earns the rest; see [PortfolioWorker.sharing].
  */
-internal fun Signal.earnableBy(worker: PortfolioWorker): Boolean = when (this) {
-    Signal.FirstSolution, Signal.Improvement -> true
-
-    Signal.Violation -> worker.acceptsInstructionBudget
-
-    Signal.Floor, Signal.RootFixings, Signal.Glue, Signal.ClauseUses, Signal.CutUses, Signal.BoundUses ->
-        !worker.acceptsInstructionBudget
-}
+internal val SEARCH_SIGNALS: Set<Signal> =
+    setOf(Signal.FirstSolution, Signal.Improvement, Signal.RootFixings, Signal.Glue)
 
 /**
  * Turns the counters a segment reports into progress credit, the graded signal a search earns before it has

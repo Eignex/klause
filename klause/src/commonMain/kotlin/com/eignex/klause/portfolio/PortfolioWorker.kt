@@ -43,6 +43,13 @@ class PortfolioWorker private constructor(
     /** The cross-arm channels this worker shares with the rest of its pool, or null when it shares none. */
     internal var sharedPools: SharedPools? = null
 
+    /** The contributions this worker publishes through [sharedPools], each earning it that contribution's signal. */
+    internal var sharing: Set<Contribution> = emptySet()
+
+    /** The reward signals this worker can earn: its engine's own and those of the channels it shares through. */
+    internal val signals: Set<Signal>
+        get() = (if (withInstructions) COUNTED_SIGNALS else SEARCH_SIGNALS) + sharing.map { it.signal }
+
     /** Whether this worker accepts the counted instruction budget used to schedule LS segments. */
     val acceptsInstructionBudget: Boolean get() = withInstructions
 

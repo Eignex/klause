@@ -55,11 +55,15 @@ internal class BacktrackWorkerConfig(
         var params = recipe.build(seed + 1000L + index, workerEvent)
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
         // Shared entries name the worker's position as their origin, so replicas of one arm are credited apart.
+        val sharing = HashSet<Contribution>()
         pools?.clauses?.let {
             params = params.copy(clauseExchange = PoolClauseExchange(it, origin = index, tally = pools.contributions))
+            sharing += Contribution.Clause
         }
         pools?.cuts?.let {
             params = params.copy(cutExchange = PoolCutExchange(it, origin = index, tally = pools.contributions))
+            // Only an arm that builds a relaxation separates cuts to publish.
+            if (params.lpConfig != null || params.lpPlan.bounding) sharing += Contribution.Cut
         }
         // Wire this arm to the shared objective lower-bound manager when optimising: publish
         // the bounds it proves and tighten its objective floor to the cross-arm maximum.
@@ -71,6 +75,7 @@ internal class BacktrackWorkerConfig(
                     },
                     objectiveLowerBoundSupplier = bounds::current,
                 )
+                sharing += Contribution.Floor
             }
             pools?.varBounds?.let { vb ->
                 params = params.copy(
@@ -82,6 +87,7 @@ internal class BacktrackWorkerConfig(
                         if (from != index) pools.contributions.note(Contribution.Bound, from)
                     },
                 )
+                sharing += Contribution.Bound
             }
             // Publish this arm's incumbents and, in the other direction, dive toward the verified global
             // best during stable phases (solution phasing). Only STABLE windows consult it, so arms explore.
@@ -103,7 +109,10 @@ internal class BacktrackWorkerConfig(
             params,
             objective = objective,
             withBound = withBound,
-        ).also { it.sharedPools = pools }
+        ).also {
+            it.sharedPools = pools
+            it.sharing = sharing
+        }
     }
 
     companion object {

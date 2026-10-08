@@ -768,7 +768,10 @@ class PortfolioTest {
         }
         val idle = ScriptedSearch({ false }) { slices[2]++ }
         val workers = listOf(finder, raiser, idle).mapIndexed { arm, search ->
-            trackingWorker("arm$arm", arm, search).also { it.sharedPools = pools }
+            trackingWorker("arm$arm", arm, search).also {
+                it.sharedPools = pools
+                it.sharing = setOf(Contribution.Floor)
+            }
         }
         var polls = 0
 
@@ -788,7 +791,10 @@ class PortfolioTest {
         val sharer = ScriptedSearch({ false }) { slices[1]++ }
         val idle = ScriptedSearch({ false }) { slices[2]++ }
         val workers = listOf(finder, sharer, idle).mapIndexed { arm, search ->
-            trackingWorker("arm$arm", arm, search).also { it.sharedPools = pools }
+            trackingWorker("arm$arm", arm, search).also {
+                it.sharedPools = pools
+                it.sharing = setOf(Contribution.Clause)
+            }
         }
         var polls = 0
 
