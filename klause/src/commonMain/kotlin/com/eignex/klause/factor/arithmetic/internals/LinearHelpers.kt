@@ -5,9 +5,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.LAZY_PAYLOAD
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.boundAt
 import com.eignex.klause.propagation.boundEstablishment
 import com.eignex.klause.propagation.boundEstablishmentLevel
-import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReasonSlots
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
@@ -256,9 +256,8 @@ internal fun explainLinearBound(
         if (j == excludeIdx || coeffs[j] == 0L) continue
         val v = vars[j]
         val citeMin = if (useLo) coeffs[j] > 0 else coeffs[j] < 0
-        val d = state.domainAt(v, atTrail)
         val root = state.rootDomains[v]
-        val b = if (citeMin) d.min else d.max
+        val b = state.boundAt(v, citeMin, atTrail)
         bound[j] = b
         if (if (citeMin) b <= root.min else b >= root.max) continue
         val l = state.boundEstablishmentLevel(v, b, citeMin) ?: 0

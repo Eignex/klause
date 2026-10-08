@@ -108,8 +108,17 @@ internal fun PropagationState.domainAt(v: Int, atTrail: Int): IntDomain {
 
 /** [v]'s lower ([lower]) or upper bound as it stood at undo-log position [atTrail]. */
 internal fun PropagationState.boundAt(v: Int, lower: Boolean, atTrail: Int): Long {
-    val d = domainAt(v, atTrail)
-    return if (lower) d.min else d.max
+    val moves = boundMoves[v] ?: return if (lower) intDomains[v].min else intDomains[v].max
+    var lo = 0
+    var hi = moves.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (moves[mid] >= atTrail) hi = mid else lo = mid + 1
+    }
+    if (lo == moves.size) return if (lower) intDomains[v].min else intDomains[v].max
+    // The first move at or after [atTrail] started from the bound as it stood then; it is read from the move's own
+    // prior bounds, with no snapshot to dereference.
+    return requireNotNull(if (lower) boundMovePriorMin[v] else boundMovePriorMax[v])[lo]
 }
 
 /** Whether `k` was in [v]'s domain at undo-log position [atTrail]; [d] is that domain, for a caller that read it. */
