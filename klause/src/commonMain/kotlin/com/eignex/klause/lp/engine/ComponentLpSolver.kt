@@ -32,7 +32,7 @@ internal class ComponentLpSolver(
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
     private var closed = false
-    private var stoppedBasis: Basis? = null
+    private var continuationTarget: Basis? = null
     override var recessionDirection: DoubleArray? = null
         private set
     override var solvedExactState: LpExactState? = null
@@ -100,7 +100,7 @@ internal class ComponentLpSolver(
     private fun clearEvidence() {
         blockResults = null
         solvedExactState = null
-        stoppedBasis = null
+        continuationTarget = null
         recessionDirection = null
         infeasibleRay = null
         lastTermination = null
@@ -113,7 +113,7 @@ internal class ComponentLpSolver(
         lastTermination = null
         blockResults = null
         solvedExactState = null
-        stoppedBasis = null
+        continuationTarget = null
         recessionDirection = null
         throw primary
     }
@@ -123,7 +123,7 @@ internal class ComponentLpSolver(
         lastTermination = null
         infeasibleRay = null
         blockResults = null
-        stoppedBasis = null
+        continuationTarget = null
         recessionDirection = null
         metrics = LpSolveMetrics()
         solvedExactState = model.exactState
@@ -184,7 +184,7 @@ internal class ComponentLpSolver(
                     for (column in direction.indices) full[part.cols[column]] = direction[column]
                     recessionDirection = full
                 }
-                if (recessionDirection != null) stoppedBasis = componentBasis()
+                if (recessionDirection != null) continuationTarget = componentBasis()
                 return null
             }
             if (part.model.exactState != null &&
@@ -217,9 +217,10 @@ internal class ComponentLpSolver(
             }
         }
         val basis = Basis(basicVars, status)
+        // A float optimum can violate an exact source row; continuation must retain its full-model target.
+        continuationTarget = basis
         if (recessionDirection != null) {
             lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
-            stoppedBasis = basis
             return null
         }
         blockResults = results
@@ -351,7 +352,7 @@ internal class ComponentLpSolver(
 
     override fun continuationBasis(model: LpModel): Basis? {
         if (model.exactState !== this.model.exactState || !currentAuthority()) return null
-        val basis = stoppedBasis ?: return null
+        val basis = continuationTarget ?: return null
         return Basis(basis.basicVars.copyOf(), basis.status.copyOf(), captureEligible = false)
     }
 

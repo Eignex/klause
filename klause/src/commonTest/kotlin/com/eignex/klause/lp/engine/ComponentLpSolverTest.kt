@@ -14,6 +14,26 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `a rounded component optimum preserves its exact fractional contradiction`() {
+        val builder = LpBuilder()
+        val x = builder.addRealVar(0.0, 1.0)
+        val y = builder.addRealVar(0.0, 3.0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.1)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(0.1), Relation.EQ, 0.010000000000000002)
+        builder.addRealRow(intArrayOf(y), doubleArrayOf(1.0), Relation.GE, 1.0)
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+
+        val result = assertIs<RetainedComponentLpSolverCapability>(newRetainedLpSolver(model)).use { solver ->
+            val raw = solver.solve()
+            certifyLpResult(model, solver, raw)
+        }
+
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict, "continuation=${result.continuation}")
+        assertTrue(assertNotNull(result.conflictSupport).rows.any { it.first == 1 })
+    }
+
+    @Test
     fun `retained components preserve fresh exact bounds across nested scopes and objective changes`() {
         val builder = LpBuilder()
         repeat(2) {
