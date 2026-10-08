@@ -47,7 +47,12 @@ internal class LpScopedRows(entries: List<LpRowIdentity>, val lastId: Long) {
 
     fun suspend(indices: Set<Int>, depth: Int): LpScopedRows = LpScopedRows(
         identities.mapIndexed { index, row ->
-            if (index in indices && row.active) row.copy(active = false, suspendedAt = depth) else row
+            if (index in indices && row.active) {
+                // A row created in this scope cannot reappear after the scope ends.
+                row.copy(active = false, suspendedAt = depth.takeUnless { row.depth == it })
+            } else {
+                row
+            }
         },
         lastId,
     )

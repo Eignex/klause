@@ -14,6 +14,27 @@ import kotlin.test.assertTrue
 
 class LpScopedRowsTest {
     @Test
+    fun `compaction retires replaced rows created in the current scope`() {
+        val source = LpBuilder().apply { addVar(0L, 3L) }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        val zero = ExactLpNumber.of(0L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        assertTrue(trail.push())
+        assertTrue(trail.append(LpScopedRow(1, listOf(0 to minusOne), minusOne, logical), true))
+        assertTrue(trail.suspend(setOf(1)))
+        assertTrue(trail.append(LpScopedRow(2, listOf(0 to minusOne), ExactLpNumber.of(-2L), logical), true))
+
+        assertTrue(trail.compact())
+
+        assertEquals(1, trail.state.model.m)
+        assertNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE)))
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ofLong(2L))))
+        assertTrue(trail.pop(0))
+        assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ZERO)))
+    }
+
+    @Test
     fun `surviving logical bounds prevent suspension of their row`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 2L)
