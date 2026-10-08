@@ -766,6 +766,8 @@ class CliModeTest {
                     MK2       'MARKER'                 'INTEND'
                 RHS
                     RHS       LOWER          5.0
+                BOUNDS
+                 PL BND       X
                 ENDATA
                 """.trimIndent(),
             )
@@ -793,6 +795,8 @@ class CliModeTest {
                     MK2       'MARKER'                 'INTEND'
                 RHS
                     RHS       ROW            3.0
+                BOUNDS
+                 PL BND       X
                 ENDATA
                 """.trimIndent(),
             )
@@ -820,6 +824,8 @@ class CliModeTest {
                     MK2       'MARKER'                 'INTEND'
                 RHS
                     RHS       LOWER          3.0
+                BOUNDS
+                 PL BND       X
                 ENDATA
                 """.trimIndent(),
             )

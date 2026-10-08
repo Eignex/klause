@@ -2,6 +2,7 @@ package com.eignex.klause.solver.mps
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsConstraint
 import com.eignex.klause.formats.mps.MpsModel
 import com.eignex.klause.formats.mps.MpsObjective
@@ -19,6 +20,18 @@ import kotlin.test.assertTrue
 import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 class MpsSolveTest {
+    @Test
+    fun `refutes a marker integer row requiring a value above one without explicit bounds`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X R 1\n" +
+                " M1 'MARKER' 'INTEND'\nRHS\n RHS R 2\nENDATA",
+        ).toProblem()
+
+        val result = BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams())
+
+        assertIs<SolveResult.Unsat>(result)
+    }
+
     @Test
     fun `solves a mixed integer-continuous model and reports the continuous value`() {
         val model = MpsModel(

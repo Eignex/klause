@@ -15,6 +15,18 @@ import kotlin.test.assertTrue
 class MpsCompiledTest {
 
     @Test
+    fun `source check rejects a marker integer above its implicit binary bound`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 1\n" +
+                " M1 'MARKER' 'INTEND'\nENDATA",
+        ).toProblem()
+
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(longArrayOf(2L), null)
+        }
+    }
+
+    @Test
     fun `source check accepts an exact rational continuous optimum`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3\nRHS\n RHS R 1\nENDATA",
