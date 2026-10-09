@@ -68,11 +68,7 @@ fun interface Cancellation {
         val self = this
         val combined = earlierDeadline(self.deadline(), other.deadline())
         val meter = self.workMeter() ?: other.workMeter()
-        return object : Cancellation {
-            override fun isCancelled(): Boolean = self.isCancelled() || other.isCancelled()
-            override fun deadline(): ComparableTimeMark? = combined
-            override fun workMeter(): WorkMeter? = meter
-        }
+        return OrCancellation(self, other, combined, meter)
     }
 
     /** Cancel only when both sides cancel — useful for "user requested AND budget
@@ -129,6 +125,28 @@ fun interface Cancellation {
             else -> minOf(a, b)
         }
     }
+}
+
+// Flatten library-owned composites at construction so hot polls visit ordered predicates without recursive calls.
+// The deadline and first work meter remain snapshots taken at composition, including for dynamic adapters.
+private class OrCancellation(
+    self: Cancellation,
+    other: Cancellation,
+    private val combined: ComparableTimeMark?,
+    private val meter: WorkMeter?,
+) : Cancellation {
+    private val tokens: Array<Cancellation> = buildList<Cancellation> {
+        if (self is OrCancellation) addAll(self.tokens) else if (self !== Cancellation.Never) add(self)
+        if (other is OrCancellation) addAll(other.tokens) else if (other !== Cancellation.Never) add(other)
+    }.toTypedArray()
+
+    override fun isCancelled(): Boolean {
+        for (token in tokens) if (token.isCancelled()) return true
+        return false
+    }
+
+    override fun deadline(): ComparableTimeMark? = combined
+    override fun workMeter(): WorkMeter? = meter
 }
 
 /**
