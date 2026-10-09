@@ -27,7 +27,7 @@ was committed under the recorded SHA. Source, JVM library and compiled-test aggr
 are retained. The test aggregate hashes sorted relative paths and their file hashes:
 
 ```sh
-rg --files klause/build/classes/kotlin/jvm/test | sort | xargs sha256sum | sha256sum
+rg --files -0 klause/build/classes/kotlin/jvm/test | sort -z | xargs -0 sha256sum | sha256sum
 ```
 
 ## Limits
