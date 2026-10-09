@@ -1,6 +1,6 @@
 # Presolve effort campaign (#554)
 
-Status: AWS pilots complete; stack integration and 300-second campaigns pending.
+Status: AWS pilots and metadata integration complete; 300-second campaigns running.
 
 The solver baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`. The neutral
 controls build is `5ad3707c0c0bfb113f994828265b9f1bafef91c3` ([PR #2378](https://github.com/Eignex/klause/pull/2378)).
@@ -10,9 +10,9 @@ GitHub CI provides validation; klause-lab builds installed JVM distributions wit
 Initial local Python runs collected and summarized remote records only. After the
 execution reminder, further inspection uses lab API reads; no local analysis or
 validation scripts are run.
-The immutable `codex/presolve-554-frozen-pilots` and
-`codex/presolve-554-frozen-integration` branches preserve the historical pilot and
-integration builds across stack rebases. Historical SHA references remain intact.
+The immutable `codex/presolve-554-frozen-pilots`,
+`codex/presolve-554-frozen-integration` and `codex/presolve-554-frozen-300` branches
+preserve historical builds across stack rebases. Historical SHA references remain intact.
 
 ## Pilot
 
@@ -184,9 +184,12 @@ The family contains several self-contained `bacp-*.mzn` files, while primary-mod
 selection uses filesystem enumeration order within its name priority. Historical
 references have no root-model hash, so their problem identity cannot be matched
 to this input. The disagreement is not evidence of a presolve soundness failure.
-A deterministic selection fix is prepared; its PR waits for the existing stack's
-latest-head CI and mergeability checks. Discovery and holdout must use that fixed
-selector with identical input hashes across configurations.
+The deterministic selection fix is [PR #2386](https://github.com/Eignex/klause/pull/2386).
+It opened after the existing stack passed latest-head CI and mergeability checks.
+Discovery and holdout use that fixed selector with identical input hashes across
+configurations. [Controls PR #2378](https://github.com/Eignex/klause/pull/2378) merged
+after its full latest-head CI passed and the integrated AWS metadata check completed.
+The selector and report are rebased onto those merged controls for fresh CI.
 
 [Job 892](http://192.168.50.104:8420/jobs/892) verifies durable opt-in evidence on
 `4020e4488856bb5ba79d8f80ff13cd4d02214306`. All four BACP cases completed and
@@ -229,7 +232,9 @@ and machine counts are unset and managed by the worker.
 
 Both specifications pin `f6944877bb7a4846d56ce2031b0843da6105515c`, containing the
 merged construction budget, fixed selector, controls and process timing. They are
-prepared but not submitted. The lab disables benchmark result caching for every
+running as [discovery job 906](http://192.168.50.104:8420/jobs/906) and
+[aggressive job 907](http://192.168.50.104:8420/jobs/907). AWS setup planned exactly
+360 and 108 cases. The lab disables benchmark result caching for every
 production case. Process timing includes FlatZinc frontend loading; MiniZinc source
 compilation precedes subprocess launch and is outside this measurement. Setup,
 compilation and post-solve source checking do not consume measured search time.
