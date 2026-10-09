@@ -355,7 +355,9 @@ internal object SolverInvocation {
                     else -> when {
                         line.startsWith(
                             ARM_PREFIX,
-                        ) -> parseArm(line.removePrefix(ARM_PREFIX))?.let { attribution.add(it) }
+                        ) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
+                            attribution.add(it.copy(processElapsedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI))
+                        }
 
                         line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
 
@@ -387,7 +389,9 @@ internal object SolverInvocation {
                             markIncumbent()
                         }
 
-                    line.startsWith(ARM_PREFIX) -> parseArm(line.removePrefix(ARM_PREFIX))?.let { attribution.add(it) }
+                    line.startsWith(ARM_PREFIX) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
+                        attribution.add(it.copy(processElapsedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI))
+                    }
 
                     // `c <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
                     line.startsWith(XCSP_COMMENT_PREFIX) -> recordStat(line.removePrefix(XCSP_COMMENT_PREFIX).trim())
@@ -577,6 +581,7 @@ internal data class Attribution(
     val exactObjective: String? = null,
     val continuousObjective: Double? = null,
     val elapsedMs: Long,
+    val processElapsedMs: Long? = null,
 )
 
 internal fun solveTimeMs(stats: Map<String, String>): Long? = stats["solveTime"]?.toDoubleOrNull()

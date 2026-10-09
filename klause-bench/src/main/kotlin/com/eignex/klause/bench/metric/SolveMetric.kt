@@ -109,6 +109,8 @@ internal data class SolveRecord(
     /** Final rendered candidate, retained for independent checks when the raw stream is not transferred. */
     val finalWitness: String? = null,
     val sourceOutputSha256: String? = null,
+    val processTimeToFirstFeasibleMs: Long? = null,
+    val processTimeToBestMs: Long? = null,
 )
 
 internal object SolveMetric {
@@ -447,6 +449,7 @@ internal object SolveMetric {
         r: SolverInvocation.Result,
     ): SolveRecord {
         val (firstFeasibleMs, bestMs) = timings(r, entry.maximize)
+        val (processFirstMs, processBestMs) = processTimings(r, entry.maximize)
         return SolveRecord(
             problem = entry.name,
             solver = solverId,
@@ -461,6 +464,8 @@ internal object SolveMetric {
             objective = r.objective,
             timeToBestMs = bestMs,
             timeToFirstFeasibleMs = firstFeasibleMs,
+            processTimeToFirstFeasibleMs = processFirstMs,
+            processTimeToBestMs = processBestMs,
             elapsedMs = r.elapsedMs,
             proven = r.proven,
             stats = r.stats,
@@ -489,6 +494,13 @@ internal object SolveMetric {
         if (r.attribution.isEmpty()) return r.timeToFirstFeasibleMs to r.timeToBestMs
         val firstFeasibleMs = r.attribution.first().elapsedMs
         return firstFeasibleMs to best(r.attribution, maximize).elapsedMs
+    }
+
+    // The CLI attribution clock starts after preparation; observing its output includes every subprocess phase.
+    internal fun processTimings(r: SolverInvocation.Result, maximize: Boolean): Pair<Long?, Long?> {
+        if (r.attribution.isEmpty()) return r.timeToFirstFeasibleMs to r.timeToBestMs
+        return r.attribution.mapNotNull { it.processElapsedMs }.minOrNull() to
+            best(r.attribution, maximize).processElapsedMs
     }
 
     /** The best-valued entry in [attribution], direction-aware — also the best-holder for per-arm credit
