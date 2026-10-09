@@ -326,7 +326,12 @@ internal object SolveMetric {
         val optimize = entry.objective != null
         val kind = if (optimize) "optimize" else "satisfy"
         return runCatching {
-            val policy = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
+            val sourceParams = SourceValidationParams(settings)
+            val checkSource = solverId == SolverInvocation.KLAUSE && (entry.hasFloats || sourceParams.requested)
+            require(!sourceParams.requested || entry.ref.format == com.eignex.klause.bench.catalog.Format.MINIZINC) {
+                "source-validation requires a MiniZinc source"
+            }
+            val policy = if (checkSource) {
                 PINNED_SOURCE_POLICY
             } else {
                 REPORTED_RESULT_POLICY
@@ -334,7 +339,7 @@ internal object SolveMetric {
             val provenance = if (solverId == SolverInvocation.KLAUSE) InstalledBuild.current else null
             val key = BenchCache.keyFor(entry.ref, tag, budget, provenance, settings, policy)
             val r = BenchCache.load(key)
-                ?: SolverInvocation.run(entry, solverId, settings, budget, optimize).also { BenchCache.store(key, it) }
+                ?: SolverInvocation.run(entry, solverId, sourceParams.solverSettings, budget, optimize).also { BenchCache.store(key, it) }
             val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
                 .copy(
                     validationPolicy = policy,
@@ -345,7 +350,7 @@ internal object SolveMetric {
                         null
                     },
                 )
-            val checked = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
+            val checked = if (checkSource) {
                 val validation = if (r.feasible == true) {
                     MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective)
                 } else {
