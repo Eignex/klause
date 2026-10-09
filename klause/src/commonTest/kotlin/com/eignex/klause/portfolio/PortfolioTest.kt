@@ -25,11 +25,13 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
+import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
@@ -53,6 +55,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -1352,5 +1355,101 @@ class PortfolioTest {
         }
 
         assertEquals(handle.work, result.stats.portfolio.arms.single().work)
+        assertEquals(10L, result.stats.portfolio.arms.single().initializationWork)
     }
+    @Test
+    fun `cancelled optimization construction retires without stopping siblings`() {
+        var openings = 0
+        val sibling = TrackingResumableSearch(MinimizeResult.Optimal(Sample(BooleanArray(0), LongArray(0)), 0.0))
+        val solver = object : ResumableOptimizer<BacktrackParams> by TrackingResumableOptimizer(sibling) {
+            override fun session() = StatelessSession(this)
+
+            override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch {
+                openings++
+                assertTrue(params.cancellation.deadline() != null)
+                throw SearchInitializationCancelled(SolveStats.EMPTY, 17L)
+            }
+        }
+        val worker = PortfolioWorker.of("opening", 0, solver.session(), BacktrackParams(), LinearObjective())
+        val portfolio = Portfolio.thompson(listOf(worker, trackingWorker("sibling", 1, sibling)))
+
+        val result = portfolio.use { it.minimize(Cancellation.Never) }
+
+        assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(1, openings)
+        val arm = result.stats.portfolio.arms.first()
+        assertEquals(17L, arm.work)
+        assertEquals(17L, arm.initializationWork)
+        assertEquals(1L, arm.initializationCancelled)
+        assertEquals(0L, arm.failures)
+        assertEquals(1, sibling.closes)
+    }
+
+    @Test
+    fun `failed satisfaction construction leaves deferred siblings eligible`() {
+        var openings = 0
+        val solver = object : ResumableSolver<BacktrackParams> by CountingResumableSolver(1) {
+            override fun session() = StatelessSession(this)
+
+            override fun resumableSolve(params: BacktrackParams): ResumableSolve {
+                openings++
+                assertTrue(params.cancellation.deadline() != null)
+                error("opening failure")
+            }
+        }
+        val sibling = CountingResumableSolver(1)
+        val workers = listOf(
+            PortfolioWorker.of("opening", 0, solver.session(), BacktrackParams()),
+            PortfolioWorker.of("sibling", 1, sibling.session(), BacktrackParams()).also { it.improvementOnly = true },
+        )
+
+        val result = Portfolio.thompson(workers).use { it.solve(Cancellation.Never) }
+
+        assertIs<SolveResult.Sat>(result)
+        assertEquals(1, openings)
+        assertEquals(1L, result.stats.portfolio.arms.first().failures)
+        assertEquals(1, sibling.opened.size)
+    }
+
+    @Test
+    fun `opening and search use one segment deadline`() {
+        var openingDeadline: ComparableTimeMark? = null
+        var requestedMillis: Long? = null
+        var remainingMillis: Long? = null
+        var slices = 0
+        val handle = object : ResumableSearch by TrackingResumableSearch(null) {
+            override fun runSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? {
+                slices++
+                requestedMillis = sliceMillis
+                remainingMillis =
+                    (checkNotNull(openingDeadline) - TimeSource.Monotonic.markNow()).inWholeMilliseconds
+                return MinimizeResult.Unknown(TerminationReason.Unsupported)
+            }
+        }
+        val solver = object : ResumableOptimizer<BacktrackParams> by TrackingResumableOptimizer(handle) {
+            override fun session() = StatelessSession(this)
+
+            override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch {
+                openingDeadline = params.cancellation.deadline()
+                return handle
+            }
+        }
+        val workers = listOf(
+            PortfolioWorker.of("opening", 0, solver.session(), BacktrackParams(), LinearObjective()),
+            trackingWorker(
+                "sibling", 1, TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.Unsupported)),
+            ),
+        )
+
+        Portfolio.thompson(workers).use { it.minimize(Cancellation.after(10.seconds)) }
+
+        assertEquals(1, slices)
+        assertTrue(checkNotNull(requestedMillis) <= checkNotNull(remainingMillis) + 1L)
+    }
+
 }

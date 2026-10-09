@@ -46,4 +46,8 @@ data class ArmSchedule(
     val reseeds: Long = 0L,
     /** What the arm's sharing with the rest of the pool cost and moved, included in [millis]. */
     val sharing: SharingStats = SharingStats(),
+    /** Work constructing resumable handles, including interrupted openings; included in [work]. */
+    val initializationWork: Long = 0L,
+    /** Openings retired because construction was cancelled. */
+    val initializationCancelled: Long = 0L,
 )

@@ -32,6 +32,7 @@ import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -947,4 +948,39 @@ class ResumableMinimizeTest {
 
         assertTrue(terminal is MinimizeResult.Unknown && search.stats.lp.standalonePasses.sum > 1.0, "$terminal")
     }
+    @Test
+    fun `cancelled optimization opening cannot expose partially initialized state`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        val factory = RecordingLpEngineFactory()
+        var cancelled = false
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) = Unit
+            override fun onSearchStart(session: PropagationSession) {
+                cancelled = true
+            }
+        }
+        val params = fixture.params.copy(
+            cancellation = Cancellation { cancelled },
+            clauseExchange = exchange,
+        )
+        val solver = BacktrackSolver(fixture.problem, LpSolveContext(factory))
+
+        assertFailsWith<SearchInitializationCancelled> { solver.resumable(fixture.objective, params) }
+
+        solver.resumable(fixture.objective, fixture.params).use { search ->
+            assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+        }
+    }
+
+    @Test
+    fun `cancelled one shot optimization returns an unknown verdict`() {
+        val fixture = FiniteCutoffKnapsackFixture
+
+        val result = BacktrackSolver(fixture.problem).minimize(
+            fixture.objective, fixture.params.copy(cancellation = Cancellation { true }),
+        )
+
+        assertIs<MinimizeResult.Unknown>(result)
+    }
+
 }

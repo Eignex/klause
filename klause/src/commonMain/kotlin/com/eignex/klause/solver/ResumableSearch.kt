@@ -5,6 +5,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * A pause/resume handle over a branch-and-bound optimisation. Unlike [Optimizer.improvements] — whose
@@ -102,7 +103,7 @@ interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
     /** Open a fresh [ResumableSearch] minimising [objective] under [params]. The returned handle owns
      *  its own slice cancellation; any cancellation token already on [params] (see
      *  [SolverParams.withCancellation]) is superseded per slice by [ResumableSearch.runSlice]'s `global`
-     *  token. */
+     *  token. The token on [params] bounds handle construction. */
     fun resumable(objective: LinearObjective, params: P): ResumableSearch
 }
 
@@ -142,7 +143,8 @@ internal interface InstructionSlicedSolve : ResumableSolve {
 /** A [Solver] that can hand out a [ResumableSolve], such as [com.eignex.klause.backtrack.BacktrackSolver]
  *  and [com.eignex.klause.localsearch.LocalSearchSolver]. */
 interface ResumableSolver<P : SolverParams> : Solver<P> {
-    /** Open a fresh [ResumableSolve] under [params]; their cancellation is superseded per slice. */
+    /** Open a fresh [ResumableSolve] under [params]; their cancellation bounds construction and is superseded
+     *  per slice. */
     fun resumableSolve(params: P): ResumableSolve
 }
 
@@ -164,3 +166,6 @@ internal interface RepairSearch : AutoCloseable {
 
     override fun close() {}
 }
+
+internal class SearchInitializationCancelled(val stats: SolveStats, val work: Long) :
+    CancellationException("search initialization cancelled")

@@ -6,11 +6,13 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -95,4 +97,27 @@ class ResumableSatisfactionTest {
 
         assertIs<SolveResult.Unsat>(verdict)
     }
+    @Test
+    fun `cancelled construction cannot report a partial root verdict`() {
+        val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+
+        assertFailsWith<SearchInitializationCancelled> {
+            solver.resumableSolve(BacktrackParams(cancellation = Cancellation { true }))
+        }
+
+        assertIs<SolveResult.Unsat>(runToVerdict(solver.resumableSolve(BacktrackParams()), 1L))
+    }
+
+    @Test
+    fun `resuming satisfaction does not renew the solve node allowance`() {
+        val budget = NodeBudget(3L)
+        val search = BacktrackSolver(pigeonhole(6, 5).bake()).resumableSolve(BacktrackParams(nodeBudget = budget))
+
+        val result = search.use { runToVerdict(it, 1L) }
+
+        assertIs<SolveResult.Unknown>(result)
+        assertEquals(3L, budget.spent)
+        assertEquals(3.0, result.stats.search.nodes.sum)
+    }
+
 }
