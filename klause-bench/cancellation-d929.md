@@ -36,7 +36,7 @@ as a measured saving from this change.
 [Job 816](http://192.168.50.104:8420/?job=816) used the same commits and runtime settings
 but omitted `per-family=1000`. The catalog's default sampling selected only
 `med/mygetpwnam`, giving six cases rather than the requested eighteen. All returned
-unknown. Median theory throughput was 55.471 / 55.363 checks/second, recursive / flat;
+unknown. Median theory throughput was 55.472 / 55.324 checks/second, recursive / flat;
 it also establishes no clear gain. Job 819 supplies the explicit large-case coverage.
 
 Specs, raw files, case JSON and build provenance are preserved in the lab job Files
