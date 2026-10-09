@@ -17,7 +17,11 @@ internal const val PINNED_SOURCE_POLICY = "minizinc-pinned-source-v1"
 internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
 
 @Serializable
-internal data class SourceValidation(val status: String, val reason: String)
+internal data class SourceValidation(
+    val status: String,
+    val reason: String,
+    val sourceHashes: Map<String, String> = emptyMap(),
+)
 
 internal object MiniZincSourceValidation {
     private const val TIMEOUT_SECONDS = 10L
