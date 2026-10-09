@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.invariantProjection
 import com.eignex.klause.propagation.PropagationState
@@ -105,5 +106,23 @@ class FactorPropagationOracleTest {
         }
 
         assertEquals(1, visited)
+    }
+
+    @Test
+    fun `wide sparse declarations select exact invariant semantics`() {
+        val magnitude = 1L shl 61
+        val problem = Problem(
+            0, 1, arrayOf(intDomainFromSurvivors(longArrayOf(-magnitude, 0L, magnitude))),
+            arrayOf<Factor>(Linear(intArrayOf(5), intArrayOf(0), LinearOp.LE, 0)),
+        )
+        val visited = HashSet<Long>()
+
+        FactorPropagationOracle.assertGac(problem) { sample ->
+            val value = sample.ints.single()
+            visited.add(value)
+            value <= 0L
+        }
+
+        assertEquals(setOf(-magnitude, 0L, magnitude), visited)
     }
 }
