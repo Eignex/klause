@@ -1,0 +1,258 @@
+{
+  "rawCasesSha256": "ded6c0e2736c2d7bdb2b3c0bfd2a903c2201b564c07caa17bc0890f8aeb5774e",
+  "problems": 63,
+  "repeats": 3,
+  "arms": {
+    "legacy-selection": {
+      "sha": "88ddc1847d778639ba06c194dedaf333f8bb52a6",
+      "records": 189,
+      "sat": 54,
+      "unsat": 42,
+      "unknown": 93,
+      "solveSeconds": 2469.205,
+      "elapsedMs": 2542503,
+      "fingerprints": [
+        "241ad0946f9157b6f7379d02a95ece78beec8fa26a12fa3b5541287a1db3161e"
+      ],
+      "totals": {
+        "openBoolDecisions": null,
+        "openIntDecisions": null,
+        "openTheoryDecisions": null,
+        "openTheoryChecks": null,
+        "openWork": null,
+        "openLearned": null,
+        "openRelearned": null,
+        "openRestarts": null,
+        "openReductions": null,
+        "openDropped": null,
+        "openRetained": null,
+        "openPeakRetained": null,
+        "openLearnedWatchVisits": null,
+        "openAssertingConflicts": null,
+        "openNonAssertingConflicts": null,
+        "openClauseActivityBumps": null,
+        "openClauseLbdImprovements": null,
+        "openReductionNs": null
+      },
+      "partiallyObserved": {
+        "openBoolDecisions": {
+          "records": 186,
+          "sum": 798526
+        },
+        "openIntDecisions": {
+          "records": 186,
+          "sum": 0
+        },
+        "openTheoryDecisions": {
+          "records": 186,
+          "sum": 1724
+        },
+        "openTheoryChecks": {
+          "records": 186,
+          "sum": 57649
+        },
+        "openWork": {
+          "records": 186,
+          "sum": 857899
+        },
+        "openLearned": {
+          "records": 186,
+          "sum": 123516
+        },
+        "openRelearned": {
+          "records": 186,
+          "sum": 0
+        },
+        "openRestarts": {
+          "records": 186,
+          "sum": 0
+        },
+        "openReductions": {
+          "records": 186,
+          "sum": 0
+        },
+        "openDropped": {
+          "records": 186,
+          "sum": 0
+        },
+        "openRetained": {
+          "records": 186,
+          "sum": 123516
+        },
+        "openPeakRetained": {
+          "records": 186,
+          "sum": 123516
+        },
+        "openLearnedWatchVisits": {
+          "records": 186,
+          "sum": 154298548
+        },
+        "openAssertingConflicts": {
+          "records": 186,
+          "sum": 123516
+        },
+        "openNonAssertingConflicts": {
+          "records": 186,
+          "sum": 0
+        },
+        "openClauseActivityBumps": {
+          "records": 0,
+          "sum": 0
+        },
+        "openClauseLbdImprovements": {
+          "records": 0,
+          "sum": 0
+        },
+        "openReductionNs": {
+          "records": 186,
+          "sum": 0
+        }
+      }
+    },
+    "bounded-selection": {
+      "sha": "df96e6f4e6eeabb800367a1597e5f40f90f7916c",
+      "records": 189,
+      "sat": 54,
+      "unsat": 42,
+      "unknown": 93,
+      "solveSeconds": 2471.819,
+      "elapsedMs": 2545067,
+      "fingerprints": [
+        "8b1d85bc7f1cbf4578428e4b00b24501294010d966651605658c2254b51b2e8a"
+      ],
+      "totals": {
+        "openBoolDecisions": null,
+        "openIntDecisions": null,
+        "openTheoryDecisions": null,
+        "openTheoryChecks": null,
+        "openWork": null,
+        "openLearned": null,
+        "openRelearned": null,
+        "openRestarts": null,
+        "openReductions": null,
+        "openDropped": null,
+        "openRetained": null,
+        "openPeakRetained": null,
+        "openLearnedWatchVisits": null,
+        "openAssertingConflicts": null,
+        "openNonAssertingConflicts": null,
+        "openClauseActivityBumps": null,
+        "openClauseLbdImprovements": null,
+        "openReductionNs": null
+      },
+      "partiallyObserved": {
+        "openBoolDecisions": {
+          "records": 186,
+          "sum": 799361
+        },
+        "openIntDecisions": {
+          "records": 186,
+          "sum": 0
+        },
+        "openTheoryDecisions": {
+          "records": 186,
+          "sum": 1737
+        },
+        "openTheoryChecks": {
+          "records": 186,
+          "sum": 57791
+        },
+        "openWork": {
+          "records": 186,
+          "sum": 858889
+        },
+        "openLearned": {
+          "records": 186,
+          "sum": 123529
+        },
+        "openRelearned": {
+          "records": 186,
+          "sum": 0
+        },
+        "openRestarts": {
+          "records": 186,
+          "sum": 0
+        },
+        "openReductions": {
+          "records": 186,
+          "sum": 0
+        },
+        "openDropped": {
+          "records": 186,
+          "sum": 0
+        },
+        "openRetained": {
+          "records": 186,
+          "sum": 123529
+        },
+        "openPeakRetained": {
+          "records": 186,
+          "sum": 123529
+        },
+        "openLearnedWatchVisits": {
+          "records": 186,
+          "sum": 154298781
+        },
+        "openAssertingConflicts": {
+          "records": 186,
+          "sum": 123529
+        },
+        "openNonAssertingConflicts": {
+          "records": 186,
+          "sum": 0
+        },
+        "openClauseActivityBumps": {
+          "records": 0,
+          "sum": 0
+        },
+        "openClauseLbdImprovements": {
+          "records": 0,
+          "sum": 0
+        },
+        "openReductionNs": {
+          "records": 186,
+          "sum": 0
+        }
+      }
+    }
+  },
+  "paired": {
+    "bounded-selection": {
+      "pairs": 189,
+      "verdictDifferences": [],
+      "lostCompletions": [],
+      "gainedCompletions": [],
+      "equalWorkPairs": 108,
+      "logicalMatches": 108,
+      "perProblemMeanSolveRatio": 1.0075112084779227,
+      "completedPerProblemMeanSolveRatio": 1.0093668871720094,
+      "perProblemMeanElapsedRatio": 1.0044256049501603,
+      "elapsedProblems": 63,
+      "perProblemMeanReductionRatio": null,
+      "reductionProblems": 0,
+      "solveRatioEstimate": {
+        "value": 1.0075112084779227,
+        "low": 0.9902509355432191,
+        "high": 1.0253230199357297,
+        "problems": 63,
+        "bootstrapSamples": 5000
+      },
+      "completedSolveRatioEstimate": {
+        "value": 1.0093668871720094,
+        "low": 0.9756424585087737,
+        "high": 1.0444355627154929,
+        "problems": 32,
+        "bootstrapSamples": 5000
+      },
+      "elapsedRatioEstimate": {
+        "value": 1.0044256049501603,
+        "low": 0.9919100763554987,
+        "high": 1.0166988834121125,
+        "problems": 63,
+        "bootstrapSamples": 5000
+      },
+      "reductionRatioEstimate": null,
+      "completedProblems": 32
+    }
+  }
+}
