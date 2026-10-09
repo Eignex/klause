@@ -20,7 +20,7 @@ import kotlin.math.round
 internal object MpsWitness {
     /** The adapter and validation rules, part of every MPS reference's cache identity and lab row: a change to how
      *  claims are judged makes earlier rows stale. */
-    const val VERSION = "mps-validate-2"
+    const val VERSION = "mps-validate-3"
 
     /** Row and bound violations allowed, relative to the bound's magnitude (absolute below one): the usual MIP checker
      *  tolerance, looser than the solvers' own so a correct solution never fails on print precision. */
@@ -144,22 +144,12 @@ internal object MpsWitness {
     /** Check [values] on [model]: rounded integers first, then a continuous repair when they fail. */
     fun validate(model: MpsModel, values: Map<String, Double>, repair: Repair?): Outcome {
         val x = DoubleArray(model.variables.size) { values[model.variables[it].name] ?: 0.0 }
-        val integrality = model.variables.indices.filter { model.variables[it].integer }.maxOfOrNull {
-            abs(
-                x[it] - round(x[it]),
-            )
-        } ?: 0.0
-        for (i in model.variables.indices) if (model.variables[i].integer) x[i] = round(x[i])
+        val integers = model.variables.indices.filter { model.variables[it].integer }
+        val integrality = integers.maxOfOrNull { abs(x[it] - round(x[it])) } ?: 0.0
+        for (i in integers) x[i] = round(x[i])
         val claimed = violations(model, x).copy(integrality = integrality)
         if (claimed.ok) return Outcome.Valid(objective(model, x), x, repaired = false, claimed = claimed)
-        if (model.variables.indices.any {
-                model.variables[it].integer && !within(
-                    x[it],
-                    model.variables[it].lower,
-                    model.variables[it].upper,
-                )
-            }
-        ) {
+        if (integers.any { !within(x[it], model.variables[it].lower, model.variables[it].upper) }) {
             return Outcome.Invalid("a rounded integer lies outside its bounds", claimed)
         }
         if (model.variables.none { !it.integer }) {
@@ -171,35 +161,43 @@ internal object MpsWitness {
         repair ?: return Outcome.Unresolved(
             "the rounded assignment violates the model and no LP solver is available to repair it",
         )
-        return when (val repaired = repair.solve(fixedLp(model, x))) {
-            is RepairResult.Infeasible -> Outcome.Invalid(
-                "no continuous completion of the rounded integers exists",
+        // The best completion first; when the solver finds none, the completion closest to feasible, which the
+        // check then judges: whether one exists is the check's question, not the LP solver's feasibility tolerance.
+        val best = (repair.solve(fixedLp(model, x)) as? RepairResult.Solved)?.let { completed(model, x, it.values) }
+        if (best != null && violations(model, best).ok) {
+            return Outcome.Valid(objective(model, best), best, repaired = true, claimed = claimed)
+        }
+        return when (val closest = repair.solve(fixedLp(model, x, elastic = true))) {
+            is RepairResult.Solved -> judgeClosest(
+                model,
+                completed(model, x, closest.values),
+                closest.values[ELASTIC],
                 claimed,
             )
 
-            is RepairResult.Failed -> Outcome.Unresolved("the repair LP did not decide: ${repaired.why}")
+            is RepairResult.Infeasible -> Outcome.Unresolved("the repair LP found the variable bounds alone infeasible")
 
-            is RepairResult.Solved -> {
-                val y = x.copyOf()
-                for (i in model.variables.indices) {
-                    if (!model.variables[i].integer) {
-                        y[i] = repaired.values[
-                            col(
-                                i,
-                            ),
-                        ] ?: 0.0
-                    }
-                }
-                val after = violations(model, y)
-                if (after.ok) {
-                    Outcome.Valid(objective(model, y), y, repaired = true, claimed = claimed)
-                } else {
-                    Outcome.Unresolved(
-                        "the repaired assignment still violates the model (row ${after.row}, bound ${after.bound})",
-                    )
-                }
-            }
+            is RepairResult.Failed -> Outcome.Unresolved("the repair LP did not decide: ${closest.why}")
         }
+    }
+
+    /** The closest completion [y], [gap] its largest scaled row violation: valid when the check accepts it. */
+    private fun judgeClosest(model: MpsModel, y: DoubleArray, gap: Double?, claimed: Violations): Outcome = when {
+        violations(model, y).ok -> Outcome.Valid(objective(model, y), y, repaired = true, claimed = claimed)
+
+        gap != null && gap > FEAS_TOL -> Outcome.Invalid(
+            "no completion of the rounded integers is within tolerance: the closest misses by $gap",
+            claimed,
+        )
+
+        else -> Outcome.Unresolved("the closest completion still violates the model (${violations(model, y)})")
+    }
+
+    /** [x] with its continuous variables taken from a repair's [values]. */
+    private fun completed(model: MpsModel, x: DoubleArray, values: Map<String, Double>): DoubleArray {
+        val y = x.copyOf()
+        for (i in model.variables.indices) if (!model.variables[i].integer) y[i] = values[col(i)] ?: 0.0
+        return y
     }
 
     /** The checked assignment as `name value` lines, the way [ReferenceSolve] keeps a reference's witness. */
@@ -267,33 +265,44 @@ internal object MpsWitness {
     /** Column [i]'s name in [fixedLp]: generated, since MPS names may hold what free MPS cannot. */
     private fun col(i: Int) = "c$i"
 
+    /** The elastic LP's column: the largest violation of any row, relative to its bound as the check measures it. */
+    internal const val ELASTIC = "t"
+
     /**
      * [model] as a free-format MPS LP with every integer variable fixed at its value in [x]: the rows an indicator
-     * switches off at that value dropped, the rest kept, so its optimum is the best continuous completion.
+     * switches off at that value dropped, the rest kept, so its optimum is the best continuous completion. [elastic]
+     * instead lets every row bound slip by [ELASTIC] times `max(1, |bound|)` and minimizes it: always feasible, its
+     * optimum is the completion closest to the model by the check's own measure, and within [FEAS_TOL] exactly when a
+     * completion the check accepts exists.
      */
-    internal fun fixedLp(model: MpsModel, x: DoubleArray): String = buildString {
+    internal fun fixedLp(model: MpsModel, x: DoubleArray, elastic: Boolean = false): String = buildString {
+        val sides = model.constraints.withIndex().filter { (_, c) ->
+            val indicator = c.indicator
+            indicator == null || round(x[indicator.column]) == if (indicator.whenOne) 1.0 else 0.0
+        }.flatMap { (r, c) ->
+            // One row per finite side, so each side slips on its own: a G row for a lower bound, an L row for an
+            // upper one, an equality being both.
+            listOfNotNull(c.lower?.let { Side("r${r}l", "G", it, c) }, c.upper?.let { Side("r${r}u", "L", it, c) })
+        }
         appendLine("NAME fixed")
         appendLine("OBJSENSE")
-        appendLine(if (model.sense == ObjectiveSense.MAXIMIZE) "    MAX" else "    MIN")
-        val rows = model.constraints.withIndex().filter { (_, c) ->
-            val indicator = c.indicator
-            (c.lower != null || c.upper != null) &&
-                (indicator == null || round(x[indicator.column]) == if (indicator.whenOne) 1.0 else 0.0)
-        }
-        fun type(c: MpsConstraint) = when {
-            c.lower != null && c.upper != null && c.lower == c.upper -> "E"
-            c.lower != null -> "G"
-            else -> "L"
-        }
+        appendLine(if (!elastic && model.sense == ObjectiveSense.MAXIMIZE) "    MAX" else "    MIN")
         appendLine("ROWS")
         appendLine(" N obj")
-        for ((r, c) in rows) appendLine(" ${type(c)} r$r")
+        for (side in sides) appendLine(" ${side.type} ${side.name}")
         val entries = Array(model.variables.size) { ArrayList<String>() }
-        for (k in model.objective.indices.indices) {
-            entries[model.objective.indices[k]] +=
-                "obj ${model.objective.coeffs[k]}"
+        if (!elastic) {
+            for (k in model.objective.indices.indices) {
+                entries[model.objective.indices[k]] +=
+                    "obj ${model.objective.coeffs[k]}"
+            }
         }
-        for ((r, c) in rows) for (k in c.indices.indices) entries[c.indices[k]] += "r$r ${c.coeffs[k]}"
+        for (side in sides) {
+            for (k in side.row.indices.indices) {
+                entries[side.row.indices[k]] +=
+                    "${side.name} ${side.row.coeffs[k]}"
+            }
+        }
         appendLine("COLUMNS")
         for (i in model.variables.indices) {
             if (entries[i].isEmpty()) {
@@ -304,17 +313,15 @@ internal object MpsWitness {
                 for (e in entries[i]) appendLine("    ${col(i)} $e")
             }
         }
+        if (elastic) {
+            appendLine("    $ELASTIC obj 1")
+            for (side in sides) {
+                val slip = max(1.0, abs(side.bound))
+                appendLine("    $ELASTIC ${side.name} ${if (side.type == "G") slip else -slip}")
+            }
+        }
         appendLine("RHS")
-        for ((r, c) in rows) {
-            // A ranged row is a G row: its lower bound on the rhs, the width in RANGES.
-            val rhs = if (type(c) == "L") c.upper else c.lower
-            if (rhs != null && rhs != 0.0) appendLine("    rhs r$r $rhs")
-        }
-        val ranged = rows.filter { (_, c) -> c.lower != null && c.upper != null && c.lower != c.upper }
-        if (ranged.isNotEmpty()) {
-            appendLine("RANGES")
-            for ((r, c) in ranged) appendLine("    rng r$r ${(c.upper ?: 0.0) - (c.lower ?: 0.0)}")
-        }
+        for (side in sides) if (side.bound != 0.0) appendLine("    rhs ${side.name} ${side.bound}")
         appendLine("BOUNDS")
         for ((i, v) in model.variables.withIndex()) {
             when {
@@ -330,4 +337,7 @@ internal object MpsWitness {
         }
         appendLine("ENDATA")
     }
+
+    /** One finite side of a model row in [fixedLp]: its row name, MPS type and bound. */
+    private class Side(val name: String, val type: String, val bound: Double, val row: MpsConstraint)
 }
