@@ -327,7 +327,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
 
 private const val NANOS_PER_MICRO = 1_000L
 
-/** Exact deterministic open-theory accounting pairs for `-s`. */
+/** Open-theory work and cost accounting pairs for `-s`. */
 internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> =
     with(stats.openTheory) {
         listOf(
@@ -346,6 +346,9 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
                 "openRetained" to "$retained",
                 "openPeakRetained" to "$peakRetained",
                 "openLearnedWatchVisits" to "$watchVisits",
+                "openAssertingConflicts" to "$assertingConflicts",
+                "openNonAssertingConflicts" to "$nonAssertingConflicts",
+                "openReductionNs" to "$reductionNanos",
             )
         } + with(stats.openHints) {
             // Only a run that drew a hint has anything to say about one, so every other open solve reports

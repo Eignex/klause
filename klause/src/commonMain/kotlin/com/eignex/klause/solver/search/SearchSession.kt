@@ -7,6 +7,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
+import kotlin.time.TimeSource
 
 /**
  * Shared trailed coordination for finite-domain and theory components.
@@ -68,6 +69,9 @@ class SearchSession(
     private var droppedClauses = 0L
     private var peakLearnedClauses = 0L
     private var glueClauses = 0L
+    private var assertingConflicts = 0L
+    private var nonAssertingConflicts = 0L
+    private var reductionNanos = 0L
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.size
@@ -484,6 +488,7 @@ class SearchSession(
                     .sorted()
                     .toIntArray()
                 val backjump = levels.lastOrNull { it < conflictLevel } ?: 0
+                assertingConflicts++
                 return SearchConflictResolution.Backjump(
                     ExplainedLearnedConflict(SearchExplanation(clause.toIntArray()), backjump, levels),
                 )
@@ -503,6 +508,7 @@ class SearchSession(
      * non-asserting backjump would.
      */
     private fun retainUnasserting(clause: List<Int>): SearchConflictResolution {
+        nonAssertingConflicts++
         learn(SearchExplanation(clause.toIntArray()))
         return SearchConflictResolution.Chronological
     }
@@ -753,6 +759,9 @@ class SearchSession(
         learned.size.toLong(),
         peakLearnedClauses,
         learned.watchVisits,
+        assertingConflicts,
+        nonAssertingConflicts,
+        reductionNanos,
     )
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
@@ -793,6 +802,15 @@ class SearchSession(
         // Reduction renumbers clauses, so it waits until no clause is queued for its first
         // examination. The next propagation drains that queue, so the following restart reduces.
         if (learned.size <= cap || pendingAttach.isNotEmpty()) return
+        val started = TimeSource.Monotonic.markNow()
+        try {
+            reduceOverCap(cap)
+        } finally {
+            reductionNanos += started.elapsedNow().inWholeNanoseconds
+        }
+    }
+
+    private fun reduceOverCap(cap: Int) {
         val droppable = IntArrayList(learned.size)
         for (index in 0 until learned.size) {
             val retained = learned.lbdAt(index) <= learnedDb.glueLbd ||
