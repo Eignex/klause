@@ -356,7 +356,8 @@ internal object SolverInvocation {
                         line.startsWith(
                             ARM_PREFIX,
                         ) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
-                            attribution.add(it.copy(processElapsedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI))
+                            val arrivedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
+                            attribution.add(it.copy(processElapsedMs = arrivedMs))
                         }
 
                         line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
@@ -390,7 +391,8 @@ internal object SolverInvocation {
                         }
 
                     line.startsWith(ARM_PREFIX) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
-                        attribution.add(it.copy(processElapsedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI))
+                        val arrivedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
+                        attribution.add(it.copy(processElapsedMs = arrivedMs))
                     }
 
                     // `c <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
