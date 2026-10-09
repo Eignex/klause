@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
@@ -60,6 +61,7 @@ class VerdictReasonTest {
                 SolveStats(
                     run = RunStats(backend = "exact-lira"),
                     openTheory = OpenTheoryWorkStats(1, 2, 3, 4, 10),
+                    openTheoryClauses = OpenTheoryClauseStats(assertingConflicts = 7, nonAssertingConflicts = 3),
                 ),
                 solveTimeMs = 0,
                 solutions = 0,
@@ -75,6 +77,8 @@ class VerdictReasonTest {
         )) {
             assertTrue("; $key=" in out, "missing $key in: $out")
         }
+        assertTrue("; openAssertingConflicts=7" in out, out)
+        assertTrue("; openNonAssertingConflicts=3" in out, out)
     }
 
     @Test
