@@ -6,6 +6,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -498,7 +499,7 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `cancellation while capturing support cannot publish an incomplete proof`() {
+    fun `cancellation before returning reconstruction discards completed proof`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
@@ -510,7 +511,7 @@ class ReconstructedCertificateTest {
         )
         val model = assertNotNull(LpExactState(source).toWorkingModel())
         var total = 0
-        reconstructCertificate(
+        val completed = reconstructCertificate(
             model,
             duals = doubleArrayOf(),
             cancellation = Cancellation {
@@ -519,18 +520,38 @@ class ReconstructedCertificateTest {
             },
             limits = ReconstructionLimits(maxAttempts = 0),
         )
+        assertNotNull(completed.bound)
         var checks = 0
 
         val result = reconstructCertificate(
             model,
             duals = doubleArrayOf(),
-            cancellation = Cancellation { ++checks >= total - 4 },
+            cancellation = Cancellation { ++checks >= total },
             limits = ReconstructionLimits(maxAttempts = 0),
         )
 
         assertEquals(ReconstructionDecline.CANCELLED, result.metrics.decline)
-        assertEquals(ReconstructionPhase.SUPPORT, result.metrics.phase)
         assertNull(result.bound)
+    }
+
+    @Test
+    fun `reconstruction work cap stops between cancellation polls`() {
+        val meter = ReconstructionMeter(ReconstructionLimits(maxWork = 1L))
+        meter.step()
+
+        assertFailsWith<RuntimeException> { meter.step() }
+
+        assertEquals(1L, meter.snapshot(null).work)
+    }
+
+    @Test
+    fun `reconstruction observes cancellation within a polling stride`() {
+        var cancelled = false
+        val meter = ReconstructionMeter(cancellation = Cancellation { cancelled })
+        meter.step()
+        cancelled = true
+
+        assertFailsWith<RuntimeException> { repeat(64) { meter.step() } }
     }
 
     @Test

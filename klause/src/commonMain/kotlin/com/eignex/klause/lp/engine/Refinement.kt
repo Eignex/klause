@@ -8,6 +8,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.PollStride
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.div
 import com.eignex.klause.util.gcd
@@ -199,6 +200,8 @@ internal class RefinementMeter(
     private val initialPivots = cache.pivots
     private var directWork = 0L
     private var directAllocation = 0L
+    private val stride = PollStride()
+    private val meteredCancellation = cancellation.workMeter() != null
     var metrics = LpRefinementMetrics()
 
     // A finite time limit is a deadline, so a phase handed this token can budget a share of what is left of it.
@@ -227,7 +230,7 @@ internal class RefinementMeter(
         if (perAttempt) Duration.ZERO else cache.elapsed
 
     fun charge(work: Long = 1L, bytes: Long = 0L) {
-        poll()
+        if (meteredCancellation || stride.due(work)) poll()
         if (work > remainingWork) stop(LpRefinementDecline.WORK)
         if (bytes > remainingAllocation) stop(LpRefinementDecline.ALLOCATION)
         cache.work = addSaturated(cache.work, work)
@@ -1344,6 +1347,10 @@ internal fun refineLp(
     } catch (stop: RefinementStop) {
         reason = stop.reason
     } finally {
+        if (reason == LpRefinementDecline.CANCELLED || cancellation()) {
+            reason = LpRefinementDecline.CANCELLED
+            run = null
+        }
         metrics = meter.finish(reason)
     }
     val candidate = run?.candidate

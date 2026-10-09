@@ -4,9 +4,11 @@ import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -15,6 +17,46 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class RefinementTest {
+    @Test
+    fun `refinement work cap stops between cancellation polls`() {
+        val cache = LpRefinementCache()
+        val meter = RefinementMeter(LpRefinementLimits(maxWork = 1L), cache, Cancellation.Never)
+        meter.charge()
+
+        val stopped = assertFailsWith<RefinementStop> { meter.charge() }
+
+        assertEquals(LpRefinementDecline.WORK, stopped.reason)
+        assertEquals(1L, cache.work)
+    }
+
+    @Test
+    fun `refinement direct poll observes cancellation between charges`() {
+        var cancelled = false
+        val meter = RefinementMeter(LpRefinementLimits(), LpRefinementCache(), Cancellation { cancelled })
+        meter.charge()
+        cancelled = true
+
+        val stopped = assertFailsWith<RefinementStop> { meter.poll() }
+
+        assertEquals(LpRefinementDecline.CANCELLED, stopped.reason)
+    }
+
+    @Test
+    fun `refinement polls work metered cancellation on every charge`() {
+        var cancelled = false
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = cancelled
+            override fun workMeter(): WorkMeter = WorkMeter { }
+        }
+        val meter = RefinementMeter(LpRefinementLimits(), LpRefinementCache(), token)
+        meter.charge()
+        cancelled = true
+
+        val stopped = assertFailsWith<RefinementStop> { meter.charge() }
+
+        assertEquals(LpRefinementDecline.CANCELLED, stopped.reason)
+    }
+
     @Test
     fun `null correction distinguishes resource exits from numerical decline`() {
         val zero = ExactLpNumber.of(0L)

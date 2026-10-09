@@ -7,6 +7,7 @@ import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.PollStride
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.magnitudeBitLength
@@ -90,11 +91,17 @@ internal class ReconstructionMeter(
     private var work = 0L
     private var allocation = 0L
     private var maxBits = 0
+    private val stride = PollStride()
+    private val meteredCancellation = cancellation.workMeter() != null
 
     fun step(units: Long = 1L) {
-        if (cancellation()) throw ReconstructionStop(ReconstructionDecline.CANCELLED)
+        if (meteredCancellation || stride.due(units)) poll()
         if (units > limits.maxWork - work) throw ReconstructionStop(ReconstructionDecline.WORK)
         work += units
+    }
+
+    fun poll() {
+        if (cancellation()) throw ReconstructionStop(ReconstructionDecline.CANCELLED)
     }
 
     fun storage(bytes: Long) {
@@ -669,6 +676,10 @@ private fun reconstructCandidates(
     } catch (stop: ReconstructionStop) {
         decline = stop.reason
     }
+    if (decline == ReconstructionDecline.CANCELLED || cancellation()) {
+        decline = ReconstructionDecline.CANCELLED
+        run = null
+    }
     return ReconstructedCertificate(
         run?.point?.witness,
         run?.bound,
@@ -777,6 +788,10 @@ internal fun verifyRationalCertificate(
         }
     } catch (stop: ReconstructionStop) {
         decline = stop.reason
+    }
+    if (decline == ReconstructionDecline.CANCELLED || cancellation()) {
+        decline = ReconstructionDecline.CANCELLED
+        run = null
     }
     return ReconstructedCertificate(
         run?.point?.witness,
