@@ -150,6 +150,10 @@ for one.
 over the shared session. Only the Boolean skeleton is branched either way — the theory decides the
 arithmetic residual at each leaf. Activity order settles no additional instance on the measured
 corpus, so it is opt-in.
+`-s` reports `openAssertingConflicts` and `openNonAssertingConflicts` for the shared first-UIP analyzer.
+The latter counts sound learned conflicts that retain chronological fallback because resolution cannot
+make the clause asserting. A nonzero count is the trigger to inspect missing component reasons. Native
+CP analysis, root refutations, and conflicts without a usable clause are outside these two counters.
 `--param open-bound-proof=false` declines the routing bound proof, so a model whose open sides the
 relaxation would have closed goes to the open theory instead of the finite lane. That is what runs one
 instance down both lanes; shrinking `-t` does not substitute, since it starves the solve along with the
