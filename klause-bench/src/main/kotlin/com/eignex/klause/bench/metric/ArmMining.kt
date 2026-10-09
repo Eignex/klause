@@ -55,7 +55,9 @@ internal object ArmMining {
 
     // The portfolio numbers the second and later replicas of one arm; they are the same configuration.
     private val REPLICA = Regex("#\\d+$")
-    private val ACCOUNTING = setOf("segments", "work", "reward", "failures", "faults", "ms", "maxMs", "initMs", "reseeds")
+    private val ACCOUNTING = setOf(
+        "segments", "work", "reward", "failures", "faults", "ms", "maxMs", "initMs", "reseeds",
+    )
 
     /** The slicing columns `by=` accepts. */
     val SLICES: List<String> = listOf("config", "suite", "family", "format", "category", "kind", "class")
