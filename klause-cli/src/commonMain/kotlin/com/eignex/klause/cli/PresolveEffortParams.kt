@@ -34,7 +34,11 @@ internal fun presolveEffortParams(params: MutableList<String>, base: PresolveCon
     )
 }
 
-internal fun presolveEffortStats(config: PresolveConfig, budget: PresolveBudget?, elapsed: Duration): PresolveEffortStats =
+internal fun presolveEffortStats(
+    config: PresolveConfig,
+    budget: PresolveBudget?,
+    elapsed: Duration,
+): PresolveEffortStats =
     PresolveEffortStats(
         emphasis = config.emphasis.id,
         abortFraction = config.abortFraction,
