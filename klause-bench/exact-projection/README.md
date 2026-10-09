@@ -125,6 +125,12 @@ machine, not a whole-corpus or solved-runtime claim. One checkpass pair is slowe
 five repetitions do not establish a universal speedup. The implementation is the
 same after the later test-only destructuring correction.
 
+The integration base `2cb5729240ee099c4c8f0a73d7acab0891d7039a` also contains
+the Boolean implication lifetime fix `49faef15c`. That fix is outside these pinned
+AWS comparisons. The measurements isolate rational normalization at the recorded
+revisions; they do not estimate the performance of the combined integration base.
+GitHub CI checks the evidence recorder and solver regressions against that base.
+
 Job 868's [candidate profile](profile-candidate-summary.json) has 1/1786 checkpass
 samples containing `BigFraction.of`, versus 113/1793 on main. Handler has 10/1772
 versus 88/1682; mygetpwnam has zero versus 75/1764. The factory's fast paths are
