@@ -430,9 +430,11 @@ An MPS reference's claim is checked against the model before it becomes a verdic
 own presolved, scaled models under their own tolerances. Each returns its solution (SCIP by `display solution`, HiGHS
 in a solution file, written beside the case record as `<problem>.sol`). The check rounds and fixes every integer
 variable, then recomputes every bound and row of the original model to a relative 1e-6. A solution that fails is
-repaired once by solving the LP over the continuous variables with the integers fixed (HiGHS, at 1e-9 and then at
-the check's 1e-6 when the tighter LP finds none), and checked again;
-one that cannot be repaired is unknown, as is one the check cannot settle. The objective recorded is the one
+repaired by solving the LP over the continuous variables with the integers fixed (HiGHS, at 1e-9), and checked again.
+When that LP finds no completion, an elastic one minimizes the largest row violation, scaled by each bound as the check
+scales it: its optimum is the closest completion, which the check accepts or rejects, and a solution whose closest
+completion lies beyond the check's tolerance is invalid. One that cannot be repaired is unknown, as is one the check
+cannot settle. The objective recorded is the one
 recomputed from the checked solution. An optimum counts as proven only when its dual bound meets its primal bound:
 HiGHS stopping within its 0.01% gap tolerance records a solution, not a proof. A HiGHS run whose claim does not hold
 up (infeasible, or a solution that fails the check) is retried without presolve on what is left of its budget, and

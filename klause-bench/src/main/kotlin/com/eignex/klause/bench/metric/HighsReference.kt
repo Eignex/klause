@@ -107,27 +107,12 @@ internal object HighsReference {
     }
 
     /**
-     * The continuous repair [MpsWitness] asks for: HiGHS on the fixed-integer LP, its solution read back. It solves at
-     * a tolerance tighter than the check first, so the completion it returns passes the check on its own numbers, and
-     * only calls the integers uncompletable once the check's own tolerance finds no completion either: a tighter LP
-     * refuses rows the check accepts.
+     * The continuous repair [MpsWitness] asks for: HiGHS on a fixed-integer LP, its solution read back. It solves at a
+     * tolerance tighter than the check, so a completion it returns passes the check on its own numbers.
      */
     val repair = MpsWitness.Repair { lp ->
         if (!available()) return@Repair MpsWitness.RepairResult.Failed("highs is not available")
-        escalate(REPAIR_TOLERANCES) { tolerance -> solveFixed(lp, tolerance) }
-    }
-
-    /** The first completion any of [tolerances] finds, tightest first; otherwise the loosest one's verdict. */
-    internal fun escalate(
-        tolerances: List<Double>,
-        solve: (Double) -> MpsWitness.RepairResult,
-    ): MpsWitness.RepairResult {
-        var last: MpsWitness.RepairResult = MpsWitness.RepairResult.Failed("no tolerance tried")
-        for (tolerance in tolerances) {
-            last = solve(tolerance)
-            if (last is MpsWitness.RepairResult.Solved) return last
-        }
-        return last
+        solveFixed(lp, REPAIR_TOLERANCE)
     }
 
     private fun solveFixed(lp: String, tolerance: Double): MpsWitness.RepairResult {
@@ -214,6 +199,5 @@ internal object HighsReference {
     private const val MIN_RETRY_MS = 5_000L
     private const val REPAIR_TIMEOUT_MS = 30_000L
 
-    /** The repair's feasibility tolerances in order: tighter than the check, then the check's own. */
-    private val REPAIR_TOLERANCES = listOf(1e-9, MpsWitness.FEAS_TOL)
+    private const val REPAIR_TOLERANCE = 1e-9
 }

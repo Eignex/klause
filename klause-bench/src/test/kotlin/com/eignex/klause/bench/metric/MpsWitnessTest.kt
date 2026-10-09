@@ -72,10 +72,11 @@ class MpsWitnessTest {
 
     @Test
     fun `a binary near zero carrying flow through a large coefficient is invalid when no completion exists`() {
-        // Within a solver's integrality tolerance, 8e-7 times 1e6 lets 0.8 units through a link that is off.
+        // Within a solver's integrality tolerance, 8e-7 times 1e6 lets 0.8 units through a link that is off; the
+        // closest completion with the link off still misses a row by 0.25.
         val values = mapOf("b" to 8e-7, "f" to 0.8)
-        val verdict = MpsWitness.judge(link, claim(MpsWitness.Status.OPTIMAL, -0.8, -0.8, values)) {
-            MpsWitness.RepairResult.Infeasible
+        val verdict = MpsWitness.judge(link, claim(MpsWitness.Status.OPTIMAL, -0.8, -0.8, values)) { lp ->
+            if (elastic(lp)) solved("c1" to 0.25, "t" to 0.25) else MpsWitness.RepairResult.Infeasible
         }
 
         assertEquals(listOf(null, null, false), listOf(verdict.feasible, verdict.objective, verdict.proven))
@@ -94,7 +95,26 @@ class MpsWitnessTest {
 
         assertEquals(listOf(true, 2.5, false), listOf(verdict.feasible, verdict.objective, verdict.proven))
         assertEquals("repaired", verdict.stats["validation"])
-        assertTrue(" FX bnd c0 2.0" in lp && " FX bnd c1 2.0" in lp && " E r0" in lp)
+        assertTrue(" FX bnd c0 2.0" in lp && " FX bnd c1 2.0" in lp && " G r0l" in lp && " L r0u" in lp)
+    }
+
+    @Test
+    fun `a completion an LP solver calls infeasible counts when the closest one is within tolerance`() {
+        val values = mapOf("x" to 2.0000004, "w" to 2.0, "y" to 0.1)
+        val verdict = MpsWitness.judge(equality, claim(MpsWitness.Status.LIMIT, 2.1, null, values)) { lp ->
+            if (elastic(lp)) solved("c2" to 0.5, "t" to 0.0) else MpsWitness.RepairResult.Infeasible
+        }
+
+        assertEquals(listOf(true, 2.5), listOf(verdict.feasible, verdict.objective))
+        assertEquals("repaired", verdict.stats["validation"])
+    }
+
+    @Test
+    fun `the elastic LP lets each row side slip by its bound's scale and minimizes the slip`() {
+        val lp = MpsWitness.fixedLp(equality, doubleArrayOf(2.0, 2.0, 0.1), elastic = true)
+
+        assertTrue("    t obj 1" in lp && "    t r0l 1.0" in lp && "    t r0u -1.0" in lp && "    MIN" in lp)
+        assertTrue("x obj" !in lp && "    c0 obj" !in lp)
     }
 
     @Test
@@ -141,4 +161,8 @@ class MpsWitnessTest {
         assertIs<MpsWitness.Outcome.Valid>(within)
         assertTrue(beyond.row > 0.0)
     }
+
+    private fun elastic(lp: String) = "    t obj 1" in lp
+
+    private fun solved(vararg values: Pair<String, Double>) = MpsWitness.RepairResult.Solved(mapOf(*values))
 }
