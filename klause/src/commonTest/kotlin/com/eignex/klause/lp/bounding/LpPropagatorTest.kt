@@ -581,8 +581,7 @@ class LpPropagatorTest {
             )
             val scoped = assertNotNull(assertNotNull(lp.solve()).witness)
             assertEquals(BigFraction.ONE, scoped.objective)
-            assertEquals(BigFraction.ONE, scoped.primal[0])
-            assertEquals(BigFraction.ZERO, scoped.primal[1])
+            assertEquals(listOf(BigFraction.ONE), scoped.primal)
 
             lp.retract(0)
 
