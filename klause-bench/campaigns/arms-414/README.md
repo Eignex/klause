@@ -77,8 +77,13 @@ are observational contribution evidence, not arm-removal counterfactuals. Refere
 must be resolved independently before a recommendation. Source witnesses use the existing solver
 checks; reference agreement alone does not independently validate a witness.
 
+Pair summaries separate discovery, holdout and sentinel cohorts, with objective quality, feasibility
+and proof deltas on distinct axes. A cell without two feasible objectives is unscored for quality.
+Aggregate solve-clock timing uses the budget for a missing event; raw missing times remain absent.
+
 Local builds, tests, benchmarks, profiles, lint and docs gates are skipped per execution policy.
-No local workload was started or interrupted. GitHub CI validates the PR stack.
+No local solver, build or test/lint/docs/source-validation gate was started or interrupted.
+GitHub CI validates the PR stack.
 
 ## Completed wiring pilot
 

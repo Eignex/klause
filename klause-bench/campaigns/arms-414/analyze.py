@@ -56,7 +56,7 @@ def objective(rec):
 def quality(a, b):
     # Positive means b improves on a. Proof is kept out of this objective comparison.
     if a['feasible'] is not True or b['feasible'] is not True:
-        return int(b['feasible'] is True) - int(a['feasible'] is True)
+        return None
     x, y = objective(a), objective(b)
     if x is None or y is None:
         return None
@@ -77,6 +77,22 @@ def interval(values):
     rng = random.Random(414)
     samples = sorted(statistics.mean(rng.choices(values, k=len(values))) for _ in range(2000))
     return [samples[49], samples[1949]]
+
+
+def pair_summary(matched):
+    by_problem = defaultdict(list)
+    for cell in matched:
+        if cell['quality'] is not None:
+            by_problem[cell['input']].append(cell['quality'])
+    means = [statistics.mean(values) for values in by_problem.values()]
+    return dict(matched=len(matched), qualityWins=sum(x['quality'] == 1 for x in matched),
+        qualityTies=sum(x['quality'] == 0 for x in matched), qualityLosses=sum(x['quality'] == -1 for x in matched),
+        qualityUnscored=sum(x['quality'] is None for x in matched),
+        feasibleGains=sum(x['feasibleDelta'] == 1 for x in matched),
+        feasibleLosses=sum(x['feasibleDelta'] == -1 for x in matched),
+        proofGains=sum(x['proofDelta'] == 1 for x in matched), proofLosses=sum(x['proofDelta'] == -1 for x in matched),
+        disagreementCases=[x for x in matched if x['disagreement']],
+        problemMeanQuality=statistics.mean(means) if means else None, problemBootstrap95=interval(means))
 
 
 def time(rec, field):
@@ -143,6 +159,10 @@ def analyze(job):
         for repeat, c in enumerate(rows):
             indexed[(arm, suite, problem, seed, repeat)] = c
     result = dict(job=job, status=jobdata['status'], cases=len(cases), arms={}, pairs=[])
+    selection = read(ROOT / 'selection.json')
+    cohort_by_input = {entry['suite'] + '/' + entry['problem']: cohort
+                       for cohort in ('discovery', 'holdout', 'historical_sentinel')
+                       for entry in selection[cohort]}
     references = defaultdict(list)
     for row in read(ROOT / 'evidence' / 'reference-snapshot.json'):
         if not row['reference'].get('stale'):
@@ -242,17 +262,11 @@ def analyze(job):
                 bestDeltaMs=time(rb, 'timeToBestMs')-time(ra, 'timeToBestMs'),
                 aObjective=str(objective(ra)), bObjective=str(objective(rb)),
                 aProven=ra['proven'], bProven=rb['proven'], disagreement=contradictions(ra, rb)))
-        by_problem = defaultdict(list)
-        for m in matched:
-            if m['quality'] is not None:
-                by_problem[m['input']].append(m['quality'])
-        means = [statistics.mean(x) for x in by_problem.values()]
-        result['pairs'].append(dict(a=a, b=b, matched=len(matched), excluded=excluded,
-            qualityWins=sum(x['quality'] == 1 for x in matched), qualityLosses=sum(x['quality'] == -1 for x in matched),
-            proofGains=sum(x['proofDelta'] == 1 for x in matched), proofLosses=sum(x['proofDelta'] == -1 for x in matched),
-            disagreementCases=[x for x in matched if x['disagreement']],
-            problemMeanQuality=statistics.mean(means) if means else None,
-            problemBootstrap95=interval(means), cells=matched))
+        cohorts = defaultdict(list)
+        for cell in matched:
+            cohorts[cohort_by_input.get(cell['input'], 'unselected')].append(cell)
+        result['pairs'].append(dict(a=a, b=b, **pair_summary(matched), excluded=excluded,
+            cohorts={cohort: pair_summary(rows) for cohort, rows in cohorts.items()}, cells=matched))
     with (folder / 'cases.csv').open('w', newline='') as stream:
         columns = ['index', 'input', 'family', 'arm', 'seed', 'outcome', 'objective', 'firstMs', 'bestMs',
                    'processFirstMs', 'processBestMs', 'elapsedMs',
