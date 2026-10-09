@@ -37,6 +37,18 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `an expanded mixed integer pool keeps its extra LP variants for improvement`() {
+        val small = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts.assumed(Kind.COP, ProblemClass.MixedInteger)
+
+        val baseline = PortfolioComposition.plan(small, facts)
+        val expanded = PortfolioComposition.plan(small.copy(arms = 12), facts)
+
+        assertEquals(baseline.arms.map { it.label }, expanded.arms.take(expanded.firstSolutionCount).map { it.label })
+        assertTrue(expanded.arms.drop(expanded.firstSolutionCount).any { it.label == "lp-default" })
+    }
+
+    @Test
     fun `explicit and parallel pools can use every arm for a first solution`() {
         val scenarios = listOf(
             PortfolioScenario.sequential(Kind.CSP, arms = 12),

@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -237,9 +238,14 @@ internal object PortfolioComposition {
             val index = remaining.indexOfFirst { it::class == arm::class && it.label == arm.label }
             if (index >= 0) remaining.removeAt(index) else null
         }.toMutableList()
-        // Default LP supplies witnesses absent from the LP-free cores, including on annotated models
-        // whose small pool gives the second backtrack slot to the annotation.
-        val relaxation = remaining.indexOfFirst { it is BacktrackWorkerConfig && it.label == "lp-default" }
+        // Finite CP's default LP supplies witnesses absent from the LP-free cores, including on annotated
+        // models whose small pool gives the second backtrack slot to the annotation. Mixed-integer pools
+        // keep their LP-free first-solution finders; relaxation variants compete for improvement.
+        val relaxation = if (facts.profile.problemClass == ProblemClass.FiniteCp) {
+            remaining.indexOfFirst { it is BacktrackWorkerConfig && it.label == "lp-default" }
+        } else {
+            -1
+        }
         if (relaxation >= 0) first += remaining.removeAt(relaxation)
         return PortfolioArmPlan(first + remaining, first.size)
     }
