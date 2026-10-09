@@ -598,6 +598,59 @@ class RationalSimplexTest {
         assertEquals("3602879701896397/36028797018963968", BigFraction.ofDouble(0.1).toString())
     }
 
+    @Test
+    fun `fraction construction reduces signs units and nontrivial common factors`() {
+        val samples = listOf(
+            longArrayOf(0, -7, 0, 1),
+            longArrayOf(17, 1, 17, 1),
+            longArrayOf(17, -1, -17, 1),
+            longArrayOf(1, 17, 1, 17),
+            longArrayOf(-1, -17, 1, 17),
+            longArrayOf(7, 11, 7, 11),
+            longArrayOf(-7, 11, -7, 11),
+            longArrayOf(21, -33, -7, 11),
+            longArrayOf(Long.MIN_VALUE, 2, Long.MIN_VALUE / 2, 1),
+        )
+        for ((numerator, denominator, expectedNumerator, expectedDenominator) in samples) {
+            val value = BigFraction.of(bigIntOf(numerator), bigIntOf(denominator))
+
+            assertEquals(bigIntOf(expectedNumerator), value.num)
+            assertEquals(bigIntOf(expectedDenominator), value.den)
+        }
+    }
+
+    @Test
+    fun `IEEE conversion preserves canonical fractions across exponent boundaries`() {
+        val samples = listOf(
+            Triple(0.0, bigIntOf(0), BIG_ONE),
+            Triple(-0.0, bigIntOf(0), BIG_ONE),
+            Triple(0.5, BIG_ONE, bigIntOf(2)),
+            Triple(-1.0, -BIG_ONE, BIG_ONE),
+            Triple(0.1, bigIntOf(3602879701896397L), BIG_ONE shl 55),
+            Triple(Double.MIN_VALUE, BIG_ONE, BIG_ONE shl 1074),
+            Triple(-Double.MIN_VALUE, -BIG_ONE, BIG_ONE shl 1074),
+            Triple(Double.fromBits(2L), BIG_ONE, BIG_ONE shl 1073),
+            Triple(Double.fromBits(3L), bigIntOf(3), BIG_ONE shl 1074),
+            Triple(Double.fromBits(0x0010000000000000L), BIG_ONE, BIG_ONE shl 1022),
+            Triple(Double.fromBits(0x000fffffffffffffL), bigIntOf(0x000fffffffffffffL), BIG_ONE shl 1074),
+            Triple(Double.MAX_VALUE, bigIntOf(0x001fffffffffffffL) shl 971, BIG_ONE),
+            Triple(-Double.MAX_VALUE, -(bigIntOf(0x001fffffffffffffL) shl 971), BIG_ONE),
+        )
+        for ((input, numerator, denominator) in samples) {
+            val value = assertNotNull(BigFraction.ofDouble(input))
+
+            assertEquals(numerator, value.num, "$input numerator")
+            assertEquals(denominator, value.den, "$input denominator")
+        }
+    }
+
+    @Test
+    fun `IEEE conversion declines every nonfinite input`() {
+        for (input in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+            assertNull(BigFraction.ofDouble(input))
+        }
+    }
+
     private val fractionSamples = listOf(
         BigFraction.ZERO, BigFraction.ONE, BigFraction.MINUS_ONE, q(-6, 1), q(1, 2), q(-3, 4), q(5, 12),
         q(7, 18), q(6, 35), q(-10, 21), q(1, 1024), checkNotNull(BigFraction.ofDouble(0.1)),
