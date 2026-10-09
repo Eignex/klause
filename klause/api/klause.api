@@ -7392,6 +7392,9 @@ public final class com/eignex/klause/presolve/PresolveBudget : com/eignex/klause
 	public fun <init> (J)V
 	public fun charge (J)V
 	public final fun getAllowance ()J
+	public final fun getPassCalls ()Ljava/util/Map;
+	public final fun getProbeCalls ()J
+	public final fun getRounds ()I
 	public final fun orSpent (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
 	public final fun remaining ()J
 	public final fun slice (J)Lcom/eignex/klause/util/Cancellation;
@@ -7401,17 +7404,21 @@ public final class com/eignex/klause/presolve/PresolveBudget : com/eignex/klause
 public final class com/eignex/klause/presolve/PresolveConfig {
 	public static final field Companion Lcom/eignex/klause/presolve/PresolveConfig$Companion;
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/presolve/PresolveEmphasis;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;Lcom/eignex/klause/presolve/AffinePivotOrder;)V
-	public synthetic fun <init> (Lcom/eignex/klause/presolve/PresolveEmphasis;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;Lcom/eignex/klause/presolve/AffinePivotOrder;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/presolve/PresolveEmphasis;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;Lcom/eignex/klause/presolve/AffinePivotOrder;DI)V
+	public synthetic fun <init> (Lcom/eignex/klause/presolve/PresolveEmphasis;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/Integer;Lcom/eignex/klause/presolve/AffinePivotOrder;DIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun forLocalSearch ()Lcom/eignex/klause/presolve/PresolveConfig;
+	public final fun getAbortFraction ()D
 	public final fun getAffinePivotOrder ()Lcom/eignex/klause/presolve/AffinePivotOrder;
 	public final fun getEmphasis ()Lcom/eignex/klause/presolve/PresolveEmphasis;
+	public final fun getMaxRounds ()I
 	public final fun getOverrides ()Ljava/util/Map;
 	public final fun probeBudgetPerVar ()I
 	public final fun probeTotalBudget ()I
 	public final fun problemPasses (Lcom/eignex/klause/presolve/PresolveContext;)Ljava/util/List;
 	public final fun resolved (Lcom/eignex/klause/presolve/PresolvePass;Lcom/eignex/klause/presolve/PresolveContext;)Z
 	public final fun withAffinePivotOrder (Lcom/eignex/klause/presolve/AffinePivotOrder;)Lcom/eignex/klause/presolve/PresolveConfig;
+	public final fun withEffort (DILjava/lang/Integer;Ljava/lang/Integer;)Lcom/eignex/klause/presolve/PresolveConfig;
+	public static synthetic fun withEffort$default (Lcom/eignex/klause/presolve/PresolveConfig;DILjava/lang/Integer;Ljava/lang/Integer;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveConfig;
 }
 
 public final class com/eignex/klause/presolve/PresolveConfig$Companion {
@@ -10292,20 +10299,53 @@ public final class com/eignex/klause/solver/result/PortfolioStats {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/result/PresolveEffortStats {
+	public synthetic fun <init> (Ljava/lang/String;DIIIJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Integer;Ljava/util/Map;Ljava/lang/Long;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/util/Map;
+	public final fun component11 ()Ljava/lang/Long;
+	public final fun component2 ()D
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()I
+	public final fun component6-UwyO8pc ()J
+	public final fun component7 ()Ljava/lang/Long;
+	public final fun component8 ()Ljava/lang/Long;
+	public final fun component9 ()Ljava/lang/Integer;
+	public final fun copy-Q4fo6ws (Ljava/lang/String;DIIIJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Integer;Ljava/util/Map;Ljava/lang/Long;)Lcom/eignex/klause/solver/result/PresolveEffortStats;
+	public static synthetic fun copy-Q4fo6ws$default (Lcom/eignex/klause/solver/result/PresolveEffortStats;Ljava/lang/String;DIIIJLjava/lang/Long;Ljava/lang/Long;Ljava/lang/Integer;Ljava/util/Map;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/PresolveEffortStats;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAbortFraction ()D
+	public final fun getAllowance ()Ljava/lang/Long;
+	public final fun getElapsed-UwyO8pc ()J
+	public final fun getEmphasis ()Ljava/lang/String;
+	public final fun getMaxRounds ()I
+	public final fun getPassCalls ()Ljava/util/Map;
+	public final fun getProbeBudgetPerVar ()I
+	public final fun getProbeCalls ()Ljava/lang/Long;
+	public final fun getProbeTotalBudget ()I
+	public final fun getRounds ()Ljava/lang/Integer;
+	public final fun getWork ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/result/PresolveStats {
-	public synthetic fun <init> (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public synthetic fun <init> (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/util/List;
 	public final fun component2 ()I
 	public final fun component3 ()Z
 	public final fun component4 ()Lcom/eignex/klause/solver/result/LpHarvestReport;
 	public final fun component5 ()Lcom/eignex/klause/solver/result/LpStats;
 	public final fun component6-UwyO8pc ()J
-	public final fun copy-17CK4j0 (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;J)Lcom/eignex/klause/solver/result/PresolveStats;
-	public static synthetic fun copy-17CK4j0$default (Lcom/eignex/klause/solver/result/PresolveStats;Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JILjava/lang/Object;)Lcom/eignex/klause/solver/result/PresolveStats;
+	public final fun component7 ()Lcom/eignex/klause/solver/result/PresolveEffortStats;
+	public final fun copy-x2RqbK4 (Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;)Lcom/eignex/klause/solver/result/PresolveStats;
+	public static synthetic fun copy-x2RqbK4$default (Lcom/eignex/klause/solver/result/PresolveStats;Ljava/util/List;IZLcom/eignex/klause/solver/result/LpHarvestReport;Lcom/eignex/klause/solver/result/LpStats;JLcom/eignex/klause/solver/result/PresolveEffortStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/PresolveStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBakeElapsed-UwyO8pc ()J
 	public final fun getConstraintsRemoved ()I
+	public final fun getEffort ()Lcom/eignex/klause/solver/result/PresolveEffortStats;
 	public final fun getInfeasible ()Z
 	public final fun getLpHarvest ()Lcom/eignex/klause/solver/result/LpHarvestReport;
 	public final fun getLpStats ()Lcom/eignex/klause/solver/result/LpStats;
