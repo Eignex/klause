@@ -1,0 +1,53 @@
+{
+  "name": "rational-normalization-independent-witnesses",
+  "description": "Supplementary MPS witnesses: identical result-recorder adapter on main and numerical candidate, outside timing claims; preserve assignments for independent GitHub CI checks.",
+  "host": "aws",
+  "problems": [
+    {
+      "suite": "mps-core",
+      "max": "4",
+      "reference": "any"
+    },
+    {
+      "suite": "miplib3",
+      "name": "egout,flugpl",
+      "max": "2",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "engine": "cp",
+    "processors": "1",
+    "lp": "default",
+    "timeout": "20000",
+    "exact": "false"
+  },
+  "configs": [
+    {
+      "ref": "8647eb38328c77a44c2fe28107e0e087e0b76a21",
+      "label": "main",
+      "exact": "false"
+    },
+    {
+      "ref": "c4df1fc9d05bfee5cd145fb0d3c9069858c8be9e",
+      "label": "candidate",
+      "exact": "false"
+    },
+    {
+      "ref": "8647eb38328c77a44c2fe28107e0e087e0b76a21",
+      "label": "main-exact",
+      "exact": "true"
+    },
+    {
+      "ref": "c4df1fc9d05bfee5cd145fb0d3c9069858c8be9e",
+      "label": "candidate-exact",
+      "exact": "true"
+    }
+  ],
+  "seeds": [
+    1
+  ],
+  "repeats": 1,
+  "parallel": 1,
+  "machines": 1
+}

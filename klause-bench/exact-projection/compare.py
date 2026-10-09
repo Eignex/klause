@@ -1,6 +1,7 @@
 """Check paired lab cases and summarize uninstrumented fixed-work timings."""
 
 import collections
+import hashlib
 import json
 import statistics
 import sys
@@ -36,12 +37,20 @@ def summarize(cases):
             "outcomes": [{name: arm.get(name) for name in outcomes} for arm in (before, after)],
             "work": [arm["stats"].get("openWork") for arm in (before, after)],
             "theoryChecks": [arm["stats"].get("smtTheoryChecks") for arm in (before, after)],
+            "referenceCounters": {name: value for name, value in before["stats"].items()
+                                  if not timing_stat(name)},
+            "counterHashes": [hashlib.sha256(json.dumps(
+                {name: value for name, value in arm["stats"].items() if not timing_stat(name)},
+                sort_keys=True, separators=(",", ":"),
+            ).encode()).hexdigest() for arm in (before, after)],
         })
     return [{
         "problem": problem,
         "medianSeconds": [statistics.median(pair["seconds"][index] for pair in pairs)
                           for index in (0, 1)],
-        "pairs": pairs,
+        "referenceCounters": pairs[0]["referenceCounters"],
+        "pairs": [{name: value for name, value in pair.items() if name != "referenceCounters"}
+                  for pair in pairs],
     } for problem, pairs in groups.items()]
 
 
