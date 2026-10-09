@@ -1,0 +1,22 @@
+{
+  "name": "presolve-554-discovery-300",
+  "description": "Frozen discovery campaign for issue 554: 20 disjoint base families, single satOptimized CP arm, three solver seeds and two alternating repeats. Compare default, conservative and the pilot-active abort fraction 0.01 on one integrated build. Source checks run after each measured subprocess. Holdout remains unopened; no default is chosen from discovery alone.",
+  "host": "aws",
+  "problems": {"set": "presolve-554-discovery", "reference": "any"},
+  "base": {
+    "ref": "5e9d4c5cf581ee6c11957e9edccd0242f88dcd19",
+    "engine": "cp",
+    "processors": "1",
+    "timeout": "300000",
+    "param.bt-arm": "satOptimized",
+    "param.arms": "1",
+    "param.source-validation": "true"
+  },
+  "configs": [
+    {"label": "default", "presolve": "default"},
+    {"label": "conservative", "presolve": "conservative"},
+    {"label": "abort-0.01", "presolve": "default", "param.presolve-abort-fraction": "0.01"}
+  ],
+  "seeds": [3, 11, 29],
+  "repeats": 2
+}
