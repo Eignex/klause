@@ -109,11 +109,37 @@ test fixture session binding and moves the deadline assertion outside the worker
 callback; its production source is identical to this measured revision.
 `lab-887/cases.csv` and `stats.json` are generated remotely by the lab;
 `cases.json.gz` retains every case's complete provenance and per-arm counters.
+`ihtc-family.csv` transcribes the IHTC family totals from those counters, with
+setup separate from search and segment overhead. Blank main `btInitWork` means
+unknown. Every row has no incumbent; every candidate row has two cancelled
+backtrack openings.
 
 Lab 872 was cancelled after 29 completed cases on an intermediate candidate.
 Labs 878 and 886 were cancelled before
 executing cases after implementation updates. These jobs do not validate the
 updated implementation.
+
+## Integration after concurrent changes
+
+[Lab 893](http://192.168.50.104:8420/jobs/893) pairs main
+`cfe18e514266b3704b4fbdf33877d6a32b29e8cc` with implementation
+`9316cc54e6810a9a1a31b29ecbb3b44b32ece7d3`. This includes the concurrent
+Boolean implication lifetime and rational normalization fixes. The explicit AWS
+spec `integration-paired.json` uses the same four problems and two pools, seed 3
+and one repetition. All 16 cases complete. Both builds and pools retain
+incumbents on every control; expanded CoinsGrid proves 2236 on both builds.
+Default CoinsGrid is unproven at 5974 on main and 6042 on candidate, so this
+single integration pair makes no solution-quality improvement claim.
+
+IHTC finds no incumbent on either build or pool. Candidate cancels both openings
+and runs all four local-search arms plus ALNS; the expanded candidate gives SA
+a second segment. Main runs both backtrack arms and one local-search arm.
+Candidate opening time totals 2335/2369 ms for default/expanded, versus main's
+4387/4448 ms. Local-search work is zero; candidate ALNS charges 5000 units of
+outer repair allowance. Complete records and remotely generated CSV/statistics
+are in `lab-893`. Main and candidate installed-build fingerprints are
+`3d5b2a8bc14f8f145b178c8f6df3db07e1e63cea99216d429efef65e6eef1963`
+and `b51cf0a1c2854536819a4b26415f8531c7b98cb4f31342bbba0f85bc4c70e106`.
 
 ## Limits and validation
 
@@ -125,7 +151,8 @@ do not imply useful sibling search or an IHTC incumbent. The broader allowance
 refactor in [2322](https://github.com/Eignex/klause/issues/2322) is outside this
 change; these records do not close the remaining construction allocation limit.
 
-GitHub CI validates cancellation, partial construction, sibling and deferred-arm
+[GitHub CI on 9316cc54e](https://github.com/Eignex/klause/actions/runs/37994351655)
+passes JVM, Linux native and lint/docs. It validates cancellation, partial construction, sibling and deferred-arm
 fallback, retirement, one opening/search deadline, construction charged once,
 resumed solve-wide node allowance and the one-shot unknown cancellation verdict.
 Before the remote-only policy, a local baseline CLI install completed, one
