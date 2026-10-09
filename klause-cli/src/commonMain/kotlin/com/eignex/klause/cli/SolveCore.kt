@@ -65,7 +65,8 @@ internal object SolveCore {
         // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only — the
         // orders differ in what they fold first, never in what the problem means — exposed so the choice
         // can be A/B'd on a corpus rather than argued about.
-        val config = affinePivotOrderParam(common)?.let { base.withAffinePivotOrder(it) } ?: base
+        val pivotPlan = affinePivotOrderParam(common)?.let { base.withAffinePivotOrder(it) } ?: base
+        val config = presolveEffortParams(common.engineParams, pivotPlan)
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
@@ -794,7 +795,14 @@ internal object SolveCore {
                 stats(
                     common,
                     output,
-                    withModelObjective(outcome.stats, solvable, outcome.bestSample),
+                    withModelObjective(
+                        outcome.stats.copy(presolve = (outcome.stats.presolve ?: PresolveStats()).copy(
+                            effort = presolveEffortStats(request.presolveConfig, request.presolveBudget,
+                                result.preparationElapsed),
+                        )),
+                        solvable,
+                        outcome.bestSample,
+                    ),
                     outcome.elapsedMs + solvable.routingElapsedMs,
                     outcome.solutions,
                 )

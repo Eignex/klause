@@ -7,7 +7,11 @@ import kotlin.test.assertEquals
 class PresolveRoundEngineTest {
 
     /** A host whose passes change the scripted number of units on each successive run. */
-    private class ScriptedHost(private val size: Long, private val changes: Map<PresolvePass, List<Long>>) :
+    private class ScriptedHost(
+        private val size: Long,
+        private val changes: Map<PresolvePass, List<Long>>,
+        private val decreasingComplexity: Boolean = false,
+    ) :
         PresolveRoundEngine.RoundHost {
         val runs = ArrayList<PresolvePass>()
         private var units = 0L
@@ -20,7 +24,7 @@ class PresolveRoundEngineTest {
             return PassOutcome.CHANGED
         }
 
-        override fun complexity(): Long = size
+        override fun complexity(): Long = if (decreasingComplexity) size - units else size
 
         override fun modelSize(): Long = size
 
@@ -30,6 +34,29 @@ class PresolveRoundEngineTest {
     private fun runs(passes: List<PresolvePass>, host: ScriptedHost): List<PresolvePass> {
         PresolveRoundEngine.run(passes, MAX_PRESOLVE_ROUNDS, Cancellation.Never, null, host)
         return host.runs
+    }
+
+    @Test
+    fun `a lower abort fraction retains productive rounds`() {
+        val pass = PresolvePass.STRENGTHEN_COEFFICIENTS
+        val stopped = ScriptedHost(10_000, mapOf(pass to listOf(5L, 5L)), decreasingComplexity = true)
+        val continued = ScriptedHost(10_000, mapOf(pass to listOf(5L, 5L)), decreasingComplexity = true)
+
+        PresolveRoundEngine.run(listOf(pass), 16, Cancellation.Never, null, stopped, 0.001)
+        PresolveRoundEngine.run(listOf(pass), 16, Cancellation.Never, null, continued, 0.0001)
+
+        assertEquals(1, stopped.runs.size)
+        assertEquals(3, continued.runs.size)
+    }
+
+    @Test
+    fun `a round cap stops a productive schedule`() {
+        val pass = PresolvePass.STRENGTHEN_COEFFICIENTS
+        val host = ScriptedHost(10_000, mapOf(pass to listOf(100L, 100L, 100L)), decreasingComplexity = true)
+
+        PresolveRoundEngine.run(listOf(pass), 2, Cancellation.Never, null, host, 0.0)
+
+        assertEquals(2, host.runs.size)
     }
 
     @Test

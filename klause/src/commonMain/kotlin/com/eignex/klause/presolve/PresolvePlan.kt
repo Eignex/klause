@@ -78,7 +78,18 @@ class PresolveConfig(
     private val probeTotalBudgetOverride: Int? = null,
     /** The pivot order used by affine elimination. */
     val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+    /** Fractional complexity reduction below which a round ends iteration. */
+    val abortFraction: Double = 0.001,
+    /** Maximum rounds per source or finite pass schedule. */
+    val maxRounds: Int = emphasis.maxRounds,
 ) {
+    init {
+        require(abortFraction.isFinite() && abortFraction in 0.0..1.0)
+        require(maxRounds >= 0)
+        require(probeBudgetPerVarOverride == null || probeBudgetPerVarOverride >= 0)
+        require(probeTotalBudgetOverride == null || probeTotalBudgetOverride >= 0)
+    }
+
     /** Per-variable cap on bake-time SAC `propagate` calls. */
     fun probeBudgetPerVar(): Int = probeBudgetPerVarOverride ?: emphasis.probeBudgetPerVar
 
@@ -87,7 +98,19 @@ class PresolveConfig(
 
     /** Return this plan with a different affine-elimination pivot order. */
     fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveConfig =
-        PresolveConfig(emphasis, overrides, probeBudgetPerVarOverride, probeTotalBudgetOverride, pivotOrder)
+        PresolveConfig(
+            emphasis, overrides, probeBudgetPerVarOverride, probeTotalBudgetOverride, pivotOrder, abortFraction, maxRounds,
+        )
+
+    /** Return a request-local effort plan, keeping unspecified limits. */
+    fun withEffort(
+        abortFraction: Double = this.abortFraction,
+        maxRounds: Int = this.maxRounds,
+        probeBudgetPerVar: Int? = probeBudgetPerVarOverride,
+        probeTotalBudget: Int? = probeTotalBudgetOverride,
+    ): PresolveConfig = PresolveConfig(
+        emphasis, overrides, probeBudgetPerVar, probeTotalBudget, affinePivotOrder, abortFraction, maxRounds,
+    )
 
     /** Whether [pass] runs under [context]. */
     fun resolved(pass: PresolvePass, context: PresolveContext): Boolean = overrides[pass] ?: auto(pass, context)
@@ -123,6 +146,8 @@ class PresolveConfig(
         probeBudgetPerVarOverride,
         probeTotalBudgetOverride,
         affinePivotOrder,
+        abortFraction,
+        maxRounds,
     )
 
     /** Predefined plans and parser. */

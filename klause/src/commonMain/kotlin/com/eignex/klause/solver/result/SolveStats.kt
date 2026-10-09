@@ -250,4 +250,21 @@ data class PresolveStats(
     val lpStats: LpStats = LpStats(),
     /** Wall time the base bake (presolve step 0, `Problem.bake`) took. */
     val bakeElapsed: Duration = Duration.ZERO,
+    /** Finite preparation settings and observed effort, when supplied by the caller. */
+    val effort: PresolveEffortStats? = null,
+)
+
+/** Request-local finite preparation observation; probe caps apply per bake tier, not to this aggregate. */
+data class PresolveEffortStats(
+    val emphasis: String,
+    val abortFraction: Double,
+    val maxRounds: Int,
+    val probeBudgetPerVar: Int,
+    val probeTotalBudget: Int,
+    val elapsed: Duration,
+    val work: Long?,
+    val allowance: Long?,
+    val rounds: Int?,
+    val passCalls: Map<String, Int>,
+    val probeCalls: Long?,
 )

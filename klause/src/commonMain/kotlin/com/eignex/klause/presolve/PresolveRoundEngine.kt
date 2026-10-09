@@ -3,9 +3,6 @@ package com.eignex.klause.presolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 
-/** Abort a pass schedule after a round makes only a marginal complexity reduction. */
-private const val PRESOLVE_ABORT_FRACTION = 0.001
-
 /**
  * Share of the model, in [PresolveRoundEngine.RoundHost.modelSize] units, that other passes must change
  * before a pass above [PresolveTiming.FAST] runs again. Below it the cheap passes absorb the change and
@@ -70,6 +67,7 @@ internal object PresolveRoundEngine {
         cancellation: Cancellation,
         budget: PresolveBudget?,
         host: RoundHost,
+        abortFraction: Double = 0.001,
     ): Result {
         var version = 0
         val ranAtVersion = HashMap<PresolvePass, Int>()
@@ -91,6 +89,7 @@ internal object PresolveRoundEngine {
         }
 
         while (round < maxRounds && !cancellation()) {
+            budget?.recordRound()
             var ranAny = false
             var eligible = passes.count(::due)
             for (pass in passes) {
@@ -101,6 +100,7 @@ internal object PresolveRoundEngine {
                 val slice = budget?.let { sliceOf(it, cancellation, eligible) }
                 eligible--
                 val size = host.modelSize()
+                budget?.recordPass(pass)
                 when (host.runPass(pass, slice)) {
                     PassOutcome.INFEASIBLE -> {
                         fired.add(pass)
@@ -126,7 +126,7 @@ internal object PresolveRoundEngine {
             round++
             val roundEndComplexity = host.complexity()
             val reduced = roundStartComplexity - roundEndComplexity
-            if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
+            if (reduced > 0 && reduced.toDouble() < abortFraction * roundStartComplexity) break
             roundStartComplexity = roundEndComplexity
         }
         return Result(fired.toList(), infeasible)
