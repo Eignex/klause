@@ -16,6 +16,8 @@ internal fun FlatZincCompiler.postExactFloatLinear(
     strict: Boolean = false,
     reifier: Int? = null,
 ) {
+    val integerImage = postIntegerImagePredicate(coefficients, variables, op, bound, strict, reifier)
+    if (integerImage && (reifier != null || op == LinearOp.NE || variables.isEmpty())) return
     if (reifier == null && op != LinearOp.NE && variables.isNotEmpty()) {
         factors.add(Linear(EmptyIntArray, EmptyDoubleArray, variables, coefficients, op, bound, strict))
         return

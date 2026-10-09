@@ -303,6 +303,7 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     val aRef = resolveFloatVarOrConst(c.args[0])
     val bRef = resolveFloatVarOrConst(c.args[1])
     val cRef = resolveFloatVarOrConst(c.args[2])
+    emitIntegerImageProduct(c, cRef)
     if (aRef is FloatRef.Const && bRef is FloatRef.Const) {
         emitFloatBinaryCmp(
             FznConstraint("float_eq", listOf(c.args[2], FznExpr.FloatLit(aRef.value * bRef.value)), emptyList()),
