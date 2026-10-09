@@ -1,12 +1,12 @@
 # LP component split measurement
 
-At solver revision `570949daf` (`arms.json` records the full commit), the first five-repeat
-sample showed a 10.6% lower median subprocess duration on generated eight-block MiniZinc and
-5.0% higher duration on eight-block MPS. These are preliminary whole-process differences,
-not established gains or regressions: one host, one seed and five repeats do not characterize
-noise. The linked control was effectively tied. Every repeated case returned a witness;
-proof counts and final objectives agreed. The counters establish actual splitting, but
-runtime conclusions require the duplicate-arm, balanced-order follow-up described below.
+At solver revision `570949daf` (`arms.json` records the full commit), duplicate-arm,
+balanced-order follow-ups found a repeatable timing difference on each selected separable
+fixture: about 9.8% faster with splitting on MiniZinc 8x24 and about 5% slower on MPS 8x24.
+The linked control's small difference falls within duplicate-arm variation. These are
+measurements on one host and seed, not a population-wide speedup or a default-policy
+recommendation. Every repeated generated-model witness passed independent source checks;
+proof counts and final objectives agreed between arms.
 
 ## Selection and method
 
@@ -44,7 +44,7 @@ job 791 confirmed that some residual LPs after integer assignments actually spli
 at most two blocks. The original MIP need not be globally separable. GeneralizedMKP is
 the representative nonseparable, node-heavy control, rather than another zero-split sweep.
 
-## Repeated results
+## Initial repeated results
 
 Times are milliseconds, with the control (`split-off`) first. `elapsedMs` covers CLI
 launch, loading, solving, output consumption and process exit. It excludes bench setup,
@@ -64,7 +64,7 @@ from subprocess duration alone. All individual samples and counters are in `summ
 
 On MiniZinc 8x24, subprocess ranges were 1003–1029 ms off and 913–925 ms on,
 with reported solve-time medians 831/723 ms and best-incumbent medians 311/281 ms.
-These five launches favor splitting, pending an independent noise calibration. MPS 8x24 ranges were
+These five launches motivated the separate noise calibration below. MPS 8x24 ranges were
 473–480 ms off and 481–507 ms on. The same continuous matrix can therefore repay the
 split on one consumer path and cost more on another; setup, certification and consumer
 behavior are included. There are five repeated launches of each problem, not five
@@ -76,6 +76,42 @@ was 2.0% worse with splitting, while reported nodes ranged 59927–62656 on and
 quality on the selection. Component work varies with the number of residual solves;
 node LP passes were zero. This case supplies a real corpus split, not evidence for
 per-node bounding overhead.
+
+## Duplicate-arm noise calibration
+
+The initial five-repeat timing differences were challenged as possible noise. Jobs
+[801](http://192.168.50.104:8420/jobs/801),
+[802](http://192.168.50.104:8420/jobs/802), and
+[803](http://192.168.50.104:8420/jobs/803) therefore ran each of the two larger separable
+fixtures and the linked control separately, with ten `off/on/on/off` blocks. Each block
+has two identical off arms and two identical on arms. One problem per job prevents the
+lab's per-problem rotation from changing that balanced order. All other arguments,
+revision, host and seed match job 793. Each invocation starts a fresh JVM.
+
+`noise.py` compares the average of the outer off durations with the average of the inner
+on durations in each block. This balances linear time drift within a block and separately
+measures the difference between identical arms. No warmed benchmark state is carried
+between invocations. Every block agreed on witness, objective and proof status.
+
+| Model | Median averaged elapsed off/on (ms) | Median paired on/off ratio | On faster blocks | Duplicate off absolute difference median/max (ms) | Duplicate on absolute difference median/max (ms) |
+| --- | --- | ---: | --- | --- | --- |
+| MiniZinc 8x24 | 1010.75/911.75 | 0.902 | 10/10 | 9/35 | 7/20 |
+| MPS 8x24 | 479.5/502.5 | 1.051 | 0/10 | 4.5/12 | 4.5/15 |
+| MiniZinc linked 8x24 | 1035.25/1039.75 | 1.004 | 2/10 | 3/18 | 7.5/17 |
+
+MiniZinc paired elapsed ratios ranged 0.889–0.930, and best-incumbent ratios
+0.887–0.908 (median 0.895). MPS elapsed ratios ranged 1.019–1.061, and
+best-incumbent ratios 1.016–1.059 (median 1.051). Both differences retained their
+sign in all ten balanced blocks and exceed typical measured duplicate-arm differences
+on these fixtures. They are more than the small tied-control variation on this host;
+they still do not establish effects on other sizes, matrices, seeds or machines.
+
+The linked-control elapsed ratios ranged 0.996–1.022 and best-incumbent ratios
+0.983–1.018. Its 0.4% median elapsed difference is inside measured identical-arm
+variation, so this report treats it as noise and does not call it a labeling penalty.
+All 120 follow-up witnesses passed the same independent source checker, with zero
+row residual. No solver proof credit was upgraded. The per-case data and balanced
+blocks are archived in `summary.json` and `noise.json`.
 
 ## Node path and labeling overhead
 
@@ -105,7 +141,7 @@ no engine or statistics implementation was changed.
 
 `analyze.py` independently checks every emitted generated-model witness against all
 original matrix rows, bounds, the finite decision and the linked row, rather than using
-split counters as correctness evidence. All 50 repeated dense-model witnesses passed;
+split counters as correctness evidence. All 50 initial and 120 calibration dense-model witnesses passed;
 maximum original-row residual was 0 for these exact-mode outputs. A manual checker probe
 accepted the known witness and rejected a changed coordinate. MiniZinc source validation
 in the bench remains `unknown` because output uses introduced array names; these explicit
@@ -130,7 +166,11 @@ python3 klause-bench/scripts/lp-component-split/generate.py
 /home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/dense-ab-spec.json
 /home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/miplib-ab-spec.json
 /home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/node-ab-spec.json
+/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mzn-dense-8x24-noise-spec.json
+/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mps-dense-8x24-noise-spec.json
+/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mzn-linked-8x24-noise-spec.json
 python3 klause-bench/scripts/lp-component-split/analyze.py klause-bench/reports/lp-component-split-1455/793/cases.json klause-bench/reports/lp-component-split-1455/793/raw
+python3 klause-bench/scripts/lp-component-split/noise.py klause-bench/reports/lp-component-split-1455/801/cases.json
 ```
 
 The specs pin the measured revision, so later report-only commits do not change their

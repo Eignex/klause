@@ -14,3 +14,8 @@ source witnesses against the original equations. Raw files are named `<case-inde
 CLI statistics omit zero-valued optional counters; missing split/component counters are
 read as zero. The script rejects failed/incomplete records and missing elapsed timing.
 It preserves proof counts and incumbent times separately from subprocess duration.
+
+`noise.py <cases.json>` compares the paired average on/off durations in saved ten-block
+`off/on/on/off` experiments, reporting duplicate-arm variation separately. It checks
+case order, completeness and outcome agreement before comparing timing. The report's
+three noise specs each select one problem to keep that balanced order.
