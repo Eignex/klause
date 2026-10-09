@@ -256,15 +256,26 @@ data class PresolveStats(
 
 /** Request-local finite preparation observation; probe caps apply per bake tier, not to this aggregate. */
 data class PresolveEffortStats(
+    /** Effective effort preset. */
     val emphasis: String,
+    /** Effective round effectiveness threshold. */
     val abortFraction: Double,
+    /** Maximum rounds per pass schedule. */
     val maxRounds: Int,
+    /** Integer probe cap per variable and tier on each bake. */
     val probeBudgetPerVar: Int,
+    /** Integer probe cap per tier on each bake. */
     val probeTotalBudget: Int,
+    /** Finite preparation time, excluding frontend routing and engine construction. */
     val elapsed: Duration,
+    /** Metered work across source and finite preparation; null without a meter. */
     val work: Long?,
+    /** Shared phase work allowance; null without a meter. */
     val allowance: Long?,
+    /** Round entries, including final empty scans; null without a meter. */
     val rounds: Int?,
+    /** Scheduled pass calls, including unchanged outcomes. */
     val passCalls: Map<String, Int>,
+    /** Root propagation probe and repair calls across tiers and reseeds; null without a meter. */
     val probeCalls: Long?,
 )
