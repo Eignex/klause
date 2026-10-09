@@ -1,0 +1,42 @@
+{
+  "name": "lp-component-noise-mzn-dense-8x24-1455-5ff5",
+  "description": "Calibrate whole-process noise with duplicate identical arms and balanced off/on/on/off ordering on one confirmed model.",
+  "problems": {
+    "suite": "lp-component-split",
+    "name": "mzn-dense-8x24",
+    "reference": "any"
+  },
+  "base": {
+    "ref": "570949daf",
+    "engine": "cp",
+    "timeout": "5000",
+    "processors": "1",
+    "lp": "aggressive",
+    "presolve": "off",
+    "exact": "true"
+  },
+  "configs": [
+    {
+      "label": "off-first",
+      "param.lp-component-split": "false"
+    },
+    {
+      "label": "on-first",
+      "param.lp-component-split": "true"
+    },
+    {
+      "label": "on-second",
+      "param.lp-component-split": "true"
+    },
+    {
+      "label": "off-second",
+      "param.lp-component-split": "false"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 10,
+  "parallel": 1,
+  "host": "lab"
+}
