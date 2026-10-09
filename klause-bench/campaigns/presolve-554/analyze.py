@@ -196,13 +196,27 @@ def analyze(cases, control):
             by_family[fam]['log_time_ratio'].append(ratio)
             for metric, measure in [('processPar2', process_timing),
                                     ('preparationAdjustedPar2', preparation_timing),
-                                    ('subprocessDuration', lambda r: r.get('elapsedMs'))]:
+                                    ('subprocessDuration', lambda r: r.get('elapsedMs')),
+                                    ('preparationDuration', lambda r: numeric(r, 'presolvePreparationMs'))]:
                 av, bv = measure(a), measure(b)
                 if av is not None and bv is not None:
                     by_family[fam][metric].append(math.log(max(1, bv) / max(1, av)))
                     timing_pairs[metric] += 1
+            equal_objective = (a.get('feasible') is not True or a.get('kind') == 'satisfy' or
+                               (a.get('objective') is not None and a.get('objective') == b.get('objective')))
+            if q == 0 and a.get('kind') == b.get('kind') and equal_objective:
+                av, bv = process_timing(a), process_timing(b)
+                if av is not None and bv is not None:
+                    by_family[fam]['equalOutcomeProcessPar2'].append(math.log(bv / av))
+                    timing_pairs['equalOutcomeProcessPar2'] += 1
             if q is not None:
                 by_family[fam]['quality'].append(q)
+            by_family[fam]['controlOutcomes'].append(category(block[control]))
+            by_family[fam]['candidateOutcomes'].append(category(block[label]))
+            for metric, record in [('controlPreparationMs', a), ('candidatePreparationMs', b)]:
+                value = numeric(record, 'presolvePreparationMs')
+                if value is not None:
+                    by_family[fam][metric].append(value)
             sa, sb = work_signature(a), work_signature(b)
             if 'presolveWork' not in sa or 'presolveWork' not in sb:
                 unmetered += 1
@@ -227,15 +241,33 @@ def analyze(cases, control):
                         'unmetered': unmetered, 'geomeanPar2RatioFamilyBootstrap': ci,
                         'timingPairs': dict(timing_pairs),
                         'processPar2RatioFamilyBootstrap': ratio_interval(by_family, 'processPar2'),
+                        'equalOutcomeProcessPar2RatioFamilyBootstrap': ratio_interval(by_family, 'equalOutcomeProcessPar2'),
                         'preparationAdjustedPar2RatioFamilyBootstrap': ratio_interval(by_family, 'preparationAdjustedPar2'),
                         'subprocessDurationRatioFamilyBootstrap': ratio_interval(by_family, 'subprocessDuration'),
+                        'preparationDurationRatioFamilyBootstrap': ratio_interval(by_family, 'preparationDuration'),
                         'qualityFamilyBootstrap': interval([statistics.mean(x['quality']) for x in by_family.values()
                                                             if x['quality']]),
                         'familyOutcomes': {f: dict(Counter(x['quality'])) for f, x in by_family.items()},
+                        'familyComparisons': {f: {
+                            'eligiblePairs': len(x['quality']),
+                            'qualityCounts': dict(Counter(x['quality'])),
+                            'meanQuality': statistics.mean(x['quality']),
+                            'controlOutcomes': dict(Counter(x['controlOutcomes'])),
+                            'candidateOutcomes': dict(Counter(x['candidateOutcomes'])),
+                            'processPar2Ratio': math.exp(statistics.mean(x['processPar2'])) if x['processPar2'] else None,
+                            'equalOutcomeProcessPar2Ratio': math.exp(statistics.mean(x['equalOutcomeProcessPar2']))
+                                if x['equalOutcomeProcessPar2'] else None,
+                            'equalOutcomeTimingPairs': len(x['equalOutcomeProcessPar2']),
+                            'medianControlPreparationMs': statistics.median(x['controlPreparationMs'])
+                                if x['controlPreparationMs'] else None,
+                            'medianCandidatePreparationMs': statistics.median(x['candidatePreparationMs'])
+                                if x['candidatePreparationMs'] else None,
+                        } for f, x in by_family.items()},
                         'differences': differences}
     return {'timingPolicy': {
                 'reportedPar2': 'Legacy search attribution time; separators when attribution is absent. Not an end-to-end measure.',
                 'processPar2': 'Subprocess incumbent arrival including launch, load, preparation and search; refutations use process duration. Unavailable legacy witness timings are excluded.',
+                'equalOutcomeProcessPar2': 'Descriptive subset with tied reported quality and objective. Coverage is disclosed; this outcome-conditioned subset is not a causal estimate.',
                 'preparationAdjustedPar2': 'Search attribution plus measured preparation; excludes launch, frontend loading and routing.',
                 'subprocessDuration': 'Total subprocess duration regardless of result, before source checking; not time to best.',
                 'unknownPenalty': 'PAR2 assigns twice the nominal budget to undecided cases; duration summaries disclose overshoot.'},
