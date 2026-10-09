@@ -1,0 +1,124 @@
+{
+  "job": 873,
+  "page": "http://192.168.50.104:8420/jobs/873",
+  "artifacts": [
+    {
+      "file": "job.json.gz",
+      "url": "http://192.168.50.104:8420/jobs/873",
+      "sha256": "18c85861abeaebf2f9a33858a42e5389bbfac3f3b58223cc12284ef310649101"
+    },
+    {
+      "file": "arms.json.gz",
+      "url": "http://192.168.50.104:8420/experiments/873/arms",
+      "sha256": "487f933febed6f000396964a8f7e229d43ad5f93e5b4b2c46a9472bc8e48fcdb"
+    },
+    {
+      "file": "cases.json.gz",
+      "url": "http://192.168.50.104:8420/experiments/873/cases",
+      "sha256": "ba01c3ed94a1da69aafec0434bfb99bd1f0f2f677d76e9d4f0558afab1bf7346"
+    },
+    {
+      "file": "lab-stats.json.gz",
+      "url": "http://192.168.50.104:8420/experiments/873/stats",
+      "sha256": "c24bfc4285ed53619f2fcb0b710360bfc561c7bff102e1901fb2c1b385e1b408"
+    },
+    {
+      "file": "reference-comparison.json.gz",
+      "url": "http://192.168.50.104:8420/experiments/873/reference",
+      "sha256": "38841103ee3ea67d547809f3140c587591ac43d3272e05b3ad906bfad2233746"
+    },
+    {
+      "file": "files.json.gz",
+      "url": "http://192.168.50.104:8420/jobs/873/files",
+      "sha256": "2ba352daa44060729496e92aa803bf2ba445e30da1b65857b902543899bd9a7a"
+    },
+    {
+      "file": "aws-instances",
+      "sha256": "891232f22d5daec51bc2bfa049197979470ae6f4c55b7aca902c406b043ff9f5"
+    },
+    {
+      "file": "job.log",
+      "sha256": "f32f0c319ec42c2914745fde5ba636a30695847ab82a6b59fc2f9641f9e68c4a"
+    },
+    {
+      "file": "setup.log",
+      "sha256": "b2fa493e6c41329703703aefa11c21d255a859900b1c0673e36a32c305b9ce3d"
+    },
+    {
+      "file": "raw-records.json.gz",
+      "sha256": "a65f6d3fef32d0e89431893b7851412156e03b7455ba7b32edb3f1af81d96767"
+    }
+  ],
+  "raw_files": [
+    {
+      "path": "0.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/873/files/0.exit"
+    },
+    {
+      "path": "1.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/873/files/1.exit"
+    },
+    {
+      "path": "aws-instances",
+      "bytes": 32,
+      "url": "http://192.168.50.104:8420/jobs/873/files/aws-instances"
+    },
+    {
+      "path": "cases/0/record.json",
+      "bytes": 59771,
+      "url": "http://192.168.50.104:8420/jobs/873/files/cases/0/record.json"
+    },
+    {
+      "path": "cases/1/record.json",
+      "bytes": 59682,
+      "url": "http://192.168.50.104:8420/jobs/873/files/cases/1/record.json"
+    },
+    {
+      "path": "job.log",
+      "bytes": 2008,
+      "url": "http://192.168.50.104:8420/jobs/873/files/job.log"
+    },
+    {
+      "path": "selection-0.jsonl",
+      "bytes": 169,
+      "url": "http://192.168.50.104:8420/jobs/873/files/selection-0.jsonl"
+    },
+    {
+      "path": "selection-1.jsonl",
+      "bytes": 156,
+      "url": "http://192.168.50.104:8420/jobs/873/files/selection-1.jsonl"
+    },
+    {
+      "path": "selection-2.jsonl",
+      "bytes": 151,
+      "url": "http://192.168.50.104:8420/jobs/873/files/selection-2.jsonl"
+    },
+    {
+      "path": "selection-3.jsonl",
+      "bytes": 148,
+      "url": "http://192.168.50.104:8420/jobs/873/files/selection-3.jsonl"
+    },
+    {
+      "path": "selection-4.jsonl",
+      "bytes": 257,
+      "url": "http://192.168.50.104:8420/jobs/873/files/selection-4.jsonl"
+    },
+    {
+      "path": "selection-5.jsonl",
+      "bytes": 229,
+      "url": "http://192.168.50.104:8420/jobs/873/files/selection-5.jsonl"
+    },
+    {
+      "path": "setup.log",
+      "bytes": 317,
+      "url": "http://192.168.50.104:8420/jobs/873/files/setup.log"
+    },
+    {
+      "path": "setup.pid",
+      "bytes": 20,
+      "url": "http://192.168.50.104:8420/jobs/873/files/setup.pid"
+    }
+  ]
+}

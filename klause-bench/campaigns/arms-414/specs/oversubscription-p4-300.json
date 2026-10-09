@@ -1,0 +1,88 @@
+{
+  "name": "arms-414-oversubscription-p4-300",
+  "description": "Arm composition/oversubscription at p1 6/12 and p4 4/8/12, balanced active discovery families plus a proof control; reseeding and slices unchanged.",
+  "host": "aws",
+  "problems": [
+    {
+      "suite": "mzn-bench",
+      "name": "2017/city-position/city-5-05",
+      "max": "1",
+      "per-family": "1",
+      "reference": "any"
+    },
+    {
+      "suite": "xcsp3-cop",
+      "name": "Fortress1-03_c25",
+      "max": "1",
+      "per-family": "1",
+      "reference": "any"
+    },
+    {
+      "suite": "pb-comp",
+      "name": "normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+      "max": "1",
+      "per-family": "1",
+      "reference": "any"
+    },
+    {
+      "suite": "pb-comp",
+      "name": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+      "max": "1",
+      "per-family": "1",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "timeout": "300000"
+  },
+  "configs": [
+    {
+      "ref": "52193ef906cfedac893b1df8390559ca0495b59e",
+      "engine": "cp",
+      "processors": "4",
+      "label": "cp-p4-a8",
+      "param.arms": "8"
+    },
+    {
+      "ref": "52193ef906cfedac893b1df8390559ca0495b59e",
+      "engine": "cp",
+      "processors": "4",
+      "label": "cp-p4-a4",
+      "param.arms": "4"
+    },
+    {
+      "ref": "52193ef906cfedac893b1df8390559ca0495b59e",
+      "engine": "cp",
+      "processors": "4",
+      "label": "cp-p4-a12",
+      "param.arms": "12"
+    },
+    {
+      "ref": "52193ef906cfedac893b1df8390559ca0495b59e",
+      "engine": "mixed",
+      "processors": "4",
+      "label": "mixed-p4-a8",
+      "param.arms": "8"
+    },
+    {
+      "ref": "52193ef906cfedac893b1df8390559ca0495b59e",
+      "engine": "mixed",
+      "processors": "4",
+      "label": "mixed-p4-a4",
+      "param.arms": "4"
+    },
+    {
+      "ref": "52193ef906cfedac893b1df8390559ca0495b59e",
+      "engine": "mixed",
+      "processors": "4",
+      "label": "mixed-p4-a12",
+      "param.arms": "12"
+    }
+  ],
+  "seeds": [
+    3,
+    7,
+    11
+  ],
+  "repeats": 1
+}
