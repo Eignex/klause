@@ -61,7 +61,13 @@ class VerdictReasonTest {
                 SolveStats(
                     run = RunStats(backend = "exact-lira"),
                     openTheory = OpenTheoryWorkStats(1, 2, 3, 4, 10),
-                    openTheoryClauses = OpenTheoryClauseStats(assertingConflicts = 7, nonAssertingConflicts = 3),
+                    openTheoryClauses = OpenTheoryClauseStats(
+                        assertingConflicts = 7,
+                        nonAssertingConflicts = 3,
+                        activityBumps = 11,
+                        lbdImprovements = 2,
+                        reductionNanos = 13,
+                    ),
                 ),
                 solveTimeMs = 0,
                 solutions = 0,
@@ -79,6 +85,9 @@ class VerdictReasonTest {
         }
         assertTrue("; openAssertingConflicts=7" in out, out)
         assertTrue("; openNonAssertingConflicts=3" in out, out)
+        assertTrue("; openClauseActivityBumps=11" in out, out)
+        assertTrue("; openClauseLbdImprovements=2" in out, out)
+        assertTrue("; openReductionNs=13" in out, out)
     }
 
     @Test

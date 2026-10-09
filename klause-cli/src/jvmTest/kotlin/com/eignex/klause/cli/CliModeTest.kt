@@ -430,6 +430,10 @@ class CliModeTest {
                 "open-branching=activity",
                 "--param",
                 "shared-restart=512",
+                "--param",
+                "open-learned-policy=activity",
+                "--param",
+                "max-learned=2000",
                 smt.absolutePath,
             )
             assertEquals(0, runCli(args))

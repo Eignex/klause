@@ -154,6 +154,14 @@ corpus, so it is opt-in.
 The latter counts sound learned conflicts that retain chronological fallback because resolution cannot
 make the clause asserting. A nonzero count is the trigger to inspect missing component reasons. Native
 CP analysis, root refutations, and conflicts without a usable clause are outside these two counters.
+`--param open-learned-policy=lbd-use|activity|glue-activity|tiered` selects retention for the shared
+open-theory store. It needs `max-learned=N` and `shared-restart=N` to execute reductions. `lbd-use`
+is the default. Activity policies bump learned conflicts and learned reasons traversed by analysis,
+and newly learned or relearned clauses; propagation alone does not bump them. They retain binary
+and locked clauses. `glue-activity` also protects glue. `tiered` improves LBD during analysis and
+protects clauses of LBD at most 6 for two reduction intervals after their last analysis; its local
+tier is ranked by activity. Protected clauses can exceed the cap. `openClauseActivityBumps`,
+`openClauseLbdImprovements`, and `openReductionNs` report mechanism work and reduction cost under `-s`.
 `--param open-bound-proof=false` declines the routing bound proof, so a model whose open sides the
 relaxation would have closed goes to the open theory instead of the finite lane. That is what runs one
 instance down both lanes; shrinking `-t` does not substitute, since it starves the solve along with the

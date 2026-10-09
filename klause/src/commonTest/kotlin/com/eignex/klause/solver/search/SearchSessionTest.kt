@@ -898,6 +898,81 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `activity retention favors a relearned clause`() {
+        for (policy in listOf(SearchLearnedDbPolicy.Activity, SearchLearnedDbPolicy.GlueActivity)) {
+            val session = SearchSession(
+                emptyList(),
+                learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0, policy = policy),
+            )
+            session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+            session.learn(SearchExplanation(intArrayOf(6, 8, 10)))
+            session.learn(SearchExplanation(intArrayOf(10, 6, 8)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.restart())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(7)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(9)))
+
+            assertEquals(true, session.boolValue(5), policy.id)
+            assertEquals(1, session.learnedClauseCount, policy.id)
+        }
+    }
+
+    @Test
+    fun `activity reduction keeps a long clause locked at the root`() {
+        for (policy in SearchLearnedDbPolicy.entries.filter { it != SearchLearnedDbPolicy.LbdUse }) {
+            val session = SearchSession(
+                emptyList(),
+                learnedDb = SearchLearnedDbParams(maxClauses = 0, glueLbd = 0, policy = policy),
+            )
+            session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+            session.learn(SearchExplanation(intArrayOf(1)))
+            session.learn(SearchExplanation(intArrayOf(3)))
+            session.learn(SearchExplanation(intArrayOf(6, 8, 10)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+
+            repeat(4) { assertIs<ComponentResult.Consistent>(session.restart()) }
+
+            assertEquals(3, session.learnedClauseCount, policy.id)
+            assertEquals(true, session.boolValue(2), policy.id)
+        }
+    }
+
+    @Test
+    fun `shared conflict analysis bumps the learned reasons it resolves through`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 10, policy = SearchLearnedDbPolicy.Activity),
+        )
+        session.learn(SearchExplanation(intArrayOf(1, 3, 4)))
+        session.learn(SearchExplanation(intArrayOf(3, 6)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+
+        val result = session.explainedConflict(SearchExplanation(intArrayOf(1, 5, 7)))
+
+        assertIs<SearchConflictResolution.Backjump>(result)
+        assertEquals(4L, session.learnedClauseStats().activityBumps)
+    }
+
+    @Test
+    fun `an idle middle tier expires after two reduction intervals`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 0, glueLbd = 0, policy = SearchLearnedDbPolicy.Tiered),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        repeat(2) { assertIs<ComponentResult.Consistent>(session.restart()) }
+        assertEquals(1, session.learnedClauseCount)
+
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
     fun `glue counts the distinct learned clauses spanning at most two levels`() {
         val session = SearchSession(emptyList())
         session.learn(SearchExplanation(intArrayOf(6, 8)))

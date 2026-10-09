@@ -32,6 +32,7 @@ import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.search.SearchLearnedDbPolicy
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
@@ -153,6 +154,7 @@ internal object SolveCore {
                     sharedRestart = takeOpenLongParam(common, "shared-restart", nonNegative = false),
                     maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
                     lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
+                    learnedDbPolicy = takeOpenLearnedPolicy(common) ?: TheoryParams().learnedDbPolicy,
                     openHintFlips = takeOpenLongParam(common, "open-hint-flips", nonNegative = true),
                     openBranching = takeOpenBranching(common) ?: TheoryParams().openBranching,
                     openHintMinSplits = takeOpenLongParam(common, "open-hint-min-splits", nonNegative = false)
@@ -316,7 +318,9 @@ internal object SolveCore {
 
     // The engine params only the open-theory route reads. A sweep that sets them for its open models also runs its
     // finite ones, where they mean nothing, so they are dropped there rather than failing the run as unknown keys.
-    private val openOnlyParams = setOf("shared-restart", "open-branching", "open-hint-flips", "open-hint-min-splits")
+    private val openOnlyParams = setOf(
+        "shared-restart", "open-branching", "open-hint-flips", "open-hint-min-splits", "open-learned-policy",
+    )
 
     private fun dropOpenOnlyParams(common: CommonOptions) {
         common.engineParams.removeAll { it.substringBefore('=') in openOnlyParams }
@@ -355,6 +359,16 @@ internal object SolveCore {
         return OpenBranching.of(raw) ?: usageError(
             "engine param `open-branching` expects one of ${OpenBranching.entries.joinToString(", ") { it.id }}, " +
                 "got `$raw`",
+        )
+    }
+
+    private fun takeOpenLearnedPolicy(common: CommonOptions): SearchLearnedDbPolicy? {
+        val entry = common.engineParams.firstOrNull { it.startsWith("open-learned-policy=") } ?: return null
+        common.engineParams.remove(entry)
+        val raw = entry.substringAfter('=')
+        return SearchLearnedDbPolicy.of(raw) ?: usageError(
+            "engine param `open-learned-policy` expects one of " +
+                "${SearchLearnedDbPolicy.entries.joinToString(", ") { it.id }}, got `$raw`",
         )
     }
 

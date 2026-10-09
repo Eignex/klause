@@ -7,6 +7,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
+import kotlin.time.TimeSource
 
 /**
  * Shared trailed coordination for finite-domain and theory components.
@@ -44,7 +45,14 @@ class SearchSession(
     }
     private val pendingAssertions = ArrayDeque<PendingAssertion>()
     private var selfPublicationsPending = false
-    private val learned = WatchedClauseStore()
+    private val learnedActivity = if (
+        learnedDb.maxClauses != null && learnedDb.policy != SearchLearnedDbPolicy.LbdUse
+    ) {
+        LearnedClauseActivity(learnedDb.policy)
+    } else {
+        null
+    }
+    private val learned = WatchedClauseStore(learnedActivity)
     private val boolTrail = IntArrayList()
     private val trailStartAtLevel = IntArrayList().apply { add(0) }
     private val pendingAttach = ArrayDeque<Int>()
@@ -70,6 +78,7 @@ class SearchSession(
     private var glueClauses = 0L
     private var assertingConflicts = 0L
     private var nonAssertingConflicts = 0L
+    private var reductionNanos = 0L
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.size
@@ -473,9 +482,19 @@ class SearchSession(
      * literal unit.
      */
     internal fun explainedConflict(explanation: SearchExplanation?): SearchConflictResolution? {
-        var clause = namedExplanation(explanation)?.literals?.toList() ?: return null
+        val named = namedExplanation(explanation) ?: return null
+        if (!named.literals.all(::isFalseLiteral)) return null
+        learnedActivity?.analyzed(named) { lbdOf(named.literals) }
+        return try {
+            analyzeClause(named.literals.toList())
+        } finally {
+            learnedActivity?.decay()
+        }
+    }
+
+    private fun analyzeClause(initial: List<Int>): SearchConflictResolution? {
+        var clause = initial
         if (clause.isEmpty()) return SearchConflictResolution.Exhausted
-        if (!clause.all(::isFalseLiteral)) return null
         var remainingResolutions = boolValues.size
         while (true) {
             val conflictLevel = clause.maxOf { literal -> levelOf(literal) }
@@ -493,6 +512,7 @@ class SearchSession(
             }
             if (remainingResolutions-- == 0) return retainUnasserting(clause)
             val pivot = latestResolvableLiteral(clause, conflictLevel) ?: return retainUnasserting(clause)
+            learnedActivity?.analyzed(pivot.second) { lbdOf(pivot.second.literals) }
             clause = resolve(clause, pivot.first, pivot.second) ?: return retainUnasserting(clause)
         }
     }
@@ -759,6 +779,9 @@ class SearchSession(
         learned.watchVisits,
         assertingConflicts,
         nonAssertingConflicts,
+        learnedActivity?.bumps ?: 0L,
+        learnedActivity?.lbdImprovements ?: 0L,
+        reductionNanos,
     )
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
@@ -799,6 +822,19 @@ class SearchSession(
         // Reduction renumbers clauses, so it waits until no clause is queued for its first
         // examination. The next propagation drains that queue, so the following restart reduces.
         if (learned.size <= cap || pendingAttach.isNotEmpty()) return
+        val started = TimeSource.Monotonic.markNow()
+        try {
+            reduceOverCap(cap)
+        } finally {
+            reductionNanos += started.elapsedNow().inWholeNanoseconds
+        }
+    }
+
+    private fun reduceOverCap(cap: Int) {
+        if (learnedActivity != null) {
+            reduceActivityDb(cap)
+            return
+        }
         val droppable = IntArrayList(learned.size)
         for (index in 0 until learned.size) {
             val retained = learned.lbdAt(index) <= learnedDb.glueLbd ||
@@ -816,6 +852,33 @@ class SearchSession(
         for (position in survivors until droppable.size) dropped.add(droppable[position])
         learned.retain { index -> index !in dropped }
         reductions++
+        droppedClauses += dropped.size
+        learned.clearUsed()
+        unitsPending = learned.units.size > 0
+    }
+
+    private fun reduceActivityDb(cap: Int) {
+        val activity = requireNotNull(learnedActivity)
+        val locked = HashSet<LearnedClauseHandle>()
+        boolReasons.forEach { _, reason -> reason.learnedHandle?.let(locked::add) }
+        val candidates = ArrayList<Int>()
+        for (index in 0 until learned.size) {
+            val handle = requireNotNull(learned.handleAt(index))
+            val protected = learned.literalsAt(index).size <= 2 || handle in locked || when (learnedDb.policy) {
+                SearchLearnedDbPolicy.GlueActivity -> handle.lbd <= learnedDb.glueLbd
+
+                SearchLearnedDbPolicy.Tiered -> handle.lbd <= learnedDb.glueLbd ||
+                    (handle.lbd <= MID_LBD && activity.epoch - handle.touched < MID_IDLE_REDUCTIONS)
+
+                else -> false
+            }
+            if (!protected) candidates.add(index)
+        }
+        val remaining = (cap - (learned.size - candidates.size)).coerceAtLeast(0)
+        candidates.sortWith(compareByDescending<Int> { requireNotNull(learned.handleAt(it)).activity }.thenBy { it })
+        val dropped = candidates.drop(remaining).toHashSet()
+        learned.retain { it !in dropped }
+        if (dropped.isNotEmpty()) reductions++
         droppedClauses += dropped.size
         learned.clearUsed()
         unitsPending = learned.units.size > 0
@@ -997,6 +1060,8 @@ class SearchSession(
     )
 
     private companion object {
+        const val MID_LBD = 6
+        const val MID_IDLE_REDUCTIONS = 2L
         const val UNASSIGNED = -1
         const val FALSE = 0
         const val TRUE = 1

@@ -348,6 +348,9 @@ internal fun openTheoryStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pai
                 "openLearnedWatchVisits" to "$watchVisits",
                 "openAssertingConflicts" to "$assertingConflicts",
                 "openNonAssertingConflicts" to "$nonAssertingConflicts",
+                "openClauseActivityBumps" to "$activityBumps",
+                "openClauseLbdImprovements" to "$lbdImprovements",
+                "openReductionNs" to "$reductionNanos",
             )
         } + with(stats.openHints) {
             // Only a run that drew a hint has anything to say about one, so every other open solve reports

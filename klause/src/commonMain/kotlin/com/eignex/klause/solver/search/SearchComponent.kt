@@ -59,7 +59,9 @@ interface SearchTheoryDecision
 data class SearchExplanation(
     /** The clause implied by the component. */
     val literals: IntArray,
-)
+) {
+    internal var learnedHandle: LearnedClauseHandle? = null
+}
 
 /** One component's result while the shared session advances. */
 sealed interface ComponentResult {
@@ -428,8 +430,10 @@ sealed interface SearchRestart : SearchRestartPolicy {
 data class SearchLearnedDbParams(
     /** Retained clause cap applied at a restart boundary, or null to retain every learned clause. */
     val maxClauses: Int? = null,
-    /** Clauses whose literal block distance is at most this are retained regardless of the cap. */
+    /** Glue protection threshold for policies that retain low-LBD clauses. */
     val glueLbd: Int = 2,
+    /** Retention rule applied when the database exceeds [maxClauses]. */
+    val policy: SearchLearnedDbPolicy = SearchLearnedDbPolicy.LbdUse,
 ) {
     init {
         require(maxClauses == null || maxClauses >= 0) { "learned clause cap must not be negative" }

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.solver.search.SearchLearnedDbPolicy
 import com.eignex.klause.util.Cancellation
 
 /** Which Boolean branching a complete open-model traversal uses. */
@@ -72,6 +73,8 @@ data class TheoryParams(
     val cancellation: Cancellation = Cancellation.Never,
     /** Solve-wide node allowance the local-search arms of an open portfolio charge their moves to, or null for none. */
     val nodeBudget: NodeBudget? = null,
+    /** Retention rule for the shared learned database when [maxLearnedClauses] is set. */
+    val learnedDbPolicy: SearchLearnedDbPolicy = SearchLearnedDbPolicy.LbdUse,
 ) {
     init {
         require(maxDecisions >= 0) { "maximum decisions must not be negative" }

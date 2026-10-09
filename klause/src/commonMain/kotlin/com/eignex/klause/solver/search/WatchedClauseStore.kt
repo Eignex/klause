@@ -31,7 +31,7 @@ internal interface ClauseWatchHost {
  * its literal *order* is owned by the watch machinery, which is why callers read literals through
  * [literalsAt] and never retain the array.
  */
-internal class WatchedClauseStore {
+internal class WatchedClauseStore(private val activity: LearnedClauseActivity? = null) {
     /** Watch entries inspected by [propagate]. */
     var watchVisits: Long = 0
         private set
@@ -41,6 +41,7 @@ internal class WatchedClauseStore {
     private val watchers = HashMap<Int, IntArrayList>()
     private val signatures = HashMap<Int, IntArrayList>()
     private val unitClauses = IntArrayList()
+    private val handles = activity?.let { ArrayList<LearnedClauseHandle>() }
 
     /** Number of retained clauses. */
     val size: Int get() = clauses.size
@@ -56,6 +57,8 @@ internal class WatchedClauseStore {
 
     /** Whether clause [index] has implied or conflicted since the last reduction. */
     fun usedAt(index: Int): Boolean = used[index]
+
+    fun handleAt(index: Int): LearnedClauseHandle? = handles?.get(index)
 
     /** Record that clause [index] implied a literal or derived a conflict. */
     fun markUsed(index: Int) {
@@ -80,13 +83,17 @@ internal class WatchedClauseStore {
         if (literals.isEmpty()) return -1
         val bucket = signatures.getOrPut(signatureOf(literals)) { IntArrayList(1) }
         for (position in 0 until bucket.size) {
-            if (sameLiterals(clauses[bucket[position]], literals)) return -1
+            if (sameLiterals(clauses[bucket[position]], literals)) {
+                activity?.bump(handleAt(bucket[position]))
+                return -1
+            }
         }
         val index = clauses.size
         bucket.add(index)
         clauses.add(literals)
         lbds.add(lbd)
         used.add(false)
+        activity?.let { handles?.add(it.add(lbd)) }
         return index
     }
 
@@ -118,7 +125,12 @@ internal class WatchedClauseStore {
             clauses[target] = clauses[index]
             lbds[target] = lbds[index]
             used[target] = used[index]
+            if (handles != null) handles[target] = handles[index]
             target++
+        }
+        if (handles != null) {
+            handles.subList(target, handles.size).clear()
+            activity?.reduced(handles)
         }
         if (target == clauses.size) return
         clauses.subList(target, clauses.size).clear()
@@ -246,7 +258,9 @@ internal class WatchedClauseStore {
     }
 
     /** The clause-form explanation of clause [index], safe for the caller to retain. */
-    fun explanationOf(index: Int): SearchExplanation = SearchExplanation(clauses[index].copyOf())
+    fun explanationOf(index: Int): SearchExplanation = SearchExplanation(clauses[index].copyOf()).also {
+        it.learnedHandle = handleAt(index)
+    }
 
     /**
      * Move the two literals that must be watched to the front of [literals].

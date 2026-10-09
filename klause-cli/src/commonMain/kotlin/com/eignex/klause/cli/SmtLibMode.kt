@@ -198,6 +198,8 @@ internal class SmtLibOutput : BufferedBestOutput() {
             "openRestarts", "openReductions", "openDropped", "openRetained", "openPeakRetained",
             "openLearnedWatchVisits",
             "openAssertingConflicts", "openNonAssertingConflicts",
+            "openClauseActivityBumps", "openClauseLbdImprovements",
+            "openReductionNs",
             "openHintDraws", "openHintProduced", "openHintVars", "openHintSteered", "openHintMoves",
         )
     }

@@ -22,6 +22,12 @@ data class OpenTheoryClauseStats(
     val assertingConflicts: Long = 0,
     /** Shared conflicts retained with chronological fallback because resolution could not make them asserting. */
     val nonAssertingConflicts: Long = 0,
+    /** Learned-clause activity bumps at insertion, relearning, or conflict analysis. */
+    val activityBumps: Long = 0,
+    /** Learned clauses whose LBD improved during conflict analysis. */
+    val lbdImprovements: Long = 0,
+    /** Time spent selecting survivors and rebuilding the shared watch index. */
+    val reductionNanos: Long = 0,
 ) {
     /** Combine counters from independent solve slices. */
     fun mergedWith(other: OpenTheoryClauseStats): OpenTheoryClauseStats = OpenTheoryClauseStats(
@@ -35,5 +41,8 @@ data class OpenTheoryClauseStats(
         watchVisits + other.watchVisits,
         assertingConflicts + other.assertingConflicts,
         nonAssertingConflicts + other.nonAssertingConflicts,
+        activityBumps + other.activityBumps,
+        lbdImprovements + other.lbdImprovements,
+        reductionNanos + other.reductionNanos,
     )
 }

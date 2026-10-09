@@ -319,7 +319,7 @@ class OpenTheoryEngine internal constructor(
             cpDomains,
             maxChecks = params.maxLeaves,
             cancellation = cancellation,
-            learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
+            learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue, params.learnedDbPolicy),
             smtStats = state.smt,
             theorySolveStop = cancellation,
         )
