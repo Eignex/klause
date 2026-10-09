@@ -148,6 +148,8 @@ internal fun SolveRecord.sourceChecked(validation: SourceValidation, approximati
         objective = if (reject) null else objective,
         proven = proven && !reject && !approximation,
         timeToBestMs = if (reject) null else timeToBestMs,
+        processTimeToFirstFeasibleMs = if (reject) null else processTimeToFirstFeasibleMs,
+        processTimeToBestMs = if (reject) null else processTimeToBestMs,
         timeToFirstFeasibleMs = if (reject) null else timeToFirstFeasibleMs,
         attribution = if (reject) {
             emptyList()

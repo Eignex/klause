@@ -17,6 +17,18 @@ import kotlin.test.assertTrue
 class SolverInvocationTest {
 
     @Test
+    fun `attribution arrival is measured on the subprocess clock`() {
+        val r = SolverInvocation.invoke(
+            listOf("sh", "-c", "echo '%%%klause-arm: label=bt objective=7 time=123456'; echo '----------'"),
+            SolverInvocation.Dialect.MINIZINC,
+        )
+
+        val improvement = r.attribution.single()
+        assertEquals(123456L, improvement.elapsedMs)
+        assertTrue(assertNotNull(improvement.processElapsedMs) in 0..assertNotNull(r.elapsedMs))
+    }
+
+    @Test
     fun `a missing klause dist is reported as a defect naming the install task`() {
         val defect = SolverInvocation.klauseCliDefect(File("does-not-exist/klause-cli"))
         assertNotNull(defect)
@@ -240,15 +252,16 @@ class SolverInvocationTest {
             proven = false,
             stats = emptyMap(),
             attribution = listOf(
-                Attribution("first", exactObjective = "5", elapsedMs = 10),
-                Attribution("true-best", exactObjective = "-3", elapsedMs = 20),
-                Attribution("late-but-worse", exactObjective = "2", elapsedMs = 30),
+                Attribution("first", exactObjective = "5", elapsedMs = 10, processElapsedMs = 110),
+                Attribution("true-best", exactObjective = "-3", elapsedMs = 20, processElapsedMs = 120),
+                Attribution("late-but-worse", exactObjective = "2", elapsedMs = 30, processElapsedMs = 130),
             ),
             rawOutput = "",
             command = "",
         )
 
         assertEquals(10L to 20L, SolveMetric.timings(r, maximize = false))
+        assertEquals(110L to 120L, SolveMetric.processTimings(r, maximize = false))
     }
 
     @Test
