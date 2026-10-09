@@ -68,6 +68,10 @@ these clocks separately and excludes unavailable legacy process witness timings.
 Preparation-adjusted search timing is an additional diagnostic; it still excludes
 startup, frontend loading and routing. Unknowns receive twice the nominal budget
 in PAR2; duration summaries retain observed overshoot.
+Time to a run's own best objective must be read alongside its final quality.
+The analyzer also reports process PAR2 on pairs with equal reported outcomes and
+objectives. This describes a subset selected by the observed outcomes; its coverage
+is disclosed and it does not estimate the causal effect of changing presolve.
 `presolveWork`, pass/round/probe counters share the metered source/finite allowance.
 Round entries include the final empty schedule scan. Root probe counts include
 Boolean failed-literal probes and integer SAC propagation/repair calls across
@@ -189,7 +193,8 @@ It opened after the existing stack passed latest-head CI and mergeability checks
 Discovery and holdout use that fixed selector with identical input hashes across
 configurations. [Controls PR #2378](https://github.com/Eignex/klause/pull/2378) merged
 after its full latest-head CI passed and the integrated AWS metadata check completed.
-The selector and report are rebased onto those merged controls for fresh CI.
+The selector merged after its full latest-head CI passed, and the report is based
+on main for fresh CI. These merges retain the shipped presolve settings.
 
 [Job 892](http://192.168.50.104:8420/jobs/892) verifies durable opt-in evidence on
 `4020e4488856bb5ba79d8f80ff13cd4d02214306`. All four BACP cases completed and
