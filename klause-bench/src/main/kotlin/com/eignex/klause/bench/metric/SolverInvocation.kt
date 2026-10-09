@@ -336,7 +336,11 @@ internal object SolverInvocation {
 
                     SEARCH_COMPLETE -> proven = true
 
-                    UNSATISFIABLE -> unsat = true
+                    // MiniZinc prints it only once the search has completed: a proof of infeasibility.
+                    UNSATISFIABLE -> {
+                        unsat = true
+                        proven = true
+                    }
 
                     UNKNOWN, ERROR -> Unit
 

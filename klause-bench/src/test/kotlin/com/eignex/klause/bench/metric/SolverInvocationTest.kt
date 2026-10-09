@@ -47,6 +47,16 @@ class SolverInvocationTest {
     }
 
     @Test
+    fun `a MiniZinc UNSATISFIABLE verdict is a proof of infeasibility`() {
+        val r = SolverInvocation.invoke(
+            listOf("sh", "-c", "echo '=====UNSATISFIABLE====='; echo '%%%mzn-core: [x > 8, x < 3]'"),
+            SolverInvocation.Dialect.MINIZINC,
+        )
+
+        assertEquals(listOf(false, true), listOf(r.feasible, r.proven))
+    }
+
+    @Test
     fun `a crash that also printed a refusal line still raises`() {
         assertFailsWith<IllegalStateException> {
             SolverInvocation.invoke(
