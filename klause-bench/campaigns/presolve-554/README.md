@@ -121,7 +121,10 @@ two inputs, default/conservative/off single-arm settings and a default six-arm
 control, two seeds and two repeats under 10,000 ms. The exact specification is
 `experiments/bacp-reference-check.json`.
 
-Completed records include source-valid witnesses of objective 29 and 30 for
+All 32 cases completed, and every witness passed the pinned-source check. The
+`evidence/876/final-{cases,job,reference,files}.json.gz` archives are the final
+responses from the corresponding lab API routes; the earlier archives are partial
+snapshots. Completed records include source-valid witnesses of objective 29 and 30 for
 `2011/bacp`, below the historical reference optimum 38. Source validation checks
 the witness, not the solver's optimality claim. The checked root model hash is
 `d3b62b85f27603fb031e95c0a16f30c663d2771a727fe8584e5cf8f80e93dd61`.
