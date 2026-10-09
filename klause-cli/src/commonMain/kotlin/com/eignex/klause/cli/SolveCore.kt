@@ -247,7 +247,7 @@ internal object SolveCore {
                 return
             }
 
-            SolvablePipeline.FiniteCp -> Unit
+            SolvablePipeline.FiniteCp -> dropOpenOnlyParams(common)
         }
         val nodeBudget = takeNodeBudget(common)
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
@@ -312,6 +312,14 @@ internal object SolveCore {
             ?: usageError("engine param `$NODE_LIMIT_KEY` expects an integer, got `$raw`")
         if (limit <= 0) usageError("engine param `$NODE_LIMIT_KEY` expects a positive node count, got $limit")
         return NodeBudget(limit)
+    }
+
+    // The engine params only the open-theory route reads. A sweep that sets them for its open models also runs its
+    // finite ones, where they mean nothing, so they are dropped there rather than failing the run as unknown keys.
+    private val openOnlyParams = setOf("shared-restart", "open-branching", "open-hint-flips", "open-hint-min-splits")
+
+    private fun dropOpenOnlyParams(common: CommonOptions) {
+        common.engineParams.removeAll { it.substringBefore('=') in openOnlyParams }
     }
 
     /** Consume the route-local fixed-work limit for an open-theory solve. */
