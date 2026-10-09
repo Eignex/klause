@@ -2,6 +2,7 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
@@ -11,6 +12,7 @@ import com.eignex.klause.ir.Lit
 import kotlinx.serialization.Serializable
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 internal const val PINNED_SOURCE_POLICY = "minizinc-pinned-source-v1"
@@ -22,6 +24,16 @@ internal data class SourceValidation(val status: String, val reason: String)
 internal object MiniZincSourceValidation {
     private const val TIMEOUT_SECONDS = 10L
     private val ASSIGNMENT = Regex("^\\s*[A-Za-z_][A-Za-z_0-9]*\\s*=")
+
+    fun hashInputs(ref: ProblemRef): Map<String, String> = buildMap {
+        fun hash(file: File): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            CorpusFiles.update(digest, file)
+            return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+        }
+        put("model", hash(CorpusFetcher.resolve(ref.source)))
+        ref.data?.let { put("data", hash(CorpusFetcher.resolve(it))) }
+    }
 
     fun validate(ref: ProblemRef, rawOutput: String, objective: Double?): SourceValidation {
         val candidate = candidate(rawOutput) ?: return SourceValidation("unknown", "no complete DZN solution")
