@@ -1,0 +1,10 @@
+{
+  "url": "https://github.com/Eignex/klause/actions/runs/37992827225",
+  "head": "4bf2d5e1c",
+  "artifacts": ["arms-414-analysis", "arms-414-source-checks"],
+  "commands": [
+    "gh run download 37992827225 --repo Eignex/klause --name arms-414-analysis",
+    "gh run download 37992827225 --repo Eignex/klause --name arms-414-source-checks"
+  ],
+  "sourceChecks": {"job": 873, "valid": 8, "invalid": 0, "unknown": 0, "error": 0}
+}

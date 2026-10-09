@@ -29,6 +29,7 @@
       ],
       "firstMs": 133.5,
       "bestMs": 774.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -231,6 +232,7 @@
       ],
       "firstMs": 119.5,
       "bestMs": 704.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -433,6 +435,7 @@
       ],
       "firstMs": 150.0,
       "bestMs": 5594.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -635,6 +638,7 @@
       ],
       "firstMs": 122.5,
       "bestMs": 5501.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -836,6 +840,7 @@
       ],
       "firstMs": 146.5,
       "bestMs": 4937.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -1034,6 +1039,7 @@
       ],
       "firstMs": 147.0,
       "bestMs": 4023.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -1235,6 +1241,7 @@
       ],
       "firstMs": 127.0,
       "bestMs": 4213.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -1437,6 +1444,7 @@
       ],
       "firstMs": 130.0,
       "bestMs": 737.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -1698,6 +1706,7 @@
       ],
       "firstMs": 133.5,
       "bestMs": 2419.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -2005,6 +2014,7 @@
       ],
       "firstMs": 177.0,
       "bestMs": 3447.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -2247,6 +2257,7 @@
       ],
       "firstMs": 163.0,
       "bestMs": 327.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -2487,6 +2498,7 @@
       ],
       "firstMs": 108.0,
       "bestMs": 4605.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -2742,6 +2754,7 @@
       ],
       "firstMs": 101.5,
       "bestMs": 1276.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -2999,6 +3012,7 @@
       ],
       "firstMs": 98.5,
       "bestMs": 4665.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -3249,6 +3263,7 @@
       ],
       "firstMs": 94.5,
       "bestMs": 4535.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -3503,6 +3518,7 @@
       ],
       "firstMs": 113.0,
       "bestMs": 2636.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -3756,6 +3772,7 @@
       ],
       "firstMs": 161.5,
       "bestMs": 942.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -3905,6 +3922,7 @@
       ],
       "firstMs": 148.5,
       "bestMs": 1772.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -4169,6 +4187,7 @@
       ],
       "firstMs": 111.5,
       "bestMs": 8801.0,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
@@ -4287,6 +4306,7 @@
       ],
       "firstMs": 160.0,
       "bestMs": 4283.5,
+      "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
           "cases": 12,
