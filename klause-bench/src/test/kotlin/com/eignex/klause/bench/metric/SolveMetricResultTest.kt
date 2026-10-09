@@ -1,5 +1,8 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.report.Reports
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -85,6 +88,38 @@ class SolveMetricResultTest {
         assertEquals(42.0, row.objective)
         assertEquals("global", row.structure, "feature joined from the oracle row")
         assertEquals(3, row.numGlobal)
+    }
+
+    @Test
+    fun `proof rows use solve time then subprocess duration without an incumbent`() {
+        val record = rec(false, null, null, true)
+        val cases = listOf(
+            record to 10_000L,
+            record.copy(elapsedMs = 140) to 140L,
+            record.copy(elapsedMs = 140, stats = mapOf("solveTime" to "0.02")) to 20L,
+        )
+
+        cases.forEach { (result, expected) ->
+            assertEquals(expected, SolveMetric.resultRow("s", result, "cfg", null).elapsedMs)
+        }
+    }
+
+    @Test
+    fun `subprocess duration does not replace incumbent time or undecided budget`() {
+        val record = rec(true, 42.0, 250, true).copy(elapsedMs = 900)
+
+        assertEquals(250, SolveMetric.resultRow("s", record, "cfg", null).elapsedMs)
+        assertEquals(10_000, SolveMetric.resultRow("s", record.copy(feasible = null), "cfg", null).elapsedMs)
+    }
+
+    @Test
+    fun `durable timing round trips and legacy records have unknown elapsed`() {
+        val record = rec(false, null, null, true).copy(elapsedMs = 140)
+        val encoded = Reports.json.encodeToString(record)
+        val legacy = Reports.json.encodeToString(rec(false, null, null, true))
+
+        assertEquals(140, Reports.json.decodeFromString<SolveRecord>(encoded).elapsedMs)
+        assertEquals(null, Reports.json.decodeFromString<SolveRecord>(legacy).elapsedMs)
     }
 
     @Test

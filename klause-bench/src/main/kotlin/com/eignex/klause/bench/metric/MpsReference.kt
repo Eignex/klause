@@ -88,6 +88,7 @@ internal object MpsReference {
         return SolverInvocation.Result(
             feasible = chosen.verdict.feasible,
             objective = chosen.verdict.objective,
+            elapsedMs = attempts.sumOf { it.elapsedMs },
             timeToBestMs = firstFeasibleMs,
             timeToFirstFeasibleMs = firstFeasibleMs,
             proven = chosen.verdict.proven && !beaten,

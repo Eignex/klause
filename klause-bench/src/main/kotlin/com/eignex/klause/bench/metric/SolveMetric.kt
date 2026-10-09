@@ -101,6 +101,8 @@ internal data class SolveRecord(
     val buildProvenance: BuildProvenance? = null,
     val buildFingerprint: String? = null,
     val validationPolicy: String = REPORTED_RESULT_POLICY,
+    /** Subprocess duration, separate from incumbent timings; null when unavailable or in legacy records. */
+    val elapsedMs: Long? = null,
 )
 
 internal object SolveMetric {
@@ -234,6 +236,7 @@ internal object SolveMetric {
             objective = r.objective,
             timeToBestMs = r.timeToBestMs,
             timeToFirstFeasibleMs = r.timeToFirstFeasibleMs,
+            elapsedMs = r.elapsedMs,
             proven = r.proven,
             stats = r.stats,
             gitSha = sha,
@@ -348,12 +351,16 @@ internal object SolveMetric {
     }
 
     /** This run's result for one instance as a reference-table-schema row: `solver` is the config [tag],
-     *  `elapsedMs` the time-used proxy (time-to-best when solved, else the budget — matching the
+     *  `elapsedMs` the time-used proxy (incumbent, solve time, or wall clock when decided; budget otherwise — matching the
      *  `compare.sh` convention), and the source-text features are joined from the committed table
      *  ([ref], null when the instance has no oracle entry). */
     internal fun resultRow(suite: String, rec: SolveRecord, tag: String, ref: ReferenceEntry?): ReferenceEntry {
         val solved = rec.feasible != null
-        val elapsed = if (solved) (rec.timeToBestMs ?: rec.budgetMs) else rec.budgetMs
+        val elapsed = if (solved) {
+            rec.timeToBestMs ?: solveTimeMs(rec.stats) ?: rec.elapsedMs ?: rec.budgetMs
+        } else {
+            rec.budgetMs
+        }
         return ReferenceEntry(
             suite = suite,
             problem = rec.problem,
@@ -433,6 +440,7 @@ internal object SolveMetric {
             objective = r.objective,
             timeToBestMs = bestMs,
             timeToFirstFeasibleMs = firstFeasibleMs,
+            elapsedMs = r.elapsedMs,
             proven = r.proven,
             stats = r.stats,
             attribution = r.attribution,

@@ -91,6 +91,7 @@ internal object Z3Reference {
         return SolverInvocation.Result(
             feasible = feasible,
             objective = null, // SMT-LIB benchmarks are decision instances — no optimisation objective
+            elapsedMs = elapsedMs,
             timeToBestMs = timeMs,
             timeToFirstFeasibleMs = timeMs,
             proven = proven,

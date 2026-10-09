@@ -57,6 +57,56 @@ class SolverInvocationTest {
     }
 
     @Test
+    fun `flattening infeasibility retains wall clock without an incumbent time`() {
+        val r = SolverInvocation.invoke(
+            listOf("sh", "-c", "printf '%s\\n' '%%%mzn-stat: flatTime=0.14' '=====UNSATISFIABLE====='"),
+            SolverInvocation.Dialect.MINIZINC,
+        )
+
+        assertTrue(assertNotNull(r.elapsedMs) >= 0)
+        assertNull(r.timeToBestMs)
+        assertNull(r.timeToFirstFeasibleMs)
+        assertNull(r.stats["solveTime"])
+        assertEquals(r.elapsedMs, r.referenceElapsedMs(60_000))
+    }
+
+    @Test
+    fun `subprocess completion retains the earlier incumbent timestamp`() {
+        val r = SolverInvocation.invoke(
+            listOf("sh", "-c", "echo '----------'; sleep 0.02; echo '=========='"),
+            SolverInvocation.Dialect.MINIZINC,
+        )
+
+        assertTrue(assertNotNull(r.elapsedMs) > assertNotNull(r.timeToBestMs))
+        assertEquals(r.timeToBestMs, r.timeToFirstFeasibleMs)
+    }
+
+    @Test
+    fun `reference proofs use solve time then wall clock then legacy budget`() {
+        val r = SolverInvocation.Result(false, null, null, proven = true, stats = emptyMap(), rawOutput = "", command = "")
+        val cases = listOf(
+            r to 60_000L,
+            r.copy(elapsedMs = 140) to 140L,
+            r.copy(elapsedMs = 140, stats = mapOf("solveTime" to "0.02")) to 20L,
+            r.copy(elapsedMs = 140, stats = mapOf("solveTime" to "NaN")) to 140L,
+            r.copy(elapsedMs = 140, stats = mapOf("solveTime" to "-1")) to 140L,
+        )
+
+        cases.forEach { (result, expected) -> assertEquals(expected, result.referenceElapsedMs(60_000)) }
+    }
+
+    @Test
+    fun `reference witnesses use incumbent time and undecided runs use budget`() {
+        val r = SolverInvocation.Result(
+            true, null, 12, timeToFirstFeasibleMs = 10, elapsedMs = 140,
+            proven = false, stats = emptyMap(), rawOutput = "", command = "",
+        )
+
+        assertEquals(10, r.referenceElapsedMs(60_000))
+        assertEquals(60_000, r.copy(feasible = null).referenceElapsedMs(60_000))
+    }
+
+    @Test
     fun `a crash that also printed a refusal line still raises`() {
         assertFailsWith<IllegalStateException> {
             SolverInvocation.invoke(

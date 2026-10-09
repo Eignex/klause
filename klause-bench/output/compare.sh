@@ -21,9 +21,9 @@
 #   feasible  true = found a solution, false = proved unsatisfiable, null = nothing found
 #   objective the model-oriented objective value (null unless feasible)
 #   proven    optimality (or unsatisfiability) was proved
-#   timeToBestMs / budgetMs    timing
-# timeUsed is approximated as timeToBestMs when solved, else budgetMs — the bench does not separately
-# stamp proof-completion time, so the tie time-fraction uses time-to-best as the proxy.
+#   timeToBestMs / stats.solveTime / elapsedMs / budgetMs    timing
+# Decided runs use incumbent time, reported solve time, then subprocess wall clock.
+# Undecided runs and legacy records without timing use the budget.
 set -eu
 MODE=complete
 case "${1:-}" in
@@ -43,7 +43,8 @@ jq -rn \
   # optimal: a complete answer — proved optimality, proved unsat, or a solved satisfaction instance.
   def optimal($r): ($r.proven == true) or ($r.feasible == false) or ($r.kind == "satisfy" and solved($r));
   # timeUsed proxy (ms).
-  def tu($r): (if solved($r) then (($r.timeToBestMs // $r.budgetMs) // 0) else ($r.budgetMs // 0) end);
+  def solveMs($r): try ($r.stats.solveTime | tonumber | select(. >= 0 and isinfinite == false and isnan == false) | . * 1000 | floor) catch null;
+  def tu($r): (if solved($r) then ($r.timeToBestMs // solveMs($r) // $r.elapsedMs // $r.budgetMs // 0) else ($r.budgetMs // 0) end);
   [ $a[] | . as $x | ($bi[.problem]) as $y | select($y != null)
     | (.maximize) as $max
     | (if (.objective != null and $y.objective != null) then
