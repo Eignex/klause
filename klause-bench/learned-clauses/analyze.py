@@ -70,7 +70,10 @@ for arm, entries in by_arm.items():
         'unknown': sum(e['feasible'] is None for e in entries),
         'solveSeconds': sum(e['solveSeconds'] for e in entries),
         'fingerprints': sorted({e['fingerprint'] for e in entries}),
-        'totals': {k: sum(e[k] for e in entries) if all(e[k] is not None for e in entries) else None for k in metrics}}
+        'totals': {k: sum(e[k] for e in entries) if all(e[k] is not None for e in entries) else None for k in metrics},
+        'partiallyObserved': {k: {'records': sum(e[k] is not None for e in entries),
+                                  'sum': sum(e[k] for e in entries if e[k] is not None)}
+                              for k in metrics if any(e[k] is None for e in entries)}}
 base = by_arm[args.baseline]
 for arm, entries in by_arm.items():
     if arm == args.baseline:
