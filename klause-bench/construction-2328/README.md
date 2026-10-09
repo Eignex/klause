@@ -1,89 +1,135 @@
 # Construction slice reproducer
 
-Issue [2328](https://github.com/Eignex/klause/issues/2328) reports 9.4 seconds of
-construction in a 10-second IHTC solve. `baseline.json` pins current main
+Issue [2328](https://github.com/Eignex/klause/issues/2328) reports 9400 ms of
+construction in a 10-second IHTC solve. `baseline.json` pins main
 `5471419aa8c832ee1065468a6861bb203a1ff8c7` after the first-solution changes in
 [2359](https://github.com/Eignex/klause/pull/2359) and
 [2360](https://github.com/Eignex/klause/pull/2360).
 
-Run with klause-lab:
+The stack contains the reproducer in [2370](https://github.com/Eignex/klause/pull/2370),
+the construction fix in [2375](https://github.com/Eignex/klause/pull/2375), and
+these records in [2384](https://github.com/Eignex/klause/pull/2384).
+The fix supplies an opening token before creating a handle, charges completed
+or cancelled opening work once, and gives search the remaining segment time.
+Cancelled partial construction closes its resources and retires the arm;
+family selection and deferred improvement admission retain their existing policy.
+
+## Reproduction and identity
+
+Submit specs through klause-lab; each explicitly selects `host=aws`, one
+runner and one case at a time. Builds use `:klause-cli:installJvmDist` remotely.
+The paired campaigns rotate main and candidate cases, with 10-second deadlines
+and default or `param.arms=12` pools. The latter has 13 workers including ALNS.
 
 ```sh
 /home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/construction-2328/baseline.json
+/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/construction-2328/validated-head-paired.json
 ```
 
-The initial execution is [lab 853](http://192.168.50.104:8420/jobs/853).
-It uses one AWS runner, one case at a time, 10-second deadlines, seed 3 and
-three repetitions of default and 12-arm pools. The lab builds each pinned
-revision with `:klause-cli:installJvmDist` and preserves installed-build and
-runtime hashes. Its rotated paired case order avoids concurrent timing cases.
-IHTC is the trigger; Fortress, CyclicBandwidth and CoinsGrid control for the
-first-solution and proof behavior of small and expanded pools.
+Archived `cases.json.gz` contains complete records with CLI distribution and
+runtime hashes, executed commit, installed-build fingerprint, input catalog
+path, budgets, incumbents and counters. `job.json.gz` contains the spec, exact
+remote commands, ordering and exits. `arms.json.gz` identifies resolved refs;
+`files.json.gz` identifies retained remote artifacts. Early campaigns also
+include per-case `summary.json` and archive hashes.
 
-Read raw case records with `lab cases 853`, export `lab csv 853`, and retain
-available reports with `lab fetch 853`. Each record includes the executed command,
-installed-build fingerprint, budget, incumbent attribution and solver counters.
-Compare `arm.*` statistics: `initMs` is inside segment `ms`; `maxMs` includes
-construction; `work` includes root propagation at the scheduler's conversion
-rate. Aggregate by family using worker labels (`bt/`, `ls/`, `alns/`). Search
-wall time is segment time minus construction time, including verification and
-other segment overhead; it is not isolated kernel time.
+The lab records `reported-result-v1`: incumbents pass the portfolio's model
+checker. No new independent source witness check or reference solve is claimed.
+Successful uninstrumented AWS cases retain reports rather than full solver
+streams. Profile stdout is a bench summary, not a complete source assignment.
+Records omit input content hashes; pinned catalog commits and catalog paths
+identify the inputs. Never treat an unproven incumbent as an optimum.
 
-These are uninstrumented deadline experiments, not fixed-work throughput
-measurements. Solver incumbents are checked by the portfolio's witness checker;
-a non-proven incumbent does not establish optimality. This baseline alone
-makes no performance comparison or improvement claim. Full local
-`check lintDocs` is skipped; GitHub CI supplies the full gate.
+`initMs` is included in segment `ms` and `maxMs`. `initWork` is included in
+`work`; main's missing `initWork` is unknown, not zero. Work counts search,
+propagation and LP operations at their existing conversion rates, not allocation.
+Segment time minus opening time includes search, verification and other overhead.
+Worker prefixes identify the `bt`, `ls` and `alns` families. These are deadline
+experiments, not measurements of fixed-work throughput.
 
-The stack starts with [2370](https://github.com/Eignex/klause/pull/2370),
-then the construction fix in [2375](https://github.com/Eignex/klause/pull/2375).
-The evidence layer archives remote records using:
+## Baseline and diagnostic pairs
 
-```sh
-python3 klause-bench/construction-2328/collect.py 853
-```
+[Lab 853](http://192.168.50.104:8420/jobs/853) completes 24 baseline cases:
+seed 3, three repetitions, four problems, two pools. Both pools find model
+incumbents on all three controls in all repetitions. Expanded CoinsGrid proves
+2236 in all three; default CoinsGrid remains unproven. Neither IHTC pool finds
+an incumbent. Its first backtrack opening takes 2008–2108 ms and the second
+about 2500 ms; only those two arms execute. This differs from the historical
+9400 ms trigger.
 
-`lab-853/cases.json.gz` retains complete case records, including distribution
-and runtime hashes. `job.json.gz` retains exact remote commands, case ordering,
-exit codes and the submitted spec. `summary.json` reads their counters and
-incumbents without executing a solve. `sha256.json` identifies the archived
-files. Missing main-build `initWork` is retained as unknown; setup work must
-not be inferred as zero. Search time below means search and segment overhead,
-including verification, excluding opening time.
+[Lab 856](http://192.168.50.104:8420/jobs/856) completes 48 paired cases of
+main and semantic candidate `dbe4070b2201525e46fa48aa4ca6ef7aba736e81`.
+IHTC finds no incumbent on either build or pool. Main runs only its two
+backtrack arms. Candidate cancels both openings and gives two or three local
+search arms turns; their reported move counts remain zero. Candidate opening
+costs are about 910–925 ms and 1722–1794 ms. This supports earlier handoff,
+without a solution-quality or throughput improvement claim.
 
-All 24 baseline cases finish. Both default and expanded pools find checked
-model incumbents on all three controls in all three repetitions. Expanded
-CoinsGrid proves objective 2236 in all three; default CoinsGrid remains
-unproven. Neither IHTC pool finds an incumbent. Its first backtrack opening
-takes 2008–2108 ms and the second about 2500 ms; only those two arms execute.
-This is a current observation, distinct from the issue's historical 9400 ms.
-No external source witness check or new reference run was performed.
+All Fortress and CoinsGrid cases retain incumbents; expanded CoinsGrid proves
+2236 on both builds in every repetition. CyclicBandwidth is variable: default
+main finds 1/3 incumbents versus candidate 3/3, while expanded main finds 2/3
+versus candidate 1/3. This diagnostic does not establish absence of regressions.
+Main's installed-build fingerprint is
+`c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566`;
+the diagnostic candidate's is
+`25e9391439905e34280559ba26a9dc285ca9cabd631c58820677ba1617d3fdde`.
 
-[Lab 856](http://192.168.50.104:8420/jobs/856) compares the first semantic
-candidate at `dbe4070b2` against main, with the same serial uninstrumented
-configuration. [Lab 864](http://192.168.50.104:8420/jobs/864) is a separate
-JFR diagnostic on IHTC. These jobs are pending; they supply no final
-candidate performance claim yet. Successful uninstrumented AWS cases retain
-reports rather than raw solver streams; profiling cases also retain stdout,
-stderr and JFR artifacts. The lab does not include input content hashes in
-these records, so the catalog names and pinned catalog commits identify inputs.
+[Lab 864](http://192.168.50.104:8420/jobs/864) completes a separate JFR
+IHTC diagnostic on those builds. Candidate retires both backtrack openings and
+runs all five remaining arms, including ALNS. Neither build finds an incumbent.
+Use it only to diagnose yielding under instrumentation. The Files page retains
+JFR recordings, resource reports and measurement manifests; timing claims use
+uninstrumented pairs.
 
-Before the remote-only execution policy was received, a local current-main
-CLI install completed and one focused test attempt failed compilation. The
-next local focused attempt was stopped with exit 130 before any tests ran.
-No completed local test validation is claimed. All subsequent builds,
-experiments and profiles use AWS klause-lab; all test/lint/docs gates use
-GitHub CI.
+## Updated implementation pair
 
-The diagnostic [lab 864](http://192.168.50.104:8420/jobs/864) completes both
-profiled IHTC cases. Its candidate retires both backtrack openings and runs
-all five remaining arms. This only diagnoses yielding under instrumentation;
-it is not paired uninstrumented timing evidence. Complete profile case
-records are archived in `lab-864`; the lab Files page retains JFR recordings,
-resource reports and measurement manifests. The raw stdout is the bench
-summary, not a complete source assignment.
+[Lab 887](http://192.168.50.104:8420/jobs/887) completes the pair of implementation
+`5bb52a36d93113dae44819e5dd011d56b09616de` against the baseline: two seeds
+(3 and 7), two repetitions, four problems and two pools, for 64 serial cases.
+The spec includes preserved public worker entrypoints, stats ABI, one-shot
+cancellation verdicts and cleanup when satisfaction cancellation polling throws.
+All 64 cases complete. Both pools and builds retain incumbents in all four
+repetitions of each control. CyclicBandwidth remains unproven at 52; Fortress
+remains unproven at 1139298, except one candidate expanded case improves to
+1139297. Expanded CoinsGrid proves 2236 in all four repetitions on both builds;
+default CoinsGrid remains unproven, with variable objectives.
 
-[Lab 872](http://192.168.50.104:8420/jobs/872) validates final production
-commit `f2c80682e3499439d200fdd22e4a6edea3a72a2e` against pinned main,
-with seeds 3 and 7 and two repetitions. It remains serial on one AWS runner;
-its build and runtime fingerprints determine the executed identities.
+Neither IHTC build or pool finds an incumbent. Candidate cancels both openings
+in all eight cases, then runs all four local-search arms and ALNS. Main runs
+both backtrack arms and zero or one local-search arm; ALNS receives no turn.
+Candidate opening times are 826–915 ms and 1492–1555 ms, versus main's
+1866–2012 ms and 2398–2723 ms. Candidate backtrack and local-search work are
+zero; ALNS records its 5000-unit outer repair allowance, not proof of useful
+inner search. No unexpected failures or faults are reported on IHTC.
+
+The installed candidate fingerprint is
+`f8564a7a7d7e8d228362b001d728038ac83ffc886adf726d381150ecb0392def`.
+The subsequent commit `c9f16cc221d670c3c5d0fcf647b8237347cd96af` changes
+test fixture session binding and moves the deadline assertion outside the worker
+callback; its production source is identical to this measured revision.
+`lab-887/cases.csv` and `stats.json` are generated remotely by the lab;
+`cases.json.gz` retains every case's complete provenance and per-arm counters.
+
+Lab 872 was cancelled after 29 completed cases on an intermediate candidate.
+Labs 878 and 886 were cancelled before
+executing cases after implementation updates. These jobs do not validate the
+updated implementation.
+
+## Limits and validation
+
+Propagation and LP structures are allocated before the first opening guard;
+allocation can overrun its segment deadline before cancellation is polled.
+Cancelled partial handles cannot be resumed. Opening work can be zero when
+allocation consumes the time before propagation begins. Earlier sibling turns
+do not imply useful sibling search or an IHTC incumbent. The broader allowance
+refactor in [2322](https://github.com/Eignex/klause/issues/2322) is outside this
+change; these records do not close the remaining construction allocation limit.
+
+GitHub CI validates cancellation, partial construction, sibling and deferred-arm
+fallback, retirement, one opening/search deadline, construction charged once,
+resumed solve-wide node allowance and the one-shot unknown cancellation verdict.
+Before the remote-only policy, a local baseline CLI install completed, one
+focused test attempt failed compilation and another was interrupted with exit
+130 before tests. No completed local test validation is claimed. Subsequent
+builds, experiments and profiles use AWS klause-lab; all test/lint/docs gates
+use GitHub CI. Saved remote reports may be inspected while preparing this archive.
