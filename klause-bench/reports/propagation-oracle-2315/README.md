@@ -141,6 +141,16 @@ Reproduce by submitting `lab/controls.json` through `klause-lab/deploy/lab run`.
 The lab runs shipping CLI builds and cannot execute `commonTest`; GitHub CI supplies the actual
 over-pruning rejection and integration lifecycle evidence. These controls make no timing claim.
 
+After the Boolean implication lifetime fix reached main, the stack was rebased onto
+`49faef15c325bf68b47641bb702d7c515a452721`. [AWS lab job 890](http://192.168.50.104:8420/jobs/890)
+compared that main with integrated head `d04133cfe86c14ef4c71b4800bf0b864faa16042`, using the same ten
+fixtures, two seeds and budgets. All 40 cases completed with the outcomes in the table, including
+the same `lia-opt` reporting limitation. Both arms have build fingerprint
+`56cd42900857db7ceeaf18c03a20f83ddf69054a08a39cc56e71fcabece3d4a7` and identical CLI/solver hashes.
+`lab/rebased/` retains the submitted spec, job and setup logs, arm revisions, CSV, complete raw
+case response and per-arm provenance. The changed solver binary differs from job 885 as expected;
+the test-only stack still leaves the shipping binary unchanged relative to its new main.
+
 ## Limits
 
 These are deterministic behavioral checks, one invocation per listed command, not benchmarks.
