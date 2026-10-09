@@ -99,3 +99,48 @@ are repository fixtures at the executed revisions. MIPLIB controls come from the
 catalog's MIPLIB 3 archive. The lab records names and source commands rather than
 per-input hashes; this provenance limitation is retained rather than treating local
 corpus hashes as verified identities of remote inputs.
+
+## Fixed-work result
+
+Job 865 completed 30 uninstrumented cases on `i-01dfcdbf992849ab5`. Every pair has
+identical outcomes and every non-timing solver counter, including exactly 1000 work
+units. All stop unknown before the safety deadline. The [summary](fixed-work-summary.json)
+retains counters, canonical counter hashes and individual times; [provenance](fixed-work-provenance.json)
+retains each executed revision, CLI command, runtime policy and solver/runtime binary hashes.
+
+| Input, ending in prp-1-46 | Theory checks | Main median seconds | Candidate median seconds | Reduction | Faster pairs |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| med/mygetpwnam | 529 | 5.616 | 5.372 | 4.3% | 5/5 |
+| large/handler_sigchld | 514 | 5.259 | 4.957 | 5.7% | 5/5 |
+| large/checkpass | 526 | 10.456 | 9.982 | 4.5% | 4/5 |
+
+This is a modest improvement for these three deterministic search prefixes on one
+machine, not a whole-corpus or solved-runtime claim. One checkpass pair is slower;
+five repetitions do not establish a universal speedup. The implementation is the
+same after the later test-only destructuring correction.
+
+Job 868's [candidate profile](profile-candidate-summary.json) has 1/1786 checkpass
+samples containing `BigFraction.of`, versus 113/1793 on main. Handler has 10/1772
+versus 88/1682; mygetpwnam has zero versus 75/1764. The factory's fast paths are
+small enough for different inlining, so disappearance of its frame is not a measured
+absolute CPU saving. These independent profile runs cover different amounts of
+deadline-limited work and contribute no timing samples to the table above.
+
+## Independent witness evidence
+
+[Job 871](http://192.168.50.104:8420/?job=871), specified in [witnesses.json](witnesses.json),
+uses the same result-recorder adapter on main (`8647eb38328c77a44c2fe28107e0e087e0b76a21`)
+and the numerical candidate (`c4df1fc9d05bfee5cd145fb0d3c9069858c8be9e`). The adapter
+preserves the final MPS `v` line in durable result JSON without changing verdict
+credit, the solver or its stopping policy. These supplementary runs are outside
+the timing comparison. The baseline adapter branch is an experiment reference;
+its complete proposed diff is included in the validation PR.
+
+Ordinary AWS runs export result JSON, not successful CLI stdout. The on-instance
+raw `.out` files are not exported by the lab, so the first campaigns cannot supply
+independent primal checks. The supplementary assignments are checked on GitHub CI
+by [check_witnesses.py](check_witnesses.py), reusing the source MPS checker from
+`lp-evidence/session-stage-c-exact-duals/check_witness.py`. It parses the original
+source independently, checks every row/bound and integer marker to relative 1e-7,
+rejects nonfinite values and requires the source's recorded SHA-256. Feasibility
+checking is not independent optimality or infeasibility certification.

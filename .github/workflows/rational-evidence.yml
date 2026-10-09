@@ -1,0 +1,26 @@
+name: Rational arithmetic witness evidence
+
+on:
+  pull_request:
+    paths:
+      - 'klause-bench/exact-projection/**'
+      - '.github/workflows/rational-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  witnesses:
+    name: Independently check recorded MPS witnesses
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check original MPS rows, bounds and integer markers
+        run: python3 klause-bench/exact-projection/check_witnesses.py klause-bench/exact-projection/witness-evidence.json > witness-checks.json
+      - name: Upload independent checks
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rational-witness-checks
+          path: witness-checks.json
