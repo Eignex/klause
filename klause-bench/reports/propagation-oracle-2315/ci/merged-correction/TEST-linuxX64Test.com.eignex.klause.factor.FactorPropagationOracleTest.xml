@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-09T21:41:03.520Z" hostname="runnervmmprz5" time="0.001">
+  <properties/>
+  <testcase name="declared reference rejects unsound root pruning[linuxX64]" classname="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" time="0.0"/>
+  <testcase name="declared holes and both Boolean values reach direct semantics[linuxX64]" classname="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" time="0.0"/>
+  <testcase name="direct semantics reject a faulty invariant[linuxX64]" classname="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" time="0.0"/>
+  <testcase name="a baked model cannot masquerade as original declarations[linuxX64]" classname="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" time="0.0"/>
+  <testcase name="the enumeration cap applies before sound root pruning[linuxX64]" classname="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" time="0.0"/>
+  <testcase name="the empty assignment is classified exactly once[linuxX64]" classname="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
