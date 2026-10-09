@@ -814,8 +814,7 @@ class SearchSession(
      * Drop the weakest retained clauses once the database exceeds its cap.
      *
      * Every learned clause is implied by the root problem, so forgetting one only weakens propagation.
-     * Clauses that are glue, that have propagated since the last reduction, or that are unit are kept
-     * regardless.
+     * Each retention policy protects the clauses its ranking cannot drop.
      */
     private fun reduceLearnedDb() {
         val cap = learnedDb.maxClauses ?: return
