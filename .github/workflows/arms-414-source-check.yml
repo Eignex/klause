@@ -20,6 +20,7 @@ jobs:
           mapfile -t job_ids < <(find klause-bench/campaigns/arms-414/evidence -mindepth 2 -maxdepth 2 -name raw-records.json.gz -printf '%h\n' | sed 's|.*/||' | sort -n)
           python3 klause-bench/campaigns/arms-414/analyze.py "${job_ids[@]}"
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: arms-414-analysis
           path: |

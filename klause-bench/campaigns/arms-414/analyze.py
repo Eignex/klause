@@ -121,6 +121,25 @@ def analyze(job):
         for repeat, c in enumerate(rows):
             indexed[(arm, suite, problem, seed, repeat)] = c
     result = dict(job=job, status=jobdata['status'], cases=len(cases), arms={}, pairs=[])
+    references = defaultdict(list)
+    for row in read(ROOT / 'evidence' / 'reference-snapshot.json'):
+        if not row['reference'].get('stale'):
+            references[(row['collection'], row['problem'])].append(row['reference'])
+    reference_checks = dict(checked=0, missing=[], disagreements=[])
+    for case in cases:
+        if not case.get('record') or outcome(case) in ['error', 'unsupported', 'invalid']:
+            continue
+        rec, problem = case['record'], case['problem']
+        refs = references[(problem.get('collection'), problem['problem'])]
+        if not refs:
+            reference_checks['missing'].append(case['index'])
+        for reference in refs:
+            reference_checks['checked'] += 1
+            if rec['maximize'] != reference['maximize'] or contradictions(reference, rec):
+                reference_checks['disagreements'].append(dict(index=case['index'], arm=case['arm'],
+                    input=problem['suite'] + '/' + problem['problem'], seed=case.get('seed'),
+                    objective=str(objective(rec)), proven=rec['proven'], reference=reference))
+    result['referenceChecks'] = reference_checks
     for arm in expected:
         rows = [c for c in cases if c['arm'] == arm]
         counts = Counter(outcome(c) for c in rows)
@@ -136,7 +155,7 @@ def analyze(job):
                 firstMs=[c['record'].get('timeToFirstFeasibleMs') for c in selected if c.get('record')],
                 bestMs=[c['record'].get('timeToBestMs') for c in selected if c.get('record')]))
         telemetry = defaultdict(lambda: dict(cases=0, work=0, ms=0, initMs=0, segments=0,
-                                             reseeds=0, failures=0, faults=0, weightedReward=0.0,
+                                             reseeds=0, reseedObservations=0, failures=0, faults=0, weightedReward=0.0,
                                              finalHolders=0, credit=defaultdict(float)))
         for rec in records:
             seen_labels = set()
@@ -148,6 +167,7 @@ def analyze(job):
                 seen_labels.add(label)
                 for key in ['work', 'ms', 'initMs', 'segments', 'reseeds', 'failures', 'faults']:
                     t[key] += int(fields.get(key, 0))
+                t['reseedObservations'] += int('reseeds' in fields)
                 t['weightedReward'] += int(fields.get('work', 0)) * float(fields.get('reward', 0))
                 for key, value in fields.items():
                     if key not in ACCOUNTING and not key.startswith('share'):
@@ -226,6 +246,10 @@ def analyze(job):
     (folder / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     for arm, summary in result['arms'].items():
         print(job, arm, summary['outcomes'], 'reseeds', sum(t['reseeds'] for t in summary['telemetry'].values()))
+    if reference_checks['disagreements'] or any(pair['disagreementCases'] for pair in result['pairs']):
+        print(json.dumps(dict(reference=reference_checks['disagreements'],
+                              pairs=[pair for pair in result['pairs'] if pair['disagreementCases']])))
+        raise SystemExit(f'Job {job} has unresolved proof or reference disagreements')
 
 
 if __name__ == '__main__':

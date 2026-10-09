@@ -130,8 +130,9 @@ The measurement SHA stays frozen despite later formatting-only CI repairs. No re
 unfinished stage is a default recommendation.
 
 Baseline job 875 is complete with 156/156 records. Oversubscription p1 job 881 and reseeding p1
-job 879 are complete with 48/48 records each and no failed commands. Matched comparisons and
-source checks run in GitHub CI; the p4 sweeps are still collecting records.
+job 879 are complete with 48/48 records each and no failed commands. Reseeding p4 job 880 is also
+complete with 48/48 records. Matched comparisons and source checks run in GitHub CI; pool sizing
+p4 job 882 is still collecting records.
 
 These measurements belong to the recorded SHAs. Exact-arithmetic normalization and Boolean
 undo-lifetime fixes reached main during collection; rebasing the plumbing does not retrospectively
@@ -150,6 +151,71 @@ remove parallel search variability; small timing or objective differences need c
 Within each width, the repeat configurations share the installed build fingerprint. Both widths
 share the runtime-file hash; their fingerprints differ because `ActiveProcessorCount` is 1 or 4.
 The recorded CLI options are `-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=N`.
+
+## Production baseline at 300 seconds
+
+[CI analysis 38000373707](https://github.com/Eignex/klause/actions/runs/38000373707) covers every
+record from job 875. All 156 cases are feasible, with no record errors, unsupported inputs or
+pairwise proof contradictions. Each configuration has 39 cases over 13 inputs and three seeds.
+
+| Portfolio | Optimal / feasible unproved | Median first incumbent | Median best incumbent |
+| --- | --- | --- | --- |
+| cp p1 | 18 / 21 | 334 ms | 37.981 s |
+| mixed p1 | 13 / 26 | 335 ms | 119.919 s |
+| cp p4 | 18 / 21 | 427 ms | 13.400 s |
+| mixed p4 | 17 / 22 | 273 ms | 25.287 s |
+
+The following cells show the minimum–maximum final objective over seeds, then the number of
+proofs out of three in parentheses. Every objective minimizes. D/H/S denotes discovery, holdout or
+the historical sentinel; identities and source paths are in `selection.json` and `cases.csv`.
+
+| Input | Set | cp p1 | mixed p1 | cp p4 | mixed p4 |
+| --- | --- | --- | --- | --- | --- |
+| city-position | D | 20666–29438 (0) | 9985–23411 (0) | 14998–34399 (0) | 5029–6878 (0) |
+| fast-food | D | 704 (3) | 704–740 (1) | 704 (3) | 704 (3) |
+| CoinsGrid | D | 80 (3) | 80 (0) | 80 (3) | 80 (3) |
+| Fortress | D | 459519–489530 (0) | 459518 (0) | 459518–469517 (0) | 459518 (0) |
+| knapsack | D | -318 (3) | -318 (3) | -318 (3) | -318 (3) |
+| linear ordering | D | 61 (0) | 61 (0) | 61 (0) | 61 (0) |
+| depot-placement | H | 107 (3) | 107 (3) | 107 (3) | 107 (3) |
+| amaze | H | 1429 (3) | 1429 (3) | 1429 (3) | 1429 (3) |
+| CyclicBandwidth | H | 6–9 (0) | 6–9 (0) | 5–6 (0) | 5–7 (0) |
+| BinPacking2 | H | 25 (3) | 25 (3) | 25 (3) | 25–26 (2) |
+| MIPLIB lseu | H | 1120 (0) | 1128 (0) | 1120 (0) | 1128 (0) |
+| logic synthesis exam.pi | H | 88 (0) | 84–88 (0) | 88 (0) | 84–87 (0) |
+| celar | S | 1163–4010 (0) | 3867–6347 (0) | 165–201 (0) | 547–2812 (0) |
+
+Against cp at the same width, mixed has 8 wins / 22 ties / 9 losses and five proof losses at p1;
+at p4 it has 7 / 24 / 8 and one proof loss. The problem-mean quality is -0.026 at both widths,
+with descriptive intervals [-0.256, 0.231] and [-0.333, 0.308]. Mixed p4 against mixed p1 has
+12 / 26 / 1, five proof gains and one loss. These outcomes document coverage and tradeoffs, not a
+default change selected on held-out data.
+
+CP catches one p1 and two p4 segment exceptions in `bt/lp-lbtree`; mixed catches none. All recorded
+fault counters are zero. Legacy baseline records have no durable witnesses or plain source hashes:
+all 156 assignments lack an independent source recheck. Baseline reseed counters are also absent;
+an analysis sum of zero with zero `reseedObservations` means unavailable, not disabled.
+
+## Observed arm contribution
+
+Baseline final holders are distributed across BT heuristics: `bt/satOptimized` holds 9/39 cp p1,
+8/39 cp p4, 14/39 mixed p1 and 13/39 mixed p4 incumbents. `alns/balanced` holds 8/39 mixed p1 and
+2/39 mixed p4 incumbents. These labels fold replicas only for summaries; the original records retain
+worker positions. Final ownership does not measure proof ownership or the effect of removing a worker.
+
+| Observed worker | Cases present | Work units | Worker time | Work-weighted mean reward | Final holders |
+| --- | --- | --- | --- | --- | --- |
+| cp p1 `bt/linucb` | 21 | 17168499 | 712.850 s | 0.02341 | 0 |
+| mixed p1 `ls/fjump/fixed` | 12 | 2473480 | 504.632 s | 0 | 0 |
+| cp p4 `bt/first-fail` | 9 | 24706460 | 531.329 s | 0.01161 | 0 |
+| mixed p4 `ls/cbls-chain/ils-basin` | 27 | 4076396 | 1459.936 s | 0.02498 | 0 |
+
+The table identifies observational long-tail candidates. `bt/linucb` still earns root-fixing,
+clause-use and improvement credit; CBLS chain earns intermediate improvement and violation credit.
+The p1 fjump rows have no recorded contribution credit, but occur on only four families. Work units
+and rewards reflect each mechanism's accounting, and should not be treated as comparable search
+rates across engines. Arm removal needs a matched counterfactual on discovery and held-out families;
+no removal is justified by final-holder counts alone.
 
 ## Completed p1 pool-size sweep
 
