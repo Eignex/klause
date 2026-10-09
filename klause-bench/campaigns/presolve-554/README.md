@@ -7,6 +7,9 @@ controls build is `5ad3707c0c0bfb113f994828265b9f1bafef91c3` ([PR #2378](https:/
 No local build, test, solve, benchmark, lint or documentation gate was run.
 GitHub CI provides validation; klause-lab builds installed JVM distributions with
 `:klause-cli:installJvmDist` and runs every campaign on AWS.
+Initial local Python runs collected and summarized remote records only. After the
+execution reminder, further inspection uses lab API reads; no local analysis or
+validation scripts are run.
 
 ## Pilot
 
@@ -109,3 +112,23 @@ arm uses its existing reported-result policy; checking happens outside solver
 runtime and that policy difference is retained. This pilot has 168 cases under
 10,000 ms, two seeds and two repeats. It must confirm the single-arm commands,
 work telemetry and source-check data before the larger 300-second sweep.
+
+## Reference identity diagnostic
+
+[Job 876](http://192.168.50.104:8420/jobs/876) checks the first pilot's BACP
+reference disagreement on AWS. It uses the same source-check build as job 874,
+two inputs, default/conservative/off single-arm settings and a default six-arm
+control, two seeds and two repeats under 10,000 ms. The exact specification is
+`experiments/bacp-reference-check.json`.
+
+Completed records include source-valid witnesses of objective 29 and 30 for
+`2011/bacp`, below the historical reference optimum 38. Source validation checks
+the witness, not the solver's optimality claim. The checked root model hash is
+`d3b62b85f27603fb031e95c0a16f30c663d2771a727fe8584e5cf8f80e93dd61`.
+The family contains several self-contained `bacp-*.mzn` files, while primary-model
+selection uses filesystem enumeration order within its name priority. Historical
+references have no root-model hash, so their problem identity cannot be matched
+to this input. The disagreement is not evidence of a presolve soundness failure.
+A deterministic selection fix is prepared; its PR waits for the existing stack's
+latest-head CI and mergeability checks. Discovery and holdout must use that fixed
+selector with identical input hashes across configurations.
