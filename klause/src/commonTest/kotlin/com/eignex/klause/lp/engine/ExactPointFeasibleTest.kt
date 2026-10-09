@@ -262,11 +262,12 @@ class ExactPointFeasibleTest {
                 assertNotNull(state.toWorkingModel()),
                 doubleArrayOf(0.5),
                 LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation { ++polls > 10 },
+                Cancellation { ++polls > 1 },
             )
 
             assertNull(result.witness)
             assertEquals(LpRefinementDecline.CANCELLED, result.decline)
+            assertEquals(1, result.checks)
             assertTrue(result.work > 0L)
             assertEquals(result.work, owner.pointRecoveryCache.work)
         }

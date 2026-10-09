@@ -582,7 +582,7 @@ class LpReplayTest {
             0L,
             LpReplaySolverKind.PERSISTENT,
             componentSplit = false,
-            cancellationPollLimit = 32,
+            cancellationPollLimit = 24,
         )
         val capture = LpExactCapture.capture(
             model,
