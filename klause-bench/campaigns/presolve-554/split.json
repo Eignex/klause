@@ -930,5 +930,55 @@
       "format": "MINIZINC",
       "category": "OPTIMIZATION"
     }
+  ],
+  "singleArmPilot": [
+    {
+      "suite": "mzn-bench",
+      "problem": "2025/carpet-cutting/cc_rnd_4_4",
+      "collection": "mzn-challenge",
+      "family": "2025/carpet-cutting",
+      "format": "MINIZINC",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "mzn-bench",
+      "problem": "2019/multi-knapsack/mknap2-1",
+      "collection": "mzn-challenge",
+      "family": "2019/multi-knapsack",
+      "format": "MINIZINC",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "mzn-bench",
+      "problem": "2018/cargo/challenge24",
+      "collection": "mzn-challenge",
+      "family": "2018/cargo",
+      "format": "MINIZINC",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "mzn-bench",
+      "problem": "2022/gfd-schedule/n60f7d50m30k10_10124",
+      "collection": "mzn-challenge",
+      "family": "2022/gfd-schedule",
+      "format": "MINIZINC",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "mzn-bench",
+      "problem": "2016/gbac/reduced_UD6-gbac",
+      "collection": "mzn-challenge",
+      "family": "2016/gbac",
+      "format": "MINIZINC",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "mzn-bench",
+      "problem": "2010/filters/dct_2_3",
+      "collection": "mzn-challenge",
+      "family": "2010/filters",
+      "format": "MINIZINC",
+      "category": "OPTIMIZATION"
+    }
   ]
 }

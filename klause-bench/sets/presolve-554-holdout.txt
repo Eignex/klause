@@ -1,0 +1,13 @@
+# Frozen in campaigns/presolve-554/split.json
+mzn-bench/2025/tower/tower_070_070_30_100-02
+mzn-bench/2017/hrc/exp1-1-945
+mzn-bench/2014/mario/mario_t_hard_2
+mzn-bench/2022/team-assignment/data3_4_31
+mzn-bench/2018/mapping/ring_mp3
+mzn-bench/2013/radiation/i6-11
+mzn-bench/2018/vrplc/vrplc9_5_10_s1
+mzn-bench/2019/zephyrus/14__10__6__3
+mzn-bench/2014/smelt/smelt_5
+mzn-bench/2023/multi-agent-graph-coverage/rnd_n10_p1500_c15_s1
+mzn-bench/2024/aircraft-disassembly/B737NG-600-01-Anon.json
+mzn-bench/2023/evm-super-compilation/isolated_block_6_0_input
