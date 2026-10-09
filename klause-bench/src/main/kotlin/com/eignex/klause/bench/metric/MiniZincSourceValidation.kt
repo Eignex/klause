@@ -29,7 +29,7 @@ internal object MiniZincSourceValidation {
         fun hash(file: File): String {
             val digest = MessageDigest.getInstance("SHA-256")
             CorpusFiles.update(digest, file)
-            return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+            return digest.digest().joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
         }
         put("model", hash(CorpusFetcher.resolve(ref.source)))
         ref.data?.let { put("data", hash(CorpusFetcher.resolve(it))) }
