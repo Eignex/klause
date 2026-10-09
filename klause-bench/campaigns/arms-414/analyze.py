@@ -30,6 +30,8 @@ def outcome(case):
         return 'error'
     if 'unsupported' in stats:
         return 'unsupported'
+    if stats.get('sourceValidation') == 'invalid':
+        return 'invalid'
     if rec['proven']:
         return 'optimal' if rec['feasible'] is True else 'infeasible'
     return 'feasible' if rec['feasible'] is True else 'unknown'
@@ -80,6 +82,25 @@ def interval(values):
 def time(rec, field):
     value = rec.get(field)
     return rec['budgetMs'] if value is None else value
+
+
+def repeat_ranges(rows):
+    groups = defaultdict(list)
+    for case in rows:
+        if case.get('record'):
+            groups[(case['problem']['suite'], case['problem']['problem'], case.get('seed'))].append(case['record'])
+    result = []
+    for (suite, problem, seed), records in groups.items():
+        if len(records) < 2:
+            continue
+        ranges = {}
+        for field in ['timeToFirstFeasibleMs', 'timeToBestMs', 'elapsedMs']:
+            values = [rec[field] for rec in records if rec.get(field) is not None]
+            ranges[field] = dict(observed=len(values), minimum=min(values), median=statistics.median(values),
+                                 maximum=max(values)) if values else dict(observed=0)
+        result.append(dict(input=suite + '/' + problem, seed=seed, repeats=len(records), ranges=ranges,
+                           objectives=[str(objective(rec)) for rec in records]))
+    return result
 
 
 def analyze(job):
@@ -136,6 +157,7 @@ def analyze(job):
             runtimeOptions=[json.loads(x) for x in sorted({json.dumps(r.get('buildProvenance', {}).get('runtimeOptions', {}), sort_keys=True) for r in records})],
             firstMs=statistics.median([time(r, 'timeToFirstFeasibleMs') for r in records]) if records else None,
             bestMs=statistics.median([time(r, 'timeToBestMs') for r in records]) if records else None,
+            repeatRanges=repeat_ranges(rows),
             telemetry=dict(telemetry))
     keys = sorted({key[1:] for key in indexed})
     for a, b in itertools.combinations(expected, 2):
@@ -144,7 +166,8 @@ def analyze(job):
         for key in keys:
             ca, cb = indexed.get((a,) + key), indexed.get((b,) + key)
             if (ca is None or cb is None or ca.get('record') is None or cb.get('record') is None or
-                    outcome(ca) in ['error', 'unsupported'] or outcome(cb) in ['error', 'unsupported']):
+                    outcome(ca) in ['error', 'unsupported', 'invalid'] or
+                    outcome(cb) in ['error', 'unsupported', 'invalid']):
                 excluded.append(list(key))
                 continue
             ra, rb = ca['record'], cb['record']
