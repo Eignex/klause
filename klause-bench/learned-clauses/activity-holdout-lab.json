@@ -1,0 +1,37 @@
+{
+  "name": "learned-clause-retention-1631-holdout",
+  "description": "Frozen 28-input unseen DTP holdout (excluded planned and exploratory discovery inputs). Activity versus LBD-plus-use, cap4000 restart1000 fixed50000 decisions; three repeated fresh JVMs. Launch only if activity meets discovery completion/runtime gate.",
+  "problems": [
+    {
+      "suite": "smtlib-qfidl",
+      "name": "*DTP/DTP_k2_n35_c210_s1,*DTP/DTP_k2_n35_c210_s10,*DTP/DTP_k2_n35_c210_s11,*DTP/DTP_k2_n35_c210_s13,*DTP/DTP_k2_n35_c210_s14,*DTP/DTP_k2_n35_c210_s16,*DTP/DTP_k2_n35_c210_s17,*DTP/DTP_k2_n35_c210_s19,*DTP/DTP_k2_n35_c210_s20,*DTP/DTP_k2_n35_c210_s3,*DTP/DTP_k2_n35_c210_s4,*DTP/DTP_k2_n35_c210_s6,*DTP/DTP_k2_n35_c210_s7,*DTP/DTP_k2_n35_c210_s8,*DTP/DTP_k2_n35_c245_s1,*DTP/DTP_k2_n35_c245_s10,*DTP/DTP_k2_n35_c245_s11,*DTP/DTP_k2_n35_c245_s13,*DTP/DTP_k2_n35_c245_s14,*DTP/DTP_k2_n35_c245_s16,*DTP/DTP_k2_n35_c245_s17,*DTP/DTP_k2_n35_c245_s19,*DTP/DTP_k2_n35_c245_s20,*DTP/DTP_k2_n35_c245_s3,*DTP/DTP_k2_n35_c245_s4,*DTP/DTP_k2_n35_c245_s6,*DTP/DTP_k2_n35_c245_s7,*DTP/DTP_k2_n35_c245_s8",
+      "per-family": "1000",
+      "max": "28",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "ref": "84ec0f7f9b0b9a44411b69c70e9519c5b4360a63",
+    "engine": "fixed",
+    "processors": "1",
+    "timeout": "30000",
+    "presolve": "off",
+    "param.max-decisions": "50000",
+    "param.shared-restart": "1000",
+    "param.max-learned": "4000"
+  },
+  "configs": [
+    {
+      "label": "lbd-use",
+      "param.open-learned-policy": "lbd-use"
+    },
+    {
+      "label": "activity",
+      "param.open-learned-policy": "activity"
+    }
+  ],
+  "repeats": 3,
+  "host": "aws",
+  "machines": 4,
+  "parallel": 2
+}

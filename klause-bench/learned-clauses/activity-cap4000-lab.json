@@ -1,6 +1,6 @@
 {
-  "name": "learned-clause-retention-1631-discovery",
-  "description": "Compare LBD-plus-use, decaying conflict activity, glue activity and dynamic-LBD tiers at 50,000 committed decisions. Frozen DTP densities 175/210/245 include SAT and UNSAT oracles; measure completions, logical work, reduction cost and repeated end-to-end runtime before selecting a policy.",
+  "name": "learned-clause-retention-1631-cap4000-exact",
+  "description": "Compare LBD-plus-use, decaying conflict activity, glue activity and dynamic-LBD tiers at 50,000 committed decisions. Frozen DTP densities 175/210/245 include SAT and UNSAT oracles; measure completions, logical work, reduction cost and repeated end-to-end runtime before selecting a policy. Cap 4000 is the predeclared second cap from the local pilot; cap2000 exploratory run lost a SAT completion.",
   "problems": [
     {
       "suite": "smtlib-qfidl",
@@ -11,14 +11,14 @@
     }
   ],
   "base": {
-    "ref": "codex/learned-clause-activity",
+    "ref": "84ec0f7f9b0b9a44411b69c70e9519c5b4360a63",
     "engine": "fixed",
     "processors": "1",
     "timeout": "30000",
     "presolve": "off",
     "param.max-decisions": "50000",
     "param.shared-restart": "1000",
-    "param.max-learned": "2000"
+    "param.max-learned": "4000"
   },
   "configs": [
     {
