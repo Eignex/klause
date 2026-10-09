@@ -1,9 +1,63 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatImage
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLong
+
+internal data class IntegerFloatProduct(val factor: Product?, val image: AffineFloatImage)
+
+internal fun FlatZincCompiler.collectIntegerFloatProduct(c: FznConstraint): Boolean {
+    if (c in integerFloatProducts) return false
+    val aRef = resolveFloatVarOrConst(c.args[0])
+    val bRef = resolveFloatVarOrConst(c.args[1])
+    if (aRef is FloatRef.Const && bRef is FloatRef.Const) return false
+    val a = floatImage(aRef) ?: return false
+    val b = floatImage(bRef) ?: return false
+    val target = resolveFloatVarOrConst(c.args[2])
+    if (target is FloatRef.Var && !target.bk.lpOnly) return false
+    if (a.terms.isEmpty() || b.terms.isEmpty()) {
+        val image = if (a.terms.isEmpty()) b.scaled(a.constant) else a.scaled(b.constant)
+        integerFloatProducts[c] = IntegerFloatProduct(null, image)
+        return recordProductImage(target, image)
+    }
+    if (!a.constant.isZero || !b.constant.isZero || a.terms.size != 1 || b.terms.size != 1) {
+        return false
+    }
+    val aTerm = a.terms.entries.single()
+    val bTerm = b.terms.entries.single()
+    val aDomain = intDomains[aTerm.key]
+    val bDomain = intDomains[bTerm.key]
+    val corners = listOf(aDomain.min, aDomain.max).flatMap { left ->
+        listOf(bDomain.min, bDomain.max).map { right -> bigIntOf(left) * bigIntOf(right) }
+    }
+    val lo = corners.minWith { left, right -> left.compareTo(right) }
+    val hi = corners.maxWith { left, right -> left.compareTo(right) }
+    if (!lo.fitsLong() || !hi.fitsLong()) return false
+    val product = allocInt("__integer_image_product_${intDomains.size}", lo.toLong(), hi.toLong())
+    val image = AffineFloatImage(mapOf(product to aTerm.value * bTerm.value))
+    integerFloatProducts[c] = IntegerFloatProduct(Product(aTerm.key, bTerm.key, product), image)
+    return recordProductImage(target, image)
+}
+
+private fun FlatZincCompiler.recordProductImage(target: FloatRef, image: AffineFloatImage): Boolean {
+    if (target !is FloatRef.Var || target.bk.varId in affineFloatImages) return false
+    affineFloatImages[target.bk.varId] = image
+    return true
+}
+
+internal fun FlatZincCompiler.emitIntegerImageProduct(c: FznConstraint, target: FloatRef) {
+    val product = integerFloatProducts[c] ?: return
+    product.factor?.let(factors::add)
+    val image = floatImage(target) ?: return
+    postAffinePredicate(image + product.image.scaled(BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO)
+}
 
 internal fun FlatZincCompiler.collectIntegerFloatImages(onlyRealColumns: Boolean): Map<Int, IntegerFloatImage> {
     val images = HashMap<Int, IntegerFloatImage>()
@@ -37,7 +91,7 @@ internal fun FlatZincCompiler.collectIntegerFloatImages(onlyRealColumns: Boolean
     return images
 }
 
-private fun FlatZincCompiler.floatReferences(e: FznExpr): List<FloatRef> = when (e) {
+internal fun FlatZincCompiler.floatReferences(e: FznExpr): List<FloatRef> = when (e) {
     is FznExpr.ArrayLit -> e.elements.map(::resolveFloatVarOrConst)
     is FznExpr.Ident -> (arrays[e.name] as? FlatZincArray.Vars)?.floatBucketings?.map { FloatRef.Var(it) }.orEmpty()
     else -> emptyList()

@@ -80,6 +80,17 @@ internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, r
 internal fun FlatZincCompiler.exactFloatValueLiteral(variable: Int, value: Double): Int {
     val canonical = if (value == 0.0) 0.0 else value
     return floatValueLiterals.getOrPut(variable to canonical) {
+        if (variable in affineFloatImages) {
+            val literal = Lit.make(newBool(), true)
+            postExactFloatLinear(
+                doubleArrayOf(1.0),
+                intArrayOf(variable),
+                LinearOp.EQ,
+                canonical,
+                reifier = literal,
+            )
+            return@getOrPut literal
+        }
         val integer = integerFloatSources[variable]
         if (integer != null && canonical >= -9007199254740992.0 && canonical <= 9007199254740992.0 &&
             canonical.toLong().toDouble() == canonical

@@ -71,6 +71,8 @@ internal class FlatZincCompiler(
     internal data class IntegerFloatImage(val variable: Int, val scale: Double)
 
     internal val integerFloatImages = HashMap<Int, IntegerFloatImage>()
+    internal val affineFloatImages = HashMap<Int, AffineFloatImage>()
+    internal val integerFloatProducts = HashMap<FznConstraint, IntegerFloatProduct>()
 
     internal val enumLabelsByVar = HashMap<String, List<String>>()
 
@@ -80,6 +82,7 @@ internal class FlatZincCompiler(
         lpOnlyFloats = selectFloatNames()
         processDeclarations()
         integerFloatImages.putAll(collectIntegerFloatImages(onlyRealColumns = true))
+        collectAffineFloatImages()
         if (lpOnlyFloats.isNotEmpty()) {
             for (domain in collectFiniteFloatDomains()) {
                 recordFiniteFloatChoices(domain)
