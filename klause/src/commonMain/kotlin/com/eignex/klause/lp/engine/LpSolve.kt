@@ -223,6 +223,7 @@ private fun solveProjectedAndCertify(
     pricing,
     workLimit,
 ).use { solver ->
+    solver.deferUnscaledSourceDiagnostics()
     val result = try {
         solver.solve(warm)
     } finally {
@@ -280,6 +281,7 @@ private fun certifyAuthoritativeSolve(
     pricing,
     workLimit,
 ).use { solver ->
+    solver.deferUnscaledSourceDiagnostics()
     val result = try {
         solver.solve(warm)
     } finally {

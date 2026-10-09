@@ -143,6 +143,9 @@ internal data class LpSolveMetrics(
  * certifying the result downstream ([integerCertify] / [integerFarkasRay]), never from these.
  */
 internal interface LpSolver : AutoCloseable {
+    // Certified callers validate source feasibility independently. Scaled arithmetic guards remain required.
+    fun deferUnscaledSourceDiagnostics() = Unit
+
     /** Most recent solve invocation. Null means the engine does not report a reason or has not solved. */
     val lastTermination: LpFloatTermination? get() = null
 

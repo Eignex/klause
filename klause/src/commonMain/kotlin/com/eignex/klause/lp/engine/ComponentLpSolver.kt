@@ -42,6 +42,10 @@ internal class ComponentLpSolver(
 
     override val lastMetrics: LpSolveMetrics get() = metrics
 
+    override fun deferUnscaledSourceDiagnostics() {
+        for (solver in solvers) solver.deferUnscaledSourceDiagnostics()
+    }
+
     override var infeasibleRay: DoubleArray? = null
         private set
 

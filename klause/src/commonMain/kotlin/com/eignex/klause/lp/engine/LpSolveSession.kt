@@ -36,7 +36,7 @@ internal class LpSolveSession(
                 previous?.close()
                 if (cancellation()) return CertifiedLpResult(null, null, null, null, null, false, { null })
                 newRetainedLpSolver(model, cancellation, componentSplit, context.engineFactory, pricing, workLimit)
-                    .also { solver = it }
+                    .also { it.deferUnscaledSourceDiagnostics(); solver = it }
             }
             val result = try {
                 if (retained) current.resolveBounds(LpFloatAllowance(workLimit, 0)) else current.solve()
