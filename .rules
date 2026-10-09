@@ -2,9 +2,14 @@
 
 Kotlin Multiplatform constraint solver.
 
-## Pre-PR gate
+## PR validation
 
-Run `./gradlew check lintDocs`.
+Opening and pushing a PR does not require a local `./gradlew check lintDocs` gate.
+Use GitHub CI for the full gate; targeted local tests during development are optional.
+Record skipped or interrupted local validation accurately in the PR. Check CI before
+reporting the PR as green, and fix failures through follow-up commits.
+
+When running the full gate locally:
 
 - check runs tests and some light checks.
 - lintDocs runs detekt and dokka linting.
