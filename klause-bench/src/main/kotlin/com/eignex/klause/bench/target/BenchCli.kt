@@ -18,6 +18,7 @@ import com.eignex.klause.bench.metric.ReferenceSolve
 import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.metric.ResultCredit
 import com.eignex.klause.bench.metric.ScipReference
+import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.Xcsp3CpSatReference
@@ -302,7 +303,9 @@ object BenchCli {
         val candidate = MiniZincSourceValidation.candidate(output).orEmpty()
         val objective = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);").find(candidate)
             ?.groupValues?.get(1)?.trim()?.toDoubleOrNull()
-        println(Reports.json.encodeToString(MiniZincSourceValidation.validate(ref, output, objective)))
+        val validation = MiniZincSourceValidation.validate(ref, output, objective)
+            .copy(sourceHashes = SolveEvidence.sourceHashes(ref))
+        println(Reports.json.encodeToString(validation))
     }
 
     /** Solve exactly one problem, `suite=<id> problem=<name>` as `select` prints it, with `solve`'s solver
