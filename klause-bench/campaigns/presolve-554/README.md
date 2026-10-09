@@ -274,3 +274,8 @@ the capped GFD case, using the same frozen source, `profileCli=true` and
 `parallel=1`. The submitted specification is `experiments/gfd-probe-profile.json`.
 Its timings are excluded from campaign estimates. The recording will identify
 which preparation operation consumes the time; the diagnostic result is pending.
+
+Partial snapshots under `evidence/906/partial-*.json.gz` and
+`evidence/907/partial-*.json.gz` validate the analyzer on process-clock records
+through CI while the jobs run. They are archived snapshots, not final comparisons
+or a basis for candidate selection. Completed-job evidence will be archived separately.
