@@ -37,6 +37,8 @@ def check(bench, jobs, output):
                 run = subprocess.run(command, text=True, capture_output=True, timeout=180)
                 try:
                     verdict = json.loads(run.stdout.strip().splitlines()[-1])
+                    if verdict.get('sourceHashes') != rec.get('sourceHashes'):
+                        verdict = dict(status='error', reason='source bytes differ from measured inputs')
                 except (ValueError, IndexError):
                     verdict = dict(status='error', reason=(run.stderr or run.stdout)[-2000:])
             results.append(dict(job=job, case=case['index'], input=case['problem']['problem'],
