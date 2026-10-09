@@ -11,9 +11,11 @@ data class PortfolioStats(
     val arms: List<ArmSchedule> = emptyList(),
     /** The classification the portfolio was built for; null when it was given none. */
     val profile: ProblemProfile? = null,
+    /** Effective reseeding threshold; null when no executor supplied one. */
+    val reseedStaleThreshold: Int? = null,
 ) {
     /** Combine two runs' schedules: the arms of both, in order, under the first one's classification. */
-    fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(arms + o.arms, profile ?: o.profile)
+    fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(arms + o.arms, profile ?: o.profile, reseedStaleThreshold ?: o.reseedStaleThreshold)
 }
 
 /** One arm of a sequential portfolio's schedule; see [PortfolioStats]. */
@@ -38,6 +40,8 @@ data class ArmSchedule(
     val maxMillis: Long = 0L,
     /** Milliseconds constructing resumable handles, included in [millis]. */
     val initializationMillis: Long = 0L,
+    /** Resumable handles discarded after an incumbent plateau. */
+    val reseeds: Long = 0L,
     /** What the arm's sharing with the rest of the pool cost and moved, included in [millis]. */
     val sharing: SharingStats = SharingStats(),
 )

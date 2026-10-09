@@ -187,6 +187,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
     private val rewards = DoubleArray(workers.size)
     private val failures = LongArray(workers.size)
     private val faults = LongArray(workers.size)
+    private val reseeds = LongArray(workers.size)
 
     /** One segment of [arm]: the [spent] work, the [elapsed] milliseconds, the [reward] it settled for, and whether
      *  it [failed]. */
@@ -201,6 +202,10 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
 
     fun initialized(arm: Int, elapsed: Long) {
         initializationMillis[arm] += elapsed
+    }
+
+    fun reseeded(arm: Int) {
+        reseeds[arm]++
     }
 
     /** Count a refuted claim against [arm]. */
@@ -224,6 +229,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                     millis = millis[arm],
                     maxMillis = maxMillis[arm],
                     initializationMillis = initializationMillis[arm],
+                    reseeds = reseeds[arm],
                     meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
                     failures = failures[arm],
                     faults = faults[arm],

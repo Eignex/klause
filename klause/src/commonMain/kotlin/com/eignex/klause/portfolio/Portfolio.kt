@@ -399,6 +399,7 @@ class Portfolio(
                     } else if (reseedStaleThreshold > 0 && ++staleSegments[arm] >= reseedStaleThreshold) {
                         runCatching { handle.close() }
                         run.handles[arm] = null
+                        run.log.reseeded(arm)
                         staleSegments[arm] = 0
                     }
                 }
@@ -670,7 +671,7 @@ class Portfolio(
 
         /** The pool's total counters, every arm that did work included, with the schedule attached. */
         fun folded(): SolveStats = perArm.filterNotNull().fold(SolveStats.EMPTY) { acc, s -> acc.mergedWith(s) }
-            .copy(portfolio = log.stats(ledger).copy(profile = profile))
+            .copy(portfolio = log.stats(ledger).copy(profile = profile, reseedStaleThreshold = reseedStaleThreshold))
 
         private fun closeAll(primaryFailure: Throwable?) {
             var closeFailure: Throwable? = null

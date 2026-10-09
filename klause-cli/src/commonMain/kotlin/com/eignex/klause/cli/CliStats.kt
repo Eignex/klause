@@ -322,14 +322,15 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val profile = stats.portfolio.profile?.let {
         "profile" to "${it.problemClass} optimizing=${it.optimizing} wide=${it.wide} scheduling=${it.scheduling}"
     }
-    return listOfNotNull(profile) + stats.portfolio.arms.map { arm ->
+    val reseeding = stats.portfolio.reseedStaleThreshold?.let { "portfolioReseedStaleThreshold" to "$it" }
+    return listOfNotNull(profile, reseeding) + stats.portfolio.arms.map { arm ->
         val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
         val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
             " share$channel=us:${t.nanos / NANOS_PER_MICRO},out:${t.exported},in:${t.imported},dup:${t.duplicates}"
         }
         "arm.${arm.label}" to
             "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
-            "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} initMs=${arm.initializationMillis}" +
+            "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} initMs=${arm.initializationMillis} reseeds=${arm.reseeds}" +
             "$credit$sharing"
     }
 }
