@@ -61,13 +61,15 @@ internal fun floatDualVerdict(
     exactDuals: ExactDuals? = null,
 ): FloatDualVerdict {
     val refused = FloatDualVerdict.REFUSED
-    val exact = model.exactState?.model ?: return refused
+    if (model.exactState == null && !model.floatProjectionAuthoritative()) return refused
+    if (exactDuals != null && model.exactState == null) return refused
+    val exact = FloatEvidenceModel(model)
     val duals = exactDuals?.approximations ?: result.duals
     val status = result.basis.status
     if (duals.size != exact.m || status.size != exact.numVars || result.primal.size < exact.n) return refused
     // The float objective is the minimized source value, every model constant and bound shift included; the primal
     // is unshifted, so summing costs over it would count a shifted column twice. Reduced costs are in scaled units.
-    val objective = (result.objective + offset) * exact.objective.scale.approximation
+    val objective = (result.objective + offset) * exact.scale
     if (!objective.isFinite()) return refused
     val rows by lazy { RowView(exact) }
     val dualRounding = if (exactDuals == null) 0 else EXACT_DUAL_ROUNDING
@@ -85,14 +87,14 @@ internal fun floatDualVerdict(
     }
     var improvement = 0.0
     for (j in 0 until exact.numVars) {
-        val cost = exact.objective.cost(j).approximation
-        if (exact.column(j).bounds.fixed) continue
+        val cost = exact.cost(j)
+        if (exact.fixed(j)) continue
         var priced = 0.0
         var terms = abs(cost)
         var count = 1
         if (j < exact.n) {
-            for (entry in exact.entries(j)) {
-                val term = entry.number.approximation * duals[entry.row]
+            exact.forEachInColumn(j) { row, coefficient ->
+                val term = coefficient * duals[row]
                 priced += term
                 terms += abs(term)
                 count++
@@ -104,9 +106,8 @@ internal fun floatDualVerdict(
         }
         val reduced = cost - priced
         if (!reduced.isFinite()) return refusal()
-        val bounds = exact.column(j).bounds
-        val lower = bounds.lower?.number?.approximation ?: Double.NEGATIVE_INFINITY
-        val upper = bounds.upper?.number?.approximation ?: Double.POSITIVE_INFINITY
+        val lower = exact.lower(j)
+        val upper = exact.upper(j)
         // A basic column's reduced cost is zero only up to the basis solve's residual, and a status resting on a
         // missing bound leaves the column free to move either way: both count over the whole box. Under the
         // engine's duals that residual is not bounded by the summation's rounding, so an unbounded basic column is
@@ -160,70 +161,98 @@ internal fun floatDualVerdict(
  * rounding; otherwise it is taken exactly from the point's doubles. Null when a nonbasic slack rests on no bound or a
  * value is not finite.
  */
-private fun dualResidualGap(exact: ExactLpModel, result: FloatLpResult, duals: DoubleArray, padded: Boolean): Double? =
-    if (padded) paddedResidualGap(exact, result, duals) else exactResidualGap(exact, result, duals)
+private fun dualResidualGap(
+    exact: FloatEvidenceModel,
+    result: FloatLpResult,
+    duals: DoubleArray,
+    padded: Boolean,
+): Double? = if (padded) paddedResidualGap(exact, result, duals) else exactResidualGap(exact, result, duals)
 
-private fun nonbasicSlack(exact: ExactLpModel, result: FloatLpResult, i: Int): ExactLpNumber? {
-    val bounds = exact.column(exact.n + i).bounds
-    return when (result.basis.status[exact.n + i]) {
-        VarStatus.AT_LOWER -> bounds.lower?.number
-        VarStatus.AT_UPPER -> bounds.upper?.number
-        else -> ExactLpNumber.of(0L)
+private fun nonbasicSlack(exact: FloatEvidenceModel, result: FloatLpResult, i: Int): BigFraction? {
+    val column = exact.n + i
+    exact.model.exactState?.model?.column(column)?.bounds?.let { bounds ->
+        return when (result.basis.status[column]) {
+            VarStatus.AT_LOWER -> bounds.lower?.number?.value
+            VarStatus.AT_UPPER -> bounds.upper?.number?.value
+            else -> BigFraction.ZERO
+        }
+    }
+    return when (result.basis.status[column]) {
+        VarStatus.AT_LOWER -> if (exact.lower(column).isFinite()) exact.model.exactLower(column) else null
+        VarStatus.AT_UPPER -> if (exact.upper(column).isFinite()) exact.model.exactUpper(column) else null
+        else -> BigFraction.ZERO
+    }
+}
+
+private fun nonbasicSlackD(exact: FloatEvidenceModel, result: FloatLpResult, i: Int): Double? {
+    val column = exact.n + i
+    exact.model.exactState?.model?.column(column)?.bounds?.let { bounds ->
+        return when (result.basis.status[column]) {
+            VarStatus.AT_LOWER -> bounds.lower?.number?.approximation
+            VarStatus.AT_UPPER -> bounds.upper?.number?.approximation
+            else -> 0.0
+        }
+    }
+    return when (result.basis.status[column]) {
+        VarStatus.AT_LOWER -> exact.lower(column).takeIf { it.isFinite() }
+        VarStatus.AT_UPPER -> exact.upper(column).takeIf { it.isFinite() }
+        else -> 0.0
     }
 }
 
 // How far the float objective can overstate the true one: its summation's rounding over every priced term and the
 // constants, in the scaled units the limit is taken in. The limit scales with the smaller size, never the larger.
-private fun objectiveRounding(exact: ExactLpModel, result: FloatLpResult, offset: Double): Double {
-    val scale = exact.objective.scale.approximation
-    var magnitude = abs(exact.objective.constant.approximation) + abs(offset * scale)
-    for (j in 0 until exact.n) magnitude += abs(exact.objective.cost(j).approximation * result.primal[j])
+private fun objectiveRounding(exact: FloatEvidenceModel, result: FloatLpResult, offset: Double): Double {
+    val scale = exact.scale
+    var magnitude = abs(exact.constant) + abs(offset * scale)
+    for (j in 0 until exact.n) magnitude += abs(exact.cost(j) * result.primal[j])
     return (exact.n + 4) * UNIT_ROUNDOFF * magnitude
 }
 
-private fun exactResidualGap(exact: ExactLpModel, result: FloatLpResult, duals: DoubleArray): Double? {
+private fun exactResidualGap(exact: FloatEvidenceModel, result: FloatLpResult, duals: DoubleArray): Double? {
     // Only rows whose slack rests on a bound under a nonzero dual add to the gap, so only they need exact activity.
     val counted = BooleanArray(exact.m) { result.basis.status[exact.n + it] != VarStatus.BASIC && duals[it] != 0.0 }
     val activity = Array(exact.m) { BigFraction.ZERO }
     for (j in 0 until exact.n) {
-        if (exact.entries(j).none { counted[it.row] }) continue
-        val shifted = (BigFraction.ofDouble(result.primal[j]) ?: return null) - exact.column(j).origin.value
+        var needed = false
+        exact.forEachInColumn(j) { row, _ -> if (counted[row]) needed = true }
+        if (!needed) continue
+        val shifted = (BigFraction.ofDouble(result.primal[j]) ?: return null) - exact.model.exactShift(j)
         if (shifted.isZero) continue
-        for (entry in exact.entries(j)) {
-            if (counted[entry.row]) activity[entry.row] += entry.number.value * shifted
+        exact.model.forEachRationalColumn(j) { row, coefficient ->
+            if (counted[row]) activity[row] += coefficient * shifted
         }
     }
     var gap = 0.0
     for (i in 0 until exact.m) {
         if (!counted[i]) continue
         val slack = nonbasicSlack(exact, result, i) ?: return null
-        val residual = magnitudeAbove(activity[i] + slack.value - exact.rhs(i).value) ?: return null
+        val residual = magnitudeAbove(activity[i] + slack - exact.model.exactRhs(i)) ?: return null
         // The residual is already rounded up; the factor covers the product.
         gap += abs(duals[i]) * residual * (1 + 2 * UNIT_ROUNDOFF)
     }
     return gap * (1 + exact.m * UNIT_ROUNDOFF)
 }
 
-private fun paddedResidualGap(exact: ExactLpModel, result: FloatLpResult, duals: DoubleArray): Double? {
+private fun paddedResidualGap(exact: FloatEvidenceModel, result: FloatLpResult, duals: DoubleArray): Double? {
     val activity = DoubleArray(exact.m)
     val magnitude = DoubleArray(exact.m)
     val terms = IntArray(exact.m)
     for (j in 0 until exact.n) {
-        val origin = exact.column(j).origin.approximation
+        val origin = exact.origin(j)
         val shifted = result.primal[j] - origin
-        for (entry in exact.entries(j)) {
-            val a = entry.number.approximation
-            activity[entry.row] += a * shifted
-            magnitude[entry.row] += abs(a) * (abs(result.primal[j]) + abs(origin))
-            terms[entry.row]++
+        exact.forEachInColumn(j) { row, a ->
+            activity[row] += a * shifted
+            magnitude[row] += abs(a) * (abs(result.primal[j]) + abs(origin))
+            terms[row]++
         }
     }
     var gap = 0.0
     for (i in 0 until exact.m) {
         val slackColumn = exact.n + i
         if (result.basis.status[slackColumn] == VarStatus.BASIC || duals[i] == 0.0) continue
-        val slack = nonbasicSlack(exact, result, i)?.approximation ?: return null
-        val rhs = exact.rhs(i).approximation
+        val slack = nonbasicSlackD(exact, result, i) ?: return null
+        val rhs = exact.rhs(i)
         val residual = abs(activity[i] + slack - rhs) +
             (terms[i] + 8) * UNIT_ROUNDOFF * (magnitude[i] + abs(slack) + abs(rhs))
         gap += abs(duals[i]) * residual
@@ -236,7 +265,7 @@ private fun paddedResidualGap(exact: ExactLpModel, result: FloatLpResult, duals:
 // given, are the rationals [duals] approximate and are priced instead.
 @Suppress("LongParameterList")
 private fun exactWrong(
-    exact: ExactLpModel,
+    exact: FloatEvidenceModel,
     duals: DoubleArray,
     exactDuals: ExactDuals?,
     j: Int,
@@ -244,14 +273,17 @@ private fun exactWrong(
     resting: Boolean,
 ): Double? {
     val reduced = if (exactDuals != null) {
-        val (numerator, denominator) = exactDuals.reducedTimesDenominator(exact, j)
+        val (numerator, denominator) = exactDuals.reducedTimesDenominator(checkNotNull(exact.model.exactState).model, j)
         BigFraction.of(numerator, denominator * exactDuals.denominator)
     } else {
-        var sum = exact.objective.cost(j).value
+        var sum = exact.model.exactCost(j)
         if (j < exact.n) {
-            for (entry in exact.entries(j)) {
-                sum -= entry.number.value * (BigFraction.ofDouble(duals[entry.row]) ?: return null)
+            var finite = true
+            exact.model.forEachRationalColumn(j) { row, coefficient ->
+                val dual = BigFraction.ofDouble(duals[row])
+                if (dual == null) finite = false else sum -= coefficient * dual
             }
+            if (!finite) return null
         } else {
             sum -= BigFraction.ofDouble(duals[j - exact.n]) ?: return null
         }
@@ -278,12 +310,12 @@ private fun magnitudeAbove(value: BigFraction): Double? =
  * with each row's least and greatest activity, to imply a column's range from the other columns' bounds. Every
  * implied bound is widened outward by the rounding its doubles can carry, so a range is never understated.
  */
-private class RowView(private val exact: ExactLpModel) {
+private class RowView(private val exact: FloatEvidenceModel) {
     private val lower = DoubleArray(exact.numVars) {
-        exact.column(it).bounds.lower?.number?.approximation ?: Double.NEGATIVE_INFINITY
+        exact.lower(it)
     }
     private val upper = DoubleArray(exact.numVars) {
-        exact.column(it).bounds.upper?.number?.approximation ?: Double.POSITIVE_INFINITY
+        exact.upper(it)
     }
 
     // Finite parts of each row's activity extremes, their absolute sums, how many terms are infinite, and the
@@ -298,7 +330,7 @@ private class RowView(private val exact: ExactLpModel) {
 
     init {
         for (i in 0 until exact.m) add(i, exact.n + i, 1.0)
-        for (j in 0 until exact.n) for (entry in exact.entries(j)) add(entry.row, j, entry.number.approximation)
+        for (j in 0 until exact.n) exact.forEachInColumn(j) { row, a -> add(row, j, a) }
     }
 
     private fun add(i: Int, j: Int, a: Double) {
@@ -334,10 +366,9 @@ private class RowView(private val exact: ExactLpModel) {
             low = max(low, implied(j - exact.n, j, 1.0, lowSide = true))
             high = minOf(high, implied(j - exact.n, j, 1.0, lowSide = false))
         } else {
-            for (entry in exact.entries(j)) {
-                val a = entry.number.approximation
-                low = max(low, implied(entry.row, j, a, lowSide = true))
-                high = minOf(high, implied(entry.row, j, a, lowSide = false))
+            exact.forEachInColumn(j) { row, a ->
+                low = max(low, implied(row, j, a, lowSide = true))
+                high = minOf(high, implied(row, j, a, lowSide = false))
             }
         }
         return max(high - low, 0.0)
@@ -360,7 +391,7 @@ private class RowView(private val exact: ExactLpModel) {
             infinite == 1 -> finite
             else -> return unbounded
         }
-        val rhs = exact.rhs(i).approximation
+        val rhs = exact.rhs(i)
         val bound = (rhs - others) / a
         val widening = (terms[i] + 8) * UNIT_ROUNDOFF * (magnitude + abs(rhs)) / abs(a)
         return if (lowSide) bound - widening else bound + widening
@@ -370,3 +401,51 @@ private class RowView(private val exact: ExactLpModel) {
 }
 
 private const val MIN_NORMAL: Double = 2.2250738585072014e-308
+
+// An unshifted, unclamped source projection has the same numeric data as its exact working model. Rounded shifts
+// and probe endpoints require importing authority before solving; their projected feasible regions can differ.
+internal fun LpModel.floatProjectionAuthoritative(): Boolean {
+    if (exactState != null) return true
+    if (!finiteExactInput() || probeClampedLo.any { it } || probeClampedHi.any { it }) return false
+    val view = doubleView
+    if (view != null) {
+        val shifts = view.shifts.value
+        return shifts.rows.isEmpty() && shifts.columns.isEmpty() &&
+            view.exactObjConstant() == exactDouble(view.objConstant)
+    }
+    val exactRange = -(1L shl 53)..(1L shl 53)
+    return csc.colVal.all { it in exactRange } && rhs.all { it in exactRange } &&
+        cost.all { it in exactRange } && loShift.all { it in exactRange } &&
+        upper.indices.all { !hasUpper[it] || upper[it] in exactRange } && objConstant in exactRange
+}
+
+private class FloatEvidenceModel(val model: LpModel) {
+    private val source = model.exactState?.model
+    val n: Int get() = model.n
+    val m: Int get() = model.m
+    val numVars: Int get() = model.numVars
+    val scale: Double get() = source?.objective?.scale?.approximation ?: 1.0
+    val constant: Double get() = source?.objective?.constant?.approximation ?: model.objConstantD
+
+    fun cost(column: Int): Double = source?.objective?.cost(column)?.approximation ?: model.costD(column)
+    fun rhs(row: Int): Double = source?.rhs(row)?.approximation ?: model.rhsD(row)
+    fun origin(column: Int): Double = source?.column(column)?.origin?.approximation ?: model.loShiftD(column)
+    fun fixed(column: Int): Boolean = model.fixed(column)
+    fun lower(column: Int): Double = if (model.hasFiniteLower(column)) {
+        model.lowerD(column)
+    } else {
+        Double.NEGATIVE_INFINITY
+    }
+    fun upper(column: Int): Double = source?.let {
+        it.column(column).bounds.upper?.number?.approximation ?: Double.POSITIVE_INFINITY
+    } ?: if (model.hasFiniteUpper(column)) model.upperD(column) else Double.POSITIVE_INFINITY
+
+    inline fun forEachInColumn(column: Int, action: (Int, Double) -> Unit) {
+        val exact = model.exactState?.model
+        if (exact != null) {
+            for (entry in exact.entries(column)) action(entry.row, entry.number.approximation)
+        } else {
+            model.forEachInColumnD(column, action)
+        }
+    }
+}
