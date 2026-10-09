@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *    original `.mzn`, so the solver compiles with its own globals library (the competition setup).
  *
  * Output is parsed off the standard FlatZinc stream — `_objective`/`objective = N`, `----------`
- * (timestamped as read for time-to-best), `==========` (proven), `=====UNSATISFIABLE=====` — plus
+ * (timestamped as read for time-to-best), `==========` (proven), `=====UNSATISFIABLE=====` (proven infeasible) — plus
  * `%%%mzn-stat` lines (klause `-s` statistics). The raw stdout is returned verbatim for saving.
  */
 internal object SolverInvocation {
