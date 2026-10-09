@@ -83,7 +83,9 @@ class SolverInvocationTest {
 
     @Test
     fun `reference proofs use solve time then wall clock then legacy budget`() {
-        val r = SolverInvocation.Result(false, null, null, proven = true, stats = emptyMap(), rawOutput = "", command = "")
+        val r = SolverInvocation.Result(
+            false, null, null, proven = true, stats = emptyMap(), rawOutput = "", command = "",
+        )
         val cases = listOf(
             r to 60_000L,
             r.copy(elapsedMs = 140) to 140L,

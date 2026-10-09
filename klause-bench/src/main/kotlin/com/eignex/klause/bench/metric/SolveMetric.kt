@@ -351,8 +351,8 @@ internal object SolveMetric {
     }
 
     /** This run's result for one instance as a reference-table-schema row: `solver` is the config [tag],
-     *  `elapsedMs` the time-used proxy (incumbent, solve time, or wall clock when decided; budget otherwise — matching the
-     *  `compare.sh` convention), and the source-text features are joined from the committed table
+     *  `elapsedMs` the time-used proxy (incumbent, solve time, or wall clock when decided; budget otherwise),
+     *  matching the `compare.sh` convention, and the source-text features are joined from the committed table
      *  ([ref], null when the instance has no oracle entry). */
     internal fun resultRow(suite: String, rec: SolveRecord, tag: String, ref: ReferenceEntry?): ReferenceEntry {
         val solved = rec.feasible != null
