@@ -22,6 +22,8 @@ data class OpenTheoryClauseStats(
     val assertingConflicts: Long = 0,
     /** Shared conflicts retained with chronological fallback because resolution could not make them asserting. */
     val nonAssertingConflicts: Long = 0,
+    /** Wall time spent selecting retained clauses and rebuilding their watch lists, in nanoseconds. */
+    val reductionNanos: Long = 0,
 ) {
     /** Combine counters from independent solve slices. */
     fun mergedWith(other: OpenTheoryClauseStats): OpenTheoryClauseStats = OpenTheoryClauseStats(
@@ -35,5 +37,6 @@ data class OpenTheoryClauseStats(
         watchVisits + other.watchVisits,
         assertingConflicts + other.assertingConflicts,
         nonAssertingConflicts + other.nonAssertingConflicts,
+        reductionNanos + other.reductionNanos,
     )
 }

@@ -11263,7 +11263,7 @@ final class com.eignex.klause.solver.result/OpenHintStats { // com.eignex.klause
 }
 
 final class com.eignex.klause.solver.result/OpenTheoryClauseStats { // com.eignex.klause.solver.result/OpenTheoryClauseStats|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/OpenTheoryClauseStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/OpenTheoryClauseStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
 
     final val assertingConflicts // com.eignex.klause.solver.result/OpenTheoryClauseStats.assertingConflicts|{}assertingConflicts[0]
         final fun <get-assertingConflicts>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.assertingConflicts.<get-assertingConflicts>|<get-assertingConflicts>(){}[0]
@@ -11275,6 +11275,8 @@ final class com.eignex.klause.solver.result/OpenTheoryClauseStats { // com.eigne
         final fun <get-nonAssertingConflicts>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.nonAssertingConflicts.<get-nonAssertingConflicts>|<get-nonAssertingConflicts>(){}[0]
     final val peakRetained // com.eignex.klause.solver.result/OpenTheoryClauseStats.peakRetained|{}peakRetained[0]
         final fun <get-peakRetained>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.peakRetained.<get-peakRetained>|<get-peakRetained>(){}[0]
+    final val reductionNanos // com.eignex.klause.solver.result/OpenTheoryClauseStats.reductionNanos|{}reductionNanos[0]
+        final fun <get-reductionNanos>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.reductionNanos.<get-reductionNanos>|<get-reductionNanos>(){}[0]
     final val reductions // com.eignex.klause.solver.result/OpenTheoryClauseStats.reductions|{}reductions[0]
         final fun <get-reductions>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.reductions.<get-reductions>|<get-reductions>(){}[0]
     final val relearned // com.eignex.klause.solver.result/OpenTheoryClauseStats.relearned|{}relearned[0]
@@ -11288,6 +11290,7 @@ final class com.eignex.klause.solver.result/OpenTheoryClauseStats { // com.eigne
 
     final fun component1(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component1|component1(){}[0]
     final fun component10(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component10|component10(){}[0]
+    final fun component11(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component11|component11(){}[0]
     final fun component2(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component2|component2(){}[0]
     final fun component3(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component3|component3(){}[0]
     final fun component4(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component4|component4(){}[0]
@@ -11296,7 +11299,7 @@ final class com.eignex.klause.solver.result/OpenTheoryClauseStats { // com.eigne
     final fun component7(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component7|component7(){}[0]
     final fun component8(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component8|component8(){}[0]
     final fun component9(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryClauseStats.component9|component9(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/OpenTheoryClauseStats // com.eignex.klause.solver.result/OpenTheoryClauseStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/OpenTheoryClauseStats // com.eignex.klause.solver.result/OpenTheoryClauseStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryClauseStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/OpenTheoryClauseStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/OpenTheoryClauseStats): com.eignex.klause.solver.result/OpenTheoryClauseStats // com.eignex.klause.solver.result/OpenTheoryClauseStats.mergedWith|mergedWith(com.eignex.klause.solver.result.OpenTheoryClauseStats){}[0]

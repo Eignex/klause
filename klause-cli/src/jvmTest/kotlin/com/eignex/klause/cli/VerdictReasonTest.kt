@@ -82,6 +82,22 @@ class VerdictReasonTest {
     }
 
     @Test
+    fun `SMT-LIB statistics include learned database reduction time`() {
+        val out = capture {
+            SmtLibOutput().onStatistics(
+                SolveStats(
+                    run = RunStats(backend = "exact-lira"),
+                    openTheoryClauses = OpenTheoryClauseStats(reductionNanos = 13),
+                ),
+                solveTimeMs = 0,
+                solutions = 0,
+            )
+        }
+
+        assertTrue("; openReductionNs=13" in out, out)
+    }
+
+    @Test
     fun `a pool with nothing that can prove is named as the cause`() {
         val out = smt(VerdictContext(budgetExhausted = true, completePool = false), Verdict.UNKNOWN)
         assertTrue("no arm in the pool can prove" in out, out)

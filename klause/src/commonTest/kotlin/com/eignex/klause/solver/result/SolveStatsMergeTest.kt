@@ -20,6 +20,16 @@ class SolveStatsMergeTest {
         assertEquals(3L, merged.nonAssertingConflicts)
     }
 
+    @Test
+    fun `learned database reduction time adds across solve rounds`() {
+        val left = SolveStats(openTheoryClauses = OpenTheoryClauseStats(reductionNanos = 13))
+        val right = SolveStats(openTheoryClauses = OpenTheoryClauseStats(reductionNanos = 29))
+
+        val merged = left.mergedWith(right).openTheoryClauses
+
+        assertEquals(42L, merged.reductionNanos)
+    }
+
     private fun stats(backend: String, nodes: Double, peak: Double, weights: Double, mean: Double, wallMs: Long) =
         SolveStats(
             run = RunStats(backend = backend, wallMs = wallMs),
