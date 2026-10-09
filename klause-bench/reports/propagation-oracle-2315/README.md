@@ -3,7 +3,7 @@
 Behavioral evidence for [#2315](https://github.com/Eignex/klause/issues/2315).
 The stack starts with [the retained reproducer](https://github.com/Eignex/klause/pull/2371),
 followed by [the oracle correction](https://github.com/Eignex/klause/pull/2376)
-and integration validation.
+and [integration validation](https://github.com/Eignex/klause/pull/2380).
 
 ## Baseline and reproducer
 
@@ -52,6 +52,22 @@ All correction and integration build/test/lint/docs validation runs on GitHub CI
 was active when the policy update arrived, so none was interrupted. The archived baseline, reproducer
 and red runs above are completed pre-policy evidence, not post-policy validation. This issue changes
 test infrastructure only; no CLI solve measurement or performance campaign is needed.
+
+## Corrected JVM evidence
+
+The [reproducer CI JVM gate](https://github.com/Eignex/klause/actions/runs/37989049171/job/114018245170)
+accepts the faulty root deductions. The [corrected CI JVM gate](https://github.com/Eignex/klause/actions/runs/37989293649/job/114019056787)
+passes the rejection regression for all four deductions and the deliberately faulty-invariant regression.
+It also passes 132 selected tests across the oracle, all-different, increasing, nvalue, sort, circuit,
+cumulative and diffn classes. The raw XML for both source versions is retained under `ci/reproducer/`
+and `ci/correction/`. Run metadata, artifact digests, the exact executed gate and actual PR merge-checkout
+SHAs are retained there; the run's `head_sha` identifies the PR source head, not the merge checkout.
+No test result was produced locally after the execution-policy update.
+
+The oracle's six JVM cases have CI-reported durations between 0 and 13 ms. This records compliance
+with the 300 ms unit-test preference on that runner; it is not a performance comparison.
+The broad fixture sources retain their existing seeds, repetitions and finite domains. Each CI gate
+runs them once with the configured coverage instrumentation and without solver-budget truncation.
 
 ## Integration contracts
 
