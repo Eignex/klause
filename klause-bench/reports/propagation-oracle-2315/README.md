@@ -2,7 +2,8 @@
 
 Behavioral evidence for [#2315](https://github.com/Eignex/klause/issues/2315).
 The stack starts with [the retained reproducer](https://github.com/Eignex/klause/pull/2371),
-followed by the oracle correction and integration validation.
+followed by [the oracle correction](https://github.com/Eignex/klause/pull/2376)
+and integration validation.
 
 ## Baseline and reproducer
 
@@ -51,6 +52,27 @@ All correction and integration build/test/lint/docs validation runs on GitHub CI
 was active when the policy update arrived, so none was interrupted. The archived baseline, reproducer
 and red runs above are completed pre-policy evidence, not post-policy validation. This issue changes
 test infrastructure only; no CLI solve measurement or performance campaign is needed.
+
+## Integration contracts
+
+The integration layer reuses the existing fixtures and checks their source semantics directly:
+
+- `ResumableSearchTest`: exhaustive 128-mask knapsack optimum, capacity/domain checks and objective
+  recomputation for one-shot, sliced and callback witnesses.
+- `ResumableNodeSliceTest`: exhaustive 27-point mixed fixture with the minimum feasible real coordinate,
+  one-shot and one-node slices, a required pause, and source constraint/objective checks.
+- `FinitePipelineTest`: reconstruct every affine fixture solution and compare with all 44 declared pairs;
+  check the continuous coordinate and affine equation together.
+- `LpPropagatorTest`: check exact coordinates under an appended row, after scope pop, and in retained
+  snapshots from both scopes.
+- `LiveLpTheoryTest`: cancelled complete checks withhold models, repeated interruption remains unknown,
+  and clearing cancellation restores a directly checked source witness; proof vetoes cannot emit models
+  or turn unknown into infeasible.
+- `LpTerminalDeclineTest`: validate mixed incumbents against the fractional row and declared bounds,
+  preserve best-found status after decline, and withhold cancelled/declined satisfaction witnesses.
+
+These changes add no production algorithm, capability, configuration or session redesign.
+GitHub CI executes the JVM, Linux native and lint/docs gates for each stack layer.
 
 ## Limits
 

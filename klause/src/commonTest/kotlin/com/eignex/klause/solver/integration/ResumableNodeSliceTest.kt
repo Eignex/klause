@@ -115,11 +115,32 @@ class ResumableNodeSliceTest {
         val search = BacktrackSolver(problem).resumable(objective, BacktrackParams(randomSeed = 0L))
 
         var terminal: MinimizeResult? = null
-        while (terminal == null) {
+        var slices = 0
+        while (terminal == null && slices < 1000) {
             terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L) { }
+            slices++
         }
+        assertTrue(slices > 1, "the mixed search must pause before its terminal proof")
 
-        assertEquals(6.5, assertIs<MinimizeResult.Optimal>(terminal).objective)
+        val sliced = assertIs<MinimizeResult.Optimal>(terminal)
+        val whole = assertIs<MinimizeResult.Optimal>(
+            BacktrackSolver(problem).minimize(objective, BacktrackParams(randomSeed = 0L)),
+        )
+        val declaredOptimum = (0L..2L).flatMap { x ->
+            (0L..2L).flatMap { y ->
+                (0L..2L).map { z -> 2 * x + 3 * y + z + 1.5 * maxOf(0L, 5L - x - y - z) }
+            }
+        }.min()
+        for (result in listOf(whole, sliced)) {
+            val ints = result.sample.ints
+            val real = result.sample.reals.single()
+            assertTrue(ints.all { it in 0L..2L })
+            assertTrue(real in 0.0..10.0)
+            assertTrue(ints.sum() + real >= 5.0)
+            assertEquals(2 * ints[0] + 3 * ints[1] + ints[2] + 1.5 * real, result.objective)
+            assertEquals(declaredOptimum, result.objective)
+        }
+        search.close()
     }
 
     /** A multi-row 0/1 knapsack: its LP relaxation is fractional at the root, so the LP arm branches. */
