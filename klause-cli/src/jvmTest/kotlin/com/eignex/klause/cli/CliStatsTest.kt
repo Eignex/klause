@@ -500,14 +500,16 @@ class CliStatsTest {
             credit = credit,
             maxMillis = 500,
             initializationMillis = 100,
+            reseeds = 2,
         )
-        val stats = SolveStats(portfolio = PortfolioStats(listOf(arm)))
+        val stats = SolveStats(portfolio = PortfolioStats(listOf(arm), reseedStaleThreshold = 4))
 
         val pairs = portfolioStatPairs(stats).toMap()
 
         assertEquals(
-            "segments=3 work=15000 ms=1200 reward=0.5 failures=0 faults=0 maxMs=500 initMs=100 ClauseUses=4",
+            "segments=3 work=15000 ms=1200 reward=0.5 failures=0 faults=0 maxMs=500 initMs=100 reseeds=2 ClauseUses=4",
             pairs["arm.bt-0"],
         )
+        assertEquals("4", pairs["portfolioReseedStaleThreshold"])
     }
 }
