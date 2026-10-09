@@ -8,6 +8,452 @@
         "feasible": 9,
         "optimal": 3
       },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "19899",
+            "29438"
+          ],
+          "firstMs": [
+            321,
+            264,
+            177
+          ],
+          "bestMs": [
+            272658,
+            223484,
+            192165
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "48349"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "37380"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "36754"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "36754"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "29438"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "188060"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "188060"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "24273"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "24273"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "19899"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "440741"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "220843"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "24273"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "24273"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "24273"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "23644"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            79,
+            74,
+            121
+          ],
+          "bestMs": [
+            79,
+            74,
+            121
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            77,
+            51,
+            52
+          ],
+          "bestMs": [
+            151,
+            86,
+            82
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459519",
+            "509568"
+          ],
+          "firstMs": [
+            879,
+            815,
+            802
+          ],
+          "bestMs": [
+            298124,
+            32581,
+            297265
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499527"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "499527"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479516"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469521"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "469517"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509570"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509568"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "509568"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "509568"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509570"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509569"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459519"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
       "fingerprints": [
         "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
       ],
@@ -29,6 +475,8 @@
       ],
       "firstMs": 149.0,
       "bestMs": 16366.0,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
@@ -38,6 +486,7 @@
           "initMs": 561,
           "segments": 84,
           "reseeds": 16,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 848283.7842999999,
@@ -49,7 +498,8 @@
             "Glue": 331.0,
             "ClauseUses": 71.0,
             "Floor": 33.0
-          }
+          },
+          "meanReward": 0.13109960318545824
         },
         "bt/lp-default": {
           "cases": 9,
@@ -58,6 +508,7 @@
           "initMs": 101,
           "segments": 81,
           "reseeds": 16,
+          "reseedObservations": 9,
           "failures": 0,
           "faults": 0,
           "weightedReward": 597112.3267999999,
@@ -68,7 +519,8 @@
             "Glue": 43.0,
             "ClauseUses": 133.0,
             "FirstSolution": 3.0
-          }
+          },
+          "meanReward": 0.07485385269376793
         },
         "bt/conflictDriven": {
           "cases": 12,
@@ -77,6 +529,7 @@
           "initMs": 118,
           "segments": 102,
           "reseeds": 28,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 971632.5802,
@@ -87,7 +540,8 @@
             "RootFixings": 2820.0,
             "Glue": 2253.0,
             "ClauseUses": 843.0
-          }
+          },
+          "meanReward": 0.1250094506857727
         },
         "bt/lp-aggressive": {
           "cases": 9,
@@ -96,6 +550,7 @@
           "initMs": 58,
           "segments": 45,
           "reseeds": 10,
+          "reseedObservations": 9,
           "failures": 0,
           "faults": 0,
           "weightedReward": 231391.92709999997,
@@ -105,7 +560,8 @@
             "Glue": 39.0,
             "Improvement": 10052.0,
             "ClauseUses": 173.0
-          }
+          },
+          "meanReward": 0.05777971504167825
         },
         "bt/lp-lbtree": {
           "cases": 9,
@@ -114,6 +570,7 @@
           "initMs": 62,
           "segments": 42,
           "reseeds": 8,
+          "reseedObservations": 9,
           "failures": 1,
           "faults": 0,
           "weightedReward": 290522.916,
@@ -123,7 +580,8 @@
             "Glue": 60.0,
             "Improvement": 30003.0,
             "ClauseUses": 214.0
-          }
+          },
+          "meanReward": 0.06716465138515879
         },
         "bt/annotation": {
           "cases": 3,
@@ -132,6 +590,7 @@
           "initMs": 11,
           "segments": 17,
           "reseeds": 2,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 81566.1307,
@@ -142,7 +601,8 @@
             "Glue": 69.0,
             "ClauseUses": 7.0,
             "Floor": 5.0
-          }
+          },
+          "meanReward": 0.0705177605636847
         },
         "bt/linucb": {
           "cases": 9,
@@ -151,6 +611,7 @@
           "initMs": 50,
           "segments": 47,
           "reseeds": 14,
+          "reseedObservations": 9,
           "failures": 0,
           "faults": 0,
           "weightedReward": 190152.09279999998,
@@ -158,7 +619,8 @@
           "credit": {
             "RootFixings": 2814.0,
             "ClauseUses": 247.0
-          }
+          },
+          "meanReward": 0.04176200395674984
         },
         "bt/free": {
           "cases": 3,
@@ -167,6 +629,7 @@
           "initMs": 0,
           "segments": 19,
           "reseeds": 6,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 110299.564,
@@ -174,7 +637,8 @@
           "credit": {
             "RootFixings": 36.0,
             "ClauseUses": 286.0
-          }
+          },
+          "meanReward": 0.07996662413363106
         },
         "bt/selector-switch": {
           "cases": 3,
@@ -183,6 +647,7 @@
           "initMs": 0,
           "segments": 16,
           "reseeds": 4,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 92653.9386,
@@ -191,7 +656,8 @@
             "RootFixings": 36.0,
             "Glue": 7.0,
             "ClauseUses": 175.0
-          }
+          },
+          "meanReward": 0.13356639344262294
         },
         "bt/domwdeg": {
           "cases": 3,
@@ -200,6 +666,7 @@
           "initMs": 0,
           "segments": 10,
           "reseeds": 3,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 93223.9999,
@@ -208,7 +675,8 @@
             "RootFixings": 36.0,
             "ClauseUses": 71.0,
             "Glue": 1.0
-          }
+          },
+          "meanReward": 0.10185654587609042
         }
       }
     },
@@ -217,6 +685,452 @@
         "feasible": 9,
         "optimal": 3
       },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "38258",
+            "194970"
+          ],
+          "firstMs": [
+            317,
+            313,
+            230
+          ],
+          "bestMs": [
+            250899,
+            285842,
+            297004
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "51370"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "48799"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "48799"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "48160"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "38258"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "291493"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "291493"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "291493"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "290207"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "194970"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "440741"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "291493"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "291493"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "291493"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "291493"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "95609"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            93,
+            73,
+            168
+          ],
+          "bestMs": [
+            93,
+            73,
+            168
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            51,
+            57,
+            51
+          ],
+          "bestMs": [
+            114,
+            90,
+            79
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459518",
+            "489515"
+          ],
+          "firstMs": [
+            832,
+            894,
+            849
+          ],
+          "bestMs": [
+            198079,
+            287741,
+            196440
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499570"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "499565"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "499565"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "489517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "489515"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499569"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "499567"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "499566"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "489515"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "479516"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499569"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "499568"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469532"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469532"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
       "fingerprints": [
         "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
       ],
@@ -238,6 +1152,8 @@
       ],
       "firstMs": 199.0,
       "bestMs": 98304.0,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
@@ -247,6 +1163,7 @@
           "initMs": 547,
           "segments": 64,
           "reseeds": 13,
+          "reseedObservations": 15,
           "failures": 0,
           "faults": 0,
           "weightedReward": 568937.0133999999,
@@ -257,7 +1174,8 @@
             "Glue": 205.0,
             "ClauseUses": 339.0,
             "Improvement": 15040.0
-          }
+          },
+          "meanReward": 0.16893873745735977
         },
         "bt/lp-default": {
           "cases": 9,
@@ -266,6 +1184,7 @@
           "initMs": 138,
           "segments": 59,
           "reseeds": 11,
+          "reseedObservations": 9,
           "failures": 0,
           "faults": 0,
           "weightedReward": 585694.6242,
@@ -276,7 +1195,8 @@
             "Glue": 3072.0,
             "ClauseUses": 60.0,
             "FirstSolution": 3.0
-          }
+          },
+          "meanReward": 0.10539738240669942
         },
         "bt/conflictDriven": {
           "cases": 12,
@@ -285,6 +1205,7 @@
           "initMs": 47,
           "segments": 52,
           "reseeds": 13,
+          "reseedObservations": 15,
           "failures": 0,
           "faults": 0,
           "weightedReward": 604031.1357999999,
@@ -295,7 +1216,8 @@
             "RootFixings": 2856.0,
             "Glue": 855.0,
             "ClauseUses": 1304.0
-          }
+          },
+          "meanReward": 0.14894776192864584
         },
         "bt/lp-aggressive": {
           "cases": 9,
@@ -304,6 +1226,7 @@
           "initMs": 65,
           "segments": 37,
           "reseeds": 9,
+          "reseedObservations": 9,
           "failures": 0,
           "faults": 0,
           "weightedReward": 240130.66520000002,
@@ -313,7 +1236,8 @@
             "Glue": 56.0,
             "Improvement": 105285.0,
             "ClauseUses": 96.0
-          }
+          },
+          "meanReward": 0.06410017495164405
         },
         "bt/lp-lbtree": {
           "cases": 9,
@@ -322,6 +1246,7 @@
           "initMs": 32,
           "segments": 23,
           "reseeds": 4,
+          "reseedObservations": 9,
           "failures": 2,
           "faults": 0,
           "weightedReward": 131667.4573,
@@ -331,7 +1256,8 @@
             "Glue": 32.0,
             "ClauseUses": 91.0,
             "Improvement": 10011.0
-          }
+          },
+          "meanReward": 0.06518765381305879
         },
         "bt/linucb": {
           "cases": 12,
@@ -340,6 +1266,7 @@
           "initMs": 47,
           "segments": 30,
           "reseeds": 5,
+          "reseedObservations": 15,
           "failures": 0,
           "faults": 0,
           "weightedReward": 95960.01860000001,
@@ -348,7 +1275,8 @@
             "RootFixings": 2856.0,
             "Glue": 178.0,
             "ClauseUses": 522.0
-          }
+          },
+          "meanReward": 0.10495795951091089
         },
         "bt/free": {
           "cases": 12,
@@ -357,6 +1285,7 @@
           "initMs": 47,
           "segments": 42,
           "reseeds": 11,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 378065.6428,
@@ -366,7 +1295,8 @@
             "RootFixings": 2820.0,
             "Glue": 208.0,
             "ClauseUses": 340.0
-          }
+          },
+          "meanReward": 0.10053766151708922
         },
         "bt/selector-switch": {
           "cases": 12,
@@ -375,6 +1305,7 @@
           "initMs": 57,
           "segments": 42,
           "reseeds": 11,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 554335.2699,
@@ -384,7 +1315,8 @@
             "RootFixings": 2822.0,
             "Glue": 2268.0,
             "ClauseUses": 334.0
-          }
+          },
+          "meanReward": 0.13471107610363464
         },
         "bt/domwdeg": {
           "cases": 12,
@@ -393,6 +1325,7 @@
           "initMs": 63,
           "segments": 42,
           "reseeds": 11,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 124771.62899999999,
@@ -401,7 +1334,8 @@
             "RootFixings": 2825.0,
             "Glue": 98.0,
             "ClauseUses": 471.0
-          }
+          },
+          "meanReward": 0.03489443961553692
         },
         "bt/first-fail": {
           "cases": 12,
@@ -410,6 +1344,7 @@
           "initMs": 48,
           "segments": 46,
           "reseeds": 7,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 423157.25940000004,
@@ -419,7 +1354,8 @@
             "Glue": 166.0,
             "ClauseUses": 309.0,
             "Improvement": 30036.0
-          }
+          },
+          "meanReward": 0.11141956848466722
         },
         "bt/activity": {
           "cases": 12,
@@ -428,6 +1364,7 @@
           "initMs": 77,
           "segments": 54,
           "reseeds": 15,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 164892.6508,
@@ -436,7 +1373,8 @@
             "RootFixings": 2820.0,
             "Glue": 35.0,
             "ClauseUses": 29.0
-          }
+          },
+          "meanReward": 0.027962428420454283
         },
         "bt/annotation": {
           "cases": 3,
@@ -445,6 +1383,7 @@
           "initMs": 14,
           "segments": 14,
           "reseeds": 2,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 39836.32,
@@ -454,7 +1393,8 @@
             "RootFixings": 6.0,
             "Glue": 8.0,
             "ClauseUses": 10.0
-          }
+          },
+          "meanReward": 0.05795865990225847
         },
         "bt/objective-guided": {
           "cases": 9,
@@ -463,6 +1403,7 @@
           "initMs": 29,
           "segments": 31,
           "reseeds": 7,
+          "reseedObservations": 9,
           "failures": 0,
           "faults": 0,
           "weightedReward": 157549.9998,
@@ -472,7 +1413,8 @@
             "RootFixings": 2814.0,
             "Glue": 38.0,
             "ClauseUses": 347.0
-          }
+          },
+          "meanReward": 0.06876237321187277
         }
       }
     },
@@ -481,6 +1423,452 @@
         "feasible": 9,
         "optimal": 3
       },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "9030",
+            "25740"
+          ],
+          "firstMs": [
+            284,
+            274,
+            225
+          ],
+          "bestMs": [
+            296247,
+            295304,
+            294913
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "29601"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25809"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "24519"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "24519"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "12050"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "30775"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "30775"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "30775"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "30775"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25740"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "440741"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "135703"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25214"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25214"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25214"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "9030"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            127,
+            76,
+            152
+          ],
+          "bestMs": [
+            127,
+            76,
+            152
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            51,
+            57,
+            60
+          ],
+          "bestMs": [
+            114,
+            84,
+            94
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459518",
+            "469517"
+          ],
+          "firstMs": [
+            991,
+            793,
+            921
+          ],
+          "bestMs": [
+            241847,
+            257027,
+            200877
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509575"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509569"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "489515"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459519"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509578"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509569"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509568"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "499552"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509578"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509571"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509530"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "489515"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "469517"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
       "fingerprints": [
         "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
       ],
@@ -502,6 +1890,8 @@
       ],
       "firstMs": 188.5,
       "bestMs": 100514.5,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
@@ -511,6 +1901,7 @@
           "initMs": 753,
           "segments": 213,
           "reseeds": 56,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 815916.2126000001,
@@ -522,7 +1913,8 @@
             "Glue": 2597.0,
             "ClauseUses": 142.0,
             "Floor": 52.0
-          }
+          },
+          "meanReward": 0.08739703016674731
         },
         "bt/annotation": {
           "cases": 3,
@@ -531,6 +1923,7 @@
           "initMs": 83,
           "segments": 68,
           "reseeds": 22,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 247191.2992,
@@ -540,7 +1933,8 @@
             "Glue": 143.0,
             "ClauseUses": 18.0,
             "Improvement": 176355.0
-          }
+          },
+          "meanReward": 0.08375116058054607
         },
         "ls/cbls/fixed": {
           "cases": 12,
@@ -549,13 +1943,15 @@
           "initMs": 0,
           "segments": 32,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 16112.2927,
           "finalHolders": 0,
           "credit": {
             "Improvement": 1196836.0
-          }
+          },
+          "meanReward": 0.012820439684078023
         },
         "ls/cbls-plateau/ils-basin": {
           "cases": 12,
@@ -564,13 +1960,15 @@
           "initMs": 0,
           "segments": 31,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 121833.9236,
           "finalHolders": 0,
           "credit": {
             "Improvement": 53744.0
-          }
+          },
+          "meanReward": 0.07158477560778705
         },
         "ls/cbls-smooth/ils-basin": {
           "cases": 6,
@@ -579,13 +1977,15 @@
           "initMs": 0,
           "segments": 16,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 595.8485,
           "finalHolders": 0,
           "credit": {
             "Improvement": 13532.0
-          }
+          },
+          "meanReward": 0.000833171597285631
         },
         "ls/sa/adaptive-perturb": {
           "cases": 6,
@@ -594,13 +1994,15 @@
           "initMs": 0,
           "segments": 14,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 15597.244,
           "finalHolders": 0,
           "credit": {
             "Improvement": 256900.0
-          }
+          },
+          "meanReward": 0.02196337101561928
         },
         "alns/balanced": {
           "cases": 12,
@@ -609,13 +2011,15 @@
           "initMs": 0,
           "segments": 104,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 2198308.762,
           "finalHolders": 2,
           "credit": {
             "Improvement": 90072.0
-          }
+          },
+          "meanReward": 0.15905804282184616
         },
         "bt/lp-default": {
           "cases": 3,
@@ -624,6 +2028,7 @@
           "initMs": 64,
           "segments": 53,
           "reseeds": 11,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1108006.1876,
@@ -634,7 +2039,8 @@
             "RootFixings": 2778.0,
             "Glue": 66.0,
             "ClauseUses": 38.0
-          }
+          },
+          "meanReward": 0.20023178101560318
         },
         "bt/conflictDriven": {
           "cases": 6,
@@ -643,6 +2049,7 @@
           "initMs": 5,
           "segments": 131,
           "reseeds": 43,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 87136.13870000001,
@@ -650,7 +2057,8 @@
           "credit": {
             "RootFixings": 36.0,
             "ClauseUses": 350.0
-          }
+          },
+          "meanReward": 0.022887395982366943
         },
         "ls/probsat-bandit/fixed": {
           "cases": 6,
@@ -659,11 +2067,13 @@
           "initMs": 0,
           "segments": 8,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         },
         "ls/fjump/fixed": {
           "cases": 6,
@@ -672,11 +2082,13 @@
           "initMs": 0,
           "segments": 18,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         }
       }
     },
@@ -685,6 +2097,452 @@
         "feasible": 9,
         "optimal": 3
       },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "20176",
+            "36003"
+          ],
+          "firstMs": [
+            263,
+            259,
+            181
+          ],
+          "bestMs": [
+            296560,
+            20298,
+            292401
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "32812"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "23517"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "23517"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "23517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "20176"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "30775"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "27835"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "27835"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "27835"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "27835"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "440741"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61874"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61874"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61874"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "54193"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "36003"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            86,
+            111,
+            125
+          ],
+          "bestMs": [
+            86,
+            111,
+            125
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            90,
+            63,
+            59
+          ],
+          "bestMs": [
+            167,
+            98,
+            93
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459518",
+            "459518"
+          ],
+          "firstMs": [
+            830,
+            893,
+            796
+          ],
+          "bestMs": [
+            276209,
+            250968,
+            258027
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "479525"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "479523"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469522"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469521"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509522"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509522"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479519"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "479518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509578"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509578"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509568"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "479530"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
       "fingerprints": [
         "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
       ],
@@ -706,6 +2564,8 @@
       ],
       "firstMs": 153.0,
       "bestMs": 10232.5,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
@@ -715,6 +2575,7 @@
           "initMs": 792,
           "segments": 124,
           "reseeds": 30,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 399890.8014,
@@ -726,7 +2587,8 @@
             "Glue": 3516.0,
             "ClauseUses": 84.0,
             "Floor": 2.0
-          }
+          },
+          "meanReward": 0.091079908549022
         },
         "bt/annotation": {
           "cases": 3,
@@ -735,6 +2597,7 @@
           "initMs": 234,
           "segments": 45,
           "reseeds": 13,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 116937.11129999999,
@@ -744,7 +2607,8 @@
             "Glue": 57.0,
             "Improvement": 176355.0,
             "ClauseUses": 5.0
-          }
+          },
+          "meanReward": 0.07421275438677769
         },
         "ls/cbls/fixed": {
           "cases": 12,
@@ -753,13 +2617,15 @@
           "initMs": 0,
           "segments": 21,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 9043.3233,
           "finalHolders": 1,
           "credit": {
             "Improvement": 1197843.0
-          }
+          },
+          "meanReward": 0.012628188074099106
         },
         "ls/cbls-plateau/ils-basin": {
           "cases": 12,
@@ -768,13 +2634,15 @@
           "initMs": 0,
           "segments": 23,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 53263.6913,
           "finalHolders": 0,
           "credit": {
             "Improvement": 22963.0
-          }
+          },
+          "meanReward": 0.09733381448649281
         },
         "ls/cbls-smooth/ils-basin": {
           "cases": 12,
@@ -783,13 +2651,15 @@
           "initMs": 0,
           "segments": 16,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 3078.868,
           "finalHolders": 1,
           "credit": {
             "Improvement": 24314.0
-          }
+          },
+          "meanReward": 0.007897692410297452
         },
         "ls/sa/adaptive-perturb": {
           "cases": 12,
@@ -798,13 +2668,15 @@
           "initMs": 0,
           "segments": 19,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 4282.373,
           "finalHolders": 0,
           "credit": {
             "Improvement": 75275.0
-          }
+          },
+          "meanReward": 0.01767370058852176
         },
         "alns/balanced": {
           "cases": 12,
@@ -813,13 +2685,15 @@
           "initMs": 0,
           "segments": 102,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1222755.1662,
           "finalHolders": 1,
           "credit": {
             "Improvement": 90050.0
-          }
+          },
+          "meanReward": 0.09203091760627749
         },
         "bt/lp-default": {
           "cases": 9,
@@ -828,6 +2702,7 @@
           "initMs": 129,
           "segments": 42,
           "reseeds": 5,
+          "reseedObservations": 9,
           "failures": 0,
           "faults": 0,
           "weightedReward": 245750.1979,
@@ -838,7 +2713,8 @@
             "Improvement": 45007.0,
             "FirstSolution": 3.0,
             "ClauseUses": 26.0
-          }
+          },
+          "meanReward": 0.07156253961052537
         },
         "bt/conflictDriven": {
           "cases": 12,
@@ -847,6 +2723,7 @@
           "initMs": 340,
           "segments": 140,
           "reseeds": 43,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1031923.2271,
@@ -857,7 +2734,8 @@
             "Glue": 51520.0,
             "ClauseUses": 790.0,
             "Improvement": 4626.0
-          }
+          },
+          "meanReward": 0.12309241493913928
         },
         "ls/cbls-chain/ils-basin": {
           "cases": 12,
@@ -866,13 +2744,15 @@
           "initMs": 0,
           "segments": 26,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 49177.6192,
           "finalHolders": 0,
           "credit": {
             "Improvement": 149315.0
-          }
+          },
+          "meanReward": 0.059557113895475716
         },
         "ls/cbls-chain-noinv/fixed": {
           "cases": 12,
@@ -881,11 +2761,13 @@
           "initMs": 0,
           "segments": 17,
           "reseeds": 0,
+          "reseedObservations": 12,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         },
         "ls/cbls-notabu/fixed": {
           "cases": 6,
@@ -894,11 +2776,13 @@
           "initMs": 0,
           "segments": 12,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         },
         "ls/cbls-lonoise/fixed": {
           "cases": 6,
@@ -907,13 +2791,15 @@
           "initMs": 0,
           "segments": 10,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 4378.4328000000005,
           "finalHolders": 0,
           "credit": {
             "Improvement": 13473.0
-          }
+          },
+          "meanReward": 0.08186587887740031
         },
         "bt/lp-aggressive": {
           "cases": 6,
@@ -922,6 +2808,7 @@
           "initMs": 35,
           "segments": 28,
           "reseeds": 7,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 161325.3787,
@@ -930,7 +2817,8 @@
             "RootFixings": 2778.0,
             "Glue": 61.0,
             "ClauseUses": 71.0
-          }
+          },
+          "meanReward": 0.05949571893672466
         },
         "ls/probsat-bandit/fixed": {
           "cases": 6,
@@ -939,11 +2827,13 @@
           "initMs": 0,
           "segments": 7,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         },
         "ls/fjump/fixed": {
           "cases": 6,
@@ -952,11 +2842,13 @@
           "initMs": 0,
           "segments": 6,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         },
         "bt/linucb": {
           "cases": 3,
@@ -965,6 +2857,7 @@
           "initMs": 5,
           "segments": 20,
           "reseeds": 6,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 82829.8787,
@@ -972,7 +2865,8 @@
           "credit": {
             "RootFixings": 36.0,
             "ClauseUses": 89.0
-          }
+          },
+          "meanReward": 0.07561637864297478
         },
         "bt/free": {
           "cases": 3,
@@ -981,6 +2875,7 @@
           "initMs": 3,
           "segments": 53,
           "reseeds": 17,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 51793.0018,
@@ -988,7 +2883,8 @@
           "credit": {
             "RootFixings": 36.0,
             "ClauseUses": 343.0
-          }
+          },
+          "meanReward": 0.028936205928477687
         }
       }
     }
@@ -1090,5 +2986,10 @@
         0.25
       ]
     }
-  ]
+  ],
+  "referenceChecks": {
+    "checked": 60,
+    "missing": [],
+    "disagreements": []
+  }
 }

@@ -1,0 +1,54 @@
+{
+  "jobs": [
+    {
+      "job": 855,
+      "status": "DONE",
+      "cases": 240
+    },
+    {
+      "job": 873,
+      "status": "DONE",
+      "cases": 24
+    },
+    {
+      "job": 875,
+      "status": "DONE",
+      "cases": 156
+    },
+    {
+      "job": 879,
+      "status": "DONE",
+      "cases": 48
+    },
+    {
+      "job": 880,
+      "status": "DONE",
+      "cases": 48
+    },
+    {
+      "job": 881,
+      "status": "DONE",
+      "cases": 48
+    },
+    {
+      "job": 882,
+      "status": "DONE",
+      "cases": 72
+    },
+    {
+      "job": 883,
+      "status": "DONE",
+      "cases": 24
+    }
+  ],
+  "cases": 660,
+  "outcomes": {
+    "feasible": 445,
+    "optimal": 215
+  },
+  "missingSourceHashRecords": 396,
+  "feasibleRecordsMissingWitnesses": 396,
+  "referenceComparisons": 874,
+  "missingReferences": 0,
+  "referenceDisagreements": 0
+}

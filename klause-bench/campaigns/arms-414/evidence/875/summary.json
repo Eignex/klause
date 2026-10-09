@@ -28,7 +28,97 @@
             176014,
             37981,
             6155
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "189"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "155"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "135"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "126"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "108"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "208"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "163"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "118"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2011/fast-food/ff10",
@@ -49,7 +139,97 @@
             82594,
             123994,
             101238
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "4442"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1176"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "883"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "708"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2516"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "925"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "784"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "728"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "721"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2528"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1139"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "885"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "783"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2012/amaze/2012-03-15",
@@ -70,7 +250,97 @@
             9314,
             8867,
             20454
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2016/celar/CELAR6-SUB0",
@@ -91,7 +361,97 @@
             185037,
             282305,
             133254
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "23203"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "6127"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "5255"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "4732"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "4077"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "4010"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "16713"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "5919"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "5312"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "5312"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "5312"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "2977"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "15435"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "7917"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "6207"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "5422"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "5114"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1163"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2017/city-position/city-5-05",
@@ -112,7 +472,97 @@
             285823,
             241957,
             296490
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "48349"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "37380"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "36754"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "36754"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "29438"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "220843"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "188060"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "188060"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "24273"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "21887"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "440741"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "188060"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "188060"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "185278"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "24273"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "20666"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu",
@@ -133,7 +583,97 @@
             9550,
             9555,
             9538
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1811"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1120"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1811"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1120"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1811"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1120"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB06/OPT-LIN/submitted-PB05/manquinho/logic-synthesis/normalized-exam.pi",
@@ -154,7 +694,97 @@
             217256,
             227670,
             217590
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2338"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "260"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "260"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "88"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2353"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "260"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "260"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "88"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2331"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "260"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "260"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "88"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
@@ -175,7 +805,97 @@
             77,
             98,
             113
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
@@ -196,7 +916,97 @@
             132,
             78,
             79
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/BinPacking2-n1c1w1a_c24",
@@ -217,7 +1027,97 @@
             2176,
             2489,
             3704
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/CoinsGrid-08-04_c22",
@@ -238,7 +1138,97 @@
             699,
             580,
             585
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/CyclicBandwidth-mesh2D05x08_c22",
@@ -259,7 +1249,97 @@
             160986,
             255444,
             282406
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "13"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "13"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "12"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "8"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "12"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "12"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "7"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "7"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "6"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "13"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "13"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "11"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "11"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "9"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/Fortress1-03_c25",
@@ -280,7 +1360,97 @@
             283269,
             297400,
             298646
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499527"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "499527"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479516"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469521"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "469517"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509570"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509568"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "509568"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "489530"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509570"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509569"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459519"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         }
       ],
       "fingerprints": [
@@ -304,6 +1474,8 @@
       ],
       "firstMs": 334,
       "bestMs": 37981,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
@@ -313,6 +1485,7 @@
           "initMs": 1831,
           "segments": 366,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 5508789.7725,
@@ -334,6 +1507,7 @@
           "initMs": 242,
           "segments": 281,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 2064557.3551,
@@ -355,6 +1529,7 @@
           "initMs": 229,
           "segments": 313,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 2689644.1091,
@@ -375,6 +1550,7 @@
           "initMs": 177,
           "segments": 179,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 736168.9090999998,
@@ -396,6 +1572,7 @@
           "initMs": 114,
           "segments": 212,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 1,
           "faults": 0,
           "weightedReward": 1250627.8559,
@@ -416,6 +1593,7 @@
           "initMs": 26,
           "segments": 61,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 549430.1673999999,
@@ -437,6 +1615,7 @@
           "initMs": 87,
           "segments": 160,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 401926.9173000001,
@@ -455,6 +1634,7 @@
           "initMs": 32,
           "segments": 50,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 130390.7084,
@@ -473,6 +1653,7 @@
           "initMs": 44,
           "segments": 53,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 182809.95059999998,
@@ -493,6 +1674,7 @@
           "initMs": 21,
           "segments": 67,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 437436.93059999996,
@@ -513,6 +1695,7 @@
           "initMs": 46,
           "segments": 28,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 109988.05900000001,
@@ -551,7 +1734,97 @@
             63660,
             205117,
             195303
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "189"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "144"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "144"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "118"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "208"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "164"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "146"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "128"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "128"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "144"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "144"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "143"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "135"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2011/fast-food/ff10",
@@ -573,7 +1846,97 @@
             241305,
             191309,
             298395
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "4442"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "972"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "972"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "954"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "726"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2516"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1029"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "846"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "742"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "742"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2528"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1017"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1017"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1017"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1017"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "740"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2012/amaze/2012-03-15",
@@ -594,7 +1957,97 @@
             6578,
             7212,
             6306
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2016/celar/CELAR6-SUB0",
@@ -615,7 +2068,97 @@
             261514,
             210738,
             296541
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "23203"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "12882"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "11882"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "10626"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "10626"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "3867"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "16713"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "16685"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "14974"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "14974"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "14764"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "6347"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "15435"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "11609"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "8716"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "8716"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "8716"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5360"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2017/city-position/city-5-05",
@@ -636,7 +2179,97 @@
             291305,
             287345,
             296814
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "33156"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "33156"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "33156"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "33156"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "23411"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "31782"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "31782"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "31782"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "31782"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "9985"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "440741"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "185922"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "29153"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "29153"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "29153"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "21622"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu",
@@ -657,7 +2290,97 @@
             72597,
             259017,
             263212
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1411"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1246"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1246"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1239"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1128"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1405"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1337"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1181"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1177"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1177"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1128"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1416"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1136"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1136"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1136"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1136"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1128"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB06/OPT-LIN/submitted-PB05/manquinho/logic-synthesis/normalized-exam.pi",
@@ -678,7 +2401,97 @@
             119919,
             63521,
             76518
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1304"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "94"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "94"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "94"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "88"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "88"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1317"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "90"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "86"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "86"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "84"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "84"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "859"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "113"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "91"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "90"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "88"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "88"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
@@ -699,7 +2512,97 @@
             104,
             77,
             122
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
@@ -720,7 +2623,97 @@
             111,
             107,
             81
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/BinPacking2-n1c1w1a_c24",
@@ -741,7 +2734,97 @@
             42761,
             55288,
             128057
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "29"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "29"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/CoinsGrid-08-04_c22",
@@ -762,7 +2845,97 @@
             9109,
             5246,
             6736
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "156"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "162"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "216"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/CyclicBandwidth-mesh2D05x08_c22",
@@ -783,7 +2956,97 @@
             276214,
             264271,
             43023
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "13"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "13"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "12"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "11"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "9"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "12"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "11"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "11"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "8"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "13"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "12"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "6"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "6"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "6"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/Fortress1-03_c25",
@@ -804,7 +3067,97 @@
             220510,
             210997,
             245986
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509524"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "489521"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479518"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509578"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509568"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509568"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "509543"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509576"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509574"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "499524"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459521"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         }
       ],
       "fingerprints": [
@@ -828,6 +3181,8 @@
       ],
       "firstMs": 335,
       "bestMs": 119919,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
@@ -837,6 +3192,7 @@
           "initMs": 2427,
           "segments": 1035,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 3695159.9922,
@@ -858,6 +3214,7 @@
           "initMs": 179,
           "segments": 261,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1680675.0514999998,
@@ -879,6 +3236,7 @@
           "initMs": 0,
           "segments": 178,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 544108.6410000001,
@@ -896,6 +3254,7 @@
           "initMs": 0,
           "segments": 175,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 492203.9007,
@@ -913,6 +3272,7 @@
           "initMs": 0,
           "segments": 100,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 113191.2895,
@@ -930,6 +3290,7 @@
           "initMs": 0,
           "segments": 119,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 86955.1892,
@@ -946,6 +3307,7 @@
           "initMs": 0,
           "segments": 567,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 3581704.0869,
@@ -962,6 +3324,7 @@
           "initMs": 78,
           "segments": 633,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1353395.9457999999,
@@ -981,6 +3344,7 @@
           "initMs": 108,
           "segments": 72,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1231720.8564,
@@ -1001,6 +3365,7 @@
           "initMs": 0,
           "segments": 45,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 334211.1841,
@@ -1017,6 +3382,7 @@
           "initMs": 0,
           "segments": 63,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
@@ -1051,7 +3417,97 @@
             8830,
             15010,
             13400
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "164"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "164"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "127"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "164"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "132"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2011/fast-food/ff10",
@@ -1072,7 +3528,97 @@
             24127,
             25187,
             44280
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2480"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "920"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2521"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "742"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2572"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "858"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "706"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2012/amaze/2012-03-15",
@@ -1093,7 +3639,97 @@
             4736,
             5560,
             5712
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2016/celar/CELAR6-SUB0",
@@ -1114,7 +3750,97 @@
             285323,
             297681,
             288022
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "12878"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "10788"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "2433"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1897"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "582"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "201"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "8027"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "4154"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "2289"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "645"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "193"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "10240"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "3947"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "3245"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1164"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "165"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2017/city-position/city-5-05",
@@ -1135,7 +3861,97 @@
             292967,
             291728,
             254301
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "39286"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "38134"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "38134"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "33788"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "14998"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "271193"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "48877"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "31139"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "30700"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "23823"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "440741"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "156187"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "141068"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "70570"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61201"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "34399"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu",
@@ -1156,7 +3972,97 @@
             6814,
             4019,
             2728
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1417"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1120"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1409"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1120"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1409"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1120"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1120"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB06/OPT-LIN/submitted-PB05/manquinho/logic-synthesis/normalized-exam.pi",
@@ -1177,7 +4083,97 @@
             48205,
             44507,
             50833
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2335"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "88"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "88"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "88"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2351"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "88"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "88"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "88"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2328"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "93"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "88"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "88"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "88"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
@@ -1198,7 +4194,97 @@
             99,
             95,
             94
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
@@ -1219,7 +4305,97 @@
             100,
             88,
             102
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/BinPacking2-n1c1w1a_c24",
@@ -1240,7 +4416,97 @@
             1845,
             1994,
             2878
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "27"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/CoinsGrid-08-04_c22",
@@ -1261,7 +4527,97 @@
             226,
             183,
             209
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/CyclicBandwidth-mesh2D05x08_c22",
@@ -1282,7 +4638,97 @@
             167873,
             146783,
             208065
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "9"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "9"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "6"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "11"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "9"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "7"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "6"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "11"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "7"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/Fortress1-03_c25",
@@ -1303,7 +4749,97 @@
             254863,
             227156,
             157568
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509576"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509522"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479516"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509569"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "489515"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "489515"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509570"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "479523"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479523"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469524"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "469517"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         }
       ],
       "fingerprints": [
@@ -1327,6 +4863,8 @@
       ],
       "firstMs": 427,
       "bestMs": 13400,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
@@ -1336,6 +4874,7 @@
           "initMs": 3665,
           "segments": 751,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 5352843.163100002,
@@ -1357,6 +4896,7 @@
           "initMs": 2543,
           "segments": 525,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 8853098.8241,
@@ -1378,6 +4918,7 @@
           "initMs": 3908,
           "segments": 705,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 5332069.0151,
@@ -1399,6 +4940,7 @@
           "initMs": 2579,
           "segments": 371,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 3135130.6308000004,
@@ -1420,6 +4962,7 @@
           "initMs": 874,
           "segments": 485,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 2,
           "faults": 0,
           "weightedReward": 7618912.459200001,
@@ -1440,6 +4983,7 @@
           "initMs": 1814,
           "segments": 556,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 4046250.242,
@@ -1460,6 +5004,7 @@
           "initMs": 2002,
           "segments": 640,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 4235859.012499999,
@@ -1481,6 +5026,7 @@
           "initMs": 445,
           "segments": 103,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1304356.4786999999,
@@ -1502,6 +5048,7 @@
           "initMs": 712,
           "segments": 398,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 2057322.9421999997,
@@ -1521,6 +5068,7 @@
           "initMs": 54,
           "segments": 165,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 704331.9264,
@@ -1540,6 +5088,7 @@
           "initMs": 57,
           "segments": 196,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 286770.47819999995,
@@ -1557,6 +5106,7 @@
           "initMs": 81,
           "segments": 229,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 205452.5953,
@@ -1575,6 +5125,7 @@
           "initMs": 429,
           "segments": 48,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 264837.957,
@@ -1615,7 +5166,97 @@
             51546,
             12078,
             39200
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "164"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "143"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "132"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "164"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "135"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "164"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "127"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "127"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "107"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "107"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2011/fast-food/ff10",
@@ -1636,7 +5277,97 @@
             48435,
             42341,
             25804
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2808"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "994"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "994"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1744"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1088"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "862"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "2530"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1017"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "704"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "704"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2012/amaze/2012-03-15",
@@ -1657,7 +5388,97 @@
             5442,
             3566,
             7027
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1429"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1429"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2016/celar/CELAR6-SUB0",
@@ -1678,7 +5499,97 @@
             290846,
             294943,
             298518
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "24393"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "17617"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "8866"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "5968"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "5152"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "2812"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "16713"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "16664"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "6753"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "5745"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "2723"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "547"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "15435"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "12196"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "6448"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "4902"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "4132"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1757"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "mzn-bench/2017/city-position/city-5-05",
@@ -1699,7 +5610,97 @@
             290838,
             293056,
             208489
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "25294"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "18745"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "18113"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "18113"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "18113"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5029"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "364088"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "90680"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "26163"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "23142"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "22989"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5317"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "272735"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "18458"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "13661"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "11816"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "8201"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "6878"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu",
@@ -1720,7 +5721,97 @@
             9096,
             4000,
             11894
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1169"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1128"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1231"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1128"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1236"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "1143"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "1128"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "1128"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB06/OPT-LIN/submitted-PB05/manquinho/logic-synthesis/normalized-exam.pi",
@@ -1741,7 +5832,97 @@
             101040,
             88944,
             14985
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "696"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "86"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "86"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1650"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "98"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "84"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "84"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1158"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "91"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "87"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "87"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "87"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "87"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
@@ -1762,7 +5943,97 @@
             94,
             86,
             98
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
@@ -1783,7 +6054,97 @@
             143,
             84,
             107
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/BinPacking2-n1c1w1a_c24",
@@ -1805,7 +6166,97 @@
             14898,
             25287,
             13018
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "29"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "27"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "29"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "28"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "26"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "26"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/CoinsGrid-08-04_c22",
@@ -1826,7 +6277,97 @@
             206,
             177,
             212
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "80"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "80"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/CyclicBandwidth-mesh2D05x08_c22",
@@ -1847,7 +6388,97 @@
             129560,
             165533,
             188961
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "9"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "8"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "7"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "20"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "10"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "9"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "7"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "6"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "11"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "9"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "9"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "7"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         },
         {
           "input": "xcsp3-cop/Fortress1-03_c25",
@@ -1868,7 +6499,97 @@
             72731,
             84595,
             153998
-          ]
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509571"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509565"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469520"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509572"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "469522"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509569"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509563"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "499555"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "479518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
         }
       ],
       "fingerprints": [
@@ -1892,6 +6613,8 @@
       ],
       "firstMs": 273,
       "bestMs": 25287,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [],
       "telemetry": {
         "bt/satOptimized": {
@@ -1901,6 +6624,7 @@
           "initMs": 5996,
           "segments": 1692,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 9533661.4872,
@@ -1922,6 +6646,7 @@
           "initMs": 2346,
           "segments": 472,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 5817304.1234,
@@ -1943,6 +6668,7 @@
           "initMs": 1764,
           "segments": 337,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 3220713.7339999997,
@@ -1964,6 +6690,7 @@
           "initMs": 0,
           "segments": 370,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 380383.3446,
@@ -1981,6 +6708,7 @@
           "initMs": 0,
           "segments": 395,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 803780.7289999999,
@@ -1998,6 +6726,7 @@
           "initMs": 0,
           "segments": 384,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 389091.92869999993,
@@ -2015,6 +6744,7 @@
           "initMs": 0,
           "segments": 189,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 218174.51020000002,
@@ -2032,6 +6762,7 @@
           "initMs": 0,
           "segments": 235,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 101847.193,
@@ -2049,6 +6780,7 @@
           "initMs": 0,
           "segments": 1024,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1640082.9773,
@@ -2065,6 +6797,7 @@
           "initMs": 4299,
           "segments": 1212,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 7309101.795099998,
@@ -2086,6 +6819,7 @@
           "initMs": 382,
           "segments": 326,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 2785306.6618999997,
@@ -2105,6 +6839,7 @@
           "initMs": 0,
           "segments": 159,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 550095.1433,
@@ -2122,6 +6857,7 @@
           "initMs": 0,
           "segments": 203,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 105721.4603,
@@ -2139,6 +6875,7 @@
           "initMs": 961,
           "segments": 440,
           "reseeds": 0,
+          "reseedObservations": 0,
           "failures": 0,
           "faults": 0,
           "weightedReward": 1562318.9856,
@@ -2250,5 +6987,10 @@
         0.3076923076923077
       ]
     }
-  ]
+  ],
+  "referenceChecks": {
+    "checked": 216,
+    "missing": [],
+    "disagreements": []
+  }
 }
