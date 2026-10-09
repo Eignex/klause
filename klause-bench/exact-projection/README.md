@@ -125,11 +125,12 @@ machine, not a whole-corpus or solved-runtime claim. One checkpass pair is slowe
 five repetitions do not establish a universal speedup. The implementation is the
 same after the later test-only destructuring correction.
 
-The integration base `2cb5729240ee099c4c8f0a73d7acab0891d7039a` also contains
-the Boolean implication lifetime fix `49faef15c`. That fix is outside these pinned
-AWS comparisons. The measurements isolate rational normalization at the recorded
-revisions; they do not estimate the performance of the combined integration base.
-GitHub CI checks the evidence recorder and solver regressions against that base.
+The integration base `ce0fbb58de84ff50d51759c4d3860a16ad2b2d50` also contains
+the Boolean implication lifetime fix `49faef15c` and portfolio/benchmark changes.
+Those changes are outside these pinned AWS comparisons. The measurements isolate
+rational normalization at the recorded revisions; they do not estimate the
+performance of the combined integration base. GitHub CI checks the archived
+evidence and solver regressions against that base.
 
 Job 868's [candidate profile](profile-candidate-summary.json) has 1/1786 checkpass
 samples containing `BigFraction.of`, versus 113/1793 on main. Handler has 10/1772
@@ -146,7 +147,10 @@ and the numerical candidate (`c4df1fc9d05bfee5cd145fb0d3c9069858c8be9e`). The ad
 preserves the final MPS `v` line in durable result JSON without changing verdict
 credit, the solver or its stopping policy. These supplementary runs are outside
 the timing comparison. The baseline adapter branch is an experiment reference;
-its complete proposed diff is included in the validation PR.
+its complete diff is archived in [witness-recorder.patch](witness-recorder.patch).
+The integration base supplies the shared `finalWitness` and `sourceHashes` recorder;
+the validation PR does not add another recorder. The collector accepts both the
+historical `mpsWitness` field and the shared `finalWitness` field.
 
 Ordinary AWS runs export result JSON, not successful CLI stdout. The on-instance
 raw `.out` files are not exported by the lab, so the first campaigns cannot supply

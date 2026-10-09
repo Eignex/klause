@@ -23,7 +23,7 @@ def collect(job, corpus):
         record = json.loads(raw)
         if record["feasible"] is not True:
             continue
-        assignment = record["mpsWitness"]
+        assignment = record.get("finalWitness") or record.get("mpsWitness")
         if not assignment:
             raise ValueError(f"missing feasible assignment {case['index']}")
         problem = record["problem"]
