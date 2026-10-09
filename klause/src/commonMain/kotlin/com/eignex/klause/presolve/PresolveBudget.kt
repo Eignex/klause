@@ -26,6 +26,26 @@ class PresolveBudget(
 ) : WorkMeter {
     private var spent = 0L
 
+    /** Round entries across source and finite schedules, including final empty scans. */
+    var rounds: Int = 0
+        private set
+
+    /** Calls to each scheduled pass, including calls that changed nothing. */
+    val passCalls: Map<String, Int> get() = calls.toMap()
+    private val calls = HashMap<String, Int>()
+
+    /** Root-bake propagation probes across reseeds and tiers, including repair calls. */
+    var probeCalls: Long = 0
+        private set
+
+    internal fun recordRound() { rounds++ }
+
+    internal fun recordPass(pass: PresolvePass) {
+        calls[pass.id] = (calls[pass.id] ?: 0) + 1
+    }
+
+    internal fun recordProbe() { probeCalls++ }
+
     /** Work units charged so far; may exceed [allowance] by the last charge before a poll noticed. */
     fun spent(): Long = spent
 

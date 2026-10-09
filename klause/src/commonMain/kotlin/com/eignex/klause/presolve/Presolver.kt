@@ -135,7 +135,7 @@ object Presolver {
         cancellation: Cancellation = Cancellation.Never,
     ): SourcePresolved {
         val passes = config.problemPasses(context, PresolvePass.Capability.SOURCE)
-        if (passes.isEmpty() || config.emphasis.maxRounds == 0) return SourcePresolved(problem)
+        if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
         val ctx = context.withCancellation(cancellation)
             .withPresolveBudget(context.presolveBudget)
         val host = object : PresolveRoundEngine.RoundHost {
@@ -167,10 +167,11 @@ object Presolver {
         }
         val rounds = PresolveRoundEngine.run(
             passes,
-            config.emphasis.maxRounds,
+            config.maxRounds,
             cancellation,
             ctx.presolveBudget,
             host,
+            config.abortFraction,
         )
         return SourcePresolved(host.current, rounds.fired, rounds.infeasible, SourceRebuilds.compose(host.rebuilds))
     }
@@ -186,7 +187,7 @@ object Presolver {
         cancellation: Cancellation = Cancellation.Never,
     ): Presolved {
         val passes = config.problemPasses(context)
-        val maxRounds = config.emphasis.maxRounds
+        val maxRounds = config.maxRounds
         if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
         // A gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible independent of the
         // variable bounds, so refuting it here in O(factors) reports the verdict without the session ever
@@ -212,7 +213,7 @@ object Presolver {
         // each pass's delta instead of rebuilding a `Problem` per firing pass. Scoped away from any
         // EXHAUSTIVE (SAC / LP-harvest) pass, whose order-sensitive probing keeps the fresh-rebuild path.
         if (passes.none { it.timing == PresolveTiming.EXHAUSTIVE }) {
-            return runIncremental(problem, passes, maxRounds, ctx, cancellation)
+            return runIncremental(problem, passes, maxRounds, ctx, cancellation, config.abortFraction)
         }
 
         val host = object : PresolveRoundEngine.RoundHost {
@@ -237,7 +238,7 @@ object Presolver {
 
             override fun changedUnits(): Long = changed
         }
-        val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host)
+        val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host, config.abortFraction)
         return Presolved(
             host.current,
             composeReconstructs(host.reconstructs),
@@ -260,6 +261,7 @@ object Presolver {
         maxRounds: Int,
         ctx: PresolveContext,
         cancellation: Cancellation,
+        abortFraction: Double,
     ): Presolved {
         val session = PresolveSession(problem, ctx.bakeConfig)
         // Persistent subsume indices + the change-mark at subsume's last firing, so each re-run reprocesses
@@ -335,7 +337,7 @@ object Presolver {
 
             override fun changedUnits(): Long = changed
         }
-        val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host)
+        val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host, abortFraction)
 
         // No pass fired: presolve is a no-op, so return the input problem itself (identity) exactly like
         // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
