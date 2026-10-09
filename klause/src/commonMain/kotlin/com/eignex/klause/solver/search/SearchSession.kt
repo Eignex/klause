@@ -823,14 +823,46 @@ class SearchSession(
             learned.clearUsed()
             return
         }
-        droppable.sortByIntKey { learned.lbdAt(it) }
-        val dropped = HashSet<Int>(droppable.size - survivors)
-        for (position in survivors until droppable.size) dropped.add(droppable[position])
-        learned.retain { index -> index !in dropped }
+        val dropped = selectDroppedClauses(droppable, survivors)
+        learned.retain { index -> !dropped[index] }
         reductions++
-        droppedClauses += dropped.size
+        droppedClauses += droppable.size - survivors
         learned.clearUsed()
         unitsPending = learned.units.size > 0
+    }
+
+    private fun selectDroppedClauses(droppable: IntArrayList, survivors: Int): BooleanArray {
+        val dropped = BooleanArray(learned.size)
+        var maximumLbd = 0
+        for (position in 0 until droppable.size) {
+            maximumLbd = maxOf(maximumLbd, learned.lbdAt(droppable[position]))
+        }
+        // A bounded histogram avoids sorting when LBDs occupy a small integer range.
+        if (maximumLbd <= MAXIMUM_BUCKETED_LBD &&
+            maximumLbd.toLong() <= droppable.size.toLong() * BUCKET_RANGE_FACTOR
+        ) {
+            markBucketedDrops(droppable, survivors, maximumLbd, dropped)
+        } else {
+            droppable.sortByIntKey { learned.lbdAt(it) }
+            for (position in survivors until droppable.size) dropped[droppable[position]] = true
+        }
+        return dropped
+    }
+
+    private fun markBucketedDrops(droppable: IntArrayList, survivors: Int, maximumLbd: Int, dropped: BooleanArray) {
+        val counts = IntArray(maximumLbd + 1)
+        for (position in 0 until droppable.size) counts[learned.lbdAt(droppable[position])]++
+        var remaining = survivors
+        var cutoff = 0
+        while (remaining > counts[cutoff]) {
+            remaining -= counts[cutoff++]
+        }
+        // Scanning original indices keeps the same oldest-first tie order as the packed sort.
+        for (position in 0 until droppable.size) {
+            val index = droppable[position]
+            val lbd = learned.lbdAt(index)
+            dropped[index] = lbd > cutoff || (lbd == cutoff && remaining-- <= 0)
+        }
     }
 
     private fun runComponents(call: (SearchComponent) -> ComponentResult): ComponentResult {
@@ -1009,6 +1041,8 @@ class SearchSession(
     )
 
     private companion object {
+        const val MAXIMUM_BUCKETED_LBD = 4096
+        const val BUCKET_RANGE_FACTOR = 4
         const val UNASSIGNED = -1
         const val FALSE = 0
         const val TRUE = 1
