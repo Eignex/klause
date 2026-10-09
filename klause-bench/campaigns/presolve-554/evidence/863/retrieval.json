@@ -1,0 +1,44 @@
+[
+  {
+    "url": "http://192.168.50.104:8420/jobs/863",
+    "file": "job.json.gz",
+    "bytes": 249981,
+    "sha256": "e090158287981da0c6d2e22922cda7959d50596d8b0eeaabba7d58929719d8e6"
+  },
+  {
+    "url": "http://192.168.50.104:8420/experiments/863/cases",
+    "file": "cases.json.gz",
+    "bytes": 1369908,
+    "sha256": "ec3897e41c2fd8090a833727a087942926100f0dd3a0e9d256b933e1e9bc42af"
+  },
+  {
+    "url": "http://192.168.50.104:8420/experiments/863/arms",
+    "file": "arms.json.gz",
+    "bytes": 1745,
+    "sha256": "dba1de9884c83ed09300ed263a0562ed1922707a74cab31d580ae73f5b01a300"
+  },
+  {
+    "url": "http://192.168.50.104:8420/experiments/863/stats",
+    "file": "stats.json.gz",
+    "bytes": 2916,
+    "sha256": "9457be7a459c4406e220c9f3ca25c90a97e14f9bbbbaf272d3d8aef3e1e8b005"
+  },
+  {
+    "url": "http://192.168.50.104:8420/experiments/863/reference",
+    "file": "reference.json.gz",
+    "bytes": 2742,
+    "sha256": "0ca2bdc211e873bae256cdc8ef8a26d41aadb17f021619cc5ba9debbfe4a9108"
+  },
+  {
+    "url": "http://192.168.50.104:8420/jobs/863/files",
+    "file": "files.json.gz",
+    "bytes": 6297,
+    "sha256": "9e4387ef7de36ff7fa58929e9edbd21480d72a83d10ef0d298f40ceb5f9519e7"
+  },
+  {
+    "url": "http://192.168.50.104:8420/jobs/863/files/job.log",
+    "file": "job.log.gz",
+    "bytes": 1410,
+    "sha256": "3ffdff8bfc9ea0ef0d9954f1e4d2e20ad3a06ddb9a253d7968cb32ef74607fad"
+  }
+]

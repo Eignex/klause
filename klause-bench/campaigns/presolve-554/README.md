@@ -18,7 +18,9 @@ cost. Ordinary AWS parallel is unset: the worker supplies a spare physical core
 per single-core case and allocates instances within its existing capacity.
 Each matched problem's arms, seeds and repetitions stay on one instance.
 
-`engine=cp`, `processors=1`, `bt-arm=satOptimized` pin the same CP policy.
+`engine=cp`, `processors=1`, `bt-arm=satOptimized` pin the same CP family. The first pilot left the default
+pool cardinality in place (six cloned satOptimized arms); it is a family-pinned
+diagnostic. A second pilot explicitly sets `param.arms=1` before the broad sweep.
 The implicit and explicit default controls intentionally duplicate settings to
 measure noise and plumbing neutrality. Conservative and aggressive change tiers;
 abort fractions 0.0001 and 0.01 bracket the current 0.001. The pilot must establish
@@ -86,7 +88,7 @@ sample of the complete challenge archive. Selection uses SHA-256 order with the
 Remaining families are reserved. Holdout is therefore independent by base family
 as well as by input; it cannot estimate within-family instance generalization.
 
-The pilot's 12 year/family groups are only nine base families because families
+The pilot's 12 year/family groups are only eight base families because families
 recur across years. It is a bounded plumbing/cost screen with catalogue ordering,
 not the representative discovery campaign. Bootstrap intervals in `analyze.py`
 cluster by base family and average seeds/repeats within each cluster.
