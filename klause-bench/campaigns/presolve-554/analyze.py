@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""Analyze archived AWS records, retaining incomplete blocks and outcome categories."""
+import argparse
+from collections import Counter, defaultdict
+import gzip
+import json
+import math
+from pathlib import Path
+import random
+import statistics
+
+
+def read(path):
+    raw = Path(path).read_bytes()
+    if str(path).endswith('.gz'):
+        raw = gzip.decompress(raw)
+    return json.loads(raw)
+
+
+def category(case):
+    r = case.get('record')
+    if r is None:
+        return 'missing-' + case['status'].lower()
+    s = r.get('stats', {})
+    if s.get('unsupported'):
+        return 'unsupported'
+    if s.get('loadError') or s.get('error') or case['status'] == 'FAILED':
+        return 'error'
+    if r.get('feasible') is True:
+        return 'proved-witness' if r.get('proven') else 'witness'
+    if r.get('feasible') is False and r.get('proven'):
+        return 'refuted'
+    return 'unknown'
+
+
+def timing(r):
+    if r.get('feasible') is not True and not r.get('proven'):
+        return 2 * r['budgetMs']
+    if r.get('feasible') is True and r.get('timeToBestMs') is not None:
+        return max(1, r['timeToBestMs'])
+    s = r.get('stats', {})
+    try:
+        t = float(s.get('solveTime', 'nan')) * 1000
+        if math.isfinite(t) and t >= 0:
+            return max(1, t)
+    except ValueError:
+        pass
+    return max(1, r.get('elapsedMs') or r['budgetMs'])
+
+
+def quality(a, b):
+    """Positive means b improves the outcome; time is deliberately excluded."""
+    aw, bw = a.get('feasible') is True, b.get('feasible') is True
+    ad = aw or (a.get('feasible') is False and a.get('proven'))
+    bd = bw or (b.get('feasible') is False and b.get('proven'))
+    if ad != bd:
+        return 1 if bd else -1
+    if not ad:
+        return 0
+    if aw != bw:
+        return None  # solution/refutation contradiction
+    ap, bp = bool(a.get('proven')), bool(b.get('proven'))
+    if ap != bp:
+        return 1 if bp else -1
+    av, bv = a.get('objective'), b.get('objective')
+    if av is None or bv is None or av == bv:
+        return 0
+    return (1 if bv > av else -1) * (1 if b.get('maximize') else -1)
+
+
+def numeric(r, key):
+    try:
+        value = float(r.get('stats', {}).get(key, 'nan'))
+        return value if math.isfinite(value) else None
+    except (ValueError, TypeError):
+        return None
+
+
+def interval(values, seed=554):
+    if not values:
+        return None
+    rng = random.Random(seed)
+    means = sorted(statistics.mean(rng.choices(values, k=len(values))) for _ in range(2000))
+    return {'value': statistics.mean(values), 'low': means[50], 'high': means[1949], 'clusters': len(values)}
+
+
+def work_signature(r):
+    s = r.get('stats', {})
+    keys = ['presolveWork', 'presolveRoundEntries', 'presolveProbeCalls', 'presolveConstraintsRemoved', 'presolvePasses']
+    return {k: s[k] for k in keys + sorted(k for k in s if k.startswith('presolveCalls_')) if k in s}
+
+
+def analyze(cases, control):
+    labels = sorted({c['arm'] for c in cases})
+    occurrences = Counter()
+    blocks = defaultdict(dict)
+    summaries = {}
+    for c in sorted(cases, key=lambda c: c['index']):
+        identity = (c['problem']['suite'], c['problem']['problem'], c.get('seed'))
+        key = identity + (occurrences[(identity, c['arm'])],)
+        occurrences[(identity, c['arm'])] += 1
+        blocks[key][c['arm']] = c
+    complete = {k: v for k, v in blocks.items() if set(v) == set(labels) and
+                all(c.get('record') is not None and c['status'] == 'DONE' for c in v.values())}
+    incomplete = [{'identity': k, 'status': {l: category(v[l]) if l in v else 'absent' for l in labels}}
+                  for k, v in blocks.items() if k not in complete]
+    for label in labels:
+        arm = [c for c in cases if c['arm'] == label]
+        recorded = [c['record'] for c in arm if c.get('record')]
+        metrics = {}
+        for key in ['presolvePreparationMs', 'presolveWork', 'presolveWorkAllowance', 'presolveRoundEntries',
+                    'presolveProbeCalls', 'presolveMaxRounds', 'presolveAbortFraction',
+                    'presolveProbeBudgetPerVar', 'presolveProbeTotalBudget']:
+            values = [v for r in recorded if (v := numeric(r, key)) is not None]
+            metrics[key] = {'n': len(values), 'median': statistics.median(values) if values else None,
+                            'max': max(values) if values else None}
+        summaries[label] = {'planned': len(arm), 'outcomes': dict(Counter(category(c) for c in arm)),
+                            'metrics': metrics,
+                            'fingerprints': dict(Counter(r.get('buildFingerprint', 'missing') for r in recorded)),
+                            'validationPolicies': dict(Counter(r.get('validationPolicy', 'missing') for r in recorded)),
+                            'sourceValidation': dict(Counter(r.get('stats', {}).get('sourceValidation', 'absent')
+                                                              for r in recorded))}
+    pairs = {}
+    for label in labels:
+        if label == control:
+            continue
+        by_family = defaultdict(lambda: defaultdict(list))
+        differences = []
+        same_work = changed_work = unmetered = 0
+        for key, block in complete.items():
+            a, b = block[control]['record'], block[label]['record']
+            fam = block[label]['problem']['family'].split('/')[-1]
+            q = quality(a, b)
+            ratio = math.log(timing(b) / timing(a))
+            by_family[fam]['log_time_ratio'].append(ratio)
+            if q is not None:
+                by_family[fam]['quality'].append(q)
+            sa, sb = work_signature(a), work_signature(b)
+            if 'presolveWork' not in sa or 'presolveWork' not in sb:
+                unmetered += 1
+            elif sa == sb:
+                same_work += 1
+            else:
+                changed_work += 1
+            if q != 0 or sa != sb:
+                differences.append({'identity': key, 'family': fam, 'quality': q,
+                                    'controlObjective': a.get('objective'), 'candidateObjective': b.get('objective'),
+                                    'controlCategory': category(block[control]),
+                                    'candidateCategory': category(block[label]),
+                                    'controlBestMs': a.get('timeToBestMs'), 'candidateBestMs': b.get('timeToBestMs'),
+                                    'controlFirstMs': a.get('timeToFirstFeasibleMs'),
+                                    'candidateFirstMs': b.get('timeToFirstFeasibleMs'),
+                                    'controlWork': sa, 'candidateWork': sb})
+        ci = interval([statistics.mean(x['log_time_ratio']) for x in by_family.values()])
+        if ci:
+            for key in ['value', 'low', 'high']:
+                ci[key] = math.exp(ci[key])
+        pairs[label] = {'completeBlocks': len(complete), 'sameWork': same_work, 'changedWork': changed_work,
+                        'unmetered': unmetered, 'geomeanPar2RatioFamilyBootstrap': ci,
+                        'qualityFamilyBootstrap': interval([statistics.mean(x['quality']) for x in by_family.values()
+                                                            if x['quality']]),
+                        'familyOutcomes': {f: dict(Counter(x['quality'])) for f, x in by_family.items()},
+                        'differences': differences}
+    return {'control': control, 'completeBlocks': len(complete), 'incompleteBlocks': incomplete,
+            'arms': summaries, 'pairs': pairs}
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('cases')
+    parser.add_argument('--control', default='explicit-default')
+    args = parser.parse_args()
+    print(json.dumps(analyze(read(args.cases), args.control), indent=2, allow_nan=False))
