@@ -117,7 +117,7 @@ class FactorPropagationOracleTest {
         )
         val visited = HashSet<Long>()
 
-        FactorPropagationOracle.assertGac(problem) { sample ->
+        FactorPropagationOracle.assertSound(problem) { sample ->
             val value = sample.ints.single()
             visited.add(value)
             value <= 0L
