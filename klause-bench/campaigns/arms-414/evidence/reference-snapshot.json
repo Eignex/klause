@@ -1,0 +1,308 @@
+[
+  {
+    "collection": "mzn-challenge",
+    "problem": "2017/city-position/city-5-05",
+    "reference": {
+      "solver": "chuffed",
+      "maximize": false,
+      "objective": 748825.0,
+      "feasible": true,
+      "proven": false,
+      "elapsedMs": 101,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2017/city-position/city-5-05",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 2850.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 11416,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2011/fast-food/ff10",
+    "reference": {
+      "solver": "chuffed",
+      "maximize": false,
+      "objective": 704.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 3160,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2011/fast-food/ff10",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 704.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 363,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "xcsp3-cop-22to25",
+    "problem": "CoinsGrid-08-04_c22",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 80.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 1,
+      "budgetMs": 10000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "xcsp3-cop-22to25",
+    "problem": "Fortress1-03_c25",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 459518.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 43,
+      "budgetMs": 10000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "pb-comp-2024",
+    "problem": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+    "reference": {
+      "solver": "clasp",
+      "maximize": false,
+      "objective": -318.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 201,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "pb-comp-2024",
+    "problem": "normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+    "reference": {
+      "solver": "clasp",
+      "maximize": false,
+      "objective": 61.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 3496,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2011/depot-placement/rat99_5",
+    "reference": {
+      "solver": "chuffed",
+      "maximize": false,
+      "objective": 107.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 599,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2011/depot-placement/rat99_5",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 107.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 881,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2012/amaze/2012-03-15",
+    "reference": {
+      "solver": "chuffed",
+      "maximize": false,
+      "objective": 1429.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 90,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2012/amaze/2012-03-15",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 1429.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 2010,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "xcsp3-cop-22to25",
+    "problem": "CyclicBandwidth-mesh2D05x08_c22",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 5.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 3724,
+      "budgetMs": 10000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "xcsp3-cop-22to25",
+    "problem": "BinPacking2-n1c1w1a_c24",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 25.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 51,
+      "budgetMs": 10000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "pb-comp-2024",
+    "problem": "normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu",
+    "reference": {
+      "solver": "clasp",
+      "maximize": false,
+      "objective": 1120.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 3339,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "pb-comp-2024",
+    "problem": "normalized-PB06/OPT-LIN/submitted-PB05/manquinho/logic-synthesis/normalized-exam.pi",
+    "reference": {
+      "solver": "clasp",
+      "maximize": false,
+      "objective": 124.0,
+      "feasible": true,
+      "proven": false,
+      "elapsedMs": 60351,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2016/celar/CELAR6-SUB0",
+    "reference": {
+      "solver": "chuffed",
+      "maximize": false,
+      "objective": 159.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 57776,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  },
+  {
+    "collection": "mzn-challenge",
+    "problem": "2016/celar/CELAR6-SUB0",
+    "reference": {
+      "solver": "cp-sat",
+      "maximize": false,
+      "objective": 159.0,
+      "feasible": true,
+      "proven": true,
+      "elapsedMs": 249,
+      "budgetMs": 60000,
+      "version": "",
+      "validation": null,
+      "dualBound": null,
+      "stale": false
+    }
+  }
+]
