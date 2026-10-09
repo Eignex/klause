@@ -28,6 +28,14 @@ can establish feasibility, but a grid optimum or refutation cannot prove the sou
 Raw output and `reportedFeasible`, `reportedObjective`, and `reportedProven` preserve solver claims.
 Earlier incumbents are not independently source checked; arm attribution is restricted to the final objective.
 
+Integer MiniZinc campaigns may opt in to the same final-witness source check with
+`param=source-validation=true`. The bench consumes this parameter before launching the CLI;
+checking remains outside the solve budget. Records retain original model/data SHA-256 in
+`sourceHashes`; included files and the MiniZinc compiler are outside those two hashes.
+`invalid` candidates lose solution/proof credit. Integer candidates with `unknown` checking
+remain reported witnesses and retain their checking status; checking a witness does not
+independently establish optimality or infeasibility. The default policy is unchanged.
+
 An existing output can be checked without solving again:
 
 ```
