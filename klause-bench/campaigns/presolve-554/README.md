@@ -258,3 +258,19 @@ requires consistent quality and process-timing evidence across discovery and hol
 with uncertainty, per-family regressions and independent-check coverage disclosed.
 An inconclusive result or no eligible discovery candidate leaves shipped defaults
 unchanged; the frozen holdout is not used to rescue or select a failed candidate.
+
+## Separate deadline diagnostic
+
+Production job 907 case 55 spends 300,144 ms in aggressive preparation on
+`2022/gfd-schedule/n60f7d50m30k10_10124`, returns unknown and finishes its CLI
+subprocess after 300,627 ms. Capped aggressive case 56 spends 416,234 ms in
+preparation and finishes after 416,717 ms, also unknown. Its aggregate probe count
+is 43,915; this includes Boolean probes and multiple tiers and does not prove a
+violation of one integer cap. These are production observations of preparation
+cost and deadline overshoot, not a guarantee for other inputs.
+
+[Job 911](http://192.168.50.104:8420/jobs/911) is a separate AWS JFR diagnostic of
+the capped GFD case, using the same frozen source, `profileCli=true` and
+`parallel=1`. The submitted specification is `experiments/gfd-probe-profile.json`.
+Its timings are excluded from campaign estimates. The recording will identify
+which preparation operation consumes the time; the diagnostic result is pending.
