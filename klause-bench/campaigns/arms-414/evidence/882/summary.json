@@ -1,0 +1,4447 @@
+{
+  "job": 882,
+  "status": "DONE",
+  "cases": 72,
+  "arms": {
+    "cp-p4-a8": {
+      "outcomes": {
+        "feasible": 9,
+        "optimal": 3
+      },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "13373",
+            "48496"
+          ],
+          "firstMs": [
+            442,
+            530,
+            300
+          ],
+          "bestMs": [
+            296573,
+            295018,
+            296268
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "38258"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "37281"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "31497"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "30231"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "13494"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "188060"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "38258"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "38227"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "26222"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "13373"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "314035"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "221437"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "192881"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "181273"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "150105"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "48496"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            83,
+            81,
+            85
+          ],
+          "bestMs": [
+            83,
+            81,
+            85
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            58,
+            63,
+            69
+          ],
+          "bestMs": [
+            99,
+            90,
+            104
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459518",
+            "459518"
+          ],
+          "firstMs": [
+            489,
+            529,
+            402
+          ],
+          "bestMs": [
+            68841,
+            248080,
+            292305
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "489515"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509569"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479516"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499569"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "469518"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469518"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 192.5,
+      "bestMs": 34472.5,
+      "processFirstMs": null,
+      "processBestMs": null,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 17808324,
+          "ms": 1529692,
+          "initMs": 1119,
+          "segments": 176,
+          "reseeds": 42,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1840015.215,
+          "finalHolders": 6,
+          "credit": {
+            "FirstSolution": 6.0,
+            "Improvement": 57948.0,
+            "Floor": 29.0,
+            "RootFixings": 2827.0,
+            "Glue": 4692.0,
+            "ClauseUses": 1246.0
+          },
+          "meanReward": 0.10332332312687034
+        },
+        "bt/lp-default": {
+          "cases": 9,
+          "work": 21098395,
+          "ms": 685943,
+          "initMs": 1191,
+          "segments": 164,
+          "reseeds": 44,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2341466.5434999997,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 42830.0,
+            "RootFixings": 2785.0,
+            "Glue": 148.0,
+            "ClauseUses": 1033.0,
+            "FirstSolution": 2.0
+          },
+          "meanReward": 0.11097842008835268
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 18779758,
+          "ms": 1806575,
+          "initMs": 1280,
+          "segments": 202,
+          "reseeds": 56,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3189629.4082999993,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 460519.0,
+            "Floor": 332.0,
+            "RootFixings": 2826.0,
+            "Glue": 17489.0,
+            "ClauseUses": 5454.0,
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.1698440101464566
+        },
+        "bt/lp-aggressive": {
+          "cases": 9,
+          "work": 15940227,
+          "ms": 475458,
+          "initMs": 1093,
+          "segments": 135,
+          "reseeds": 36,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1249952.7666,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 62531.0,
+            "RootFixings": 2789.0,
+            "Glue": 123.0,
+            "ClauseUses": 683.0,
+            "FirstSolution": 1.0
+          },
+          "meanReward": 0.07841499161837533
+        },
+        "bt/lp-lbtree": {
+          "cases": 9,
+          "work": 17716634,
+          "ms": 574471,
+          "initMs": 678,
+          "segments": 135,
+          "reseeds": 37,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1577753.0093,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 40685.0,
+            "RootFixings": 2784.0,
+            "Glue": 118.0,
+            "ClauseUses": 918.0
+          },
+          "meanReward": 0.08905489661862406
+        },
+        "bt/linucb": {
+          "cases": 12,
+          "work": 15325726,
+          "ms": 1341305,
+          "initMs": 835,
+          "segments": 172,
+          "reseeds": 53,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1909310.2025,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 2820.0,
+            "Glue": 12495.0,
+            "ClauseUses": 2101.0,
+            "Improvement": 1090.0,
+            "Floor": 98.0
+          },
+          "meanReward": 0.1245820395392688
+        },
+        "bt/free": {
+          "cases": 12,
+          "work": 18844547,
+          "ms": 1658579,
+          "initMs": 986,
+          "segments": 190,
+          "reseeds": 57,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2471798.3529000003,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 9410.0,
+            "RootFixings": 2823.0,
+            "Glue": 426.0,
+            "ClauseUses": 3618.0
+          },
+          "meanReward": 0.13116783082660466
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 3382047,
+          "ms": 662033,
+          "initMs": 157,
+          "segments": 43,
+          "reseeds": 10,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 297666.02249999996,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 30358.0,
+            "Floor": 36.0,
+            "RootFixings": 6.0,
+            "Glue": 127.0,
+            "ClauseUses": 62.0
+          },
+          "meanReward": 0.08801356767070356
+        },
+        "bt/selector-switch": {
+          "cases": 9,
+          "work": 18405707,
+          "ms": 788382,
+          "initMs": 849,
+          "segments": 164,
+          "reseeds": 52,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2143301.7642,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 2814.0,
+            "Glue": 280.0,
+            "ClauseUses": 1628.0,
+            "Improvement": 10000.0
+          },
+          "meanReward": 0.11644767376770694
+        },
+        "bt/domwdeg": {
+          "cases": 3,
+          "work": 5109403,
+          "ms": 619904,
+          "initMs": 2,
+          "segments": 58,
+          "reseeds": 18,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1026005.9634,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "ClauseUses": 2832.0
+          },
+          "meanReward": 0.20080740614901585
+        },
+        "bt/first-fail": {
+          "cases": 3,
+          "work": 3295653,
+          "ms": 360771,
+          "initMs": 3,
+          "segments": 40,
+          "reseeds": 12,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 381756.74159999995,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "ClauseUses": 637.0
+          },
+          "meanReward": 0.11583644928637814
+        },
+        "bt/activity": {
+          "cases": 3,
+          "work": 5759261,
+          "ms": 266509,
+          "initMs": 3,
+          "segments": 64,
+          "reseeds": 20,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 67198.4935,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0
+          },
+          "meanReward": 0.011667902097161424
+        }
+      }
+    },
+    "cp-p4-a4": {
+      "outcomes": {
+        "feasible": 7,
+        "optimal": 5
+      },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "17920",
+            "28432"
+          ],
+          "firstMs": [
+            189,
+            175,
+            167
+          ],
+          "bestMs": [
+            153577,
+            246948,
+            282782
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "113033"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "57565"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "29802"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "29802"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "29802"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "28432"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1012533"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "268862"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "66568"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "35652"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "24725"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "23891"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "314035"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "275433"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "30702"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "29695"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "23029"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "17920"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "optimal": 2,
+            "feasible": 1
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            86,
+            80,
+            85
+          ],
+          "bestMs": [
+            86,
+            80,
+            85
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            62,
+            63,
+            70
+          ],
+          "bestMs": [
+            105,
+            91,
+            101
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459519",
+            "469519"
+          ],
+          "firstMs": [
+            369,
+            479,
+            392
+          ],
+          "bestMs": [
+            299493,
+            72776,
+            31754
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "479523"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "469523"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469521"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469521"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "469519"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499516"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "469525"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469525"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "469517"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509570"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "459521"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "459519"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459519"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459519"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 126.5,
+      "bestMs": 15929.5,
+      "processFirstMs": null,
+      "processBestMs": null,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 26096580,
+          "ms": 2209594,
+          "initMs": 577,
+          "segments": 12,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 9660494.7445,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 2802.0,
+            "Glue": 7262.0,
+            "ClauseUses": 273.0,
+            "FirstSolution": 2.0
+          },
+          "meanReward": 0.3701824049166596
+        },
+        "bt/lp-default": {
+          "cases": 9,
+          "work": 97081860,
+          "ms": 1793190,
+          "initMs": 467,
+          "segments": 9,
+          "reseeds": 0,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14198455.625799999,
+          "finalHolders": 4,
+          "credit": {
+            "RootFixings": 2787.0,
+            "Glue": 87.0,
+            "ClauseUses": 102.0,
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.14625240622501462
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 35313912,
+          "ms": 2209731,
+          "initMs": 577,
+          "segments": 12,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 24458950.1668,
+          "finalHolders": 4,
+          "credit": {
+            "Floor": 282.0,
+            "RootFixings": 2828.0,
+            "Glue": 735.0,
+            "ClauseUses": 141.0,
+            "FirstSolution": 4.0
+          },
+          "meanReward": 0.6926151417832156
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 9430187,
+          "ms": 893967,
+          "initMs": 96,
+          "segments": 3,
+          "reseeds": 0,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6154925.700999999,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 3.0,
+            "RootFixings": 6.0,
+            "Glue": 6.0,
+            "ClauseUses": 17.0
+          },
+          "meanReward": 0.6526833138091535
+        },
+        "bt/lp-aggressive": {
+          "cases": 6,
+          "work": 18995910,
+          "ms": 898873,
+          "initMs": 371,
+          "segments": 6,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 16727201.747200001,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 2782.0,
+            "Glue": 12.0,
+            "ClauseUses": 5.0
+          },
+          "meanReward": 0.8805685933024531
+        },
+        "bt/linucb": {
+          "cases": 3,
+          "work": 3461363,
+          "ms": 416672,
+          "initMs": 110,
+          "segments": 3,
+          "reseeds": 0,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2677016.4296,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "ClauseUses": 176.0
+          },
+          "meanReward": 0.7733995046460022
+        },
+        "bt/free": {
+          "cases": 3,
+          "work": 7028481,
+          "ms": 416669,
+          "initMs": 111,
+          "segments": 3,
+          "reseeds": 0,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6015032.3015,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "ClauseUses": 36.0
+          },
+          "meanReward": 0.85580828937291
+        }
+      }
+    },
+    "cp-p4-a12": {
+      "outcomes": {
+        "feasible": 9,
+        "optimal": 3
+      },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "5897",
+            "25682"
+          ],
+          "firstMs": [
+            526,
+            410,
+            294
+          ],
+          "bestMs": [
+            285997,
+            293035,
+            290665
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "42307"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "23807"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "23287"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "21752"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "13599"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "1164720"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "291493"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "66475"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "54391"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "38258"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "25682"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "404899"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "282673"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "31611"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "28085"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "23114"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5897"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            80,
+            76,
+            82
+          ],
+          "bestMs": [
+            80,
+            76,
+            82
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            67,
+            68,
+            65
+          ],
+          "bestMs": [
+            106,
+            98,
+            95
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459518",
+            "459523"
+          ],
+          "firstMs": [
+            365,
+            425,
+            512
+          ],
+          "bestMs": [
+            294278,
+            56288,
+            88799
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499568"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "499515"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "499515"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "479516"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459523"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "499560"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "489515"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "489515"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "479516"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 188.0,
+      "bestMs": 28197.0,
+      "processFirstMs": null,
+      "processBestMs": null,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 17014718,
+          "ms": 1312701,
+          "initMs": 958,
+          "segments": 176,
+          "reseeds": 44,
+          "reseedObservations": 15,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1233776.7729999998,
+          "finalHolders": 5,
+          "credit": {
+            "FirstSolution": 5.0,
+            "Improvement": 45178.0,
+            "RootFixings": 2862.0,
+            "Glue": 1328.0,
+            "ClauseUses": 1024.0
+          },
+          "meanReward": 0.07251232568180088
+        },
+        "bt/lp-default": {
+          "cases": 9,
+          "work": 15055129,
+          "ms": 618705,
+          "initMs": 920,
+          "segments": 126,
+          "reseeds": 33,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1458820.2381,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 2786.0,
+            "Glue": 133.0,
+            "Improvement": 24959.0,
+            "ClauseUses": 736.0,
+            "FirstSolution": 2.0
+          },
+          "meanReward": 0.09689855451255183
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 18685800,
+          "ms": 1531141,
+          "initMs": 1050,
+          "segments": 195,
+          "reseeds": 57,
+          "reseedObservations": 15,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3044652.8273,
+          "finalHolders": 2,
+          "credit": {
+            "Floor": 282.0,
+            "RootFixings": 2862.0,
+            "Glue": 1028.0,
+            "ClauseUses": 8145.0,
+            "Improvement": 9368.0,
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.16293938858919607
+        },
+        "bt/lp-aggressive": {
+          "cases": 9,
+          "work": 11935037,
+          "ms": 477112,
+          "initMs": 854,
+          "segments": 111,
+          "reseeds": 26,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1097098.4932,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 199519.0,
+            "RootFixings": 2785.0,
+            "Glue": 425.0,
+            "ClauseUses": 440.0,
+            "FirstSolution": 1.0
+          },
+          "meanReward": 0.09192250457204279
+        },
+        "bt/lp-lbtree": {
+          "cases": 9,
+          "work": 13447445,
+          "ms": 406286,
+          "initMs": 473,
+          "segments": 109,
+          "reseeds": 31,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1036551.1349,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 2784.0,
+            "Glue": 99.0,
+            "Improvement": 10046.0,
+            "ClauseUses": 875.0
+          },
+          "meanReward": 0.07708164152372439
+        },
+        "bt/linucb": {
+          "cases": 12,
+          "work": 7377828,
+          "ms": 708445,
+          "initMs": 378,
+          "segments": 97,
+          "reseeds": 28,
+          "reseedObservations": 15,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 956666.3574999998,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 2856.0,
+            "Glue": 12888.0,
+            "ClauseUses": 2023.0
+          },
+          "meanReward": 0.12966775011561665
+        },
+        "bt/free": {
+          "cases": 12,
+          "work": 11730602,
+          "ms": 914736,
+          "initMs": 546,
+          "segments": 118,
+          "reseeds": 33,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1170032.2058,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 64246.0,
+            "RootFixings": 2823.0,
+            "Glue": 374.0,
+            "ClauseUses": 1208.0,
+            "FirstSolution": 1.0
+          },
+          "meanReward": 0.09974187222446045
+        },
+        "bt/selector-switch": {
+          "cases": 12,
+          "work": 9777433,
+          "ms": 754346,
+          "initMs": 396,
+          "segments": 105,
+          "reseeds": 29,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1477101.9874,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 277552.0,
+            "Floor": 258.0,
+            "RootFixings": 2821.0,
+            "Glue": 3985.0,
+            "ClauseUses": 2121.0
+          },
+          "meanReward": 0.15107257573639216
+        },
+        "bt/domwdeg": {
+          "cases": 12,
+          "work": 13690370,
+          "ms": 1193915,
+          "initMs": 432,
+          "segments": 142,
+          "reseeds": 43,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1193879.8156,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1745.0,
+            "RootFixings": 2825.0,
+            "Glue": 694.0,
+            "ClauseUses": 6633.0
+          },
+          "meanReward": 0.08720581077063659
+        },
+        "bt/first-fail": {
+          "cases": 12,
+          "work": 9943976,
+          "ms": 598216,
+          "initMs": 342,
+          "segments": 101,
+          "reseeds": 28,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 709704.6594,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 2824.0,
+            "Glue": 411.0,
+            "ClauseUses": 1093.0,
+            "Improvement": 30031.0
+          },
+          "meanReward": 0.07137031097017933
+        },
+        "bt/activity": {
+          "cases": 12,
+          "work": 15199813,
+          "ms": 999385,
+          "initMs": 356,
+          "segments": 149,
+          "reseeds": 45,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 246026.4874,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 18730.0,
+            "RootFixings": 2820.0,
+            "Glue": 41.0,
+            "ClauseUses": 172.0
+          },
+          "meanReward": 0.016186152250688875
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 2034081,
+          "ms": 484238,
+          "initMs": 97,
+          "segments": 36,
+          "reseeds": 7,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 171636.193,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 44122.0,
+            "RootFixings": 6.0,
+            "Glue": 148.0,
+            "ClauseUses": 78.0
+          },
+          "meanReward": 0.08438021543881487
+        },
+        "bt/objective-guided": {
+          "cases": 9,
+          "work": 11496037,
+          "ms": 770414,
+          "initMs": 341,
+          "segments": 116,
+          "reseeds": 35,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1566862.9334000002,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 20055.0,
+            "RootFixings": 2814.0,
+            "Glue": 58.0,
+            "ClauseUses": 5212.0
+          },
+          "meanReward": 0.13629591948947278
+        }
+      }
+    },
+    "mixed-p4-a8": {
+      "outcomes": {
+        "feasible": 9,
+        "optimal": 3
+      },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "4950",
+            "5565"
+          ],
+          "firstMs": [
+            170,
+            91,
+            114
+          ],
+          "bestMs": [
+            294290,
+            295231,
+            296513
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "25294"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "19133"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "15355"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "15355"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "14712"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "4950"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "344507"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "31840"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "31399"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "14780"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "9282"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5565"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "275190"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "34818"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "22260"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "18173"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "9926"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "5530"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            85,
+            91,
+            86
+          ],
+          "bestMs": [
+            85,
+            91,
+            86
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            88,
+            71,
+            59
+          ],
+          "bestMs": [
+            132,
+            103,
+            89
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459518",
+            "459518"
+          ],
+          "firstMs": [
+            497,
+            427,
+            436
+          ],
+          "bestMs": [
+            55043,
+            102418,
+            123744
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "479522"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "479520"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509522"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "509517"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509563"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "489516"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479525"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 91.0,
+      "bestMs": 27587.5,
+      "processFirstMs": null,
+      "processBestMs": null,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 34112863,
+          "ms": 2316105,
+          "initMs": 2522,
+          "segments": 554,
+          "reseeds": 165,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3684006.4256999996,
+          "finalHolders": 8,
+          "credit": {
+            "Improvement": 96837.0,
+            "Floor": 149.0,
+            "RootFixings": 2825.0,
+            "Glue": 10942.0,
+            "ClauseUses": 607.0,
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.1079946419536818
+        },
+        "bt/lp-default": {
+          "cases": 6,
+          "work": 51578576,
+          "ms": 1000391,
+          "initMs": 1369,
+          "segments": 371,
+          "reseeds": 109,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3180529.4177,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 82539.0,
+            "RootFixings": 2785.0,
+            "Glue": 366.0,
+            "FirstSolution": 2.0,
+            "ClauseUses": 470.0
+          },
+          "meanReward": 0.06166376942434394
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 5790887,
+          "ms": 586550,
+          "initMs": 456,
+          "segments": 136,
+          "reseeds": 39,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 917086.6141000001,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 1.0,
+            "Improvement": 4954.0,
+            "Floor": 263.0,
+            "RootFixings": 7.0,
+            "Glue": 391.0,
+            "ClauseUses": 179.0
+          },
+          "meanReward": 0.1583672093929652
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 9702920,
+          "ms": 363543,
+          "initMs": 0,
+          "segments": 148,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 85160.6667,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.008776808084576601
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 8658022,
+          "ms": 487457,
+          "initMs": 0,
+          "segments": 155,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 35969.8968,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 248259.0
+          },
+          "meanReward": 0.004154516678289799
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 9085740,
+          "ms": 435938,
+          "initMs": 0,
+          "segments": 166,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 174140.6031,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 94891.0,
+            "Violation": 2.0
+          },
+          "meanReward": 0.019166364335761316
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 6,
+          "work": 2462811,
+          "ms": 461760,
+          "initMs": 0,
+          "segments": 96,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 76232.7513,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 230798.0
+          },
+          "meanReward": 0.030953553195921246
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 6,
+          "work": 1861724,
+          "ms": 504372,
+          "initMs": 0,
+          "segments": 113,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 5693.7164999999995,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 153066.0
+          },
+          "meanReward": 0.0030583032178776227
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 60994467,
+          "ms": 1611317,
+          "initMs": 0,
+          "segments": 423,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 563786.4162,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 56945.0
+          },
+          "meanReward": 0.009243238672779942
+        },
+        "bt/conflictDriven": {
+          "cases": 9,
+          "work": 28074401,
+          "ms": 1737427,
+          "initMs": 2083,
+          "segments": 418,
+          "reseeds": 136,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4459041.5019000005,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 2820.0,
+            "Glue": 284.0,
+            "ClauseUses": 5052.0,
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.15882944401556423
+        },
+        "bt/linucb": {
+          "cases": 3,
+          "work": 7674532,
+          "ms": 894738,
+          "initMs": 127,
+          "segments": 184,
+          "reseeds": 60,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1443279.9875,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "ClauseUses": 1217.0
+          },
+          "meanReward": 0.18806097720356107
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 6,
+          "work": 5879076,
+          "ms": 14831,
+          "initMs": 0,
+          "segments": 60,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        },
+        "ls/fjump/fixed": {
+          "cases": 6,
+          "work": 5030623,
+          "ms": 353749,
+          "initMs": 0,
+          "segments": 70,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 143476.09530000002,
+          "finalHolders": 0,
+          "credit": {
+            "Violation": 3.0
+          },
+          "meanReward": 0.028520542147563038
+        },
+        "bt/lp-aggressive": {
+          "cases": 3,
+          "work": 12,
+          "ms": 635,
+          "initMs": 131,
+          "segments": 3,
+          "reseeds": 0,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4.0,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 4.0
+          },
+          "meanReward": 0.3333333333333333
+        }
+      }
+    },
+    "mixed-p4-a4": {
+      "outcomes": {
+        "feasible": 6,
+        "optimal": 6
+      },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "20290",
+            "23380"
+          ],
+          "firstMs": [
+            131,
+            113,
+            100
+          ],
+          "bestMs": [
+            18205,
+            22422,
+            298130
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "94492"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "44044"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "20290"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "20290"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "20290"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "20290"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "373467"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "46667"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "23380"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "23380"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "23380"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "23380"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "163503"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "40169"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "25723"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "25723"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "25723"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "22952"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            73,
+            90,
+            129
+          ],
+          "bestMs": [
+            73,
+            90,
+            129
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            50,
+            44,
+            44
+          ],
+          "bestMs": [
+            148,
+            60,
+            91
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "469519",
+            "499521"
+          ],
+          "firstMs": [
+            1848,
+            2045,
+            1282
+          ],
+          "bestMs": [
+            88489,
+            212317,
+            202322
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "709551"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "639528"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "539521"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "499521"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "499521"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "709541"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "579527"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "519520"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469520"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "469519"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": null
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "609529"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "539527"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "529523"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "499521"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "479520"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 106.5,
+      "bestMs": 9176.5,
+      "processFirstMs": null,
+      "processBestMs": null,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 39677679,
+          "ms": 2062777,
+          "initMs": 506,
+          "segments": 12,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 31723531.275,
+          "finalHolders": 7,
+          "credit": {
+            "RootFixings": 2784.0,
+            "Glue": 612.0,
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.799530922033015
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 110745115,
+          "ms": 2062725,
+          "initMs": 0,
+          "segments": 12,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 21917148.0,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 5.0
+          },
+          "meanReward": 0.19790622818893636
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 6,
+          "work": 37909019,
+          "ms": 1792614,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 23763228.0,
+          "finalHolders": 2,
+          "credit": {
+            "FirstSolution": 2.0
+          },
+          "meanReward": 0.6268489300659561
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 6,
+          "work": 90125538,
+          "ms": 1792599,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 187815.0,
+          "finalHolders": 3,
+          "credit": {
+            "FirstSolution": 2.0
+          },
+          "meanReward": 0.0020839265336757267
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 6,
+          "work": 85086240,
+          "ms": 270159,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        },
+        "ls/fjump/fixed": {
+          "cases": 6,
+          "work": 3827666,
+          "ms": 270154,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        }
+      }
+    },
+    "mixed-p4-a12": {
+      "outcomes": {
+        "feasible": 9,
+        "optimal": 3
+      },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "4234",
+            "7479"
+          ],
+          "firstMs": [
+            175,
+            165,
+            169
+          ],
+          "bestMs": [
+            278509,
+            289485,
+            292157
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "113033"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "27835"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "16908"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "14703"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "14703"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "4234"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "508897"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "131039"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "75342"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "49844"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "23570"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "7479"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "286083"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "82071"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "26672"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "18616"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "13285"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "4986"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix",
+          "family": "normalized-PB15eval/OPT-LIN/dt-problems",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "61",
+            "61"
+          ],
+          "firstMs": [
+            85,
+            79,
+            81
+          ],
+          "bestMs": [
+            85,
+            79,
+            81
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "61"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "61"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            60,
+            60,
+            62
+          ],
+          "bestMs": [
+            100,
+            88,
+            92
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "xcsp3-cop/Fortress1-03_c25",
+          "family": "Fortress1",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "459518",
+            "469517"
+          ],
+          "firstMs": [
+            514,
+            421,
+            535
+          ],
+          "bestMs": [
+            43852,
+            96667,
+            106949
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509572"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "489520"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 7,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "489526"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "459518"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "459518"
+                }
+              ]
+            },
+            {
+              "seed": 11,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "509579"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "509570"
+                },
+                {
+                  "budgetMs": 30000,
+                  "objective": "509569"
+                },
+                {
+                  "budgetMs": 60000,
+                  "objective": "479521"
+                },
+                {
+                  "budgetMs": 120000,
+                  "objective": "469517"
+                },
+                {
+                  "budgetMs": 300000,
+                  "objective": "469517"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 125.0,
+      "bestMs": 21976.0,
+      "processFirstMs": null,
+      "processBestMs": null,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 26635992,
+          "ms": 2008280,
+          "initMs": 2878,
+          "segments": 460,
+          "reseeds": 142,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3061984.2719999994,
+          "finalHolders": 4,
+          "credit": {
+            "Improvement": 8508.0,
+            "Floor": 7.0,
+            "RootFixings": 2824.0,
+            "Glue": 9500.0,
+            "ClauseUses": 2132.0,
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.11495664482854626
+        },
+        "bt/lp-default": {
+          "cases": 9,
+          "work": 35283216,
+          "ms": 884138,
+          "initMs": 1459,
+          "segments": 265,
+          "reseeds": 73,
+          "reseedObservations": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2884283.706,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 79509.0,
+            "RootFixings": 2789.0,
+            "Glue": 222.0,
+            "ClauseUses": 926.0,
+            "FirstSolution": 2.0
+          },
+          "meanReward": 0.08174662156646945
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 31761349,
+          "ms": 2317573,
+          "initMs": 3223,
+          "segments": 504,
+          "reseeds": 160,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 5154006.0812,
+          "finalHolders": 4,
+          "credit": {
+            "Improvement": 14482.0,
+            "Floor": 407.0,
+            "RootFixings": 2827.0,
+            "Glue": 45585.0,
+            "ClauseUses": 7169.0,
+            "FirstSolution": 3.0
+          },
+          "meanReward": 0.16227289594028263
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 4971389,
+          "ms": 626118,
+          "initMs": 849,
+          "segments": 108,
+          "reseeds": 33,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 734330.5988,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 3.0,
+            "Improvement": 1235.0,
+            "Floor": 55.0,
+            "RootFixings": 7.0,
+            "Glue": 478.0,
+            "ClauseUses": 168.0
+          },
+          "meanReward": 0.1477113536679588
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 2600109,
+          "ms": 206974,
+          "initMs": 0,
+          "segments": 58,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 5447.4413,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 796161.0
+          },
+          "meanReward": 0.0020950818984896403
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 2171626,
+          "ms": 257248,
+          "initMs": 0,
+          "segments": 58,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 15392.283800000001,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 42586.0
+          },
+          "meanReward": 0.00708790731000642
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 2463410,
+          "ms": 136844,
+          "initMs": 0,
+          "segments": 48,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14253.004700000001,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 189813.0
+          },
+          "meanReward": 0.005785884079385893
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 12,
+          "work": 1466594,
+          "ms": 166293,
+          "initMs": 0,
+          "segments": 51,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 47565.3868,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 30453.0
+          },
+          "meanReward": 0.03243255243100681
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 12,
+          "work": 1623935,
+          "ms": 412493,
+          "initMs": 0,
+          "segments": 84,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 24466.731200000002,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 83813.0
+          },
+          "meanReward": 0.015066324206325993
+        },
+        "ls/cbls-chain-noinv/fixed": {
+          "cases": 12,
+          "work": 853190,
+          "ms": 180281,
+          "initMs": 0,
+          "segments": 48,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        },
+        "ls/cbls-notabu/fixed": {
+          "cases": 6,
+          "work": 1633016,
+          "ms": 137112,
+          "initMs": 0,
+          "segments": 46,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 9797.5872,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 123533.0
+          },
+          "meanReward": 0.005999688429262175
+        },
+        "ls/cbls-lonoise/fixed": {
+          "cases": 6,
+          "work": 1327276,
+          "ms": 145300,
+          "initMs": 0,
+          "segments": 44,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 915.37,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 566.0
+          },
+          "meanReward": 0.0006896606282340673
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 33123238,
+          "ms": 913005,
+          "initMs": 0,
+          "segments": 235,
+          "reseeds": 0,
+          "reseedObservations": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 852409.2198,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 95109.0
+          },
+          "meanReward": 0.025734477402239476
+        },
+        "bt/lp-aggressive": {
+          "cases": 6,
+          "work": 16666204,
+          "ms": 677745,
+          "initMs": 845,
+          "segments": 126,
+          "reseeds": 36,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2512768.8063999997,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 1.0,
+            "Improvement": 80132.0,
+            "RootFixings": 2782.0,
+            "Glue": 162.0,
+            "ClauseUses": 983.0
+          },
+          "meanReward": 0.15077031376791017
+        },
+        "bt/linucb": {
+          "cases": 3,
+          "work": 7018619,
+          "ms": 825913,
+          "initMs": 128,
+          "segments": 166,
+          "reseeds": 54,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 943157.9896,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "ClauseUses": 1039.0
+          },
+          "meanReward": 0.13437942558215513
+        },
+        "bt/free": {
+          "cases": 3,
+          "work": 6747099,
+          "ms": 844685,
+          "initMs": 128,
+          "segments": 169,
+          "reseeds": 56,
+          "reseedObservations": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1537526.6977,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "ClauseUses": 5005.0,
+            "Glue": 1.0
+          },
+          "meanReward": 0.2278796706110285
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 6,
+          "work": 808561,
+          "ms": 2259,
+          "initMs": 0,
+          "segments": 14,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        },
+        "ls/fjump/fixed": {
+          "cases": 6,
+          "work": 378706,
+          "ms": 26740,
+          "initMs": 0,
+          "segments": 11,
+          "reseeds": 0,
+          "reseedObservations": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        }
+      }
+    }
+  },
+  "pairs": [
+    {
+      "a": "cp-p4-a8",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 5,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.75,
+        0
+      ]
+    },
+    {
+      "a": "cp-p4-a8",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0
+      ]
+    },
+    {
+      "a": "cp-p4-a8",
+      "b": "mixed-p4-a8",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 0,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        0,
+        0.75
+      ]
+    },
+    {
+      "a": "cp-p4-a8",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 5,
+      "proofGains": 3,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.75,
+        0
+      ]
+    },
+    {
+      "a": "cp-p4-a8",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666669,
+      "problemBootstrap95": [
+        -0.25,
+        0.75
+      ]
+    },
+    {
+      "a": "cp-p4-a4",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.75
+      ]
+    },
+    {
+      "a": "cp-p4-a4",
+      "b": "mixed-p4-a8",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 6,
+      "qualityLosses": 0,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.5,
+      "problemBootstrap95": [
+        0,
+        1
+      ]
+    },
+    {
+      "a": "cp-p4-a4",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 1,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666669,
+      "problemBootstrap95": [
+        -0.75,
+        0.25
+      ]
+    },
+    {
+      "a": "cp-p4-a4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.75
+      ]
+    },
+    {
+      "a": "cp-p4-a12",
+      "b": "mixed-p4-a8",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 0,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.75
+      ]
+    },
+    {
+      "a": "cp-p4-a12",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 5,
+      "proofGains": 3,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.75,
+        0
+      ]
+    },
+    {
+      "a": "cp-p4-a12",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        0,
+        0.75
+      ]
+    },
+    {
+      "a": "mixed-p4-a8",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 0,
+      "qualityLosses": 6,
+      "proofGains": 3,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -1,
+        0
+      ]
+    },
+    {
+      "a": "mixed-p4-a8",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.0,
+      "problemBootstrap95": [
+        -0.25,
+        0.25
+      ]
+    },
+    {
+      "a": "mixed-p4-a4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 6,
+      "qualityLosses": 0,
+      "proofGains": 0,
+      "proofLosses": 3,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.5,
+      "problemBootstrap95": [
+        0,
+        1
+      ]
+    }
+  ],
+  "referenceChecks": {
+    "checked": 90,
+    "missing": [],
+    "disagreements": []
+  }
+}

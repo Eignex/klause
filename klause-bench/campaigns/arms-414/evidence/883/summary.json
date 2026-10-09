@@ -8,6 +8,158 @@
         "feasible": 3,
         "optimal": 3
       },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "149925",
+            "149925"
+          ],
+          "firstMs": [
+            269,
+            259,
+            241
+          ],
+          "bestMs": [
+            317,
+            313,
+            294
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "149925"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "149925"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "149925"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            64,
+            63,
+            60
+          ],
+          "bestMs": [
+            149,
+            148,
+            123
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
       "fingerprints": [
         "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
       ],
@@ -29,6 +181,8 @@
       ],
       "firstMs": 152.5,
       "bestMs": 221.5,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [
         {
           "input": "mzn-bench/2017/city-position/city-5-05",
@@ -99,6 +253,7 @@
           "initMs": 179,
           "segments": 14,
           "reseeds": 2,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 34151.5199,
@@ -108,7 +263,8 @@
             "RootFixings": 6.0,
             "Glue": 12.0,
             "ClauseUses": 6.0
-          }
+          },
+          "meanReward": 0.3237233629711079
         },
         "bt/lp-default": {
           "cases": 6,
@@ -117,6 +273,7 @@
           "initMs": 8,
           "segments": 18,
           "reseeds": 3,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 37480.460399999996,
@@ -124,7 +281,8 @@
           "credit": {
             "RootFixings": 6.0,
             "Glue": 3.0
-          }
+          },
+          "meanReward": 0.16679999999999998
         },
         "bt/conflictDriven": {
           "cases": 6,
@@ -133,6 +291,7 @@
           "initMs": 4,
           "segments": 19,
           "reseeds": 6,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 79351.9417,
@@ -140,7 +299,8 @@
           "credit": {
             "RootFixings": 6.0,
             "Glue": 4677.0
-          }
+          },
+          "meanReward": 0.4768631865820533
         },
         "bt/lp-aggressive": {
           "cases": 6,
@@ -149,13 +309,15 @@
           "initMs": 3,
           "segments": 3,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 12796.665,
           "finalHolders": 0,
           "credit": {
             "RootFixings": 6.0
-          }
+          },
+          "meanReward": 0.1819
         },
         "bt/lp-lbtree": {
           "cases": 6,
@@ -164,13 +326,15 @@
           "initMs": 0,
           "segments": 3,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 15537.950399999998,
           "finalHolders": 0,
           "credit": {
             "RootFixings": 6.0
-          }
+          },
+          "meanReward": 0.19091205583132645
         },
         "bt/annotation": {
           "cases": 3,
@@ -179,6 +343,7 @@
           "initMs": 1,
           "segments": 6,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 3258.411,
@@ -186,7 +351,8 @@
           "credit": {
             "RootFixings": 6.0,
             "Glue": 3.0
-          }
+          },
+          "meanReward": 0.20783333333333334
         },
         "bt/linucb": {
           "cases": 3,
@@ -195,11 +361,13 @@
           "initMs": 0,
           "segments": 0,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": null
         }
       }
     },
@@ -208,6 +376,158 @@
         "feasible": 3,
         "optimal": 3
       },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "33156",
+            "33156"
+          ],
+          "firstMs": [
+            309,
+            312,
+            336
+          ],
+          "bestMs": [
+            4117,
+            4166,
+            4189
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "33156"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "33156"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "33156"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "33156"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "33156"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "33156"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            58,
+            54,
+            56
+          ],
+          "bestMs": [
+            126,
+            120,
+            120
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
       "fingerprints": [
         "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
       ],
@@ -229,6 +549,8 @@
       ],
       "firstMs": 183.5,
       "bestMs": 2121.5,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [
         {
           "input": "mzn-bench/2017/city-position/city-5-05",
@@ -299,6 +621,7 @@
           "initMs": 182,
           "segments": 30,
           "reseeds": 7,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 16759.1184,
@@ -308,7 +631,8 @@
             "RootFixings": 6.0,
             "Glue": 31.0,
             "ClauseUses": 15.0
-          }
+          },
+          "meanReward": 0.2736942237029053
         },
         "bt/annotation": {
           "cases": 3,
@@ -317,6 +641,7 @@
           "initMs": 17,
           "segments": 43,
           "reseeds": 13,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 9363.639000000001,
@@ -324,7 +649,8 @@
           "credit": {
             "RootFixings": 6.0,
             "Glue": 3.0
-          }
+          },
+          "meanReward": 0.06968496922699095
         },
         "ls/cbls/fixed": {
           "cases": 6,
@@ -333,13 +659,15 @@
           "initMs": 0,
           "segments": 8,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 391.25,
           "finalHolders": 0,
           "credit": {
             "Improvement": 322497.0
-          }
+          },
+          "meanReward": 0.34230096237970253
         },
         "ls/cbls-plateau/ils-basin": {
           "cases": 6,
@@ -348,13 +676,15 @@
           "initMs": 0,
           "segments": 12,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 255.34029999999998,
           "finalHolders": 0,
           "credit": {
             "Improvement": 21768.0
-          }
+          },
+          "meanReward": 0.14906030356100408
         },
         "ls/cbls-smooth/ils-basin": {
           "cases": 3,
@@ -363,11 +693,13 @@
           "initMs": 0,
           "segments": 6,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         },
         "ls/sa/adaptive-perturb": {
           "cases": 3,
@@ -376,13 +708,15 @@
           "initMs": 0,
           "segments": 3,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 289.5996,
           "finalHolders": 3,
           "credit": {
             "Improvement": 6042.0
-          }
+          },
+          "meanReward": 0.03218488553011781
         },
         "alns/balanced": {
           "cases": 6,
@@ -391,11 +725,13 @@
           "initMs": 0,
           "segments": 17,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         },
         "bt/conflictDriven": {
           "cases": 3,
@@ -404,11 +740,13 @@
           "initMs": 0,
           "segments": 0,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": null
         },
         "ls/probsat-bandit/fixed": {
           "cases": 3,
@@ -417,11 +755,13 @@
           "initMs": 0,
           "segments": 0,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": null
         },
         "ls/fjump/fixed": {
           "cases": 3,
@@ -430,11 +770,13 @@
           "initMs": 0,
           "segments": 0,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": null
         }
       }
     },
@@ -443,6 +785,158 @@
         "feasible": 3,
         "optimal": 3
       },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "24058",
+            "53680"
+          ],
+          "firstMs": [
+            439,
+            532,
+            686
+          ],
+          "bestMs": [
+            5918,
+            12573,
+            6569
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "24058"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "24058"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "54391"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "50776"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "149925"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "53680"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "53680"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            70,
+            73,
+            69
+          ],
+          "bestMs": [
+            111,
+            121,
+            118
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
       "fingerprints": [
         "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
       ],
@@ -464,6 +958,8 @@
       ],
       "firstMs": 256.0,
       "bestMs": 3019.5,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [
         {
           "input": "mzn-bench/2017/city-position/city-5-05",
@@ -534,6 +1030,7 @@
           "initMs": 270,
           "segments": 25,
           "reseeds": 5,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 27019.0641,
@@ -543,7 +1040,8 @@
             "RootFixings": 13.0,
             "Glue": 112.0,
             "ClauseUses": 21.0
-          }
+          },
+          "meanReward": 0.2509083354227608
         },
         "bt/lp-default": {
           "cases": 6,
@@ -552,6 +1050,7 @@
           "initMs": 231,
           "segments": 19,
           "reseeds": 3,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 110879.34120000001,
@@ -561,7 +1060,8 @@
             "RootFixings": 6.0,
             "ClauseUses": 16.0,
             "Glue": 3.0
-          }
+          },
+          "meanReward": 0.17556199997466623
         },
         "bt/conflictDriven": {
           "cases": 6,
@@ -570,6 +1070,7 @@
           "initMs": 240,
           "segments": 24,
           "reseeds": 4,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 46995.488300000005,
@@ -581,7 +1082,8 @@
             "Glue": 788.0,
             "ClauseUses": 341.0,
             "FirstSolution": 2.0
-          }
+          },
+          "meanReward": 0.4104194391560268
         },
         "bt/lp-aggressive": {
           "cases": 6,
@@ -590,6 +1092,7 @@
           "initMs": 233,
           "segments": 21,
           "reseeds": 3,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 51739.538700000005,
@@ -597,7 +1100,8 @@
           "credit": {
             "RootFixings": 6.0,
             "Glue": 5.0
-          }
+          },
+          "meanReward": 0.08091193078480895
         },
         "bt/lp-lbtree": {
           "cases": 6,
@@ -606,6 +1110,7 @@
           "initMs": 19,
           "segments": 16,
           "reseeds": 3,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 22086.014,
@@ -613,7 +1118,8 @@
           "credit": {
             "RootFixings": 6.0,
             "Glue": 4.0
-          }
+          },
+          "meanReward": 0.041313775739255355
         },
         "bt/linucb": {
           "cases": 6,
@@ -622,6 +1128,7 @@
           "initMs": 71,
           "segments": 21,
           "reseeds": 6,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 26442.5649,
@@ -630,7 +1137,8 @@
             "RootFixings": 6.0,
             "Glue": 2069.0,
             "ClauseUses": 128.0
-          }
+          },
+          "meanReward": 0.24463017522110794
         },
         "bt/free": {
           "cases": 6,
@@ -639,6 +1147,7 @@
           "initMs": 65,
           "segments": 19,
           "reseeds": 5,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 12469.387,
@@ -649,7 +1158,8 @@
             "Glue": 216.0,
             "ClauseUses": 40.0,
             "Improvement": 594.0
-          }
+          },
+          "meanReward": 0.17172152752912662
         },
         "bt/annotation": {
           "cases": 3,
@@ -658,6 +1168,7 @@
           "initMs": 22,
           "segments": 20,
           "reseeds": 4,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 10963.9981,
@@ -668,7 +1179,8 @@
             "Glue": 45.0,
             "ClauseUses": 12.0,
             "Improvement": 16577.0
-          }
+          },
+          "meanReward": 0.10223318662874727
         },
         "bt/selector-switch": {
           "cases": 3,
@@ -677,11 +1189,13 @@
           "initMs": 0,
           "segments": 0,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": null
         }
       }
     },
@@ -690,6 +1204,158 @@
         "feasible": 3,
         "optimal": 3
       },
+      "inputs": [
+        {
+          "input": "mzn-bench/2017/city-position/city-5-05",
+          "family": "2017/city-position",
+          "outcomes": {
+            "feasible": 3
+          },
+          "objectiveRange": [
+            "19370",
+            "26274"
+          ],
+          "firstMs": [
+            191,
+            117,
+            144
+          ],
+          "bestMs": [
+            12600,
+            1450,
+            5223
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "42426"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "28234"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "26274"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "28881"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "21700"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "21700"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "30204"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "19370"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "19370"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        },
+        {
+          "input": "pb-comp/normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948",
+          "family": "normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling",
+          "outcomes": {
+            "optimal": 3
+          },
+          "objectiveRange": [
+            "-318",
+            "-318"
+          ],
+          "firstMs": [
+            76,
+            73,
+            61
+          ],
+          "bestMs": [
+            123,
+            119,
+            112
+          ],
+          "anytime": [
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            },
+            {
+              "seed": 3,
+              "checkpoints": [
+                {
+                  "budgetMs": 1000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 10000,
+                  "objective": "-318"
+                },
+                {
+                  "budgetMs": 15000,
+                  "objective": "-318"
+                }
+              ]
+            }
+          ],
+          "processAnytime": []
+        }
+      ],
       "fingerprints": [
         "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
       ],
@@ -711,6 +1377,8 @@
       ],
       "firstMs": 96.5,
       "bestMs": 786.5,
+      "processFirstMs": null,
+      "processBestMs": null,
       "repeatRanges": [
         {
           "input": "mzn-bench/2017/city-position/city-5-05",
@@ -781,6 +1449,7 @@
           "initMs": 303,
           "segments": 95,
           "reseeds": 29,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 40373.5909,
@@ -790,7 +1459,8 @@
             "Glue": 894.0,
             "ClauseUses": 23.0,
             "FirstSolution": 1.0
-          }
+          },
+          "meanReward": 0.1812588259854539
         },
         "bt/lp-default": {
           "cases": 3,
@@ -799,6 +1469,7 @@
           "initMs": 117,
           "segments": 22,
           "reseeds": 5,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 38855.345199999996,
@@ -806,7 +1477,8 @@
           "credit": {
             "RootFixings": 6.0,
             "Glue": 4.0
-          }
+          },
+          "meanReward": 0.07164216884575174
         },
         "bt/annotation": {
           "cases": 3,
@@ -815,6 +1487,7 @@
           "initMs": 187,
           "segments": 88,
           "reseeds": 28,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 13502.8217,
@@ -824,7 +1497,8 @@
             "RootFixings": 6.0,
             "Glue": 11.0,
             "ClauseUses": 5.0
-          }
+          },
+          "meanReward": 0.04729485049193879
         },
         "ls/cbls/fixed": {
           "cases": 6,
@@ -833,13 +1507,15 @@
           "initMs": 0,
           "segments": 27,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 45.996399999999994,
           "finalHolders": 0,
           "credit": {
             "FirstSolution": 2.0
-          }
+          },
+          "meanReward": 0.016201620288834095
         },
         "ls/cbls-plateau/ils-basin": {
           "cases": 6,
@@ -848,13 +1524,15 @@
           "initMs": 0,
           "segments": 32,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
           "credit": {
             "Improvement": 100672.0
-          }
+          },
+          "meanReward": 0.0
         },
         "ls/cbls-smooth/ils-basin": {
           "cases": 6,
@@ -863,13 +1541,15 @@
           "initMs": 0,
           "segments": 31,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 223.66089999999997,
           "finalHolders": 0,
           "credit": {
             "Improvement": 35023.0
-          }
+          },
+          "meanReward": 0.0746033689126084
         },
         "ls/sa/adaptive-perturb": {
           "cases": 3,
@@ -878,13 +1558,15 @@
           "initMs": 0,
           "segments": 32,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 4279.304,
           "finalHolders": 2,
           "credit": {
             "Improvement": 31488.0
-          }
+          },
+          "meanReward": 0.1580945766218413
         },
         "ls/cbls-chain/ils-basin": {
           "cases": 3,
@@ -893,13 +1575,15 @@
           "initMs": 0,
           "segments": 31,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 73.6893,
           "finalHolders": 0,
           "credit": {
             "Improvement": 83206.0
-          }
+          },
+          "meanReward": 0.03983205405405406
         },
         "alns/balanced": {
           "cases": 6,
@@ -908,13 +1592,15 @@
           "initMs": 0,
           "segments": 71,
           "reseeds": 0,
+          "reseedObservations": 6,
           "failures": 0,
           "faults": 0,
           "weightedReward": 2849.625,
           "finalHolders": 1,
           "credit": {
             "Improvement": 1078.0
-          }
+          },
+          "meanReward": 0.0002894650712909159
         },
         "bt/conflictDriven": {
           "cases": 3,
@@ -923,6 +1609,7 @@
           "initMs": 126,
           "segments": 3,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 4351.3696,
@@ -930,7 +1617,8 @@
           "credit": {
             "FirstSolution": 2.0,
             "RootFixings": 6.0
-          }
+          },
+          "meanReward": 0.9120456088870258
         },
         "bt/lp-aggressive": {
           "cases": 3,
@@ -939,13 +1627,15 @@
           "initMs": 125,
           "segments": 3,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
           "credit": {
             "RootFixings": 2.0
-          }
+          },
+          "meanReward": 0.0
         },
         "ls/probsat-bandit/fixed": {
           "cases": 3,
@@ -954,11 +1644,13 @@
           "initMs": 0,
           "segments": 3,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": 0.0
         },
         "ls/fjump/fixed": {
           "cases": 3,
@@ -967,11 +1659,13 @@
           "initMs": 0,
           "segments": 0,
           "reseeds": 0,
+          "reseedObservations": 3,
           "failures": 0,
           "faults": 0,
           "weightedReward": 0.0,
           "finalHolders": 0,
-          "credit": {}
+          "credit": {},
+          "meanReward": null
         }
       }
     }
@@ -1073,5 +1767,10 @@
         0.3333333333333333
       ]
     }
-  ]
+  ],
+  "referenceChecks": {
+    "checked": 36,
+    "missing": [],
+    "disagreements": []
+  }
 }

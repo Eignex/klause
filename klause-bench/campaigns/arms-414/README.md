@@ -6,6 +6,15 @@ finite portfolios at p1 and p4 with 300-second budgets. It changes no defaults. 
 `52193ef906cfedac893b1df8390559ca0495b59e` ([plumbing PR](https://github.com/Eignex/klause/pull/2374)).
 The measurement SHA is retained by remote branch `codex/arms-414-measurement-frozen`.
 
+The eight original AWS stages complete 660/660 cases: 215 optimal and 445 feasible but unproved,
+with no failed commands, record errors, unsupported, unknown or invalid outcomes. CI finds no
+pairwise proof contradiction or disagreement in 874 applicable frozen-reference comparisons.
+All 67 distinct MiniZinc final candidates pass independent source checks. There are 396 legacy
+records without durable witnesses/source hashes; the other 264 retain both. OPB/XCSP3 witnesses
+have internal solver checks and stored-reference checks, without an independent source gate.
+The arm-count sweeps support retaining the shipped counts. P4 threshold 2 is undergoing a
+preselected integrated-build confirmation before any threshold recommendation.
+
 ## Frozen design
 
 `selection.json` freezes six discovery and six holdout problems, two distinct families per
@@ -306,3 +315,26 @@ signal, and CoinsGrid guards proof retention. This adds 54 cases, at most 4.5 so
 before setup. Both variants share the build, input bytes, default arm count, slice policy, presolve
 policy and AWS allocation settings. No p1 threshold change is proposed. Confirmation is still
 running, so this selection does not authorize a default change by itself.
+
+## Completed p4 pool-size sweep
+
+Job 882 completes 72/72 feasible records with witnesses and matching paired source hashes, no arm
+exceptions or refuted-claim faults, and no proof/reference contradictions. [CI run 38001835657](https://github.com/Eignex/klause/actions/runs/38001835657)
+analyzes all 660 original cases and independently checks all 67 distinct MiniZinc final candidates.
+
+| Portfolio / requested arms against default 8 | Objective wins / ties / losses | Proof gains / losses | Problem mean quality | Descriptive 95% interval |
+| --- | --- | --- | --- | --- |
+| cp / 4 | 1 / 6 / 5 | 2 / 0 | -0.333 | [-0.75, 0] |
+| cp / 12 | 1 / 8 / 3 | 0 / 0 | -0.167 | [-0.333, 0] |
+| mixed / 4 | 0 / 6 / 6 | 3 / 0 | -0.500 | [-1, 0] |
+| mixed / 12 | 2 / 8 / 2 | 0 / 0 | 0 | [-0.25, 0.25] |
+
+Four-arm proofs are extra linear-ordering proofs at the unchanged objective 61. Mixed four-arm
+pools lose all city and Fortress seeds; cp four-arm pools lose every Fortress seed and two city
+seeds. Mixed twelve-arm pools win two city seeds, lose the third and lose one Fortress seed.
+There is no consistent discovery advantage to carry into a held-out pool-size confirmation.
+
+Four-arm configurations run whole arms at p4 and record no reseeds; they also omit the appended
+mixed ALNS worker. Default/expanded cp pools record 437/439 reseeds and mixed pools 509/554.
+Consequently the four-arm comparison includes composition, allocation and resumability together.
+Its extra proofs do not isolate a scheduler cause or outweigh the incumbent-quality losses.
