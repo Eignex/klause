@@ -44,7 +44,11 @@ control for a later candidate.
 
 No local Gradle build, solve, test, lint or documentation gate is run for this stack.
 GitHub CI supplies the build/test/lint/documentation gates. Raw-record analysis is
-separate from experiments and does not execute a solver.
+separate from experiments and does not execute a solver. Initial offline summaries
+were produced locally before the explicit reminder also prohibited local validation
+scripts. Their regeneration and validation run on GitHub CI from the complete
+compressed [lab record archives](raw/); no local validation script is run after that
+reminder. No local build, test, solve or analysis gate was started or left running.
 
 ## Current-main profile
 
