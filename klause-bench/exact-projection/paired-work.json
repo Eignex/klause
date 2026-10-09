@@ -1,0 +1,37 @@
+{
+  "name": "rational-normalization-paired-work",
+  "description": "Uninstrumented alternating main/candidate fixed-work runs after current-main profile: require identical outcomes and every deterministic counter; 1000 work units, 120-second safety cap.",
+  "host": "aws",
+  "problems": {
+    "suite": "smtlib-qflia",
+    "name": "nec-smt/med/mygetpwnam/prp-1-46,nec-smt/large/handler_sigchld/prp-1-46,nec-smt/large/checkpass/prp-1-46",
+    "max": "3",
+    "seed": "1",
+    "reference": "any",
+    "per-family": "1000"
+  },
+  "base": {
+    "engine": "cp",
+    "processors": "1",
+    "lp": "default",
+    "timeout": "120000",
+    "exact": "false",
+    "param.node-limit": "1000"
+  },
+  "configs": [
+    {
+      "ref": "5471419aa8c832ee1065468a6861bb203a1ff8c7",
+      "label": "main"
+    },
+    {
+      "ref": "9aa1cf5d1aadc0f39cd367d4e901f145c481725c",
+      "label": "candidate"
+    }
+  ],
+  "seeds": [
+    1
+  ],
+  "repeats": 5,
+  "parallel": 1,
+  "machines": 1
+}
