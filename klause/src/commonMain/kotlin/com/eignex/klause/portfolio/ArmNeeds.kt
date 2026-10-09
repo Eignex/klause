@@ -28,6 +28,7 @@ internal sealed interface ArmNeed {
 internal class ProblemFacts(
     /** The model's classification. */
     val profile: ProblemProfile,
+    val binaryIntegers: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -46,6 +47,10 @@ internal class ProblemFacts(
         /** The facts of [problem], classified as [profile], with the arms' LP capped under [lpCeiling]. */
         fun of(problem: BakedProblem, profile: ProblemProfile, lpCeiling: LpConfig): ProblemFacts = ProblemFacts(
             profile,
+            binaryIntegers = (0 until problem.numIntVars).all {
+                problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) &&
+                    problem.intBounds.lower(it) >= 0L && problem.intBounds.upper(it) <= 1L
+            },
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },

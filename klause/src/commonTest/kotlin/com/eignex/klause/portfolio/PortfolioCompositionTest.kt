@@ -46,10 +46,39 @@ class PortfolioCompositionTest {
     }
 
     @Test
-    fun `a model without continuous columns keeps the curated backtrack order`() {
+    fun `a finite optimization pool covers the default relaxation with two backtrack slots`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.MIXED, arms = 6)
 
         val backtrack = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertEquals(listOf("satOptimized", "lp-default"), backtrack.map { it.label })
+    }
+
+    @Test
+    fun `a finite optimization pool without a relaxation keeps its LP free cores`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, relaxation = { false })
+
+        val backtrack = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertEquals(listOf("satOptimized", "conflictDriven"), backtrack.map { it.label })
+    }
+
+    @Test
+    fun `a small finite optimization pool retains the model search annotation`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(annotationArm = BacktrackParams())
+
+        val backtrack = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertEquals(listOf("satOptimized", "annotation"), backtrack.map { it.label })
+    }
+
+    @Test
+    fun `a binary integer pool keeps its LP free cores for first solutions`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, binaryIntegers = true) { true }
+
+        val backtrack = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
 
         assertEquals(listOf("satOptimized", "conflictDriven"), backtrack.map { it.label })
     }
