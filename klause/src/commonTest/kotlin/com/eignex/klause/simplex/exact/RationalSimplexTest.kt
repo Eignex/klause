@@ -611,11 +611,11 @@ class RationalSimplexTest {
             longArrayOf(21, -33, -7, 11),
             longArrayOf(Long.MIN_VALUE, 2, Long.MIN_VALUE / 2, 1),
         )
-        for ((numerator, denominator, expectedNumerator, expectedDenominator) in samples) {
-            val value = BigFraction.of(bigIntOf(numerator), bigIntOf(denominator))
+        for (sample in samples) {
+            val value = BigFraction.of(bigIntOf(sample[0]), bigIntOf(sample[1]))
 
-            assertEquals(bigIntOf(expectedNumerator), value.num)
-            assertEquals(bigIntOf(expectedDenominator), value.den)
+            assertEquals(bigIntOf(sample[2]), value.num)
+            assertEquals(bigIntOf(sample[3]), value.den)
         }
     }
 
