@@ -1,0 +1,21 @@
+# Frozen in campaigns/presolve-554/split.json
+mzn-bench/2025/carpet-cutting/cc_rnd_4_4
+mzn-bench/2013/rcpsp/12
+mzn-bench/2023/yumi-static/p_4_SG_SG_yumi_grid_setup_3_3
+mzn-bench/2020/stable-goods/s-d6
+mzn-bench/2018/test-scheduling/t100m10r3-2
+mzn-bench/2019/multi-knapsack/mknap2-1
+mzn-bench/2025/stripboard/stripboard_w20_h15_l4_c4_n24
+mzn-bench/2018/proteindesign12/2PCY.18p.8aa.usingEref_self
+mzn-bench/2018/cargo/challenge24
+mzn-bench/2022/gfd-schedule/n60f7d50m30k10_10124
+mzn-bench/2016/gbac/reduced_UD6-gbac
+mzn-bench/2011/cyclic-rcpsp/medium_1
+mzn-bench/2023/kidney-exchange/3_20_0.40_2
+mzn-bench/2020/tower_challenge/tower_070_070_15_070-04
+mzn-bench/2010/filters/dct_2_3
+mzn-bench/2018/neighbours/neighbours3
+mzn-bench/2012/pattern-set-mining-k2/audiology
+mzn-bench/2013/league/model30-8-4
+mzn-bench/2013/ghoulomb/3-9-16
+mzn-bench/2012/amaze/2012-03-15
