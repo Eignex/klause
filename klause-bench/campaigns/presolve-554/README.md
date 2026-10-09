@@ -55,6 +55,18 @@ runs through the remote lab. JFR, if needed, gets a separate `host=aws`,
 
 `presolvePreparationMs` includes source-safe/finite preparation and base bake,
 excluding frontend routing, source compilation and search-arm construction.
+Legacy `timeToFirstFeasibleMs` and `timeToBestMs` use the search attribution clock,
+which starts after preparation; without attribution they use output separators.
+The pilot's PAR2 ratios therefore are reported search timings, not end-to-end gains.
+The integrated benchmark also records `processTimeToFirstFeasibleMs` and
+`processTimeToBestMs` when it receives each incumbent line. These include JVM launch,
+frontend loading, preparation and search, plus output transport delay. They select
+the best objective across the stream rather than its last arrival. `elapsedMs`
+records total subprocess duration, before source checks. The analyzer reports
+these clocks separately and excludes unavailable legacy process witness timings.
+Preparation-adjusted search timing is an additional diagnostic; it still excludes
+startup, frontend loading and routing. Unknowns receive twice the nominal budget
+in PAR2; duration summaries retain observed overshoot.
 `presolveWork`, pass/round/probe counters share the metered source/finite allowance.
 Round entries include the final empty schedule scan. Root probe counts include
 Boolean failed-literal probes and integer SAC propagation/repair calls across
@@ -149,7 +161,7 @@ work in every block. Abort 0.01 changes four blocks on `gbac`, reducing work fro
 263,657,217 to 263,412,856 and round entries from seven to five, with the same 603
 removed constraints. It remains a discovery candidate; the lower fraction is
 pruned. Conservative's PAR2 ratio is 1.157 (family bootstrap 0.842–1.832), and
-aggressive's is 3.111 (1.189–9.801), under this short budget. These reported-outcome
+aggressive's is 3.111 (1.189–9.801), under this short budget. These reported search
 intervals are screening evidence, not independently validated default choices.
 
 ## Reference identity diagnostic
@@ -186,3 +198,9 @@ The integrated build uses main's canonical `finalWitness` and source hashing,
 with opt-in source checks and stdout hashes. Historical job 892 used
 `sourceWitness`; the analyzer accepts both fields. Main's witness-size limit
 still applies. Integration is validated through fresh GitHub CI and AWS records.
+
+[Job 903](http://192.168.50.104:8420/jobs/903) checks the integrated metadata on
+`ba90d4104093c70563324f95415adad10ad25b5a`, including merged construction budgeting,
+deterministic model selection, canonical witnesses and process-clock attribution.
+Its four BACP cases are metadata validation only. The exact submitted specification
+is `experiments/integration-smoke.json`; its result is pending.

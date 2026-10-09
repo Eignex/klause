@@ -79,6 +79,32 @@ def numeric(r, key):
         return None
 
 
+def process_timing(r):
+    if r.get('feasible') is not True and not r.get('proven'):
+        return 2 * r['budgetMs']
+    value = r.get('processTimeToBestMs') if r.get('feasible') is True else r.get('elapsedMs')
+    return max(1, value) if value is not None else None
+
+
+def preparation_timing(r):
+    if r.get('feasible') is not True and not r.get('proven'):
+        return 2 * r['budgetMs']
+    preparation = numeric(r, 'presolvePreparationMs')
+    if preparation is None or not r.get('attribution'):
+        return None
+    return timing(r) + preparation
+
+
+def ratio_interval(families, metric):
+    values = [statistics.mean(x[metric]) for x in families.values() if x[metric]]
+    ci = interval(values)
+    if ci:
+        for key in ['value', 'low', 'high']:
+            if ci[key] is not None:
+                ci[key] = math.exp(ci[key])
+    return ci
+
+
 def interval(values, seed=554):
     if not values:
         return None
@@ -119,6 +145,11 @@ def analyze(cases, control):
             values = [v for r in recorded if (v := numeric(r, key)) is not None]
             metrics[key] = {'n': len(values), 'median': statistics.median(values) if values else None,
                             'max': max(values) if values else None}
+        for key in ['timeToBestMs', 'timeToFirstFeasibleMs', 'processTimeToBestMs',
+                    'processTimeToFirstFeasibleMs']:
+            values = [r[key] for r in recorded if r.get(key) is not None]
+            metrics[key] = {'n': len(values), 'median': statistics.median(values) if values else None,
+                            'max': max(values) if values else None}
         summaries[label] = {'planned': len(arm), 'outcomes': dict(Counter(category(c) for c in arm)),
                             'metrics': metrics,
                             'elapsedMs': {'n': sum(r.get('elapsedMs') is not None for r in recorded),
@@ -143,6 +174,7 @@ def analyze(cases, control):
         same_work = changed_work = unmetered = 0
         skipped = []
         identity_unverified = checked_witness_pairs = 0
+        timing_pairs = Counter()
         for key, block in complete.items():
             a, b = block[control]['record'], block[label]['record']
             if any(category(block[arm]) in ('error', 'unsupported') for arm in (control, label)):
@@ -162,6 +194,13 @@ def analyze(cases, control):
                 r.get('stats', {}).get('sourceValidation') == 'valid' for r in (a, b))
             ratio = math.log(timing(b) / timing(a))
             by_family[fam]['log_time_ratio'].append(ratio)
+            for metric, measure in [('processPar2', process_timing),
+                                    ('preparationAdjustedPar2', preparation_timing),
+                                    ('subprocessDuration', lambda r: r.get('elapsedMs'))]:
+                av, bv = measure(a), measure(b)
+                if av is not None and bv is not None:
+                    by_family[fam][metric].append(math.log(max(1, bv) / max(1, av)))
+                    timing_pairs[metric] += 1
             if q is not None:
                 by_family[fam]['quality'].append(q)
             sa, sb = work_signature(a), work_signature(b)
@@ -180,21 +219,27 @@ def analyze(cases, control):
                                     'controlFirstMs': a.get('timeToFirstFeasibleMs'),
                                     'candidateFirstMs': b.get('timeToFirstFeasibleMs'),
                                     'controlWork': sa, 'candidateWork': sb})
-        ci = interval([statistics.mean(x['log_time_ratio']) for x in by_family.values()])
-        if ci:
-            for key in ['value', 'low', 'high']:
-                if ci[key] is not None:
-                    ci[key] = math.exp(ci[key])
+        ci = ratio_interval(by_family, 'log_time_ratio')
         pairs[label] = {'completeBlocks': len(complete), 'eligiblePairs': len(complete) - len(skipped),
                         'skippedPairs': skipped, 'inputIdentityUnverified': identity_unverified,
                         'independentlyCheckedWitnessPairs': checked_witness_pairs,
                         'sameWork': same_work, 'changedWork': changed_work,
                         'unmetered': unmetered, 'geomeanPar2RatioFamilyBootstrap': ci,
+                        'timingPairs': dict(timing_pairs),
+                        'processPar2RatioFamilyBootstrap': ratio_interval(by_family, 'processPar2'),
+                        'preparationAdjustedPar2RatioFamilyBootstrap': ratio_interval(by_family, 'preparationAdjustedPar2'),
+                        'subprocessDurationRatioFamilyBootstrap': ratio_interval(by_family, 'subprocessDuration'),
                         'qualityFamilyBootstrap': interval([statistics.mean(x['quality']) for x in by_family.values()
                                                             if x['quality']]),
                         'familyOutcomes': {f: dict(Counter(x['quality'])) for f, x in by_family.items()},
                         'differences': differences}
-    return {'control': control, 'completeBlocks': len(complete), 'incompleteBlocks': incomplete,
+    return {'timingPolicy': {
+                'reportedPar2': 'Legacy search attribution time; separators when attribution is absent. Not an end-to-end measure.',
+                'processPar2': 'Subprocess incumbent arrival including launch, load, preparation and search; refutations use process duration. Unavailable legacy witness timings are excluded.',
+                'preparationAdjustedPar2': 'Search attribution plus measured preparation; excludes launch, frontend loading and routing.',
+                'subprocessDuration': 'Total subprocess duration regardless of result, before source checking; not time to best.',
+                'unknownPenalty': 'PAR2 assigns twice the nominal budget to undecided cases; duration summaries disclose overshoot.'},
+            'control': control, 'completeBlocks': len(complete), 'incompleteBlocks': incomplete,
             'arms': summaries, 'pairs': pairs}
 
 
