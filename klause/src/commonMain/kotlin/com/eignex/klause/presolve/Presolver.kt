@@ -238,7 +238,9 @@ object Presolver {
 
             override fun changedUnits(): Long = changed
         }
-        val rounds = PresolveRoundEngine.run(passes, maxRounds, cancellation, ctx.presolveBudget, host, config.abortFraction)
+        val rounds = PresolveRoundEngine.run(
+            passes, maxRounds, cancellation, ctx.presolveBudget, host, config.abortFraction,
+        )
         return Presolved(
             host.current,
             composeReconstructs(host.reconstructs),

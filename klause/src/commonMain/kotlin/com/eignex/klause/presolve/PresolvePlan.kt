@@ -99,7 +99,13 @@ class PresolveConfig(
     /** Return this plan with a different affine-elimination pivot order. */
     fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveConfig =
         PresolveConfig(
-            emphasis, overrides, probeBudgetPerVarOverride, probeTotalBudgetOverride, pivotOrder, abortFraction, maxRounds,
+            emphasis,
+            overrides,
+            probeBudgetPerVarOverride,
+            probeTotalBudgetOverride,
+            pivotOrder,
+            abortFraction,
+            maxRounds,
         )
 
     /** Return a request-local effort plan, keeping unspecified limits. */
