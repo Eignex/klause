@@ -7,6 +7,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
+import kotlin.time.TimeSource
 
 /**
  * Shared trailed coordination for finite-domain and theory components.
@@ -70,6 +71,7 @@ class SearchSession(
     private var glueClauses = 0L
     private var assertingConflicts = 0L
     private var nonAssertingConflicts = 0L
+    private var reductionNanos = 0L
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.size
@@ -759,6 +761,7 @@ class SearchSession(
         learned.watchVisits,
         assertingConflicts,
         nonAssertingConflicts,
+        reductionNanos,
     )
 
     /** Retain a sound clause-form explanation for subsequent propagation. */
@@ -799,6 +802,15 @@ class SearchSession(
         // Reduction renumbers clauses, so it waits until no clause is queued for its first
         // examination. The next propagation drains that queue, so the following restart reduces.
         if (learned.size <= cap || pendingAttach.isNotEmpty()) return
+        val started = TimeSource.Monotonic.markNow()
+        try {
+            reduceOverCap(cap)
+        } finally {
+            reductionNanos += started.elapsedNow().inWholeNanoseconds
+        }
+    }
+
+    private fun reduceOverCap(cap: Int) {
         val droppable = IntArrayList(learned.size)
         for (index in 0 until learned.size) {
             val retained = learned.lbdAt(index) <= learnedDb.glueLbd ||

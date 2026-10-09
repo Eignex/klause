@@ -1,0 +1,45 @@
+{
+  "name": "learned-clause-retention-1631-cap4000-exact",
+  "description": "Compare LBD-plus-use, decaying conflict activity, glue activity and dynamic-LBD tiers at 50,000 committed decisions. Frozen DTP densities 175/210/245 include SAT and UNSAT oracles; measure completions, logical work, reduction cost and repeated end-to-end runtime before selecting a policy. Cap 4000 is the predeclared second cap from the local pilot; cap2000 exploratory run lost a SAT completion.",
+  "problems": [
+    {
+      "suite": "smtlib-qfidl",
+      "name": "*DTP/DTP_k2_n35_c175_s2,*DTP/DTP_k2_n35_c175_s5,*DTP/DTP_k2_n35_c175_s9,*DTP/DTP_k2_n35_c175_s12,*DTP/DTP_k2_n35_c175_s15,*DTP/DTP_k2_n35_c175_s18,*DTP/DTP_k2_n35_c210_s2,*DTP/DTP_k2_n35_c210_s5,*DTP/DTP_k2_n35_c210_s9,*DTP/DTP_k2_n35_c210_s12,*DTP/DTP_k2_n35_c210_s15,*DTP/DTP_k2_n35_c210_s18,*DTP/DTP_k2_n35_c245_s2,*DTP/DTP_k2_n35_c245_s5,*DTP/DTP_k2_n35_c245_s9,*DTP/DTP_k2_n35_c245_s12,*DTP/DTP_k2_n35_c245_s15,*DTP/DTP_k2_n35_c245_s18,*DTP/DTP_k2_n35_c175_s1,*DTP/DTP_k2_n35_c175_s3,*DTP/DTP_k2_n35_c175_s4,*DTP/DTP_k2_n35_c175_s6,*DTP/DTP_k2_n35_c175_s7,*DTP/DTP_k2_n35_c175_s8",
+      "per-family": "1000",
+      "max": "24",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "ref": "84ec0f7f9b0b9a44411b69c70e9519c5b4360a63",
+    "engine": "fixed",
+    "processors": "1",
+    "timeout": "30000",
+    "presolve": "off",
+    "param.max-decisions": "50000",
+    "param.shared-restart": "1000",
+    "param.max-learned": "4000"
+  },
+  "configs": [
+    {
+      "label": "lbd-use",
+      "param.open-learned-policy": "lbd-use"
+    },
+    {
+      "label": "activity",
+      "param.open-learned-policy": "activity"
+    },
+    {
+      "label": "glue-activity",
+      "param.open-learned-policy": "glue-activity"
+    },
+    {
+      "label": "tiered",
+      "param.open-learned-policy": "tiered"
+    }
+  ],
+  "repeats": 3,
+  "host": "aws",
+  "machines": 4,
+  "parallel": 2
+}

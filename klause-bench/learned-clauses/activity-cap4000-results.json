@@ -1,0 +1,262 @@
+{
+  "rawCasesSha256": "9565f848e31f58249bc3b4e1833435cc6cdc789ac9b2ac3f2d88adb9f8a60ea7",
+  "problems": 24,
+  "repeats": 3,
+  "arms": {
+    "lbd-use": {
+      "sha": "84ec0f7f9b0b9a44411b69c70e9519c5b4360a63",
+      "records": 72,
+      "sat": 18,
+      "unsat": 0,
+      "unknown": 54,
+      "solveSeconds": 434.709,
+      "fingerprints": [
+        "593c9bf673e2fe6a915039f2a62dd198c4a0110d61310ade6ef721ff9e1bd0fa"
+      ],
+      "totals": {
+        "openBoolDecisions": 3281433,
+        "openIntDecisions": 0,
+        "openTheoryDecisions": 0,
+        "openTheoryChecks": 18,
+        "openWork": 3281451,
+        "openLearned": 663630,
+        "openRelearned": 0,
+        "openRestarts": 3267,
+        "openReductions": 1071,
+        "openDropped": 403749,
+        "openRetained": 259881,
+        "openPeakRetained": 297459,
+        "openLearnedWatchVisits": 441887556,
+        "openAssertingConflicts": 663630,
+        "openNonAssertingConflicts": 0,
+        "openClauseActivityBumps": 0,
+        "openClauseLbdImprovements": 0,
+        "openReductionNs": 1603921954
+      }
+    },
+    "activity": {
+      "sha": "84ec0f7f9b0b9a44411b69c70e9519c5b4360a63",
+      "records": 72,
+      "sat": 15,
+      "unsat": 0,
+      "unknown": 57,
+      "solveSeconds": 406.844,
+      "fingerprints": [
+        "593c9bf673e2fe6a915039f2a62dd198c4a0110d61310ade6ef721ff9e1bd0fa"
+      ],
+      "totals": {
+        "openBoolDecisions": 3292731,
+        "openIntDecisions": 0,
+        "openTheoryDecisions": 0,
+        "openTheoryChecks": 15,
+        "openWork": 3292746,
+        "openLearned": 624297,
+        "openRelearned": 0,
+        "openRestarts": 3282,
+        "openReductions": 1146,
+        "openDropped": 364779,
+        "openRetained": 259518,
+        "openPeakRetained": 291966,
+        "openLearnedWatchVisits": 451698864,
+        "openAssertingConflicts": 624297,
+        "openNonAssertingConflicts": 0,
+        "openClauseActivityBumps": 4924287,
+        "openClauseLbdImprovements": 0,
+        "openReductionNs": 2727006210
+      }
+    },
+    "glue-activity": {
+      "sha": "84ec0f7f9b0b9a44411b69c70e9519c5b4360a63",
+      "records": 72,
+      "sat": 15,
+      "unsat": 0,
+      "unknown": 57,
+      "solveSeconds": 411.929,
+      "fingerprints": [
+        "593c9bf673e2fe6a915039f2a62dd198c4a0110d61310ade6ef721ff9e1bd0fa"
+      ],
+      "totals": {
+        "openBoolDecisions": 3292731,
+        "openIntDecisions": 0,
+        "openTheoryDecisions": 0,
+        "openTheoryChecks": 15,
+        "openWork": 3292746,
+        "openLearned": 626859,
+        "openRelearned": 0,
+        "openRestarts": 3282,
+        "openReductions": 1146,
+        "openDropped": 367341,
+        "openRetained": 259518,
+        "openPeakRetained": 292140,
+        "openLearnedWatchVisits": 452054862,
+        "openAssertingConflicts": 626859,
+        "openNonAssertingConflicts": 0,
+        "openClauseActivityBumps": 4945158,
+        "openClauseLbdImprovements": 0,
+        "openReductionNs": 2771837657
+      }
+    },
+    "tiered": {
+      "sha": "84ec0f7f9b0b9a44411b69c70e9519c5b4360a63",
+      "records": 72,
+      "sat": 15,
+      "unsat": 0,
+      "unknown": 57,
+      "solveSeconds": 409.436,
+      "fingerprints": [
+        "593c9bf673e2fe6a915039f2a62dd198c4a0110d61310ade6ef721ff9e1bd0fa"
+      ],
+      "totals": {
+        "openBoolDecisions": 3292722,
+        "openIntDecisions": 0,
+        "openTheoryDecisions": 0,
+        "openTheoryChecks": 15,
+        "openWork": 3292737,
+        "openLearned": 620664,
+        "openRelearned": 0,
+        "openRestarts": 3282,
+        "openReductions": 1146,
+        "openDropped": 361119,
+        "openRetained": 259545,
+        "openPeakRetained": 292290,
+        "openLearnedWatchVisits": 445596714,
+        "openAssertingConflicts": 620664,
+        "openNonAssertingConflicts": 0,
+        "openClauseActivityBumps": 4880184,
+        "openClauseLbdImprovements": 609783,
+        "openReductionNs": 2646396153
+      }
+    }
+  },
+  "paired": {
+    "activity": {
+      "pairs": 72,
+      "verdictDifferences": [
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          0
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          1
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          2
+        ]
+      ],
+      "lostCompletions": [
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          0
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          1
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          2
+        ]
+      ],
+      "gainedCompletions": [],
+      "equalWorkPairs": 72,
+      "logicalMatches": 0,
+      "perProblemMeanSolveRatio": 0.9514597301533116,
+      "completedPerProblemMeanSolveRatio": 1.0324845391860151,
+      "completedProblems": 5
+    },
+    "glue-activity": {
+      "pairs": 72,
+      "verdictDifferences": [
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          0
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          1
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          2
+        ]
+      ],
+      "lostCompletions": [
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          0
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          1
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          2
+        ]
+      ],
+      "gainedCompletions": [],
+      "equalWorkPairs": 72,
+      "logicalMatches": 0,
+      "perProblemMeanSolveRatio": 0.9699075335196831,
+      "completedPerProblemMeanSolveRatio": 1.0368680557230774,
+      "completedProblems": 5
+    },
+    "tiered": {
+      "pairs": 72,
+      "verdictDifferences": [
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          0
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          1
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          2
+        ]
+      ],
+      "lostCompletions": [
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          0
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          1
+        ],
+        [
+          "smtlib-qfidl",
+          "DTP/DTP_k2_n35_c175_s4",
+          2
+        ]
+      ],
+      "gainedCompletions": [],
+      "equalWorkPairs": 72,
+      "logicalMatches": 0,
+      "perProblemMeanSolveRatio": 0.9576010921110986,
+      "completedPerProblemMeanSolveRatio": 1.046411183654767,
+      "completedProblems": 5
+    }
+  }
+}
