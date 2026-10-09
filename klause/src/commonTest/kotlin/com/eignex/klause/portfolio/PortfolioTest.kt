@@ -810,6 +810,22 @@ class PortfolioTest {
     }
 
     @Test
+    fun `plateau reseeding is counted and the off control retains its handle`() {
+        for (threshold in listOf(0, 2, 3, 4)) {
+            var slices = 0
+            val handle = ScriptedSearch({ it == 0 }) { slices++ }
+            val worker = trackingWorker("plateau", 0, handle)
+
+            val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
+                it.minimize(Cancellation { slices >= 13 })
+            }
+
+            assertEquals(threshold, result.stats.portfolio.reseedStaleThreshold)
+            assertEquals(if (threshold == 0) 0L else 12L / threshold, result.stats.portfolio.arms.single().reseeds)
+        }
+    }
+
+    @Test
     fun `useless arms take a small share of the run however many there are`() {
         for (useless in listOf(1, 4, 12)) {
             val slices = IntArray(useless + 1)
