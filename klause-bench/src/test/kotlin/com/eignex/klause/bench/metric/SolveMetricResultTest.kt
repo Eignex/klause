@@ -3,6 +3,8 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -116,7 +118,7 @@ class SolveMetricResultTest {
     fun `durable timing round trips and legacy records have unknown elapsed`() {
         val record = rec(false, null, null, true).copy(elapsedMs = 140)
         val encoded = Reports.json.encodeToString(record)
-        val legacy = Reports.json.encodeToString(rec(false, null, null, true))
+        val legacy = JsonObject(Reports.json.parseToJsonElement(encoded).jsonObject - "elapsedMs").toString()
 
         assertEquals(140, Reports.json.decodeFromString<SolveRecord>(encoded).elapsedMs)
         assertEquals(null, Reports.json.decodeFromString<SolveRecord>(legacy).elapsedMs)

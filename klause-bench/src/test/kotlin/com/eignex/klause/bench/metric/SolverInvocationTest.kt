@@ -3,6 +3,8 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -95,6 +97,18 @@ class SolverInvocationTest {
         )
 
         cases.forEach { (result, expected) -> assertEquals(expected, result.referenceElapsedMs(60_000)) }
+    }
+
+    @Test
+    fun `subprocess duration survives caching and legacy caches have unknown elapsed`() {
+        val r = SolverInvocation.Result(
+            false, null, null, proven = true, stats = emptyMap(), rawOutput = "", command = "", elapsedMs = 140,
+        )
+        val encoded = Reports.json.encodeToString(r)
+        val legacy = JsonObject(Reports.json.parseToJsonElement(encoded).jsonObject - "elapsedMs").toString()
+
+        assertEquals(140, Reports.json.decodeFromString<SolverInvocation.Result>(encoded).elapsedMs)
+        assertNull(Reports.json.decodeFromString<SolverInvocation.Result>(legacy).elapsedMs)
     }
 
     @Test
