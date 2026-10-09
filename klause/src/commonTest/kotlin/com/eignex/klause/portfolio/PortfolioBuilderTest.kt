@@ -25,7 +25,12 @@ class PortfolioBuilderTest {
 
         try {
             assertEquals(
-                listOf("ls/cbls-chain/ils-basin", "ls/cbls-chain-noinv/fixed", "ls/cbls-notabu/fixed", "ls/cbls-lonoise/fixed"),
+                listOf(
+                    "ls/cbls-chain/ils-basin",
+                    "ls/cbls-chain-noinv/fixed",
+                    "ls/cbls-notabu/fixed",
+                    "ls/cbls-lonoise/fixed",
+                ),
                 workers.filter { it.improvementOnly && it.family == ArmFamily.LocalSearch }.map { it.label },
             )
             assertTrue(workers.filter { !it.improvementOnly }.any { it.label == "bt/satOptimized" })
