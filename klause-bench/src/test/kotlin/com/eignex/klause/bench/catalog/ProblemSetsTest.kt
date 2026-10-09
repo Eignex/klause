@@ -39,18 +39,27 @@ class ProblemSetsTest {
     }
 
     @Test
-    fun `every committed set loads, and sweep holds each problem once`() {
+    fun `every committed set loads`() {
         val root = File("sets")
         for (name in ProblemSets.names(root)) {
             val entries = ProblemSets.load(listOf(name), root)
             assertTrue(entries.isNotEmpty(), "set '$name' is empty")
         }
+    }
+
+    @Test
+    fun `sweep holds every thematic problem once`() {
+        val root = File("sets")
         val sweep = ProblemSets.load(listOf("sweep"), root)
-        val focused = ProblemSets.names(root).filter { it != "sweep" && it != "linear" }
+        val focused = listOf(
+            "open-int", "linear-real", "mip", "scheduling", "routing", "packing", "globals", "sat", "maxsat", "pb",
+        )
+        val expected = focused.flatMap { ProblemSets.load(listOf(it), root) }
         assertEquals(
-            focused.sumOf { ProblemSets.load(listOf(it), root).size },
+            expected.size,
             sweep.size,
             "a problem is in two focused sets",
         )
+        assertEquals(expected.toSet(), sweep.toSet())
     }
 }
