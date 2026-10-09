@@ -2,6 +2,7 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
@@ -328,7 +329,7 @@ internal object SolveMetric {
         return runCatching {
             val sourceParams = SourceValidationParams(settings)
             val checkSource = solverId == SolverInvocation.KLAUSE && (entry.hasFloats || sourceParams.requested)
-            require(!sourceParams.requested || entry.ref.format == com.eignex.klause.bench.catalog.Format.MINIZINC) {
+            require(!sourceParams.requested || entry.ref.format == Format.MINIZINC) {
                 "source-validation requires a MiniZinc source"
             }
             val policy = if (checkSource) {
@@ -339,7 +340,8 @@ internal object SolveMetric {
             val provenance = if (solverId == SolverInvocation.KLAUSE) InstalledBuild.current else null
             val key = BenchCache.keyFor(entry.ref, tag, budget, provenance, settings, policy)
             val r = BenchCache.load(key)
-                ?: SolverInvocation.run(entry, solverId, sourceParams.solverSettings, budget, optimize).also { BenchCache.store(key, it) }
+                ?: SolverInvocation.run(entry, solverId, sourceParams.solverSettings, budget, optimize)
+                    .also { BenchCache.store(key, it) }
             val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
                 .copy(
                     validationPolicy = policy,
