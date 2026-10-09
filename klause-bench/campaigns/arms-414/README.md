@@ -50,8 +50,8 @@ Historical scripts are not measurement commands: fixed arms=6 at p4 is different
 default 8, and comparing default arms with arms=6 at p1 is an identical-setting comparison.
 Oversubscription uses p1 6/12 and p4 4/8/12; it measures composition and execution together, not a
 pure scheduler factor. No tuning of #1748 slice sizing is included. Construction budgeting #2328
-is still open; concurrent [PR #2375](https://github.com/Eignex/klause/pull/2375) must be integrated
-and measured before any policy recommendation is considered ready.
+was integrated by [PR #2375](https://github.com/Eignex/klause/pull/2375) during collection. These
+frozen builds predate it; policy candidates need measurements on that integrated implementation.
 
 ## Evidence and reproduction
 
@@ -120,7 +120,7 @@ covering both widths and both engines on all three formats. All eight MiniZinc c
 the pinned-source constraint and objective check in [CI run 37992827225](https://github.com/Eignex/klause/actions/runs/37992827225),
 with matching model/data hashes and no invalid or unknown verdict. Repeated controls 883 are also
 complete, with 24/24 records and no failed commands. [CI run 37993711067](https://github.com/Eignex/klause/actions/runs/37993711067)
-mines the repeats and checks all 13 distinct MiniZinc candidates from both jobs, including agreement
+mines the repeats and checks all 14 distinct MiniZinc candidates from both jobs, including agreement
 between the archived candidate's objective and its record. Every source check is valid.
 Baseline 875 and the split sweeps are
 submitted: reseeding [879](http://192.168.50.104:8420/jobs/879) / [880](http://192.168.50.104:8420/jobs/880),
@@ -129,8 +129,9 @@ and repeated controls [883](http://192.168.50.104:8420/jobs/883). `jobs.json` re
 The measurement SHA stays frozen despite later formatting-only CI repairs. No result from an
 unfinished stage is a default recommendation.
 
-Oversubscription p1 job 881 is complete with 48/48 records and no failed commands. Its matched
-comparisons and source checks run in GitHub CI; the other 300-second stages remain in progress.
+Oversubscription p1 job 881 and reseeding p1 job 879 are complete with 48/48 records each and no
+failed commands. Matched comparisons and source checks run in GitHub CI; the remaining 300-second
+stages are still collecting records.
 
 These measurements belong to the recorded SHAs. Exact-arithmetic normalization and Boolean
 undo-lifetime fixes reached main during collection; rebasing the plumbing does not retrospectively
@@ -149,3 +150,31 @@ remove parallel search variability; small timing or objective differences need c
 Within each width, the repeat configurations share the installed build fingerprint. Both widths
 share the runtime-file hash; their fingerprints differ because `ActiveProcessorCount` is 1 or 4.
 The recorded CLI options are `-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=N`.
+
+## Completed p1 pool-size sweep
+
+Job 881 has 12 matched cells per configuration: four discovery inputs at three seeds. Every cell
+is feasible; each configuration proves only the three knapsack cases. All 48 records retain witnesses
+and source hashes. [CI analysis 37997388472](https://github.com/Eignex/klause/actions/runs/37997388472)
+compares 12 requested arms against the default six:
+
+| Portfolio | Objective wins / ties / losses | Proof gains / losses | Problem mean quality | Descriptive 95% interval |
+| --- | --- | --- | --- | --- |
+| cp p1 | 2 / 6 / 4 | 0 / 0 | -0.167 | [-0.75, 0.25] |
+| mixed p1 | 1 / 8 / 3 | 0 / 0 | -0.167 | [-0.75, 0.25] |
+
+Both expanded pools lose city-position at all three seeds. Fortress varies by seed for cp; mixed
+gains one Fortress incumbent and ties two. Both OPB inputs tie every seed. This is no case for
+raising the p1 default, and the four-problem intervals do not establish a population effect.
+
+The cp pools record one and two caught segment exceptions respectively, all in `bt/lp-lbtree`.
+There are no refuted-claim faults or quarantines, no failed commands, and no pairwise proof
+contradictions. Exception details were not retained by the frozen portfolio; the counts cannot
+identify their cause. No arm-removal claim follows from these data.
+
+In the default mixed pool, `bt/satOptimized` holds 10 of 12 final incumbents and `alns/balanced`
+holds two. `ls/cbls/fixed` holds none but earns 1196836 units of intermediate Improvement credit.
+The larger pool spreads final credit over additional workers while still losing city-position.
+Final-holder counts and raw contribution credit measure different roles; neither is a removal
+counterfactual. Per-arm time, work, initialization, segments, reseeds and work-weighted rewards are
+retained in the CI analysis.
