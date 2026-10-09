@@ -1,0 +1,12 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+From https://github.com/Eignex/klause
+   6ca8a3275..5e9cf7411  codex/arms-414-report -> codex/arms-414-report
+[i-05be37b823d1d3029] 54101a2cb is not cached: building
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-041fa3f25f72ba6f1] 54101a2cb is not cached: building
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-041cba7d9a97d2a38] reused the cached build of 54101a2cb
+WARNING: Using incubator modules: jdk.incubator.vector
+
