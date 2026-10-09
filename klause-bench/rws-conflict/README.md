@@ -18,7 +18,7 @@ deploy/lab run /path/to/klause/klause-bench/rws-conflict/baseline-lab.json
 curl -fsS http://192.168.50.104:8420/experiments/852/cases -o baseline-cases.json
 curl -fsS http://192.168.50.104:8420/experiments/852/arms -o baseline-arms.json
 curl -fsS http://192.168.50.104:8420/jobs/852 -o baseline-job.json
-python3 summarize.py baseline-lab.json baseline-cases.json baseline-arms.json baseline-results.json
+python3 summarize.py baseline-lab.json baseline-cases.json baseline-arms.json baseline-job.json baseline-results.json
 ```
 
 Run the summarizer on the remote runner or CI. It audits complete arm/seed/repetition coverage,
@@ -36,3 +36,7 @@ at their purported asserting target. Tracing was removed, and no local workload 
 policy changed. These observations guide investigation and are not paired performance evidence.
 Full local `check lintDocs` and unit tests were skipped. GitHub CI supplies build/test/lint/docs gates;
 all further experiments use AWS lab.
+
+The [validation report](report.md) supersedes the pending-result checkpoint above. The stack is
+[#2372](https://github.com/Eignex/klause/pull/2372) (reproduction),
+[#2377](https://github.com/Eignex/klause/pull/2377) (pin lifetime fix), then the evidence layer.
