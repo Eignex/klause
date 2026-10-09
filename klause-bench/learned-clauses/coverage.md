@@ -30,7 +30,7 @@ do not add order-atom proxies or unsupported reasons without a failing conflict.
 ## Recorded result
 
 Lab [817](http://192.168.50.104:8420/experiments/817) completed all 567 cases: 63 inputs across nine
-formats, three arms and three repetitions. The immutable revisions are baseline `58ae735e7`,
+suites, three arms and three repetitions. The immutable revisions are baseline `58ae735e7`,
 coverage `4ffba2d4e`, and the activity experiment's unchanged default path `84ec0f7f9`.
 `coverage-default-control-lab.json` reproduces the full comparison. The first two arms each report
 54 SAT, 38 UNSAT and 97 unknown records. The lab has reference coverage on 48 inputs and reports
