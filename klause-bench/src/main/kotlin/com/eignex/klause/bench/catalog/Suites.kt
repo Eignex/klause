@@ -751,6 +751,7 @@ internal object Suites {
         format = Format.MINIZINC
         license = "internal"
         val base = "klause-mzn-lib/test-models"
+        workspace("enigma_2275_pinned", "klause/src/jvmTest/resources/flatzinc/enigma_2275_pinned.fzn", Category.CSP, Expected.Sat)
         workspace("argmax", "$base/argmax.mzn", Category.CSP, Expected.Sat)
         workspace("bin_packing", "$base/bin_packing.mzn", Category.PACKING, Expected.Sat)
         workspace("connected", "$base/connected.mzn", Category.CSP, Expected.Sat)

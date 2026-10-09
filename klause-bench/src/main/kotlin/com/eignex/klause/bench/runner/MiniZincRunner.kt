@@ -58,6 +58,7 @@ internal class MiniZincRunner(
         require(supports(ref)) { "${ref.name}: MiniZincRunner only resolves MINIZINC problems" }
         val root = CorpusFetcher.workspaceRoot()
         val mzn = CorpusFetcher.resolve(ref.source)
+        if (mzn.extension == "fzn") return mzn
         val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
         val workDir = File(root, "klause-bench/build/mzn-fzn-seed$MZN_RANDOM_SEED").apply { mkdirs() }
         val fzn = File(workDir, "${ref.name.replace('/', '_')}.fzn")
