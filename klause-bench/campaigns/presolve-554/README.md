@@ -10,8 +10,9 @@ GitHub CI provides validation; klause-lab builds installed JVM distributions wit
 Initial local Python runs collected and summarized remote records only. After the
 execution reminder, further inspection uses lab API reads; no local analysis or
 validation scripts are run.
-The immutable `codex/presolve-554-frozen-pilots` branch preserves every pilot build
-and its evidence across stack rebases. Historical SHA references remain intact.
+The immutable `codex/presolve-554-frozen-pilots` and
+`codex/presolve-554-frozen-integration` branches preserve the historical pilot and
+integration builds across stack rebases. Historical SHA references remain intact.
 
 ## Pilot
 
@@ -203,7 +204,15 @@ still applies. Integration is validated through fresh GitHub CI and AWS records.
 `ba90d4104093c70563324f95415adad10ad25b5a`, including merged construction budgeting,
 deterministic model selection, canonical witnesses and process-clock attribution.
 Its four BACP cases are metadata validation only. The exact submitted specification
-is `experiments/integration-smoke.json`; its result is pending.
+is `experiments/integration-smoke.json`. All four cases completed, passed source
+checking and retained canonical witnesses, stdout hashes and process timings.
+Process time to best was 3,420, 10,161, 10,162 and 3,657 ms; raw search times were
+2,486, 9,455, 9,473 and 2,848 ms. These clocks are distinct as intended.
+The deterministic selector changes the BACP root models: the checked hashes are
+`7e84fff2674388a5a8dfb0259963345cc45707145fe42657c0a0c1a0ff7e5a9c` (2010) and
+`03b92632a1b720d592955e03d5c60dadad2e06f6c3fcd1883c969f914dca4771` (2011), stable
+across both seeds. Objectives cannot be compared to the earlier BACP input hashes.
+Final records and job/file metadata are archived under `evidence/903`.
 
 ## Frozen 300-second specifications
 
@@ -218,7 +227,7 @@ The worker rotates arm order by problem and alternates arms within each seed and
 repeat; all configurations of an input stay on one AWS instance. Normal parallel
 and machine counts are unset and managed by the worker.
 
-Both specifications pin `5e9d4c5cf581ee6c11957e9edccd0242f88dcd19`, containing the
+Both specifications pin `f6944877bb7a4846d56ce2031b0843da6105515c`, containing the
 merged construction budget, fixed selector, controls and process timing. They are
 prepared but not submitted. The lab disables benchmark result caching for every
 production case. Process timing includes FlatZinc frontend loading; MiniZinc source

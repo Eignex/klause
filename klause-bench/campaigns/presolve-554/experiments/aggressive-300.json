@@ -4,7 +4,7 @@
   "host": "aws",
   "problems": {"set": "presolve-554-pilot", "reference": "any"},
   "base": {
-    "ref": "5e9d4c5cf581ee6c11957e9edccd0242f88dcd19",
+    "ref": "f6944877bb7a4846d56ce2031b0843da6105515c",
     "engine": "cp",
     "processors": "1",
     "timeout": "300000",
