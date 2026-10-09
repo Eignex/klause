@@ -37,6 +37,8 @@ Integer MiniZinc campaigns may opt in to the same final-witness source check wit
 `param=source-validation=true`. The bench consumes this parameter before launching the CLI;
 checking remains outside the solve budget. Included files and the MiniZinc compiler
 are outside the original model/data hashes.
+Opt-in records also retain the full stdout hash in `sourceOutputSha256`, including
+candidates rejected by checking. Their rendered candidates remain in `finalWitness`.
 `invalid` candidates lose solution/proof credit. Integer candidates with `unknown` checking
 remain reported witnesses and retain their checking status; checking a witness does not
 independently establish optimality or infeasibility. The default policy is unchanged.

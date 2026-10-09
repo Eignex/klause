@@ -108,6 +108,7 @@ internal data class SolveRecord(
     val sourceHashes: Map<String, String> = emptyMap(),
     /** Final rendered candidate, retained for independent checks when the raw stream is not transferred. */
     val finalWitness: String? = null,
+    val sourceOutputSha256: String? = null,
 )
 
 internal object SolveMetric {
@@ -351,6 +352,7 @@ internal object SolveMetric {
                     } else {
                         null
                     },
+                    sourceOutputSha256 = if (sourceParams.requested) sha256(r.rawOutput.toByteArray()) else null,
                 )
             val checked = if (checkSource) {
                 val validation = if (r.feasible == true) {
