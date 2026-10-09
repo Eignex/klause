@@ -60,6 +60,7 @@ import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
@@ -1276,20 +1277,37 @@ private fun SearchNode.withReductionBounds(reduction: ExactLiraReduction.Bounded
     return bounded
 }
 
+// Every bounded integer folded into the node's branches as [SearchNode.withBranch] would, in one pass: folding them
+// one at a time scans and copies the branch list per bound, quadratic in the bounds a large root publishes.
 private fun SearchNode.withPublishedBounds(
     numIntVars: Int,
     lowerBound: (Int) -> Long?,
     upperBound: (Int) -> Long?,
 ): SearchNode {
-    var bounded = this
+    var merged: MutableList<IntegerBranch>? = null
+    var positions: MutableIntIntMap? = null
     for (integer in 0 until numIntVars) {
         val lower = lowerBound(integer)?.let(::bigIntOf)
         val upper = upperBound(integer)?.let(::bigIntOf)
-        if (lower != null || upper != null) {
-            bounded = bounded.withBranch(IntegerBranch(integer, lower, upper))
+        if (lower == null && upper == null) continue
+        val list = merged ?: branches.toMutableList().also { merged = it }
+        val index = positions ?: MutableIntIntMap(list.size * 2).also { map ->
+            list.forEachIndexed { at, branch -> map.put(branch.variable, at) }
+            positions = map
+        }
+        val at = index.getOrDefault(integer, -1)
+        if (at < 0) {
+            index.put(integer, list.size)
+            list += IntegerBranch(integer, lower, upper)
+        } else {
+            val existing = list[at]
+            list[at] = existing.copy(
+                lower = maxOfNullable(existing.lower, lower),
+                upper = minOfNullable(existing.upper, upper),
+            )
         }
     }
-    return bounded
+    return merged?.let { copy(branches = it) } ?: this
 }
 
 // holds states one row of a comparison disjunction and fails its exact complement.
