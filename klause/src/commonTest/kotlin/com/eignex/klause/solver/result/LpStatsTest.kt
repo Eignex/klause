@@ -5,6 +5,8 @@ import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.ExactBasisPhase
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpPhaseMetrics
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ContinuationPhase
@@ -16,6 +18,28 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LpStatsTest {
+    @Test
+    fun `phase snapshots retain refusal costs and consumer routes after merging`() {
+        val sink = LpStatsSink()
+        sink.certificationObserver(LpRoute.STANDALONE).observePhase(
+            LpPhaseMetrics(LpSolvePhase.EXACT_DUALS, "STEPS", 13L, steps = 2),
+        )
+        val before = sink.snapshot()
+        sink.certificationObserver(LpRoute.STANDALONE).observePhase(
+            LpPhaseMetrics(LpSolvePhase.EXACT_DUALS, "ACCEPTED", 7L, steps = 1),
+        )
+        sink.certificationObserver(LpRoute.NODE).observePhase(
+            LpPhaseMetrics(LpSolvePhase.CLEANUP, "PIVOTS", 19L, work = 23L, pivots = 3),
+        )
+
+        val combined = before.mergedWith(sink.snapshot())
+
+        assertEquals(1L, before.phases.getValue("EXACT_DUALS_STANDALONE").calls)
+        assertEquals(LpPhaseStats(3L, 33L, steps = 5L, outcomes = mapOf("STEPS" to 2L, "ACCEPTED" to 1L)),
+            combined.phases.getValue("EXACT_DUALS_STANDALONE"))
+        assertEquals(LpPhaseStats(1L, 19L, 23L, 3L, outcomes = mapOf("PIVOTS" to 1L)),
+            combined.phases.getValue("CLEANUP_NODE"))
+    }
 
     @Test
     fun `continuation invocation deltas retain abandoned work and terminal phase`() {
