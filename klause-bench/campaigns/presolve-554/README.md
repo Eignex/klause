@@ -143,6 +143,15 @@ passed the source check; all remaining source-check outcomes are unknown, with n
 invalid candidates. Unknown checks retain integer witnesses as reported outcomes.
 The final API responses are archived under `evidence/874/final-*.json.gz`.
 
+The CI-generated comparison has 24 complete matched blocks with no source-hash
+mismatches among updated arms. Abort 0.0001 and implicit default match default
+work in every block. Abort 0.01 changes four blocks on `gbac`, reducing work from
+263,657,217 to 263,412,856 and round entries from seven to five, with the same 603
+removed constraints. It remains a discovery candidate; the lower fraction is
+pruned. Conservative's PAR2 ratio is 1.157 (family bootstrap 0.842–1.832), and
+aggressive's is 3.111 (1.189–9.801), under this short budget. These reported-outcome
+intervals are screening evidence, not independently validated default choices.
+
 ## Reference identity diagnostic
 
 [Job 876](http://192.168.50.104:8420/jobs/876) checks the first pilot's BACP
