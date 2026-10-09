@@ -43,7 +43,7 @@ def timing(r):
         t = float(s.get('solveTime', 'nan')) * 1000
         if math.isfinite(t) and t >= 0:
             return max(1, t)
-    except ValueError:
+    except (ValueError, TypeError):
         pass
     return max(1, r.get('elapsedMs') or r['budgetMs'])
 
@@ -59,6 +59,8 @@ def quality(a, b):
         return 0
     if aw != bw:
         return None  # solution/refutation contradiction
+    if aw and a.get('kind') == b.get('kind') == 'satisfy':
+        return 0
     ap, bp = bool(a.get('proven')), bool(b.get('proven'))
     av, bv = a.get('objective'), b.get('objective')
     if av is not None and bv is not None and av != bv:
