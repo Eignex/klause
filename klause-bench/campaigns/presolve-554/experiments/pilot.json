@@ -1,0 +1,55 @@
+{
+  "name": "presolve-554-pilot-portable",
+  "description": "Bounded current-default control and effort pilot for issue 554. Frozen main versus neutral controls build, single satOptimized CP arm, 12 balanced MiniZinc families, alternating two seeds and two repetitions; audit settings/work and runtime before 300-second campaigns.",
+  "host": "aws",
+  "problems": {
+    "suite": "mzn-bench",
+    "per-family": "1",
+    "max": "12",
+    "seed": "554",
+    "reference": "any"
+  },
+  "base": {
+    "ref": "5ad3707c0c0bfb113f994828265b9f1bafef91c3",
+    "engine": "cp",
+    "processors": "1",
+    "timeout": "10000",
+    "param.bt-arm": "satOptimized"
+  },
+  "configs": [
+    {
+      "label": "main-default",
+      "ref": "5471419aa8c832ee1065468a6861bb203a1ff8c7"
+    },
+    {
+      "label": "implicit-default"
+    },
+    {
+      "label": "explicit-default",
+      "presolve": "default"
+    },
+    {
+      "label": "conservative",
+      "presolve": "conservative"
+    },
+    {
+      "label": "aggressive",
+      "presolve": "aggressive"
+    },
+    {
+      "label": "abort-0.0001",
+      "presolve": "default",
+      "param.presolve-abort-fraction": "0.0001"
+    },
+    {
+      "label": "abort-0.01",
+      "presolve": "default",
+      "param.presolve-abort-fraction": "0.01"
+    }
+  ],
+  "seeds": [
+    3,
+    11
+  ],
+  "repeats": 2
+}
