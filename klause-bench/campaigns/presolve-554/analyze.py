@@ -129,7 +129,8 @@ def analyze(cases, control):
                             'validationPolicies': dict(Counter(r.get('validationPolicy', 'missing') for r in recorded)),
                             'sourceValidation': dict(Counter(r.get('stats', {}).get('sourceValidation', 'absent')
                                                               for r in recorded)),
-                            'retainedWitnesses': sum(r.get('sourceWitness') is not None for r in recorded),
+                            'retainedWitnesses': sum(r.get('finalWitness') is not None or
+                                r.get('sourceWitness') is not None for r in recorded),
                             'retainedOutputHashes': sum(r.get('sourceOutputSha256') is not None for r in recorded)}
     pairs = {}
     for label in labels:
