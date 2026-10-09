@@ -115,6 +115,65 @@ class CpSearchComponentTest {
     }
 
     @Test
+    fun `late equality exclusions explain through their establishing source bound`() {
+        val cases = listOf(
+            Triple(IntDomain(0, 10), 5L, SearchDecision.IntAtLeast(7, 6L) to 8L),
+            Triple(IntDomain(0, 10), 5L, SearchDecision.IntAtMost(7, 4L) to 2L),
+            Triple(
+                IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 4),
+                Long.MIN_VALUE + 1,
+                SearchDecision.IntAtLeast(7, Long.MIN_VALUE + 2) to Long.MIN_VALUE + 3,
+            ),
+            Triple(
+                IntDomain(Long.MAX_VALUE - 4, Long.MAX_VALUE),
+                Long.MAX_VALUE - 1,
+                SearchDecision.IntAtMost(7, Long.MAX_VALUE - 2) to Long.MAX_VALUE - 3,
+            ),
+        )
+        for ((domain, excluded, bounds) in cases) {
+            val native = PropagationSession(Problem(1, 1, arrayOf(domain), emptyArray()))
+            val cp = CpSearchComponent(native, intArrayOf(7))
+            cp.rebase()
+            val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val (establishing, later) = bounds
+            assertIs<ComponentResult.Consistent>(session.push(establishing))
+            val equality = native.equalityLit(0, excluded, positive = true)
+            assertIs<ComponentResult.Consistent>(
+                cp.import(
+                    assertIs<PropagationResult.Implied>(
+                        native.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), equality)), lbd = 2),
+                    ),
+                    session,
+                ),
+            )
+            val consequence = if (establishing is SearchDecision.IntAtLeast) {
+                native.boundGeLit(0, later, positive = true)
+            } else {
+                native.boundLeLit(0, later, positive = true)
+            }
+            assertIs<ComponentResult.Consistent>(
+                cp.import(
+                    assertIs<PropagationResult.Implied>(
+                        native.addLearnedClause(Clause(intArrayOf(Lit.make(0, false), consequence)), lbd = 2),
+                    ),
+                    session,
+                ),
+            )
+
+            assertEquals(true, session.boolValue(0))
+            assertEquals(
+                later,
+                if (establishing is SearchDecision.IntAtLeast) session.intLowerBound(7) else session.intUpperBound(7),
+            )
+            assertEquals(
+                setOf(Lit.make(0, true), assertNotNull(session.atomLiteral(establishing)) xor 1),
+                cp.reasonFor(Lit.make(0, true))?.literals?.toSet(),
+            )
+        }
+    }
+
+    @Test
     fun `complements of extreme finite bounds refute without wrapping`() {
         for (upper in listOf(false, true)) {
             val cp = CpSearchComponent(

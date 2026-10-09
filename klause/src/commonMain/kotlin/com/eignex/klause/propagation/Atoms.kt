@@ -71,11 +71,13 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
             val d = intDomains[v]
             // A value carved on this path (or strictly interior) was ruled out at its carve, so the
             // carve level is the real level — not a later bound move that snapped over an
-            // already-dead value. A value swept past an endpoint is ruled out by that live endpoint.
+            // already-dead value. A bound exclusion takes the first crossing's level.
             when {
                 holeHistHas(v, k) -> holeLevelFor(v, k)
-                k < d.min -> endpointLevel(v, viaMax = false)
-                k > d.max -> endpointLevel(v, viaMax = true)
+                k < d.min -> boundEstablishmentLevel(v, k + 1, lower = true)
+                    ?: endpointLevel(v, viaMax = false)
+                k > d.max -> boundEstablishmentLevel(v, k - 1, lower = false)
+                    ?: endpointLevel(v, viaMax = true)
                 else -> holeLevelFor(v, k)
             }
         }
@@ -223,9 +225,9 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     // Only a threshold the live endpoint sits exactly on can be explained: that endpoint move is the
     // one that established this atom's truth, so its premises ([endpointReason], over other
     // variables) are all established before it, and before anything that cites the atom. A true eq
-    // atom is the singleton case and cites its two live endpoint bounds; a carved eq-false atom
-    // cites the cross-variable carve reason. Every reason is a valid standalone clause, so recursive
-    // clause minimization resolving through it stays sound.
+    // atom cites both endpoint bounds; a carved eq-false atom cites the carve reason, and a bound
+    // exclusion cites the adjacent order atom whose reason preserves the first crossing. Every reason is
+    // a valid standalone clause, so recursive clause minimization resolving through it stays sound.
     return when (atoms.kind[atomId]) {
         AtomKind.GE ->
             if (truth) {
@@ -245,7 +247,11 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
             if (truth) {
                 composeIntVarAtomAntecedents(intArrayOf(v))
             } else {
-                if (holeHistHas(v, k) || k in d.min..d.max) reasonOf(holeReasonFor(v, k)) else null
+                when {
+                    holeHistHas(v, k) || k in d.min..d.max -> reasonOf(holeReasonFor(v, k))
+                    k < d.min -> intArrayOf(Lit.make(atomVarGe(v, k + 1), false))
+                    else -> intArrayOf(Lit.make(atomVarLe(v, k - 1), false))
+                }
             }
     }
 }
