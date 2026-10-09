@@ -1,0 +1,500 @@
+{
+  "name": "shared-conflict-coverage-1630",
+  "description": "Compare shared conflict telemetry against the unchanged baseline at equal decision allowance. Recount the dormant non-asserting trigger and check verdict/work parity and runtime overhead across frozen DTP and format controls.",
+  "problems": [],
+  "problemList": [
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "DTP/DTP_k2_n35_c175_s12",
+      "collection": "smtlib-qf_idl",
+      "family": "DTP",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "DTP/DTP_k2_n35_c175_s18",
+      "collection": "smtlib-qf_idl",
+      "family": "DTP",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "DTP/DTP_k2_n35_c175_s9",
+      "collection": "smtlib-qf_idl",
+      "family": "DTP",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "20210312-Bouvier/vlsat3_i06",
+      "collection": "smtlib-qf_idl",
+      "family": "20210312-Bouvier",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "20220214-RVpredict-BohanLi/RVpredict_13",
+      "collection": "smtlib-qf_idl",
+      "family": "20220214-RVpredict-BohanLi",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "20220214-jobshop-BohanLi/jobshop30-2-15-15-4-4-16",
+      "collection": "smtlib-qf_idl",
+      "family": "20220214-jobshop-BohanLi",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "Averest/buble_sort/BubbleSort_safe_bgmc004",
+      "collection": "smtlib-qf_idl",
+      "family": "Averest",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "DTP/DTP_k2_n35_c210_s6",
+      "collection": "smtlib-qf_idl",
+      "family": "DTP",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "RTCL/b13_tf_10/ckt_PROP3_tf_10",
+      "collection": "smtlib-qf_idl",
+      "family": "RTCL",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "asp/GeneralizedSlitherlink/altair1.48.asp",
+      "collection": "smtlib-qf_idl",
+      "family": "asp",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "bcnscheduling/bcnscheduling139",
+      "collection": "smtlib-qf_idl",
+      "family": "bcnscheduling",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "cellar/CELAR7_SUB2",
+      "collection": "smtlib-qf_idl",
+      "family": "cellar",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "check/int_incompleteness1",
+      "collection": "smtlib-qf_idl",
+      "family": "check",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "diamonds/diamonds.15.3.i.a.u",
+      "collection": "smtlib-qf_idl",
+      "family": "diamonds",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "fuzzy-matrix/Waldmann_r6.srs_slice-4_constraint-151140",
+      "collection": "smtlib-qf_idl",
+      "family": "fuzzy-matrix",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "job_shop/jobshop30-2-15-15-2-4-9",
+      "collection": "smtlib-qf_idl",
+      "family": "job_shop",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "mathsat/fischer/FISCHER10-6-ninc",
+      "collection": "smtlib-qf_idl",
+      "family": "mathsat",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "parity/26.600.graph",
+      "collection": "smtlib-qf_idl",
+      "family": "parity",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "planning/plan-13.cvc",
+      "collection": "smtlib-qf_idl",
+      "family": "planning",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "qlock/qlock-4-10-9.induction.cvc",
+      "collection": "smtlib-qf_idl",
+      "family": "qlock",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "queens_bench/super_queen/super_queen92-1",
+      "collection": "smtlib-qf_idl",
+      "family": "queens_bench",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "sal/bakery/inf-bakery-mutex-1",
+      "collection": "smtlib-qf_idl",
+      "family": "sal",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "schedulingIDL/gp10_05_mkspan1069",
+      "collection": "smtlib-qf_idl",
+      "family": "schedulingIDL",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qfidl",
+      "problem": "sep/railroad/RailRoad_neg_0",
+      "collection": "smtlib-qf_idl",
+      "family": "sep",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "20180326-Bromberger/more_slacked/CAV_2009_benchmarks/smt/10-vars/v10_problem_2__009.smt2.slack",
+      "collection": "smtlib-qf_lia",
+      "family": "20180326-Bromberger",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "2019-cmodelsdiff/wireRouting/wire.12.x.12.b.5.a.20_unsat.data",
+      "collection": "smtlib-qf_lia",
+      "family": "2019-cmodelsdiff",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "2019-ezsmt/incrementalScheduling/214-incremental_scheduling-27000-0",
+      "collection": "smtlib-qf_lia",
+      "family": "2019-ezsmt",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "20210219-Dartagnan/ConcurrencySafety-Main/stack-2-O0",
+      "collection": "smtlib-qf_lia",
+      "family": "20210219-Dartagnan",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "20220307-SMPT/RobotManipulation-PT-10000/RF-11",
+      "collection": "smtlib-qf_lia",
+      "family": "20220307-SMPT",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "20230321-UltimateAutomizerSvcomp2023/jain_5-2.c_7",
+      "collection": "smtlib-qf_lia",
+      "family": "20230321-UltimateAutomizerSvcomp2023",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "20231117-c_inference/50_50_74_13_sat",
+      "collection": "smtlib-qf_lia",
+      "family": "20231117-c_inference",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "Averest/parallel_prefix_sum/ParallelPrefixSum_safe_blmc003",
+      "collection": "smtlib-qf_lia",
+      "family": "Averest",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "CAV_2009_benchmarks/smt/10-vars/problem_2__030",
+      "collection": "smtlib-qf_lia",
+      "family": "CAV_2009_benchmarks",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "CIRC/multiplier/MULTIPLIER_10.msat",
+      "collection": "smtlib-qf_lia",
+      "family": "CIRC",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "RTCL/b04_tf_20/ckt_PROP0_tf_20",
+      "collection": "smtlib-qf_lia",
+      "family": "RTCL",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "RWS/Example_2.txt",
+      "collection": "smtlib-qf_lia",
+      "family": "RWS",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "arctic-matrix/constraint-1228327",
+      "collection": "smtlib-qf_lia",
+      "family": "arctic-matrix",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "bofill-scheduling/SMT_real_LIA/ex5680_2400_100",
+      "collection": "smtlib-qf_lia",
+      "family": "bofill-scheduling",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflia",
+      "problem": "calypto/problem-004299.cvc.1",
+      "collection": "smtlib-qf_lia",
+      "family": "calypto",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflra",
+      "problem": "2017-Heizmann-UltimateInvariantSynthesis/_standard_strcpy_original.i_3_3_2.bpl_11",
+      "collection": "smtlib-qf_lra",
+      "family": "2017-Heizmann-UltimateInvariantSynthesis",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflra",
+      "problem": "2019-ezsmt/blending/13",
+      "collection": "smtlib-qf_lra",
+      "family": "2019-ezsmt",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflra",
+      "problem": "DTP-Scheduling/constraints-tempo-depth-9",
+      "collection": "smtlib-qf_lra",
+      "family": "DTP-Scheduling",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflra",
+      "problem": "LassoRanker/Ultimate/Gcd.bpl_Iteration1_Lasso_7-phaseTemplate",
+      "collection": "smtlib-qf_lra",
+      "family": "LassoRanker",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflra",
+      "problem": "TM/p-DepotsNum_s8.msat",
+      "collection": "smtlib-qf_lra",
+      "family": "TM",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflra",
+      "problem": "check/bignum_lra2",
+      "collection": "smtlib-qf_lra",
+      "family": "check",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflra",
+      "problem": "clock_synchro/clocksynchro_6clocks.worst_case_skew.base",
+      "collection": "smtlib-qf_lra",
+      "family": "clock_synchro",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "smtlib-qflra",
+      "problem": "keymaera/water_tank-node5964",
+      "collection": "smtlib-qf_lra",
+      "family": "keymaera",
+      "format": "SMTLIB",
+      "category": "CSP"
+    },
+    {
+      "suite": "dimacs-core",
+      "problem": "php4",
+      "collection": "klause-bench/smoke-corpus/dimacs",
+      "family": "php4",
+      "format": "DIMACS",
+      "category": "UNSAT"
+    },
+    {
+      "suite": "dimacs-core",
+      "problem": "php3",
+      "collection": "klause-bench/smoke-corpus/dimacs",
+      "family": "php3",
+      "format": "DIMACS",
+      "category": "UNSAT"
+    },
+    {
+      "suite": "dimacs-core",
+      "problem": "implication-chain",
+      "collection": "klause-bench/smoke-corpus/dimacs",
+      "family": "implication-chain",
+      "format": "DIMACS",
+      "category": "SAT"
+    },
+    {
+      "suite": "dimacs-core",
+      "problem": "bipartite-2col",
+      "collection": "klause-bench/smoke-corpus/dimacs",
+      "family": "bipartite-2col",
+      "format": "DIMACS",
+      "category": "SAT"
+    },
+    {
+      "suite": "dimacs-core",
+      "problem": "random3sat-20-80",
+      "collection": "klause-bench/smoke-corpus/dimacs",
+      "family": "random3sat-20-80",
+      "format": "DIMACS",
+      "category": "SAT"
+    },
+    {
+      "suite": "dimacs-core",
+      "problem": "random3sat-50-200",
+      "collection": "klause-bench/smoke-corpus/dimacs",
+      "family": "random3sat-50-200",
+      "format": "DIMACS",
+      "category": "SAT"
+    },
+    {
+      "suite": "opb-core",
+      "problem": "setcover-tiny",
+      "collection": "klause-bench/smoke-corpus/opb",
+      "family": "setcover-tiny",
+      "format": "OPB",
+      "category": "PACKING"
+    },
+    {
+      "suite": "opb-core",
+      "problem": "pb-cardinality",
+      "collection": "klause-bench/smoke-corpus/opb",
+      "family": "pb-cardinality",
+      "format": "OPB",
+      "category": "SAT"
+    },
+    {
+      "suite": "opb-core",
+      "problem": "sporttournament06",
+      "collection": "klause-bench/smoke-corpus/opb",
+      "family": "sporttournament06",
+      "format": "OPB",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "opb-core",
+      "problem": "queens4-soft",
+      "collection": "klause-bench/smoke-corpus/opb",
+      "family": "queens4-soft",
+      "format": "OPB",
+      "category": "OPTIMIZATION"
+    },
+    {
+      "suite": "xcsp3-core",
+      "problem": "magic-series-tiny",
+      "collection": "klause-bench/smoke-corpus/xcsp3",
+      "family": "magic-series-tiny",
+      "format": "XCSP3",
+      "category": "CSP"
+    },
+    {
+      "suite": "xcsp3-core",
+      "problem": "sum-opt-tiny",
+      "collection": "klause-bench/smoke-corpus/xcsp3",
+      "family": "sum-opt-tiny",
+      "format": "XCSP3",
+      "category": "OPTIMIZATION"
+    }
+  ],
+  "base": {
+    "engine": "fixed",
+    "processors": "1",
+    "timeout": "10000",
+    "presolve": "off",
+    "param.max-decisions": "50000"
+  },
+  "configs": [
+    {
+      "label": "baseline",
+      "ref": "58ae735e7b527a9d5e1050a0111b78f38b8590f0"
+    },
+    {
+      "label": "coverage",
+      "ref": "codex/shared-conflict-coverage"
+    }
+  ],
+  "repeats": 3,
+  "host": "aws",
+  "machines": 2,
+  "parallel": 2
+}
