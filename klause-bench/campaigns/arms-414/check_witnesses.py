@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Run independent MiniZinc pinned-source checks in GitHub CI, outside campaign timings."""
 import argparse
+from decimal import Decimal
 import gzip
 import json
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 
@@ -25,6 +27,12 @@ def check(bench, jobs, output):
             if witness is None:
                 results.append(dict(job=job, case=case['index'], status='missing', reason='legacy record has no witness'))
                 continue
+            reported = re.search(r'(?m)^\s*_objective\s*=\s*([^;]+);', witness)
+            if reported and rec.get('objective') is not None:
+                if Decimal(reported.group(1).strip()) != Decimal(str(rec['objective'])):
+                    results.append(dict(job=job, case=case['index'], status='error',
+                                        reason='archived candidate does not support reported objective'))
+                    continue
             identity = (case['problem']['problem'], witness)
             if identity in seen:
                 continue
