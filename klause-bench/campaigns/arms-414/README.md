@@ -4,6 +4,7 @@ Refs [#414](https://github.com/Eignex/klause/issues/414). This bounded campaign 
 finite portfolios at p1 and p4 with 300-second budgets. It changes no defaults. Baseline:
 `5471419aa8c832ee1065468a6861bb203a1ff8c7`; measurement seam:
 `52193ef906cfedac893b1df8390559ca0495b59e` ([plumbing PR](https://github.com/Eignex/klause/pull/2374)).
+The measurement SHA is retained by remote branch `codex/arms-414-measurement-frozen`.
 
 ## Frozen design
 
@@ -118,10 +119,25 @@ Witness pilot 873 is complete: 24/24 feasible records retain a final candidate a
 covering both widths and both engines on all three formats. All eight MiniZinc candidates passed
 the pinned-source constraint and objective check in [CI run 37992827225](https://github.com/Eignex/klause/actions/runs/37992827225),
 with matching model/data hashes and no invalid or unknown verdict. Repeated controls 883 are also
-complete, with 24/24 records and no failed commands; their mining is pending the next CI update.
+complete, with 24/24 records and no failed commands. [CI run 37993711067](https://github.com/Eignex/klause/actions/runs/37993711067)
+mines the repeats and checks all 13 distinct MiniZinc candidates from both jobs, including agreement
+between the archived candidate's objective and its record. Every source check is valid.
 Baseline 875 and the split sweeps are
 submitted: reseeding [879](http://192.168.50.104:8420/jobs/879) / [880](http://192.168.50.104:8420/jobs/880),
 oversubscription [881](http://192.168.50.104:8420/jobs/881) / [882](http://192.168.50.104:8420/jobs/882),
 and repeated controls [883](http://192.168.50.104:8420/jobs/883). `jobs.json` records exact submissions.
 The measurement SHA stays frozen despite later formatting-only CI repairs. No result from an
 unfinished stage is a default recommendation.
+
+## Identical-seed repeats
+
+Job 883 repeats seed 3 three times per configuration at 15 seconds. Knapsack reaches and proves
+objective -318 in all 12 cases; process elapsed times range from 499 to 589 ms. City-position remains
+unproved in all 12 cases. At p1, cp returns 149925 and mixed returns 33156 in every repeat. At p4,
+cp ranges from 24058 to 53680 and mixed from 19370 to 26274. Best-incumbent times range from
+5.918 to 12.573 seconds for cp p4 and 1.450 to 12.600 seconds for mixed p4. Equal seeds do not
+remove parallel search variability; small timing or objective differences need confirmation.
+
+Within each width, the repeat configurations share the installed build fingerprint. Both widths
+share the runtime-file hash; their fingerprints differ because `ActiveProcessorCount` is 1 or 4.
+The recorded CLI options are `-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=N`.
