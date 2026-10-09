@@ -1,0 +1,44 @@
+{
+  "name": "construction-2328-accounting-integration",
+  "description": "Integration pair after portfolio reseeding and separate arm-work accounting merged. Pinned main ce0fbb58de84ff50d51759c4d3860a16ad2b2d50 versus construction candidate 73686b8996251a45682ff22c4eac483197576eab, IHTC and three first-solution/proof controls, default and expanded pools, serial cases on one AWS runner.",
+  "problems": [
+    {
+      "suite": "xcsp3-cop",
+      "name": "IHTC-i16_c25,Fortress1-05_c25,CyclicBandwidth-caterpillar13_c22,CoinsGrid-19-09_c22",
+      "per-family": "1000",
+      "max": "4",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "processors": "1",
+    "timeout": "10000"
+  },
+  "configs": [
+    {
+      "ref": "ce0fbb58de84ff50d51759c4d3860a16ad2b2d50",
+      "label": "main-default"
+    },
+    {
+      "ref": "73686b8996251a45682ff22c4eac483197576eab",
+      "label": "candidate-default"
+    },
+    {
+      "ref": "ce0fbb58de84ff50d51759c4d3860a16ad2b2d50",
+      "label": "main-arms12",
+      "param.arms": "12"
+    },
+    {
+      "ref": "73686b8996251a45682ff22c4eac483197576eab",
+      "label": "candidate-arms12",
+      "param.arms": "12"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 1,
+  "parallel": 1,
+  "host": "aws",
+  "machines": 1
+}

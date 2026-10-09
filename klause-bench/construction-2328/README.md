@@ -37,8 +37,11 @@ The lab records `reported-result-v1`: incumbents pass the portfolio's model
 checker. No new independent source witness check or reference solve is claimed.
 Successful uninstrumented AWS cases retain reports rather than full solver
 streams. Profile stdout is a bench summary, not a complete source assignment.
-Records omit input content hashes; pinned catalog commits and catalog paths
-identify the inputs. Never treat an unproven incumbent as an optimum.
+Campaigns through lab 893 omit input content hashes; pinned catalog commits and
+catalog paths identify those inputs. Lab 897 retains plain-source hashes and
+final rendered witnesses for the controls. These are retained evidence, without
+an additional independent source check. Never treat an unproven incumbent as
+an optimum.
 
 `initMs` is included in segment `ms` and `maxMs`. `initWork` is included in
 `work`; main's missing `initWork` is unknown, not zero. Work counts search,
@@ -141,6 +144,39 @@ are in `lab-893`. Main and candidate installed-build fingerprints are
 `3d5b2a8bc14f8f145b178c8f6df3db07e1e63cea99216d429efef65e6eef1963`
 and `b51cf0a1c2854536819a4b26415f8531c7b98cb4f31342bbba0f85bc4c70e106`.
 
+## Integration with reseeding and arm accounting
+
+[Lab 897](http://192.168.50.104:8420/jobs/897) pairs main
+`ce0fbb58de84ff50d51759c4d3860a16ad2b2d50` with implementation
+`73686b8996251a45682ff22c4eac483197576eab`, including the merged portfolio
+reseeding controls and separation of arm work from contribution credit.
+`accounting-integration-paired.json` explicitly runs on AWS with seed 3, one
+repetition, four problems and two pools. All 16 cases complete. Every control
+retains an incumbent on both builds and pools; expanded CoinsGrid proves 2236.
+Main's default Fortress objective is 1139293 versus candidate's 1139298;
+default CoinsGrid is unproven at 6760 versus 5270. This single pair does not
+establish a solution-quality improvement or absence of regressions.
+
+Neither IHTC build or pool finds an incumbent. Both candidate pools cancel and
+retire their two backtrack openings, then give all four local-search arms and
+ALNS turns. Local search receives six segments, with zero reported work; ALNS
+charges its 5000-unit outer repair allowance. Main runs the two backtrack arms
+and three local-search arms, without an ALNS turn. Candidate opening totals are
+2183/2190 ms for default/expanded, versus main's 3951/4244 ms. Candidate IHTC
+reports no unexpected failures or faults. `lab-897/ihtc-family.csv` transcribes
+the complete per-family accounting from the retained case counters.
+
+All 16 records retain the same plain-source SHA-256 for a given problem across
+both builds and pools. The 12 control records retain final rendered witnesses;
+the four IHTC records have none. This records input identity and witnesses for
+future checking, while validation remains `reported-result-v1`. Main and
+candidate installed-build fingerprints are
+`1ae6a657b1483ad6f083af35e12dbae712b91680babda45bee955e464dbc8cc6`
+and `18ad627b46c891359422accc512adec53a617f1b87aedeef6656e05fc3547174`.
+The following commit `a7dc00e50903f7d7b2e1c7ef5ba8c9416b7a119a` only adds
+5 ms of opening time to the deadline contract test; its production source is
+identical to the measured candidate.
+
 ## Limits and validation
 
 Propagation and LP structures are allocated before the first opening guard;
@@ -151,9 +187,10 @@ do not imply useful sibling search or an IHTC incumbent. The broader allowance
 refactor in [2322](https://github.com/Eignex/klause/issues/2322) is outside this
 change; these records do not close the remaining construction allocation limit.
 
-[GitHub CI on 9316cc54e](https://github.com/Eignex/klause/actions/runs/37994351655)
-passes JVM, Linux native and lint/docs. It validates cancellation, partial construction, sibling and deferred-arm
-fallback, retirement, one opening/search deadline, construction charged once,
+[GitHub CI on a7dc00e50](https://github.com/Eignex/klause/actions/runs/37996659900)
+passes JVM, Linux native and lint/docs. It validates cancellation, partial
+construction, sibling and deferred-arm fallback, retirement, one opening/search
+deadline, construction charged once,
 resumed solve-wide node allowance and the one-shot unknown cancellation verdict.
 Before the remote-only policy, a local baseline CLI install completed, one
 focused test attempt failed compilation and another was interrupted with exit
