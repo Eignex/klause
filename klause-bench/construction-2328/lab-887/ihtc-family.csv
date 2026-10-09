@@ -1,0 +1,17 @@
+case,build,pool,seed,repeat,btSetupMs,btSearchAndOverheadMs,btWork,btInitWork,lsSegments,lsMs,lsWork,alnsSegments,alnsMs,alnsWork
+49,main,default,3,0,4705,162,13250,,0,0,0,0,0,0
+50,candidate,default,3,0,2400,3,0,0,4,2009,0,1,755,5000
+53,main,default,3,1,4625,163,13250,,1,619,0,0,0,0
+54,candidate,default,3,1,2418,3,0,0,4,1985,0,1,760,5000
+57,main,default,7,0,4323,153,13250,,1,840,0,0,0,0
+58,candidate,default,7,0,2394,2,0,0,4,2067,0,1,764,5000
+61,main,default,7,1,4616,152,13250,,1,587,0,0,0,0
+62,candidate,default,7,1,2318,2,0,0,4,2017,0,1,785,5000
+51,main,arms12,3,0,4331,140,13250,,0,0,0,0,0,0
+48,candidate,arms12,3,0,2466,3,0,0,4,2050,0,1,799,5000
+55,main,arms12,3,1,4530,150,13250,,1,571,0,0,0,0
+52,candidate,arms12,3,1,2391,2,0,0,4,2040,0,1,793,5000
+59,main,arms12,7,0,4668,156,13250,,1,582,0,0,0,0
+56,candidate,arms12,7,0,2336,2,0,0,4,2035,0,1,792,5000
+63,main,arms12,7,1,4586,152,13250,,1,604,0,0,0,0
+60,candidate,arms12,7,1,2380,2,0,0,4,2025,0,1,794,5000
