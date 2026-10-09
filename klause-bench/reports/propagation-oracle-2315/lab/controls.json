@@ -1,0 +1,17 @@
+{
+  "name": "oracle-2315-source-controls",
+  "description": "Behavioral controls for the test-only propagation oracle and integration stack. Run the existing small integer/real SMT-LIB and MPS fixtures on baseline, reproducer, corrected oracle and integrated sources. These unchanged production builds must agree with the catalog's known verdicts and optima. The actual faulty-oracle rejection and lifecycle regressions run in GitHub CI; this lab job cannot exercise commonTest code. No timing or performance claim is made.",
+  "host": "aws",
+  "machines": 1,
+  "parallel": 1,
+  "problems": { "suite": "smtlib-core,mps-core", "reference": "any" },
+  "base": { "engine": "cp", "processors": "1", "timeout": "5000" },
+  "configs": [
+    { "label": "baseline", "ref": "5471419aa8c832ee1065468a6861bb203a1ff8c7" },
+    { "label": "reproducer", "ref": "3afe432b9b8ac3b2a4ecd2d75404c12e7803dc75" },
+    { "label": "correction", "ref": "80e6add305cf2936804e4ce11dfc914543d4b9ea" },
+    { "label": "integration", "ref": "39dc3e2a84c78984e2edff9588911a415734e5a1" }
+  ],
+  "seeds": [0, 1],
+  "repeats": 1
+}

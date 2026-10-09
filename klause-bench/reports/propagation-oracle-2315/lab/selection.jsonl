@@ -1,0 +1,11 @@
+{"suite":"smtlib-core","problem":"lia-basic","collection":"klause-bench/smoke-corpus/smtlib","family":"lia-basic","format":"SMTLIB","category":"CSP"}
+{"suite":"smtlib-core","problem":"lia-opt","collection":"klause-bench/smoke-corpus/smtlib","family":"lia-opt","format":"SMTLIB","category":"OPTIMIZATION"}
+{"suite":"smtlib-core","problem":"lia-unsat","collection":"klause-bench/smoke-corpus/smtlib","family":"lia-unsat","format":"SMTLIB","category":"UNSAT"}
+{"suite":"smtlib-core","problem":"lia-disjunction","collection":"klause-bench/smoke-corpus/smtlib","family":"lia-disjunction","format":"SMTLIB","category":"CSP"}
+{"suite":"smtlib-core","problem":"lra-rational","collection":"klause-bench/smoke-corpus/smtlib","family":"lra-rational","format":"SMTLIB","category":"CSP"}
+{"suite":"smtlib-core","problem":"lia-wide-span","collection":"klause-bench/smoke-corpus/smtlib","family":"lia-wide-span","format":"SMTLIB","category":"CSP"}
+{"suite":"mps-core","problem":"blend-tiny","collection":"klause-bench/smoke-corpus/mps","family":"blend-tiny","format":"MPS","category":"OPTIMIZATION"}
+{"suite":"mps-core","problem":"feasible-tiny","collection":"klause-bench/smoke-corpus/mps","family":"feasible-tiny","format":"MPS","category":"CSP"}
+{"suite":"mps-core","problem":"float-tiny","collection":"klause-bench/smoke-corpus/mps","family":"float-tiny","format":"MPS","category":"CSP"}
+{"suite":"mps-core","problem":"infeasible-tiny","collection":"klause-bench/smoke-corpus/mps","family":"infeasible-tiny","format":"MPS","category":"UNSAT"}
+

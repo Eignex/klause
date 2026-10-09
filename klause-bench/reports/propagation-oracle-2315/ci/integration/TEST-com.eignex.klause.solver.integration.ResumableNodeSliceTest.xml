@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ResumableNodeSliceTest[jvm]" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-09T21:07:37.776Z" hostname="runnervmmprz5" time="0.204">
+  <properties/>
+  <testcase name="a node-budgeted slice stops on its budget rather than running the search out[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.007"/>
+  <testcase name="the same node budget stops at the same place every time[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.007"/>
+  <testcase name="leaf LP completions spend work even without a node LP arm[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.008"/>
+  <testcase name="a constructor refutation returns when root work consumes the slice[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.002"/>
+  <testcase name="a mixed search sliced one node at a time still proves its optimum[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.102"/>
+  <testcase name="an LP arm's slice spends its LP work as nodes[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.049"/>
+  <testcase name="successive node-budgeted slices resume rather than restart[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.008"/>
+  <testcase name="propagation charged slices preserve the optimum and decision count[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.01"/>
+  <testcase name="an LP arm repays the LP work one slice overspent with slices that explore nothing[jvm]" classname="com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

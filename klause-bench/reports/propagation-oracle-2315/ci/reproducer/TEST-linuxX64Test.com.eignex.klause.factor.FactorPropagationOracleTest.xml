@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-09T20:48:03.657Z" hostname="runnervmmprz5" time="0.0">
+  <properties/>
+  <testcase name="baked reference hides unsound root pruning from the oracle[linuxX64]" classname="linuxX64Test.com.eignex.klause.factor.FactorPropagationOracleTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

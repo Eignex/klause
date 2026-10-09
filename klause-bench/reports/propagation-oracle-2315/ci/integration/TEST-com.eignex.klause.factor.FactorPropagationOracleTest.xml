@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="FactorPropagationOracleTest[jvm]" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-09T21:06:54.174Z" hostname="runnervmmprz5" time="0.047">
+  <properties/>
+  <testcase name="declared holes and both Boolean values reach direct semantics[jvm]" classname="com.eignex.klause.factor.FactorPropagationOracleTest" time="0.009"/>
+  <testcase name="a baked model cannot masquerade as original declarations[jvm]" classname="com.eignex.klause.factor.FactorPropagationOracleTest" time="0.002"/>
+  <testcase name="declared reference rejects unsound root pruning[jvm]" classname="com.eignex.klause.factor.FactorPropagationOracleTest" time="0.022"/>
+  <testcase name="the empty assignment is classified exactly once[jvm]" classname="com.eignex.klause.factor.FactorPropagationOracleTest" time="0.001"/>
+  <testcase name="wide sparse declarations select exact invariant semantics[jvm]" classname="com.eignex.klause.factor.FactorPropagationOracleTest" time="0.011"/>
+  <testcase name="the enumeration cap applies before sound root pruning[jvm]" classname="com.eignex.klause.factor.FactorPropagationOracleTest" time="0.0"/>
+  <testcase name="direct semantics reject a faulty invariant[jvm]" classname="com.eignex.klause.factor.FactorPropagationOracleTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
