@@ -18,6 +18,34 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `a late mixed clause implication survives an asserting backjump`() {
+        val session = PropagationSession(
+            Problem(
+                3,
+                2,
+                Array(2) { IntDomain(0, 2) },
+                arrayOf(
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
+                ),
+            ),
+        )
+        assertIs<PropagationResult.Implied>(session.pinIntAtLeast(0, 1))
+        assertIs<PropagationResult.Implied>(session.pinIntAtLeast(1, 1))
+        val bound = session.explanationState.atomVarGe(0, 1)
+        assertIs<PropagationResult.Implied>(
+            session.addLearnedClause(Clause(intArrayOf(Lit.make(bound, false), Lit.make(0, true))), lbd = 2),
+        )
+
+        val conflict = assertIs<PropagationResult.Unsat>(session.pinBool(1, true))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        session.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(session.addLearnedClause(Clause(learned.literals), learned.lbd))
+
+        assertEquals(false, session.boolValue(1))
+    }
+
+    @Test
     fun `integer probes expose complete domains until popped`() {
         val session = PropagationSession(
             Problem(
