@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -27,6 +28,27 @@ class SolveMetricResultTest {
         timestamp = "t",
         command = "c",
     )
+
+    @Test
+    fun `the final MPS assignment survives durable records without changing verdict credit`() {
+        val record = rec(true, 3.0, 100, false)
+
+        val witnessed = record.withMpsWitness(Format.MPS, "v x=4\nv x=3/2\ns SATISFIABLE\n")
+        val decoded = Reports.json.decodeFromString<SolveRecord>(Reports.json.encodeToString(witnessed))
+
+        assertEquals("v x=3/2", decoded.mpsWitness)
+        assertEquals(record, decoded.copy(mpsWitness = null))
+    }
+
+    @Test
+    fun `absent and non MPS assignments have no MPS witness`() {
+        val record = rec(null, null, null, false)
+        val cases = listOf(Format.MPS to null, Format.MPS to "s UNKNOWN\n", Format.SMTLIB to "v x=3\n")
+
+        for ((format, output) in cases) {
+            assertEquals(record, record.withMpsWitness(format, output))
+        }
+    }
 
     @Test
     fun `a source rejected result receives no solution or proof credit`() {

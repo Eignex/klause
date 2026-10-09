@@ -2,6 +2,7 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
@@ -103,7 +104,14 @@ internal data class SolveRecord(
     val validationPolicy: String = REPORTED_RESULT_POLICY,
     /** Subprocess duration, separate from incumbent timings; null when unavailable or in legacy records. */
     val elapsedMs: Long? = null,
+    val mpsWitness: String? = null,
 )
+
+internal fun SolveRecord.withMpsWitness(format: Format, output: String?): SolveRecord = if (format == Format.MPS) {
+    copy(mpsWitness = output?.lineSequence()?.lastOrNull { it.startsWith("v ") })
+} else {
+    this
+}
 
 internal object SolveMetric {
     private const val SOLVE_SEED = 3L
@@ -343,7 +351,7 @@ internal object SolveMetric {
             } else {
                 reported
             }
-            checked to r.rawOutput
+            checked.withMpsWitness(entry.ref.format, r.rawOutput) to r.rawOutput
         }.getOrElse {
             println("?? [${entry.name}] $kind ERROR: ${it.message ?: it::class.simpleName}")
             errorRecord(entry, solverId, settings, budget, kind, timestamp, sha) to null
