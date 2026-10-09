@@ -249,6 +249,9 @@ class NValuePropagatorTest {
                 intDomains = doms,
                 factors = arrayOf<Factor>(NValue(n = xsCount, xs = IntArray(xsCount) { it }, mode = mode)),
             )
+            FactorPropagationOracle.assertSound(problem, "nvalue-$mode-direct") { sample ->
+                relates(sample.ints[xsCount].toInt(), sample.ints.take(xsCount).distinct().size)
+            }
             val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "mode=$mode: enumerated (xs, n) set must equal brute force")

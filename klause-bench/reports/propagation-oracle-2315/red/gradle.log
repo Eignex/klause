@@ -1,0 +1,44 @@
+Starting a Gradle Daemon, 2 busy and 1 incompatible and 3 stopped Daemons could not be reused, use --status for details
+Reusing configuration cache.
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause:jvmTestProcessResources UP-TO-DATE
+> Task :klause:koverFindJar UP-TO-DATE
+> Task :klause:processJvmTestResources SKIPPED
+> Task :klause:compileKotlinJvm UP-TO-DATE
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses UP-TO-DATE
+> Task :klause:jvmJar UP-TO-DATE
+
+> Task :klause:compileTestKotlinJvm
+w: file:///home/rasmus/.codex/worktrees/oracle-reference-2315/klause/klause/src/commonTest/kotlin/com/eignex/klause/portfolio/PortfolioTest.kt:1020:43 Expression is unused.
+
+> Task :klause:compileJvmTestJava NO-SOURCE
+> Task :klause:jvmTestClasses
+
+> Task :klause:jvmTest
+WARNING: Using incubator modules: jdk.incubator.vector
+
+FactorPropagationOracleTest[jvm] > declared reference rejects unsound root pruning[jvm] FAILED
+    java.lang.AssertionError at FactorPropagationOracleTest.kt:44
+
+1 test completed, 1 failed
+
+> Task :klause:jvmTest FAILED
+
+[Incubating] Problems report is available at: file:///home/rasmus/.codex/worktrees/oracle-reference-2315/klause/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':klause:jvmTest'.
+> There were failing tests. See the report at: file:///home/rasmus/.codex/worktrees/oracle-reference-2315/klause/klause/build/reports/tests/jvmTest/index.html
+
+* Try:
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+BUILD FAILED in 36s
+7 actionable tasks: 3 executed, 4 up-to-date
+Configuration cache entry reused.
