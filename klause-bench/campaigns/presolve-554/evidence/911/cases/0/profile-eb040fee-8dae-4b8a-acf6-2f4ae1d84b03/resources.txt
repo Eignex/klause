@@ -1,0 +1,5 @@
+peakRssKiB=245964
+userSeconds=333.51
+systemSeconds=1.95
+wallSeconds=320.65
+exit=0

@@ -272,8 +272,11 @@ cost and deadline overshoot, not a guarantee for other inputs.
 [Job 911](http://192.168.50.104:8420/jobs/911) is a separate AWS JFR diagnostic of
 the capped GFD case, using the same frozen source, `profileCli=true` and
 `parallel=1`. The submitted specification is `experiments/gfd-probe-profile.json`.
-Its timings are excluded from campaign estimates. The recording will identify
-which preparation operation consumes the time; the diagnostic result is pending.
+Its timings are excluded from campaign estimates. It completed with 319,871 ms in
+preparation and 320,657 ms in the CLI subprocess, returning unknown with the same
+43,915 aggregate probes. The retained JFR, record, measurement manifest and peak
+RSS are archived under `evidence/911`; CI summarizes execution samples using the
+existing JFR helper. The profile summary is pending.
 
 Partial snapshots under `evidence/906/partial-*.json.gz` and
 `evidence/907/partial-*.json.gz` validate the analyzer on process-clock records
