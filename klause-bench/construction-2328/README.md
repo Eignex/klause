@@ -21,7 +21,7 @@ IHTC is the trigger; Fortress, CyclicBandwidth and CoinsGrid control for the
 first-solution and proof behavior of small and expanded pools.
 
 Read raw case records with `lab cases 853`, export `lab csv 853`, and retain
-raw streams with `lab fetch 853`. Each record includes the executed command,
+available reports with `lab fetch 853`. Each record includes the executed command,
 installed-build fingerprint, budget, incumbent attribution and solver counters.
 Compare `arm.*` statistics: `initMs` is inside segment `ms`; `maxMs` includes
 construction; `work` includes root propagation at the scheduler's conversion
@@ -74,3 +74,16 @@ next local focused attempt was stopped with exit 130 before any tests ran.
 No completed local test validation is claimed. All subsequent builds,
 experiments and profiles use AWS klause-lab; all test/lint/docs gates use
 GitHub CI.
+
+The diagnostic [lab 864](http://192.168.50.104:8420/jobs/864) completes both
+profiled IHTC cases. Its candidate retires both backtrack openings and runs
+all five remaining arms. This only diagnoses yielding under instrumentation;
+it is not paired uninstrumented timing evidence. Complete profile case
+records are archived in `lab-864`; the lab Files page retains JFR recordings,
+resource reports and measurement manifests. The raw stdout is the bench
+summary, not a complete source assignment.
+
+[Lab 872](http://192.168.50.104:8420/jobs/872) validates final production
+commit `f2c80682e3499439d200fdd22e4a6edea3a72a2e` against pinned main,
+with seeds 3 and 7 and two repetitions. It remains serial on one AWS runner;
+its build and runtime fingerprints determine the executed identities.

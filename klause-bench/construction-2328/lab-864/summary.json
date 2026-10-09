@@ -1,0 +1,300 @@
+[
+  {
+    "case": 0,
+    "arm": "main",
+    "seed": 3,
+    "repeat": 0,
+    "problem": {
+      "suite": "xcsp3-cop",
+      "problem": "IHTC-i16_c25",
+      "collection": "xcsp3-cop-22to25",
+      "family": "IHTC",
+      "format": "XCSP3",
+      "category": "OPTIMIZATION"
+    },
+    "status": "DONE",
+    "rawRecord": "http://192.168.50.104:8420/jobs/864/files/cases/0/record.json",
+    "executedCommit": "5471419aa8c832ee1065468a6861bb203a1ff8c7",
+    "buildFingerprint": "9e0b2681c6e78062b201bef8ca565dc5776f17aea1a98e4aa56028c613699f15",
+    "validationPolicy": "reported-result-v1",
+    "command": "/home/ubuntu/work/5471419aa8c8/klause-cli/build/install/klause-cli-jvm/bin/klause-cli /home/ubuntu/corpus/xcsp3-cop-22to25/COP22to25/IHTC-i16_c25.xml.zst -t 10000 -r 3 -s -a --output-objective",
+    "budgetMs": 10000,
+    "elapsedMs": 10564,
+    "feasible": null,
+    "proven": false,
+    "objective": null,
+    "timeToFirstFeasibleMs": null,
+    "timeToBestMs": null,
+    "attribution": [],
+    "families": {
+      "bt": {
+        "segments": 2,
+        "work": 13250,
+        "ms": 4401,
+        "initMs": 4221,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 180
+      },
+      "ls": {
+        "segments": 1,
+        "work": 0,
+        "ms": 1001,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 1001
+      },
+      "alns": {
+        "segments": 0,
+        "work": 0,
+        "ms": 0,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 0
+      }
+    },
+    "arms": {
+      "bt/satOptimized": {
+        "segments": 1,
+        "work": 6646,
+        "ms": 2047,
+        "initMs": 1867,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 180,
+        "initWork": null,
+        "searchWork": null
+      },
+      "bt/lp-default": {
+        "segments": 1,
+        "work": 6604,
+        "ms": 2354,
+        "initMs": 2354,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 0,
+        "initWork": null,
+        "searchWork": null
+      },
+      "ls/cbls/fixed": {
+        "segments": 1,
+        "work": 0,
+        "ms": 1001,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 1001,
+        "initWork": null,
+        "searchWork": null
+      },
+      "ls/cbls-plateau/ils-basin": {
+        "segments": 0,
+        "work": 0,
+        "ms": 0,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 0,
+        "initWork": null,
+        "searchWork": null
+      },
+      "ls/cbls-smooth/ils-basin": {
+        "segments": 0,
+        "work": 0,
+        "ms": 0,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 0,
+        "initWork": null,
+        "searchWork": null
+      },
+      "ls/sa/adaptive-perturb": {
+        "segments": 0,
+        "work": 0,
+        "ms": 0,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 0,
+        "initWork": null,
+        "searchWork": null
+      },
+      "alns/balanced": {
+        "segments": 0,
+        "work": 0,
+        "ms": 0,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 0,
+        "initWork": null,
+        "searchWork": null
+      }
+    }
+  },
+  {
+    "case": 1,
+    "arm": "candidate",
+    "seed": 3,
+    "repeat": 0,
+    "problem": {
+      "suite": "xcsp3-cop",
+      "problem": "IHTC-i16_c25",
+      "collection": "xcsp3-cop-22to25",
+      "family": "IHTC",
+      "format": "XCSP3",
+      "category": "OPTIMIZATION"
+    },
+    "status": "DONE",
+    "rawRecord": "http://192.168.50.104:8420/jobs/864/files/cases/1/record.json",
+    "executedCommit": "dbe4070b2201525e46fa48aa4ca6ef7aba736e81",
+    "buildFingerprint": "92dd95b3413f055405d870924213d42397790f65f4003acd8331601af30ef151",
+    "validationPolicy": "reported-result-v1",
+    "command": "/home/ubuntu/work/dbe4070b2201/klause-cli/build/install/klause-cli-jvm/bin/klause-cli /home/ubuntu/corpus/xcsp3-cop-22to25/COP22to25/IHTC-i16_c25.xml.zst -t 10000 -r 3 -s -a --output-objective",
+    "budgetMs": 10000,
+    "elapsedMs": 10446,
+    "feasible": null,
+    "proven": false,
+    "objective": null,
+    "timeToFirstFeasibleMs": null,
+    "timeToBestMs": null,
+    "attribution": [],
+    "families": {
+      "bt": {
+        "segments": 2,
+        "work": 0,
+        "ms": 2377,
+        "initMs": 2374,
+        "initCancelled": 2,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 3,
+        "initWork": 0,
+        "searchWork": 0
+      },
+      "ls": {
+        "segments": 4,
+        "work": 0,
+        "ms": 1981,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 1981,
+        "initWork": 0,
+        "searchWork": 0
+      },
+      "alns": {
+        "segments": 1,
+        "work": 5000,
+        "ms": 454,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 454,
+        "initWork": 0,
+        "searchWork": 5000
+      }
+    },
+    "arms": {
+      "bt/satOptimized": {
+        "segments": 1,
+        "work": 0,
+        "ms": 859,
+        "initMs": 856,
+        "initCancelled": 1,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 3,
+        "initWork": 0,
+        "searchWork": 0
+      },
+      "bt/lp-default": {
+        "segments": 1,
+        "work": 0,
+        "ms": 1518,
+        "initMs": 1518,
+        "initCancelled": 1,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 0,
+        "initWork": 0,
+        "searchWork": 0
+      },
+      "ls/cbls/fixed": {
+        "segments": 1,
+        "work": 0,
+        "ms": 638,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 638,
+        "initWork": 0,
+        "searchWork": 0
+      },
+      "ls/cbls-plateau/ils-basin": {
+        "segments": 1,
+        "work": 0,
+        "ms": 471,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 471,
+        "initWork": 0,
+        "searchWork": 0
+      },
+      "ls/cbls-smooth/ils-basin": {
+        "segments": 1,
+        "work": 0,
+        "ms": 505,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 505,
+        "initWork": 0,
+        "searchWork": 0
+      },
+      "ls/sa/adaptive-perturb": {
+        "segments": 1,
+        "work": 0,
+        "ms": 367,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 367,
+        "initWork": 0,
+        "searchWork": 0
+      },
+      "alns/balanced": {
+        "segments": 1,
+        "work": 5000,
+        "ms": 454,
+        "initMs": 0,
+        "initCancelled": 0,
+        "failures": 0,
+        "faults": 0,
+        "searchAndOverheadMs": 454,
+        "initWork": 0,
+        "searchWork": 5000
+      }
+    }
+  }
+]
