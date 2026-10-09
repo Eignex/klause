@@ -27,3 +27,17 @@ records directly, and shared lab infrastructure was not edited.
 
 Reproduce with `/home/rasmus/Workspaces/klause-lab/deploy/lab run flattening-spec.json`.
 The pinned commits can be used without these report-only follow-up commits.
+
+Lab job [787](http://192.168.50.104:8420/jobs/787) also ran `mzn-smoke/graph_coloring`
+through actual cp-sat search with the same hashes, seed, budget, serial queue and two repeats.
+All four runs proved objective 3. The installed cp-sat reported solveTime in this case
+(36–44 ms), contrary to the spec's exploratory description, so it does not exercise the
+missing-solveTime fallback. Candidate subprocess durations were 116 and 121 ms;
+incumbent times were 79 and 84 ms and remained distinct. Reported solveTime still wins
+for reference proof timing, while comparison timing retains time-to-best. The missing
+solveTime shape is covered by job 786 and the targeted regression tests.
+
+Targeted `SolverInvocationTest`, `SolveMetricResultTest`, and `BenchCacheTest` passed;
+the CLI installed successfully. An offline two-record UNSAT comparison used 140 and
+280 ms and split the equal-proof score 0.67/0.33. Full local check/lintDocs was skipped;
+GitHub CI is the full gate.
