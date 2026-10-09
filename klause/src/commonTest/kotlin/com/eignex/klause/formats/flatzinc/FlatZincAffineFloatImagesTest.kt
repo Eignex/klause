@@ -62,7 +62,10 @@ class FlatZincAffineFloatImagesTest {
 
             val deductions = assertIs<PropagationResult.Implied>(program.problem.baked)
 
-            assertEquals(predicate != "ne" && predicate != "lt", deductions.boolValueOrNull(program.boolVarsByName.getValue("result")))
+            assertEquals(
+                predicate != "ne" && predicate != "lt",
+                deductions.boolValueOrNull(program.boolVarsByName.getValue("result")),
+            )
         }
     }
 

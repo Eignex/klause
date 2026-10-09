@@ -36,9 +36,18 @@ class FlatZincEnigmaWitnessTest {
         for (declaration in original.varDecls) {
             val value = when {
                 declaration.value != null -> evaluate(declaration.value)
-                declaration.name in program.intVarsByName -> listOf(assignment.ints[program.intVarsByName.getValue(declaration.name)].toDouble())
-                declaration.name in program.boolVarsByName -> listOf(if (assignment.bools[program.boolVarsByName.getValue(declaration.name)]) 1.0 else 0.0)
-                else -> listOf(assignment.approximateRealValue(program.floatVarsByName.getValue(declaration.name).varId))
+                declaration.name in program.intVarsByName -> {
+                    val variable = program.intVarsByName.getValue(declaration.name)
+                    listOf(assignment.ints[variable].toDouble())
+                }
+                declaration.name in program.boolVarsByName -> {
+                    val variable = program.boolVarsByName.getValue(declaration.name)
+                    listOf(if (assignment.bools[variable]) 1.0 else 0.0)
+                }
+                else -> {
+                    val variable = program.floatVarsByName.getValue(declaration.name).varId
+                    listOf(assignment.approximateRealValue(variable))
+                }
             }
             values[declaration.name] = value
             when (val type = declaration.type) {
