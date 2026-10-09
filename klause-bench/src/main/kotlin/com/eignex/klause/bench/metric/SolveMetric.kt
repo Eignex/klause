@@ -106,6 +106,8 @@ internal data class SolveRecord(
     val elapsedMs: Long? = null,
     /** Original model/data SHA-256 when opt-in source validation was requested. */
     val sourceHashes: Map<String, String> = emptyMap(),
+    val sourceWitness: String? = null,
+    val sourceOutputSha256: String? = null,
 )
 
 internal object SolveMetric {
@@ -346,7 +348,16 @@ internal object SolveMetric {
                 ?: SolverInvocation.run(entry, solverId, sourceParams.solverSettings, budget, optimize)
                     .also { BenchCache.store(key, it) }
             val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
-                .copy(validationPolicy = policy, sourceHashes = sourceHashes)
+                .copy(
+                    validationPolicy = policy,
+                    sourceHashes = sourceHashes,
+                    sourceWitness = if (sourceParams.requested) {
+                        MiniZincSourceValidation.candidate(r.rawOutput)
+                    } else {
+                        null
+                    },
+                    sourceOutputSha256 = if (sourceParams.requested) sha256(r.rawOutput.toByteArray()) else null,
+                )
             val checked = if (checkSource) {
                 val validation = if (r.feasible == true) {
                     MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective)
