@@ -74,3 +74,19 @@ and runtime hashes/options, elapsed time, validation policy and statistics. The
 file listing supplies durable retrieval references for solver streams and setup
 logs. Collect finished jobs again to replace partial snapshots. The live job's
 `files` endpoint and `/experiments/<id>/cases.csv` remain independently accessible.
+
+## Frozen split
+
+`split.json` freezes 20 discovery and 12 holdout instances, one per base family
+(with the year removed for grouping). Its universe is the 62 MiniZinc identities
+already selected by lab status sweep 845; only identities were used for selection.
+This is an existing regression corpus with reference coverage, not an unbiased
+sample of the complete challenge archive. Selection uses SHA-256 order with the
+`presolve-554/` prefix, and the holdout excludes every pilot base family.
+Remaining families are reserved. Holdout is therefore independent by base family
+as well as by input; it cannot estimate within-family instance generalization.
+
+The pilot's 12 year/family groups are only nine base families because families
+recur across years. It is a bounded plumbing/cost screen with catalogue ordering,
+not the representative discovery campaign. Bootstrap intervals in `analyze.py`
+cluster by base family and average seeds/repeats within each cluster.
