@@ -1,0 +1,57 @@
+{
+  "name": "presolve-554-bacp-reference-check",
+  "description": "Investigate reference disagreements in initial presolve pilot: both CP-SAT and Chuffed store a proven objective 38 for 2011/bacp, while frozen main and default/conservative klause report objectives 29-30. Check current original-source witnesses remotely under off/default/conservative, single-arm controls and the original six-arm cardinality. No reference-solver arm.",
+  "host": "aws",
+  "problems": [
+    {
+      "suite": "mzn-bench",
+      "name": "2010/bacp",
+      "per-family": "1",
+      "max": "1",
+      "reference": "any"
+    },
+    {
+      "suite": "mzn-bench",
+      "name": "2011/bacp",
+      "per-family": "1",
+      "max": "1",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "ref": "09f01a9ba2b27755e4eb4008bf85070d14cf491e",
+    "engine": "cp",
+    "processors": "1",
+    "timeout": "10000",
+    "param.bt-arm": "satOptimized",
+    "param.arms": "1"
+  },
+  "configs": [
+    {
+      "label": "default-one",
+      "presolve": "default",
+      "param.source-validation": "true"
+    },
+    {
+      "label": "off-one",
+      "presolve": "off",
+      "param.source-validation": "true"
+    },
+    {
+      "label": "conservative-one",
+      "presolve": "conservative",
+      "param.source-validation": "true"
+    },
+    {
+      "label": "default-six",
+      "presolve": "default",
+      "param.arms": "6",
+      "param.source-validation": "true"
+    }
+  ],
+  "seeds": [
+    3,
+    11
+  ],
+  "repeats": 2
+}

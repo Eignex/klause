@@ -2,14 +2,14 @@
   {
     "url": "http://192.168.50.104:8420/jobs/863",
     "file": "job.json.gz",
-    "bytes": 250807,
-    "sha256": "49c991cc1c2aa925087f529060be03bffb76387c578c9f951ff2bb7544f270b1"
+    "bytes": 251457,
+    "sha256": "15f029f36c2cee9c846f759d98fffbf3e4a9b8e9aa03d6df96bdb5bbe0fd5de5"
   },
   {
     "url": "http://192.168.50.104:8420/experiments/863/cases",
     "file": "cases.json.gz",
-    "bytes": 4155004,
-    "sha256": "2b24f6678f78a00542889fe982b0419eaa69bac2474a17d91057dc7321396a03"
+    "bytes": 6375016,
+    "sha256": "68290424945c194d09d8f03ae32221cb2d0a084b3ee5b006a170a94dcb76bc4a"
   },
   {
     "url": "http://192.168.50.104:8420/experiments/863/arms",
@@ -20,25 +20,25 @@
   {
     "url": "http://192.168.50.104:8420/experiments/863/stats",
     "file": "stats.json.gz",
-    "bytes": 5187,
-    "sha256": "9a15c4e5b65b3373e7ad554d5eca973cebb30bb2e90ce865ebe6332ec8ab7faf"
+    "bytes": 5141,
+    "sha256": "774595eca7b31e5552397c720d65fd2a74f3fe5c69d873e1164bbf3c1129c24e"
   },
   {
     "url": "http://192.168.50.104:8420/experiments/863/reference",
     "file": "reference.json.gz",
     "bytes": 4703,
-    "sha256": "eab554a870cfd515160da33f3c413884cc6c7492ff0fb1ef24b350e3b03225ee"
+    "sha256": "a2d765f62bdc40e318f931e30e512bd639d0e3f696b56d128c20805591f87b45"
   },
   {
     "url": "http://192.168.50.104:8420/jobs/863/files",
     "file": "files.json.gz",
-    "bytes": 11037,
-    "sha256": "281ad2801f5288c60f43a714efdf1b458dbd88cabe76f2b5d34ae140c75d116d"
+    "bytes": 14887,
+    "sha256": "d64452daf821b73c06d3e19ce4c2d919a9656bc696b00f97398bae182a1258be"
   },
   {
     "url": "http://192.168.50.104:8420/jobs/863/files/job.log",
     "file": "job.log.gz",
-    "bytes": 1584,
-    "sha256": "22cfc5120dffb2e48257c615137cc3482cca9d0c1d86bc8e94d0d1f36a9c1bb8"
+    "bytes": 1955,
+    "sha256": "ff064ce977e835d6978fade2038e46f884f82826df487aea0074b4e9dd8e5937"
   }
 ]
