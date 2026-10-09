@@ -4,6 +4,7 @@ import com.eignex.klause.lp.engine.ExactBasisMetrics
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
+import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.kumulant.stat.summary.CountStat
@@ -392,10 +393,13 @@ data class LpStats(
     val componentRoute: LpRouteSolveStats = LpRouteSolveStats(),
     /** Complete root and presolve engine telemetry. */
     val rootRoute: LpRouteSolveStats = LpRouteSolveStats(),
+    /** Inclusive phase timings and outcomes, keyed by engine phase and consumer route. */
+    val phases: Map<String, LpPhaseStats> = emptyMap(),
 ) {
     /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
      *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
     fun mergedWith(o: LpStats): LpStats = LpStats(
+        phases = mergePhaseStats(phases, o.phases),
         nodePasses = SumResult(nodePasses.sum + o.nodePasses.sum),
         standalonePasses = SumResult(standalonePasses.sum + o.standalonePasses.sum),
         componentPasses = SumResult(componentPasses.sum + o.componentPasses.sum),
@@ -484,6 +488,7 @@ internal fun LpStats.hasActivity(): Boolean =
 
 /** Mutable LP-stats accumulator, one per solve; snapshots into an [LpStats]. See [SolveStatsSink]. */
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
+    private val phases = LinkedHashMap<String, LpPhaseStats>()
     val solves: CountStat = CountStat()
     val pruned: CountStat = CountStat()
     val infeasible: CountStat = CountStat()
@@ -605,6 +610,18 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         Array(LpRoute.entries.size) { index ->
             val route = LpRoute.entries[index]
             object : LpCertificationObserver {
+                override fun observePhase(metrics: LpPhaseMetrics) {
+                    val key = "${metrics.phase.name}_${route.name}"
+                    val delta = LpPhaseStats(
+                        1L,
+                        metrics.nanos,
+                        metrics.work,
+                        metrics.pivots.toLong(),
+                        metrics.steps.toLong(),
+                        mapOf(metrics.outcome to 1L),
+                    )
+                    phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+                }
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                     val i = certifier.ordinal
                     certifierAttempts[i]++
@@ -841,6 +858,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     }
 
     fun snapshot(): LpStats = LpStats(
+        phases = phases.toMap(),
         nodePasses = SumResult(nodePasses.toDouble()),
         standalonePasses = SumResult(standalonePasses.toDouble()),
         componentPasses = SumResult(componentPasses.toDouble()),

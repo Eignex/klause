@@ -32,7 +32,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val routed = stats.lp.standalonePasses.sum + stats.lp.componentPasses.sum + stats.lp.rootPasses.sum
     if (solves == 0.0 && stats.lp.nodePasses.sum == 0.0 && routed == 0.0 &&
         lagrangian == 0.0 && energetic == 0.0 && splits == 0.0 &&
-        stats.lp.basisVerification.calls == 0L && stats.lp.continuation.calls == 0L
+        stats.lp.basisVerification.calls == 0L && stats.lp.continuation.calls == 0L && stats.lp.phases.isEmpty()
     ) {
         return emptyList()
     }
@@ -135,6 +135,15 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     appendCertifierStats(out, "ExactPointFeasible", stats.lp.exactPointFeasible)
     appendCertifierStats(out, "RationalOutcome", stats.lp.rationalOutcome)
     out += continuationStatPairs("lp", stats.lp.continuation)
+    for ((phase, metrics) in stats.lp.phases) {
+        val prefix = "lpPhase_$phase"
+        out += "${prefix}_Calls" to "${metrics.calls}"
+        out += "${prefix}_Nanos" to "${metrics.nanos}"
+        out += "${prefix}_Work" to "${metrics.work}"
+        out += "${prefix}_Pivots" to "${metrics.pivots}"
+        out += "${prefix}_Steps" to "${metrics.steps}"
+        for ((outcome, count) in metrics.outcomes) out += "${prefix}_$outcome" to "$count"
+    }
     val basis = stats.lp.basisVerification
     if (basis.calls > 0L) {
         out += "lpRationalBasisCalls" to "${basis.calls}"

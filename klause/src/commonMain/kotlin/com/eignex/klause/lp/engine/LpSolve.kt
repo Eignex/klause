@@ -142,10 +142,10 @@ internal fun solveAndCertify(
     val authoritative = if (model.exactState != null) {
         model
     } else {
-        val exact = model.authoritativeModel()
-            ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
-        LpExactState(exact).toWorkingModel()
-            ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
+        val timer = LpPhaseTimer(observer, LpSolvePhase.AUTHORITATIVE_IMPORT)
+        val working = model.authoritativeModel()?.let { LpExactState(it).toWorkingModel() }
+        timer.finish(if (working != null) "IMPORTED" else "DECLINED")
+        working ?: return CertifiedLpResult(null, null, null, null, null, false, { null })
     }
     val counters = if (authoritative === model) {
         counterResults
@@ -202,15 +202,15 @@ private fun certifyAuthoritativeSolve(
         observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
     }
     LpCertificationSession(context, pricing).use { certification ->
-        certification.certify(model, solver, result, cancellation, observer, counterResults,
-            refinementLimits, floatAccept, floatOffset)
+        certification.certify(
+            model, solver, result, cancellation, observer, counterResults,
+            refinementLimits, floatAccept, floatOffset,
+        )
     }
 }
 
-internal class LpCertificationSession(
-    private val context: LpSolveContext,
-    private val pricing: LpPricingOptions,
-) : AutoCloseable {
+internal class LpCertificationSession(private val context: LpSolveContext, private val pricing: LpPricingOptions) :
+    AutoCloseable {
     private val continuation = LpExactContinuationCache()
     private var anchor: LpScopedSolver? = null
 
@@ -227,10 +227,14 @@ internal class LpCertificationSession(
     ): CertifiedLpResult {
         // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
         if (floatAccept != null && result != null && result.optimal && !cancellation()) {
-            floatOptimum(model, result, floatAccept, floatOffset, cancellation)?.let { float ->
+            val timer = LpPhaseTimer(observer, LpSolvePhase.FLOAT_ACCEPTANCE)
+            val float = floatOptimum(model, result, floatAccept, floatOffset, cancellation, observer)
+            timer.finish(if (float != null) "ACCEPTED" else "REFUSED")
+            float?.let {
                 return CertifiedLpResult(float, null, null, null, null, false, { null }, floatOptimum = float)
             }
         }
+        val ladderTimer = LpPhaseTimer(observer, LpSolvePhase.EXACT_LADDER)
         val state = model.exactState
         val refinement = if (state != null && solver !is ComponentLpSolverCapability && !cancellation()) {
             val previous = anchor
@@ -245,8 +249,12 @@ internal class LpCertificationSession(
         } else {
             null
         }
-        return certifyLpResult(model, solver, result, cancellation, observer, context.certificationPolicy,
-            counterResults, continuationCache = continuation, refinement = refinement)
+        val certified = certifyLpResult(
+            model, solver, result, cancellation, observer, context.certificationPolicy,
+            counterResults, continuationCache = continuation, refinement = refinement,
+        )
+        ladderTimer.finish(certified.verdict.name)
+        return certified
     }
 
     override fun close() {
@@ -1112,8 +1120,12 @@ internal fun LpModel.finiteExactInput(): Boolean {
     ) {
         return false
     }
-    if (rowPremises.any { it != null && (it.vars.size != it.isUpper.size || it.vars.size != it.thresholds.size ||
-            it.vars.any { variable -> variable < 0 } || it.boolLits.any { literal -> literal < 0 }) }
+    if (rowPremises.any {
+            it != null && (
+                it.vars.size != it.isUpper.size || it.vars.size != it.thresholds.size ||
+                it.vars.any { variable -> variable < 0 } || it.boolLits.any { literal -> literal < 0 }
+            )
+        }
     ) {
         return false
     }
@@ -1281,20 +1293,26 @@ private fun floatOptimum(
     floatAccept: (FloatLpResult) -> Boolean,
     offset: Double,
     cancellation: Cancellation,
+    observer: LpCertificationObserver?,
 ): FloatLpResult? {
-    val verdict = provenFloatOptimum(model, result, offset, cancellation)
+    val verdict = provenFloatOptimum(model, result, offset, cancellation, observer)
     if (verdict == FloatDualVerdict.ACCEPTED) return result.takeIf(floatAccept)
     if (verdict == FloatDualVerdict.REFUSED || cancellation()) return null
+    val timer = LpPhaseTimer(observer, LpSolvePhase.CLEANUP)
     val cleanup = RevisedSimplex(
         model,
         cancellation,
         iterationLimit = CLEANUP_PIVOTS,
         primalPricingTolerance = CLEANUP_PRICING_TOLERANCE,
-    ).use { it.solvePrimal(result.basis) }
+    ).use {
+        val cleaned = it.solvePrimal(result.basis)
+        timer.finish(it.lastTermination?.name ?: "OTHER", it.lastWorkOps, it.lastPivots)
+        cleaned
+    }
         ?.takeIf { it.optimal && !cancellation() }
         ?: return null
     return cleanup.takeIf {
-        provenFloatOptimum(model, it, offset, cancellation) == FloatDualVerdict.ACCEPTED && floatAccept(it)
+        provenFloatOptimum(model, it, offset, cancellation, observer) == FloatDualVerdict.ACCEPTED && floatAccept(it)
     }
 }
 
@@ -1305,15 +1323,20 @@ private fun provenFloatOptimum(
     result: FloatLpResult,
     offset: Double,
     cancellation: Cancellation,
+    observer: LpCertificationObserver?,
 ): FloatDualVerdict {
     if (floatDualFeasible(model, result, offset)) return FloatDualVerdict.ACCEPTED
-    val duals = exactBasisDuals(
+    val timer = LpPhaseTimer(observer, LpSolvePhase.EXACT_DUALS)
+    val exact = exactBasisDuals(
         model,
         result.basis,
         result.duals,
         cancellation.shorten(EXACT_DUAL_BUDGET_FRACTION),
-    ).duals ?: return FloatDualVerdict.WRONG_SIGNED
-    return floatDualVerdict(model, result, offset, exactDuals = duals)
+    )
+    val verdict = exact.duals?.let { floatDualVerdict(model, result, offset, exactDuals = it) }
+        ?: FloatDualVerdict.WRONG_SIGNED
+    timer.finish(exact.decline?.name ?: verdict.name, steps = exact.steps)
+    return verdict
 }
 
 private const val EXACT_DUAL_BUDGET_FRACTION: Double = 0.5

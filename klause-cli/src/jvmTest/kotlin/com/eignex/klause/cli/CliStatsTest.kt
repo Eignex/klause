@@ -6,6 +6,7 @@ import com.eignex.klause.solver.result.LpBasisVerificationStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpContinuationStats
+import com.eignex.klause.solver.result.LpPhaseStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
@@ -24,6 +25,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliStatsTest {
+    @Test
+    fun `refused float phase costs are emitted without a node solve`() {
+        val stats = SolveStats(lp = LpStats(phases = mapOf("CLEANUP_STANDALONE" to
+            LpPhaseStats(1L, 13L, 17L, 2L, outcomes = mapOf("PIVOTS" to 1L)))))
+
+        val pairs = lpStatPairs(stats).toMap()
+
+        assertEquals("1", pairs["lpPhase_CLEANUP_STANDALONE_Calls"])
+        assertEquals("13", pairs["lpPhase_CLEANUP_STANDALONE_Nanos"])
+        assertEquals("17", pairs["lpPhase_CLEANUP_STANDALONE_Work"])
+        assertEquals("2", pairs["lpPhase_CLEANUP_STANDALONE_Pivots"])
+        assertEquals("1", pairs["lpPhase_CLEANUP_STANDALONE_PIVOTS"])
+    }
 
     @Test
     fun `continuation costs remain visible for LP and SMT declines`() {
