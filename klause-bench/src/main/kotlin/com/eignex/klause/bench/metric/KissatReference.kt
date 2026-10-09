@@ -39,6 +39,7 @@ internal object KissatReference {
         return SolverInvocation.Result(
             feasible = feasible,
             objective = null,
+            elapsedMs = elapsedMs,
             timeToBestMs = timeMs,
             timeToFirstFeasibleMs = timeMs,
             proven = feasible != null,

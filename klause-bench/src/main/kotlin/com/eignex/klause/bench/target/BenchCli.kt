@@ -435,14 +435,7 @@ object BenchCli {
         val r = run.result
         val maximize = run.maximize
         r.stats["error"]?.let { println("?? ${ref.name} ERROR: $it") }
-        // Proof time when proven (the solver's `solveTime`, seconds -> ms); for an unproven feasible
-        // witness the time-to-first-feasible (the CSP metric); a pure timeout stores the full budget.
-        val solveMs = r.stats["solveTime"]?.toDoubleOrNull()?.let { (it * 1000).toLong() }
-        val elapsedMs = when {
-            r.proven -> solveMs ?: budget.timeoutMillis
-            r.feasible == true -> r.timeToFirstFeasibleMs ?: solveMs ?: budget.timeoutMillis
-            else -> budget.timeoutMillis
-        }
+        val elapsedMs = r.referenceElapsedMs(budget.timeoutMillis)
         val verdict = when {
             r.proven && r.feasible == false -> "UNSAT"
             r.proven -> "opt=${r.objective ?: "sat"}"

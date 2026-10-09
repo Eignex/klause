@@ -79,7 +79,15 @@ internal object SolverInvocation {
         /** The solution a reference returned, as `name value` lines: kept beside its record so the verdict can be
          *  checked again. Null when it returned none, or for a solver that does not report one. */
         val assignment: String? = null,
-    )
+        /** Subprocess wall-clock duration, including launch and output consumption; null in legacy caches. */
+        val elapsedMs: Long? = null,
+    ) {
+        fun referenceElapsedMs(budgetMs: Long): Long = when {
+            proven -> solveTimeMs(stats) ?: elapsedMs ?: budgetMs
+            feasible == true -> timeToFirstFeasibleMs ?: solveTimeMs(stats) ?: elapsedMs ?: budgetMs
+            else -> budgetMs
+        }
+    }
 
     /** Registered MiniZinc solver ids, parsed once from `minizinc --solvers` (the parenthesised tag
      *  lists). Lets a reference report "not available" instead of failing obscurely. */
@@ -279,6 +287,7 @@ internal object SolverInvocation {
     }
 
     internal fun invoke(cmd: List<String>, dialect: Dialect, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
+        val startNanos = System.nanoTime()
         val process = ProcessBuilder(cmd).redirectErrorStream(false).start()
         // Watchdog: force-kill a runaway that blew past [hardTimeoutMs] so the read loop below (which
         // blocks until the child's stdout closes) can't hang forever on a child that never exits. A
@@ -309,7 +318,6 @@ internal object SolverInvocation {
         var proven = false
         var unsat = false
         var anySolution = false
-        val startNanos = System.nanoTime()
 
         // An improving incumbent (a new solution / better objective): stamp time-to-best afresh.
         fun markIncumbent() {
@@ -405,6 +413,7 @@ internal object SolverInvocation {
             process.destroyForcibly()
             process.waitFor()
         }
+        val elapsedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
         // Three-way split on a non-zero exit. A clean exit, or any verdict line (solution / unsat),
         // is a usable run. A child *we* force-killed for blowing its wall-clock ceiling exits non-zero
         // with no verdict, but that is an honest "ran out of time, undecided": recording it as an error
@@ -435,6 +444,7 @@ internal object SolverInvocation {
                 else -> null
             },
             objective = objective.takeIf { anySolution },
+            elapsedMs = elapsedMs,
             timeToBestMs = timeToBestMs,
             timeToFirstFeasibleMs = timeToFirstFeasibleMs,
             proven = proven,
@@ -568,3 +578,6 @@ internal data class Attribution(
     val continuousObjective: Double? = null,
     val elapsedMs: Long,
 )
+
+internal fun solveTimeMs(stats: Map<String, String>): Long? = stats["solveTime"]?.toDoubleOrNull()
+    ?.takeIf { it.isFinite() && it >= 0 }?.let { (it * 1000).toLong() }

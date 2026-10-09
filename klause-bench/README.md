@@ -10,6 +10,14 @@ bench solve [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 
 `solve` runs **one** solver per invocation, **as a subprocess**: klause via `klause-cli`, and reference solvers (`choco`/`gecode`/`yuck`/…) via `minizinc --solver <id>` — each emitting MiniZinc-format output. Output is saved **one file per problem** under `output/<config>/` (`<config>` = solver+settings+budget, e.g. `choco-p8-free-t300s`): a `<problem>.out` (raw solver stream = the log) and a self-describing `<problem>.json` (solver/settings/budget + parsed result). There is no in-session comparison and no in-process reference adapter: run `solve` once per config and diff two config dirs offline with `output/compare.sh` — so one solver's crash or warmup never contaminates another's baseline. The same offline diff doubles as a **regression check**: keep a baseline config's dir and compare a fresh run's dir against it (verdict counts catch quality regressions, the time aggregate catches slowdowns). Results are also content-addressed in `build/bench-cache/`, so re-running an identical instance replays instantly.
 
+Solve records retain `elapsedMs`, the subprocess wall-clock duration including launch and output
+consumption. It is separate from `timeToBestMs` and `timeToFirstFeasibleMs`, which stay null without
+a witness. Legacy records and runs that never launched have `elapsedMs=null`. Comparison/CSV timing
+uses the incumbent time for a witness, then a valid reported `stats.solveTime` (seconds), then
+`elapsedMs`, then the budget. Reference proof timing uses solve time, elapsed time, then budget;
+unproven reference witnesses prefer first-feasible time. Undecided runs keep the budget penalty.
+Lab consumers must read `elapsedMs` as the fallback after `solveTime`; older lab builds ignore it.
+
 MiniZinc float runs validate their final candidate by recompiling the original model with
 its DZN assignments pinned, using MiniZinc's standard library and the same data seed.
 No reference solver runs. Records include `sourceValidation` (`valid`, `invalid`, or `unknown`)

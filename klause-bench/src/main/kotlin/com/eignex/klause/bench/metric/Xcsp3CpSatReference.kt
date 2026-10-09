@@ -116,6 +116,7 @@ internal object Xcsp3CpSatReference {
     }
 
     private fun solve(cmd: List<String>, name: String, budget: Budget, stderr: File): SolverInvocation.Result {
+        val startNanos = System.nanoTime()
         val proc = ProcessBuilder(cmd).redirectError(stderr).start()
         // Watchdog: `docker kill` the CONTAINER (not just the client) if it blows the deadline — CPMpy's
         // parse phase is not time-bounded and can hang/balloon, and killing only the client leaves the
@@ -138,6 +139,7 @@ internal object Xcsp3CpSatReference {
         val stdout = proc.inputStream.bufferedReader().readText()
         proc.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS)
         watchdog.interrupt()
+        val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
         val exit = runCatching { proc.exitValue() }.getOrNull()
         // docker itself failed and the container never ran: an error to retry, not a result to cache.
         check(exit !in DOCKER_RUN_FAILED) {
@@ -149,7 +151,7 @@ internal object Xcsp3CpSatReference {
             v == null -> undecided(cmd, stdout, "no JSON verdict (${stderr.readText().takeLast(ERROR_TAIL_CHARS)})")
             v.exit == "ERROR" -> undecided(cmd, stdout, v.error ?: "unknown")
             else -> decided(cmd, stdout, v)
-        }
+        }.copy(elapsedMs = elapsedMs)
     }
 
     private fun decided(cmd: List<String>, stdout: String, v: Verdict): SolverInvocation.Result {

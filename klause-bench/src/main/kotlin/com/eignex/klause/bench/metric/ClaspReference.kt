@@ -164,6 +164,7 @@ internal object ClaspReference {
         return SolverInvocation.Result(
             feasible = feasible,
             objective = bestObjective.takeIf { feasible == true },
+            elapsedMs = elapsedMs,
             timeToBestMs = timeMs,
             timeToFirstFeasibleMs = timeMs,
             proven = proven,
