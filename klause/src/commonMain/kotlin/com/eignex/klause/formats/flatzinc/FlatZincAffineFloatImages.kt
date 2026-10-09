@@ -15,24 +15,6 @@ import com.eignex.klause.util.minus
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLong
 
-internal data class AffineFloatImage(
-    val terms: Map<Int, BigFraction>,
-    val constant: BigFraction = BigFraction.ZERO,
-) {
-    fun scaled(scale: BigFraction): AffineFloatImage = AffineFloatImage(
-        terms.mapValues { (_, coefficient) -> coefficient * scale }.filterValues { !it.isZero },
-        constant * scale,
-    )
-
-    operator fun plus(other: AffineFloatImage): AffineFloatImage {
-        val result = terms.toMutableMap()
-        for ((variable, coefficient) in other.terms) {
-            result[variable] = (result[variable] ?: BigFraction.ZERO) + coefficient
-        }
-        return AffineFloatImage(result.filterValues { !it.isZero }, constant + other.constant)
-    }
-}
-
 internal fun FlatZincCompiler.collectAffineFloatImages() {
     for (variable in floatVars.values) {
         if (variable.lpOnly && variable.lo == variable.hi) {

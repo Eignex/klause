@@ -7,6 +7,7 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -69,6 +70,7 @@ internal class FlatZincCompiler(
     internal val integerFloatSources = HashMap<Int, Int>()
 
     internal data class IntegerFloatImage(val variable: Int, val scale: Double)
+    internal data class IntegerFloatProduct(val factor: Product?, val image: AffineFloatImage)
 
     internal val integerFloatImages = HashMap<Int, IntegerFloatImage>()
     internal val affineFloatImages = HashMap<Int, AffineFloatImage>()
