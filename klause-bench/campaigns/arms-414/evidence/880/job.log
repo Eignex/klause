@@ -1,0 +1,43 @@
+1791580353198 launched c7i.2xlarge instances [i-0f2e8a64bf757818f, i-0e6703965f75bfb9b]
+1791580357331 waiting for i-0f2e8a64bf757818f to boot failed (try 1 of 45), retrying in 20 s: on 16.171.115.38 (exit 255): ssh: connect to host 16.171.115.38 port 22: Connection refused
+
+1791580364341 waiting for i-0e6703965f75bfb9b to boot failed (try 1 of 45), retrying in 20 s: on 13.60.69.78 (exit 255): ssh: connect to host 13.60.69.78 port 22: Connection refused
+
+1791580378570 waiting for i-0f2e8a64bf757818f to boot failed (try 2 of 45), retrying in 20 s: on 16.171.115.38 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0f2e8a64bf757818f' (ED25519) to the list of known hosts.
+
+1791580385434 waiting for i-0e6703965f75bfb9b to boot failed (try 2 of 45), retrying in 20 s: on 13.60.69.78 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0e6703965f75bfb9b' (ED25519) to the list of known hosts.
+
+1791580399186 i-0f2e8a64bf757818f: booted; building 52193ef90
+1791580409976 i-0e6703965f75bfb9b: booted; building 52193ef90
+1791580566645 i-0f2e8a64bf757818f: built
+1791580576066 i-0e6703965f75bfb9b: built
+1791580576066 i-0f2e8a64bf757818f: planning, which fetches the corpora the selections read
+1791580577295 selection 0 ('suite=mzn-bench' 'name=2017/city-position/city-5-05' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580597672 selection 1 ('suite=xcsp3-cop' 'name=Fortress1-03_c25' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580598390 selection 2 ('suite=pb-comp' 'name=normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580599004 selection 3 ('suite=pb-comp' 'name=normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580599006 planned 4 problems × 4 arms = 48 cases, up to 4,0 h
+1791580599006 i-0f2e8a64bf757818f: compressing and pushing newly fetched corpora to s3://klause-lab-corpus-459222092693-eu-north-1
+1791580617128 fetching the corpora on the other instances
+1791580634127 running 4 problems on 2 instances, each taking the next problem as it has room
+1791580821056 AWS gave no more instances (VcpuLimitExceeded); running on 2
+1791581243624 AWS gave no more instances (VcpuLimitExceeded); running on 2
+1791581444769 AWS gave no more instances (VcpuLimitExceeded); running on 2
+1791582495854 launched c7i.2xlarge instances [i-0bdce2a7b8b101b94]
+1791582514041 waiting for i-0bdce2a7b8b101b94 to boot failed (try 1 of 45), retrying in 20 s: on 13.48.29.193 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0bdce2a7b8b101b94' (ED25519) to the list of known hosts.
+
+1791582534596 i-0bdce2a7b8b101b94: booted; building 52193ef90
+1791582701808 i-0bdce2a7b8b101b94: built
+1791582718603 i-0bdce2a7b8b101b94 joined; 3 instances now
+1791582727254 AWS gave no more instances (VcpuLimitExceeded); running on 3
+1791582859449 launched c7i.2xlarge instances [i-0454caad5eb6029d5]
+1791582877868 waiting for i-0454caad5eb6029d5 to boot failed (try 1 of 45), retrying in 20 s: on 13.53.132.209 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0454caad5eb6029d5' (ED25519) to the list of known hosts.
+
+1791582898264 i-0454caad5eb6029d5: booted; building 52193ef90
+1791583062871 i-0454caad5eb6029d5: built
+1791583080074 i-0454caad5eb6029d5 joined; 4 instances now
+1791583100337 i-0454caad5eb6029d5 has no problems left to take: terminated
+1791584255834 i-0f2e8a64bf757818f has no problems left to take: terminated
+1791584255840 i-0e6703965f75bfb9b has no problems left to take: terminated
+1791585864283 i-0bdce2a7b8b101b94 has no problems left to take: terminated
+1791585872312 job finished

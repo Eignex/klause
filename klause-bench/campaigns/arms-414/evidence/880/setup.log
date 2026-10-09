@@ -1,0 +1,19 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+From https://github.com/Eignex/klause
+ + 7aff48e19...39400f65b codex/construction-2328-evidence -> codex/construction-2328-evidence  (forced update)
+   58c214ec6..5bb52a36d  codex/construction-2328-slice -> codex/construction-2328-slice
+   125be7aed..69e44ab89  codex/presolve-554-campaign -> codex/presolve-554-campaign
+ + 029713ddf...4b8baad71 codex/rws-conflict-lifetime -> codex/rws-conflict-lifetime  (forced update)
+ * [new branch]          codex/rws-conflict-reproducer -> codex/rws-conflict-reproducer
+[i-0f2e8a64bf757818f] reused the cached build of 52193ef90
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-0e6703965f75bfb9b] reused the cached build of 52193ef90
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-0bdce2a7b8b101b94] reused the cached build of 52193ef90
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-0454caad5eb6029d5] reused the cached build of 52193ef90
+WARNING: Using incubator modules: jdk.incubator.vector
+
