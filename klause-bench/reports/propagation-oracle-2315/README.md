@@ -151,6 +151,23 @@ the same `lia-opt` reporting limitation. Both arms have build fingerprint
 case response and per-arm provenance. The changed solver binary differs from job 885 as expected;
 the test-only stack still leaves the shipping binary unchanged relative to its new main.
 
+After the rational arithmetic fixes reached main, [AWS job 894](http://192.168.50.104:8420/jobs/894)
+compared main `27d604ee5232caa99f5bd6ff8efdcf1f5b866707` with integrated oracle head
+`2bd62ece755c6852cc21e7bd4baf7d86dc3c2bce`. All 40 cases completed with the same reported outcomes
+and the same `lia-opt` limitation. Both shipping builds have fingerprint
+`3d5b2a8bc14f8f145b178c8f6df3db07e1e63cea99216d429efef65e6eef1963`. `lab/integrated/` retains
+the specification, raw response, provenance, CSV, revisions and logs. The worker waited for AWS
+capacity and recovered from a vCPU allocation refusal before executing the job.
+
+The reproducer merged as [#2371](https://github.com/Eignex/klause/pull/2371) after its
+[latest-head gate](https://github.com/Eignex/klause/actions/runs/37993036834) passed all three jobs.
+The correction merged as [#2376](https://github.com/Eignex/klause/pull/2376) after rebasing onto main
+and passing [all three jobs](https://github.com/Eignex/klause/actions/runs/37994366083) at head
+`80eeeccee783cf4aa74041a1bac05271f1b5f2aa`. `ci/merged-correction/` retains both six-case oracle
+reports, gate conclusions, artifact metadata and executed merge-checkout/build excerpts. The final
+integration PR targets main and receives a fresh gate after its parent merge; superseded CI runs
+are cancelled rather than used as acceptance evidence.
+
 ## Limits
 
 These are deterministic behavioral checks, one invocation per listed command, not benchmarks.

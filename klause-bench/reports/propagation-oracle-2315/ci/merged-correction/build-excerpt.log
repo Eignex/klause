@@ -1,0 +1,9 @@
+2026-10-09T21:36:52.6630779Z HEAD is now at 58c0028 Merge 80eeeccee783cf4aa74041a1bac05271f1b5f2aa into 27d604ee5232caa99f5bd6ff8efdcf1f5b866707
+2026-10-09T21:36:52.6726051Z 58c0028c9d30f05bc09b845d0cb1581c6047f218
+2026-10-09T21:37:05.3543307Z ##[group]Run ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport
+2026-10-09T21:37:05.3544300Z [36;1m./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport[0m
+2026-10-09T21:44:36.2396377Z BUILD SUCCESSFUL in 7m 30s
+2026-10-09T21:44:38.8559143Z SHA256 digest of uploaded artifact is 1ceec3d4aef28af77fa2d0cb2902ce976c018f64f9266a717c74e77a04a68ecf
+2026-10-09T21:44:39.0640671Z Artifact download URL: https://github.com/Eignex/klause/actions/runs/37994366083/artifacts/11647280356
+2026-10-09T21:44:46.1380209Z     Requested Key : gradle-home-v2|Linux-X64|test[debe7e2089933f89baa724f718db4c25]-58c0028c9d30f05bc09b845d0cb1581c6047f218
+2026-10-09T21:44:46.1384003Z     Saved     Key : gradle-home-v2|Linux-X64|test[debe7e2089933f89baa724f718db4c25]-58c0028c9d30f05bc09b845d0cb1581c6047f218

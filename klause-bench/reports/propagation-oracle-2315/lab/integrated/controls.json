@@ -1,0 +1,31 @@
+{
+  "name": "oracle-2315-integrated-controls",
+  "description": "Supplemental source controls after merging reproducer PR 2371 and rebasing the oracle/integration stack onto main 27d604ee5, which includes the Boolean implication lifetime and rational normalization fixes. Compare fixed main and integrated head on ten existing source fixtures, two seeds each. Verify verdict agreement and blend-tiny optimum; lia-opt records omit objective/proof and support feasibility only. Actual oracle/lifecycle regressions run in GitHub CI. No timing claim.",
+  "host": "aws",
+  "machines": 1,
+  "parallel": 1,
+  "problems": {
+    "suite": "smtlib-core,mps-core",
+    "reference": "any"
+  },
+  "base": {
+    "engine": "cp",
+    "processors": "1",
+    "timeout": "5000"
+  },
+  "configs": [
+    {
+      "label": "integrated-main",
+      "ref": "27d604ee5232caa99f5bd6ff8efdcf1f5b866707"
+    },
+    {
+      "label": "integrated-oracles",
+      "ref": "2bd62ece755c6852cc21e7bd4baf7d86dc3c2bce"
+    }
+  ],
+  "seeds": [
+    0,
+    1
+  ],
+  "repeats": 1
+}
