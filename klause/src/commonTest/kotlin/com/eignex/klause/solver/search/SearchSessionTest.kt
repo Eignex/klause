@@ -938,6 +938,44 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `reduction keeps the oldest clause when LBDs tie`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(4, 6)))
+        session.learn(SearchExplanation(intArrayOf(8, 10)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `reduction prefers lower LBD over insertion order`() {
+        listOf(3, 10).forEach { levels ->
+            val session = SearchSession(
+                emptyList(),
+                learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+            )
+            for (variable in 0 until levels) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(variable * 2)))
+            }
+            session.learn(SearchExplanation(IntArray(levels) { it * 2 }))
+            session.learn(SearchExplanation(intArrayOf(levels * 2, (levels + 1) * 2)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.restart())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(levels * 2 + 1)))
+
+            assertEquals(true, session.boolValue(levels + 1), "levels=$levels")
+        }
+    }
+
+    @Test
     fun `a sole component's publications reach a fixpoint`() {
         val session = SearchSession(listOf(ExplainingPublisher(explains = false)))
 
