@@ -74,6 +74,16 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `a binary integer pool keeps its LP free cores for first solutions`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, binaryIntegers = true) { true }
+
+        val backtrack = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertEquals(listOf("satOptimized", "conflictDriven"), backtrack.map { it.label })
+    }
+
+    @Test
     fun `a model with nothing to relax builds no LP arm and keeps the pool full`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 6)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile, relaxation = { false })

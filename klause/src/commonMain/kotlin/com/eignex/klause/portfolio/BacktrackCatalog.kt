@@ -227,7 +227,9 @@ object BacktrackCatalog {
         val order = rankedArms(kind, facts.profile.realColumns)
         // A small finite optimization pool needs a relaxation beside its SAT guard: the LP arm finds
         // witnesses that the two LP-free cores miss, without probing an entire intensity palette.
-        val ranked = if (kind == Kind.COP && facts.profile.problemClass == ProblemClass.FiniteCp) {
+        val ranked = if (kind == Kind.COP && facts.profile.problemClass == ProblemClass.FiniteCp &&
+            !facts.binaryIntegers
+        ) {
             val rest = order.filter { it != BacktrackArm.LpDefault }
             rest.take(1) + BacktrackArm.LpDefault + rest.drop(1)
         } else {

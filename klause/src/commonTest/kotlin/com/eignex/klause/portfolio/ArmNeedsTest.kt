@@ -12,18 +12,30 @@ import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ProblemProfile
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ArmNeedsTest {
-    private fun linearModel() = Problem(
+    private fun linearModel(upper: Long = 5L) = Problem(
         numBoolVars = 0,
         numIntVars = 2,
-        intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
+        intDomains = arrayOf(IntDomain(0, upper), IntDomain(0, upper)),
         factors = arrayOf<Factor>(
             Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 3),
         ),
     ).bake()
+
+    @Test
+    fun `integer domain bounds identify binary pools`() {
+        for ((upper, binary) in listOf(1L to true, 5L to false)) {
+            val model = linearModel(upper)
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, optimizing = true), LpConfig.AGGRESSIVE)
+
+            assertEquals(binary, facts.binaryIntegers)
+        }
+    }
 
     @Test
     fun `a linear row offers a relaxation`() {
