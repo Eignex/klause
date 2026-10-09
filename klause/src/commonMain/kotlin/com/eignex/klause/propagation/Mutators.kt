@@ -152,9 +152,7 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     if (currentFactor >= 0) propagations++
     if (value) boolValueBits.set(v) else boolValueBits.clear(v)
     boolAssigned.set(v)
-    // The undo mark owns the pin's lifetime, even when its clause cites facts from a shallower level.
-    // Dating it before that mark lets an asserting backjump erase several supposedly surviving literals.
-    boolLevel[v] = maxOf(currentLevel, levelToDecisionVar.size)
+    boolLevel[v] = currentLevel
     boolReason[v] = currentFactor
     noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused
     boolAntecedents[v] = antecedents
