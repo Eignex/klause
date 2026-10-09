@@ -195,7 +195,18 @@ internal class FlatZincCompiler(
         when (type) {
             FznType.Bool -> boolVars[name] = Lit.variable(resolveBoolLit(rhs))
 
-            FznType.IntAny, is FznType.IntSet -> intVars[name] = resolveIntVar(rhs)
+            FznType.IntAny -> intVars[name] = resolveIntVar(rhs)
+
+            is FznType.IntSet -> {
+                val id = resolveIntVar(rhs)
+                val values = type.values.filter { it in intDomains[id] }.distinct().sorted().toLongArray()
+                if (values.isEmpty()) {
+                    postFalseFactor()
+                } else {
+                    intDomains[id] = intDomainFromSurvivors(values)
+                }
+                intVars[name] = id
+            }
 
             is FznType.IntRange -> {
                 val id = resolveIntVar(rhs)
