@@ -279,6 +279,11 @@ internal class RevisedSimplex(
     private var sourceResidualCalls = 0L
     private var sourceResidualNanos = 0L
     private var sourceResidualScaledCalls = 0L
+    private var deferUnscaledSourceDiagnostics = false
+
+    override fun deferUnscaledSourceDiagnostics() {
+        deferUnscaledSourceDiagnostics = true
+    }
 
     override val scalingMetrics: LpScalingMetrics
         get() = numerical.metrics.copy(
@@ -2548,7 +2553,7 @@ internal class RevisedSimplex(
         val scaledDuals = duals()
         recordDegeneracy(scaledDuals)
         val y = DoubleArray(m) { numerical.sourceDual(it, scaledDuals[it]) }
-        recordSourceResiduals(beta, y)
+        if (!deferUnscaledSourceDiagnostics || numerical.applied) recordSourceResiduals(beta, y)
         return FloatLpResult(
             basis,
             model.objectiveD(obj),
