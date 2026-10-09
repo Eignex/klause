@@ -1,0 +1,38 @@
+{
+  "name": "rws-conflict-2352-lifetime-canary",
+  "description": "Uninstrumented serial current-main versus Boolean undo-lifetime fix on RWS Example_2, pinned conflictDriven, LP off, seed1, node100k/wall60s. One repetition for diagnosis; full repeated acceptance follows only if SAT recovers.",
+  "problems": {
+    "suite": "smtlib-qflia",
+    "name": "*RWS/Example_2.txt",
+    "reference": "any",
+    "per-family": "1000",
+    "max": "1"
+  },
+  "base": {
+    "engine": "cp",
+    "processors": "1",
+    "timeout": "60000",
+    "lp": "off",
+    "param.arms": "1",
+    "param.node-limit": "100000"
+  },
+  "configs": [
+    {
+      "label": "main-conflictDriven",
+      "ref": "5471419aa8c832ee1065468a6861bb203a1ff8c7",
+      "param.bt-arm": "conflictDriven"
+    },
+    {
+      "label": "lifetime-conflictDriven",
+      "ref": "029713ddf",
+      "param.bt-arm": "conflictDriven"
+    }
+  ],
+  "seeds": [
+    1
+  ],
+  "repeats": 1,
+  "host": "aws",
+  "machines": 1,
+  "parallel": 1
+}
