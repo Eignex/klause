@@ -47,4 +47,19 @@ class SecondReferencesTest {
         assertTrue(identity.startsWith("HiGHS version 1.15.1|") && "mip_rel_gap=0.0001" in identity)
         assertTrue("retry=presolve-off" in identity && identity.endsWith(MpsWitness.VERSION))
     }
+
+    @Test
+    fun `highs's repair loosens to the check's tolerance before calling integers uncompletable`() {
+        val tried = mutableListOf<Double>()
+        val solved = MpsWitness.RepairResult.Solved(mapOf("c0" to 1.0))
+
+        val completed = HighsReference.escalate(listOf(1e-9, 1e-6)) { tolerance ->
+            tried += tolerance
+            if (tolerance < 1e-6) MpsWitness.RepairResult.Infeasible else solved
+        }
+        val uncompletable = HighsReference.escalate(listOf(1e-9, 1e-6)) { MpsWitness.RepairResult.Infeasible }
+
+        assertEquals(listOf(solved, MpsWitness.RepairResult.Infeasible), listOf(completed, uncompletable))
+        assertEquals(listOf(1e-9, 1e-6), tried)
+    }
 }
