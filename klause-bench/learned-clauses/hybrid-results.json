@@ -1,0 +1,90 @@
+{
+  "rawCasesSha256": "3396cae0f106fbbfd9e801f093df95045602b042c8941c8e15bd76a3143bba65",
+  "problems": 32,
+  "repeats": 3,
+  "arms": {
+    "lbd-use": {
+      "sha": "f60801bc1b4a952c1549151bb03836daa8b21f58",
+      "records": 96,
+      "sat": 30,
+      "unsat": 0,
+      "unknown": 66,
+      "solveSeconds": 616.083,
+      "elapsedMs": null,
+      "fingerprints": [
+        "45838495e8fd2df818a9b39f64c6f387f05b125a8e55ccd127e78aa0f38eac86"
+      ],
+      "totals": {
+        "openBoolDecisions": 4302723,
+        "openIntDecisions": 0,
+        "openTheoryDecisions": 0,
+        "openTheoryChecks": 30,
+        "openWork": 4302753,
+        "openLearned": 843915,
+        "openRelearned": 0,
+        "openRestarts": 4281,
+        "openReductions": 1344,
+        "openDropped": 497109,
+        "openRetained": 346806,
+        "openPeakRetained": 393975,
+        "openLearnedWatchVisits": 548815359,
+        "openAssertingConflicts": 843915,
+        "openNonAssertingConflicts": 0,
+        "openClauseActivityBumps": 0,
+        "openClauseLbdImprovements": 0,
+        "openReductionNs": 2357812421
+      },
+      "partiallyObserved": {}
+    },
+    "lbd-activity": {
+      "sha": "f60801bc1b4a952c1549151bb03836daa8b21f58",
+      "records": 96,
+      "sat": 30,
+      "unsat": 0,
+      "unknown": 66,
+      "solveSeconds": 625.856,
+      "elapsedMs": null,
+      "fingerprints": [
+        "45838495e8fd2df818a9b39f64c6f387f05b125a8e55ccd127e78aa0f38eac86"
+      ],
+      "totals": {
+        "openBoolDecisions": 4305870,
+        "openIntDecisions": 0,
+        "openTheoryDecisions": 0,
+        "openTheoryChecks": 30,
+        "openWork": 4305900,
+        "openLearned": 844122,
+        "openRelearned": 0,
+        "openRestarts": 4284,
+        "openReductions": 1347,
+        "openDropped": 497322,
+        "openRetained": 346800,
+        "openPeakRetained": 394179,
+        "openLearnedWatchVisits": 555610071,
+        "openAssertingConflicts": 844122,
+        "openNonAssertingConflicts": 0,
+        "openClauseActivityBumps": 6848055,
+        "openClauseLbdImprovements": 0,
+        "openReductionNs": 4012056613
+      },
+      "partiallyObserved": {}
+    }
+  },
+  "paired": {
+    "lbd-activity": {
+      "pairs": 96,
+      "verdictDifferences": [],
+      "lostCompletions": [],
+      "gainedCompletions": [],
+      "equalWorkPairs": 96,
+      "logicalMatches": 0,
+      "perProblemMeanSolveRatio": 1.016927663552338,
+      "completedPerProblemMeanSolveRatio": 1.003028388925471,
+      "perProblemMeanElapsedRatio": null,
+      "elapsedProblems": 0,
+      "perProblemMeanReductionRatio": 1.6837350772256945,
+      "reductionProblems": 25,
+      "completedProblems": 10
+    }
+  }
+}

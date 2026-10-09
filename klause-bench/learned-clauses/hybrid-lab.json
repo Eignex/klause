@@ -1,0 +1,37 @@
+{
+  "name": "learned-clause-retention-1631-protected-hybrids",
+  "description": "Frozen 32-input discovery union including earlier completion regression guards. Legacy LBD-plus-use versus activity as an LBD tie-break while preserving glue and recent-use protections, cap4000 restart1000 fixed50000 decisions. Three fresh-JVM repetitions. Both pure-activity protection hybrid caps and LBD tie-break cap2000 failed the local regression guards and are excluded from promotion.",
+  "problems": [
+    {
+      "suite": "smtlib-qfidl",
+      "name": "*DTP/DTP_k2_n35_c175_s1,*DTP/DTP_k2_n35_c175_s10,*DTP/DTP_k2_n35_c175_s11,*DTP/DTP_k2_n35_c175_s12,*DTP/DTP_k2_n35_c175_s13,*DTP/DTP_k2_n35_c175_s14,*DTP/DTP_k2_n35_c175_s15,*DTP/DTP_k2_n35_c175_s16,*DTP/DTP_k2_n35_c175_s17,*DTP/DTP_k2_n35_c175_s18,*DTP/DTP_k2_n35_c175_s19,*DTP/DTP_k2_n35_c175_s2,*DTP/DTP_k2_n35_c175_s20,*DTP/DTP_k2_n35_c175_s3,*DTP/DTP_k2_n35_c175_s4,*DTP/DTP_k2_n35_c175_s5,*DTP/DTP_k2_n35_c175_s6,*DTP/DTP_k2_n35_c175_s7,*DTP/DTP_k2_n35_c175_s8,*DTP/DTP_k2_n35_c175_s9,*DTP/DTP_k2_n35_c210_s12,*DTP/DTP_k2_n35_c210_s15,*DTP/DTP_k2_n35_c210_s18,*DTP/DTP_k2_n35_c210_s2,*DTP/DTP_k2_n35_c210_s5,*DTP/DTP_k2_n35_c210_s9,*DTP/DTP_k2_n35_c245_s12,*DTP/DTP_k2_n35_c245_s15,*DTP/DTP_k2_n35_c245_s18,*DTP/DTP_k2_n35_c245_s2,*DTP/DTP_k2_n35_c245_s5,*DTP/DTP_k2_n35_c245_s9",
+      "per-family": "1000",
+      "max": "32",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "ref": "f60801bc1b4a952c1549151bb03836daa8b21f58",
+    "engine": "fixed",
+    "processors": "1",
+    "timeout": "30000",
+    "presolve": "off",
+    "param.max-decisions": "50000",
+    "param.shared-restart": "1000",
+    "param.max-learned": "4000"
+  },
+  "configs": [
+    {
+      "label": "lbd-use",
+      "param.open-learned-policy": "lbd-use"
+    },
+    {
+      "label": "lbd-activity",
+      "param.open-learned-policy": "lbd-activity"
+    }
+  ],
+  "repeats": 3,
+  "host": "aws",
+  "machines": 4,
+  "parallel": 2
+}

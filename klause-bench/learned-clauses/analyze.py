@@ -49,7 +49,8 @@ for row in rows:
     entry = dict(arm=arm, suite=suite, problem=problem, repeat=row.get('repeat', 0),
                  sha=record['gitSha'], fingerprint=record['buildFingerprint'],
                  feasible=record['feasible'], proven=record['proven'], objective=record.get('objective'),
-                 solveSeconds=float(stats['solveTime']), budgetMs=record['budgetMs'])
+                 solveSeconds=float(stats['solveTime']), elapsedMs=record.get('elapsedMs'),
+                 budgetMs=record['budgetMs'])
     for metric in metrics:
         entry[metric] = int(stats[metric]) if metric in stats else None
     entry['decisions'] = sum(entry[k] or 0 for k in metrics[:3])
@@ -69,6 +70,7 @@ for arm, entries in by_arm.items():
         'unsat': sum(e['feasible'] is False and e['proven'] for e in entries),
         'unknown': sum(e['feasible'] is None for e in entries),
         'solveSeconds': sum(e['solveSeconds'] for e in entries),
+        'elapsedMs': sum(e['elapsedMs'] for e in entries) if all(e['elapsedMs'] is not None for e in entries) else None,
         'fingerprints': sorted({e['fingerprint'] for e in entries}),
         'totals': {k: sum(e[k] for e in entries) if all(e[k] is not None for e in entries) else None for k in metrics},
         'partiallyObserved': {k: {'records': sum(e[k] is not None for e in entries),
@@ -80,6 +82,8 @@ for arm, entries in by_arm.items():
         continue
     ratios = collections.defaultdict(list)
     completed_ratios = collections.defaultdict(list)
+    elapsed_ratios = collections.defaultdict(list)
+    reduction_ratios = collections.defaultdict(list)
     equal_work = logical_matches = 0
     differences, lost, gained = [], [], []
     for key, e in entries.items():
@@ -92,6 +96,10 @@ for arm, entries in by_arm.items():
             ratios[key[:2]].append(e['solveSeconds'] / b['solveSeconds'])
             if e['feasible'] is not None and verdict(e) == verdict(b):
                 completed_ratios[key[:2]].append(e['solveSeconds'] / b['solveSeconds'])
+        if e['elapsedMs'] and b['elapsedMs']:
+            elapsed_ratios[key[:2]].append(e['elapsedMs'] / b['elapsedMs'])
+        if e['openReductionNs'] and b['openReductionNs']:
+            reduction_ratios[key[:2]].append(e['openReductionNs'] / b['openReductionNs'])
         if b['equalWorkEligible'] and e['equalWorkEligible']:
             equal_work += 1
             comparable = [k for k in metrics if b[k] is not None and e[k] is not None and k != 'openReductionNs']
@@ -101,6 +109,10 @@ for arm, entries in by_arm.items():
         'logicalMatches': logical_matches,
         'perProblemMeanSolveRatio': geometric_mean([statistics.mean(v) for v in ratios.values()]),
         'completedPerProblemMeanSolveRatio': geometric_mean([statistics.mean(v) for v in completed_ratios.values()]),
+        'perProblemMeanElapsedRatio': geometric_mean([statistics.mean(v) for v in elapsed_ratios.values()]),
+        'elapsedProblems': len(elapsed_ratios),
+        'perProblemMeanReductionRatio': geometric_mean([statistics.mean(v) for v in reduction_ratios.values()]),
+        'reductionProblems': len(reduction_ratios),
         'completedProblems': len(completed_ratios)}
 args.output.with_suffix('.json').write_text(json.dumps(report, indent=2)+'\n')
 with args.output.with_suffix('.csv').open('w') as file:
