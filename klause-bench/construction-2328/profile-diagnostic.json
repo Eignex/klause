@@ -1,0 +1,32 @@
+{
+  "name": "construction-2328-opening-profile",
+  "description": "Instrumented diagnostic only: identify allocation/root setup barriers in IHTC opening on main and candidate. JFR timings are excluded from uninstrumented performance claims.",
+  "problems": {
+    "suite": "xcsp3-cop",
+    "name": "IHTC-i16_c25",
+    "reference": "any",
+    "max": "1"
+  },
+  "base": {
+    "processors": "1",
+    "timeout": "10000"
+  },
+  "configs": [
+    {
+      "ref": "5471419aa8c832ee1065468a6861bb203a1ff8c7",
+      "label": "main"
+    },
+    {
+      "ref": "dbe4070b2",
+      "label": "candidate"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 1,
+  "parallel": 1,
+  "host": "aws",
+  "machines": 1,
+  "profileCli": true
+}
