@@ -1,6 +1,6 @@
 # Presolve effort campaign (#554)
 
-Status: AWS pilots running; no defaults recommendation yet.
+Status: AWS pilots complete; stack integration and 300-second campaigns pending.
 
 The solver baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`. The neutral
 controls build is `5ad3707c0c0bfb113f994828265b9f1bafef91c3` ([PR #2378](https://github.com/Eignex/klause/pull/2378)).
@@ -10,6 +10,8 @@ GitHub CI provides validation; klause-lab builds installed JVM distributions wit
 Initial local Python runs collected and summarized remote records only. After the
 execution reminder, further inspection uses lab API reads; no local analysis or
 validation scripts are run.
+The immutable `codex/presolve-554-frozen-pilots` branch preserves every pilot build
+and its evidence across stack rebases. Historical SHA references remain intact.
 
 ## Pilot
 
@@ -170,3 +172,8 @@ passed source checking; each lab record retains its checked DZN candidate and
 stdout SHA-256. The specification is `experiments/witness-record-smoke.json`,
 and final API records are under `evidence/892`. These metadata checks contribute
 no tuning comparison.
+
+The integrated build uses main's canonical `finalWitness` and source hashing,
+with opt-in source checks and stdout hashes. Historical job 892 used
+`sourceWitness`; the analyzer accepts both fields. Main's witness-size limit
+still applies. Integration is validated through fresh GitHub CI and AWS records.
