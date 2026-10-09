@@ -52,6 +52,10 @@ enum class EngineMix {
  * carry more arms than cores, and — when
  * `arms < cores` — [PortfolioBuilder.build] replicates the composed arms across the extra lanes with
  * distinct seeds, so a parallel run can be wider than its pool of distinct configs.
+ *
+ * A curated single-core mixed optimization pool first searches with the default-sized pool and a default
+ * relaxation arm when applicable. Additional variants join after the first incumbent; an explicit pool uses
+ * every selected arm from the start.
  */
 data class PortfolioScenario(
     /** Compute width. `1` selects the single-core sequential executor; `> 1` the parallel one. */
@@ -183,6 +187,8 @@ internal sealed interface WorkerConfig {
     ): PortfolioWorker
 }
 
+internal class PortfolioArmPlan(val arms: List<WorkerConfig>, val firstSolutionCount: Int)
+
 /**
  * The single generic decision algorithm: given a [PortfolioScenario], pick and order the arms.
  * This is the whole portfolio policy in one place — and the surface issue #9 tunes. Everything
@@ -215,6 +221,27 @@ internal object PortfolioComposition {
         val arms = composeArms(scenario, facts)
         val check = scenario.toleranceCheck ?: return arms
         return arms.map { if (it is BacktrackWorkerConfig) it.withToleranceCheck(check) else it }
+    }
+
+    internal fun plan(scenario: PortfolioScenario, facts: ProblemFacts): PortfolioArmPlan {
+        val composed = compose(scenario, facts)
+        if (scenario.cores != 1 || scenario.engine != EngineMix.MIXED || scenario.kind != Kind.COP ||
+            scenario.arms <= PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null || scenario.btPool != null
+        ) {
+            return PortfolioArmPlan(composed, composed.size)
+        }
+        // Keep the small pool's positions: materialization derives each arm's seed from its position.
+        val small = compose(scenario.copy(arms = PortfolioScenario.DEFAULT_ARMS), facts)
+        val remaining = composed.toMutableList()
+        val first = small.mapNotNull { arm ->
+            val index = remaining.indexOfFirst { it::class == arm::class && it.label == arm.label }
+            if (index >= 0) remaining.removeAt(index) else null
+        }.toMutableList()
+        // Default LP supplies witnesses absent from the LP-free cores, including on annotated models
+        // whose small pool gives the second backtrack slot to the annotation.
+        val relaxation = remaining.indexOfFirst { it is BacktrackWorkerConfig && it.label == "lp-default" }
+        if (relaxation >= 0) first += remaining.removeAt(relaxation)
+        return PortfolioArmPlan(first + remaining, first.size)
     }
 
     private fun composeArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {

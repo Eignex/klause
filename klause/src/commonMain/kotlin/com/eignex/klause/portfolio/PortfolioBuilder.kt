@@ -46,7 +46,8 @@ object PortfolioBuilder {
         profile: ProblemProfile = ProblemProfile.of(problem, scenario.kind == Kind.COP),
     ): List<PortfolioWorker> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling)
-        val composed = PortfolioComposition.compose(scenario, facts)
+        val plan = PortfolioComposition.plan(scenario, facts)
+        val composed = plan.arms
         // Expand the composed arms to one entry per lane. A lane is a worker slot; a parallel track
         // wants one per core, the sequential track one per arm — so laneCount is maxOf(arms, cores).
         // When arms >= cores (every existing scenario) this is a no-op cycle that returns the composed
@@ -70,7 +71,7 @@ object PortfolioBuilder {
             definitionalSweep,
             onEvent,
             pools = poolsFor(scenario, problem),
-        )
+        ).onEach { it.improvementOnly = it.armId >= plan.firstSolutionCount }
     }
 
     /**

@@ -16,6 +16,24 @@ import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
 
+    @Test
+    fun `only added variants wait for an incumbent in an expanded curated pool`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, arms = 12)
+
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()
+        val workers = PortfolioBuilder.build(problem, scenario)
+
+        try {
+            assertEquals(
+                listOf("ls/cbls-chain/ils-basin", "ls/cbls-chain-noinv/fixed", "ls/cbls-notabu/fixed", "ls/cbls-lonoise/fixed"),
+                workers.filter { it.improvementOnly && it.family == ArmFamily.LocalSearch }.map { it.label },
+            )
+            assertTrue(workers.filter { !it.improvementOnly }.any { it.label == "bt/satOptimized" })
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
     private val continuous = Problem(
         numBoolVars = 0,
         numIntVars = 1,

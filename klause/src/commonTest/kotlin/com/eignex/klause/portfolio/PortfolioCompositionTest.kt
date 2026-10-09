@@ -13,6 +13,49 @@ import kotlin.test.assertTrue
 class PortfolioCompositionTest {
 
     @Test
+    fun `expanding a sequential optimization pool keeps the small pool positions`() {
+        val small = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts.assumed(Kind.COP)
+
+        val baseline = PortfolioComposition.plan(small, facts)
+        val expanded = PortfolioComposition.plan(small.copy(arms = 12), facts)
+
+        assertEquals(baseline.arms.map { it.label }, expanded.arms.take(baseline.arms.size).map { it.label })
+        assertEquals(baseline.arms.size, expanded.firstSolutionCount)
+        assertEquals(13, expanded.arms.size)
+    }
+
+    @Test
+    fun `an expanded annotated pool keeps default LP in its first solution pool`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP, arms = 12).copy(annotationArm = BacktrackParams())
+
+        val plan = PortfolioComposition.plan(scenario, ProblemFacts.assumed(Kind.COP))
+        val first = plan.arms.take(plan.firstSolutionCount)
+
+        assertEquals(listOf("satOptimized", "annotation"), first.take(2).map { it.label })
+        assertEquals("lp-default", first.last().label)
+    }
+
+    @Test
+    fun `explicit and parallel pools can use every arm for a first solution`() {
+        val scenarios = listOf(
+            PortfolioScenario.sequential(Kind.CSP, arms = 12),
+            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 12),
+            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.LOCAL_SEARCH, arms = 12),
+            PortfolioScenario.parallel(4, Kind.COP, arms = 12),
+            PortfolioScenario.sequential(Kind.COP, arms = 12)
+                .copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
+            PortfolioScenario.sequential(Kind.COP, arms = 12)
+                .copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+        )
+        for (scenario in scenarios) {
+            val plan = PortfolioComposition.plan(scenario, ProblemFacts.assumed(scenario.kind))
+
+            assertEquals(plan.arms.size, plan.firstSolutionCount, "$scenario")
+        }
+    }
+
+    @Test
     fun `mixed optimization schedules a complete arm before local search`() {
         val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP))
 

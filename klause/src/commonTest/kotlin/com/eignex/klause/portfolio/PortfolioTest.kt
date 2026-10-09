@@ -853,6 +853,94 @@ class PortfolioTest {
     }
 
     @Test
+    fun `added improvement variants wait until the first incumbent`() {
+        val slices = IntArray(2)
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ false }) { slices[0]++ }),
+            trackingWorker("variant", 1, ScriptedSearch({ true }) { slices[1]++ })
+                .also { it.improvementOnly = true },
+        )
+
+        val result = Portfolio.thompson(workers).use { it.minimize(Cancellation { slices.sum() >= 4 }) }
+
+        assertIs<MinimizeResult.Unknown>(result)
+        assertEquals(listOf(4, 0), slices.toList())
+    }
+
+    @Test
+    fun `the first incumbent admits improvement variants at their base allowance`() {
+        val slices = IntArray(2)
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ it == 2 }) { slices[0]++ }),
+            trackingWorker("variant", 1, ScriptedSearch({ true }, start = 500.0) { slices[1]++ })
+                .also { it.improvementOnly = true },
+        )
+
+        val result = Portfolio.thompson(workers, baseSliceWork = 7L).use {
+            it.minimize(Cancellation { slices[1] >= 1 })
+        }
+
+        assertEquals(499.0, assertIs<MinimizeResult.WithSample>(result).objectiveValue)
+        assertEquals(7L, result.stats.portfolio.arms[1].work)
+        assertEquals(listOf(3, 1), slices.toList())
+    }
+
+    @Test
+    fun `retiring the first solution pool admits deferred arms`() {
+        val unfinished = TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.BudgetExhausted))
+        val witness = Sample(BooleanArray(0), LongArray(0))
+        val deferred = TrackingResumableSearch(MinimizeResult.Optimal(witness, 3.0))
+        val workers = listOf(
+            trackingWorker("unfinished", 0, unfinished),
+            trackingWorker("deferred", 1, deferred).also { it.improvementOnly = true },
+        )
+
+        val result = Portfolio.thompson(workers).use { it.minimize() }
+
+        assertEquals(3.0, assertIs<MinimizeResult.Optimal>(result).objectiveValue)
+    }
+
+    @Test
+    fun `neutral family shares do not grow with the local search arm count`() {
+        for (locals in listOf(1, 4, 8)) {
+            val slices = IntArray(locals + 1)
+            val workers = List(locals + 1) { arm ->
+                PortfolioWorker.ofSolve("arm$arm", arm) { _, _ ->
+                    slices[arm]++
+                    SolveResult.Unknown(TerminationReason.BudgetExhausted)
+                }.also { if (arm > 0) it.family = ArmFamily.LocalSearch }
+            }
+
+            Portfolio.thompson(workers, seed = 3L).use { it.solve(Cancellation { slices.sum() >= 1_000 }) }
+
+            val localShare = slices.drop(1).sum().toDouble() / slices.sum()
+            assertTrue(localShare in 0.44..0.56, "$locals local search arms took $localShare of the segments")
+        }
+    }
+
+    @Test
+    fun `deferred variants preserve the first solution family schedule`() {
+        val schedules = listOf(0, 4, 8).map { variants ->
+            val chosen = ArrayList<Int>()
+            val workers = List(variants + 2) { arm ->
+                PortfolioWorker.ofSolve("arm$arm", arm) { _, _ ->
+                    chosen += arm
+                    SolveResult.Unknown(TerminationReason.BudgetExhausted)
+                }.also {
+                    if (arm > 0) it.family = ArmFamily.LocalSearch
+                    it.improvementOnly = arm >= 2
+                }
+            }
+
+            Portfolio.thompson(workers, seed = 3L).use { it.solve(Cancellation { chosen.size >= 100 }) }
+            chosen
+        }
+
+        assertEquals(schedules.first(), schedules[1])
+        assertEquals(schedules.first(), schedules[2])
+    }
+
+    @Test
     fun `an arm raising the proven floor takes more of the run than one doing nothing`() {
         val slices = IntArray(3)
         val floor = SharedObjectiveBound()
