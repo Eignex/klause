@@ -1,0 +1,58 @@
+{
+  "arms": [
+    {
+      "label": "legacy-selection",
+      "problems": 63,
+      "solved": {
+        "value": 32.0,
+        "low": 24.0,
+        "high": 40.0
+      },
+      "par2": {
+        "value": 30.347592592592598,
+        "low": 23.128576719576717,
+        "high": 37.399582010582
+      },
+      "score": {
+        "value": 16.0,
+        "low": 12.0,
+        "high": 20.0
+      }
+    },
+    {
+      "label": "bounded-selection",
+      "problems": 63,
+      "solved": {
+        "value": 32.0,
+        "low": 24.0,
+        "high": 40.0
+      },
+      "par2": {
+        "value": 30.343137566137564,
+        "low": 22.781677248677248,
+        "high": 37.43315873015872
+      },
+      "score": {
+        "value": 16.0,
+        "low": 12.0,
+        "high": 20.0
+      }
+    }
+  ],
+  "paired": [
+    {
+      "label": "bounded-selection",
+      "problems": 32,
+      "timeRatio": {
+        "value": 1.0095582775353533,
+        "low": 0.9794088063122396,
+        "high": 1.0406013983894344
+      },
+      "wilcoxonP": 0.757677306748008,
+      "better": 0,
+      "worse": 0,
+      "signP": 1.0
+    }
+  ],
+  "noise": []
+}
