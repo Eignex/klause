@@ -46,6 +46,17 @@ class CorpusSelectionTest {
     }
 
     @Test
+    fun `equal-priority primary models are independent of directory enumeration`() {
+        val candidates = listOf(File("bacp-9.mzn"), File("bacp-19.mzn"))
+
+        val forward = CorpusSelection.pickPrimaryMzn("bacp", candidates)
+        val reversed = CorpusSelection.pickPrimaryMzn("bacp", candidates.reversed())
+
+        assertEquals("bacp-19.mzn", forward.name)
+        assertEquals(forward, reversed)
+    }
+
+    @Test
     fun `per-family cap then interleave then overall cap`() {
         val all = (1..4).map { Discovered("famA/$it", "famA/m.mzn", "famA/$it.dzn") } +
             (1..4).map { Discovered("famB/$it", "famB/m.mzn", "famB/$it.dzn") }
