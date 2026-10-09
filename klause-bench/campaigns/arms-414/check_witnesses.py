@@ -36,11 +36,13 @@ def check(bench, jobs, output):
                            'problem=' + case['problem']['problem'], 'output=' + str(path)]
                 run = subprocess.run(command, text=True, capture_output=True, timeout=180)
                 try:
-                    verdict = json.loads(run.stdout.strip())
+                    lines = run.stdout.splitlines()
+                    start = next(i for i, line in enumerate(lines) if line.startswith('{'))
+                    verdict = json.loads('\n'.join(lines[start:]))
                     if verdict.get('sourceHashes') != rec.get('sourceHashes'):
                         verdict = dict(status='error', reason='source bytes differ from measured inputs')
-                except (ValueError, IndexError):
-                    verdict = dict(status='error', reason=(run.stderr or run.stdout)[-2000:])
+                except (ValueError, IndexError, StopIteration):
+                    verdict = dict(status='error', reason=(run.stderr + run.stdout)[-2000:])
             results.append(dict(job=job, case=case['index'], input=case['problem']['problem'],
                                 objective=rec.get('objective'), measuredSourceHashes=rec.get('sourceHashes'), **verdict))
     output.write_text(json.dumps(results, indent=2) + '\n')
