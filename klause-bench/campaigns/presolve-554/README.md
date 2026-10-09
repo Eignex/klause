@@ -227,3 +227,15 @@ compilation and post-solve source checking do not consume measured search time.
 The abort fraction 0.0001 is pruned because it changed no observed pilot work.
 No round-cap expansion is justified by the pilot. A holdout candidate and its
 settings will be frozen only after discovery; holdout outcomes remain unopened.
+
+Discovery screening ranks work-active candidates by the complete paired process
+PAR2 ratio, provided their mean reported quality is nonnegative. Ties prefer the
+smaller change (abort 0.01 before conservative; neither aggressive setting becomes
+a global-default candidate from its focused six-family screen). Any invalid checked
+witness, contradictory verdict or input-hash mismatch requires investigation before
+selection. Freeze at most one candidate for a 12-family holdout comparison against
+default, with the same build, three seeds and two repeats (144 cases). A recommendation
+requires consistent quality and process-timing evidence across discovery and holdout,
+with uncertainty, per-family regressions and independent-check coverage disclosed.
+An inconclusive result or no eligible discovery candidate leaves shipped defaults
+unchanged; the frozen holdout is not used to rescue or select a failed candidate.
