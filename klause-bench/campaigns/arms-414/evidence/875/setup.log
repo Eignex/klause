@@ -1,0 +1,21 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+From https://github.com/Eignex/klause
+   09f01a9ba..125be7aed  codex/presolve-554-campaign -> codex/presolve-554-campaign
+[i-0db396ca358647f9c] reused the cached build of 5471419aa
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-0f4cc377fdbc98ba1] reused the cached build of 5471419aa
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-0941d7e1c86027815] reused the cached build of 5471419aa
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-04040170f172b4a0d] reused the cached build of 5471419aa
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-088cc5ec19a9d6d98] reused the cached build of 5471419aa
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-0784cc9835723b5b2] reused the cached build of 5471419aa
+WARNING: Using incubator modules: jdk.incubator.vector
+

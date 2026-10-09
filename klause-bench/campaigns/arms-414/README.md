@@ -129,9 +129,9 @@ and repeated controls [883](http://192.168.50.104:8420/jobs/883). `jobs.json` re
 The measurement SHA stays frozen despite later formatting-only CI repairs. No result from an
 unfinished stage is a default recommendation.
 
-Oversubscription p1 job 881 and reseeding p1 job 879 are complete with 48/48 records each and no
-failed commands. Matched comparisons and source checks run in GitHub CI; the remaining 300-second
-stages are still collecting records.
+Baseline job 875 is complete with 156/156 records. Oversubscription p1 job 881 and reseeding p1
+job 879 are complete with 48/48 records each and no failed commands. Matched comparisons and
+source checks run in GitHub CI; the p4 sweeps are still collecting records.
 
 These measurements belong to the recorded SHAs. Exact-arithmetic normalization and Boolean
 undo-lifetime fixes reached main during collection; rebasing the plumbing does not retrospectively
@@ -178,3 +178,28 @@ The larger pool spreads final credit over additional workers while still losing 
 Final-holder counts and raw contribution credit measure different roles; neither is a removal
 counterfactual. Per-arm time, work, initialization, segments, reseeds and work-weighted rewards are
 retained in the CI analysis.
+
+## Completed p1 reseeding sweep
+
+[CI analysis 37999618925](https://github.com/Eignex/klause/actions/runs/37999618925) mines all 48
+records from job 879. Every record is feasible with a retained witness and source hashes; there are
+no caught arm exceptions, refuted-claim faults or pairwise proof contradictions. All 37 distinct
+MiniZinc candidates across the completed witness jobs pass the source gate.
+
+| Threshold against default 3 | Objective wins / ties / losses | Proof gains / losses | Problem mean quality | Descriptive 95% interval |
+| --- | --- | --- | --- | --- |
+| off (0) | 1 / 8 / 3 | 1 / 0 | -0.167 | [-0.333, 0] |
+| 2 | 3 / 7 / 2 | 0 / 0 | 0.083 | [-0.5, 0.75] |
+| 4 | 3 / 7 / 2 | 0 / 0 | 0.083 | [-0.5, 0.75] |
+
+Thresholds 2 and 4 win all three city-position seeds and lose two Fortress seeds. Off loses two city
+seeds and one Fortress seed, wins one city seed, and proves the seed-3 linear-ordering objective 61
+at 237.208 seconds. Every configuration proves the three knapsack cases at -318. These tradeoffs
+do not support a general threshold replacement. The retained first/best timings distinguish early
+feasibility from continued improvement: median first incumbents are 141.5/168/165.5/158 ms for
+thresholds 3/0/2/4; median best times are 59.091/4.421/56.388/50.149 seconds. The short best time
+for off includes earlier, worse incumbents, so it is not an optimization speedup.
+
+Thresholds 3/0/2/4 record 134/0/204/93 actual reseeds. The off configuration performs no reseeding,
+and the other values materially change execution. Per-arm initialization is retained separately;
+these frozen builds predate the construction-accounting repair and its integrated measurements.

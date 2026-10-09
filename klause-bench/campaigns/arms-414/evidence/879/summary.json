@@ -1,0 +1,965 @@
+{
+  "job": 879,
+  "status": "DONE",
+  "cases": 48,
+  "arms": {
+    "mixed-p1-r3": {
+      "outcomes": {
+        "feasible": 9,
+        "optimal": 3
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 141.5,
+      "bestMs": 59090.5,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 8382232,
+          "ms": 558207,
+          "initMs": 685,
+          "segments": 222,
+          "reseeds": 62,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 687944.1098,
+          "finalHolders": 9,
+          "credit": {
+            "FirstSolution": 9.0,
+            "Improvement": 18428.0,
+            "RootFixings": 2820.0,
+            "Glue": 3792.0,
+            "ClauseUses": 154.0
+          },
+          "meanReward": 0.08207170951603343
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 3057845,
+          "ms": 207373,
+          "initMs": 57,
+          "segments": 57,
+          "reseeds": 18,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 262805.8955,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 6.0,
+            "Glue": 86.0,
+            "Improvement": 176355.0,
+            "ClauseUses": 13.0
+          },
+          "meanReward": 0.08594480606440155
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 1291426,
+          "ms": 162061,
+          "initMs": 0,
+          "segments": 40,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 13040.312399999999,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1196836.0
+          },
+          "meanReward": 0.010097607141253157
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 2413855,
+          "ms": 131544,
+          "initMs": 0,
+          "segments": 37,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 139828.8781,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 22971.0
+          },
+          "meanReward": 0.057927621211713215
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 6,
+          "work": 800707,
+          "ms": 103525,
+          "initMs": 0,
+          "segments": 19,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2607.7072000000003,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 22417.0
+          },
+          "meanReward": 0.003256755842024611
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 6,
+          "work": 559463,
+          "ms": 50061,
+          "initMs": 0,
+          "segments": 18,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 29244.645199999995,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 255577.0
+          },
+          "meanReward": 0.052272706506060265
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 14716050,
+          "ms": 701492,
+          "initMs": 0,
+          "segments": 111,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1727963.4323999998,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 70079.0
+          },
+          "meanReward": 0.11742032898773787
+        },
+        "bt/lp-default": {
+          "cases": 3,
+          "work": 5866651,
+          "ms": 193081,
+          "initMs": 67,
+          "segments": 55,
+          "reseeds": 11,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1044501.0279999999,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 3.0,
+            "Improvement": 70079.0,
+            "RootFixings": 2778.0,
+            "Glue": 57.0,
+            "ClauseUses": 38.0
+          },
+          "meanReward": 0.1780404234034034
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 4247832,
+          "ms": 521044,
+          "initMs": 3,
+          "segments": 130,
+          "reseeds": 43,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 98190.339,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "ClauseUses": 350.0
+          },
+          "meanReward": 0.02311540075031216
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 6,
+          "work": 359000,
+          "ms": 1034,
+          "initMs": 0,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        },
+        "ls/fjump/fixed": {
+          "cases": 6,
+          "work": 868555,
+          "ms": 60076,
+          "initMs": 0,
+          "segments": 18,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        }
+      }
+    },
+    "mixed-p1-r0": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "0": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 168.0,
+      "bestMs": 4421.0,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 7136632,
+          "ms": 423931,
+          "initMs": 468,
+          "segments": 169,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 462673.5058,
+          "finalHolders": 7,
+          "credit": {
+            "FirstSolution": 9.0,
+            "RootFixings": 2820.0,
+            "Glue": 15.0,
+            "Improvement": 16.0,
+            "ClauseUses": 2.0
+          },
+          "meanReward": 0.0648307921439693
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 2513157,
+          "ms": 186284,
+          "initMs": 5,
+          "segments": 58,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 128476.391,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 6.0,
+            "Improvement": 176355.0,
+            "Glue": 2.0
+          },
+          "meanReward": 0.05112151409561758
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 782488,
+          "ms": 147787,
+          "initMs": 0,
+          "segments": 30,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 13725.909000000001,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1196836.0
+          },
+          "meanReward": 0.017541366768563865
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 1913337,
+          "ms": 138784,
+          "initMs": 0,
+          "segments": 41,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 122908.1087,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 23971.0
+          },
+          "meanReward": 0.06423756437052124
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 6,
+          "work": 1145264,
+          "ms": 160079,
+          "initMs": 0,
+          "segments": 27,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2785.8392999999996,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 22542.0
+          },
+          "meanReward": 0.0024324865707819328
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 6,
+          "work": 470765,
+          "ms": 73284,
+          "initMs": 0,
+          "segments": 22,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 27150.503,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 259129.0
+          },
+          "meanReward": 0.05767315539600438
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 15625126,
+          "ms": 797711,
+          "initMs": 0,
+          "segments": 121,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3315038.955,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 110115.0
+          },
+          "meanReward": 0.2121607822554519
+        },
+        "bt/lp-default": {
+          "cases": 3,
+          "work": 3697524,
+          "ms": 123021,
+          "initMs": 35,
+          "segments": 37,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 359666.31240000005,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 3.0,
+            "RootFixings": 2778.0,
+            "Glue": 8.0,
+            "Improvement": 40046.0
+          },
+          "meanReward": 0.09727220496743227
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 3955002,
+          "ms": 522346,
+          "initMs": 3,
+          "segments": 71,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 283613.3706,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "Glue": 3.0
+          },
+          "meanReward": 0.07171004479896598
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 6,
+          "work": 498750,
+          "ms": 1384,
+          "initMs": 0,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        },
+        "ls/fjump/fixed": {
+          "cases": 6,
+          "work": 745577,
+          "ms": 52195,
+          "initMs": 0,
+          "segments": 12,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        }
+      }
+    },
+    "mixed-p1-r2": {
+      "outcomes": {
+        "feasible": 9,
+        "optimal": 3
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "2": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 165.5,
+      "bestMs": 56388.0,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 8722821,
+          "ms": 678194,
+          "initMs": 937,
+          "segments": 220,
+          "reseeds": 93,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 852652.2112,
+          "finalHolders": 6,
+          "credit": {
+            "FirstSolution": 9.0,
+            "Improvement": 22612.0,
+            "Floor": 80.0,
+            "RootFixings": 2821.0,
+            "Glue": 3477.0,
+            "ClauseUses": 233.0
+          },
+          "meanReward": 0.09774959399029282
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 2849743,
+          "ms": 210906,
+          "initMs": 136,
+          "segments": 55,
+          "reseeds": 26,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 260403.545,
+          "finalHolders": 0,
+          "credit": {
+            "Floor": 109.0,
+            "RootFixings": 6.0,
+            "Glue": 115.0,
+            "ClauseUses": 25.0,
+            "Improvement": 191320.0
+          },
+          "meanReward": 0.09137790495493804
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 1303161,
+          "ms": 179918,
+          "initMs": 0,
+          "segments": 35,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 18336.7504,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 1199041.0
+          },
+          "meanReward": 0.014070978489994713
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 1381829,
+          "ms": 53108,
+          "initMs": 0,
+          "segments": 25,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 223094.6435,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 169497.0
+          },
+          "meanReward": 0.16144880697973482
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 6,
+          "work": 220553,
+          "ms": 31995,
+          "initMs": 0,
+          "segments": 20,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1923.8604,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 34692.0
+          },
+          "meanReward": 0.008722893816905688
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 6,
+          "work": 538138,
+          "ms": 48851,
+          "initMs": 0,
+          "segments": 16,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 17437.443199999998,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 81758.0
+          },
+          "meanReward": 0.03240329283566668
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 14570377,
+          "ms": 716839,
+          "initMs": 0,
+          "segments": 113,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2851093.4271000004,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 110126.0
+          },
+          "meanReward": 0.19567739579422005
+        },
+        "bt/lp-default": {
+          "cases": 3,
+          "work": 5349576,
+          "ms": 185806,
+          "initMs": 85,
+          "segments": 51,
+          "reseeds": 20,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1287740.2428000001,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 3.0,
+            "RootFixings": 2778.0,
+            "Glue": 92.0,
+            "ClauseUses": 134.0,
+            "Improvement": 10041.0
+          },
+          "meanReward": 0.2407181882825854
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 4193524,
+          "ms": 531577,
+          "initMs": 4,
+          "segments": 132,
+          "reseeds": 65,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 130014.1103,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "Glue": 3.0,
+            "ClauseUses": 1559.0
+          },
+          "meanReward": 0.031003545061385127
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 6,
+          "work": 467905,
+          "ms": 1282,
+          "initMs": 0,
+          "segments": 12,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        },
+        "ls/fjump/fixed": {
+          "cases": 6,
+          "work": 745909,
+          "ms": 51064,
+          "initMs": 0,
+          "segments": 13,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        }
+      }
+    },
+    "mixed-p1-r4": {
+      "outcomes": {
+        "feasible": 9,
+        "optimal": 3
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "52193ef906cfedac893b1df8390559ca0495b59e"
+      ],
+      "missingWitnesses": 0,
+      "missingSourceHashes": 0,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
+      "thresholds": {
+        "4": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 158.0,
+      "bestMs": 50149.0,
+      "repeatRanges": [],
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 8765654,
+          "ms": 572202,
+          "initMs": 600,
+          "segments": 206,
+          "reseeds": 40,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 708273.2842000001,
+          "finalHolders": 9,
+          "credit": {
+            "FirstSolution": 9.0,
+            "Improvement": 32144.0,
+            "Floor": 136.0,
+            "RootFixings": 2821.0,
+            "Glue": 3553.0,
+            "ClauseUses": 84.0
+          },
+          "meanReward": 0.08080096296294607
+        },
+        "bt/annotation": {
+          "cases": 3,
+          "work": 2059799,
+          "ms": 169630,
+          "initMs": 51,
+          "segments": 60,
+          "reseeds": 14,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 165775.34590000001,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 6.0,
+            "Glue": 154.0,
+            "ClauseUses": 19.0,
+            "Improvement": 176355.0,
+            "Floor": 45.0
+          },
+          "meanReward": 0.08048132167264865
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 1194247,
+          "ms": 201705,
+          "initMs": 0,
+          "segments": 34,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 26441.3285,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1286413.0
+          },
+          "meanReward": 0.022140586076414677
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 2428597,
+          "ms": 148017,
+          "initMs": 0,
+          "segments": 45,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 167903.6712,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 160342.0
+          },
+          "meanReward": 0.06913607782600407
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 6,
+          "work": 204734,
+          "ms": 69499,
+          "initMs": 0,
+          "segments": 18,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1669.0346,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 16432.0
+          },
+          "meanReward": 0.008152210184922876
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 6,
+          "work": 510409,
+          "ms": 24384,
+          "initMs": 0,
+          "segments": 17,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4271.6465,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 76723.0
+          },
+          "meanReward": 0.00836906578841674
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 14063542,
+          "ms": 765826,
+          "initMs": 0,
+          "segments": 110,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2874672.596,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 100121.0
+          },
+          "meanReward": 0.20440601635064623
+        },
+        "bt/lp-default": {
+          "cases": 3,
+          "work": 4446784,
+          "ms": 153495,
+          "initMs": 45,
+          "segments": 41,
+          "reseeds": 7,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 841386.209,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 3.0,
+            "Improvement": 20047.0,
+            "RootFixings": 2778.0,
+            "Glue": 38.0,
+            "ClauseUses": 34.0
+          },
+          "meanReward": 0.18921229567255798
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 4198481,
+          "ms": 522756,
+          "initMs": 4,
+          "segments": 131,
+          "reseeds": 32,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 107285.6826,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 36.0,
+            "Glue": 1.0,
+            "ClauseUses": 372.0
+          },
+          "meanReward": 0.025553451974654643
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 6,
+          "work": 648655,
+          "ms": 1729,
+          "initMs": 0,
+          "segments": 12,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        },
+        "ls/fjump/fixed": {
+          "cases": 6,
+          "work": 876531,
+          "ms": 60717,
+          "initMs": 0,
+          "segments": 13,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {},
+          "meanReward": 0.0
+        }
+      }
+    }
+  },
+  "pairs": [
+    {
+      "a": "mixed-p1-r3",
+      "b": "mixed-p1-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 3,
+      "proofGains": 1,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0
+      ]
+    },
+    {
+      "a": "mixed-p1-r3",
+      "b": "mixed-p1-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333334,
+      "problemBootstrap95": [
+        -0.5,
+        0.75
+      ]
+    },
+    {
+      "a": "mixed-p1-r3",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333334,
+      "problemBootstrap95": [
+        -0.5,
+        0.75
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p1-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 1,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333334,
+      "problemBootstrap95": [
+        -0.5,
+        0.75
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 1,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        0,
+        0.75
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.75
+      ]
+    }
+  ]
+}
