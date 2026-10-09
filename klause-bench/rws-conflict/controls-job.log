@@ -1,0 +1,16 @@
+1791579312303 launched c7i.2xlarge instances [i-09f40a56bb1c17fed]
+1791579330204 waiting for i-09f40a56bb1c17fed to boot failed (try 1 of 45), retrying in 20 s: on 16.171.13.254 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-09f40a56bb1c17fed' (ED25519) to the list of known hosts.
+
+1791579350699 i-09f40a56bb1c17fed: booted; building 5471419aa, 029713ddf
+1791579519650 i-09f40a56bb1c17fed: built
+1791579519650 i-09f40a56bb1c17fed: planning, which fetches the corpora the selections read
+1791579521028 selection 0 ('suite=smtlib-qflia' 'name=*RWS/Example_1.txt,*miplib2003/harp2.sat' 'max=2' 'per-family=1000', reference=any): 2 selected, 0 left out by the reference filter, 2 planned
+1791579521465 selection 1 ('suite=dimacs-core' 'name=*php3,*implication-chain' 'max=2' 'per-family=1000', reference=any): 2 selected, 0 left out by the reference filter, 2 planned
+1791579521914 selection 2 ('suite=opb-core' 'name=*pb-cardinality,*setcover-tiny' 'max=2' 'per-family=1000', reference=any): 2 selected, 0 left out by the reference filter, 2 planned
+1791579522348 selection 3 ('suite=xcsp3-core' 'name=*magic-series-tiny' 'max=1' 'per-family=1000', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579522791 selection 4 ('suite=wcnf-core' 'name=*maxsat-tiny' 'max=1' 'per-family=1000', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579522793 planned 8 problems × 2 arms = 48 cases, up to 0,1 h
+1791579522793 i-09f40a56bb1c17fed: compressing and pushing newly fetched corpora to s3://klause-lab-corpus-459222092693-eu-north-1
+1791579539708 running 8 problems on 1 instances, each taking the next problem as it has room
+1791579628791 i-09f40a56bb1c17fed has no problems left to take: terminated
+1791579630497 job finished

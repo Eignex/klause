@@ -1,0 +1,12 @@
+1791579302844 launched c7i.2xlarge instances [i-0751a60498901da42]
+1791579320972 waiting for i-0751a60498901da42 to boot failed (try 1 of 45), retrying in 20 s: on 13.61.23.180 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0751a60498901da42' (ED25519) to the list of known hosts.
+
+1791579341502 i-0751a60498901da42: booted; building 5471419aa, 029713ddf
+1791579506978 i-0751a60498901da42: built
+1791579506978 i-0751a60498901da42: planning, which fetches the corpora the selections read
+1791579508537 selection 0 ('suite=smtlib-qflia' 'name=*RWS/Example_2.txt' 'per-family=1000' 'max=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579508539 planned 1 problems × 6 arms = 18 cases, up to 0,3 h
+1791579508539 i-0751a60498901da42: compressing and pushing newly fetched corpora to s3://klause-lab-corpus-459222092693-eu-north-1
+1791579525022 running 1 problems on 1 instances, each taking the next problem as it has room
+1791579764988 i-0751a60498901da42 has no problems left to take: terminated
+1791579767138 job finished

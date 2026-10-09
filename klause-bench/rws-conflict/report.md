@@ -44,9 +44,42 @@ candidate's unique nine-character commit abbreviation; its arm metadata and reco
 resolved SHA and executed binary fingerprint. This one repetition establishes recovery in the
 canary, not repeated acceptance or a general speedup.
 
-Repeated route acceptance and eight bounded related-format controls are pending. Their specifications
-are retained separately. The related controls use three repetitions, node allowance 10,000 and wall
-allowance 10,000 ms. Candidate/default and candidate/satOptimized preservation remain required.
+## Repeated acceptance and related controls
+
+[AWS 869](http://192.168.50.104:8420/experiments/869) completed all 18 paired route cases on one
+exclusive c7i.2xlarge, without JFR. Every process exited zero. Its main binary fingerprint is
+`c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566`; the executed fix fingerprint
+is `56cd42900857db7ceeaf18c03a20f83ddf69054a08a39cc56e71fcabece3d4a7`. Raw provenance maps
+retain each installed jar, launcher and Java runtime hash. The executed fix is `029713ddf`; the
+evidence layer changes only reports and their CI audits, not solver source.
+
+| Route | Main outcomes / nodes / failures | Fix outcomes / nodes / failures | Main solve seconds | Fix solve seconds |
+| --- | --- | --- | --- | --- |
+| conflictDriven | UNKNOWN × 3 / 873 / 70782, 70456, 63962 | SAT × 3 / 1813 / 1194 | 59.024 / 59.010 / 59.032 | 2.917 / 2.810 / 2.845 |
+| satOptimized | SAT × 3 / 416 / 68 | SAT × 3 / 416 / 68 | 0.529 / 0.528 / 0.504 | 0.518 / 0.489 / 0.524 |
+| default, one arm, LP off | SAT × 3 / 416 / 68 | SAT × 3 / 416 / 68 | 0.507 / 0.516 / 0.496 | 0.501 / 0.499 / 0.510 |
+
+This establishes recovery under the issue's node/deadline allowance, not a fixed-work speedup:
+main hits the wall while the fix finishes. Passing-route times are small and mixed; no throughput
+improvement is claimed. The lab reference covers RWS and reports no disagreements or shortfalls.
+
+[AWS 870](http://192.168.50.104:8420/experiments/870) completed all 48 related-control cases:
+eight inputs across SMT-LIB, DIMACS, OPB, XCSP3 and WCNF, two revisions, seed 1 and three repeats.
+It uses an exclusive serial c7i.2xlarge, LP off, node allowance 10,000 and wall allowance 10,000 ms.
+Every process exited zero. All 24 matched pairs preserve verdict, proof flag, objective, nodes and
+failures. `RWS/Example_1.txt` remains SAT at 1,835 nodes/950 failures; `harp2` remains UNKNOWN at
+exactly 10,000 nodes/91 failures. The six small format controls retain SAT/UNSAT results and the
+set-cover optimum 4 / MaxSAT optimum 1. The lab reference covers only the two SMT inputs and reports
+no disagreement or shortfall; this is not eight independently checked source witnesses. Most tiny
+controls require little or no search, so this bounded sample does not establish broad performance.
+
+The default route in [historical frozen 764](http://192.168.50.104:8420/experiments/764) also left LP
+and arm defaults unrestricted. [AWS 877](http://192.168.50.104:8420/experiments/877) preserves that
+distinct CP route under the original ten-second wall / 100,000-node control. All six cases finished
+with zero process exits and SAT at 416 nodes/68 failures. Main solve seconds are 0.539 / 0.474 /
+0.482; fix seconds are 0.505 / 0.485 / 0.476. Both revisions use the same binary fingerprints as
+869, and reference comparison reports no disagreements or shortfalls. These three paired repeats
+preserve the unrestricted default route separately from the LP-off one-arm acceptance.
 
 SAT records use `reported-result-v1`, not an independent source-witness checker. Reference agreement
 and a returned SAT model must not be described as independently verified witnesses. No source model,
@@ -57,8 +90,26 @@ diagnostics only; the execution-policy history is recorded in README.md.
 
 [#2372](https://github.com/Eignex/klause/pull/2372) freezes reproduction;
 [#2377](https://github.com/Eignex/klause/pull/2377) changes Boolean pin lifetime and adds the regression;
-the dependent evidence layer archives the measurements and audits them in GitHub CI. The full local
-gate and local unit tests were skipped. GitHub JVM/native/lint/docs checks are pending on the fix.
+[#2385](https://github.com/Eignex/klause/pull/2385) archives the measurements and audits them in
+GitHub CI. The full local gate and local unit tests were skipped. GitHub JVM/native/lint/docs checks
+passed on reproducer `b080b243f` and fix `029713ddf`; their retained CI metadata links exact runs.
 The CI control branch `f75cdae05cf95cdd60fb4dfef4b60a392db00b35` retains the added test with the
-old assignment behavior; [its CI run](https://github.com/Eignex/klause/actions/runs/37989439563) is
-expected to fail that regression and is pending. No stack PR is reported green at this checkpoint.
+old assignment behavior; [its CI run](https://github.com/Eignex/klause/actions/runs/37989439563)
+failed on that regression on JVM with `expected:<false> but was:<null>` in 5 ms. The candidate passes
+the same test in less than the report's 1 ms resolution. Both class reports are retained and checked
+by the evidence audit. The redundant native control was cancelled after the JVM failure proved the
+regression; this does not cancel or replace any stack PR gate. The evidence layer's build and audit
+workflows run on each update; check its latest head through the PR's checks.
+
+The reproducer merged into main as `bc001bb90a10df3905cc04a6b009b92f1e956152`. The fix was
+rebased onto that commit as `4b8baad714d19ce5d144c3b3320f34984b5c08ed`; its entire Git tree
+is identical to the executed candidate's tree (`b209e2e169b693b6d4e7138bdc3db7f8edaf58ed`).
+This changes commit ancestry without changing the measured source or test. Fresh CI gates are
+required on the rebased PR head. The evidence layer remains a separate incremental report/audit diff.
+
+The lab HTTP records remain available. A separate `deploy/lab ssh 869 0` read attempted to check the
+AWS input hash during setup, but local SSH authentication to the lab server was denied (including
+a retry restricted to the existing identity). No solve ran through that failed read. The input hash
+in README.md identifies the local cached source inspected before the remote-only policy, rather
+than an independently rehashed AWS file. The remote records identify the executed corpus path and
+the frozen Zenodo collection; binary/runtime provenance is independently captured by the runner.

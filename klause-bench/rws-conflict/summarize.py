@@ -49,7 +49,10 @@ for case in cases:
     for key, value in params.items():
         if key.startswith("param."):
             assert f"--param {key[6:]}={value}" in record["command"], "engine parameter mismatch"
-    assert f"--lp {params['lp']}" in record["command"], "LP setting mismatch"
+    if "lp" in params:
+        assert f"--lp {params['lp']}" in record["command"], "LP setting mismatch"
+    else:
+        assert "--lp " not in record["command"], "default LP setting overridden"
     rows.append({"index": case["index"], "arm": case["arm"], "problem": case["problem"],
                  "seed": case["seed"], "repeat": case.get("repeat", 0),
                  **{k: record.get(k) for k in ("gitSha", "buildFingerprint", "command", "budgetMs",
