@@ -64,3 +64,38 @@ denominator even when the GCD is one. IEEE conversion also sends its already
 reduced pair through that factory. These are candidates for a focused arithmetic
 change; this profile supplies no absolute CPU saving or end-to-end speedup claim.
 The residual cancellation share on mygetpwnam remains outside this change.
+
+## Paired candidate campaigns
+
+The numerical change is [PR #2379](https://github.com/Eignex/klause/pull/2379),
+stacked on the reproducer. Its executed candidate revision is
+`9aa1cf5d1a` (the full immutable revision is retained in each specification).
+
+- [Fixed-work job 865](http://192.168.50.104:8420/?job=865): five alternating repetitions,
+  1000 search work units and a 120-second safety cap, using [paired-work.json](paired-work.json).
+- [Deadline job 866](http://192.168.50.104:8420/?job=866): three alternating repetitions,
+  20 seconds, using [paired-deadline.json](paired-deadline.json).
+- [Controls job 867](http://192.168.50.104:8420/?job=867): MPS and SMT core plus
+  blend2/egout/flugpl, default and exact policies, two repetitions, using [controls.json](controls.json).
+- [Profile job 868](http://192.168.50.104:8420/?job=868): separate candidate JFR cases,
+  using [profile-candidate.json](profile-candidate.json).
+
+All specify `host=aws`, `machines=1`, `parallel=1`, the same hardware, heap and
+processor policy as the baseline. The jobs retain exact commands and fingerprints;
+JFR fingerprints include their per-case recording paths and differ even for one build.
+Jobs 859–862 were cancelled before solver cases when a factory-helper visibility
+problem was corrected. They supply no measurements. AWS capacity delays are outside
+measured solver time.
+
+Job 854's uninstrumented characterization completed at work 1000, with 529/514/526
+theory checks on mygetpwnam/handler_sigchld/checkpass respectively. Reported solve
+seconds are 6.127/5.368/11.871. This single repetition supplies no paired speedup
+estimate. Its build fingerprint is
+`c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566`.
+
+The SMT-LIB inputs come from the catalog's immutable Zenodo release 15493090,
+`QF_LIA.tar.zst`, under `non-incremental/QF_LIA/nec-smt/`. MPS core and SMT core
+are repository fixtures at the executed revisions. MIPLIB controls come from the
+catalog's MIPLIB 3 archive. The lab records names and source commands rather than
+per-input hashes; this provenance limitation is retained rather than treating local
+corpus hashes as verified identities of remote inputs.

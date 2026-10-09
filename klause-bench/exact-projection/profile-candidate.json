@@ -1,0 +1,33 @@
+{
+  "name": "rational-normalization-profile",
+  "description": "Separate instrumented profile after rational factory change; sample shares cannot establish absolute CPU savings.",
+  "host": "aws",
+  "problems": {
+    "suite": "smtlib-qflia",
+    "name": "nec-smt/med/mygetpwnam/prp-1-46,nec-smt/large/handler_sigchld/prp-1-46,nec-smt/large/checkpass/prp-1-46",
+    "max": "3",
+    "seed": "1",
+    "reference": "any",
+    "per-family": "1000"
+  },
+  "base": {
+    "engine": "cp",
+    "processors": "1",
+    "lp": "default",
+    "timeout": "20000",
+    "exact": "false"
+  },
+  "configs": [
+    {
+      "ref": "9aa1cf5d1aadc0f39cd367d4e901f145c481725c",
+      "label": "candidate"
+    }
+  ],
+  "seeds": [
+    1
+  ],
+  "repeats": 1,
+  "parallel": 1,
+  "machines": 1,
+  "profileCli": true
+}
