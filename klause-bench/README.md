@@ -28,6 +28,11 @@ can establish feasibility, but a grid optimum or refutation cannot prove the sou
 Raw output and `reportedFeasible`, `reportedObjective`, and `reportedProven` preserve solver claims.
 Earlier incumbents are not independently source checked; arm attribution is restricted to the final objective.
 
+Solve records also retain `sourceHashes` for the plain model/data bytes and `finalWitness` for the
+last rendered candidate, up to 8 MiB. A missing witness is not a validated assignment. These fields
+are captured outside subprocess timing; legacy records and failed loads may omit them. AWS record
+files retain them even when a lab API built against an older schema omits them from its case view.
+
 An existing output can be checked without solving again:
 
 ```

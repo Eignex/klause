@@ -103,6 +103,10 @@ internal data class SolveRecord(
     val validationPolicy: String = REPORTED_RESULT_POLICY,
     /** Subprocess duration, separate from incumbent timings; null when unavailable or in legacy records. */
     val elapsedMs: Long? = null,
+    /** Plain source bytes, independent of cache compression; absent on legacy or failed loads. */
+    val sourceHashes: Map<String, String> = emptyMap(),
+    /** Final rendered candidate, retained for independent checks when the raw stream is not transferred. */
+    val finalWitness: String? = null,
 )
 
 internal object SolveMetric {
@@ -332,7 +336,11 @@ internal object SolveMetric {
             val r = BenchCache.load(key)
                 ?: SolverInvocation.run(entry, solverId, settings, budget, optimize).also { BenchCache.store(key, it) }
             val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
-                .copy(validationPolicy = policy)
+                .copy(
+                    validationPolicy = policy,
+                    sourceHashes = SolveEvidence.sourceHashes(entry.ref),
+                    finalWitness = if (r.feasible == true) SolveEvidence.finalWitness(entry.ref.format, r.rawOutput) else null,
+                )
             val checked = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
                 val validation = if (r.feasible == true) {
                     MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective)
