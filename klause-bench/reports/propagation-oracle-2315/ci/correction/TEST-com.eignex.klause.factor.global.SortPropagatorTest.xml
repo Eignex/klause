@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="SortPropagatorTest[jvm]" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-09T20:50:27.313Z" hostname="runnervmmprz5" time="0.567">
+  <properties/>
+  <testcase name="mehlhorn-thiel filtering never over-prunes on width-four vectors[jvm]" classname="com.eignex.klause.factor.global.SortPropagatorTest" time="0.078"/>
+  <testcase name="sort deductions are implied by their reasons under carved holes[jvm]" classname="com.eignex.klause.factor.global.SortPropagatorTest" time="0.45"/>
+  <testcase name="a sorted bound cites only the values that rank below it[jvm]" classname="com.eignex.klause.factor.global.SortPropagatorTest" time="0.001"/>
+  <testcase name="sort matches sorted xs[jvm]" classname="com.eignex.klause.factor.global.SortPropagatorTest" time="0.0"/>
+  <testcase name="mehlhorn-thiel filtering never over-prunes[jvm]" classname="com.eignex.klause.factor.global.SortPropagatorTest" time="0.037"/>
+  <testcase name="sort with duplicates[jvm]" classname="com.eignex.klause.factor.global.SortPropagatorTest" time="0.001"/>
+  <testcase name="two searches sharing one propagator keep independent per-search state[jvm]" classname="com.eignex.klause.factor.global.SortPropagatorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
