@@ -1,6 +1,6 @@
 # Presolve effort campaign (#554)
 
-Status: AWS pilot queued; no defaults recommendation yet.
+Status: AWS pilots running; no defaults recommendation yet.
 
 The solver baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`. The neutral
 controls build is `5ad3707c0c0bfb113f994828265b9f1bafef91c3` ([PR #2378](https://github.com/Eignex/klause/pull/2378)).
@@ -92,3 +92,20 @@ The pilot's 12 year/family groups are only eight base families because families
 recur across years. It is a bounded plumbing/cost screen with catalogue ordering,
 not the representative discovery campaign. Bootstrap intervals in `analyze.py`
 cluster by base family and average seeds/repeats within each cluster.
+
+## Pilot correction
+
+Initial records exposed two MiniZinc compile errors (`debruijn_binary` string search
+annotations and `black-hole`'s obsolete `is_output`). They stay in the record as
+load errors; they do not contribute presolve cost observations. The first pilot
+also confirms that `bt-arm=satOptimized` selects a family but leaves six cloned
+arms under default cardinality. These are measured settings, not a single solver.
+
+[Job 874](http://192.168.50.104:8420/jobs/874) explicitly sets `param.arms=1` and
+uses six frozen discovery inputs from `presolve-554-pilot`. Its controls build is
+`09f01a9ba` (full SHA in `experiments/single-arm-pilot.json`), with source checks
+and model/data hashes enabled only on the updated bench arms. The immutable main
+arm uses its existing reported-result policy; checking happens outside solver
+runtime and that policy difference is retained. This pilot has 168 cases under
+10,000 ms, two seeds and two repeats. It must confirm the single-arm commands,
+work telemetry and source-check data before the larger 300-second sweep.
