@@ -202,15 +202,15 @@ private fun certifyAuthoritativeSolve(
         observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
     }
     LpCertificationSession(context, pricing).use { certification ->
-        certification.certify(model, solver, result, cancellation, observer, counterResults,
-            refinementLimits, floatAccept, floatOffset)
+        certification.certify(
+            model, solver, result, cancellation, observer, counterResults,
+            refinementLimits, floatAccept, floatOffset,
+        )
     }
 }
 
-internal class LpCertificationSession(
-    private val context: LpSolveContext,
-    private val pricing: LpPricingOptions,
-) : AutoCloseable {
+internal class LpCertificationSession(private val context: LpSolveContext, private val pricing: LpPricingOptions) :
+    AutoCloseable {
     private val continuation = LpExactContinuationCache()
     private var anchor: LpScopedSolver? = null
 
@@ -249,8 +249,10 @@ internal class LpCertificationSession(
         } else {
             null
         }
-        val certified = certifyLpResult(model, solver, result, cancellation, observer, context.certificationPolicy,
-            counterResults, continuationCache = continuation, refinement = refinement)
+        val certified = certifyLpResult(
+            model, solver, result, cancellation, observer, context.certificationPolicy,
+            counterResults, continuationCache = continuation, refinement = refinement,
+        )
         ladderTimer.finish(certified.verdict.name)
         return certified
     }
@@ -1118,8 +1120,12 @@ internal fun LpModel.finiteExactInput(): Boolean {
     ) {
         return false
     }
-    if (rowPremises.any { it != null && (it.vars.size != it.isUpper.size || it.vars.size != it.thresholds.size ||
-            it.vars.any { variable -> variable < 0 } || it.boolLits.any { literal -> literal < 0 }) }
+    if (rowPremises.any {
+            it != null && (
+                it.vars.size != it.isUpper.size || it.vars.size != it.thresholds.size ||
+                it.vars.any { variable -> variable < 0 } || it.boolLits.any { literal -> literal < 0 }
+            )
+        }
     ) {
         return false
     }

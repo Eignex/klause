@@ -297,7 +297,9 @@ internal interface RetainedLpSolver : LpSolver {
     fun resolveBounds(allowance: LpFloatAllowance? = null): FloatLpResult?
 }
 
-internal interface RetainedComponentLpSolverCapability : ComponentLpSolverCapability, RetainedLpSolver
+internal interface RetainedComponentLpSolverCapability :
+    ComponentLpSolverCapability,
+    RetainedLpSolver
 
 /**
  * An [LpSolver] retaining its basis and factorization across exact bound and objective adoption.
@@ -412,9 +414,20 @@ internal fun newRetainedLpSolver(
 ): RetainedLpSolver {
     require(model.exactState != null)
     if (componentSplit) {
-        componentLpSolverOrNull(model, cancellation,
-            { part, token -> newPersistentLpSolver(part, token, factory = factory, pricing = pricing,
-                workLimit = workLimit) }, factory::newRetainedComponentSolver)?.let { return it }
+        componentLpSolverOrNull(
+            model,
+            cancellation,
+            { part, token ->
+                newPersistentLpSolver(
+                    part,
+                    token,
+                    factory = factory,
+                    pricing = pricing,
+                    workLimit = workLimit,
+                )
+            },
+            factory::newRetainedComponentSolver,
+        )?.let { return it }
     }
     return newPersistentLpSolver(model, cancellation, factory = factory, pricing = pricing, workLimit = workLimit)
 }
@@ -443,8 +456,12 @@ internal object UnscaledLpEngineFactory : LpEngineFactory {
         isolated: IntArray,
     ): ComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
 
-    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
-        isolated: IntArray): RetainedComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
+    override fun newRetainedComponentSolver(
+        model: LpModel,
+        parts: List<LpNeighborhood>,
+        solvers: List<LpSolver>,
+        isolated: IntArray,
+    ): RetainedComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
 
     override fun newTableauSolver(
         model: LpModel,

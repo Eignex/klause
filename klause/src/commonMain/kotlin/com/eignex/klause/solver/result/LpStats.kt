@@ -217,8 +217,6 @@ data class LpRouteSolveStats(
  * `backtrack/lp`; zero for backends that never solve a relaxation.
  */
 data class LpStats(
-    /** Inclusive phase timings and outcomes, keyed by engine phase and consumer route. */
-    val phases: Map<String, LpPhaseStats> = emptyMap(),
     /** Search nodes that entered LP bounding. */
     val nodePasses: SumResult = ZERO_COUNT,
     /** Standalone LP engine invocations. */
@@ -395,6 +393,8 @@ data class LpStats(
     val componentRoute: LpRouteSolveStats = LpRouteSolveStats(),
     /** Complete root and presolve engine telemetry. */
     val rootRoute: LpRouteSolveStats = LpRouteSolveStats(),
+    /** Inclusive phase timings and outcomes, keyed by engine phase and consumer route. */
+    val phases: Map<String, LpPhaseStats> = emptyMap(),
 ) {
     /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
      *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
@@ -612,8 +612,14 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             object : LpCertificationObserver {
                 override fun observePhase(metrics: LpPhaseMetrics) {
                     val key = "${metrics.phase.name}_${route.name}"
-                    val delta = LpPhaseStats(1L, metrics.nanos, metrics.work, metrics.pivots.toLong(),
-                        metrics.steps.toLong(), mapOf(metrics.outcome to 1L))
+                    val delta = LpPhaseStats(
+                        1L,
+                        metrics.nanos,
+                        metrics.work,
+                        metrics.pivots.toLong(),
+                        metrics.steps.toLong(),
+                        mapOf(metrics.outcome to 1L),
+                    )
                     phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
                 }
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
