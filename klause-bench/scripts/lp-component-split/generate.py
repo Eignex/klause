@@ -10,11 +10,13 @@ def mzn(blocks, width, linked):
     return f'''int: blocks = {blocks};
 int: width = {width};
 array[1..blocks, 1..width] of var 0.0..2.0: x;
+var 0..1: k;
+constraint int2float(k) + x[1,1] >= 1.0;
 constraint forall(b in 1..blocks, r in 1..width)(
   sum(c in 1..width)((if c = r then width + 1 else 1 endif) * x[b,c]) = 2 * width
 );
 {link}solve satisfy;
-output ["x = " ++ show(x) ++ ";\\n"];
+output ["k = " ++ show(k) ++ ";\\nx = " ++ show(x) ++ ";\\n"];
 '''
 
 
