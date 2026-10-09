@@ -32,7 +32,7 @@ internal object Suites {
     val all: List<Suite> by lazy {
         listOf(
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
-            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted,
+            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit,
         )
     }
 
@@ -718,6 +718,19 @@ internal object Suites {
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
         vendored("magic-square-3", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-square-3.xml")
         vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
+    }
+
+    private val lpComponentSplit = suite("lp-component-split", "Targeted separable and linked dense LP models") {
+        license = "internal"
+        for (name in listOf("dense-2x12", "dense-8x24", "linked-8x24")) {
+            vendoredMzn("mzn-$name", Category.CSP, Expected.Sat, model = "lp-component-split/$name.mzn")
+        }
+        for (name in listOf("dense-2x12", "dense-8x24")) {
+            vendored(
+                "mps-$name", Category.CSP, Expected.Sat,
+                relPath = "lp-component-split/$name.mps", format = Format.MPS,
+            )
+        }
     }
 
     private val mpsCore = suite("mps-core", "Curated MPS (MIP) integer + bounded-float instances") {

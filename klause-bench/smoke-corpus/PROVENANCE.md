@@ -38,3 +38,10 @@ Vendored directories and their provenance:
 MiniZinc smoke models are not copied here. They live at
 `klause-mzn-lib/test-models/` and are referenced by the `mzn-smoke` suite; they
 are also owned by klause-mzn-lib's own docs and tests.
+
+`lp-component-split/` contains self-authored bounded continuous dense block systems
+(license: internal) for the explicit `lp-component-split` measurement suite. Each width-n
+block has matrix nI + 11^T and RHS 2n, giving the unique exact witness x = 1.
+The linked MiniZinc control adds one redundant row joining all blocks. Regenerate the
+MPS and MiniZinc sources with `scripts/lp-component-split/generate.py`. These fixtures
+are selected only for targeted experiments; they are not part of the CI smoke selection.
