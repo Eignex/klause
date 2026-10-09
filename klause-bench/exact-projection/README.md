@@ -1,6 +1,7 @@
 # Current-main exact arithmetic investigation
 
 Partial work toward [#2348](https://github.com/Eignex/klause/issues/2348).
+The reproducer is [PR #2373](https://github.com/Eignex/klause/pull/2373).
 The baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`, after the cancellation
 polling work in [#2363](https://github.com/Eignex/klause/pull/2363).
 
@@ -42,3 +43,24 @@ control for a later candidate.
 No local Gradle build, solve, test, lint or documentation gate is run for this stack.
 GitHub CI supplies the build/test/lint/documentation gates. Raw-record analysis is
 separate from experiments and does not execute a solver.
+
+## Current-main profile
+
+Job 851 completed all three cases on instance `i-0481ad434ce5c125f`. The retained
+[summary](profile-main-summary.json) includes the executed build fingerprints and
+SHA-256 of each JFR file. All three outcomes are unknown at the time budget.
+
+| Inclusive symbol | checkpass, 1793 samples | handler_sigchld, 1682 | mygetpwnam, 1764 |
+| --- | ---: | ---: | ---: |
+| BigFraction.of | 113 (6.3%) | 88 (5.2%) | 75 (4.3%) |
+| withPublishedBounds | 86 (4.8%) | 9 (0.5%) | 13 (0.7%) |
+| LiveQfLraSystem.install | 73 (4.1%) | 20 (1.2%) | 9 (0.5%) |
+| LpExactState.projectScalars | 2 (0.1%) | 1 (0.1%) | 0 |
+| Cancellation.invoke | 18 (1.0%) | 16 (1.0%) | 317 (18.0%) |
+
+Rational construction is the largest remaining named numerical item on checkpass.
+Its factory computes a GCD even for denominator one and divides numerator and
+denominator even when the GCD is one. IEEE conversion also sends its already
+reduced pair through that factory. These are candidates for a focused arithmetic
+change; this profile supplies no absolute CPU saving or end-to-end speedup claim.
+The residual cancellation share on mygetpwnam remains outside this change.
