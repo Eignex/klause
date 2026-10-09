@@ -2,6 +2,8 @@
 
 Partial work toward [#2348](https://github.com/Eignex/klause/issues/2348).
 The reproducer is [PR #2373](https://github.com/Eignex/klause/pull/2373).
+The stack continues with [numerical PR #2379](https://github.com/Eignex/klause/pull/2379)
+and [validation PR #2383](https://github.com/Eignex/klause/pull/2383).
 The baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`, after the cancellation
 polling work in [#2363](https://github.com/Eignex/klause/pull/2363).
 
@@ -29,7 +31,7 @@ The three named nec-smt inputs are checkpass, handler_sigchld and mygetpwnam, ea
 `prp-1-46`. Selection sets `per-family=1000` so the controls survive family sampling.
 Both jobs pin the commit rather than a moving branch. The lab builds
 `:klause-cli:installJvmDist` remotely and retains CLI/runtime build fingerprints,
-raw output, selection, commands, JVM options and records in the job Files pages.
+selection, commands, JVM options and case records in the job Files pages.
 
 JFR records the whole CLI JVM at a 20-second solve budget. Its samples include
 startup and are statistical; inclusive symbols overlap and cannot be added as
@@ -144,3 +146,58 @@ by [check_witnesses.py](check_witnesses.py), reusing the source MPS checker from
 source independently, checks every row/bound and integer marker to relative 1e-7,
 rejects nonfinite values and requires the source's recorded SHA-256. Feasibility
 checking is not independent optimality or infeasibility certification.
+
+[The GitHub CI witness check](https://github.com/Eignex/klause/actions/runs/37991052614)
+passes every one of the 18 feasible cases (seven distinct printed assignments).
+The archived [results](witness-checks.json) show maximum relative violation 2.22e-15
+for egout and zero for the remaining witnesses. The checker fetched MIPLIB sources
+from the catalog's original archive and verified their pinned hashes; vendored
+models were checked against the repository files. The collected source identities
+are independent check targets, not asserted hashes of the AWS input files.
+
+## Deadline and shared numerical controls
+
+Job 866 completed all 18 deadline cases on `i-0b9a65fedba4888fa`. All remain
+unknown at 20 seconds. The [summary](job-866-summary.json) and
+[provenance](job-866-provenance.json) retain outcomes, medians, fingerprints and commands.
+
+| Input, ending in prp-1-46 | Main median theory checks/second | Candidate median theory checks/second |
+| --- | ---: | ---: |
+| med/mygetpwnam | 102.302 | 128.864 |
+| large/handler_sigchld | 115.656 | 151.268 |
+| large/checkpass | 59.072 | 64.836 |
+
+These runs reach different search states and amounts of work. Their larger progress
+ratios do not replace the matched-prefix timing result or demonstrate a verdict gain.
+
+Job 867 completed 104 default/exact-policy cases over four MPS core fixtures, six
+SMT core fixtures, and blend2/egout/flugpl. Every paired outcome and objective matches.
+The [summary](job-867-summary.json) and [provenance](job-867-provenance.json) preserve
+each policy's results. Blend-tiny reports proven objective 9, flugpl reports proven
+1201500, and default-policy egout reports unproven 606.0797. Exact-policy egout
+declines on both builds because its source column bound `F....001` differs from the
+lowered bound; this is four unsupported cases, not an exact proof check. Blend2
+remains unknown. No MPS runtime improvement is claimed.
+
+To regenerate the retained analyses from exported records:
+
+```sh
+curl -fsS http://192.168.50.104:8420/experiments/865/cases > /tmp/work-cases.json
+python3 klause-bench/exact-projection/compare.py /tmp/work-cases.json
+curl -fsS http://192.168.50.104:8420/experiments/866/cases > /tmp/deadline-cases.json
+python3 klause-bench/exact-projection/summarize.py /tmp/deadline-cases.json /tmp/deadline
+curl -fsS http://192.168.50.104:8420/experiments/867/cases > /tmp/control-cases.json
+python3 klause-bench/exact-projection/summarize.py /tmp/control-cases.json /tmp/control
+python3 klause-bench/exact-projection/collect_witnesses.py 871 ~/.cache/klause-bench/corpus
+```
+
+Verification runs on GitHub CI through `rational-evidence.yml`; it was not run locally.
+The full JVM/native and lint/docs gates also run on CI. A four-entry destructuring
+style finding in the new rational test table was corrected without changing the
+measured implementation. Canonical-value tests cover signs, coprime and reducible
+inputs, subnormal boundaries and nonfinite values; existing exact certificate,
+cancellation, authority and theory tests remain part of the full gates.
+
+This delivers one validated arithmetic improvement toward #2348. It does not close
+the issue: nec-smt remains undecided at these budgets, and the remaining published
+bounds, theory assertion/installation and other costs still need investigation.

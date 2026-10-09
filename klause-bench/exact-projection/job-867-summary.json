@@ -1,0 +1,955 @@
+[
+  {
+    "problem": "blend-tiny",
+    "arms": {
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 9.0,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1225,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 9.0,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.099,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 9.0,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.098,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 9.0,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.101,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "blend2",
+    "arms": {
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 19.701,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 19.697499999999998,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 19.6995,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 19.697499999999998,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "feasible-tiny",
+    "arms": {
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.056,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.0565,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.0605,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.0555,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "egout",
+    "arms": {
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": null,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": [
+          "MPS: exact MPS lowering differs from the source at column bound 'F....001'"
+        ]
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 606.0797,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 19.795,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 606.0797,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 19.8015,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": null,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": [
+          "MPS: exact MPS lowering differs from the source at column bound 'F....001'"
+        ]
+      }
+    }
+  },
+  {
+    "problem": "float-tiny",
+    "arms": {
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1455,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.145,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1575,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.1585,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "flugpl",
+    "arms": {
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 1201500.0,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 1.4195,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 1201500.0,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 1.485,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 1201500.0,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 1.4785,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": 1201500.0,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 1.4275,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "infeasible-tiny",
+    "arms": {
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": false,
+            "objective": null,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.0125,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": false,
+            "objective": null,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.012,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": false,
+            "objective": null,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.012,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": false,
+            "objective": null,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.012,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "lia-basic",
+    "arms": {
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.1665,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1675,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.164,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1665,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "lia-opt",
+    "arms": {
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.189,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.185,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.187,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.185,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "lia-unsat",
+    "arms": {
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": false,
+            "objective": null,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.045,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": false,
+            "objective": null,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.045,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": false,
+            "objective": null,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.044,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": false,
+            "objective": null,
+            "proven": true,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.0445,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "lia-disjunction",
+    "arms": {
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1565,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.159,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1585,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.156,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "lra-rational",
+    "arms": {
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.153,
+        "medianTheoryChecksPerSecond": 45.753550000000004,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1585,
+        "medianTheoryChecksPerSecond": 44.185599999999994,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.157,
+        "medianTheoryChecksPerSecond": 44.631249999999994,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.1575,
+        "medianTheoryChecksPerSecond": 44.444900000000004,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "lia-wide-span",
+    "arms": {
+      "main": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.064,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.0635,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "main-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 0.063,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      },
+      "candidate-exact": {
+        "outcomes": [
+          {
+            "feasible": true,
+            "objective": null,
+            "proven": false,
+            "count": 2
+          }
+        ],
+        "cases": 2,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 0.064,
+        "medianTheoryChecksPerSecond": null,
+        "unsupportedReasons": []
+      }
+    }
+  }
+]

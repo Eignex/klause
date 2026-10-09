@@ -1,0 +1,119 @@
+[
+  {
+    "problem": "nec-smt/med/mygetpwnam/prp-1-46",
+    "arms": {
+      "main": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 3
+          }
+        ],
+        "cases": 3,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 19.839,
+        "medianTheoryChecksPerSecond": 102.3019,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 3
+          }
+        ],
+        "cases": 3,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 19.859,
+        "medianTheoryChecksPerSecond": 128.8637,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "nec-smt/large/handler_sigchld/prp-1-46",
+    "arms": {
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 3
+          }
+        ],
+        "cases": 3,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 19.827,
+        "medianTheoryChecksPerSecond": 151.2677,
+        "unsupportedReasons": []
+      },
+      "main": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 3
+          }
+        ],
+        "cases": 3,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 19.881,
+        "medianTheoryChecksPerSecond": 115.6564,
+        "unsupportedReasons": []
+      }
+    }
+  },
+  {
+    "problem": "nec-smt/large/checkpass/prp-1-46",
+    "arms": {
+      "main": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 3
+          }
+        ],
+        "cases": 3,
+        "fingerprints": [
+          "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+        ],
+        "medianSolveSeconds": 19.874,
+        "medianTheoryChecksPerSecond": 59.0722,
+        "unsupportedReasons": []
+      },
+      "candidate": {
+        "outcomes": [
+          {
+            "feasible": null,
+            "objective": null,
+            "proven": false,
+            "count": 3
+          }
+        ],
+        "cases": 3,
+        "fingerprints": [
+          "312960bc56774752296f6c525c85e85b2973c5af96c404eda99850158d15ecd8"
+        ],
+        "medianSolveSeconds": 19.927,
+        "medianTheoryChecksPerSecond": 64.8358,
+        "unsupportedReasons": []
+      }
+    }
+  }
+]
