@@ -1,0 +1,16 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+From https://github.com/Eignex/klause
+ - [deleted]             (none)                      -> codex/rws-conflict-lifetime
+ - [deleted]             (none)                      -> codex/rws-conflict-reproducer
+   b37fea123..4bf2d5e1c  codex/arms-414-report       -> codex/arms-414-report
+   5bb52a36d..7d37bc7d0  codex/construction-2328-slice -> codex/construction-2328-slice
+ + 80e6add30...b9888483f codex/oracle-2315-declared-space -> codex/oracle-2315-declared-space  (forced update)
+ + 39dc3e2a8...d04133cfe codex/oracle-2315-integration -> codex/oracle-2315-integration  (forced update)
+ + 3afe432b9...dc79b8482 codex/oracle-2315-reproducer -> codex/oracle-2315-reproducer  (forced update)
+ + 9d96e9e7f...30867f1b9 codex/rws-conflict-evidence -> codex/rws-conflict-evidence  (forced update)
+   aeb14e3cf..49faef15c  main                        -> main
+[i-07808f9ed3ab25451] 49faef15c is not cached: building
+WARNING: Using incubator modules: jdk.incubator.vector
+d04133cfe is not cached: building
+WARNING: Using incubator modules: jdk.incubator.vector
+
