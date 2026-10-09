@@ -100,6 +100,9 @@ object Mps {
                 section = openSection(fields).also {
                     if (it == Section.NAME) name = fields.getOrElse(1) { "" }
                 }
+                // ENDATA ends the model: older files append sections after it, such as MIPLIB 3's IMPORTANCES
+                // branching priorities, which are no part of the model.
+                if (section == Section.ENDATA) break
                 // OBJSENSE may state MAX/MAXIMIZE on the header line itself.
                 if (section == Section.OBJSENSE && isMaximize(fields.getOrNull(1))) sense = ObjectiveSense.MAXIMIZE
                 if (objectiveRow == null) objectiveRow = rows.firstOrNull { it.type == RowType.OBJECTIVE }

@@ -20,7 +20,7 @@ import kotlin.math.round
 internal object MpsWitness {
     /** The adapter and validation rules, part of every MPS reference's cache identity and lab row: a change to how
      *  claims are judged makes earlier rows stale. */
-    const val VERSION = "mps-validate-1"
+    const val VERSION = "mps-validate-2"
 
     /** Row and bound violations allowed, relative to the bound's magnitude (absolute below one): the usual MIP checker
      *  tolerance, looser than the solvers' own so a correct solution never fails on print precision. */

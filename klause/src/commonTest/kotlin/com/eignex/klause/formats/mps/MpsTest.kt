@@ -56,6 +56,28 @@ class MpsTest {
     }
 
     @Test
+    fun `sections after ENDATA are not read as the model`() {
+        val text = """
+            NAME          TRAILER
+            ROWS
+             N  COST
+             L  C1
+            COLUMNS
+                X1        COST           1.0   C1             1.0
+            RHS
+                RHS       C1             4.0
+            ENDATA
+            IMPORTANCES
+            X1           2
+        """.trimIndent()
+
+        val model = Mps.parse(text)
+
+        assertEquals(listOf("X1"), model.variables.map { it.name })
+        assertEquals(listOf(4.0), model.constraints.map { it.upper })
+    }
+
+    @Test
     fun `a lazy constraint is posted as an ordinary constraint`() {
         val text = """
             NAME          LAZY
