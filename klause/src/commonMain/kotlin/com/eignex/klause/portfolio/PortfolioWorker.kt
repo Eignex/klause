@@ -59,6 +59,8 @@ class PortfolioWorker private constructor(
     /** The family the portfolio shares time with before it picks among the family's arms; see [FamilyPolicy]. */
     internal var family: ArmFamily = if (withInstructions) ArmFamily.LocalSearch else ArmFamily.Backtrack
 
+    internal var improvementOnly: Boolean = false
+
     /**
      * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine
      * can't be paused/resumed (local search — it restarts cheaply from a warm-started incumbent

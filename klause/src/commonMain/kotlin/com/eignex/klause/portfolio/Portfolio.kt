@@ -430,6 +430,7 @@ class Portfolio(
         val sliceMillis: Long,
         val sliceWork: Long,
         val whole: Boolean = false,
+        val probeCount: Int = 1,
     ) {
         /** The work a resumable handle's slice may spend; a negative allowance leaves it to the run's token. */
         val handleNodes: Long get() = if (whole) -1L else sliceWork
@@ -477,7 +478,7 @@ class Portfolio(
         private val busy = BooleanArray(workers.size)
         private val retired = BooleanArray(workers.size)
         private var remaining = workers.size
-        private var probed = 0
+        private val probed = BooleanArray(workers.size)
 
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
         private val armNanos = LongArray(workers.size)
@@ -535,29 +536,44 @@ class Portfolio(
         /**
          * The next arm for lane [lane], or null when none is free. With a lane for every arm, each lane keeps its own
          * arm: there is nothing to share, so neither a probe nor the policy has a choice to make. Otherwise every arm
-         * first runs one base slice, in order, so the policy starts from evidence on each; then the policy picks
-         * among arms neither busy nor retired.
+         * first runs one base slice, in order, so the policy starts from evidence on each admitted arm; then the
+         * policy picks among arms neither busy nor retired. Improvement variants are admitted at the first
+         * incumbent, or when the initial pool retires.
          */
         private fun claim(lane: Int): Claim? = locked {
             if (remaining == 0) return@locked null
             val dedicated = lanes == workers.size
-            val probing = !dedicated && probed < workers.size
+            val eligible = eligibleArms()
+            val probe = if (dedicated) null else eligible.firstOrNull { !probed[it] && !busy[it] && !retired[it] }
+            val probing = probe != null
             val arm = when {
                 dedicated -> lane
-                probing -> probed++
-                else -> policyPick()
+                probe != null -> probe.also { probed[it] = true }
+                else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
             busy[arm] = true
-            Claim(arm, probing, slice, sliceWork, whole = dedicated)
+            Claim(
+                arm,
+                probing,
+                if (probing) baseSliceMillis else slice,
+                if (probing) baseSliceWork else sliceWork,
+                whole = dedicated,
+                probeCount = eligible.size,
+            )
+        }
+
+        private fun eligibleArms(): List<Int> {
+            val first = workers.indices.filter { !workers[it].improvementOnly }
+            return if (improving || first.all { retired[it] }) workers.indices.toList() else first
         }
 
         // The free arm furthest below its owed share, else the policy's pick among free arms: a family first, so a
         // family's share does not grow with its arm count, then an arm of that family. LNS works on an incumbent, so it
         // waits for one unless it is all that is left.
-        private fun policyPick(): Int {
-            owedArm()?.let { return it }
-            val free = workers.indices.filter { !busy[it] && !retired[it] }
+        private fun policyPick(eligibleArms: List<Int>): Int {
+            owedArm(eligibleArms)?.let { return it }
+            val free = eligibleArms.filter { !busy[it] && !retired[it] }
             if (free.isEmpty()) return -1
             val present = free.mapTo(LinkedHashSet()) { workers[it].family }
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
@@ -583,11 +599,11 @@ class Portfolio(
             (bandit as? DiscountedThompson)?.fade(phaseRetention)
         }
 
-        private fun owedArm(): Int? {
+        private fun owedArm(eligibleArms: List<Int>): Int? {
             if (minShares.isEmpty()) return null
             var owed: Int? = null
             var deficit = 0.0
-            for (arm in workers.indices) {
+            for (arm in eligibleArms) {
                 if (busy[arm] || retired[arm]) continue
                 val short = minShares[arm] * totalNanos - armNanos[arm]
                 if (short > deficit) {
@@ -731,11 +747,11 @@ class Portfolio(
      * The share of the time the run has left one segment may take: half of it split between the families the
      * policy chooses among, since the policy shares time by family and an arm's segments add up to its family's.
      * A segment cut to a share per arm would chop a proof into pieces too short to finish however much of the run
-     * its family won. Probes run before the policy chooses anything, one for every arm, so each takes a share per
-     * arm, and the probes together never take more than half the run.
+     * its family won. Probes run before the policy chooses among newly admitted arms, so each takes a share per
+     * admitted arm, and the probes together never take more than half the run.
      */
     private fun remainingShare(claim: Claim): Double =
-        REMAINING_SHARE / (if (claim.probing) workers.size else familyCount)
+        REMAINING_SHARE / (if (claim.probing) claim.probeCount else familyCount)
 
     private fun until(millis: Long): Cancellation =
         Cancellation.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
