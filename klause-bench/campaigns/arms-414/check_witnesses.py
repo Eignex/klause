@@ -42,7 +42,7 @@ def check(bench, jobs, output):
                 except (ValueError, IndexError):
                     verdict = dict(status='error', reason=(run.stderr or run.stdout)[-2000:])
             results.append(dict(job=job, case=case['index'], input=case['problem']['problem'],
-                                objective=rec.get('objective'), sourceHashes=rec.get('sourceHashes'), **verdict))
+                                objective=rec.get('objective'), measuredSourceHashes=rec.get('sourceHashes'), **verdict))
     output.write_text(json.dumps(results, indent=2) + '\n')
     print(json.dumps(dict(checked=len(results), statuses={s: sum(x['status'] == s for x in results)
                                                         for s in {x['status'] for x in results}})))

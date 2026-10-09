@@ -1,0 +1,7522 @@
+{
+  "job": 855,
+  "status": "DONE",
+  "cases": 240,
+  "arms": {
+    "main-cp-p1": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+      ],
+      "commits": [
+        "5471419aa8c832ee1065468a6861bb203a1ff8c7"
+      ],
+      "thresholds": {
+        "absent": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 133.5,
+      "bestMs": 774.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 320983,
+          "ms": 24578,
+          "initMs": 472,
+          "segments": 34,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 96644.3288,
+          "finalHolders": 5,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1944.0,
+            "Glue": 14.0,
+            "ClauseUses": 8.0,
+            "Improvement": 3.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 409472,
+          "ms": 7644,
+          "initMs": 37,
+          "segments": 31,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 82504.5174,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1958.0,
+            "Glue": 11.0,
+            "FirstSolution": 2.0,
+            "ClauseUses": 2.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 382749,
+          "ms": 33572,
+          "initMs": 22,
+          "segments": 43,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 92960.31300000001,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1947.0,
+            "Glue": 1140.0,
+            "Improvement": 981693.0,
+            "Floor": 94.0,
+            "ClauseUses": 24.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 10,
+          "work": 409793,
+          "ms": 9184,
+          "initMs": 18,
+          "segments": 16,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 47332.608100000005,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1920.0,
+            "Improvement": 10338.0,
+            "Glue": 11.0,
+            "ClauseUses": 5.0
+          }
+        },
+        "bt/lp-lbtree": {
+          "cases": 10,
+          "work": 425001,
+          "ms": 9431,
+          "initMs": 18,
+          "segments": 13,
+          "reseeds": 0,
+          "failures": 1,
+          "faults": 0,
+          "weightedReward": 42482.1534,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1888.0,
+            "Glue": 15.0,
+            "ClauseUses": 9.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 101016,
+          "ms": 9785,
+          "initMs": 4,
+          "segments": 16,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14955.3206,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 73.0,
+            "Improvement": 125.0,
+            "ClauseUses": 44.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 8,
+          "work": 164695,
+          "ms": 10583,
+          "initMs": 13,
+          "segments": 16,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14489.9769,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1876.0,
+            "ClauseUses": 12.0
+          }
+        },
+        "bt/free": {
+          "cases": 2,
+          "work": 19741,
+          "ms": 2243,
+          "initMs": 0,
+          "segments": 5,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3991.5191999999997,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 1.0
+          }
+        },
+        "bt/selector-switch": {
+          "cases": 2,
+          "work": 54639,
+          "ms": 5892,
+          "initMs": 0,
+          "segments": 7,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 9123.9476,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "Glue": 4.0,
+            "ClauseUses": 6.0
+          }
+        },
+        "bt/domwdeg": {
+          "cases": 2,
+          "work": 10189,
+          "ms": 1132,
+          "initMs": 0,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1273.1189,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0
+          }
+        }
+      }
+    },
+    "seam-cp-p1": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 119.5,
+      "bestMs": 704.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 296536,
+          "ms": 24947,
+          "initMs": 485,
+          "segments": 37,
+          "reseeds": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 84735.16440000001,
+          "finalHolders": 5,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1944.0,
+            "Glue": 14.0,
+            "ClauseUses": 9.0,
+            "Improvement": 198.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 458256,
+          "ms": 7841,
+          "initMs": 39,
+          "segments": 31,
+          "reseeds": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 91205.86260000001,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1992.0,
+            "Glue": 18.0,
+            "FirstSolution": 2.0,
+            "ClauseUses": 2.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 416960,
+          "ms": 38631,
+          "initMs": 22,
+          "segments": 43,
+          "reseeds": 8,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 119805.9488,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1982.0,
+            "Glue": 1857.0,
+            "Improvement": 981233.0,
+            "Floor": 94.0,
+            "ClauseUses": 22.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 10,
+          "work": 377787,
+          "ms": 9055,
+          "initMs": 17,
+          "segments": 14,
+          "reseeds": 1,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 48245.9363,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1920.0,
+            "Improvement": 10338.0,
+            "Glue": 11.0,
+            "ClauseUses": 4.0
+          }
+        },
+        "bt/lp-lbtree": {
+          "cases": 10,
+          "work": 419290,
+          "ms": 9434,
+          "initMs": 16,
+          "segments": 14,
+          "reseeds": 2,
+          "failures": 1,
+          "faults": 0,
+          "weightedReward": 41453.02650000001,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1888.0,
+            "Glue": 15.0,
+            "ClauseUses": 8.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 41045,
+          "ms": 4094,
+          "initMs": 3,
+          "segments": 9,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 8830.092999999999,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 54.0,
+            "Improvement": 169.0,
+            "ClauseUses": 63.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 8,
+          "work": 160809,
+          "ms": 10213,
+          "initMs": 13,
+          "segments": 17,
+          "reseeds": 4,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 11800.261299999998,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1876.0,
+            "ClauseUses": 10.0
+          }
+        },
+        "bt/free": {
+          "cases": 2,
+          "work": 19612,
+          "ms": 2304,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3270.4428,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 1.0
+          }
+        },
+        "bt/selector-switch": {
+          "cases": 2,
+          "work": 54438,
+          "ms": 6089,
+          "initMs": 0,
+          "segments": 7,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 9094.6217,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "Glue": 4.0,
+            "ClauseUses": 6.0
+          }
+        },
+        "bt/domwdeg": {
+          "cases": 2,
+          "work": 10067,
+          "ms": 1155,
+          "initMs": 0,
+          "segments": 3,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1883.6189,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0
+          }
+        }
+      }
+    },
+    "main-mixed-p1": {
+      "outcomes": {
+        "feasible": 10,
+        "optimal": 2
+      },
+      "fingerprints": [
+        "c5f3896bdc0ec8fd17986a96333426c23c7369322641a064d6e0e9fb8f35e566"
+      ],
+      "commits": [
+        "5471419aa8c832ee1065468a6861bb203a1ff8c7"
+      ],
+      "thresholds": {
+        "absent": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 150.0,
+      "bestMs": 5594.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1384144,
+          "ms": 38703,
+          "initMs": 556,
+          "segments": 137,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 117499.66979999999,
+          "finalHolders": 6,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1945.0,
+            "Glue": 40.0,
+            "ClauseUses": 14.0,
+            "Improvement": 607.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 165597,
+          "ms": 13507,
+          "initMs": 12,
+          "segments": 52,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 18562.345800000003,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 57.0,
+            "Improvement": 177138.0,
+            "ClauseUses": 66.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 263407,
+          "ms": 8713,
+          "initMs": 0,
+          "segments": 34,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 25354.7188,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1045629.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 562298,
+          "ms": 9702,
+          "initMs": 0,
+          "segments": 36,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 28828.1394,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 7290.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 8,
+          "work": 137024,
+          "ms": 8580,
+          "initMs": 0,
+          "segments": 20,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4299.3234,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 13564.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 343101,
+          "ms": 6375,
+          "initMs": 0,
+          "segments": 21,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 153.0656,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 5035.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 11252520,
+          "ms": 28899,
+          "initMs": 0,
+          "segments": 96,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 720309.4202,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 4046.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 652636,
+          "ms": 18330,
+          "initMs": 4,
+          "segments": 74,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4626.0729,
+          "finalHolders": 0,
+          "credit": {
+            "ClauseUses": 34.0,
+            "RootFixings": 24.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 2,
+          "work": 191383,
+          "ms": 6652,
+          "initMs": 20,
+          "segments": 11,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 59562.6312,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 2.0,
+            "Improvement": 53.0,
+            "RootFixings": 1852.0,
+            "Glue": 9.0,
+            "ClauseUses": 11.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 187249,
+          "ms": 591,
+          "initMs": 0,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 12562,
+          "ms": 824,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        }
+      }
+    },
+    "seam-mixed-p1": {
+      "outcomes": {
+        "feasible": 10,
+        "optimal": 2
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 122.5,
+      "bestMs": 5501.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1296050,
+          "ms": 38373,
+          "initMs": 517,
+          "segments": 121,
+          "reseeds": 31,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 128598.2359,
+          "finalHolders": 6,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1944.0,
+            "Glue": 27.0,
+            "ClauseUses": 19.0,
+            "Improvement": 509.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 162761,
+          "ms": 14815,
+          "initMs": 19,
+          "segments": 54,
+          "reseeds": 16,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 16442.9009,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 54.0,
+            "Improvement": 177118.0,
+            "ClauseUses": 17.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 276077,
+          "ms": 10545,
+          "initMs": 0,
+          "segments": 34,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 28980.6337,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1045629.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 589927,
+          "ms": 9405,
+          "initMs": 0,
+          "segments": 35,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 30445.824500000002,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 7291.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 8,
+          "work": 146359,
+          "ms": 8095,
+          "initMs": 0,
+          "segments": 23,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2838.255,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 13555.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 220103,
+          "ms": 3987,
+          "initMs": 0,
+          "segments": 14,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 106.145,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 4028.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 9641836,
+          "ms": 28552,
+          "initMs": 0,
+          "segments": 88,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 914109.6634,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 14325.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 910538,
+          "ms": 21193,
+          "initMs": 4,
+          "segments": 87,
+          "reseeds": 28,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4697.5687,
+          "finalHolders": 0,
+          "credit": {
+            "ClauseUses": 38.0,
+            "RootFixings": 24.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 2,
+          "work": 130607,
+          "ms": 4986,
+          "initMs": 17,
+          "segments": 9,
+          "reseeds": 1,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 35986.544799999996,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 2.0,
+            "RootFixings": 1852.0,
+            "Glue": 9.0,
+            "ClauseUses": 12.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 196218,
+          "ms": 597,
+          "initMs": 0,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 13843,
+          "ms": 842,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        }
+      }
+    },
+    "mixed-p1-r0": {
+      "outcomes": {
+        "feasible": 10,
+        "optimal": 2
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "0": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 146.5,
+      "bestMs": 4937.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1067555,
+          "ms": 37897,
+          "initMs": 493,
+          "segments": 129,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 92823.78800000002,
+          "finalHolders": 6,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1944.0,
+            "Glue": 14.0,
+            "ClauseUses": 3.0,
+            "Improvement": 73.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 171732,
+          "ms": 14344,
+          "initMs": 11,
+          "segments": 45,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14400.5232,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 38.0,
+            "Improvement": 177118.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 242657,
+          "ms": 11538,
+          "initMs": 0,
+          "segments": 37,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 27991.9571,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1045629.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 618918,
+          "ms": 10929,
+          "initMs": 0,
+          "segments": 35,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 17842.7787,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 7289.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 8,
+          "work": 89297,
+          "ms": 6436,
+          "initMs": 0,
+          "segments": 23,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4180.1976,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 13564.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 352367,
+          "ms": 4414,
+          "initMs": 0,
+          "segments": 16,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 101.1412,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 4028.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 11121501,
+          "ms": 28595,
+          "initMs": 0,
+          "segments": 94,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 817540.9846000001,
+          "finalHolders": 4,
+          "credit": {
+            "Improvement": 4749.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 825338,
+          "ms": 20363,
+          "initMs": 4,
+          "segments": 56,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6836.473,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 2,
+          "work": 149477,
+          "ms": 5866,
+          "initMs": 18,
+          "segments": 11,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 29342.521399999998,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 2.0,
+            "RootFixings": 1852.0,
+            "Glue": 5.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 188531,
+          "ms": 563,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 12562,
+          "ms": 787,
+          "initMs": 0,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        }
+      }
+    },
+    "mixed-p1-r2": {
+      "outcomes": {
+        "feasible": 10,
+        "optimal": 2
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "2": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 147.0,
+      "bestMs": 4023.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1495783,
+          "ms": 37570,
+          "initMs": 604,
+          "segments": 135,
+          "reseeds": 56,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 126095.24419999999,
+          "finalHolders": 6,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1945.0,
+            "Glue": 171.0,
+            "ClauseUses": 17.0,
+            "Improvement": 105.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 206953,
+          "ms": 16576,
+          "initMs": 17,
+          "segments": 51,
+          "reseeds": 23,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 24219.1139,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 84.0,
+            "Improvement": 177156.0,
+            "ClauseUses": 145.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 208829,
+          "ms": 9407,
+          "initMs": 0,
+          "segments": 29,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 26042.47,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1045629.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 637576,
+          "ms": 10560,
+          "initMs": 0,
+          "segments": 35,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 24845.2254,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 7289.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 8,
+          "work": 100361,
+          "ms": 7575,
+          "initMs": 0,
+          "segments": 20,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6926.959599999999,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 13637.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 98401,
+          "ms": 4229,
+          "initMs": 0,
+          "segments": 20,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 188.68439999999998,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 5035.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 10648012,
+          "ms": 27262,
+          "initMs": 0,
+          "segments": 94,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 642734.9571,
+          "finalHolders": 4,
+          "credit": {
+            "Improvement": 4402.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 925743,
+          "ms": 20111,
+          "initMs": 4,
+          "segments": 77,
+          "reseeds": 38,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4954.8579,
+          "finalHolders": 0,
+          "credit": {
+            "ClauseUses": 64.0,
+            "RootFixings": 24.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 2,
+          "work": 183795,
+          "ms": 6738,
+          "initMs": 30,
+          "segments": 12,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 57295.5371,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 2.0,
+            "RootFixings": 1852.0,
+            "Glue": 16.0,
+            "ClauseUses": 24.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 201342,
+          "ms": 578,
+          "initMs": 0,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 15124,
+          "ms": 875,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        }
+      }
+    },
+    "mixed-p1-r4": {
+      "outcomes": {
+        "feasible": 10,
+        "optimal": 2
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "4": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 127.0,
+      "bestMs": 4213.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1456550,
+          "ms": 37667,
+          "initMs": 516,
+          "segments": 140,
+          "reseeds": 28,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 118334.8451,
+          "finalHolders": 4,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1944.0,
+            "Glue": 36.0,
+            "ClauseUses": 8.0,
+            "Improvement": 70.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 174153,
+          "ms": 14750,
+          "initMs": 28,
+          "segments": 52,
+          "reseeds": 10,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 19724.5158,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 66.0,
+            "Improvement": 177118.0,
+            "ClauseUses": 81.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 168661,
+          "ms": 8992,
+          "initMs": 0,
+          "segments": 33,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 19599.184699999998,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1045629.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 621529,
+          "ms": 12200,
+          "initMs": 0,
+          "segments": 39,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 41296.6647,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 7291.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 8,
+          "work": 114635,
+          "ms": 7147,
+          "initMs": 0,
+          "segments": 19,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 11328.736200000001,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 13555.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 246806,
+          "ms": 5703,
+          "initMs": 0,
+          "segments": 19,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 58.0672,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 4028.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 9931764,
+          "ms": 25011,
+          "initMs": 0,
+          "segments": 89,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 841677.4142,
+          "finalHolders": 4,
+          "credit": {
+            "Improvement": 4219.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 6,
+          "work": 740046,
+          "ms": 19612,
+          "initMs": 4,
+          "segments": 75,
+          "reseeds": 18,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4438.965,
+          "finalHolders": 0,
+          "credit": {
+            "ClauseUses": 36.0,
+            "RootFixings": 24.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 2,
+          "work": 234794,
+          "ms": 8720,
+          "initMs": 20,
+          "segments": 13,
+          "reseeds": 1,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 61669.842,
+          "finalHolders": 1,
+          "credit": {
+            "FirstSolution": 2.0,
+            "Improvement": 53.0,
+            "RootFixings": 1852.0,
+            "Glue": 8.0,
+            "ClauseUses": 10.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 192374,
+          "ms": 580,
+          "initMs": 0,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 12562,
+          "ms": 859,
+          "initMs": 0,
+          "segments": 5,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        }
+      }
+    },
+    "cp-p1-a12": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 130.0,
+      "bestMs": 737.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 14,
+          "work": 246828,
+          "ms": 16352,
+          "initMs": 464,
+          "segments": 32,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 98131.03349999999,
+          "finalHolders": 5,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1968.0,
+            "Glue": 15.0,
+            "ClauseUses": 17.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 270254,
+          "ms": 5558,
+          "initMs": 35,
+          "segments": 21,
+          "reseeds": 4,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 71939.50499999999,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1920.0,
+            "Glue": 34.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 14,
+          "work": 178026,
+          "ms": 15899,
+          "initMs": 14,
+          "segments": 25,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 56356.332599999994,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 2008.0,
+            "Glue": 581.0,
+            "ClauseUses": 294.0,
+            "Improvement": 861560.0,
+            "Floor": 94.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 10,
+          "work": 150077,
+          "ms": 3402,
+          "initMs": 19,
+          "segments": 12,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 15135.2948,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 1920.0,
+            "Improvement": 286.0,
+            "Glue": 10.0,
+            "ClauseUses": 1.0
+          }
+        },
+        "bt/lp-lbtree": {
+          "cases": 10,
+          "work": 263058,
+          "ms": 4842,
+          "initMs": 13,
+          "segments": 10,
+          "reseeds": 1,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 26106.8194,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1920.0,
+            "Glue": 27.0,
+            "ClauseUses": 4.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 14,
+          "work": 229351,
+          "ms": 12313,
+          "initMs": 15,
+          "segments": 16,
+          "reseeds": 1,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 23554.0555,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1968.0,
+            "ClauseUses": 141.0,
+            "Improvement": 622.0,
+            "Glue": 12.0
+          }
+        },
+        "bt/free": {
+          "cases": 12,
+          "work": 77886,
+          "ms": 7465,
+          "initMs": 14,
+          "segments": 18,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14811.4782,
+          "finalHolders": 0,
+          "credit": {
+            "Floor": 3.0,
+            "RootFixings": 1945.0,
+            "Glue": 64.0,
+            "ClauseUses": 28.0,
+            "Improvement": 243.0
+          }
+        },
+        "bt/selector-switch": {
+          "cases": 12,
+          "work": 112566,
+          "ms": 10623,
+          "initMs": 16,
+          "segments": 16,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 27607.099299999998,
+          "finalHolders": 0,
+          "credit": {
+            "Floor": 159.0,
+            "RootFixings": 2000.0,
+            "Glue": 1301.0,
+            "ClauseUses": 52.0,
+            "Improvement": 800.0
+          }
+        },
+        "bt/domwdeg": {
+          "cases": 12,
+          "work": 90390,
+          "ms": 11121,
+          "initMs": 18,
+          "segments": 18,
+          "reseeds": 1,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14807.7078,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 2017.0,
+            "Glue": 108.0,
+            "ClauseUses": 44.0,
+            "Improvement": 27.0
+          }
+        },
+        "bt/first-fail": {
+          "cases": 12,
+          "work": 164201,
+          "ms": 7399,
+          "initMs": 13,
+          "segments": 21,
+          "reseeds": 1,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 29311.320900000002,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 2015.0,
+            "Glue": 106.0,
+            "ClauseUses": 361.0,
+            "Improvement": 20019.0
+          }
+        },
+        "bt/activity": {
+          "cases": 12,
+          "work": 151719,
+          "ms": 10366,
+          "initMs": 22,
+          "segments": 20,
+          "reseeds": 4,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14863.8661,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1944.0,
+            "Improvement": 602.0,
+            "ClauseUses": 8.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 41648,
+          "ms": 5325,
+          "initMs": 6,
+          "segments": 6,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4828.2126,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 68.0,
+            "Glue": 20.0,
+            "ClauseUses": 48.0
+          }
+        },
+        "bt/objective-guided": {
+          "cases": 8,
+          "work": 35951,
+          "ms": 3197,
+          "initMs": 4,
+          "segments": 10,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 5075.8584,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1876.0,
+            "Glue": 17.0,
+            "ClauseUses": 3.0
+          }
+        }
+      }
+    },
+    "mixed-p1-a12": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "3e5d9c523c45a7618f9d864d10dbfa91ae5c917ac0c0a083e211cd197e12c68c"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1"
+        }
+      ],
+      "firstMs": 133.5,
+      "bestMs": 2419.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 302618,
+          "ms": 21344,
+          "initMs": 478,
+          "segments": 69,
+          "reseeds": 15,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 61978.406,
+          "finalHolders": 5,
+          "credit": {
+            "FirstSolution": 10.0,
+            "RootFixings": 1980.0,
+            "Glue": 34.0,
+            "ClauseUses": 14.0,
+            "Improvement": 995.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 119862,
+          "ms": 10221,
+          "initMs": 15,
+          "segments": 31,
+          "reseeds": 7,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 21409.0294,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 108.0,
+            "Glue": 113.0,
+            "Improvement": 168095.0,
+            "ClauseUses": 129.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 230897,
+          "ms": 4681,
+          "initMs": 0,
+          "segments": 16,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 10183.0298,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 1054692.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 112594,
+          "ms": 4693,
+          "initMs": 0,
+          "segments": 15,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 25928.247199999998,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 7289.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 40572,
+          "ms": 2694,
+          "initMs": 0,
+          "segments": 13,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2115.5,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 22.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 12,
+          "work": 40699,
+          "ms": 2786,
+          "initMs": 0,
+          "segments": 12,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 31.531399999999998,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 4469.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 4684520,
+          "ms": 14348,
+          "initMs": 0,
+          "segments": 47,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 436416.0012,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 2610.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 252196,
+          "ms": 7255,
+          "initMs": 23,
+          "segments": 24,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 28961.8663,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1956.0,
+            "Glue": 39.0,
+            "FirstSolution": 2.0,
+            "ClauseUses": 5.0,
+            "Improvement": 56.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 260777,
+          "ms": 19913,
+          "initMs": 34,
+          "segments": 63,
+          "reseeds": 19,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 39337.352100000004,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1981.0,
+            "Glue": 2145.0,
+            "ClauseUses": 80.0,
+            "Floor": 94.0,
+            "Improvement": 771.0
+          }
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 12,
+          "work": 18696,
+          "ms": 4974,
+          "initMs": 0,
+          "segments": 15,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/cbls-chain-noinv/fixed": {
+          "cases": 12,
+          "work": 21316,
+          "ms": 4730,
+          "initMs": 0,
+          "segments": 13,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/cbls-notabu/fixed": {
+          "cases": 8,
+          "work": 19452,
+          "ms": 1470,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/cbls-lonoise/fixed": {
+          "cases": 8,
+          "work": 22829,
+          "ms": 2256,
+          "initMs": 0,
+          "segments": 9,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "bt/lp-aggressive": {
+          "cases": 6,
+          "work": 74713,
+          "ms": 2442,
+          "initMs": 10,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6523.004499999999,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 118.0,
+            "RootFixings": 1852.0,
+            "Glue": 11.0,
+            "ClauseUses": 11.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 16405,
+          "ms": 141,
+          "initMs": 0,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 10000,
+          "ms": 822,
+          "initMs": 0,
+          "segments": 2,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "bt/linucb": {
+          "cases": 2,
+          "work": 39281,
+          "ms": 4627,
+          "initMs": 2,
+          "segments": 19,
+          "reseeds": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2365.6693999999998,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 1.0
+          }
+        },
+        "bt/free": {
+          "cases": 2,
+          "work": 64870,
+          "ms": 7072,
+          "initMs": 0,
+          "segments": 22,
+          "reseeds": 6,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 2742.4714999999997,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 1.0
+          }
+        }
+      }
+    },
+    "main-cp-p4": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "e1c4f94cba1305205e0e7771d2880959c2e85d14b3ee2909e4531d6c65108b72"
+      ],
+      "commits": [
+        "5471419aa8c832ee1065468a6861bb203a1ff8c7"
+      ],
+      "thresholds": {
+        "absent": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 177.0,
+      "bestMs": 3447.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 831790,
+          "ms": 70937,
+          "initMs": 779,
+          "segments": 72,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 121511.08590000002,
+          "finalHolders": 3,
+          "credit": {
+            "FirstSolution": 7.0,
+            "RootFixings": 1947.0,
+            "Glue": 328.0,
+            "ClauseUses": 29.0,
+            "Improvement": 207.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 803836,
+          "ms": 17562,
+          "initMs": 608,
+          "segments": 32,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 120587.1699,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 37111.0,
+            "RootFixings": 2006.0,
+            "ClauseUses": 14.0,
+            "Glue": 56.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 1018553,
+          "ms": 95785,
+          "initMs": 754,
+          "segments": 82,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 222306.57270000002,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 498560.0,
+            "Floor": 188.0,
+            "RootFixings": 1987.0,
+            "Glue": 593.0,
+            "ClauseUses": 270.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 10,
+          "work": 927629,
+          "ms": 16409,
+          "initMs": 621,
+          "segments": 32,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 91283.93519999999,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 2006.0,
+            "Glue": 40.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/lp-lbtree": {
+          "cases": 10,
+          "work": 484548,
+          "ms": 15105,
+          "initMs": 43,
+          "segments": 18,
+          "reseeds": 0,
+          "failures": 3,
+          "faults": 0,
+          "weightedReward": 38803.3238,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1922.0,
+            "Glue": 30.0,
+            "ClauseUses": 4.0,
+            "Improvement": 54.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 12,
+          "work": 713860,
+          "ms": 75970,
+          "initMs": 235,
+          "segments": 71,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 118785.5334,
+          "finalHolders": 1,
+          "credit": {
+            "Floor": 25.0,
+            "RootFixings": 1946.0,
+            "Glue": 3608.0,
+            "ClauseUses": 208.0,
+            "Improvement": 823.0
+          }
+        },
+        "bt/free": {
+          "cases": 12,
+          "work": 767733,
+          "ms": 65840,
+          "initMs": 253,
+          "segments": 67,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 77426.71659999999,
+          "finalHolders": 1,
+          "credit": {
+            "Floor": 12.0,
+            "RootFixings": 1946.0,
+            "Glue": 132.0,
+            "ClauseUses": 25.0,
+            "Improvement": 360994.0,
+            "FirstSolution": 1.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 240285,
+          "ms": 31533,
+          "initMs": 41,
+          "segments": 28,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 68742.4306,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 111.0,
+            "ClauseUses": 278.0,
+            "Improvement": 151057.0
+          }
+        },
+        "bt/selector-switch": {
+          "cases": 8,
+          "work": 594114,
+          "ms": 29218,
+          "initMs": 68,
+          "segments": 32,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 109088.61570000001,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1876.0,
+            "Glue": 80.0,
+            "ClauseUses": 65.0
+          }
+        },
+        "bt/domwdeg": {
+          "cases": 2,
+          "work": 125855,
+          "ms": 14744,
+          "initMs": 0,
+          "segments": 11,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 10465.044399999999,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 18.0
+          }
+        },
+        "bt/first-fail": {
+          "cases": 2,
+          "work": 142700,
+          "ms": 14664,
+          "initMs": 0,
+          "segments": 16,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 29702.907,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 57.0
+          }
+        },
+        "bt/activity": {
+          "cases": 2,
+          "work": 168924,
+          "ms": 7929,
+          "initMs": 0,
+          "segments": 19,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3715.9346000000005,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0
+          }
+        }
+      }
+    },
+    "seam-cp-p4": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 163.0,
+      "bestMs": 327.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 511614,
+          "ms": 50788,
+          "initMs": 700,
+          "segments": 71,
+          "reseeds": 16,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 80794.2858,
+          "finalHolders": 2,
+          "credit": {
+            "FirstSolution": 7.0,
+            "RootFixings": 1990.0,
+            "Glue": 145.0,
+            "ClauseUses": 31.0,
+            "Improvement": 4.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 994768,
+          "ms": 17334,
+          "initMs": 567,
+          "segments": 30,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 105167.69810000001,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1966.0,
+            "Glue": 41.0,
+            "Improvement": 592.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 1001055,
+          "ms": 87491,
+          "initMs": 717,
+          "segments": 84,
+          "reseeds": 17,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 215297.4074,
+          "finalHolders": 5,
+          "credit": {
+            "Improvement": 470956.0,
+            "Floor": 188.0,
+            "RootFixings": 2011.0,
+            "Glue": 848.0,
+            "ClauseUses": 297.0,
+            "FirstSolution": 3.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 10,
+          "work": 690959,
+          "ms": 17048,
+          "initMs": 571,
+          "segments": 29,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 95518.19209999999,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 1965.0,
+            "Improvement": 196802.0,
+            "ClauseUses": 3.0,
+            "Glue": 23.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/lp-lbtree": {
+          "cases": 10,
+          "work": 896611,
+          "ms": 22757,
+          "initMs": 27,
+          "segments": 25,
+          "reseeds": 4,
+          "failures": 2,
+          "faults": 0,
+          "weightedReward": 113507.11469999999,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 2003.0,
+            "Glue": 46.0,
+            "ClauseUses": 9.0,
+            "Improvement": 56.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 12,
+          "work": 808405,
+          "ms": 79967,
+          "initMs": 174,
+          "segments": 75,
+          "reseeds": 22,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 111760.2462,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1946.0,
+            "Glue": 1456.0,
+            "ClauseUses": 337.0,
+            "Improvement": 1715.0
+          }
+        },
+        "bt/free": {
+          "cases": 12,
+          "work": 861404,
+          "ms": 81850,
+          "initMs": 192,
+          "segments": 77,
+          "reseeds": 19,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 109762.6438,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 385625.0,
+            "RootFixings": 2034.0,
+            "Glue": 148.0,
+            "ClauseUses": 79.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 197205,
+          "ms": 28078,
+          "initMs": 38,
+          "segments": 20,
+          "reseeds": 5,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 39304.4372,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 148373.0,
+            "RootFixings": 76.0,
+            "Glue": 103.0,
+            "ClauseUses": 678.0
+          }
+        },
+        "bt/selector-switch": {
+          "cases": 8,
+          "work": 677871,
+          "ms": 30010,
+          "initMs": 63,
+          "segments": 38,
+          "reseeds": 11,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 121203.2866,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1876.0,
+            "Glue": 83.0,
+            "ClauseUses": 58.0
+          }
+        },
+        "bt/domwdeg": {
+          "cases": 2,
+          "work": 147248,
+          "ms": 18186,
+          "initMs": 0,
+          "segments": 10,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 16611.588,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 32.0
+          }
+        },
+        "bt/first-fail": {
+          "cases": 2,
+          "work": 141842,
+          "ms": 15714,
+          "initMs": 0,
+          "segments": 7,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 26122.3405,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 68.0
+          }
+        },
+        "bt/activity": {
+          "cases": 2,
+          "work": 158922,
+          "ms": 7539,
+          "initMs": 0,
+          "segments": 19,
+          "reseeds": 5,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3988.4102000000003,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0
+          }
+        }
+      }
+    },
+    "main-mixed-p4": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "e1c4f94cba1305205e0e7771d2880959c2e85d14b3ee2909e4531d6c65108b72"
+      ],
+      "commits": [
+        "5471419aa8c832ee1065468a6861bb203a1ff8c7"
+      ],
+      "thresholds": {
+        "absent": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 108.0,
+      "bestMs": 4605.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1323320,
+          "ms": 101830,
+          "initMs": 937,
+          "segments": 259,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 163106.14940000002,
+          "finalHolders": 4,
+          "credit": {
+            "Improvement": 6675.0,
+            "Floor": 82.0,
+            "RootFixings": 1987.0,
+            "Glue": 1574.0,
+            "ClauseUses": 81.0,
+            "FirstSolution": 4.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 6,
+          "work": 1425127,
+          "ms": 23668,
+          "initMs": 382,
+          "segments": 37,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 179023.59680000003,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 2004.0,
+            "Glue": 91.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 274395,
+          "ms": 46949,
+          "initMs": 285,
+          "segments": 102,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 43390.9926,
+          "finalHolders": 0,
+          "credit": {
+            "Floor": 33.0,
+            "RootFixings": 76.0,
+            "Glue": 151.0,
+            "ClauseUses": 588.0,
+            "Improvement": 29.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 1080460,
+          "ms": 29605,
+          "initMs": 0,
+          "segments": 72,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3803.7586,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 4.0,
+            "Improvement": 51325.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 803585,
+          "ms": 23661,
+          "initMs": 0,
+          "segments": 62,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 12818.120299999999,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 148683.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 1547345,
+          "ms": 25932,
+          "initMs": 0,
+          "segments": 77,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 125211.9902,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 6007.0,
+            "Violation": 2.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 185471,
+          "ms": 23462,
+          "initMs": 0,
+          "segments": 58,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 15109.4862,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 147675.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 8,
+          "work": 122817,
+          "ms": 24041,
+          "initMs": 0,
+          "segments": 49,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 10021.7151,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 7315.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 24989718,
+          "ms": 62131,
+          "initMs": 0,
+          "segments": 183,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 435107.6308,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 55295.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 8,
+          "work": 870178,
+          "ms": 54775,
+          "initMs": 606,
+          "segments": 145,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 144373.66079999998,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 1880.0,
+            "Glue": 189.0,
+            "ClauseUses": 170.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 4,
+          "work": 190,
+          "ms": 940,
+          "initMs": 181,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4.0,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 4.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 648151,
+          "ms": 2271,
+          "initMs": 0,
+          "segments": 18,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 131053,
+          "ms": 8816,
+          "initMs": 0,
+          "segments": 29,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 4481.0169000000005,
+          "finalHolders": 0,
+          "credit": {
+            "Violation": 2.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 2,
+          "work": 225843,
+          "ms": 28113,
+          "initMs": 71,
+          "segments": 80,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 39656.802899999995,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 96.0
+          }
+        }
+      }
+    },
+    "seam-mixed-p4": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 101.5,
+      "bestMs": 1276.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1251798,
+          "ms": 105835,
+          "initMs": 885,
+          "segments": 270,
+          "reseeds": 81,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 129937.79449999999,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1990.0,
+            "Glue": 678.0,
+            "ClauseUses": 71.0,
+            "Improvement": 1372.0,
+            "FirstSolution": 4.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 6,
+          "work": 600434,
+          "ms": 13767,
+          "initMs": 372,
+          "segments": 27,
+          "reseeds": 4,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 62869.1884,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1968.0,
+            "Glue": 43.0,
+            "Improvement": 253109.0,
+            "Floor": 13.0,
+            "ClauseUses": 15.0,
+            "FirstSolution": 1.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 455001,
+          "ms": 49167,
+          "initMs": 219,
+          "segments": 108,
+          "reseeds": 33,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 71442.3714,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 76.0,
+            "Glue": 115.0,
+            "ClauseUses": 562.0,
+            "Improvement": 124.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 993918,
+          "ms": 32602,
+          "initMs": 0,
+          "segments": 73,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 39929.06940000001,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 5.0,
+            "Improvement": 234.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 808591,
+          "ms": 19898,
+          "initMs": 0,
+          "segments": 54,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6603.9407,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 12741.0,
+            "Violation": 0.1364
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 1023555,
+          "ms": 25605,
+          "initMs": 0,
+          "segments": 69,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 62747.52159999999,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 22401.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 126759,
+          "ms": 18230,
+          "initMs": 0,
+          "segments": 51,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6037.948399999999,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 99450.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 8,
+          "work": 130784,
+          "ms": 26042,
+          "initMs": 0,
+          "segments": 57,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 24229.9355,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 10407.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 26087976,
+          "ms": 64507,
+          "initMs": 0,
+          "segments": 191,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 416055.8104,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 1844.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 8,
+          "work": 896428,
+          "ms": 55003,
+          "initMs": 603,
+          "segments": 144,
+          "reseeds": 45,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 166119.2564,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1880.0,
+            "Glue": 253.0,
+            "ClauseUses": 85.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 4,
+          "work": 198,
+          "ms": 992,
+          "initMs": 188,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3.9912,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 2.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 653990,
+          "ms": 2289,
+          "initMs": 0,
+          "segments": 17,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 206452,
+          "ms": 14715,
+          "initMs": 0,
+          "segments": 35,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 9085.8074,
+          "finalHolders": 0,
+          "credit": {
+            "Violation": 2.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 2,
+          "work": 226237,
+          "ms": 28725,
+          "initMs": 73,
+          "segments": 75,
+          "reseeds": 25,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 48599.9654,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 97.0
+          }
+        }
+      }
+    },
+    "mixed-p4-r0": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "0": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 98.5,
+      "bestMs": 4665.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1361133,
+          "ms": 99823,
+          "initMs": 626,
+          "segments": 262,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 50281.0459,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 131415.0,
+            "RootFixings": 1948.0,
+            "Glue": 196.0,
+            "ClauseUses": 4.0,
+            "FirstSolution": 3.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 6,
+          "work": 435895,
+          "ms": 12083,
+          "initMs": 375,
+          "segments": 24,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 44532.5335,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1926.0,
+            "Glue": 29.0,
+            "FirstSolution": 1.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 351180,
+          "ms": 41822,
+          "initMs": 177,
+          "segments": 120,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 16079.0905,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 1.0,
+            "RootFixings": 76.0,
+            "Glue": 70.0,
+            "ClauseUses": 2.0,
+            "Improvement": 282.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 580913,
+          "ms": 32724,
+          "initMs": 0,
+          "segments": 113,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 14273.5283,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 31624.0,
+            "FirstSolution": 4.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 507144,
+          "ms": 21508,
+          "initMs": 0,
+          "segments": 71,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6735.0697,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 112711.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 1095603,
+          "ms": 29372,
+          "initMs": 0,
+          "segments": 99,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 41973.0671,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 126178.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 197758,
+          "ms": 22817,
+          "initMs": 0,
+          "segments": 68,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6696.4437,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 220065.0
+          }
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 8,
+          "work": 135221,
+          "ms": 33728,
+          "initMs": 0,
+          "segments": 70,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 15116.8119,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 132239.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 28661712,
+          "ms": 61992,
+          "initMs": 0,
+          "segments": 209,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1266420.0221,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 2468.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 8,
+          "work": 1183871,
+          "ms": 54004,
+          "initMs": 451,
+          "segments": 157,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 27458.292699999998,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 1880.0,
+            "Glue": 16.0,
+            "FirstSolution": 3.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 4,
+          "work": 202,
+          "ms": 1005,
+          "initMs": 187,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 2,
+          "credit": {}
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 820853,
+          "ms": 2554,
+          "initMs": 0,
+          "segments": 17,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 219407,
+          "ms": 14729,
+          "initMs": 0,
+          "segments": 32,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6899.2711,
+          "finalHolders": 0,
+          "credit": {
+            "Violation": 2.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 2,
+          "work": 237792,
+          "ms": 28547,
+          "initMs": 68,
+          "segments": 51,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 46527.466499999995,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 41.0
+          }
+        }
+      }
+    },
+    "mixed-p4-r2": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "2": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 94.5,
+      "bestMs": 4535.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1146884,
+          "ms": 100926,
+          "initMs": 1130,
+          "segments": 262,
+          "reseeds": 121,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 137225.41119999997,
+          "finalHolders": 1,
+          "credit": {
+            "Floor": 37.0,
+            "RootFixings": 1987.0,
+            "Glue": 1595.0,
+            "ClauseUses": 87.0,
+            "FirstSolution": 4.0,
+            "Improvement": 172.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 6,
+          "work": 1638197,
+          "ms": 22624,
+          "initMs": 408,
+          "segments": 36,
+          "reseeds": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 238082.51479999998,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1989.0,
+            "Glue": 78.0,
+            "FirstSolution": 1.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 342077,
+          "ms": 43844,
+          "initMs": 300,
+          "segments": 116,
+          "reseeds": 53,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 54252.5124,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 1.0,
+            "RootFixings": 76.0,
+            "Glue": 97.0,
+            "ClauseUses": 839.0,
+            "Improvement": 255.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 1178752,
+          "ms": 27431,
+          "initMs": 0,
+          "segments": 80,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 21231.7475,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 4.0,
+            "Improvement": 134500.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 840679,
+          "ms": 26298,
+          "initMs": 0,
+          "segments": 74,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 15063.783,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 51663.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 1527711,
+          "ms": 28759,
+          "initMs": 0,
+          "segments": 85,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 89367.5541,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 66781.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 120195,
+          "ms": 17310,
+          "initMs": 0,
+          "segments": 33,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 7811.370599999999,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 77862.0
+          }
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 8,
+          "work": 122364,
+          "ms": 30640,
+          "initMs": 0,
+          "segments": 66,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6351.696400000001,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 29142.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 25556301,
+          "ms": 59911,
+          "initMs": 0,
+          "segments": 186,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 475092.6359,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 82505.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 8,
+          "work": 831440,
+          "ms": 55822,
+          "initMs": 720,
+          "segments": 146,
+          "reseeds": 69,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 145875.74,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1880.0,
+            "Glue": 266.0,
+            "ClauseUses": 322.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 4,
+          "work": 186,
+          "ms": 1026,
+          "initMs": 197,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 4.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 769697,
+          "ms": 2536,
+          "initMs": 0,
+          "segments": 16,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 154416,
+          "ms": 10820,
+          "initMs": 0,
+          "segments": 33,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6986.1915,
+          "finalHolders": 0,
+          "credit": {
+            "Violation": 2.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 2,
+          "work": 222144,
+          "ms": 28607,
+          "initMs": 70,
+          "segments": 76,
+          "reseeds": 37,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 30609.343699999998,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 179.0
+          }
+        }
+      }
+    },
+    "mixed-p4-r4": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "4": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 113.0,
+      "bestMs": 2636.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1207925,
+          "ms": 97829,
+          "initMs": 842,
+          "segments": 262,
+          "reseeds": 57,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 110193.0973,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 1982.0,
+            "Glue": 1306.0,
+            "ClauseUses": 49.0,
+            "Improvement": 637.0,
+            "Floor": 76.0,
+            "FirstSolution": 3.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 6,
+          "work": 864808,
+          "ms": 17897,
+          "initMs": 375,
+          "segments": 34,
+          "reseeds": 5,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 69053.42480000001,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1954.0,
+            "Glue": 56.0,
+            "FirstSolution": 1.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 315582,
+          "ms": 44425,
+          "initMs": 230,
+          "segments": 109,
+          "reseeds": 26,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 42576.5225,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 1.0,
+            "RootFixings": 76.0,
+            "Glue": 135.0,
+            "ClauseUses": 459.0,
+            "Improvement": 65.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 1028626,
+          "ms": 30388,
+          "initMs": 0,
+          "segments": 83,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 28594.662800000002,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 4.0,
+            "Improvement": 76905.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 864391,
+          "ms": 25380,
+          "initMs": 0,
+          "segments": 69,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 10856.677899999999,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 172978.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 1800394,
+          "ms": 33599,
+          "initMs": 0,
+          "segments": 76,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 141398.9503,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 118259.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 8,
+          "work": 202515,
+          "ms": 22345,
+          "initMs": 0,
+          "segments": 45,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 7245.916,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 79178.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 8,
+          "work": 109832,
+          "ms": 26971,
+          "initMs": 0,
+          "segments": 66,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 6754.656500000001,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 82702.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 24536010,
+          "ms": 59256,
+          "initMs": 0,
+          "segments": 179,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 409812.8016,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 1231.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 8,
+          "work": 938319,
+          "ms": 55695,
+          "initMs": 576,
+          "segments": 147,
+          "reseeds": 34,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 93657.32879999999,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1880.0,
+            "Glue": 145.0,
+            "ClauseUses": 69.0,
+            "FirstSolution": 3.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 4,
+          "work": 202,
+          "ms": 998,
+          "initMs": 187,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 2,
+          "credit": {}
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 854201,
+          "ms": 2795,
+          "initMs": 0,
+          "segments": 15,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 167411,
+          "ms": 11382,
+          "initMs": 0,
+          "segments": 28,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 5976.572700000001,
+          "finalHolders": 0,
+          "credit": {
+            "Violation": 2.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 2,
+          "work": 225037,
+          "ms": 28458,
+          "initMs": 74,
+          "segments": 73,
+          "reseeds": 18,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 42286.822,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 123.0
+          }
+        }
+      }
+    },
+    "cp-p4-a4": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 161.5,
+      "bestMs": 942.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1393414,
+          "ms": 114379,
+          "initMs": 661,
+          "segments": 12,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 539499.1094,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1944.0,
+            "Glue": 61.0,
+            "FirstSolution": 6.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 4156588,
+          "ms": 84830,
+          "initMs": 585,
+          "segments": 10,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1149033.2811,
+          "finalHolders": 3,
+          "credit": {
+            "RootFixings": 1922.0,
+            "Glue": 46.0,
+            "ClauseUses": 7.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 1417997,
+          "ms": 114386,
+          "initMs": 660,
+          "segments": 12,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 927176.2782000001,
+          "finalHolders": 5,
+          "credit": {
+            "Floor": 188.0,
+            "RootFixings": 1948.0,
+            "Glue": 486.0,
+            "ClauseUses": 22.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 498749,
+          "ms": 54958,
+          "initMs": 178,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 288061.614,
+          "finalHolders": 0,
+          "credit": {
+            "FirstSolution": 2.0,
+            "RootFixings": 76.0,
+            "Glue": 34.0,
+            "ClauseUses": 59.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 6,
+          "work": 441824,
+          "ms": 29816,
+          "initMs": 406,
+          "segments": 6,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 441627.9956,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1854.0,
+            "Glue": 5.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 2,
+          "work": 245903,
+          "ms": 29651,
+          "initMs": 76,
+          "segments": 2,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 156670.03999999998,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 62.0
+          }
+        },
+        "bt/free": {
+          "cases": 2,
+          "work": 412843,
+          "ms": 29628,
+          "initMs": 76,
+          "segments": 2,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 120643.7448,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 31.0
+          }
+        }
+      }
+    },
+    "cp-p4-a12": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 148.5,
+      "bestMs": 1772.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 14,
+          "work": 446369,
+          "ms": 44686,
+          "initMs": 695,
+          "segments": 70,
+          "reseeds": 14,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 77494.3799,
+          "finalHolders": 2,
+          "credit": {
+            "FirstSolution": 8.0,
+            "Improvement": 271592.0,
+            "RootFixings": 2054.0,
+            "Glue": 47.0,
+            "ClauseUses": 26.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 330905,
+          "ms": 9219,
+          "initMs": 554,
+          "segments": 22,
+          "reseeds": 1,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 50520.28179999999,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1926.0,
+            "Glue": 5.0,
+            "FirstSolution": 1.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 14,
+          "work": 512464,
+          "ms": 57583,
+          "initMs": 644,
+          "segments": 72,
+          "reseeds": 16,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 93353.74879999999,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 531549.0,
+            "Floor": 99.0,
+            "RootFixings": 2074.0,
+            "Glue": 631.0,
+            "ClauseUses": 124.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 10,
+          "work": 204271,
+          "ms": 8148,
+          "initMs": 552,
+          "segments": 22,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 31062.501500000002,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1926.0,
+            "Glue": 9.0,
+            "FirstSolution": 1.0
+          }
+        },
+        "bt/lp-lbtree": {
+          "cases": 10,
+          "work": 904028,
+          "ms": 20331,
+          "initMs": 62,
+          "segments": 24,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 75026.2622,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 12673.0,
+            "RootFixings": 2003.0,
+            "Glue": 50.0,
+            "ClauseUses": 2.0
+          }
+        },
+        "bt/linucb": {
+          "cases": 14,
+          "work": 528190,
+          "ms": 46269,
+          "initMs": 137,
+          "segments": 39,
+          "reseeds": 10,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 60316.279500000004,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1969.0,
+            "ClauseUses": 347.0,
+            "Glue": 103.0,
+            "Improvement": 858.0
+          }
+        },
+        "bt/free": {
+          "cases": 12,
+          "work": 424860,
+          "ms": 46126,
+          "initMs": 183,
+          "segments": 47,
+          "reseeds": 11,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 72377.58660000001,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1945.0,
+            "Glue": 125.0,
+            "ClauseUses": 177.0,
+            "Improvement": 511646.0
+          }
+        },
+        "bt/selector-switch": {
+          "cases": 12,
+          "work": 543937,
+          "ms": 38709,
+          "initMs": 65,
+          "segments": 38,
+          "reseeds": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 78870.7414,
+          "finalHolders": 0,
+          "credit": {
+            "Floor": 89.0,
+            "RootFixings": 2012.0,
+            "Glue": 613.0,
+            "ClauseUses": 148.0,
+            "Improvement": 537.0
+          }
+        },
+        "bt/domwdeg": {
+          "cases": 12,
+          "work": 588610,
+          "ms": 60074,
+          "initMs": 37,
+          "segments": 38,
+          "reseeds": 9,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 37132.176400000004,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1981.0,
+            "Glue": 201.0,
+            "ClauseUses": 185.0,
+            "Improvement": 514.0
+          }
+        },
+        "bt/first-fail": {
+          "cases": 12,
+          "work": 607489,
+          "ms": 50718,
+          "initMs": 48,
+          "segments": 54,
+          "reseeds": 12,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 72042.55600000001,
+          "finalHolders": 2,
+          "credit": {
+            "RootFixings": 1987.0,
+            "Glue": 144.0,
+            "ClauseUses": 650.0,
+            "Improvement": 20088.0
+          }
+        },
+        "bt/activity": {
+          "cases": 12,
+          "work": 765859,
+          "ms": 48394,
+          "initMs": 53,
+          "segments": 53,
+          "reseeds": 13,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 21999.397999999997,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 1944.0,
+            "Glue": 4.0,
+            "Improvement": 616.0,
+            "ClauseUses": 12.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 44308,
+          "ms": 10260,
+          "initMs": 19,
+          "segments": 16,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 5286.0243,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 109.0,
+            "Glue": 49.0,
+            "ClauseUses": 148.0
+          }
+        },
+        "bt/objective-guided": {
+          "cases": 8,
+          "work": 200482,
+          "ms": 16060,
+          "initMs": 21,
+          "segments": 18,
+          "reseeds": 3,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 31610.3064,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1876.0,
+            "Glue": 24.0,
+            "ClauseUses": 85.0,
+            "Improvement": 10054.0
+          }
+        }
+      }
+    },
+    "mixed-p4-a4": {
+      "outcomes": {
+        "feasible": 10,
+        "optimal": 2
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 111.5,
+      "bestMs": 8801.0,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 4599096,
+          "ms": 143320,
+          "initMs": 589,
+          "segments": 12,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 1750923.8256,
+          "finalHolders": 5,
+          "credit": {
+            "RootFixings": 1944.0,
+            "Glue": 474.0,
+            "FirstSolution": 3.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 8537641,
+          "ms": 143298,
+          "initMs": 0,
+          "segments": 12,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3652959.0,
+          "finalHolders": 2,
+          "credit": {
+            "FirstSolution": 6.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 8,
+          "work": 2169714,
+          "ms": 113251,
+          "initMs": 0,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 989582.0,
+          "finalHolders": 4,
+          "credit": {
+            "FirstSolution": 2.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 8,
+          "work": 1580102,
+          "ms": 113230,
+          "initMs": 0,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 554980.0,
+          "finalHolders": 1,
+          "credit": {
+            "FirstSolution": 1.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 12150679,
+          "ms": 30073,
+          "initMs": 0,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 470199,
+          "ms": 30074,
+          "initMs": 0,
+          "segments": 4,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        }
+      }
+    },
+    "mixed-p4-a12": {
+      "outcomes": {
+        "feasible": 8,
+        "optimal": 4
+      },
+      "fingerprints": [
+        "4714dd6920b6c864987314151bd85b7b2982cd5df5b8105fe0d557f785cc449f"
+      ],
+      "commits": [
+        "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "thresholds": {
+        "3": 12
+      },
+      "runtimeOptions": [
+        {
+          "KLAUSE_CLI_OPTS": "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=4"
+        }
+      ],
+      "firstMs": 160.0,
+      "bestMs": 4283.5,
+      "telemetry": {
+        "bt/satOptimized": {
+          "cases": 12,
+          "work": 1163560,
+          "ms": 94192,
+          "initMs": 847,
+          "segments": 247,
+          "reseeds": 70,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 150795.6073,
+          "finalHolders": 3,
+          "credit": {
+            "Improvement": 148050.0,
+            "RootFixings": 2219.0,
+            "Glue": 914.0,
+            "ClauseUses": 162.0,
+            "FirstSolution": 6.0
+          }
+        },
+        "bt/lp-default": {
+          "cases": 10,
+          "work": 227863,
+          "ms": 9441,
+          "initMs": 559,
+          "segments": 26,
+          "reseeds": 2,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 18401.051199999998,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 102574.0,
+            "RootFixings": 1922.0,
+            "Glue": 7.0,
+            "ClauseUses": 1.0
+          }
+        },
+        "bt/conflictDriven": {
+          "cases": 12,
+          "work": 1066260,
+          "ms": 93584,
+          "initMs": 795,
+          "segments": 223,
+          "reseeds": 61,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 197229.3535,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 500007.0,
+            "Floor": 290.0,
+            "RootFixings": 2224.0,
+            "Glue": 2929.0,
+            "ClauseUses": 303.0,
+            "FirstSolution": 2.0
+          }
+        },
+        "bt/annotation": {
+          "cases": 4,
+          "work": 324438,
+          "ms": 44473,
+          "initMs": 256,
+          "segments": 101,
+          "reseeds": 28,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 73783.01699999999,
+          "finalHolders": 1,
+          "credit": {
+            "FirstSolution": 2.0,
+            "RootFixings": 332.0,
+            "Glue": 175.0,
+            "ClauseUses": 2203.0,
+            "Improvement": 355.0
+          }
+        },
+        "ls/cbls/fixed": {
+          "cases": 12,
+          "work": 381071,
+          "ms": 13031,
+          "initMs": 0,
+          "segments": 30,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 30162.638899999998,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 11887.0,
+            "FirstSolution": 1.0
+          }
+        },
+        "ls/cbls-plateau/ils-basin": {
+          "cases": 12,
+          "work": 238502,
+          "ms": 16816,
+          "initMs": 0,
+          "segments": 46,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 35683.5791,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 804533.0,
+            "FirstSolution": 1.0,
+            "Violation": 1.0
+          }
+        },
+        "ls/cbls-smooth/ils-basin": {
+          "cases": 12,
+          "work": 262936,
+          "ms": 13597,
+          "initMs": 0,
+          "segments": 33,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 391.99519999999995,
+          "finalHolders": 2,
+          "credit": {
+            "Improvement": 178215.0
+          }
+        },
+        "ls/sa/adaptive-perturb": {
+          "cases": 12,
+          "work": 162988,
+          "ms": 14996,
+          "initMs": 0,
+          "segments": 35,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 3041.15,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 152630.0
+          }
+        },
+        "ls/cbls-chain/ils-basin": {
+          "cases": 12,
+          "work": 99740,
+          "ms": 21248,
+          "initMs": 0,
+          "segments": 46,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 13294.3059,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 210016.0
+          }
+        },
+        "ls/cbls-chain-noinv/fixed": {
+          "cases": 12,
+          "work": 94410,
+          "ms": 15780,
+          "initMs": 0,
+          "segments": 34,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/cbls-notabu/fixed": {
+          "cases": 8,
+          "work": 260668,
+          "ms": 10874,
+          "initMs": 0,
+          "segments": 25,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 201.2604,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 110066.0
+          }
+        },
+        "ls/cbls-lonoise/fixed": {
+          "cases": 8,
+          "work": 361249,
+          "ms": 9053,
+          "initMs": 0,
+          "segments": 21,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 31.82,
+          "finalHolders": 0,
+          "credit": {
+            "Improvement": 7806.0
+          }
+        },
+        "alns/balanced": {
+          "cases": 12,
+          "work": 19922552,
+          "ms": 46139,
+          "initMs": 0,
+          "segments": 147,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 429617.1372,
+          "finalHolders": 1,
+          "credit": {
+            "Improvement": 135891.0
+          }
+        },
+        "bt/lp-aggressive": {
+          "cases": 6,
+          "work": 348,
+          "ms": 2200,
+          "initMs": 374,
+          "segments": 8,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 69.87599999999999,
+          "finalHolders": 1,
+          "credit": {
+            "RootFixings": 1854.0,
+            "Glue": 2.0
+          }
+        },
+        "ls/probsat-bandit/fixed": {
+          "cases": 4,
+          "work": 332968,
+          "ms": 1241,
+          "initMs": 0,
+          "segments": 5,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "ls/fjump/fixed": {
+          "cases": 4,
+          "work": 24536,
+          "ms": 2168,
+          "initMs": 0,
+          "segments": 6,
+          "reseeds": 0,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 0.0,
+          "finalHolders": 0,
+          "credit": {}
+        },
+        "bt/linucb": {
+          "cases": 2,
+          "work": 206536,
+          "ms": 25842,
+          "initMs": 78,
+          "segments": 69,
+          "reseeds": 23,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 33333.3726,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 117.0
+          }
+        },
+        "bt/free": {
+          "cases": 2,
+          "work": 190712,
+          "ms": 22445,
+          "initMs": 76,
+          "segments": 60,
+          "reseeds": 19,
+          "failures": 0,
+          "faults": 0,
+          "weightedReward": 16542.2552,
+          "finalHolders": 0,
+          "credit": {
+            "RootFixings": 24.0,
+            "ClauseUses": 111.0
+          }
+        }
+      }
+    }
+  },
+  "pairs": [
+    {
+      "a": "main-cp-p1",
+      "b": "seam-cp-p1",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        0,
+        0
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "main-mixed-p1",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "seam-mixed-p1",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p1-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p1-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "cp-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.25,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 6,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "main-cp-p1",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "main-mixed-p1",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "seam-mixed-p1",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p1-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p1-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "cp-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.25,
+        0
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 6,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "seam-cp-p1",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "seam-mixed-p1",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.16666666666666666,
+        0.5833333333333334
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p1-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.25,
+        0.5
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p1-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 0,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.25,
+      "problemBootstrap95": [
+        -0.5833333333333334,
+        0
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.25,
+      "problemBootstrap95": [
+        -0.5833333333333334,
+        0
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "cp-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.25,
+      "problemBootstrap95": [
+        -0.5833333333333334,
+        0
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        0,
+        0
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.25
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 7,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        -0.16666666666666666
+      ]
+    },
+    {
+      "a": "main-mixed-p1",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p1-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        0,
+        0
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p1-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.25,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.16666666666666666
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.5,
+        0
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "cp-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.25,
+      "problemBootstrap95": [
+        -0.5833333333333334,
+        0
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        0,
+        0
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.5,
+        0
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        0,
+        0
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 7,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        -0.16666666666666666
+      ]
+    },
+    {
+      "a": "seam-mixed-p1",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p1-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.5,
+        0.25
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.5,
+        0.25
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "cp-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.5,
+        0.4166666666666667
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        0,
+        0.5833333333333334
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        -0.16666666666666666,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 6,
+      "qualityLosses": 0,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.5,
+      "problemBootstrap95": [
+        0.16666666666666666,
+        0.8333333333333334
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 7,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        -0.16666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r0",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "mixed-p1-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.5,
+        0.4166666666666667
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "cp-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "mixed-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.25,
+        0
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 6,
+      "qualityLosses": 0,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.5,
+      "problemBootstrap95": [
+        0.16666666666666666,
+        0.8333333333333334
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 6,
+      "qualityLosses": 0,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.5,
+      "problemBootstrap95": [
+        0.16666666666666666,
+        0.8333333333333334
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 7,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        -0.16666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r2",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "cp-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "mixed-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.25,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 7,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        -0.16666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-r4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "mixed-p1-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 6,
+      "qualityLosses": 0,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.5,
+      "problemBootstrap95": [
+        0.16666666666666666,
+        0.8333333333333334
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 6,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "cp-p1-a12",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "main-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.5833333333333334,
+        0.4166666666666667
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 6,
+      "qualityLosses": 0,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.5,
+      "problemBootstrap95": [
+        0.16666666666666666,
+        0.8333333333333334
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 5,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        0,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 6,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p1-a12",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "seam-cp-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        0,
+        0
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.5,
+        0
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        0,
+        0.5833333333333334
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 7,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        -0.16666666666666666
+      ]
+    },
+    {
+      "a": "main-cp-p4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.4166666666666667,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "main-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.5,
+        0
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.25,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        0,
+        0.5833333333333334
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.4166666666666667,
+        0.5833333333333334
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 6,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "seam-cp-p4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.4166666666666667,
+        0.5
+      ]
+    },
+    {
+      "a": "main-mixed-p4",
+      "b": "seam-mixed-p4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.25,
+        0
+      ]
+    },
+    {
+      "a": "main-mixed-p4",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "main-mixed-p4",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.25,
+        0
+      ]
+    },
+    {
+      "a": "main-mixed-p4",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "main-mixed-p4",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "main-mixed-p4",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "main-mixed-p4",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 7,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        -0.16666666666666666
+      ]
+    },
+    {
+      "a": "main-mixed-p4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-mixed-p4",
+      "b": "mixed-p4-r0",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 5,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0
+      ]
+    },
+    {
+      "a": "seam-mixed-p4",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.5,
+        0
+      ]
+    },
+    {
+      "a": "seam-mixed-p4",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "seam-mixed-p4",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "seam-mixed-p4",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "seam-mixed-p4",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 0,
+      "qualityLosses": 8,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.6666666666666666,
+      "problemBootstrap95": [
+        -1,
+        -0.3333333333333333
+      ]
+    },
+    {
+      "a": "seam-mixed-p4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p4-r0",
+      "b": "mixed-p4-r2",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        0,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p4-r0",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        -0.16666666666666666,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p4-r0",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p4-r0",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p4-r0",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 6,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p4-r0",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p4-r2",
+      "b": "mixed-p4-r4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 1,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.25,
+      "problemBootstrap95": [
+        0,
+        0.5833333333333334
+      ]
+    },
+    {
+      "a": "mixed-p4-r2",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p4-r2",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.4166666666666667,
+        0.5833333333333334
+      ]
+    },
+    {
+      "a": "mixed-p4-r2",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 1,
+      "qualityLosses": 7,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.5,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        -0.16666666666666666
+      ]
+    },
+    {
+      "a": "mixed-p4-r2",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.4166666666666667,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p4-r4",
+      "b": "cp-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 4,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.16666666666666666,
+      "problemBootstrap95": [
+        -0.6666666666666666,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p4-r4",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 3,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.08333333333333333,
+      "problemBootstrap95": [
+        -0.4166666666666667,
+        0.5833333333333334
+      ]
+    },
+    {
+      "a": "mixed-p4-r4",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 0,
+      "qualityLosses": 8,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.6666666666666666,
+      "problemBootstrap95": [
+        -1,
+        -0.3333333333333333
+      ]
+    },
+    {
+      "a": "mixed-p4-r4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 3,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.08333333333333333,
+      "problemBootstrap95": [
+        -0.5,
+        0.25
+      ]
+    },
+    {
+      "a": "cp-p4-a4",
+      "b": "cp-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p4-a4",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 6,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "cp-p4-a4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 4,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.16666666666666666,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.6666666666666666
+      ]
+    },
+    {
+      "a": "cp-p4-a12",
+      "b": "mixed-p4-a4",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 6,
+      "proofGains": 0,
+      "proofLosses": 2,
+      "disagreementCases": [],
+      "problemMeanQuality": -0.3333333333333333,
+      "problemBootstrap95": [
+        -0.8333333333333334,
+        0.3333333333333333
+      ]
+    },
+    {
+      "a": "cp-p4-a12",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 2,
+      "qualityLosses": 2,
+      "proofGains": 0,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0,
+      "problemBootstrap95": [
+        -0.5,
+        0.5
+      ]
+    },
+    {
+      "a": "mixed-p4-a4",
+      "b": "mixed-p4-a12",
+      "matched": 12,
+      "excluded": [],
+      "qualityWins": 6,
+      "qualityLosses": 2,
+      "proofGains": 2,
+      "proofLosses": 0,
+      "disagreementCases": [],
+      "problemMeanQuality": 0.3333333333333333,
+      "problemBootstrap95": [
+        -0.3333333333333333,
+        0.8333333333333334
+      ]
+    }
+  ]
+}

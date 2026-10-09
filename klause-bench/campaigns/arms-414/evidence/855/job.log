@@ -1,0 +1,55 @@
+1791578886478 launched c7i.2xlarge instances [i-053fa77b6e29f1fd2, i-0647907caa3e51b1e, i-03cd54a7c3dc56eb8, i-04a5a62a2e6081969, i-060880b48759c8dce, i-0847797873fccdb94, i-067f7a1edb3cb042b, i-0ef39fa7938975c55]
+1791578899724 waiting for i-0ef39fa7938975c55 to boot failed (try 1 of 45), retrying in 20 s: on 13.60.80.7 (exit 255): ssh: connect to host 13.60.80.7 port 22: Connection refused
+
+1791578900616 waiting for i-0847797873fccdb94 to boot failed (try 1 of 45), retrying in 20 s: on 13.48.147.49 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0847797873fccdb94' (ED25519) to the list of known hosts.
+
+1791578900616 waiting for i-060880b48759c8dce to boot failed (try 1 of 45), retrying in 20 s: on 13.48.149.246 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-060880b48759c8dce' (ED25519) to the list of known hosts.
+
+1791578900618 waiting for i-04a5a62a2e6081969 to boot failed (try 1 of 45), retrying in 20 s: on 13.60.205.212 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-04a5a62a2e6081969' (ED25519) to the list of known hosts.
+
+1791578900628 waiting for i-0647907caa3e51b1e to boot failed (try 1 of 45), retrying in 20 s: on 13.60.181.39 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0647907caa3e51b1e' (ED25519) to the list of known hosts.
+
+1791578900645 waiting for i-053fa77b6e29f1fd2 to boot failed (try 1 of 45), retrying in 20 s: on 13.60.181.126 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-053fa77b6e29f1fd2' (ED25519) to the list of known hosts.
+
+1791578900690 waiting for i-03cd54a7c3dc56eb8 to boot failed (try 1 of 45), retrying in 20 s: on 13.53.177.152 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-03cd54a7c3dc56eb8' (ED25519) to the list of known hosts.
+
+1791578900752 waiting for i-067f7a1edb3cb042b to boot failed (try 1 of 45), retrying in 20 s: on 13.60.15.41 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-067f7a1edb3cb042b' (ED25519) to the list of known hosts.
+
+1791578920688 waiting for i-0ef39fa7938975c55 to boot failed (try 2 of 45), retrying in 20 s: on 13.60.80.7 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0ef39fa7938975c55' (ED25519) to the list of known hosts.
+
+1791578921142 i-04a5a62a2e6081969: booted; building 5471419aa, 1795496d3
+1791578921222 i-067f7a1edb3cb042b: booted; building 5471419aa, 1795496d3
+1791578921222 i-060880b48759c8dce: booted; building 5471419aa, 1795496d3
+1791578921258 i-053fa77b6e29f1fd2: booted; building 5471419aa, 1795496d3
+1791578921263 i-0847797873fccdb94: booted; building 5471419aa, 1795496d3
+1791578921263 i-0647907caa3e51b1e: booted; building 5471419aa, 1795496d3
+1791578921298 i-03cd54a7c3dc56eb8: booted; building 5471419aa, 1795496d3
+1791578941371 i-0ef39fa7938975c55: booted; building 5471419aa, 1795496d3
+1791579099683 i-04a5a62a2e6081969: built
+1791579099705 i-0847797873fccdb94: built
+1791579099723 i-0647907caa3e51b1e: built
+1791579099778 i-067f7a1edb3cb042b: built
+1791579100672 i-053fa77b6e29f1fd2: built
+1791579103641 i-03cd54a7c3dc56eb8: built
+1791579104972 i-060880b48759c8dce: built
+1791579118694 i-0ef39fa7938975c55: built
+1791579118694 i-053fa77b6e29f1fd2: planning, which fetches the corpora the selections read
+1791579120135 selection 0 ('suite=mzn-bench' 'name=2017/city-position/city-5-05' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579120703 selection 1 ('suite=mzn-bench' 'name=2011/fast-food/ff10' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579121321 selection 2 ('suite=xcsp3-cop' 'name=CoinsGrid-08-04_c22' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579121930 selection 3 ('suite=xcsp3-cop' 'name=Fortress1-03_c25' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579122585 selection 4 ('suite=pb-comp' 'name=normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579123200 selection 5 ('suite=pb-comp' 'name=normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791579123209 planned 6 problems × 20 arms = 240 cases, up to 0,7 h
+1791579123210 i-053fa77b6e29f1fd2: compressing and pushing newly fetched corpora to s3://klause-lab-corpus-459222092693-eu-north-1
+1791579140112 fetching the corpora on the other instances
+1791579159178 running 6 problems on 8 instances, each taking the next problem as it has room
+1791579160636 i-067f7a1edb3cb042b has no problems left to take: terminated
+1791579160637 i-0ef39fa7938975c55 has no problems left to take: terminated
+1791579213130 i-060880b48759c8dce has no problems left to take: terminated
+1791579332633 i-03cd54a7c3dc56eb8 has no problems left to take: terminated
+1791579678661 i-0847797873fccdb94 has no problems left to take: terminated
+1791579682034 i-04a5a62a2e6081969 has no problems left to take: terminated
+1791579682516 i-0647907caa3e51b1e has no problems left to take: terminated
+1791579685095 i-053fa77b6e29f1fd2 has no problems left to take: terminated
+1791579693634 job finished
