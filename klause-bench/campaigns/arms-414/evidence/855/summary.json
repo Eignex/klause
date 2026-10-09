@@ -14,6 +14,11 @@
       "commits": [
         "5471419aa8c832ee1065468a6861bb203a1ff8c7"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "absent": 12
       },
@@ -210,6 +215,11 @@
       ],
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
       ],
       "thresholds": {
         "3": 12
@@ -408,6 +418,11 @@
       "commits": [
         "5471419aa8c832ee1065468a6861bb203a1ff8c7"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "absent": 12
       },
@@ -605,6 +620,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "3": 12
       },
@@ -801,6 +821,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "0": 12
       },
@@ -993,6 +1018,11 @@
       ],
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
       ],
       "thresholds": {
         "2": 12
@@ -1189,6 +1219,11 @@
       ],
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
       ],
       "thresholds": {
         "4": 12
@@ -1387,6 +1422,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "3": 12
       },
@@ -1399,7 +1439,7 @@
       "bestMs": 737.5,
       "telemetry": {
         "bt/satOptimized": {
-          "cases": 14,
+          "cases": 12,
           "work": 246828,
           "ms": 16352,
           "initMs": 464,
@@ -1434,7 +1474,7 @@
           }
         },
         "bt/conflictDriven": {
-          "cases": 14,
+          "cases": 12,
           "work": 178026,
           "ms": 15899,
           "initMs": 14,
@@ -1488,7 +1528,7 @@
           }
         },
         "bt/linucb": {
-          "cases": 14,
+          "cases": 12,
           "work": 229351,
           "ms": 12313,
           "initMs": 15,
@@ -1642,6 +1682,11 @@
       ],
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
       ],
       "thresholds": {
         "3": 12
@@ -1945,6 +1990,11 @@
       "commits": [
         "5471419aa8c832ee1065468a6861bb203a1ff8c7"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "absent": 12
       },
@@ -2182,6 +2232,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "3": 12
       },
@@ -2416,6 +2471,11 @@
       ],
       "commits": [
         "5471419aa8c832ee1065468a6861bb203a1ff8c7"
+      ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
       ],
       "thresholds": {
         "absent": 12
@@ -2666,6 +2726,11 @@
       ],
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
       ],
       "thresholds": {
         "3": 12
@@ -2919,6 +2984,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "0": 12
       },
@@ -3163,6 +3233,11 @@
       ],
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
       ],
       "thresholds": {
         "2": 12
@@ -3413,6 +3488,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "4": 12
       },
@@ -3661,6 +3741,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "3": 12
       },
@@ -3805,6 +3890,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "3": 12
       },
@@ -3817,7 +3907,7 @@
       "bestMs": 1772.0,
       "telemetry": {
         "bt/satOptimized": {
-          "cases": 14,
+          "cases": 12,
           "work": 446369,
           "ms": 44686,
           "initMs": 695,
@@ -3853,7 +3943,7 @@
           }
         },
         "bt/conflictDriven": {
-          "cases": 14,
+          "cases": 12,
           "work": 512464,
           "ms": 57583,
           "initMs": 644,
@@ -3908,7 +3998,7 @@
           }
         },
         "bt/linucb": {
-          "cases": 14,
+          "cases": 12,
           "work": 528190,
           "ms": 46269,
           "initMs": 137,
@@ -4064,6 +4154,11 @@
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
       ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
+      ],
       "thresholds": {
         "3": 12
       },
@@ -4176,6 +4271,11 @@
       ],
       "commits": [
         "1795496d36dddf0ac97ababeb32ee0145e3ba49c"
+      ],
+      "missingWitnesses": 12,
+      "missingSourceHashes": 12,
+      "runtimeHashes": [
+        "4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769"
       ],
       "thresholds": {
         "3": 12

@@ -108,11 +108,13 @@ def analyze(job):
                                              reseeds=0, failures=0, faults=0, weightedReward=0.0,
                                              finalHolders=0, credit=defaultdict(float)))
         for rec in records:
+            seen_labels = set()
             for label, fields in arm_fields(rec):
                 # Replica positions are distinct in evidence and fold only for contribution ranking.
                 label = label.rsplit('#', 1)[0]
                 t = telemetry[label]
-                t['cases'] += 1
+                t['cases'] += int(label not in seen_labels)
+                seen_labels.add(label)
                 for key in ['work', 'ms', 'initMs', 'segments', 'reseeds', 'failures', 'faults']:
                     t[key] += int(fields.get(key, 0))
                 t['weightedReward'] += int(fields.get('work', 0)) * float(fields.get('reward', 0))

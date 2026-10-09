@@ -103,8 +103,8 @@ are retained for reproduction and are not submitted. The short timing-repeat sta
 Worst-case solve work across these stages is 31 case-hours plus six minutes for repeats, before
 setup. It is not a wall-time promise: instances grow and share quota according to the lab worker.
 
-Run `python3 generate.py` to reproduce stage JSON. `collect.py JOB...` archives lab state and
-original record files (including fields an older lab API can omit). `analyze.py JOB...` mines final
+`generate.py` reproduces stage JSON. `collect.py JOB...` only retrieves lab state and
+original record files (including fields an older lab API can omit). GitHub CI runs `analyze.py JOB...` to mine final
 holders and work/reward/contribution credit, produces matched per-cell analysis in gzip JSON and
 problem-cluster bootstrap intervals. An interval based on this few families is descriptive, not
 population evidence. Each seed/repeat has one vote within its problem. Source witnesses are checked

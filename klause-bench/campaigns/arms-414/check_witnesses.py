@@ -36,7 +36,7 @@ def check(bench, jobs, output):
                            'problem=' + case['problem']['problem'], 'output=' + str(path)]
                 run = subprocess.run(command, text=True, capture_output=True, timeout=180)
                 try:
-                    verdict = json.loads(run.stdout.strip().splitlines()[-1])
+                    verdict = json.loads(run.stdout.strip())
                     if verdict.get('sourceHashes') != rec.get('sourceHashes'):
                         verdict = dict(status='error', reason='source bytes differ from measured inputs')
                 except (ValueError, IndexError):
