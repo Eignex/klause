@@ -126,6 +126,16 @@ Solver-control flags are common to **every** mode:
     `smooth-factor`; recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
     (`greedy|walksat|probsat|skew|sa`), `cb`, `skew-alpha`, `cooling-rate`, `initial-temp`, `min-temp`
   - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`
+  - presolve effort (any engine): `presolve-abort-fraction` (finite number in `[0,1]`, default `0.001`),
+    `presolve-max-rounds` (nonnegative, default `1` for conservative, `16` for default/aggressive),
+    `presolve-probe-per-var` and `presolve-probe-total` (nonnegative propagation-call caps;
+    defaults `256`/`20000`, aggressive `4096`/`250000`). These edit only this invocation's plan.
+    Finite statistics include effective settings, `presolvePreparationMs`, metered work, round entries,
+    pass calls and root probe calls, including no-op preparations. Preparation time excludes source
+    routing and input compilation; work/probe counters span the shared metered source and finite phases.
+    Round caps apply per schedule, and probe caps apply separately to each integer SAC tier per bake;
+    Boolean failed-literal probes use cancellation rather than those caps. Aggregate counters can
+    therefore exceed one cap across reseeds. Missing meters omit work/call counters.
   - presolve (any engine): `affine-pivot-order` (`markowitz|stable_id`) — the order affine elimination
     picks its pivots in. `markowitz` (the default) takes the lowest estimated fill first; `stable_id` takes
     them in model order. Both yield the same solutions; the order decides how many variables the pass

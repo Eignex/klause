@@ -457,8 +457,21 @@ private fun round4(x: Double): String {
  *  presolve was off or a no-op. */
 internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val p = stats.presolve ?: return emptyList()
-    if (p.passes.isEmpty() && p.constraintsRemoved == 0 && !p.infeasible) return emptyList()
+    if (p.passes.isEmpty() && p.constraintsRemoved == 0 && !p.infeasible && p.effort == null) return emptyList()
     val out = ArrayList<Pair<String, String>>()
+    p.effort?.let { e ->
+        out += "presolveEmphasis" to e.emphasis
+        out += "presolveAbortFraction" to "${e.abortFraction}"
+        out += "presolveMaxRounds" to "${e.maxRounds}"
+        out += "presolveProbeBudgetPerVar" to "${e.probeBudgetPerVar}"
+        out += "presolveProbeTotalBudget" to "${e.probeTotalBudget}"
+        out += "presolvePreparationMs" to "${e.elapsed.inWholeMilliseconds}"
+        e.work?.let { out += "presolveWork" to "$it" }
+        e.allowance?.let { out += "presolveWorkAllowance" to "$it" }
+        e.rounds?.let { out += "presolveRoundEntries" to "$it" }
+        e.probeCalls?.let { out += "presolveProbeCalls" to "$it" }
+        for ((id, calls) in e.passCalls.toSortedMap()) out += "presolveCalls_$id" to "$calls"
+    }
     if (p.passes.isNotEmpty()) out += "presolvePasses" to p.passes.joinToString(",")
     if (p.constraintsRemoved != 0) out += "presolveConstraintsRemoved" to "${p.constraintsRemoved}"
     if (p.infeasible) out += "presolveInfeasible" to "true"

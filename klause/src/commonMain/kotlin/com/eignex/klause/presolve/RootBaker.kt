@@ -130,11 +130,13 @@ object RootBaker {
                     if (k in existingHoles) continue
                     perVarCalls[v]++
                     totalCalls++
+                    (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                     val pin = problem.propagate(accAsAssumptions.withInt(v, k), problem.cancellation)
                     if (pin is PropagationResult.Unsat) {
                         bumpFactorWeights(pin, factorWeights)
                         perVarCalls[v]++
                         totalCalls++
+                        (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                         val r = problem.propagate(accAsAssumptions.withIntHole(v, k), problem.cancellation)
                         if (r is PropagationResult.Unsat) return r
                         acc = acc.withHole(v, k).merge(r as PropagationResult.Implied)
@@ -221,12 +223,14 @@ object RootBaker {
                 val accAsAssumptions = acc.toAssumptions()
                 perVarCalls[v]++
                 totalCalls++
+                (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                 val pinMin = problem.propagate(accAsAssumptions.withInt(v, curMin), problem.cancellation)
                 if (pinMin is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMin, factorWeights)
                     perVarCalls[v]++
                     totalCalls++
                     val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
+                    (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                     val r = problem.propagate(tightened, problem.cancellation)
                     if (r is PropagationResult.Unsat) return r
                     acc = acc.withMin(v, curMin + 1).merge(r as PropagationResult.Implied)
@@ -237,12 +241,14 @@ object RootBaker {
                 if (totalCalls >= config.probeTotalBudget) return acc
                 perVarCalls[v]++
                 totalCalls++
+                (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                 val pinMax = problem.propagate(accAsAssumptions.withInt(v, curMax), problem.cancellation)
                 if (pinMax is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMax, factorWeights)
                     perVarCalls[v]++
                     totalCalls++
                     val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
+                    (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                     val r = problem.propagate(tightened, problem.cancellation)
                     if (r is PropagationResult.Unsat) return r
                     acc = acc.withMax(v, curMax - 1).merge(r as PropagationResult.Implied)
@@ -267,16 +273,20 @@ object RootBaker {
             for (v in 0 until problem.numBoolVars) {
                 if (problem.cancellation()) return PropagationResult.Implied(bools, ints)
                 if (v in bools) continue
+                (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                 val tryTrue = problem.propagate(Assumptions(bools + (v to true), ints), problem.cancellation)
                 if (tryTrue is PropagationResult.Unsat) {
+                    (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                     val r = problem.propagate(Assumptions(bools + (v to false), ints), problem.cancellation)
                     if (r is PropagationResult.Unsat) return r
                     foldInto(bools, ints, v, false, r as PropagationResult.Implied)
                     changed = true
                     continue
                 }
+                (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                 val tryFalse = problem.propagate(Assumptions(bools + (v to false), ints), problem.cancellation)
                 if (tryFalse is PropagationResult.Unsat) {
+                    (problem.cancellation.workMeter() as? PresolveBudget)?.recordProbe()
                     val r = problem.propagate(Assumptions(bools + (v to true), ints), problem.cancellation)
                     if (r is PropagationResult.Unsat) return r
                     foldInto(bools, ints, v, true, r as PropagationResult.Implied)
