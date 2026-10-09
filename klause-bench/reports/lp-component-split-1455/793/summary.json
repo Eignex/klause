@@ -1,0 +1,1302 @@
+[
+  {
+    "problem": "lp-component-split/mps-dense-2x12",
+    "arm": "split-off",
+    "runs": 5,
+    "decided": 5,
+    "proven": 0,
+    "objectives": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "elapsedMs": [
+      285,
+      284,
+      284,
+      285,
+      285
+    ],
+    "medianElapsedMs": 285,
+    "solveMs": [
+      129.0,
+      129.0,
+      129.0,
+      129.0,
+      130.0
+    ],
+    "timeToBestMs": [
+      279,
+      278,
+      278,
+      279,
+      280
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentBlocksMax": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpNodePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandalonePasses": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "lpComponentPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpPivots": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpOverheadOps": [
+        2448,
+        2448,
+        2448,
+        2448,
+        2448
+      ],
+      "nodes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandaloneWorkOps": [
+        29676,
+        29676,
+        29676,
+        29676,
+        29676
+      ],
+      "lpComponentWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mps-dense-2x12",
+    "arm": "split-on",
+    "runs": 5,
+    "decided": 5,
+    "proven": 0,
+    "objectives": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "elapsedMs": [
+      288,
+      287,
+      287,
+      289,
+      287
+    ],
+    "medianElapsedMs": 287,
+    "solveMs": [
+      132.0,
+      130.0,
+      131.0,
+      132.0,
+      130.0
+    ],
+    "timeToBestMs": [
+      281,
+      280,
+      280,
+      282,
+      280
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "lpComponentBlocksMax": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "lpNodePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandalonePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentPasses": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "lpRootPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpPivots": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpOverheadOps": [
+        2448,
+        2448,
+        2448,
+        2448,
+        2448
+      ],
+      "nodes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandaloneWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentWorkOps": [
+        16226,
+        16226,
+        16226,
+        16226,
+        16226
+      ],
+      "lpRootWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mps-dense-8x24",
+    "arm": "split-off",
+    "runs": 5,
+    "decided": 5,
+    "proven": 0,
+    "objectives": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "elapsedMs": [
+      480,
+      473,
+      477,
+      473,
+      476
+    ],
+    "medianElapsedMs": 476,
+    "solveMs": [
+      300.0,
+      294.0,
+      298.0,
+      293.0,
+      297.0
+    ],
+    "timeToBestMs": [
+      474,
+      467,
+      471,
+      467,
+      470
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentBlocksMax": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpNodePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandalonePasses": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "lpComponentPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpPivots": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpOverheadOps": [
+        38016,
+        38016,
+        38016,
+        38016,
+        38016
+      ],
+      "nodes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandaloneWorkOps": [
+        2675137,
+        2675137,
+        2675137,
+        2675137,
+        2675137
+      ],
+      "lpComponentWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mps-dense-8x24",
+    "arm": "split-on",
+    "runs": 5,
+    "decided": 5,
+    "proven": 0,
+    "objectives": [
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "elapsedMs": [
+      498,
+      500,
+      507,
+      500,
+      481
+    ],
+    "medianElapsedMs": 500,
+    "solveMs": [
+      317.0,
+      319.0,
+      328.0,
+      319.0,
+      302.0
+    ],
+    "timeToBestMs": [
+      491,
+      492,
+      499,
+      492,
+      475
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "lpComponentBlocksMax": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "lpNodePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandalonePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentPasses": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "lpRootPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpPivots": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpOverheadOps": [
+        38016,
+        38016,
+        38016,
+        38016,
+        38016
+      ],
+      "nodes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandaloneWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentWorkOps": [
+        428360,
+        428360,
+        428360,
+        428360,
+        428360
+      ],
+      "lpRootWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mzn-dense-2x12",
+    "arm": "split-off",
+    "runs": 5,
+    "decided": 5,
+    "proven": 5,
+    "objectives": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "elapsedMs": [
+      319,
+      320,
+      318,
+      319,
+      316
+    ],
+    "medianElapsedMs": 319,
+    "solveMs": [
+      138.0,
+      139.0,
+      138.0,
+      139.0,
+      139.0
+    ],
+    "timeToBestMs": [
+      124,
+      125,
+      124,
+      125,
+      125
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentBlocksMax": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpNodePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandalonePasses": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "lpComponentPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpPivots": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpOverheadOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodes": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "lpStandaloneWorkOps": [
+        37713,
+        37713,
+        37713,
+        37713,
+        37713
+      ],
+      "lpComponentWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mzn-dense-2x12",
+    "arm": "split-on",
+    "runs": 5,
+    "decided": 5,
+    "proven": 5,
+    "objectives": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "elapsedMs": [
+      318,
+      320,
+      317,
+      319,
+      321
+    ],
+    "medianElapsedMs": 319,
+    "solveMs": [
+      140.0,
+      139.0,
+      138.0,
+      140.0,
+      141.0
+    ],
+    "timeToBestMs": [
+      126,
+      125,
+      122,
+      126,
+      126
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "lpComponentBlocksMax": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "lpNodePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpStandalonePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentPasses": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "lpRootPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpPivots": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpOverheadOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodes": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "lpStandaloneWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentWorkOps": [
+        20935,
+        20935,
+        20935,
+        20935,
+        20935
+      ],
+      "lpRootWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mzn-dense-8x24",
+    "arm": "split-off",
+    "runs": 5,
+    "decided": 5,
+    "proven": 0,
+    "objectives": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "elapsedMs": [
+      1029,
+      1015,
+      1023,
+      1028,
+      1003
+    ],
+    "medianElapsedMs": 1023,
+    "solveMs": [
+      836.0,
+      823.0,
+      831.0,
+      833.0,
+      812.0
+    ],
+    "timeToBestMs": [
+      311,
+      317,
+      310,
+      308,
+      311
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentBlocksMax": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpNodePasses": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpStandalonePasses": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpComponentPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootPasses": [
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "lpPivots": [
+        378,
+        378,
+        378,
+        378,
+        378
+      ],
+      "lpWorkOps": [
+        3786396,
+        3786396,
+        3786396,
+        3786396,
+        3786396
+      ],
+      "lpOverheadOps": [
+        1079502,
+        1079502,
+        1079502,
+        1079502,
+        1079502
+      ],
+      "nodes": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpStandaloneWorkOps": [
+        16914985,
+        16914985,
+        16914985,
+        16914985,
+        16914985
+      ],
+      "lpComponentWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootWorkOps": [
+        3026196,
+        3026196,
+        3026196,
+        3026196,
+        3026196
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mzn-dense-8x24",
+    "arm": "split-on",
+    "runs": 5,
+    "decided": 5,
+    "proven": 0,
+    "objectives": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "elapsedMs": [
+      916,
+      925,
+      913,
+      915,
+      913
+    ],
+    "medianElapsedMs": 915,
+    "solveMs": [
+      726.0,
+      735.0,
+      721.0,
+      723.0,
+      723.0
+    ],
+    "timeToBestMs": [
+      275,
+      295,
+      277,
+      281,
+      292
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpComponentBlocksMax": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "lpNodePasses": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpStandalonePasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentPasses": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpRootPasses": [
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "lpPivots": [
+        378,
+        378,
+        378,
+        378,
+        378
+      ],
+      "lpWorkOps": [
+        3786396,
+        3786396,
+        3786396,
+        3786396,
+        3786396
+      ],
+      "lpOverheadOps": [
+        1079502,
+        1079502,
+        1079502,
+        1079502,
+        1079502
+      ],
+      "nodes": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpStandaloneWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentWorkOps": [
+        2681589,
+        2681589,
+        2681589,
+        2681589,
+        2681589
+      ],
+      "lpRootWorkOps": [
+        3026196,
+        3026196,
+        3026196,
+        3026196,
+        3026196
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mzn-linked-8x24",
+    "arm": "split-off",
+    "runs": 5,
+    "decided": 5,
+    "proven": 0,
+    "objectives": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "elapsedMs": [
+      1045,
+      1035,
+      1040,
+      1043,
+      1041
+    ],
+    "medianElapsedMs": 1041,
+    "solveMs": [
+      853.0,
+      838.0,
+      846.0,
+      853.0,
+      850.0
+    ],
+    "timeToBestMs": [
+      339,
+      324,
+      332,
+      335,
+      331
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentBlocksMax": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpNodePasses": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpStandalonePasses": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpComponentPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootPasses": [
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "lpPivots": [
+        333,
+        333,
+        333,
+        333,
+        333
+      ],
+      "lpWorkOps": [
+        3791718,
+        3791718,
+        3791718,
+        3791718,
+        3791718
+      ],
+      "lpOverheadOps": [
+        1081443,
+        1081443,
+        1081443,
+        1081443,
+        1081443
+      ],
+      "nodes": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpStandaloneWorkOps": [
+        18520699,
+        18520699,
+        18520699,
+        18520699,
+        18520699
+      ],
+      "lpComponentWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootWorkOps": [
+        3045216,
+        3045216,
+        3045216,
+        3045216,
+        3045216
+      ]
+    }
+  },
+  {
+    "problem": "lp-component-split/mzn-linked-8x24",
+    "arm": "split-on",
+    "runs": 5,
+    "decided": 5,
+    "proven": 0,
+    "objectives": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "elapsedMs": [
+      1044,
+      1047,
+      1040,
+      1042,
+      1032
+    ],
+    "medianElapsedMs": 1042,
+    "solveMs": [
+      853.0,
+      853.0,
+      848.0,
+      849.0,
+      843.0
+    ],
+    "timeToBestMs": [
+      332,
+      335,
+      337,
+      333,
+      329
+    ],
+    "witnessMaxResidual": 0.0,
+    "counters": {
+      "lpComponentSplits": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpComponentBlocksMax": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpNodePasses": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpStandalonePasses": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpComponentPasses": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootPasses": [
+        3,
+        3,
+        3,
+        3,
+        3
+      ],
+      "lpPivots": [
+        333,
+        333,
+        333,
+        333,
+        333
+      ],
+      "lpWorkOps": [
+        3791718,
+        3791718,
+        3791718,
+        3791718,
+        3791718
+      ],
+      "lpOverheadOps": [
+        1081443,
+        1081443,
+        1081443,
+        1081443,
+        1081443
+      ],
+      "nodes": [
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "lpStandaloneWorkOps": [
+        18520699,
+        18520699,
+        18520699,
+        18520699,
+        18520699
+      ],
+      "lpComponentWorkOps": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "lpRootWorkOps": [
+        3045216,
+        3045216,
+        3045216,
+        3045216,
+        3045216
+      ]
+    }
+  }
+]

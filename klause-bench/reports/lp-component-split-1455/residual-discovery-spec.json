@@ -1,0 +1,34 @@
+{
+  "name": "lp-component-residual-discovery-1455-5ff5",
+  "description": "Verify exact MiniZinc residual LP component counters using a real objective to select the CP path.",
+  "problems": {
+    "suite": "lp-component-split",
+    "reference": "any",
+    "name": "mzn-*"
+  },
+  "base": {
+    "ref": "570949daf",
+    "engine": "cp",
+    "timeout": "5000",
+    "processors": "1",
+    "lp": "aggressive",
+    "presolve": "off",
+    "exact": "true"
+  },
+  "configs": [
+    {
+      "label": "split-on",
+      "param.lp-component-split": "true"
+    },
+    {
+      "label": "split-off",
+      "param.lp-component-split": "false"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 1,
+  "parallel": 1,
+  "host": "lab"
+}

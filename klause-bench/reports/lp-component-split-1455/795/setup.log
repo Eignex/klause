@@ -1,0 +1,9 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+$ git worktree add --detach '/Users/rasmusros/klause-lab-data/work/795' 570949dafa803acc46d3bb5790353cbdeb995488
+Preparing worktree (detached HEAD 570949daf)
+HEAD is now at 570949daf chore: select CP residual LP measurement path
+$ ./gradlew :klause-cli:installJvmDist :klause-bench:installDist --max-workers=2 -q
+$ (cd '/Users/rasmusros/klause-lab-data/work/795/klause-bench' && rm -f '/Users/rasmusros/klause-lab-data/work/795/klause-bench/build/provenance.json' && help=$('/Users/rasmusros/klause-lab-data/work/795/klause-bench/build/install/klause-bench/bin/klause-bench' --help 2>&1 || true) && case "$help" in *'bench provenance out=<file>'*) '/Users/rasmusros/klause-lab-data/work/795/klause-bench/build/install/klause-bench/bin/klause-bench' provenance 'out=/Users/rasmusros/klause-lab-data/work/795/klause-bench/build/provenance.json';; *) echo 'bench revision has no provenance manifest support';; esac)
+WARNING: Using incubator modules: jdk.incubator.vector
+$ JAVA_OPTS='-Dklause.bench.corpusCache=/Users/rasmusros/.cache/klause-bench/corpus -Dklause.workspace.root=/Users/rasmusros/klause-lab-data/work/795' KLAUSE_BENCH_CORPUS_MAX_GB=off ./build/install/klause-bench/bin/klause-bench select 'suite=xcsp3-cop' 'name=GeneralizedMKP-0-OR05x100-25-1_c23' 'max=1' > '/var/folders/g4/5_9th25n1vs4tngwrxdz04d80000gn/T/select14576391395794236276.jsonl'
+WARNING: Using incubator modules: jdk.incubator.vector

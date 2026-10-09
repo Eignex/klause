@@ -1,0 +1,11 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+$ git worktree add --detach '/Users/rasmusros/klause-lab-data/work/791' 8f197fc59ccffaf3a1195d6d1be711059a8a9d6b
+Preparing worktree (detached HEAD 8f197fc59)
+HEAD is now at 8f197fc59 chore: retain a finite decision in LP measurement models
+$ ./gradlew :klause-cli:installJvmDist :klause-bench:installDist --max-workers=2 -q
+$ (cd '/Users/rasmusros/klause-lab-data/work/791/klause-bench' && rm -f '/Users/rasmusros/klause-lab-data/work/791/klause-bench/build/provenance.json' && help=$('/Users/rasmusros/klause-lab-data/work/791/klause-bench/build/install/klause-bench/bin/klause-bench' --help 2>&1 || true) && case "$help" in *'bench provenance out=<file>'*) '/Users/rasmusros/klause-lab-data/work/791/klause-bench/build/install/klause-bench/bin/klause-bench' provenance 'out=/Users/rasmusros/klause-lab-data/work/791/klause-bench/build/provenance.json';; *) echo 'bench revision has no provenance manifest support';; esac)
+WARNING: Using incubator modules: jdk.incubator.vector
+$ JAVA_OPTS='-Dklause.bench.corpusCache=/Users/rasmusros/.cache/klause-bench/corpus -Dklause.workspace.root=/Users/rasmusros/klause-lab-data/work/791' KLAUSE_BENCH_CORPUS_MAX_GB=off ./build/install/klause-bench/bin/klause-bench select 'suite=miplib2017' 'name=30_70_45_05_100' 'max=1' > '/var/folders/g4/5_9th25n1vs4tngwrxdz04d80000gn/T/select17508716649615397127.jsonl'
+WARNING: Using incubator modules: jdk.incubator.vector
+$ JAVA_OPTS='-Dklause.bench.corpusCache=/Users/rasmusros/.cache/klause-bench/corpus -Dklause.workspace.root=/Users/rasmusros/klause-lab-data/work/791' KLAUSE_BENCH_CORPUS_MAX_GB=off ./build/install/klause-bench/bin/klause-bench select 'suite=xcsp3-cop' 'name=GeneralizedMKP-0-OR05x100-25-1_c23' 'max=1' > '/var/folders/g4/5_9th25n1vs4tngwrxdz04d80000gn/T/select16271228598772343729.jsonl'
+WARNING: Using incubator modules: jdk.incubator.vector

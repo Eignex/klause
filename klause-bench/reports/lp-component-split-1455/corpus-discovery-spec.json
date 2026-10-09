@@ -1,0 +1,42 @@
+{
+  "name": "lp-component-corpus-discovery-1455-5ff5",
+  "description": "Check the historical MIPLIB split and a node-heavy GeneralizedMKP nonseparable control at one pinned solver revision.",
+  "problems": [
+    {
+      "suite": "miplib2017",
+      "name": "30_70_45_05_100",
+      "max": "1",
+      "reference": "any"
+    },
+    {
+      "suite": "xcsp3-cop",
+      "name": "GeneralizedMKP-0-OR05x100-25-1_c23",
+      "max": "1",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "ref": "8f197fc59",
+    "engine": "cp",
+    "timeout": "5000",
+    "processors": "1",
+    "lp": "aggressive",
+    "presolve": "off"
+  },
+  "configs": [
+    {
+      "label": "split-on",
+      "param.lp-component-split": "true"
+    },
+    {
+      "label": "split-off",
+      "param.lp-component-split": "false"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 1,
+  "parallel": 1,
+  "host": "lab"
+}

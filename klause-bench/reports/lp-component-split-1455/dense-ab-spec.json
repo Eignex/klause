@@ -1,0 +1,33 @@
+{
+  "name": "lp-component-dense-ab-1455-5ff5",
+  "description": "Repeated targeted on/off A/B of two genuinely separable LP sizes in MPS and exact MiniZinc, plus a linked MiniZinc control.",
+  "problems": {
+    "suite": "lp-component-split",
+    "reference": "any"
+  },
+  "base": {
+    "ref": "570949daf",
+    "engine": "cp",
+    "timeout": "5000",
+    "processors": "1",
+    "lp": "aggressive",
+    "presolve": "off",
+    "exact": "true"
+  },
+  "configs": [
+    {
+      "label": "split-on",
+      "param.lp-component-split": "true"
+    },
+    {
+      "label": "split-off",
+      "param.lp-component-split": "false"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 5,
+  "parallel": 1,
+  "host": "lab"
+}

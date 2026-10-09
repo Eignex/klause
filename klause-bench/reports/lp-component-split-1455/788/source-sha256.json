@@ -1,0 +1,7 @@
+{
+  "klause-bench/smoke-corpus/lp-component-split/dense-2x12.mps": "6ba94a952d4a9c1404781c1ec29ebbc22321e28ecac94d1486a573e96e8656e0",
+  "klause-bench/smoke-corpus/lp-component-split/dense-2x12.mzn": "b0d671f58fc1763e4765e5b9cf2e25d0add628694622648a54d5e0d7441086df",
+  "klause-bench/smoke-corpus/lp-component-split/dense-8x24.mps": "73a6752351a3a7ba85047bcdd5e0b7045f430f8f6a74b5fdf70a27007a4607f7",
+  "klause-bench/smoke-corpus/lp-component-split/dense-8x24.mzn": "90f9de3830909ca3f024a9783c45a5e596ee37d90b8bddf7a6a4943c3d40ce18",
+  "klause-bench/smoke-corpus/lp-component-split/linked-8x24.mzn": "ab08308d6250dc2db6390a8cedf52f968e5e9eff4ae050c0c13321e6e8fcc1c7"
+}

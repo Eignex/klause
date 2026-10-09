@@ -1,0 +1,42 @@
+{
+  "name": "lp-component-reversed-noise-mps-dense-8x24-1455-5ff5",
+  "description": "Reverse the balanced duplicate-arm order to on/off/off/on and check whether the measured effect survives the position change.",
+  "problems": {
+    "suite": "lp-component-split",
+    "name": "mps-dense-8x24",
+    "reference": "any"
+  },
+  "base": {
+    "ref": "570949daf",
+    "engine": "cp",
+    "timeout": "5000",
+    "processors": "1",
+    "lp": "aggressive",
+    "presolve": "off",
+    "exact": "true"
+  },
+  "configs": [
+    {
+      "label": "on-first",
+      "param.lp-component-split": "true"
+    },
+    {
+      "label": "off-first",
+      "param.lp-component-split": "false"
+    },
+    {
+      "label": "off-second",
+      "param.lp-component-split": "false"
+    },
+    {
+      "label": "on-second",
+      "param.lp-component-split": "true"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 10,
+  "parallel": 1,
+  "host": "lab"
+}

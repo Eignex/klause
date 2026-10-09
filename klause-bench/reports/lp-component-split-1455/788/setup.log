@@ -1,0 +1,13 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+From https://github.com/Eignex/klause
+   85cab2154..734cf7278  codex/bench-wall-clock -> codex/bench-wall-clock
+ * [new branch]          codex/lp-component-measurement -> codex/lp-component-measurement
+ * [new branch]          codex/lp-fallback-measurement -> codex/lp-fallback-measurement
+$ git worktree add --detach '/Users/rasmusros/klause-lab-data/work/788' 58c5a22504d8957beef4dc6e6dce4489722ed071
+Preparing worktree (detached HEAD 58c5a2250)
+HEAD is now at 58c5a2250 chore: add targeted separable LP measurement models
+$ ./gradlew :klause-cli:installJvmDist :klause-bench:installDist --max-workers=2 -q
+$ (cd '/Users/rasmusros/klause-lab-data/work/788/klause-bench' && rm -f '/Users/rasmusros/klause-lab-data/work/788/klause-bench/build/provenance.json' && help=$('/Users/rasmusros/klause-lab-data/work/788/klause-bench/build/install/klause-bench/bin/klause-bench' --help 2>&1 || true) && case "$help" in *'bench provenance out=<file>'*) '/Users/rasmusros/klause-lab-data/work/788/klause-bench/build/install/klause-bench/bin/klause-bench' provenance 'out=/Users/rasmusros/klause-lab-data/work/788/klause-bench/build/provenance.json';; *) echo 'bench revision has no provenance manifest support';; esac)
+WARNING: Using incubator modules: jdk.incubator.vector
+$ JAVA_OPTS='-Dklause.bench.corpusCache=/Users/rasmusros/.cache/klause-bench/corpus -Dklause.workspace.root=/Users/rasmusros/klause-lab-data/work/788' KLAUSE_BENCH_CORPUS_MAX_GB=off ./build/install/klause-bench/bin/klause-bench select 'suite=lp-component-split' > '/var/folders/g4/5_9th25n1vs4tngwrxdz04d80000gn/T/select2882574226798727652.jsonl'
+WARNING: Using incubator modules: jdk.incubator.vector

@@ -1,0 +1,37 @@
+{
+  "name": "lp-component-node-ab-1455-5ff5",
+  "description": "Fixed-decision repeated on/off A/B on node-heavy nonseparable GeneralizedMKP, using existing work and overhead counters.",
+  "problems": [
+    {
+      "suite": "xcsp3-cop",
+      "name": "GeneralizedMKP-0-OR05x100-25-1_c23",
+      "max": "1",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "ref": "570949daf",
+    "engine": "cp",
+    "timeout": "5000",
+    "processors": "1",
+    "lp": "aggressive",
+    "presolve": "off",
+    "param.max-decisions": "500"
+  },
+  "configs": [
+    {
+      "label": "split-on",
+      "param.lp-component-split": "true"
+    },
+    {
+      "label": "split-off",
+      "param.lp-component-split": "false"
+    }
+  ],
+  "seeds": [
+    3
+  ],
+  "repeats": 3,
+  "parallel": 1,
+  "host": "lab"
+}
