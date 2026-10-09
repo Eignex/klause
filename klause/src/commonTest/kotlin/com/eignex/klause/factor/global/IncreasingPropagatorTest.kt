@@ -15,6 +15,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -38,8 +39,14 @@ class IncreasingPropagatorTest {
             "strictly_increasing" to chain(strict = true, hi = 4),
         )
         for ((label, problem) in cases) {
-            FactorPropagationOracle.assertSound(problem, label)
-            FactorPropagationOracle.assertGac(problem, label)
+            val strict = label == "strictly_increasing"
+            val semantics = { sample: Sample ->
+                (0 until problem.numIntVars - 1).all {
+                    if (strict) sample.ints[it] < sample.ints[it + 1] else sample.ints[it] <= sample.ints[it + 1]
+                }
+            }
+            FactorPropagationOracle.assertSound(problem, label, semantics)
+            FactorPropagationOracle.assertGac(problem, label, semantics)
         }
     }
 

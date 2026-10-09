@@ -1,19 +1,24 @@
 package com.eignex.klause.factor
 
-import com.eignex.klause.brute.BruteForceParams
-import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.values
+import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
+import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Brute-force oracle for [com.eignex.klause.ir.Factor.propagate]. Builds the ground-truth
- * set of satisfying assignments via [BruteForceSolver] and asserts the propagator's deductions
- * are consistent.
+ * Exhaustive oracle for [com.eignex.klause.propagation.Propagator.propagate] over a source
+ * [Problem] whose original declarations have not been baked. Enumerates every declared assignment
+ * and checks deductions against the satisfying ones.
+ *
+ * An optional semantic predicate classifies assignments independently of local-search invariants
+ * and checks their agreement on the entire space, including rejected assignments.
  *
  * Two strength levels:
  *  - [assertSound] (default): every pin/bound/hole the propagator emits must hold on *all*
@@ -23,8 +28,8 @@ import kotlin.test.assertTrue
  */
 object FactorPropagationOracle {
 
-    fun assertSound(problem: Problem, label: String = "factor") {
-        checkSound(problem, label)
+    fun assertSound(problem: Problem, label: String = "factor", satisfies: ((Sample) -> Boolean)? = null) {
+        checkSound(problem, label, satisfies)
     }
 
     /**
@@ -36,8 +41,8 @@ object FactorPropagationOracle {
 
     /** [assertSound]'s checks, handing the enumeration and propagation back so [assertGac] adds its
      *  own on the same data instead of brute-enumerating the space a second time. */
-    private fun checkSound(problem: Problem, label: String): SoundnessCheck {
-        val samples = enumerateSat(problem)
+    private fun checkSound(problem: Problem, label: String, satisfies: ((Sample) -> Boolean)?): SoundnessCheck {
+        val samples = enumerateSat(problem, label, satisfies)
         val result = problem.propagate()
         if (samples.isEmpty()) {
             assertTrue(
@@ -100,8 +105,8 @@ object FactorPropagationOracle {
         return SoundnessCheck(samples, result)
     }
 
-    fun assertGac(problem: Problem, label: String = "factor") {
-        val check = checkSound(problem, label)
+    fun assertGac(problem: Problem, label: String = "factor", satisfies: ((Sample) -> Boolean)? = null) {
+        val check = checkSound(problem, label, satisfies)
         val samples = check.samples
         if (samples.isEmpty()) return
         val result = check.result as PropagationResult.Implied
@@ -124,8 +129,8 @@ object FactorPropagationOracle {
         for (v in 0 until problem.numIntVars) {
             val pinned = result.intValueOrNull(v)
             val orig = problem.finiteIntDomain(v)
-            for (value in orig.min..orig.max) {
-                if (value !in orig) continue
+            for (index in 0 until orig.values.size) {
+                val value = orig.values.valueAt(index)
                 val supported = samples.any { it.ints[v] == value }
                 val allowed = isAllowed(result, problem, v, value, pinned)
                 if (supported && !allowed) {
@@ -148,12 +153,52 @@ object FactorPropagationOracle {
         return !hole
     }
 
-    private fun enumerateSat(problem: Problem): List<Sample> {
-        val baked = problem.bake()
-        require(BruteForceSolver.fits(baked, cap = 1L shl 18)) {
-            "Problem too large to brute-enumerate (cap 262 144 assignments). Shrink domains or vars."
+    private fun enumerateSat(problem: Problem, label: String, satisfies: ((Sample) -> Boolean)?): List<Sample> {
+        require(problem !is BakedProblem) { "Pass the original source Problem, before root domains are folded." }
+        require(problem.numRealVars == 0) { "The oracle requires a finite Boolean/integer assignment space." }
+        require((0 until problem.numIntVars).all { problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) }) {
+            "The oracle requires closed declared integer domains, not invented finite boxes."
         }
-        return BruteForceSolver(baked).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+        val domains = problem.finiteIntDomains()
+        val cap = 1L shl 18
+        var space = 1L
+        fun include(radix: Long) {
+            require(radix in 1..cap / space) {
+                "Problem too large to brute-enumerate (cap 262 144 assignments). Shrink domains or vars."
+            }
+            space *= radix
+        }
+        repeat(problem.numBoolVars) { include(2L) }
+        domains.forEach { include(it.valueCount) }
+        // This projection evaluates factors over the declarations without running root deductions.
+        val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(0L))
+        val samples = ArrayList<Sample>()
+        repeat(space.toInt()) { ordinal ->
+            var remaining = ordinal.toLong()
+            repeat(problem.numBoolVars) { v ->
+                state.assignment.setBool(v, remaining % 2L == 1L)
+                remaining /= 2L
+            }
+            domains.forEachIndexed { v, domain ->
+                state.assignment.setInt(v, domain.values.valueAt((remaining % domain.valueCount).toInt()))
+                remaining /= domain.valueCount
+            }
+            state.recompute()
+            if (satisfies == null) {
+                if (state.cost == 0L) samples.add(state.assignment.snapshot())
+            } else {
+                val sample = state.assignment.snapshot()
+                val accepted = satisfies(sample)
+                assertEquals(
+                    accepted,
+                    state.cost == 0L,
+                    "$label: invariant disagrees with direct semantics at bools=${sample.bools.toList()}, " +
+                        "ints=${sample.ints.toList()}",
+                )
+                if (accepted) samples.add(sample)
+            }
+        }
+        return samples
     }
 
     private fun fail(msg: String): Nothing = throw AssertionError(msg)
