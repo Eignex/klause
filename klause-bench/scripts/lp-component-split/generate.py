@@ -15,7 +15,7 @@ constraint int2float(k) + x[1,1] >= 1.0;
 constraint forall(b in 1..blocks, r in 1..width)(
   sum(c in 1..width)((if c = r then width + 1 else 1 endif) * x[b,c]) = 2 * width
 );
-{link}solve satisfy;
+{link}solve minimize x[1,1];
 output ["k = " ++ show(k) ++ ";\\nx = " ++ show(x) ++ ";\\n"];
 '''
 

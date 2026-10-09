@@ -7,5 +7,5 @@ constraint forall(b in 1..blocks, r in 1..width)(
   sum(c in 1..width)((if c = r then width + 1 else 1 endif) * x[b,c]) = 2 * width
 );
 constraint sum(b in 1..blocks)(x[b,1]) = blocks;
-solve satisfy;
+solve minimize x[1,1];
 output ["k = " ++ show(k) ++ ";\nx = " ++ show(x) ++ ";\n"];
