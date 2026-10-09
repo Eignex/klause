@@ -31,8 +31,8 @@ class PortfolioWorker private constructor(
     private val solveFn: (Cancellation, Long?) -> SolveResult,
     private val improvementsFn: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
-    private val resumableFn: ((readBound: () -> Double) -> ResumableSearch)?,
-    private val resumableSolveFn: (() -> ResumableSolve?)?,
+    private val resumableFn: ((readBound: () -> Double, cancellation: Cancellation?) -> ResumableSearch)?,
+    private val resumableSolveFn: ((Cancellation?) -> ResumableSolve?)?,
     private val withInstructions: Boolean,
     private val closeFn: () -> Unit,
 ) : AutoCloseable {
@@ -68,14 +68,20 @@ class PortfolioWorker private constructor(
      * search prunes on it, exactly like [improvements]'s `withBound` seam. A [Portfolio]
      * holds one handle per backtrack arm and resumes it each segment, so the arm never cold-restarts between
      * slices. */
-    fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound)
+    fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound, null)
+
+    internal fun newResumableSearch(readBound: () -> Double, cancellation: Cancellation): ResumableSearch? =
+        resumableFn?.invoke(readBound, cancellation)
 
     /**
      * Open a fresh pause/resume handle over this worker's satisfaction search, or `null` when the engine can't be
      * paused. Local-search handles retain their walk across segments. The satisfaction counterpart of
      * [newResumableSearch]: [Portfolio.solve] resumes it each segment rather than restarting the arm.
      */
-    fun newResumableSolve(): ResumableSolve? = resumableSolveFn?.invoke()
+    fun newResumableSolve(): ResumableSolve? = resumableSolveFn?.invoke(null)
+
+    internal fun newResumableSolve(cancellation: Cancellation): ResumableSolve? =
+        resumableSolveFn?.invoke(cancellation)
 
     /** Stream improving incumbents against this worker's *own* objective representation (the one
      *  it was built with — see [of]). [readBound] exposes the portfolio's shared best objective
@@ -146,13 +152,14 @@ class PortfolioWorker private constructor(
                 return if (maxInstructions != null && budget != null) budget(p, maxInstructions) else p
             }
             // A pause/resume handle is available only for an optimising worker over a ResumableOptimizer
-            // engine (backtrack). The handle owns its own per-slice cancellation, so only the bound
-            // supplier is wired here; warm-start is irrelevant (the live session carries the search).
+            // engine (backtrack). Opening uses the supplied token; the handle owns cancellation after that.
+            // Warm-start is irrelevant because the live session carries the search.
             val resumableOpt = session.solver as? ResumableOptimizer<P>
-            val resumableFn: ((() -> Double) -> ResumableSearch)? =
+            val resumableFn: ((() -> Double, Cancellation?) -> ResumableSearch)? =
                 if (objective != null && resumableOpt != null) {
-                    { readBound ->
-                        val p = withBound?.invoke(params, readBound) ?: params
+                    { readBound, cancellation ->
+                        val base = cancellation?.let(::withCancel) ?: params
+                        val p = withBound?.invoke(base, readBound) ?: base
                         resumableOpt.resumable(objective, p)
                     }
                 } else {
@@ -175,7 +182,9 @@ class PortfolioWorker private constructor(
                 },
                 samplesFn = { c -> session.samples(withCancel(c)) },
                 resumableFn = resumableFn,
-                resumableSolveFn = { session.resumableSolve(params) },
+                resumableSolveFn = { cancellation ->
+                    session.resumableSolve(cancellation?.let(::withCancel) ?: params)
+                },
                 withInstructions = withInstructionBudget != null,
                 closeFn = { session.close() },
             )
@@ -199,7 +208,7 @@ class PortfolioWorker private constructor(
             improvementsFn = { _, _, _, _ -> error("PortfolioWorker '$label' cannot stream improvements") },
             samplesFn = { emptySequence() },
             resumableFn = null,
-            resumableSolveFn = resumable,
+            resumableSolveFn = resumable?.let { open -> { _ -> open() } },
             withInstructions = countsInstructions,
             closeFn = {},
         )
@@ -222,7 +231,7 @@ class PortfolioWorker private constructor(
             solveFn = { _, _ -> error("PortfolioWorker '$label' only minimizes") },
             improvementsFn = improvements,
             samplesFn = { emptySequence() },
-            resumableFn = resumable,
+            resumableFn = resumable?.let { open -> { readBound, _ -> open(readBound) } },
             resumableSolveFn = null,
             withInstructions = countsInstructions,
             closeFn = {},

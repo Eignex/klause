@@ -332,6 +332,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
             "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
             "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} " +
             "initMs=${arm.initializationMillis} reseeds=${arm.reseeds}" +
+            " initWork=${arm.initializationWork} initCancelled=${arm.initializationCancelled}" +
             "$credit$sharing"
     }
 }

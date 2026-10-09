@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -17,7 +18,7 @@ import com.eignex.klause.util.Cancellation
  */
 @Suppress("TooGenericExceptionCaught") // ownership boundaries preserve arbitrary primary and cleanup failures
 internal class ResumableSatisfaction(private val solver: BacktrackSolver, params0: BacktrackParams) : ResumableSolve {
-    private var globalToken: Cancellation = Cancellation.Never
+    private var globalToken: Cancellation = params0.cancellation
     private val sink = SolveStatsSink(backend = "backtrack").also { it.start() }
 
     // Its LP reading waits for the traversal below; nothing arms the slice before the first [runSlice].
@@ -51,6 +52,17 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
     override val work: Long get() = slice.spent()
 
     override val initialWork: Long = slice.spent()
+
+    init {
+        try {
+            if (globalToken() || traversal.initializationCancelled) {
+                throw SearchInitializationCancelled(stats, work)
+            }
+        } catch (failure: Throwable) {
+            closeAfter(failure)
+            throw failure
+        }
+    }
 
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
         done?.let { return it }

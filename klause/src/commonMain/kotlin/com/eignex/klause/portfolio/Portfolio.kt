@@ -8,6 +8,7 @@ import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.result.MinimizeResult
@@ -173,19 +174,32 @@ class Portfolio(
             val arm = claim.arm
             val worker = workers[arm]
             val opening = run.handles[arm] == null
+            val armToken = segmentToken(worker, run.token, claim)
             val setup = TimeSource.Monotonic.markNow()
-            val handle = run.handles[arm] ?: worker.newResumableSolve()?.also {
-                run.handles[arm] = it
-                run.log.initialized(arm, setup.elapsedNow().inWholeMilliseconds)
+            val opened = runCatching {
+                run.handles[arm] ?: worker.newResumableSolve(armToken)?.also { run.handles[arm] = it }
+            }
+            val handle = opened.getOrNull()
+            val openingFailure = opened.exceptionOrNull()
+            if (opening && (handle != null || openingFailure != null)) {
+                run.log.initialized(
+                    arm, setup.elapsedNow().inWholeMilliseconds,
+                    handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L,
+                    openingFailure is SearchInitializationCancelled,
+                )
             }
             val r: SolveResult?
             val failure: Throwable?
             val work: Long
-            if (handle != null) {
+            if (openingFailure != null) {
+                r = null
+                failure = openingFailure
+                work = (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
+            } else if (handle != null) {
                 val workBefore = handle.work - if (opening) handle.initialWork else 0L
                 val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
                 val outcome = runCatching {
-                    val millis = handleMillis(worker, run.token, claim)
+                    val millis = remainingMillis(armToken)
                     if (worker.acceptsInstructionBudget && handle is InstructionSlicedSolve) {
                         handle.runInstructionSlice(run.token, millis, instructionsOf(claim))
                     } else {
@@ -200,13 +214,12 @@ class Portfolio(
                     handle.work - workBefore
                 }
             } else {
-                val token = segmentToken(worker, run.token, claim)
-                val outcome = runCatching { worker.solve(token, instructionsOf(claim)) }
+                val outcome = runCatching { worker.solve(armToken, instructionsOf(claim)) }
                 r = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
                 work = countedWork(claim, r?.stats)
             }
-            val failed = failure != null
+            val failed = failure != null && failure !is SearchInitializationCancelled
             // A failing arm leaves the others to answer; an unsound one answered wrongly, so it is quarantined too.
             if (failure is UnsoundnessException) claim.fault = failure.message
             if (r is SolveResult.Sat) {
@@ -215,7 +228,10 @@ class Portfolio(
                 }
             }
             run.locked {
-                run.record(claim, handle?.stats ?: r?.stats, cumulative = handle != null, work = work, failed = failed)
+                run.record(
+                    claim, handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
+                    cumulative = handle != null, work = work, failed = failed,
+                )
                 if (claim.fault != null) {
                     run.quarantine(claim)
                     return@locked
@@ -225,7 +241,7 @@ class Portfolio(
                     run.finish()
                 }
                 // An arm that threw is retired like one that finished: rescheduling it would only fail again.
-                if (failed || (handle != null && r != null)) {
+                if (failure != null || (handle != null && r != null)) {
                     r?.let(verdicts::add)
                     run.retire(arm)
                 }
@@ -340,19 +356,31 @@ class Portfolio(
             val worker = workers[arm]
             claim.hadIncumbent = incumbent.current() != null
             val opening = run.handles[arm] == null
+            val armToken = segmentToken(worker, run.token, claim)
             val setup = TimeSource.Monotonic.markNow()
-            val handle = run.handles[arm] ?: worker.newResumableSearch(readBound)?.also {
-                run.handles[arm] = it
-                run.log.initialized(arm, setup.elapsedNow().inWholeMilliseconds)
+            val opened = runCatching {
+                run.handles[arm] ?: worker.newResumableSearch(readBound, armToken)?.also { run.handles[arm] = it }
+            }
+            val handle = opened.getOrNull()
+            val openingFailure = opened.exceptionOrNull()
+            if (opening && (handle != null || openingFailure != null)) {
+                run.log.initialized(
+                    arm, setup.elapsedNow().inWholeMilliseconds,
+                    handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L,
+                    openingFailure is SearchInitializationCancelled,
+                )
             }
             var terminal: MinimizeResult? = null
             val failure: Throwable?
             val work: Long
-            if (handle != null) {
+            if (openingFailure != null) {
+                failure = openingFailure
+                work = (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
+            } else if (handle != null) {
                 val workBefore = handle.work - if (opening) handle.initialWork else 0L
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
-                    handle.runSlice(run.token, handleMillis(worker, run.token, claim), claim.handleNodes) {
+                    handle.runSlice(run.token, remainingMillis(armToken), claim.handleNodes) {
                         accept(claim, it)
                     }
                 }
@@ -361,7 +389,6 @@ class Portfolio(
                 work = handle.work - workBefore
             } else {
                 // Local-search segments restart from the shared incumbent, bounded by their own counted work.
-                val armToken = segmentToken(worker, run.token, claim)
                 failure = runCatching {
                     for (r in worker.improvements(
                         readBound,
@@ -376,7 +403,7 @@ class Portfolio(
                 work = countedWork(claim, terminal?.stats)
             }
             callbackFailure?.let { throw it }
-            val failed = failure != null
+            val failed = failure != null && failure !is SearchInitializationCancelled
             if (failure is UnsoundnessException) claim.fault = failure.message
             (terminal as? MinimizeResult.WithSample)?.let { accept(claim, it) }
             check(claim)
@@ -384,7 +411,7 @@ class Portfolio(
                 claim.fault = "claimed infeasibility while the pool holds a verified solution"
             }
             run.locked {
-                val stats = handle?.stats ?: terminal?.stats
+                val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
                 run.record(claim, stats, cumulative = handle != null, work = work, failed = failed)
                 if (claim.fault != null) {
                     run.quarantine(claim)
@@ -414,7 +441,7 @@ class Portfolio(
                     run.finish()
                 }
                 // An arm that threw is retired like one that finished: rescheduling it would only fail again.
-                if (failed || (handle != null && terminal != null)) run.retire(arm)
+                if (failure != null || (handle != null && terminal != null)) run.retire(arm)
             }
         }
         val stats = run.folded()
@@ -732,17 +759,10 @@ class Portfolio(
         return until(slice) or cancellation.shorten(remainingShare(claim))
     }
 
-    /** The time a resumable arm's slice may run before its work runs out: its time slice, within its
-     *  [remainingShare] of what the run has left, as a counted segment's ([segmentToken]). A node is priced at one
-     *  unit whatever it costs, so without the bound a slice of a few thousand expensive nodes holds the core for the
-     *  run. */
-    private fun handleMillis(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Long {
-        if (claim.whole) return Long.MAX_VALUE
-        val slice = if (claim.probing && worker.acceptsInstructionBudget) probeSliceMillis else claim.sliceMillis
-        val deadline = cancellation.deadline() ?: return slice
-        val share = (deadline - TimeSource.Monotonic.markNow()) * remainingShare(claim)
-        return minOf(slice, share.inWholeMilliseconds.coerceAtLeast(1L))
-    }
+    // Opening and search share one deadline; a completed opening does not renew the segment's time.
+    private fun remainingMillis(token: Cancellation): Long = token.deadline()?.let {
+        (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
+    } ?: Long.MAX_VALUE
 
     /**
      * The share of the time the run has left one segment may take: half of it split between the families the

@@ -184,6 +184,8 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
     private val millis = LongArray(workers.size)
     private val maxMillis = LongArray(workers.size)
     private val initializationMillis = LongArray(workers.size)
+    private val initializationWork = LongArray(workers.size)
+    private val initializationCancelled = LongArray(workers.size)
     private val rewards = DoubleArray(workers.size)
     private val failures = LongArray(workers.size)
     private val faults = LongArray(workers.size)
@@ -200,8 +202,10 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
         if (failed) failures[arm]++
     }
 
-    fun initialized(arm: Int, elapsed: Long) {
+    fun initialized(arm: Int, elapsed: Long, work: Long, cancelled: Boolean) {
         initializationMillis[arm] += elapsed
+        initializationWork[arm] += work
+        if (cancelled) initializationCancelled[arm]++
     }
 
     fun reseeded(arm: Int) {
@@ -230,6 +234,8 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                     maxMillis = maxMillis[arm],
                     initializationMillis = initializationMillis[arm],
                     reseeds = reseeds[arm],
+                    initializationWork = initializationWork[arm],
+                    initializationCancelled = initializationCancelled[arm],
                     meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
                     failures = failures[arm],
                     faults = faults[arm],

@@ -507,7 +507,8 @@ class CliStatsTest {
         val pairs = portfolioStatPairs(stats).toMap()
 
         assertEquals(
-            "segments=3 work=15000 ms=1200 reward=0.5 failures=0 faults=0 maxMs=500 initMs=100 reseeds=2 ClauseUses=4",
+            "segments=3 work=15000 ms=1200 reward=0.5 failures=0 faults=0 maxMs=500 initMs=100 reseeds=2 " +
+                "initWork=0 initCancelled=0 ClauseUses=4",
             pairs["arm.bt-0"],
         )
         assertEquals("4", pairs["portfolioReseedStaleThreshold"])

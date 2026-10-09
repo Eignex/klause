@@ -30,6 +30,7 @@ import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentSubscription
 import com.eignex.klause.solver.incumbent.Publication
@@ -147,7 +148,7 @@ internal class ResumableMinimize(
         objective.boolWeights.any { it != 0L } || objective.intCoefficients.any { it != 0L }
 
     // Slice control without a coroutine: a re-armable deadline plus the current global token.
-    private var globalToken: Cancellation = Cancellation.Never
+    private var globalToken: Cancellation = params0.cancellation
 
     // Wall-clock anchor for sizing the LP sub-budgets against [BacktrackParams.solveBudgetMillis] on the
     // non-pausable one-shot path, where no slice deadline is armed. Captured at construction,
@@ -310,7 +311,9 @@ internal class ResumableMinimize(
 
     init {
         try {
+            checkInitialization()
             val seeded = session.seed(params.assumptions)
+            checkInitialization()
             cp.rebase()
             if (seeded is PropagationResult.Unsat || session.isUnsatAtRoot ||
                 problem.baked is PropagationResult.Unsat
@@ -324,11 +327,18 @@ internal class ResumableMinimize(
                     ComponentResult.Indeterminate -> Unit
                 }
             }
+            checkInitialization()
             run = searchSession.openRun(problem.numBoolVars, traversal)
             initialWork = slice.spent()
         } catch (primary: Throwable) {
             closeAfter(primary)
             throw primary
+        }
+    }
+
+    private fun checkInitialization() {
+        if (pausable && (session.fixpointCancelled || solveCancelled())) {
+            throw SearchInitializationCancelled(stats, work)
         }
     }
 

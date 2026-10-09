@@ -232,6 +232,8 @@ internal class CpSatisfactionTraversal(
     /** LP work the traversal's relaxations have done, for a slice that charges it against its budget. */
     fun lpWork(): Long = lpResources.sumOf { it.totalSolveWork() } + (sink?.lp?.standaloneWork ?: 0L)
 
+    val initializationCancelled: Boolean get() = cp.session.fixpointCancelled
+
     fun propagationWork(): Long = cp.session.work
 
     /**
