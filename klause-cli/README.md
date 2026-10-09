@@ -131,7 +131,7 @@ Solver-control flags are common to **every** mode:
     `presolve-probe-per-var` and `presolve-probe-total` (nonnegative propagation-call caps;
     defaults `256`/`20000`, aggressive `4096`/`250000`). These edit only this invocation's plan.
     Finite statistics include effective settings, `presolvePreparationMs`, metered work, round entries,
-    pass calls and root probe calls, including no-op preparations. Preparation time excludes source
+    pass calls and root probe calls, including no-op preparations. Preparation time includes source-safe presolve but excludes frontend
     routing and input compilation; work/probe counters span the shared metered source and finite phases.
     Round caps apply per schedule, and probe caps apply separately to each integer SAC tier per bake;
     Boolean failed-literal probes use cancellation rather than those caps. Aggregate counters can

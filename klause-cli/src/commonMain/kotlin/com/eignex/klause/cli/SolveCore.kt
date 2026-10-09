@@ -797,8 +797,11 @@ internal object SolveCore {
                     output,
                     withModelObjective(
                         outcome.stats.copy(presolve = (outcome.stats.presolve ?: PresolveStats()).copy(
-                            effort = presolveEffortStats(request.presolveConfig, request.presolveBudget,
-                                result.preparationElapsed),
+                            effort = presolveEffortStats(
+                                request.presolveConfig,
+                                request.presolveBudget,
+                                result.preparationElapsed,
+                            ),
                         )),
                         solvable,
                         outcome.bestSample,
