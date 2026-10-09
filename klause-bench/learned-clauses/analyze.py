@@ -5,6 +5,7 @@ import csv
 import hashlib
 import json
 import math
+import random
 from pathlib import Path
 import statistics
 
@@ -61,6 +62,16 @@ for row in rows:
 def geometric_mean(values):
     return math.exp(statistics.mean(math.log(v) for v in values)) if values else None
 
+def ratio_estimate(ratios):
+    values = [math.log(statistics.mean(v)) for v in ratios.values()]
+    if not values:
+        return None
+    rng = random.Random(1631)
+    samples = sorted(statistics.mean(rng.choices(values, k=len(values))) for _ in range(5000))
+    return {'value': math.exp(statistics.mean(values)),
+            'low': math.exp(samples[124]), 'high': math.exp(samples[4874]),
+            'problems': len(values), 'bootstrapSamples': 5000}
+
 report = {'rawCasesSha256': hashlib.sha256(args.cases.read_bytes()).hexdigest(),
           'problems': len(expected), 'repeats': args.repeats, 'arms': {}, 'paired': {}}
 for arm, entries in by_arm.items():
@@ -113,6 +124,10 @@ for arm, entries in by_arm.items():
         'elapsedProblems': len(elapsed_ratios),
         'perProblemMeanReductionRatio': geometric_mean([statistics.mean(v) for v in reduction_ratios.values()]),
         'reductionProblems': len(reduction_ratios),
+        'solveRatioEstimate': ratio_estimate(ratios),
+        'completedSolveRatioEstimate': ratio_estimate(completed_ratios),
+        'elapsedRatioEstimate': ratio_estimate(elapsed_ratios),
+        'reductionRatioEstimate': ratio_estimate(reduction_ratios),
         'completedProblems': len(completed_ratios)}
 args.output.with_suffix('.json').write_text(json.dumps(report, indent=2)+'\n')
 with args.output.with_suffix('.csv').open('w') as file:
