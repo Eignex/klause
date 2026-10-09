@@ -64,6 +64,15 @@ Check concurrent construction budgeting (#2328) before recommending settings. A
 recommendation affected by that work requires confirmation on the integrated build.
 No settings are merged automatically; a null result is acceptable.
 
+`analyze.py` compares complete matched blocks, excludes errors, unsupported cases,
+source-hash mismatches and contradictory reported outcomes from paired estimates,
+and discloses every exclusion. Legacy records without hashes remain explicitly
+unverified. Witness checks and retained candidates are counted separately from
+reported results. Bootstrap intervals cluster by base family; a single cluster
+has no estimated sampling interval. GitHub's `presolve report` workflow executes
+the script against archived AWS records and publishes the JSON reports. It runs
+no solver or benchmark.
+
 ## Reproduction and evidence
 
 From the repository root:
@@ -154,3 +163,10 @@ to this input. The disagreement is not evidence of a presolve soundness failure.
 A deterministic selection fix is prepared; its PR waits for the existing stack's
 latest-head CI and mergeability checks. Discovery and holdout must use that fixed
 selector with identical input hashes across configurations.
+
+[Job 892](http://192.168.50.104:8420/jobs/892) verifies durable opt-in evidence on
+`4020e4488856bb5ba79d8f80ff13cd4d02214306`. All four BACP cases completed and
+passed source checking; each lab record retains its checked DZN candidate and
+stdout SHA-256. The specification is `experiments/witness-record-smoke.json`,
+and final API records are under `evidence/892`. These metadata checks contribute
+no tuning comparison.

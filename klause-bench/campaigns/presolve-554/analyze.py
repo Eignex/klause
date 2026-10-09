@@ -60,12 +60,13 @@ def quality(a, b):
     if aw != bw:
         return None  # solution/refutation contradiction
     ap, bp = bool(a.get('proven')), bool(b.get('proven'))
-    if ap != bp:
-        return 1 if bp else -1
     av, bv = a.get('objective'), b.get('objective')
-    if av is None or bv is None or av == bv:
-        return 0
-    return (1 if bv > av else -1) * (1 if b.get('maximize') else -1)
+    if av is not None and bv is not None and av != bv:
+        direction = (1 if bv > av else -1) * (1 if b.get('maximize') else -1)
+        if (ap and direction > 0) or (bp and direction < 0):
+            return None
+        return direction
+    return (1 if bp else -1) if ap != bp else 0
 
 
 def numeric(r, key):
@@ -79,6 +80,8 @@ def numeric(r, key):
 def interval(values, seed=554):
     if not values:
         return None
+    if len(values) < 2:
+        return {'value': statistics.mean(values), 'low': None, 'high': None, 'clusters': len(values)}
     rng = random.Random(seed)
     means = sorted(statistics.mean(rng.choices(values, k=len(values))) for _ in range(2000))
     return {'value': statistics.mean(values), 'low': means[50], 'high': means[1949], 'clusters': len(values)}
@@ -125,7 +128,9 @@ def analyze(cases, control):
                             'fingerprints': dict(Counter(r.get('buildFingerprint', 'missing') for r in recorded)),
                             'validationPolicies': dict(Counter(r.get('validationPolicy', 'missing') for r in recorded)),
                             'sourceValidation': dict(Counter(r.get('stats', {}).get('sourceValidation', 'absent')
-                                                              for r in recorded))}
+                                                              for r in recorded)),
+                            'retainedWitnesses': sum(r.get('sourceWitness') is not None for r in recorded),
+                            'retainedOutputHashes': sum(r.get('sourceOutputSha256') is not None for r in recorded)}
     pairs = {}
     for label in labels:
         if label == control:
@@ -133,10 +138,25 @@ def analyze(cases, control):
         by_family = defaultdict(lambda: defaultdict(list))
         differences = []
         same_work = changed_work = unmetered = 0
+        skipped = []
+        identity_unverified = checked_witness_pairs = 0
         for key, block in complete.items():
             a, b = block[control]['record'], block[label]['record']
+            if any(category(block[arm]) in ('error', 'unsupported') for arm in (control, label)):
+                skipped.append({'identity': key, 'reason': 'error or unsupported'})
+                continue
+            ah, bh = a.get('sourceHashes'), b.get('sourceHashes')
+            if ah and bh and ah != bh:
+                skipped.append({'identity': key, 'reason': 'different source hashes'})
+                continue
             fam = block[label]['problem']['family'].split('/')[-1]
             q = quality(a, b)
+            if q is None:
+                skipped.append({'identity': key, 'reason': 'contradictory reported outcomes'})
+                continue
+            identity_unverified += not ah or not bh
+            checked_witness_pairs += all(r.get('feasible') is True and
+                r.get('stats', {}).get('sourceValidation') == 'valid' for r in (a, b))
             ratio = math.log(timing(b) / timing(a))
             by_family[fam]['log_time_ratio'].append(ratio)
             if q is not None:
@@ -160,8 +180,12 @@ def analyze(cases, control):
         ci = interval([statistics.mean(x['log_time_ratio']) for x in by_family.values()])
         if ci:
             for key in ['value', 'low', 'high']:
-                ci[key] = math.exp(ci[key])
-        pairs[label] = {'completeBlocks': len(complete), 'sameWork': same_work, 'changedWork': changed_work,
+                if ci[key] is not None:
+                    ci[key] = math.exp(ci[key])
+        pairs[label] = {'completeBlocks': len(complete), 'eligiblePairs': len(complete) - len(skipped),
+                        'skippedPairs': skipped, 'inputIdentityUnverified': identity_unverified,
+                        'independentlyCheckedWitnessPairs': checked_witness_pairs,
+                        'sameWork': same_work, 'changedWork': changed_work,
                         'unmetered': unmetered, 'geomeanPar2RatioFamilyBootstrap': ci,
                         'qualityFamilyBootstrap': interval([statistics.mean(x['quality']) for x in by_family.values()
                                                             if x['quality']]),
