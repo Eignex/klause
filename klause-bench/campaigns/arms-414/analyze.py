@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Offline analysis of archived case records; never executes a solver."""
 import argparse
+import csv
+import hashlib
 from collections import Counter, defaultdict
 from decimal import Decimal
 import gzip
@@ -125,6 +127,9 @@ def analyze(job):
                     telemetry[holders[-1]['label'].rsplit('#', 1)[0]]['finalHolders'] += 1
         result['arms'][arm] = dict(outcomes=dict(counts), fingerprints=sorted({r.get('buildFingerprint') or 'missing' for r in records}),
             commits=sorted({r.get('gitSha') or 'missing' for r in records}),
+            missingWitnesses=sum(r['feasible'] is True and not r.get('finalWitness') for r in records),
+            missingSourceHashes=sum(not r.get('sourceHashes') for r in records),
+            runtimeHashes=sorted({hashlib.sha256(json.dumps(r.get('buildProvenance', {}).get('runtime', {}), sort_keys=True).encode()).hexdigest() for r in records}),
             thresholds=dict(Counter(r['stats'].get('portfolioReseedStaleThreshold', 'absent') for r in records)),
             runtimeOptions=[json.loads(x) for x in sorted({json.dumps(r.get('buildProvenance', {}).get('runtimeOptions', {}), sort_keys=True) for r in records})],
             firstMs=statistics.median([time(r, 'timeToFirstFeasibleMs') for r in records]) if records else None,
@@ -141,6 +146,9 @@ def analyze(job):
                 excluded.append(list(key))
                 continue
             ra, rb = ca['record'], cb['record']
+            if ra.get('sourceHashes') and rb.get('sourceHashes') and ra['sourceHashes'] != rb['sourceHashes']:
+                excluded.append(list(key) + ['different source bytes'])
+                continue
             matched.append(dict(input='/'.join(key[:2]), suite=key[0], seed=key[2], repeat=key[3],
                 quality=quality(ra, rb), proofDelta=int(rb['proven'])-int(ra['proven']),
                 feasibleDelta=int(rb['feasible'] is True)-int(ra['feasible'] is True),
@@ -159,6 +167,21 @@ def analyze(job):
             disagreementCases=[x for x in matched if x['disagreement']],
             problemMeanQuality=statistics.mean(means) if means else None,
             problemBootstrap95=interval(means), cells=matched))
+    with (folder / 'cases.csv').open('w', newline='') as stream:
+        columns = ['index', 'input', 'family', 'arm', 'seed', 'outcome', 'objective', 'firstMs', 'bestMs', 'elapsedMs',
+                   'proven', 'workers', 'work', 'reseeds', 'initMs', 'sourceHashes', 'buildFingerprint']
+        writer = csv.DictWriter(stream, fieldnames=columns)
+        writer.writeheader()
+        for case in cases:
+            rec = case.get('record') or {}
+            fields = arm_fields(rec)
+            writer.writerow(dict(index=case['index'], input=case['problem']['suite'] + '/' + case['problem']['problem'],
+                family=case['problem'].get('family'), arm=case['arm'], seed=case.get('seed'), outcome=outcome(case),
+                objective=str(objective(rec)) if rec else None, firstMs=rec.get('timeToFirstFeasibleMs'),
+                bestMs=rec.get('timeToBestMs'), elapsedMs=rec.get('elapsedMs'), proven=rec.get('proven'), workers=len(fields),
+                work=sum(int(f.get('work', 0)) for _, f in fields), reseeds=sum(int(f.get('reseeds', 0)) for _, f in fields),
+                initMs=sum(int(f.get('initMs', 0)) for _, f in fields), sourceHashes=json.dumps(rec.get('sourceHashes', {})),
+                buildFingerprint=rec.get('buildFingerprint')))
     (folder / 'analysis.json.gz').write_bytes(gzip.compress(json.dumps(result).encode(), mtime=0))
     summary = dict(result, pairs=[{k: v for k, v in pair.items() if k != 'cells'} for pair in result['pairs']])
     (folder / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
