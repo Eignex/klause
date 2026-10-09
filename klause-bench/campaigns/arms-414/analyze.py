@@ -148,6 +148,8 @@ def analyze(job):
                            if x.get('exactObjective') is not None and Decimal(x['exactObjective']) == value]
                 if holders:
                     telemetry[holders[-1]['label'].rsplit('#', 1)[0]]['finalHolders'] += 1
+        for totals in telemetry.values():
+            totals['meanReward'] = totals['weightedReward'] / totals['work'] if totals['work'] else None
         result['arms'][arm] = dict(outcomes=dict(counts), fingerprints=sorted({r.get('buildFingerprint') or 'missing' for r in records}),
             commits=sorted({r.get('gitSha') or 'missing' for r in records}),
             missingWitnesses=sum(r['feasible'] is True and not r.get('finalWitness') for r in records),
@@ -194,7 +196,7 @@ def analyze(job):
             problemBootstrap95=interval(means), cells=matched))
     with (folder / 'cases.csv').open('w', newline='') as stream:
         columns = ['index', 'input', 'family', 'arm', 'seed', 'outcome', 'objective', 'firstMs', 'bestMs', 'elapsedMs',
-                   'proven', 'workers', 'work', 'reseeds', 'initMs', 'sourceHashes', 'buildFingerprint']
+                   'proven', 'workers', 'work', 'reseeds', 'armFailures', 'armFaults', 'initMs', 'sourceHashes', 'buildFingerprint']
         writer = csv.DictWriter(stream, fieldnames=columns)
         writer.writeheader()
         for case in cases:
@@ -205,6 +207,8 @@ def analyze(job):
                 objective=str(objective(rec)) if rec else None, firstMs=rec.get('timeToFirstFeasibleMs'),
                 bestMs=rec.get('timeToBestMs'), elapsedMs=rec.get('elapsedMs'), proven=rec.get('proven'), workers=len(fields),
                 work=sum(int(f.get('work', 0)) for _, f in fields), reseeds=sum(int(f.get('reseeds', 0)) for _, f in fields),
+                armFailures=sum(int(f.get('failures', 0)) for _, f in fields),
+                armFaults=sum(int(f.get('faults', 0)) for _, f in fields),
                 initMs=sum(int(f.get('initMs', 0)) for _, f in fields), sourceHashes=json.dumps(rec.get('sourceHashes', {})),
                 buildFingerprint=rec.get('buildFingerprint')))
     (folder / 'analysis.json.gz').write_bytes(gzip.compress(json.dumps(result).encode(), mtime=0))

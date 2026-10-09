@@ -1,0 +1,33 @@
+1791580205370 AWS refused another instance (VcpuLimitExceeded); trying again in 30 s
+1791580261542 launched c7i.2xlarge instances [i-06cd645356d59fef8]
+1791580279856 waiting for i-06cd645356d59fef8 to boot failed (try 1 of 45), retrying in 20 s: on 56.228.81.75 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-06cd645356d59fef8' (ED25519) to the list of known hosts.
+
+1791580300391 i-06cd645356d59fef8: booted; building 52193ef90
+1791580469365 i-06cd645356d59fef8: built
+1791580469365 i-06cd645356d59fef8: planning, which fetches the corpora the selections read
+1791580490873 selection 0 ('suite=mzn-bench' 'name=2017/city-position/city-5-05' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580491457 selection 1 ('suite=xcsp3-cop' 'name=Fortress1-03_c25' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580542171 selection 2 ('suite=pb-comp' 'name=normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580542759 selection 3 ('suite=pb-comp' 'name=normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580542761 planned 4 problems × 4 arms = 48 cases, up to 1,0 h
+1791580542761 i-06cd645356d59fef8: compressing and pushing newly fetched corpora to s3://klause-lab-corpus-459222092693-eu-north-1
+1791580559477 running 4 problems on 1 instances, each taking the next problem as it has room
+1791580825028 AWS gave no more instances (VcpuLimitExceeded); running on 1
+1791581461513 AWS gave no more instances (VcpuLimitExceeded); running on 1
+1791582734088 AWS gave no more instances (VcpuLimitExceeded); running on 1
+1791582866212 launched c7i.2xlarge instances [i-03a830ba6a4f931d3]
+1791582884732 waiting for i-03a830ba6a4f931d3 to boot failed (try 1 of 45), retrying in 20 s: on 13.60.215.59 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-03a830ba6a4f931d3' (ED25519) to the list of known hosts.
+
+1791582905165 i-03a830ba6a4f931d3: booted; building 52193ef90
+1791583069302 i-03a830ba6a4f931d3: built
+1791583086321 i-03a830ba6a4f931d3 joined; 2 instances now
+1791583097857 launched c7i.2xlarge instances [i-0b74ecaa8691ff644]
+1791583116156 waiting for i-0b74ecaa8691ff644 to boot failed (try 1 of 45), retrying in 20 s: on 13.62.100.97 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0b74ecaa8691ff644' (ED25519) to the list of known hosts.
+
+1791583136683 i-0b74ecaa8691ff644: booted; building 52193ef90
+1791583304025 i-0b74ecaa8691ff644: built
+1791583321024 i-0b74ecaa8691ff644 joined; 3 instances now
+1791583333152 i-0b74ecaa8691ff644 has no problems left to take: terminated
+1791584182803 i-06cd645356d59fef8 has no problems left to take: terminated
+1791584896680 i-03a830ba6a4f931d3 has no problems left to take: terminated
+1791584899940 job finished
