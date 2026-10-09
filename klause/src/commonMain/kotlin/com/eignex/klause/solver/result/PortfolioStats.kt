@@ -15,7 +15,9 @@ data class PortfolioStats(
     val reseedStaleThreshold: Int? = null,
 ) {
     /** Combine two runs' schedules: the arms of both, in order, under the first one's classification. */
-    fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(arms + o.arms, profile ?: o.profile, reseedStaleThreshold ?: o.reseedStaleThreshold)
+    fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(
+        arms + o.arms, profile ?: o.profile, reseedStaleThreshold ?: o.reseedStaleThreshold,
+    )
 }
 
 /** One arm of a sequential portfolio's schedule; see [PortfolioStats]. */
