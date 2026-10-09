@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LpTerminalDeclineTest[jvm]" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-09T20:42:33.354Z" hostname="LTHCL001" time="0.765">
+  <properties/>
+  <testcase name="finite MPS satisfaction decline is unknown[jvm]" classname="com.eignex.klause.lp.LpTerminalDeclineTest" time="0.048"/>
+  <testcase name="sequential LP solve contexts stay isolated[jvm]" classname="com.eignex.klause.lp.LpTerminalDeclineTest" time="0.015"/>
+  <testcase name="finite MPS optimizer keeps incumbent non optimal after a later decline[jvm]" classname="com.eignex.klause.lp.LpTerminalDeclineTest" time="0.019"/>
+  <testcase name="a feasible continuous incumbent without an objective proof stays best found[jvm]" classname="com.eignex.klause.lp.LpTerminalDeclineTest" time="0.006"/>
+  <testcase name="finite MPS optimizer decline without incumbent is unknown[jvm]" classname="com.eignex.klause.lp.LpTerminalDeclineTest" time="0.013"/>
+  <testcase name="a bound alone cannot accept a continuous satisfaction leaf[jvm]" classname="com.eignex.klause.lp.LpTerminalDeclineTest" time="0.005"/>
+  <testcase name="cancellation during proof fallback stays unknown without leaking context[jvm]" classname="com.eignex.klause.lp.LpTerminalDeclineTest" time="0.009"/>
+  <testcase name="finite MPS enumeration decline is unknown[jvm]" classname="com.eignex.klause.lp.LpTerminalDeclineTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

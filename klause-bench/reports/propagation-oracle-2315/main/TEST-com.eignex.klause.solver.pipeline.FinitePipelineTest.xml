@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="FinitePipelineTest[jvm]" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-09T20:42:35.179Z" hostname="LTHCL001" time="0.22">
+  <properties/>
+  <testcase name="an unbounded leaf ray survives presolve as a source-model verdict[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.142"/>
+  <testcase name="reports construction bake time through the preparation[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.001"/>
+  <testcase name="leaves a harvested model at the presolve fixpoint[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.064"/>
+  <testcase name="reconstructs an affine-eliminated variable[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.005"/>
+  <testcase name="a spent presolve allowance still hands the engine a fully baked model[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.002"/>
+  <testcase name="a source model crosses the baked boundary before finite execution[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.002"/>
+  <testcase name="selects the portfolio composition for a finite route[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="pre-bake strengthening short-circuits a wide model with solve cancellation[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.001"/>
+  <testcase name="reconstruction keeps the continuous part of a solution[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.001"/>
+  <testcase name="keeps an unchanged finite model for the selected route[jvm]" classname="com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
