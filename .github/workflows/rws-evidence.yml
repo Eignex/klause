@@ -12,6 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Audit the CI regression control
+        run: python3 klause-bench/rws-conflict/audit_regression.py
+      - name: Audit acceptance outcomes
+        run: python3 klause-bench/rws-conflict/audit_outcomes.py
       - name: Audit frozen AWS records
         shell: bash
         run: |

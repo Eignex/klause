@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="PropagationSessionTest[jvm]" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-10-09T20:56:13.765Z" hostname="runnervmmprz5" time="0.003">
+  <properties/>
+  <testcase name="the root domain stays at the seed while the live domain follows the trail[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="repeated endpoint tightening publishes the final bound[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="an imported clause that forces a unit counts a use for its origin[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.001"/>
+  <testcase name="integer probes expose complete domains until popped[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="seed propagates clause implications[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="pushed pins imply the same values a one-shot propagate does[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="Boolean probes retain native deductions until popped[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="pop restores feasibility[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="incremental propagation reports changed non singleton endpoints[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="endpoint publications follow a new push after rollback[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="popUntilUnpinned pops to target[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.001"/>
+  <testcase name="currentAssumptions reflects trail[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="the root fixed count leaves out what decisions fixed[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="push reports only newly implied facts[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="undo preserves work already spent while restoring the propagated state[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="a late mixed clause implication survives an asserting backjump[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <testcase name="a per-node fixpoint cut short by the deadline flags fixpointCancelled[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.001"/>
+  <testcase name="the fixed variable count covers assigned bools and singleton ints[jvm]" classname="com.eignex.klause.propagation.PropagationSessionTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

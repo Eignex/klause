@@ -9,7 +9,7 @@ The corpus is fetched by the existing SMT-LIB bench collection; it is not vendor
 60-second wall allowance, three repetitions of each route/revision. It compares current main,
 historical regression `7cbf3ba14`, historical control `86156e3e2`, and current-main `satOptimized`
 and default routes. [AWS lab 852](http://192.168.50.104:8420/experiments/852) executes the specification
-serially on one instance. JFR is disabled. Its results are pending at this checkpoint.
+serially on one instance. JFR is disabled. Completed results are retained in the validation report.
 
 Submit and retain the raw records, executed arm identities and job metadata:
 
@@ -37,6 +37,7 @@ policy changed. These observations guide investigation and are not paired perfor
 Full local `check lintDocs` and unit tests were skipped. GitHub CI supplies build/test/lint/docs gates;
 all further experiments use AWS lab.
 
-The [validation report](report.md) supersedes the pending-result checkpoint above. The stack is
+The [validation report](report.md) records the results. The stack is
 [#2372](https://github.com/Eignex/klause/pull/2372) (reproduction),
-[#2377](https://github.com/Eignex/klause/pull/2377) (pin lifetime fix), then the evidence layer.
+[#2377](https://github.com/Eignex/klause/pull/2377) (pin lifetime fix), then
+[#2385](https://github.com/Eignex/klause/pull/2385) (evidence).

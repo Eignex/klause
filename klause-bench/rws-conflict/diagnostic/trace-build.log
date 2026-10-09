@@ -1,0 +1,31 @@
+Reusing configuration cache.
+> Task :klause:kmpPartiallyResolvedDependenciesChecker
+> Task :klause-cli:kmpPartiallyResolvedDependenciesChecker
+> Task :klause:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause-cli:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :klause:jvmProcessResources NO-SOURCE
+> Task :klause:processJvmMainResources SKIPPED
+> Task :klause-cli:generateCliBuildInfo UP-TO-DATE
+> Task :klause-cli:jvmProcessResources NO-SOURCE
+> Task :klause-cli:processJvmMainResources SKIPPED
+> Task :klause:compileKotlinJvm
+w: file:///home/rasmus/.codex/worktrees/rws-conflict-progress/klause/klause/src/commonMain/kotlin/com/eignex/klause/backtrack/Search.kt:174:13 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///home/rasmus/.codex/worktrees/rws-conflict-progress/klause/klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/ExactDuals.kt:143:14 Type 'Dyadic' is final, so the value of the type parameter is predetermined.
+w: file:///home/rasmus/.codex/worktrees/rws-conflict-progress/klause/klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpSolve.kt:733:55 Unnecessary safe call on a non-null receiver of type 'ExactLpWitness'.
+w: file:///home/rasmus/.codex/worktrees/rws-conflict-progress/klause/klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/RevisedSimplex.kt:1523:23 Unnecessary safe call on a non-null receiver of type 'LpExactState'.
+
+> Task :klause:compileJvmMainJava NO-SOURCE
+> Task :klause:jvmMainClasses
+> Task :klause:jvmJar
+> Task :klause-cli:compileKotlinJvm
+> Task :klause-cli:compileJvmMainJava NO-SOURCE
+> Task :klause-cli:jvmMainClasses
+> Task :klause-cli:jvmJar UP-TO-DATE
+> Task :klause-cli:startScriptsForJvm
+> Task :klause-cli:installJvmDist
+
+[Incubating] Problems report is available at: file:///home/rasmus/.codex/worktrees/rws-conflict-progress/klause/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 1m 4s
+9 actionable tasks: 7 executed, 2 up-to-date
+Configuration cache entry reused.

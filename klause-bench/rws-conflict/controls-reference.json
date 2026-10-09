@@ -1,0 +1,1 @@
+{"summaries":[{"arm":"main-conflictDriven","covered":2,"bothSolved":1,"armOnly":0,"referenceOnly":1,"optimaMatched":0,"provenOptima":0,"better":0,"meanGap":0.0,"worse":0},{"arm":"lifetime-conflictDriven","covered":2,"bothSolved":1,"armOnly":0,"referenceOnly":1,"optimaMatched":0,"provenOptima":0,"better":0,"meanGap":0.0,"worse":0}],"disagreements":[],"shortfalls":[]}
