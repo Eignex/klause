@@ -1,0 +1,36 @@
+{
+  "name": "learned-clause-retention-1631-exact-selection-holdout",
+  "description": "Predeclared unseen 28-input holdout of exact legacy survivor selection versus bounded histogram and unboxed mask. Identical fixed50000 decisions, cap4000 restart1000; three alternating fresh JVMs. Launch only after discovery acceptance.",
+  "problems": [
+    {
+      "suite": "smtlib-qfidl",
+      "name": "*DTP/DTP_k2_n35_c210_s1,*DTP/DTP_k2_n35_c210_s10,*DTP/DTP_k2_n35_c210_s11,*DTP/DTP_k2_n35_c210_s13,*DTP/DTP_k2_n35_c210_s14,*DTP/DTP_k2_n35_c210_s16,*DTP/DTP_k2_n35_c210_s17,*DTP/DTP_k2_n35_c210_s19,*DTP/DTP_k2_n35_c210_s20,*DTP/DTP_k2_n35_c210_s3,*DTP/DTP_k2_n35_c210_s4,*DTP/DTP_k2_n35_c210_s6,*DTP/DTP_k2_n35_c210_s7,*DTP/DTP_k2_n35_c210_s8,*DTP/DTP_k2_n35_c245_s1,*DTP/DTP_k2_n35_c245_s10,*DTP/DTP_k2_n35_c245_s11,*DTP/DTP_k2_n35_c245_s13,*DTP/DTP_k2_n35_c245_s14,*DTP/DTP_k2_n35_c245_s16,*DTP/DTP_k2_n35_c245_s17,*DTP/DTP_k2_n35_c245_s19,*DTP/DTP_k2_n35_c245_s20,*DTP/DTP_k2_n35_c245_s3,*DTP/DTP_k2_n35_c245_s4,*DTP/DTP_k2_n35_c245_s6,*DTP/DTP_k2_n35_c245_s7,*DTP/DTP_k2_n35_c245_s8",
+      "per-family": "1000",
+      "max": "28",
+      "reference": "any"
+    }
+  ],
+  "base": {
+    "engine": "fixed",
+    "processors": "1",
+    "timeout": "30000",
+    "presolve": "off",
+    "param.max-decisions": "50000",
+    "param.shared-restart": "1000",
+    "param.max-learned": "4000"
+  },
+  "configs": [
+    {
+      "label": "legacy-selection",
+      "ref": "88ddc1847d778639ba06c194dedaf333f8bb52a6"
+    },
+    {
+      "label": "bounded-selection",
+      "ref": "df96e6f4e6eeabb800367a1597e5f40f90f7916c"
+    }
+  ],
+  "repeats": 3,
+  "host": "aws",
+  "machines": 4,
+  "parallel": 2
+}

@@ -1,0 +1,30 @@
+{
+  "summaries": [
+    {
+      "arm": "legacy-selection",
+      "covered": 32,
+      "bothSolved": 10,
+      "armOnly": 0,
+      "referenceOnly": 22,
+      "optimaMatched": 0,
+      "provenOptima": 0,
+      "better": 0,
+      "meanGap": 0.0,
+      "worse": 0
+    },
+    {
+      "arm": "bounded-selection",
+      "covered": 32,
+      "bothSolved": 10,
+      "armOnly": 0,
+      "referenceOnly": 22,
+      "optimaMatched": 0,
+      "provenOptima": 0,
+      "better": 0,
+      "meanGap": 0.0,
+      "worse": 0
+    }
+  ],
+  "disagreements": [],
+  "shortfalls": []
+}
