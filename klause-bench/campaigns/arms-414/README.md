@@ -111,3 +111,13 @@ population evidence. Each seed/repeat has one vote within its problem. Source wi
 in GitHub CI by the existing pinned-source compiler check with MiniZinc 2.9.4; valid, invalid,
 unknown and missing checks remain distinct. This compiler gate does not run a reference solver and
 its times are not campaign measurements.
+
+## Submitted stages
+
+Witness pilot 873 is complete: 24/24 feasible records retain a final candidate and source hashes,
+covering both widths and both engines on all three formats. Baseline 875 and the split sweeps are
+submitted: reseeding [879](http://192.168.50.104:8420/jobs/879) / [880](http://192.168.50.104:8420/jobs/880),
+oversubscription [881](http://192.168.50.104:8420/jobs/881) / [882](http://192.168.50.104:8420/jobs/882),
+and repeated controls [883](http://192.168.50.104:8420/jobs/883). `jobs.json` records exact submissions.
+The measurement SHA stays frozen despite later formatting-only CI repairs. No result from an
+unfinished stage is a default recommendation.
