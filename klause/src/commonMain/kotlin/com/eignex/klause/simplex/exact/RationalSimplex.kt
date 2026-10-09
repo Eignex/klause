@@ -246,11 +246,6 @@ class BigFraction private constructor(
         return (num * other.den).compareTo(other.num * den)
     }
 
-    // Native BigInt equality goes through a generic comparison, which costs more than the arithmetic it would skip.
-    private val BigInt.isUnit: Boolean get() = magnitudeBitLength() == 1
-
-    private val BigInt.isOne: Boolean get() = signum() > 0 && magnitudeBitLength() == 1
-
     override fun equals(other: Any?): Boolean = this === other || (
         other is BigFraction &&
             (num === other.num || num.compareTo(other.num) == 0) &&
@@ -310,3 +305,8 @@ class BigFraction private constructor(
         }
     }
 }
+
+// Native BigInt equality goes through a generic comparison, which costs more than the arithmetic it would skip.
+private val BigInt.isUnit: Boolean get() = magnitudeBitLength() == 1
+
+private val BigInt.isOne: Boolean get() = signum() > 0 && magnitudeBitLength() == 1
