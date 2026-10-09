@@ -579,6 +579,14 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
      * so their denominator ([solves]) always names the same route. */
     fun observeEngineCost(route: LpRoute, metrics: LpSolveMetrics) {
         val effectiveRoute = if (route == LpRoute.NODE) probeRoute else route
+        if (metrics.sourceResidualCalls > 0L) {
+            val key = "SOURCE_RESIDUALS_${effectiveRoute.name}"
+            phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(
+                LpPhaseStats(calls = metrics.sourceResidualCalls, nanos = metrics.sourceResidualNanos,
+                    outcomes = mapOf("SCALED" to metrics.sourceResidualScaledCalls,
+                        "UNSCALED" to metrics.sourceResidualCalls - metrics.sourceResidualScaledCalls)),
+            )
+        }
         if (effectiveRoute != LpRoute.NODE) routeMetrics[effectiveRoute.ordinal].observe(metrics)
         when (effectiveRoute) {
             LpRoute.NODE -> observeMetrics(metrics)
