@@ -8,7 +8,6 @@ import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -54,9 +53,8 @@ enum class EngineMix {
  * `arms < cores` — [PortfolioBuilder.build] replicates the composed arms across the extra lanes with
  * distinct seeds, so a parallel run can be wider than its pool of distinct configs.
  *
- * A curated single-core mixed optimization pool first searches with the default-sized pool and a default
- * relaxation arm when applicable. Additional variants join after the first incumbent; an explicit pool uses
- * every selected arm from the start.
+ * A curated single-core mixed optimization pool first searches with the default-sized pool. Additional
+ * variants join after the first incumbent; an explicit pool uses every selected arm from the start.
  */
 data class PortfolioScenario(
     /** Compute width. `1` selects the single-core sequential executor; `> 1` the parallel one. */
@@ -237,16 +235,7 @@ internal object PortfolioComposition {
         val first = small.mapNotNull { arm ->
             val index = remaining.indexOfFirst { it::class == arm::class && it.label == arm.label }
             if (index >= 0) remaining.removeAt(index) else null
-        }.toMutableList()
-        // Finite CP's default LP supplies witnesses absent from the LP-free cores, including on annotated
-        // models whose small pool gives the second backtrack slot to the annotation. Mixed-integer pools
-        // keep their LP-free first-solution finders; relaxation variants compete for improvement.
-        val relaxation = if (facts.profile.problemClass == ProblemClass.FiniteCp) {
-            remaining.indexOfFirst { it is BacktrackWorkerConfig && it.label == "lp-default" }
-        } else {
-            -1
         }
-        if (relaxation >= 0) first += remaining.removeAt(relaxation)
         return PortfolioArmPlan(first + remaining, first.size)
     }
 

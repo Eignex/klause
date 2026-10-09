@@ -15,37 +15,28 @@ class PortfolioCompositionTest {
     @Test
     fun `expanding a sequential optimization pool keeps the small pool positions`() {
         val small = PortfolioScenario.sequential(Kind.COP)
-        val facts = ProblemFacts.assumed(Kind.COP)
+        for (problemClass in listOf(ProblemClass.FiniteCp, ProblemClass.MixedInteger)) {
+            val facts = ProblemFacts.assumed(Kind.COP, problemClass)
 
-        val baseline = PortfolioComposition.plan(small, facts)
-        val expanded = PortfolioComposition.plan(small.copy(arms = 12), facts)
+            val baseline = PortfolioComposition.plan(small, facts)
+            val expanded = PortfolioComposition.plan(small.copy(arms = 12), facts)
 
-        assertEquals(baseline.arms.map { it.label }, expanded.arms.take(baseline.arms.size).map { it.label })
-        assertEquals(baseline.arms.size, expanded.firstSolutionCount)
-        assertEquals(13, expanded.arms.size)
+            assertEquals(baseline.arms.map { it.label }, expanded.arms.take(baseline.arms.size).map { it.label })
+            assertEquals(baseline.arms.size, expanded.firstSolutionCount)
+            assertEquals(13, expanded.arms.size)
+        }
     }
 
     @Test
-    fun `an expanded annotated pool keeps default LP in its first solution pool`() {
+    fun `an expanded annotated pool defers its extra LP arm until improvement`() {
         val scenario = PortfolioScenario.sequential(Kind.COP, arms = 12).copy(annotationArm = BacktrackParams())
 
         val plan = PortfolioComposition.plan(scenario, ProblemFacts.assumed(Kind.COP))
         val first = plan.arms.take(plan.firstSolutionCount)
 
         assertEquals(listOf("satOptimized", "annotation"), first.take(2).map { it.label })
-        assertEquals("lp-default", first.last().label)
-    }
-
-    @Test
-    fun `an expanded mixed integer pool keeps its extra LP variants for improvement`() {
-        val small = PortfolioScenario.sequential(Kind.COP)
-        val facts = ProblemFacts.assumed(Kind.COP, ProblemClass.MixedInteger)
-
-        val baseline = PortfolioComposition.plan(small, facts)
-        val expanded = PortfolioComposition.plan(small.copy(arms = 12), facts)
-
-        assertEquals(baseline.arms.map { it.label }, expanded.arms.take(expanded.firstSolutionCount).map { it.label })
-        assertTrue(expanded.arms.drop(expanded.firstSolutionCount).any { it.label == "lp-default" })
+        assertTrue(first.none { it.label == "lp-default" })
+        assertTrue(plan.arms.drop(plan.firstSolutionCount).any { it.label == "lp-default" })
     }
 
     @Test
