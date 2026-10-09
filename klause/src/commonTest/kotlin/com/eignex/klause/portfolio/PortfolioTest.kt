@@ -1436,6 +1436,8 @@ class PortfolioTest {
 
             override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch {
                 openingDeadline = params.cancellation.deadline()
+                val until = TimeSource.Monotonic.markNow() + 5.milliseconds
+                while (!until.hasPassedNow()) Unit
                 return handle
             }
         }
