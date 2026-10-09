@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""Compare balanced off/on/on/off blocks against duplicate-arm timing variation."""
+"""Compare balanced duplicate-arm blocks against timing variation."""
 import argparse
 import json
 import statistics
 from pathlib import Path
 
 LABELS = ("off-first", "on-first", "on-second", "off-second")
+REVERSED_LABELS = ("on-first", "off-first", "off-second", "on-second")
 
 
 def analyze(cases):
     if len(cases) % 4:
         raise ValueError("incomplete balanced block")
     blocks = []
+    ordered = sorted(cases, key=lambda case: case["index"])
     for start in range(0, len(cases), 4):
-        group = sorted(cases, key=lambda case: case["index"])[start:start + 4]
-        if tuple(case["arm"] for case in group) != LABELS:
-            raise ValueError("case order does not match off/on/on/off")
+        group = ordered[start:start + 4]
+        labels = tuple(case["arm"] for case in group)
+        if labels not in (LABELS, REVERSED_LABELS):
+            raise ValueError("case order is not a balanced duplicate-arm block")
         if any(case["status"] != "DONE" or case.get("record") is None for case in group):
             raise ValueError("incomplete case")
         records = [case["record"] for case in group]
@@ -24,15 +27,15 @@ def analyze(cases):
             raise ValueError("verdicts differ within balanced block")
         block = {"indices": [case["index"] for case in group]}
         for metric in ("elapsedMs", "timeToBestMs"):
-            values = [r[metric] for r in records]
-            if any(value is None for value in values):
+            values = {case["arm"]: case["record"][metric] for case in group}
+            if any(value is None for value in values.values()):
                 raise ValueError("missing timing")
-            off = (values[0] + values[3]) / 2
-            on = (values[1] + values[2]) / 2
+            off = (values["off-first"] + values["off-second"]) / 2
+            on = (values["on-first"] + values["on-second"]) / 2
             block[metric] = dict(off=off, on=on, differenceMs=on-off,
                                  ratio=on/off,
-                                 duplicateOffMs=values[3]-values[0],
-                                 duplicateOnMs=values[2]-values[1])
+                                 duplicateOffMs=values["off-second"]-values["off-first"],
+                                 duplicateOnMs=values["on-second"]-values["on-first"])
         blocks.append(block)
     summary = {}
     for metric in ("elapsedMs", "timeToBestMs"):

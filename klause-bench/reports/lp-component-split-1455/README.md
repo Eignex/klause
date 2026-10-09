@@ -1,7 +1,7 @@
 # LP component split measurement
 
 At solver revision `570949daf` (`arms.json` records the full commit), duplicate-arm,
-balanced-order follow-ups found a repeatable timing difference on each selected separable
+balanced-order and reversed-order follow-ups found a repeatable timing difference on each selected separable
 fixture: about 9.8% faster with splitting on MiniZinc 8x24 and about 5% slower on MPS 8x24.
 The linked control's small difference falls within duplicate-arm variation. These are
 measurements on one host and seed, not a population-wide speedup or a default-policy
@@ -113,6 +113,34 @@ All 120 follow-up witnesses passed the same independent source checker, with zer
 row residual. No solver proof credit was upgraded. The per-case data and balanced
 blocks are archived in `summary.json` and `noise.json`.
 
+## Reversed-order confirmation
+
+Jobs [822](http://192.168.50.104:8420/jobs/822),
+[823](http://192.168.50.104:8420/jobs/823), and
+[824](http://192.168.50.104:8420/jobs/824) repeat the three calibrated fixtures in
+`on/off/off/on` order, placing the split arm at the outside positions. Each job uses
+another ten blocks at the same revision, arguments, host and seed. This checks whether
+placing an arm consistently in the middle of a block explains the earlier result.
+The analyzer accepts either balanced order and groups timings by arm labels.
+
+| Model | Median averaged elapsed off/on (ms) | Median paired on/off ratio | On faster blocks | Duplicate off absolute difference median/max (ms) | Duplicate on absolute difference median/max (ms) |
+| --- | --- | ---: | --- | --- | --- |
+| MiniZinc 8x24 | 1017.5/915 | 0.899 | 10/10 | 12/25 | 3/21 |
+| MPS 8x24 | 478.25/502 | 1.050 | 0/10 | 3.5/10 | 6.5/16 |
+| MiniZinc linked 8x24 | 1036/1044.5 | 1.008 | 1/10 | 13/50 | 9.5/48 |
+
+The separable effects survive the position reversal: about 10.1% faster on MiniZinc
+and 5.0% slower on MPS, with matching signs in every reversed block. Combined with
+the original order, each effect retains its sign in all twenty blocks. The paired
+elapsed ratio ranges are 0.873–0.922 for MiniZinc and 1.033–1.065 for MPS. Best-incumbent
+ratios have medians 0.893 and 1.050 respectively. These repeated launches strengthen
+the fixture-specific result without expanding its scope to other models or hosts.
+The linked control's 0.8% median elapsed difference remains inside duplicate-arm
+variation (up to 50 ms off and 48 ms on), with paired ratios spanning 0.994–1.025.
+Its median best-incumbent ratio is 1.004. This is still not isolated labeling overhead.
+All 120 reversed-order witnesses passed the independent checker with zero row residual;
+objectives and proof status agree within every block.
+
 ## Node path and labeling overhead
 
 Every GeneralizedMKP repeat, on both arms, reported objective 22688, 3006 nodes,
@@ -141,7 +169,7 @@ no engine or statistics implementation was changed.
 
 `analyze.py` independently checks every emitted generated-model witness against all
 original matrix rows, bounds, the finite decision and the linked row, rather than using
-split counters as correctness evidence. All 50 initial and 120 calibration dense-model witnesses passed;
+split counters as correctness evidence. All 50 initial and 240 calibration dense-model witnesses passed;
 maximum original-row residual was 0 for these exact-mode outputs. A manual checker probe
 accepted the known witness and rejected a changed coordinate. MiniZinc source validation
 in the bench remains `unknown` because output uses introduced array names; these explicit
@@ -169,6 +197,9 @@ python3 klause-bench/scripts/lp-component-split/generate.py
 /home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mzn-dense-8x24-noise-spec.json
 /home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mps-dense-8x24-noise-spec.json
 /home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mzn-linked-8x24-noise-spec.json
+/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mzn-dense-8x24-reversed-noise-spec.json
+/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mps-dense-8x24-reversed-noise-spec.json
+/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/reports/lp-component-split-1455/mzn-linked-8x24-reversed-noise-spec.json
 python3 klause-bench/scripts/lp-component-split/analyze.py klause-bench/reports/lp-component-split-1455/793/cases.json klause-bench/reports/lp-component-split-1455/793/raw
 python3 klause-bench/scripts/lp-component-split/noise.py klause-bench/reports/lp-component-split-1455/801/cases.json
 ```
