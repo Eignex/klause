@@ -38,7 +38,8 @@ class ArmMiningTest {
     fun `an arm telemetry line parses into accounting and per-signal credit`() {
         val arm = ArmMining.parseArm(
             "domwdeg",
-            "segments=4 work=1200 reward=0.25 failures=1 faults=0 ms=42 maxMs=20 initMs=4 reseeds=2 FirstSolution=1.0 ClauseUses=3.5",
+            "segments=4 work=1200 reward=0.25 failures=1 faults=0 ms=42 maxMs=20 initMs=4 reseeds=2 " +
+                "FirstSolution=1.0 ClauseUses=3.5",
         )
 
         assertEquals(1200L, arm.work)

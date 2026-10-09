@@ -339,7 +339,11 @@ internal object SolveMetric {
                 .copy(
                     validationPolicy = policy,
                     sourceHashes = SolveEvidence.sourceHashes(entry.ref),
-                    finalWitness = if (r.feasible == true) SolveEvidence.finalWitness(entry.ref.format, r.rawOutput) else null,
+                    finalWitness = if (r.feasible == true) {
+                        SolveEvidence.finalWitness(entry.ref.format, r.rawOutput)
+                    } else {
+                        null
+                    },
                 )
             val checked = if (solverId == SolverInvocation.KLAUSE && entry.hasFloats) {
                 val validation = if (r.feasible == true) {

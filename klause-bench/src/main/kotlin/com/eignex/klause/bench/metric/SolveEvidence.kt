@@ -5,6 +5,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import java.security.MessageDigest
+import java.util.Locale
 
 internal object SolveEvidence {
     private const val MAX_WITNESS_CHARS = 8 * 1024 * 1024
@@ -14,7 +15,7 @@ internal object SolveEvidence {
         for ((label, source) in sources) {
             val digest = MessageDigest.getInstance("SHA-256")
             CorpusFiles.update(digest, CorpusFetcher.resolve(source))
-            put(label, digest.digest().joinToString("") { "%02x".format(it) })
+            put(label, digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it) })
         }
     }
 
