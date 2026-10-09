@@ -24,6 +24,7 @@ jobs:
         with:
           name: arms-414-analysis
           path: |
+            klause-bench/campaigns/arms-414/evidence/campaign-summary.json
             klause-bench/campaigns/arms-414/evidence/*/analysis.json.gz
             klause-bench/campaigns/arms-414/evidence/*/summary.json
             klause-bench/campaigns/arms-414/evidence/*/cases.csv

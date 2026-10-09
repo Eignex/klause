@@ -1,0 +1,2 @@
+MiniZinc to FlatZinc converter, version 2.9.4, build 2068644735
+Copyright (C) 2014-2025 Monash University, NICTA, Data61

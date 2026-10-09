@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 MAIN = '5471419aa8c832ee1065468a6861bb203a1ff8c7'
 MEASUREMENT = '52193ef906cfedac893b1df8390559ca0495b59e'
+INTEGRATED = '54101a2cb001c825d0a920779004f4b140a0b956'
 
 
 def config(engine, processors, label, ref=MEASUREMENT, **params):
@@ -38,6 +39,10 @@ if __name__ == '__main__':
     write('timing-repeat', 'Alternating identical-seed timing controls at production settings on one plateau and one early-closing proof input; distinct from 300 s outcome evidence.',
           [active[0], active[3]], [config(e, p, f'repeat-{e}-p{p}') for p in (1, 4) for e in ('cp', 'mixed')],
           timeout=15000, seeds=(3,), repeats=3)
+    write('reseed-p4-confirm-300', 'Preselected p4 threshold-2 candidate versus production threshold 3 on one integrated build, six held-out families plus city/Fortress discovery repeats and CoinsGrid proof retention; no arm, slice or presolve overrides.',
+          [selection['discovery'][i] for i in (0, 3, 2)] + selection['holdout'],
+          [config('mixed', 4, f'integrated-mixed-p4-r{r}', INTEGRATED, reseed_stale_threshold=r)
+           for r in (3, 2)])
 
     for name in ('reseed-300', 'oversubscription-300'):
         spec = json.loads((ROOT / 'specs' / (name + '.json')).read_text())

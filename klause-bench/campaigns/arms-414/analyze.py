@@ -84,6 +84,28 @@ def time(rec, field):
     return rec['budgetMs'] if value is None else value
 
 
+def observed_median(records, field):
+    values = [rec[field] for rec in records if rec.get(field) is not None]
+    return statistics.median(values) if values else None
+
+
+def anytime(rec, clock='elapsedMs'):
+    checkpoints = sorted({point for point in [1000, 10000, 30000, 60000, 120000, 300000]
+                          if point <= rec['budgetMs']} | {rec['budgetMs']})
+    result = []
+    for checkpoint in checkpoints:
+        values = []
+        for entry in rec.get('attribution', []):
+            value = entry.get('exactObjective')
+            if value is None:
+                value = entry.get('continuousObjective')
+            if entry.get(clock) is not None and entry[clock] <= checkpoint and value is not None:
+                values.append(Decimal(str(value)))
+        best = (max if rec['maximize'] else min)(values) if values else None
+        result.append(dict(budgetMs=checkpoint, objective=str(best) if best is not None else None))
+    return result
+
+
 def repeat_ranges(rows):
     groups = defaultdict(list)
     for case in rows:
@@ -153,7 +175,12 @@ def analyze(job):
                 outcomes=dict(Counter(outcome(c) for c in selected)),
                 objectiveRange=[str(min(values)), str(max(values))] if values else None,
                 firstMs=[c['record'].get('timeToFirstFeasibleMs') for c in selected if c.get('record')],
-                bestMs=[c['record'].get('timeToBestMs') for c in selected if c.get('record')]))
+                bestMs=[c['record'].get('timeToBestMs') for c in selected if c.get('record')],
+                anytime=[dict(seed=c.get('seed'), checkpoints=anytime(c['record']))
+                         for c in selected if c.get('record')],
+                processAnytime=[dict(seed=c.get('seed'), checkpoints=anytime(c['record'], 'processElapsedMs'))
+                                for c in selected if c.get('record') and
+                                any(x.get('processElapsedMs') is not None for x in c['record'].get('attribution', []))]))
         telemetry = defaultdict(lambda: dict(cases=0, work=0, ms=0, initMs=0, segments=0,
                                              reseeds=0, reseedObservations=0, failures=0, faults=0, weightedReward=0.0,
                                              finalHolders=0, credit=defaultdict(float)))
@@ -189,6 +216,8 @@ def analyze(job):
             runtimeOptions=[json.loads(x) for x in sorted({json.dumps(r.get('buildProvenance', {}).get('runtimeOptions', {}), sort_keys=True) for r in records})],
             firstMs=statistics.median([time(r, 'timeToFirstFeasibleMs') for r in records]) if records else None,
             bestMs=statistics.median([time(r, 'timeToBestMs') for r in records]) if records else None,
+            processFirstMs=observed_median(records, 'processTimeToFirstFeasibleMs'),
+            processBestMs=observed_median(records, 'processTimeToBestMs'),
             repeatRanges=repeat_ranges(rows),
             telemetry=dict(telemetry))
     keys = sorted({key[1:] for key in indexed})
@@ -225,7 +254,8 @@ def analyze(job):
             problemMeanQuality=statistics.mean(means) if means else None,
             problemBootstrap95=interval(means), cells=matched))
     with (folder / 'cases.csv').open('w', newline='') as stream:
-        columns = ['index', 'input', 'family', 'arm', 'seed', 'outcome', 'objective', 'firstMs', 'bestMs', 'elapsedMs',
+        columns = ['index', 'input', 'family', 'arm', 'seed', 'outcome', 'objective', 'firstMs', 'bestMs',
+                   'processFirstMs', 'processBestMs', 'elapsedMs',
                    'proven', 'workers', 'work', 'reseeds', 'armFailures', 'armFaults', 'initMs', 'sourceHashes', 'buildFingerprint']
         writer = csv.DictWriter(stream, fieldnames=columns)
         writer.writeheader()
@@ -236,6 +266,7 @@ def analyze(job):
                 family=case['problem'].get('family'), arm=case['arm'], seed=case.get('seed'), outcome=outcome(case),
                 objective=str(objective(rec)) if rec else None, firstMs=rec.get('timeToFirstFeasibleMs'),
                 bestMs=rec.get('timeToBestMs'), elapsedMs=rec.get('elapsedMs'), proven=rec.get('proven'), workers=len(fields),
+                processFirstMs=rec.get('processTimeToFirstFeasibleMs'), processBestMs=rec.get('processTimeToBestMs'),
                 work=sum(int(f.get('work', 0)) for _, f in fields), reseeds=sum(int(f.get('reseeds', 0)) for _, f in fields),
                 armFailures=sum(int(f.get('failures', 0)) for _, f in fields),
                 armFaults=sum(int(f.get('faults', 0)) for _, f in fields),
@@ -250,10 +281,22 @@ def analyze(job):
         print(json.dumps(dict(reference=reference_checks['disagreements'],
                               pairs=[pair for pair in result['pairs'] if pair['disagreementCases']])))
         raise SystemExit(f'Job {job} has unresolved proof or reference disagreements')
+    return result
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('jobs', type=int, nargs='+')
-    for job in parser.parse_args().jobs:
-        analyze(job)
+    results = [analyze(job) for job in parser.parse_args().jobs]
+    totals = Counter()
+    for result in results:
+        for arm in result['arms'].values():
+            totals.update(arm['outcomes'])
+    campaign = dict(jobs=[dict(job=result['job'], status=result['status'], cases=result['cases']) for result in results],
+        cases=sum(result['cases'] for result in results), outcomes=dict(totals),
+        missingSourceHashRecords=sum(arm['missingSourceHashes'] for result in results for arm in result['arms'].values()),
+        feasibleRecordsMissingWitnesses=sum(arm['missingWitnesses'] for result in results for arm in result['arms'].values()),
+        referenceComparisons=sum(result['referenceChecks']['checked'] for result in results),
+        missingReferences=sum(len(result['referenceChecks']['missing']) for result in results),
+        referenceDisagreements=sum(len(result['referenceChecks']['disagreements']) for result in results))
+    (ROOT / 'evidence' / 'campaign-summary.json').write_text(json.dumps(campaign, indent=2) + '\n')

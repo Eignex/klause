@@ -2,6 +2,7 @@
   "baseline": "5471419aa8c832ee1065468a6861bb203a1ff8c7",
   "wiring": "1795496d36dddf0ac97ababeb32ee0145e3ba49c",
   "measurement": "52193ef906cfedac893b1df8390559ca0495b59e",
+  "integratedConfirmation": "54101a2cb001c825d0a920779004f4b140a0b956",
   "jobs": [
     {
       "id": 855,
@@ -50,6 +51,12 @@
       "spec": "timing-repeat.json",
       "url": "http://192.168.50.104:8420/jobs/883",
       "command": "/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/campaigns/arms-414/specs/timing-repeat.json"
+    },
+    {
+      "id": 909,
+      "spec": "reseed-p4-confirm-300.json",
+      "url": "http://192.168.50.104:8420/jobs/909",
+      "command": "/home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/campaigns/arms-414/specs/reseed-p4-confirm-300.json"
     }
   ]
 }
