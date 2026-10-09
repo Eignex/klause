@@ -204,3 +204,26 @@ still applies. Integration is validated through fresh GitHub CI and AWS records.
 deterministic model selection, canonical witnesses and process-clock attribution.
 Its four BACP cases are metadata validation only. The exact submitted specification
 is `experiments/integration-smoke.json`; its result is pending.
+
+## Frozen 300-second specifications
+
+`experiments/discovery-300.json` names the 20 discovery inputs and compares default,
+conservative and abort 0.01. Three solver seeds (3, 11, 29) and two alternating
+repeats produce 360 cases, with 30 solver core-hours at the nominal budget.
+`experiments/aggressive-300.json` uses the six discovery pilot inputs and compares
+default, aggressive and aggressive with integer caps of 256 per variable and 20,000
+per tier. Its 108 cases represent nine nominal solver core-hours. Boolean probes,
+reseeds and subprocess overshoot are reported separately from those integer caps.
+The worker rotates arm order by problem and alternates arms within each seed and
+repeat; all configurations of an input stay on one AWS instance. Normal parallel
+and machine counts are unset and managed by the worker.
+
+Both specifications pin `5e9d4c5cf581ee6c11957e9edccd0242f88dcd19`, containing the
+merged construction budget, fixed selector, controls and process timing. They are
+prepared but not submitted. The lab disables benchmark result caching for every
+production case. Process timing includes FlatZinc frontend loading; MiniZinc source
+compilation precedes subprocess launch and is outside this measurement. Setup,
+compilation and post-solve source checking do not consume measured search time.
+The abort fraction 0.0001 is pruned because it changed no observed pilot work.
+No round-cap expansion is justified by the pilot. A holdout candidate and its
+settings will be frozen only after discovery; holdout outcomes remain unopened.

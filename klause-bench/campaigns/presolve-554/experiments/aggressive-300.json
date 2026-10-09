@@ -1,0 +1,22 @@
+{
+  "name": "presolve-554-aggressive-300",
+  "description": "Focused issue 554 SAC cost campaign on the six frozen discovery pilot families. Compare default against aggressive with shipped integer SAC budgets and aggressive capped at 256 calls per variable and 20000 total per tier. Three seeds, two alternating repeats, single satOptimized CP arm, 300-second shared deadlines and post-solve source checks. Boolean probes and reseeds are disclosed separately; aggregate counts are not one-tier cap counts.",
+  "host": "aws",
+  "problems": {"set": "presolve-554-pilot", "reference": "any"},
+  "base": {
+    "ref": "5e9d4c5cf581ee6c11957e9edccd0242f88dcd19",
+    "engine": "cp",
+    "processors": "1",
+    "timeout": "300000",
+    "param.bt-arm": "satOptimized",
+    "param.arms": "1",
+    "param.source-validation": "true"
+  },
+  "configs": [
+    {"label": "default", "presolve": "default"},
+    {"label": "aggressive", "presolve": "aggressive"},
+    {"label": "aggressive-capped", "presolve": "aggressive", "param.presolve-probe-per-var": "256", "param.presolve-probe-total": "20000"}
+  ],
+  "seeds": [3, 11, 29],
+  "repeats": 2
+}
