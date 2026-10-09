@@ -125,6 +125,16 @@ def analyze(job):
         rows = [c for c in cases if c['arm'] == arm]
         counts = Counter(outcome(c) for c in rows)
         records = [c['record'] for c in rows if c.get('record')]
+        inputs = []
+        for identity in sorted({(c['problem']['suite'], c['problem']['problem']) for c in rows}):
+            selected = [c for c in rows if (c['problem']['suite'], c['problem']['problem']) == identity]
+            values = [objective(c['record']) for c in selected if c.get('record')]
+            values = [x for x in values if x is not None]
+            inputs.append(dict(input='/'.join(identity), family=selected[0]['problem'].get('family'),
+                outcomes=dict(Counter(outcome(c) for c in selected)),
+                objectiveRange=[str(min(values)), str(max(values))] if values else None,
+                firstMs=[c['record'].get('timeToFirstFeasibleMs') for c in selected if c.get('record')],
+                bestMs=[c['record'].get('timeToBestMs') for c in selected if c.get('record')]))
         telemetry = defaultdict(lambda: dict(cases=0, work=0, ms=0, initMs=0, segments=0,
                                              reseeds=0, failures=0, faults=0, weightedReward=0.0,
                                              finalHolders=0, credit=defaultdict(float)))
@@ -150,7 +160,7 @@ def analyze(job):
                     telemetry[holders[-1]['label'].rsplit('#', 1)[0]]['finalHolders'] += 1
         for totals in telemetry.values():
             totals['meanReward'] = totals['weightedReward'] / totals['work'] if totals['work'] else None
-        result['arms'][arm] = dict(outcomes=dict(counts), fingerprints=sorted({r.get('buildFingerprint') or 'missing' for r in records}),
+        result['arms'][arm] = dict(outcomes=dict(counts), inputs=inputs, fingerprints=sorted({r.get('buildFingerprint') or 'missing' for r in records}),
             commits=sorted({r.get('gitSha') or 'missing' for r in records}),
             missingWitnesses=sum(r['feasible'] is True and not r.get('finalWitness') for r in records),
             missingSourceHashes=sum(not r.get('sourceHashes') for r in records),
