@@ -76,8 +76,10 @@ python3 klause-bench/campaigns/presolve-554/collect.py 863
 `collect.py` downloads and gzip-archives raw lab API responses with their URLs,
 uncompressed SHA-256 and size. Cases retain exact commands, git SHAs, installed CLI
 and runtime hashes/options, elapsed time, validation policy and statistics. The
-file listing supplies durable retrieval references for solver streams and setup
-logs. Collect finished jobs again to replace partial snapshots. The live job's
+file listing supplies durable retrieval references for retained streams and setup
+logs. Successful production cases retain records without their stdout streams;
+the pilots therefore preserve source-check verdicts, not replayable witnesses.
+Collect finished jobs again to replace partial snapshots. The live job's
 `files` endpoint and `/experiments/<id>/cases.csv` remain independently accessible.
 
 ## Frozen split
@@ -90,6 +92,7 @@ sample of the complete challenge archive. Selection uses SHA-256 order with the
 `presolve-554/` prefix, and the holdout excludes every pilot base family.
 Remaining families are reserved. Holdout is therefore independent by base family
 as well as by input; it cannot estimate within-family instance generalization.
+These campaign sets are separate from the curated thematic `sweep` set.
 
 The pilot's 12 year/family groups are only eight base families because families
 recur across years. It is a bounded plumbing/cost screen with catalogue ordering,
@@ -104,6 +107,14 @@ load errors; they do not contribute presolve cost observations. The first pilot
 also confirms that `bt-arm=satOptimized` selects a family but leaves six cloned
 arms under default cardinality. These are measured settings, not a single solver.
 
+Job 863 finished all 336 cases. Each configuration has 48 records, including eight
+load errors. Explicit default and frozen main each report 13 witnesses (four proved),
+four refutations and 23 unknowns; aggressive reports no witnesses, four refutations
+and 36 unknowns. These are reported outcomes under a short budget. The final
+`evidence/863/final-{cases,job,reference,files}.json.gz` responses supplement the
+earlier partial snapshots. Lab transport retries can inflate command wall times;
+timing comparisons use the returned solver record, not command completion time.
+
 [Job 874](http://192.168.50.104:8420/jobs/874) explicitly sets `param.arms=1` and
 uses six frozen discovery inputs from `presolve-554-pilot`. Its controls build is
 `09f01a9ba` (full SHA in `experiments/single-arm-pilot.json`), with source checks
@@ -112,6 +123,14 @@ arm uses its existing reported-result policy; checking happens outside solver
 runtime and that policy difference is retained. This pilot has 168 cases under
 10,000 ms, two seeds and two repeats. It must confirm the single-arm commands,
 work telemetry and source-check data before the larger 300-second sweep.
+
+All 168 cases finished. Explicit default, implicit default and frozen main each
+report 16 witnesses and eight unknowns. Conservative reports 14 witnesses and ten
+unknowns; aggressive reports four witnesses and 20 unknowns. No arm reports a
+proof or refutation. Four witnesses in each updated non-aggressive configuration
+passed the source check; all remaining source-check outcomes are unknown, with no
+invalid candidates. Unknown checks retain integer witnesses as reported outcomes.
+The final API responses are archived under `evidence/874/final-*.json.gz`.
 
 ## Reference identity diagnostic
 
