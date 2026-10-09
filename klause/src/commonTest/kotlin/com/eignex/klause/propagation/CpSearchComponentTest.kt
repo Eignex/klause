@@ -1,28 +1,201 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchIntegerBound
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.theory.qflra.SourceBoundAtom
 import com.eignex.klause.theory.qflra.SourceBoundTerm
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class CpSearchComponentTest {
+    @Test
+    fun `an unnameable native antecedent declines its shared proof`() {
+        val cp = CpSearchComponent(
+            PropagationSession(
+                Problem(
+                    0,
+                    2,
+                    arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+                    arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
+                ),
+            ),
+        )
+        cp.rebase()
+        val session = SearchSession(listOf(cp))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtMost(1, 3L)))
+
+        assertEquals(3L, session.intUpperBound(0))
+        assertSame(SearchAtomPremise.Unavailable, session.intUpperBoundPremise(0))
+        assertNull(session.explainAtoms(session.intUpperBoundPremise(0)))
+    }
+
+    @Test
+    fun `native bound proofs preserve source integer remapping and rollback`() {
+        val native = PropagationSession(
+            Problem(
+                0,
+                2,
+                arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
+            ),
+        )
+        val cp = CpSearchComponent(native, intArrayOf(4, 7))
+        cp.rebase()
+        val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val bound = SearchDecision.IntAtMost(7, 3L)
+        assertIs<ComponentResult.Consistent>(session.push(bound))
+        val literal = assertNotNull(session.atomLiteral(bound))
+
+        assertEquals(3L, session.intUpperBound(4))
+        assertContentEquals(intArrayOf(literal xor 1), session.explainAtoms(session.intUpperBoundPremise(4))?.literals)
+
+        session.popTo(0)
+        assertEquals(10L, session.intUpperBound(4))
+        val sibling = SearchDecision.IntAtLeast(4, 5L)
+        assertIs<ComponentResult.Consistent>(session.push(sibling))
+        val siblingLiteral = assertNotNull(session.atomLiteral(sibling))
+        assertEquals(5L, session.intLowerBound(7))
+        assertContentEquals(
+            intArrayOf(siblingLiteral xor 1),
+            session.explainAtoms(session.intLowerBoundPremise(7))?.literals,
+        )
+    }
+
+    @Test
+    fun `a native order antecedent becomes its shared integer witness`() {
+        val native = PropagationSession(
+            Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
+        )
+        val order = native.boundGeLit(0, 5L, positive = false)
+        assertIs<PropagationResult.Implied>(
+            native.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), order)), lbd = 2),
+        )
+        val cp = CpSearchComponent(native)
+        cp.rebase()
+        val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val reserved = assertNotNull(SearchIntegerBound.of(SearchDecision.IntAtMost(0, 0L)))
+        assertNotNull(session.registerAtom(reserved, reserved.complement()))
+        val bound = SearchDecision.IntAtLeast(0, 5L)
+
+        assertIs<ComponentResult.Consistent>(session.push(bound))
+
+        assertEquals(true, session.boolValue(0))
+        assertEquals(
+            setOf(Lit.make(0, true), assertNotNull(session.atomLiteral(bound)) xor 1),
+            cp.reasonFor(Lit.make(0, true))?.literals?.toSet(),
+        )
+    }
+
+    @Test
+    fun `late equality exclusions explain through their establishing source bound`() {
+        val cases = listOf(
+            Triple(IntDomain(0, 10), 5L, SearchDecision.IntAtLeast(7, 6L) to 8L),
+            Triple(IntDomain(0, 10), 5L, SearchDecision.IntAtMost(7, 4L) to 2L),
+            Triple(
+                IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 4),
+                Long.MIN_VALUE + 1,
+                SearchDecision.IntAtLeast(7, Long.MIN_VALUE + 2) to Long.MIN_VALUE + 3,
+            ),
+            Triple(
+                IntDomain(Long.MAX_VALUE - 4, Long.MAX_VALUE),
+                Long.MAX_VALUE - 1,
+                SearchDecision.IntAtMost(7, Long.MAX_VALUE - 2) to Long.MAX_VALUE - 3,
+            ),
+        )
+        for ((domain, excluded, bounds) in cases) {
+            val native = PropagationSession(Problem(1, 1, arrayOf(domain), emptyArray()))
+            val cp = CpSearchComponent(native, intArrayOf(7))
+            cp.rebase()
+            val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val (establishing, later) = bounds
+            assertIs<ComponentResult.Consistent>(session.push(establishing))
+            val equality = native.equalityLit(0, excluded, positive = true)
+            assertIs<ComponentResult.Consistent>(
+                cp.import(
+                    assertIs<PropagationResult.Implied>(
+                        native.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), equality)), lbd = 2),
+                    ),
+                    session,
+                ),
+            )
+            val consequence = if (establishing is SearchDecision.IntAtLeast) {
+                native.boundGeLit(0, later, positive = true)
+            } else {
+                native.boundLeLit(0, later, positive = true)
+            }
+            assertIs<ComponentResult.Consistent>(
+                cp.import(
+                    assertIs<PropagationResult.Implied>(
+                        native.addLearnedClause(Clause(intArrayOf(Lit.make(0, false), consequence)), lbd = 2),
+                    ),
+                    session,
+                ),
+            )
+
+            assertEquals(true, session.boolValue(0))
+            assertEquals(
+                later,
+                if (establishing is SearchDecision.IntAtLeast) session.intLowerBound(7) else session.intUpperBound(7),
+            )
+            assertEquals(
+                setOf(Lit.make(0, true), assertNotNull(session.atomLiteral(establishing)) xor 1),
+                cp.reasonFor(Lit.make(0, true))?.literals?.toSet(),
+            )
+        }
+    }
+
+    @Test
+    fun `complements of extreme finite bounds refute without wrapping`() {
+        for (upper in listOf(false, true)) {
+            val cp = CpSearchComponent(
+                PropagationSession(Problem(0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), emptyArray())),
+            )
+            cp.rebase()
+            val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val bound = if (upper) {
+                SearchDecision.IntAtMost(0, Long.MAX_VALUE)
+            } else {
+                SearchDecision.IntAtLeast(0, Long.MIN_VALUE)
+            }
+            assertIs<ComponentResult.Consistent>(session.push(bound))
+            val literal = assertNotNull(session.atomLiteral(bound))
+            session.popTo(0)
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(literal xor 1)))
+
+            assertContentEquals(intArrayOf(literal), conflict.explanation?.literals)
+        }
+    }
 
     @Test
     fun `registered theory names bypass CP arrays while source Booleans still propagate`() {

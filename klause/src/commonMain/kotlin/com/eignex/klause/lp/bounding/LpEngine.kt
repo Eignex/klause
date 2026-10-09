@@ -30,6 +30,7 @@ import com.eignex.klause.lp.engine.LpCounterResults
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
@@ -112,6 +113,11 @@ internal class LpEngine(
             } catch (closeFailure: Throwable) {
                 failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
             }
+        }
+        try {
+            leafSolver?.releaseSolvers()
+        } catch (closeFailure: Throwable) {
+            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
         }
         try {
             propagator.releaseSolver()
@@ -500,7 +506,7 @@ internal class LpEngine(
     private var lpBackjump: Learned? = null
 
     // A fixed source layout allows bound-only adoption without rebuilding its factorization.
-    private var persistentResolved = false
+    private var persistentRelaxer: CpToLpRelaxation? = null
     private var persistentRelaxation: LpRelaxation? = null
 
     // The current legacy fallback owner remains live for metrics until replacement or engine close.
@@ -523,61 +529,38 @@ internal class LpEngine(
         cancellation = params.cancellation,
     )
 
-    internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
-        val relaxation = buildNodeRelaxation(relaxer, session)
-        relaxation.sourceMap?.withCpBounds(relaxation.model, session)?.let(cutPool::remap)
+    internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
+        val base = buildNodeRelaxation(relaxer, session) ?: return null
+        val relaxation = cpAdapter.cutRelaxation(base, session) ?: return null
+        relaxation.sourceMap?.let(cutPool::remap)
         return relaxation
     }
 
-    private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
-        if (!persistentResolved) {
-            persistentResolved = true
+    private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
+        if (persistentRelaxer !== relaxer) {
+            cpAdapter.reset()
+            persistentRelaxation = null
             val base = relaxer.build(PropagationSession(problem), cancellation = params.cancellation)
             if (base.persistentEligible) persistentRelaxation = base
+            persistentRelaxer = relaxer
         }
         persistentRelaxation?.let {
-            cpAdapter.relaxation(it, session)?.let { rebound ->
+            return cpAdapter.relaxation(it, session)?.also { rebound ->
                 noteNodeOverhead(rebound.model.numVars.toLong() * LpNodeOverhead.EDIT)
-                return rebound
             }
         }
-        // Residual real models rebuild only when an activating pin changed: with no integer columns
-        // every row and bound is a function of the aux-bool pin set alone, so an unchanged fingerprint
-        // means the previously built relaxation is byte-identical — the common case along a dive,
-        // where most decisions touch Booleans that activate no real row.
-        if (residualAuxVars.isNotEmpty() && problem.numIntVars == 0) {
-            val key = IntArray(residualAuxVars.size) {
-                when (session.boolValue(residualAuxVars[it])) {
-                    null -> 2
-                    true -> 1
-                    false -> 0
-                }
-            }
-            residualCache?.let { cached ->
-                if (residualCacheKey?.contentEquals(key) == true) return cached
-            }
-            val built = relaxer.build(session, cancellation = params.cancellation)
-            noteNodeOverhead(built.model.extent() * LpNodeOverhead.BUILD)
-            residualCache = built
-            residualCacheKey = key
-            return built
-        }
-        return relaxer.build(session, cancellation = params.cancellation)
-            .also { noteNodeOverhead(it.model.extent() * LpNodeOverhead.BUILD) }
+        return cpAdapter.relaxation(relaxer, session)
     }
 
     internal var lpCounterResults = LpCounterResults()
         private set
 
-    // Pin-fingerprint cache for the residual real relaxation (realResidual plans, no integer columns).
-    private var residualCacheKey: IntArray? = null
-    private var residualCache: LpRelaxation? = null
+    private var leafSolver: LpSolveSession? = null
 
     // Gated residual float filter (pure-real models): a structurally node-invariant relaxation whose
     // rows toggle by per-row enforcement alone, plus ONE simplex instance that re-solves it with its
     // kept LU factorization — the per-node build+factorize that dominated the satisfaction path
-    // collapses to a few dual pivots. Exact certificates never read this model; they run on the
-    // per-node pin-consulting build.
+    // collapses to a few dual pivots. Exact certificates read the retained source rows and live bounds.
     private var gatedResolved = false
     private var gatedFilter: GatedResidual? = null
 
@@ -651,16 +634,16 @@ internal class LpEngine(
         if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxer = lpRelaxer ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxation = nodeRelaxation(relaxer, session)
+            ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val model = relaxation.model
-        val certified = solveAndCertify(
+        val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
+            .also { leafSolver = it }
+        val certified = solver.solve(
             model,
             cancellation = params.cancellation,
             workLimit = leafWorkBudget(model),
-            componentSplit = params.lpPlan.componentSplit,
             observer = sink.lp.certificationObserver(LpRoute.STANDALONE),
-            context = solveContext,
             counterResults = lpCounterResults,
-            pricing = pricingOptions,
             floatAccept = toleranceCheck?.let { check ->
                 { result -> check(leafSample(session, relaxation.floatReals(result.primal, problem))) }
             },

@@ -19,6 +19,120 @@ import kotlin.test.assertTrue
 /** The Neumaier–Shcherbina safe bound must never exceed the true optimum (#567 component 3): a
  *  sound lower bound on `min cᵀz`, validated against the exact [DualSimplex]. */
 class SafeObjectiveBoundTest {
+    @Test
+    fun `supplied legacy certificates cannot preserve a bound after its objective changes`() {
+        val model = LpBuilder().apply {
+            val x = addVar(0L, 9L, cost = 1L)
+            val y = addVar(0L, 9L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
+            addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 4L)
+        }.build(Sense.MINIMIZE)
+        val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0, -1.0)))
+        assertEquals(7L, certificate.objectiveBoundCeil(0L))
+
+        model.cost[0] = 0L
+        val current = doubleArrayOf(0.0, -1.0)
+        val bound = assertNotNull(tightObjectiveLowerBound(model, current, certificate))
+
+        assertTrue(bound <= 4.0 && bound > 3.0)
+        assertEquals(
+            bound,
+            certifiedTightObjectiveLowerBound(model, current, certificate, null, ProductionLpCertificationPolicy),
+        )
+    }
+
+
+    @Test
+    fun `retained variable bounds follow nested endpoints and rollback in source coordinates`() {
+        for (maximize in listOf(false, true)) {
+            val source = LpBuilder().apply { addVar(3L, 9L, cost = if (maximize) -1L else 1L) }
+                .build(Sense.MINIMIZE)
+            val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+            assertTrue(trail.push())
+            assertTrue(trail.assertBound(0, maximize, ExactLpSide(ExactLpNumber.of(if (maximize) 4L else 2L)), 7L))
+            assertTrue(trail.push())
+            assertTrue(trail.assertBound(0, maximize, ExactLpSide(ExactLpNumber.of(3L)), 8L))
+
+            for ((depth, expected) in listOf(2 to 6L, 1 to if (maximize) 7L else 5L, 0 to if (maximize) 9L else 3L)) {
+                assertTrue(trail.pop(depth))
+                val model = assertNotNull(trail.state.toWorkingModel())
+                val result = assertNotNull(RevisedSimplex(model).solvePrimal())
+
+                assertEquals(expected, model.safeVariableBound(result, 0, maximize))
+                assertEquals(expected, model.exactVariableBound(result, 0, maximize))
+                assertEquals(expected, model.tightVariableBound(result, 0, maximize))
+            }
+        }
+    }
+
+    @Test
+    fun `retained variable bounds certify fractional rows on an integer source lattice`() {
+        for (maximize in listOf(false, true)) {
+            val source = LpBuilder().apply {
+                val x = addVar(3L, 9L, cost = if (maximize) -1L else 1L)
+                addRealRow(intArrayOf(x), doubleArrayOf(0.5), if (maximize) Relation.LE else Relation.GE, 2.75)
+            }.build(Sense.MINIMIZE)
+            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
+            val result = assertNotNull(RevisedSimplex(model).solvePrimal())
+
+            assertEquals(null, integerCertify(model, result.duals))
+            assertEquals(if (maximize) 5L else 6L, model.exactVariableBound(result, 0, maximize))
+            assertEquals(if (maximize) 5L else 6L, model.tightVariableBound(result, 0, maximize))
+        }
+    }
+
+    @Test
+    fun `retained variable bounds divide objective scaling before integer rounding`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L, cost = 2L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val objective = ExactLpObjective(
+            listOf(ExactLpNumber.of(2L)), source.objective.constant, scale = ExactLpNumber.of(2L),
+        )
+        val trail = LpBoundTrail(source.copy(objective = objective))
+        assertTrue(trail.assertBound(
+            0,
+            false,
+            ExactLpSide(ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(1.5))), true),
+            7L,
+        ))
+        val model = assertNotNull(trail.state.toWorkingModel())
+        val result = assertNotNull(RevisedSimplex(model).solvePrimal())
+
+        assertEquals(null, integerCertify(model, result.duals))
+        assertEquals(5L, model.exactVariableBound(result, 0, maximize = false))
+        assertEquals(5L, model.safeVariableBound(result, 0, maximize = false))
+    }
+
+    @Test
+    fun `supplied retained certificates contribute integer ceilings only to their current state`() {
+        val source = assertNotNull(LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(2L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        val model = assertNotNull(trail.state.toWorkingModel())
+        val duals = doubleArrayOf(0.5)
+        val certificate = assertNotNull(integerCertify(model, duals))
+
+        assertEquals(1.0, tightObjectiveLowerBound(model, duals, certificate))
+        assertEquals(
+            1.0,
+            certifiedTightObjectiveLowerBound(model, duals, certificate, null, ProductionLpCertificationPolicy),
+        )
+        assertTrue(trail.replaceObjective(ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(0L)))))
+        val unpriced = assertNotNull(trail.state.toWorkingModel())
+        assertEquals(0.0, tightObjectiveLowerBound(unpriced, doubleArrayOf(0.0), certificate))
+        assertEquals(
+            0.0,
+            certifiedTightObjectiveLowerBound(
+                unpriced,
+                doubleArrayOf(0.0),
+                certificate,
+                null,
+                ProductionLpCertificationPolicy,
+            ),
+        )
+    }
 
     private fun randomModel(m: Int, n: Int, rng: Random): LpModel {
         val b = LpBuilder()

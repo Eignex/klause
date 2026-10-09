@@ -12,6 +12,8 @@ import com.eignex.klause.util.MutableIntDoubleMap
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
@@ -534,6 +536,19 @@ internal class LpBuilder {
      *  which rows a given producer emitted (the relaxation cache). */
     val rowCount: Int get() = rows.size
 
+    fun sourceBounds(column: Int): ExactLpBounds {
+        require(column in 0 until varCount)
+        fun number(upper: Boolean): ExactLpNumber = if (column in continuousCols) {
+            ExactLpNumber.ofIeee(if (upper) contHi.getOrDefault(column, 0.0) else contLo.getOrDefault(column, 0.0))
+        } else {
+            ExactLpNumber.of(if (upper) hi[column] else lo[column])
+        }
+        return ExactLpBounds(
+            if (column in clampedLoCols) null else ExactLpSide(number(false)),
+            if (column in clampedHiCols || column in openAboveCols) null else ExactLpSide(number(true)),
+        )
+    }
+
     /**
      * Add a structural variable with domain `[lower, upper]` and objective coefficient [cost].
      * [tag] is an opaque caller identifier (e.g. an encoded `(varId, value)`) carried through to
@@ -932,31 +947,40 @@ private fun Long.roundsInBinary64(): Boolean {
 
 // This foundation deliberately does not implement ExactSimplexModel: legacy solvers require a
 // checked projection before they can see any of its values.
-internal class ExactLpNumber private constructor(val value: BigFraction, val ieeeBits: Long?) {
+internal class ExactLpNumber private constructor(
+    val value: BigFraction,
+    val ieeeBits: Long?,
+    private val integer: Long?,
+) {
     val approximation: Double by lazy(LazyThreadSafetyMode.PUBLICATION) {
         ieeeBits?.let { Double.fromBits(it) } ?: value.toDouble()
     }
 
-    fun legacyLong(): Long? {
-        if (ieeeBits != null || value.den != BIG_ONE ||
-            value < BigFraction.ofLong(Long.MIN_VALUE) || value > BigFraction.ofLong(Long.MAX_VALUE)
-        ) {
-            return null
-        }
-        return value.num.toLongExact()
-    }
+    fun legacyLong(): Long? = if (ieeeBits == null) exactLong() else null
+
+    fun exactLong(): Long? = integer
 
     override fun equals(other: Any?): Boolean =
         other is ExactLpNumber && value == other.value && ieeeBits == other.ieeeBits
     override fun hashCode(): Int = 31 * value.hashCode() + (ieeeBits?.hashCode() ?: 0)
 
     companion object {
-        fun of(value: Long): ExactLpNumber = ExactLpNumber(BigFraction.ofLong(value), null)
-        fun of(value: BigFraction): ExactLpNumber = ExactLpNumber(value, null)
-        fun ofIeee(value: Double): ExactLpNumber = ExactLpNumber(
-            requireNotNull(BigFraction.ofDouble(value)) { "exact input must be finite" },
-            value.toRawBits(),
-        )
+        private val minimumLong = bigIntOf(Long.MIN_VALUE)
+        private val maximumLong = bigIntOf(Long.MAX_VALUE)
+        fun of(value: Long): ExactLpNumber = ExactLpNumber(BigFraction.ofLong(value), null, value)
+        fun of(value: BigFraction): ExactLpNumber = ExactLpNumber(value, null, integerOf(value))
+        fun ofIeee(value: Double): ExactLpNumber {
+            val exact = requireNotNull(BigFraction.ofDouble(value)) { "exact input must be finite" }
+            return ExactLpNumber(exact, value.toRawBits(), integerOf(exact))
+        }
+
+        private fun integerOf(value: BigFraction): Long? = if (value.den != BIG_ONE ||
+            value.num < minimumLong || value.num > maximumLong
+        ) {
+            null
+        } else {
+            value.num.toLongExact()
+        }
     }
 }
 
@@ -1082,8 +1106,9 @@ internal class ExactLpModel private constructor(
     val n: Int get() = matrix.size
     val m: Int get() = rows.size
     val numVars: Int get() = columns.size
-    val keySize: Long get() = n.toLong() * 16 + m.toLong() * 16 + matrix.sumOf { it.size.toLong() * 3 } +
-        rows.sumOf { it.premises?.size ?: 0L }
+    private var storageCache: LpLayoutStorage? = null
+    val layoutStorage: LpLayoutStorage get() = storageCache ?: LpLayoutStorage.of(this).also { storageCache = it }
+    val keySize: Long get() = layoutStorage.total
 
     init {
         require(n.toLong() + m == numVars.toLong() && rightHandSide.size == m && objective.size == numVars)
@@ -1100,6 +1125,9 @@ internal class ExactLpModel private constructor(
     fun row(i: Int): ExactLpRow = rows[i]
     fun rhs(i: Int): ExactLpNumber = rightHandSide[i]
     fun entries(j: Int): List<ExactLpEntry> = matrix[j].toList()
+
+    // Engine kernels read the owned immutable list; caller snapshots go through entries.
+    internal fun columnEntries(j: Int): List<ExactLpEntry> = matrix[j]
 
     fun copy(
         rhs: List<ExactLpNumber> = this.rightHandSide,
@@ -1118,7 +1146,7 @@ internal class ExactLpModel private constructor(
             if (rows === this.rows) this.rows else rows.toList(),
             objective,
             false,
-        )
+        ).also { it.storageCache = if (rows === this.rows) layoutStorage else layoutStorage.withRows(rows) }
     }
 
     /**
@@ -1129,8 +1157,20 @@ internal class ExactLpModel private constructor(
      */
     fun withBoundColumns(columns: List<ExactLpColumn>): ExactLpModel {
         require(columns.size == numVars)
-        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false)
+        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false).also {
+            it.storageCache = layoutStorage
+        }
     }
+
+    fun withObjective(objective: ExactLpObjective): ExactLpModel {
+        require(objective.size == numVars)
+        return ExactLpModel(matrix, rightHandSide, columns, rows, objective, false).also {
+            it.storageCache = layoutStorage
+        }
+    }
+
+    internal fun sharesRegion(other: ExactLpModel): Boolean = matrix === other.matrix &&
+        rightHandSide === other.rightHandSide && columns === other.columns && rows === other.rows
 
     fun recentered(origins: List<ExactLpNumber>): ExactLpModel {
         require(origins.size == n)
@@ -1156,7 +1196,9 @@ internal class ExactLpModel private constructor(
         } else {
             objective.withConstant(ExactLpNumber.of(constant))
         }
-        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows, nextObjective, false)
+        return ExactLpModel(matrix, rhs.toList(), columns.toList(), rows, nextObjective, false).also {
+            it.storageCache = layoutStorage
+        }
     }
 
     private fun hasIeeeInput(): Boolean = matrix.any { entries -> entries.any { it.number.ieeeBits != null } } ||

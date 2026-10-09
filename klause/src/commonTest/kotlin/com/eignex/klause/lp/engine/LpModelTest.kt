@@ -14,6 +14,42 @@ import kotlin.test.assertTrue
 
 class LpModelTest {
     @Test
+    fun `builder source bounds preserve open sides and exact mixed endpoints`() {
+        val builder = LpBuilder().apply {
+            addVar(2L, 5L)
+            addFreeVar(null, 7L)
+            addOpenAboveVar(-3L)
+            addRealVar(0.1, 0.3)
+            addRealVar(null, null)
+        }
+        val expectedLower = listOf(
+            BigFraction.ofLong(2L),
+            null,
+            BigFraction.ofLong(-3L),
+            BigFraction.ofDouble(0.1),
+            null,
+        )
+        val expectedUpper = listOf(
+            BigFraction.ofLong(5L),
+            BigFraction.ofLong(7L),
+            null,
+            BigFraction.ofDouble(0.3),
+            null,
+        )
+        val bounds = List(builder.varCount) { builder.sourceBounds(it) }
+        val model = builder.build(Sense.MINIMIZE)
+
+        for (column in bounds.indices) {
+            assertEquals(expectedLower[column], bounds[column].lower?.number?.value)
+            assertEquals(expectedUpper[column], bounds[column].upper?.number?.value)
+            val normalized = model.exactBounds(column)
+            val origin = model.exactShift(column)
+            assertEquals(expectedLower[column], normalized.lower?.let { it.number.value + origin })
+            assertEquals(expectedUpper[column], normalized.upper?.let { it.number.value + origin })
+        }
+    }
+
+    @Test
     fun `objective helpers clear every previous structural and logical cost`() {
         val source = LpBuilder().apply {
             addVar(0L, 2L, cost = 7L)

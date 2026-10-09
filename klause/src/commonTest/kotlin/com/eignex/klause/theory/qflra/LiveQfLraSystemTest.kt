@@ -5,6 +5,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.bounding.LpEffortProfile
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
@@ -12,6 +13,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.search.ComponentResult
@@ -30,6 +32,152 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LiveQfLraSystemTest {
+    @Test
+    fun `repeated and weaker rows preserve the active bound and its premise`() {
+        for (upper in listOf(false, true)) {
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source(), lp)
+                assertTrue(system.install())
+                val session = SearchSession(listOf(lp))
+                session.initialize()
+                session.push(SearchDecision.Bool(Lit.make(0, true)))
+                val coefficients = if (upper) listOf(1, 2) else listOf(-1, -2)
+                val strong = row(coefficients, if (upper) 3 else -3)
+                assertTrue(system.assertRow(strong, premise(0)))
+                session.push(SearchDecision.Bool(Lit.make(1, true)))
+                val edits = assertNotNull(lp.metrics).editAttempts
+
+                repeat(3) {
+                    assertTrue(system.assertRow(strong, premise(1)))
+                    assertTrue(system.assertRow(row(coefficients, if (upper) 4 else -2), premise(1)))
+                }
+
+                assertEquals(edits, assertNotNull(lp.metrics).editAttempts)
+                val active = assertNotNull(lp.state?.activeSide(2, upper))
+                assertEquals(BigFraction.ofLong(3), active.side.number.value)
+                assertEquals(
+                    listOf(Lit.make(0, false)),
+                    assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.toList(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a weaker row is asserted after rollback removes its stronger sibling`() {
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source(), lp)
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertTrue(system.assertRow(row(listOf(1, 2), 2), premise(0)))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+            assertTrue(system.assertRow(row(listOf(1, 2), 3), premise(1)))
+            session.popTo(0)
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertTrue(system.assertRow(row(listOf(1, 2), 3), premise(1)))
+
+            val active = assertNotNull(lp.state?.activeSide(2, true))
+            assertEquals(BigFraction.ofLong(3), active.side.number.value)
+            assertEquals(
+                listOf(Lit.make(1, false)),
+                assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.toList(),
+            )
+        }
+    }
+
+    @Test
+    fun `a strict row strengthens an equal nonstrict bound on either side`() {
+        for (upper in listOf(false, true)) {
+            LpPropagator(object : LpSearchPolicy {}).use { lp ->
+                val system = LiveQfLraSystem(source(), lp)
+                assertTrue(system.install())
+                assertTrue(lp.atLevel(1))
+                val plain = row(if (upper) listOf(1) else listOf(-1), if (upper) 3 else -3)
+                assertTrue(system.assertRow(plain, axiom))
+                val edits = assertNotNull(lp.metrics).editAttempts
+                val strict = ExactRationalInequality(plain.columns, plain.coefficients, plain.rhs, strict = true)
+
+                assertTrue(system.assertRow(strict, axiom))
+                assertTrue(system.assertRow(plain, axiom))
+
+                assertEquals(edits + 1, assertNotNull(lp.metrics).editAttempts)
+                assertTrue(assertNotNull(lp.state?.activeSide(0, upper)).side.strict)
+                assertTrue(lp.atLevel(0))
+                assertNull(lp.state?.activeSide(0, upper))
+            }
+        }
+    }
+
+    @Test
+    fun `prepared comparisons match fresh rows for every relation and complement`() {
+        for (op in LinearOp.entries) {
+            val factor = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 2.0), op, 3.0)
+            val source = source().withFactors(arrayOf(factor))
+            val form = factor.linearRows.single().exactForm(2)
+            for (truth in listOf(false, true)) {
+                val comparison = form.comparison(truth) { false }
+                val directions = if (comparison.op == LinearOp.NE) listOf(LinearOp.LE, LinearOp.GE) else listOf(null)
+                for (direction in directions) {
+                    LpPropagator(object : LpSearchPolicy {}).use { retained ->
+                        LpPropagator(object : LpSearchPolicy {}).use { fresh ->
+                            val prepared = LiveQfLraSystem(source, retained, listOf(listOf(form)))
+                            val rebuilt = LiveQfLraSystem(source, fresh)
+                            assertTrue(prepared.install())
+                            assertTrue(rebuilt.install())
+                            assertTrue(retained.atLevel(1))
+                            assertTrue(fresh.atLevel(1))
+                            val rows = ArrayList<ExactRationalInequality>()
+                            comparison.rowsInto(rows, direction)
+
+                            repeat(2) { assertTrue(prepared.assertComparison(comparison, direction, axiom)) }
+                            for (row in rows) assertTrue(rebuilt.assertRow(row, axiom))
+
+                            val actual = assertNotNull(retained.state).model
+                            val expected = assertNotNull(fresh.state).model
+                            assertEquals(expected.numVars, actual.numVars)
+                            for (column in 0 until expected.numVars) {
+                                assertEquals(expected.column(column).bounds, actual.column(column).bounds)
+                            }
+                            assertTrue(retained.atLevel(0))
+                            assertNull(retained.state?.activeSide(2, false))
+                            assertNull(retained.state?.activeSide(2, true))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a root fixing bypasses cached normalization and retains both fixing premises`() {
+        val factor = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.LE, 3.0)
+        val source = source().withFactors(arrayOf(factor))
+        val form = factor.linearRows.single().exactForm(2)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp, listOf(listOf(form)))
+            assertTrue(system.install())
+            val session = SearchSession(listOf(lp))
+            session.initialize()
+            for (variable in 0..2) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
+            val comparison = form.comparison(true) { false }
+            assertTrue(system.assertComparison(comparison, null, premise(0)))
+            assertTrue(lp.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2)), premise(1)))
+            assertTrue(lp.assertBound(0, true, ExactLpSide(ExactLpNumber.of(2)), premise(2)))
+
+            assertTrue(system.assertComparison(comparison, null, premise(0)))
+
+            val active = assertNotNull(lp.state?.activeSide(1, true))
+            assertEquals(BigFraction.ONE, active.side.number.value)
+            assertEquals(
+                (0..2).map { Lit.make(it, false) },
+                assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.sorted(),
+            )
+        }
+    }
+
     @Test
     fun `registered negative rational sides reuse a term across sibling scopes`() {
         LpPropagator(object : LpSearchPolicy {}).use { lp ->

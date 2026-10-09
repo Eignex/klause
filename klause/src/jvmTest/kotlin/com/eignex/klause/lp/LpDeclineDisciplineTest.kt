@@ -25,6 +25,7 @@ import com.eignex.klause.lp.bounding.sparseCertifiedPrune
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
+import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -125,6 +126,14 @@ private class ConsumerRecordingFactory : LpEngineFactory {
         return RecordingComponentSolver(delegate, calls)
     }
 
+    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
+        isolated: IntArray): RetainedComponentLpSolverCapability {
+        calls += DeclineCall.COMPONENT
+        return RecordingComponentSolver(
+            ProductionLpEngineFactory.newRetainedComponentSolver(model, parts, solvers, isolated), calls,
+        )
+    }
+
     override fun newTableauSolver(
         model: LpModel,
         cancellation: Cancellation,
@@ -192,7 +201,13 @@ private class RecordingComponentSolver(
     private val component: ComponentLpSolverCapability,
     calls: MutableList<DeclineCall>,
 ) : RecordingSolver(component, calls),
-    ComponentLpSolverCapability {
+    RetainedComponentLpSolverCapability {
+    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+        (component as? RetainedComponentLpSolverCapability)?.adopt(state, token) ?: false
+
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+        (component as? RetainedComponentLpSolverCapability)?.resolveBounds(allowance)
+
     override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? =
         component.exactBound(observer, policy)
 
@@ -407,7 +422,7 @@ class LpDeclineDisciplineTest {
             LpPlan(bounding = true, realResidual = true),
         )
 
-        val leaf = engine.leafCertify(PropagationSession(problem))
+        val leaf = engine.use { it.leafCertify(PropagationSession(problem)) }
 
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, leafRealFeasibility(problem, null, sample).verdict)
         assertEquals(LpVerdict.INDETERMINATE, standalone.verdict)
@@ -415,13 +430,14 @@ class LpDeclineDisciplineTest {
         assertTrue(standalone.reals.isEmpty())
         assertTrue(leaf.reals.isEmpty())
         assertTrue(standaloneHarness.factory.calls.contains(DeclineCall.GENERAL))
-        assertTrue(engineHarness.factory.calls.contains(DeclineCall.GENERAL))
+        assertTrue(engineHarness.factory.calls.contains(DeclineCall.PERSISTENT))
+        assertEquals(0, engineHarness.factory.calls.count { it == DeclineCall.GENERAL })
         assertEquals(
             standaloneHarness.factory.calls.count { it == DeclineCall.GENERAL },
             standaloneHarness.factory.calls.count { it == DeclineCall.CLOSE },
         )
         assertEquals(
-            engineHarness.factory.calls.count { it == DeclineCall.GENERAL },
+            engineHarness.factory.calls.count { it == DeclineCall.PERSISTENT },
             engineHarness.factory.calls.count { it == DeclineCall.CLOSE },
         )
     }
@@ -635,9 +651,11 @@ class LpDeclineDisciplineTest {
         assertNull(declined.bounds[0].hi)
         assertEquals(5L, accepted.bounds[0].hi)
         assertTrue(boundHarness.factory.calls.contains(DeclineCall.SOLVE_PRIMAL))
+        assertTrue(boundHarness.factory.calls.contains(DeclineCall.RESOLVE_BOUNDS))
         assertTrue(boundHarness.policy.observedSuccess(LpCertifier.SAFE_OBJECTIVE))
+        assertEquals(1, boundHarness.factory.calls.count { it == DeclineCall.PERSISTENT })
         assertEquals(
-            boundHarness.factory.calls.count { it == DeclineCall.GENERAL },
+            boundHarness.factory.calls.count { it == DeclineCall.PERSISTENT },
             boundHarness.factory.calls.count { it == DeclineCall.CLOSE },
         )
 

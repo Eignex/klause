@@ -16,6 +16,150 @@ import kotlin.test.assertTrue
 
 class LpCaptureTest {
     @Test
+    fun `mixed structural capture restores scoped rows without dropping permanent definitions`() {
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 3L, cost = 1L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))
+        val rows = listOf(
+            LpScopedRow(0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L), logical),
+            LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L), logical),
+        )
+        val capture = LpExactCapture.capture(
+            source, LpReplaySettings(
+                "mixed-rows",
+                1L,
+                componentSplit = false,
+                solverKind = LpReplaySolverKind.PERSISTENT,
+            ),
+            listOf(
+                LpExactReplayEvent.Push(), LpExactReplayEvent.Extend(emptyList(), rows, true, setOf(0L)),
+                LpExactReplayEvent.Solve(), LpExactReplayEvent.Pop(0), LpExactReplayEvent.Solve(),
+            ),
+        )
+
+        val decoded = LpExactCapture.decode(capture.encode())
+        val report = LpExactReplay.replay(decoded)
+
+        assertContentEquals(capture.encode(), decoded.encode())
+        assertEquals(setOf(0L), (decoded.events[1] as LpExactReplayEvent.Extend).permanentRows)
+        assertTrue(report.steps.all { it.accepted })
+        assertEquals(listOf(BigFraction.ofLong(2L), BigFraction.ONE), report.steps.mapNotNull { it.result?.lowerBound })
+    }
+
+    @Test
+    fun `version two captures retain row authority when upgraded`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
+        }.build(Sense.MINIMIZE)
+        val id = 0x0123456789ABCDEFL
+        val state = LpExactState(
+            assertNotNull(source.authoritativeModel()),
+            rows = LpScopedRows(listOf(LpRowIdentity(id, null)), id),
+        )
+        val capture = LpExactCapture.capture(state, LpReplaySettings("legacy-rows", 1L), emptyList())
+        val encoded = capture.encode()
+        val rowHeader = ByteArray(8) { (id ushr (56 - 8 * it)).toByte() } + byteArrayOf(-1, -1, -1, -1, 1)
+        val rowOffset = (0..encoded.size - rowHeader.size).single { start ->
+            rowHeader.indices.all { encoded[start + it] == rowHeader[it] }
+        }
+        val suspensionOffset = rowOffset + rowHeader.size
+        val legacy = (encoded.copyOfRange(
+            0,
+            suspensionOffset,
+        ) + encoded.copyOfRange(suspensionOffset + 4, encoded.size))
+            .also { it[11] = 2 }
+
+        val decoded = LpExactCapture.decode(legacy)
+
+        assertTrue(state.fullAuthorityEquals(decoded.initialState))
+        assertEquals(LP_EXACT_CAPTURE_VERSION, decoded.version)
+        assertNull(decoded.initialState.rows.row(0).suspendedAt)
+    }
+
+    @Test
+    fun `structural capture replays new columns with exact origins costs and row guards`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
+            emptyList(),
+            ExactLpObjective(listOf(one)),
+        )
+        val column = LpStructuralColumn(
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), third, false, 7),
+            third,
+        )
+        val row = LpScopedRow(
+            5,
+            listOf(0 to third, 1 to one),
+            one,
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            ExactLpRow(false, premises = ExactLpPremises(emptyList(), listOf(11))),
+        )
+        val capture = LpExactCapture.capture(
+            source,
+            LpReplaySettings(
+                "structural-extension",
+                1L,
+                componentSplit = false,
+                solverKind = LpReplaySolverKind.PERSISTENT,
+            ),
+            listOf(LpExactReplayEvent.Push(), LpExactReplayEvent.Extend(listOf(column), listOf(row), true)),
+        )
+
+        val decoded = LpExactCapture.decode(capture.encode())
+        val report = LpExactReplay.replay(decoded)
+
+        assertContentEquals(capture.encode(), decoded.encode())
+        assertNull(report.declinedEventIndex)
+        val state = report.steps.last().state
+        assertEquals(column.column, state.baseModel.column(1))
+        assertEquals(third, state.model.objective.cost(1))
+        assertEquals(row.metadata, state.model.row(0))
+        assertEquals(5L, state.rows.row(0).id)
+    }
+
+    @Test
+    fun `exact capture restores suspended parent rows and replays further replacements`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 2L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.suspend(setOf(0)))
+        val capture = LpExactCapture.capture(
+            trail.state,
+            LpReplaySettings(
+                "suspended-parent",
+                1L,
+                componentSplit = false,
+                solverKind = LpReplaySolverKind.PERSISTENT,
+            ),
+            listOf(
+                LpExactReplayEvent.Pop(0),
+                LpExactReplayEvent.Push(),
+                LpExactReplayEvent.Suspend(setOf(0)),
+                LpExactReplayEvent.Pop(0),
+            ),
+        )
+
+        val decoded = LpExactCapture.decode(capture.encode())
+        val report = LpExactReplay.replay(decoded)
+
+        assertTrue(trail.state.fullAuthorityEquals(decoded.initialState))
+        assertContentEquals(capture.encode(), decoded.encode())
+        assertNull(report.declinedEventIndex)
+        assertEquals(listOf(true, true, false, true), report.steps.map { it.state.rows.row(0).active })
+        assertTrue(report.steps.all { it.accepted })
+        assertEquals(setOf(0L), (decoded.events[2] as LpExactReplayEvent.Suspend).ids)
+    }
+
+    @Test
     fun `row capture resumes complete state after compaction and preserves every append field`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)

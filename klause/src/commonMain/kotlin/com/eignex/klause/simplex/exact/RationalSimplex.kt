@@ -11,6 +11,7 @@ import com.eignex.klause.util.gcd
 import com.eignex.klause.util.isZero
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.plus
+import com.eignex.klause.util.rem
 import com.eignex.klause.util.shl
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
@@ -184,6 +185,12 @@ class BigFraction private constructor(
     /** Returns the additive inverse of this fraction. */
     fun negated(): BigFraction = if (isZero) this else BigFraction(-num, den)
 
+    internal fun ceilInteger(): BigInt {
+        if (den.isOne) return num
+        val quotient = num / den
+        return if (num.signum() > 0 && !(num % den).isZero()) quotient + BIG_ONE else quotient
+    }
+
     /** Returns this fraction converted to a [Double]. */
     fun toDouble(): Double = num.toDouble() / den.toDouble()
 
@@ -235,7 +242,7 @@ class BigFraction private constructor(
         val sign = num.signum()
         val otherSign = other.num.signum()
         if (sign != otherSign || sign == 0) return sign.compareTo(otherSign)
-        if (den == other.den) return num.compareTo(other.num)
+        if (den === other.den || den.compareTo(other.den) == 0) return num.compareTo(other.num)
         return (num * other.den).compareTo(other.num * den)
     }
 
@@ -244,7 +251,11 @@ class BigFraction private constructor(
 
     private val BigInt.isOne: Boolean get() = signum() > 0 && magnitudeBitLength() == 1
 
-    override fun equals(other: Any?): Boolean = other is BigFraction && num == other.num && den == other.den
+    override fun equals(other: Any?): Boolean = this === other || (
+        other is BigFraction &&
+            (num === other.num || num.compareTo(other.num) == 0) &&
+            (den === other.den || den.compareTo(other.den) == 0)
+        )
 
     override fun hashCode(): Int = num.hashCode() * 31 + den.hashCode()
 

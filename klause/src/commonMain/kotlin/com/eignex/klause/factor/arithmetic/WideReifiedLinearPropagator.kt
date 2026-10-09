@@ -1,8 +1,9 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
+import com.eignex.klause.factor.arithmetic.internals.integralQuotientOrNull
 import com.eignex.klause.factor.arithmetic.internals.reifiedAuxTail
+import com.eignex.klause.factor.arithmetic.internals.unreachableEqualityReason
 import com.eignex.klause.factor.arithmetic.internals.wideAlwaysHolds
 import com.eignex.klause.factor.arithmetic.internals.wideEnforceRow
 import com.eignex.klause.factor.arithmetic.internals.wideNeverHolds
@@ -17,12 +18,8 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
 
 /**
  * CP propagator for a wide [ReifiedLinear]: `auxBoolVar ↔ (Σ wideCoeffs·vars ⟨op⟩ bound)`, where the
@@ -42,31 +39,31 @@ internal class WideReifiedLinearPropagator(
     private val bound: BigInt,
 ) : Propagator {
 
-    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+    private val singleEquality = vars.size == 1 && (op == LinearOp.EQ || op == LinearOp.NE)
+    private val equalityTarget: Long? =
+        if (singleEquality) integralQuotientOrNull(bound, coeffs[0]) else null
+
+    // A single-term equality also reads membership of its target, including under negated reification.
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars).let {
+        if (singleEquality && equalityTarget != null) it + IntEvent.pack(vars[0], IntEvent.VALUE_REMOVED) else it
+    }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         val auxValue = state.boolValues[auxBoolVar]
         val extraLit = auxValue?.let { Lit.make(auxBoolVar, !it) } ?: 0
         val includeExtraLit = auxValue != null
-        // A single-term equality body can be infeasible because its target is an interior hole; use the
-        // hole-aware collector there so the carved value's eq-atom joins the reason.
-        return if (op == LinearOp.EQ && vars.size == 1) {
-            collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit, includeExtraLit = includeExtraLit)
+        if (singleEquality && eqTargetUnreachable(state)) {
+            return unreachableEqualityReason(state, vars[0], equalityTarget, extraLit.takeIf { includeExtraLit })
+        }
+        // With the indicator set, the body (or its negation) fails on one side of the activity range.
+        val (sumLo, sumHi) = wideSumRange(state, vars, coeffs)
+        val side = auxValue?.let { wideSettlingSide(op, sumLo, sumHi, bound, holds = !it) }
+        return if (side != null) {
+            wideSideReason(state, vars, coeffs, side, -1, if (includeExtraLit) extraLit else null)
         } else {
-            // With the indicator set, the body (or its negation) fails on one side of the activity range.
-            val (sumLo, sumHi) = wideSumRange(state, vars, coeffs)
-            val side = auxValue?.let { wideSettlingSide(op, sumLo, sumHi, bound, holds = !it) }
-            if (side != null) {
-                wideSideReason(state, vars, coeffs, side, -1, if (includeExtraLit) extraLit else null)
-            } else {
-                collectLinearTightenAntecedents(
-                    state,
-                    vars,
-                    excludeIdx = -1,
-                    extraLit = extraLit,
-                    includeExtraLit = includeExtraLit,
-                )
-            }
+            collectLinearTightenAntecedents(
+                state, vars, excludeIdx = -1, extraLit = extraLit, includeExtraLit = includeExtraLit,
+            )
         }
     }
 
@@ -125,9 +122,12 @@ internal class WideReifiedLinearPropagator(
                     else -> wideSideReason(state, vars, coeffs, side, -1, null)
                 }
             },
-            extraFalsePin = {
-                if (op == LinearOp.EQ && vars.size == 1 && eqTargetUnreachable(state)) {
-                    state.pinBool(auxBoolVar, false, eqUnreachableReason(state))
+            // Target absence decides EQ and NE even when the interval still straddles the target.
+            extraPin = {
+                if (singleEquality && eqTargetUnreachable(state)) {
+                    state.pinBool(
+                        auxBoolVar, op == LinearOp.NE, unreachableEqualityReason(state, vars[0], equalityTarget),
+                    )
                 } else {
                     null
                 }
@@ -144,33 +144,9 @@ internal class WideReifiedLinearPropagator(
         )
     }
 
-    /** For a single-term `c·x = bound`, true when `bound/c` is not an integer in `x`'s current domain
-     *  (an interior hole or a non-divisible bound), so the equality can never hold. */
     private fun eqTargetUnreachable(state: PropagationState): Boolean {
-        val c = coeffs[0]
-        if (c == BIG_ZERO) return bound != BIG_ZERO
-        if (bound - bound / c * c != BIG_ZERO) return true
-        val value = bound / c
-        if (!value.fitsLong()) return true
-        return value.toLongExact() !in state.intDomains[vars[0]]
-    }
-
-    /** Reason for pinning the indicator false on an unreachable single-term `c·x == bound` (see
-     *  [ReifiedLinearPropagator.eqUnreachableReason] for the original-vs-current distinction). */
-    private fun eqUnreachableReason(state: PropagationState): IntArray? {
-        val c = coeffs[0]
-        if (c == BIG_ZERO || bound - bound / c * c != BIG_ZERO) return null
-        val k = bound / c
-        if (!k.fitsLong()) return null
-        val kl = k.toLongExact()
-        val v = vars[0]
-        val d = state.intDomains[v]
-        val orig = state.rootDomains[v]
-        return when {
-            kl < orig.min || kl > orig.max -> null
-            kl < d.min -> intArrayOf(Lit.make(state.atomVarGe(v, d.min), false))
-            kl > d.max -> intArrayOf(Lit.make(state.atomVarLe(v, d.max), false))
-            else -> intArrayOf(Lit.make(state.atomVarEq(v, kl), true))
-        }
+        if (coeffs[0] == BIG_ZERO) return bound != BIG_ZERO
+        val value = equalityTarget ?: return true
+        return value !in state.intDomains[vars[0]]
     }
 }

@@ -16,7 +16,8 @@ import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.relaxation.leafRealFeasibility
+import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
@@ -225,7 +226,16 @@ internal class ResumableMinimize(
     // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
     // is off.
     private val lpEngine = LpEngine(problem, objective, params.lpParams(), sink, solver.lpSolveContext)
+    private var leafSolver: LeafRealSolver? = null
     private val rootLpDutyCycle = RootLpDutyCycle()
+
+    private fun completeLeaf(sample: Sample, cancellation: Cancellation): LeafRealResult {
+        val owner = leafSolver ?: LeafRealSolver(
+            problem, objective, params.lpPlan.componentSplit, sink.lp, solver.lpSolveContext,
+            LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
+        ).also { leafSolver = it }
+        return owner.solve(sample, cancellation, params.toleranceCheck)
+    }
 
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
     // The engine records each node's LP solution into it; the descent reads it for variable/value order.
@@ -394,6 +404,11 @@ internal class ResumableMinimize(
             failure = closeFailure
         }
         try {
+            leafSolver?.close()
+        } catch (closeFailure: Throwable) {
+            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
+        }
+        try {
             sink.stop()
         } catch (closeFailure: Throwable) {
             failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
@@ -404,7 +419,18 @@ internal class ResumableMinimize(
     // A lazy sequence can be abandoned while suspended, so it must not carry native factors across a yield.
     internal fun releaseForSequenceYield() {
         check(!closed) { "search is closed" }
-        lpEngine.releasePersistentSolvers()
+        var failure: Throwable? = null
+        try {
+            lpEngine.releasePersistentSolvers()
+        } catch (closeFailure: Throwable) {
+            failure = closeFailure
+        }
+        try {
+            leafSolver?.releaseSolvers()
+        } catch (closeFailure: Throwable) {
+            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
+        }
+        failure?.let { throw it }
     }
 
     private fun closeAfter(failure: Throwable) {
@@ -710,17 +736,7 @@ internal class ResumableMinimize(
         val accepted = if (problem.numRealVars == 0) {
             sample
         } else {
-            val real = leafRealFeasibility(
-                problem,
-                objective,
-                sample,
-                token,
-                componentSplit = params.lpPlan.componentSplit,
-                sink = sink.lp,
-                context = solver.lpSolveContext,
-                pricing = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
-                toleranceCheck = params.toleranceCheck,
-            )
+            val real = completeLeaf(sample, token)
             if (real.verdict !in listOf(
                     LpVerdict.FEASIBLE,
                     LpVerdict.ATTAINED_OPTIMUM,
@@ -1009,17 +1025,7 @@ internal class ResumableMinimize(
             } else {
                 // Only the run's end may cut a leaf LP short. A slice boundary pauses at the next decision, and
                 // a leaf it cut would read as unresolved and be passed over, though a longer LP might have decided it.
-                val real = leafRealFeasibility(
-                    problem,
-                    objective,
-                    sample,
-                    runEndToken(),
-                    componentSplit = params.lpPlan.componentSplit,
-                    sink = sink.lp,
-                    context = solver.lpSolveContext,
-                    pricing = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L),
-                    toleranceCheck = params.toleranceCheck,
-                )
+                val real = completeLeaf(sample, runEndToken())
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
 

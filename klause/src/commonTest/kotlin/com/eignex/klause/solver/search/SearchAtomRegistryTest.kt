@@ -17,6 +17,58 @@ import kotlin.test.assertTrue
 
 class SearchAtomRegistryTest {
     @Test
+    fun `integer bound names share exact complements through rollback`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        val upper = SearchDecision.IntAtMost(4, 7L)
+        val lower = SearchDecision.IntAtLeast(4, 8L)
+        assertIs<ComponentResult.Consistent>(session.push(upper))
+        val literal = assertNotNull(session.atomLiteral(upper))
+        assertEquals(literal xor 1, session.atomLiteral(lower))
+        assertContentEquals(intArrayOf(literal xor 1), session.explainAtoms(session.intUpperBoundPremise(4))?.literals)
+
+        session.popTo(0)
+        assertIs<ComponentResult.Consistent>(session.push(lower))
+
+        assertNull(session.intUpperBound(4))
+        assertEquals(8L, session.intLowerBound(4))
+        assertContentEquals(intArrayOf(literal), session.explainAtoms(session.intLowerBoundPremise(4))?.literals)
+    }
+
+    @Test
+    fun `learned integer names deliver their bounds at the shared root`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
+        val bound = SearchDecision.IntAtMost(0, 4L)
+        assertIs<ComponentResult.Consistent>(session.push(bound))
+        val literal = assertNotNull(session.atomLiteral(bound))
+        session.popTo(0)
+        session.learn(SearchExplanation(intArrayOf(literal)))
+
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertEquals(0, session.decisionLevel)
+        assertEquals(4L, session.intUpperBound(0))
+        assertContentEquals(intArrayOf(literal xor 1), session.explainAtoms(session.intUpperBoundPremise(0))?.literals)
+    }
+
+    @Test
+    fun `integer values and their published premises restore together`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.push(SearchDecision.Bool(0))
+        session.publish(SearchDecision.IntAtMost(0, 5L), SearchAtomPremise.Asserted(SearchDecision.Bool(0)))
+        session.push(SearchDecision.Bool(2))
+        session.publish(SearchDecision.IntAtMost(0, 3L), SearchAtomPremise.Asserted(SearchDecision.Bool(2)))
+        session.publish(SearchDecision.IntAtMost(0, 6L), SearchAtomPremise.Unavailable)
+        assertContentEquals(intArrayOf(3), session.explainAtoms(session.intUpperBoundPremise(0))?.literals)
+
+        session.popTo(1)
+
+        assertEquals(5L, session.intUpperBound(0))
+        assertContentEquals(intArrayOf(1), session.explainAtoms(session.intUpperBoundPremise(0))?.literals)
+        session.popTo(0)
+        assertNull(session.intUpperBound(0))
+    }
+
+    @Test
     fun `new source roots cannot inherit registered learned facts from matching numeric names`() {
         val previous = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
         val old = assertNotNull(previous.registerAtom(Symbol("old bound"), Symbol("old complement")))
@@ -150,6 +202,58 @@ class SearchAtomRegistryTest {
         session.popTo(1)
         assertNull(session.explainAtoms(premise))
         assertEquals(0, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `shared premise graphs retain every active source leaf within the traversal budget`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.push(SearchDecision.Bool(0))
+        session.push(SearchDecision.Bool(2))
+        var premise: SearchAtomPremise = SearchAtomPremise.All(
+            listOf(
+                SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                SearchAtomPremise.Asserted(SearchDecision.Bool(2)),
+            ),
+        )
+        repeat(12) { premise = SearchAtomPremise.All(listOf(premise, premise)) }
+
+        val explanation = session.explainAtoms(premise)
+
+        assertEquals(setOf(1, 3), assertNotNull(explanation).literals.toSet())
+    }
+
+    @Test
+    fun `a shared premise graph with an unavailable leaf declines its whole explanation`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
+        session.push(SearchDecision.Bool(0))
+        var premise: SearchAtomPremise = SearchAtomPremise.All(
+            listOf(SearchAtomPremise.Unavailable, SearchAtomPremise.Asserted(SearchDecision.Bool(0))),
+        )
+        repeat(12) { premise = SearchAtomPremise.All(listOf(premise, premise)) }
+
+        val explanation = session.explainAtoms(premise)
+
+        assertNull(explanation)
+    }
+
+    @Test
+    fun `a shared premise graph rechecks source truth after rollback`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        session.push(SearchDecision.Bool(0))
+        session.push(SearchDecision.Bool(2))
+        var premise: SearchAtomPremise = SearchAtomPremise.All(
+            listOf(
+                SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                SearchAtomPremise.Asserted(SearchDecision.Bool(2)),
+            ),
+        )
+        repeat(12) { premise = SearchAtomPremise.All(listOf(premise, premise)) }
+        assertNotNull(session.explainAtoms(premise))
+        session.popTo(1)
+
+        val explanation = session.explainAtoms(premise)
+
+        assertNull(explanation)
     }
 
     @Test

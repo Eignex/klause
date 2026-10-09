@@ -23,6 +23,8 @@ import com.eignex.klause.lp.engine.ExactLpEntry
 import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpObjective
+import com.eignex.klause.lp.engine.ExactLpPremise
+import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBuilder
@@ -33,6 +35,7 @@ import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.integerTableauCuts
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CutColumnSource
@@ -367,6 +370,55 @@ class SourceCutTest {
         assertFalse(portable.provenance.global)
         assertTrue(portable.provenance.facts.any { !it.global && it.premise is CutPremise.Bound })
         assertEquals(BigFraction.ofLong(3), portable.provenance.rules.single().rows.single().row.rhs)
+    }
+
+    @Test
+    fun `retained tableau proofs preserve rational row guards and their Boolean activators`() {
+        val source = assertNotNull(LpBuilder().apply {
+            val x = addVar(1L, 5L)
+            addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 3L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val threshold = assertNotNull(BigFraction.ofDouble(1.5))
+        val premises = ExactLpPremises(listOf(ExactLpPremise(1, true, ExactLpNumber.of(threshold))), listOf(2))
+        val model = assertNotNull(LpExactState(source.copy(rows = listOf(ExactLpRow(
+            global = false,
+            premises = premises,
+        )))).toWorkingModel())
+        val integral = CutPremise.Integral(CutExpression(mapOf(x to BigFraction.ONE)))
+        val guardVariable = CutSource(CutSourceKind.INTEGER, 1)
+        val bound = CutPremise.Bound(CutExpression(mapOf(guardVariable to BigFraction.ONE)), true, threshold)
+        val literal = CutPremise.Literal(2)
+        val lower = CutPremise.Bound(CutExpression(mapOf(x to BigFraction.ONE)), false, BigFraction.ONE)
+        val map = CutSourceMap(
+            modelToken, 0, listOf(CutColumnSource(x)), activePremises = setOf(bound, literal),
+            globalPremises = setOf(integral, lower),
+        )
+        val relaxation = LpRelaxation(
+            model,
+            intArrayOf(0),
+            booleanArrayOf(false),
+            0L,
+            intArrayOf(0),
+            intArrayOf(),
+            sourceMap = map,
+        )
+        val raw = integerTableauCuts(
+            model,
+            Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }),
+            doubleArrayOf(1.5),
+            1,
+            false,
+        ).single()
+
+        val cut = assertNotNull(SourceCut.fromCut(raw, relaxation).orNull())
+
+        assertFalse(cut.provenance.global)
+        assertTrue(CutProofFact(bound, false) in cut.provenance.facts)
+        assertTrue(CutProofFact(literal, false) in cut.provenance.facts)
+        assertEquals(BigFraction.ofLong(3L), cut.provenance.rules.single().rows.single().row.rhs)
+        assertNotNull(cut.toCut(map).orNull())
+        val inactive = CutSourceMap(modelToken, 1, map.columns, globalPremises = setOf(integral, lower))
+        assertEquals(CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD), cut.toCut(inactive))
     }
 
     @Test

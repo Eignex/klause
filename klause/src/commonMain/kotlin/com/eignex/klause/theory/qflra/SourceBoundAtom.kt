@@ -64,6 +64,12 @@ class SourceBoundAtom private constructor(
 
     /** Exact source branch constructors; unsupported inputs and resource limits decline atomically. */
     companion object {
+        internal fun side(terms: List<SourceBoundTerm>, threshold: BigFraction, upper: Boolean): SourceBoundAtom? {
+            val limits = SourceBoundLimits()
+            if (!threshold.fits(limits)) return null
+            return SourceBoundAtom(normalize(terms, limits) ?: return null, threshold, upper, strict = false)
+        }
+
         /**
          * Register `activity + constant <= floor(value)` and `activity + constant >= floor(value) + 1`.
          *

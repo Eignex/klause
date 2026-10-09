@@ -21,6 +21,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.CertifiedLpBound
 import com.eignex.klause.lp.engine.ComponentLpSolverCapability
+import com.eignex.klause.lp.engine.RetainedComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpWitness
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -144,6 +145,23 @@ private class LifecycleFactory : LpEngineFactory {
                 policy: LpCertificationPolicy,
                 cancellation: Cancellation,
             ): ExactLpWitness? = delegate.exactWitness(observer, policy, cancellation)
+
+            override fun close() = record.close(delegate::close, fails(record))
+        }
+    }
+
+    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
+        isolated: IntArray): RetainedComponentLpSolverCapability {
+        val delegate = ProductionLpEngineFactory.newRetainedComponentSolver(model, parts, solvers, isolated)
+        val record = record(LifecycleKind.COMPONENT)
+        return object : RetainedComponentLpSolverCapability by delegate {
+            override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                record.use()
+                return delegate.adopt(state, token)
+            }
+
+            override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                record.solve(delegate) { delegate.resolveBounds(allowance) }
 
             override fun close() = record.close(delegate::close, fails(record))
         }

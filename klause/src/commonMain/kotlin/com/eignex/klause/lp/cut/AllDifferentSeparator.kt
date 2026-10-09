@@ -76,9 +76,13 @@ internal class AllDifferentSeparator : CutSeparator {
             var lpSum = 0.0
             for (c in cols) lpSum += ctx.primalOf(c)
             val ones = LongArray(cols.size) { 1L }
-            if (lpSum < minSum - tol) cuts.add(Cut(cols.copyOf(), ones, Relation.GE, minSum, global))
+            if (lpSum < minSum - tol) {
+                cuts.add(ctx.withIntervalPremises(Cut(cols.copyOf(), ones, Relation.GE, minSum, global), vars))
+            }
             if (lpSum > maxSum + tol) {
-                cuts.add(Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, maxSum, global))
+                cuts.add(ctx.withIntervalPremises(
+                    Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, maxSum, global), vars,
+                ))
             }
         }
         return cuts

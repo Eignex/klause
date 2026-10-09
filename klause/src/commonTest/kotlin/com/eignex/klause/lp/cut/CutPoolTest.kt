@@ -3,6 +3,8 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutProvenance
+import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.Relation
@@ -16,6 +18,36 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CutPoolTest {
+
+    @Test
+    fun `conditional deduplication ignores premise order and preserves distinct guards`() {
+        val root = Any()
+        val x = CutSource(CutSourceKind.INTEGER, 0)
+        val y = CutSource(CutSourceKind.INTEGER, 1)
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val lower = CutPremise.Bound(expression, false, BigFraction.ONE)
+        val upper = CutPremise.Bound(CutExpression(mapOf(y to BigFraction.ONE)), true, BigFraction.ofLong(2L))
+        val weaker = lower.copy(value = BigFraction.ZERO)
+        val map = CutSourceMap(
+            root,
+            0L,
+            listOf(CutColumnSource(x), CutColumnSource(y)),
+            activePremises = setOf(lower, upper),
+        )
+        val first = SourceCut(expression, Relation.LE, BigFraction.ofLong(5L),
+            CutProvenance(root, 0L, listOf(CutProofFact(lower, false), CutProofFact(upper, false))))
+        val reversed = SourceCut(expression, Relation.LE, BigFraction.ofLong(5L),
+            CutProvenance(root, 0L, listOf(CutProofFact(upper, false), CutProofFact(lower, false))))
+        val different = SourceCut(expression, Relation.LE, BigFraction.ofLong(5L),
+            CutProvenance(root, 0L, listOf(CutProofFact(weaker, false), CutProofFact(upper, false))))
+        val pool = CutPool()
+
+        assertTrue(pool.add(first, map))
+        assertFalse(pool.add(reversed, map))
+        assertTrue(pool.add(different, map))
+
+        assertEquals(2, pool.size)
+    }
 
     private fun cut(col: Int, coeff: Long, rhs: Long) =
         Cut(intArrayOf(col), longArrayOf(coeff), Relation.LE, rhs, global = true)

@@ -17,6 +17,7 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -72,18 +73,34 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
     var opened = 0
     var closed = 0
+    var visited = 0
     val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
-        override fun newGeneralSolver(
+        override fun newPersistentSolver(
             model: LpModel,
             cancellation: Cancellation,
+            refactorUpdateLimit: Int,
+            iterationLimit: Int,
             workLimit: Long,
+            trackDegeneracy: Boolean,
             pricing: LpPricingOptions,
-        ): LpSolver {
-            val delegate = ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing)
-            opened++
-            return object : LpSolver by delegate {
+        ): PersistentLpSolver {
+            val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
+                iterationLimit, workLimit, trackDegeneracy, pricing)
+            val leaf = iterationLimit == 0 && workLimit == 0L
+            if (leaf) opened++
+            return object : PersistentLpSolver by delegate {
+                override fun solve(warm: Basis?): FloatLpResult? {
+                    if (leaf) visited++
+                    return delegate.solve(warm)
+                }
+
+                override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                    if (leaf) visited++
+                    return delegate.resolveBounds(allowance)
+                }
+
                 override fun close() {
-                    closed++
+                    if (leaf) closed++
                     delegate.close()
                 }
             }
@@ -95,7 +112,7 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
         factory,
         object : LpCertificationPolicy {
             override fun accepts(certifier: LpCertifier, successful: Boolean): Boolean {
-                val leaf = factory.calls.count { it.kind == EngineConstruction.GENERAL }
+                val leaf = visited
                 attempts += leaf to successful
                 return successful && acceptProof(leaf, certifier)
             }
@@ -108,10 +125,11 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
         lpPlan = LpPlan(componentSplit = false),
     )
 
-    fun assertVisitedLeaves() {
-        assertEquals(if (withIncumbent) 2 else 1, factory.calls.count { it.kind == EngineConstruction.GENERAL })
+    fun assertVisitedLeaves(ownersReleased: Boolean = true) {
+        assertEquals(if (withIncumbent) 2 else 1, visited)
+        assertEquals(0, factory.calls.count { it.kind == EngineConstruction.GENERAL })
         assertTrue(attempts.any { it.first == (if (withIncumbent) 2 else 1) && it.second })
-        assertEquals(opened, closed)
+        assertEquals(if (ownersReleased) opened else 0, closed)
     }
 
     fun assertIncumbent(sample: Sample) {
@@ -439,21 +457,6 @@ class ResumableMinimizeTest {
             var sharedClauses = 0
             var observedSession: PropagationSession? = null
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newGeneralSolver(
-                    model: LpModel,
-                    cancellation: Cancellation,
-                    workLimit: Long,
-                    pricing: LpPricingOptions,
-                ): LpSolver = newPersistentSolver(
-                    model,
-                    cancellation,
-                    DEFAULT_REFACTOR_UPDATE_LIMIT,
-                    1,
-                    1L,
-                    false,
-                    pricing,
-                )
-
                 override fun newPersistentSolver(
                     model: LpModel,
                     cancellation: Cancellation,
@@ -463,28 +466,30 @@ class ResumableMinimizeTest {
                     trackDegeneracy: Boolean,
                     pricing: LpPricingOptions,
                 ): PersistentLpSolver {
+                    val leafWork = if (workLimit == 0L && iterationLimit == 0) 1L else workLimit
+                    val leafIterations = if (workLimit == 0L && iterationLimit == 0) 1 else iterationLimit
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(
                         model,
                         cancellation,
                         refactorUpdateLimit,
-                        iterationLimit,
-                        workLimit,
+                        leafIterations,
+                        leafWork,
                         trackDegeneracy,
                         pricing,
                     )
                     opened++
                     return object : PersistentLpSolver by delegate {
                         override fun solve(warm: Basis?): FloatLpResult? = delegate.solve(warm).also {
-                            if (workLimit == 1L) {
+                            if (leafWork == 1L) {
                                 cappedSolves++
                                 assertNull(it)
-                                assertTrue(delegate.lastWorkOps >= workLimit)
+                                assertTrue(delegate.lastWorkOps >= leafWork)
                             }
                         }
 
                         override fun continuationBasis(model: LpModel): Basis? =
                             delegate.continuationBasis(model).also {
-                                if (workLimit == 1L && it != null) continuationExports++
+                                if (leafWork == 1L && it != null) continuationExports++
                             }
 
                         override fun close() {
@@ -550,14 +555,18 @@ class ResumableMinimizeTest {
     fun `a real leaf LP is handed the run deadline`() {
         val deadlines = ArrayList<ComparableTimeMark?>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newGeneralSolver(
+            override fun newPersistentSolver(
                 model: LpModel,
                 cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
                 workLimit: Long,
+                trackDegeneracy: Boolean,
                 pricing: LpPricingOptions,
-            ): LpSolver {
+            ): PersistentLpSolver {
                 deadlines += cancellation.deadline()
-                return ProductionLpEngineFactory.newGeneralSolver(model, cancellation, workLimit, pricing)
+                return ProductionLpEngineFactory.newPersistentSolver(model, cancellation, refactorUpdateLimit,
+                    iterationLimit, workLimit, trackDegeneracy, pricing)
             }
         }
         val problem = Problem(
@@ -650,16 +659,17 @@ class ResumableMinimizeTest {
             assertEquals(TerminationReason.Unsupported, result.reason)
             assertEquals(listOf(0.5), offered)
             assertEquals(0.5, result.sample.reals.single())
-            fixture.assertVisitedLeaves()
+            fixture.assertVisitedLeaves(ownersReleased = false)
             assertSame(result, search.runSlice(Cancellation.Never, 1000L, 256L) { error("duplicate incumbent") })
             search.rebind(Assumptions.None, 256L)
             fixture.acceptProof = { _, _ -> false }
             assertIs<MinimizeResult.Unknown>(
                 search.runSlice(Cancellation.Never, 1000L, 256L) { error("stale incumbent") },
             )
-            assertEquals(2, fixture.opened)
-            assertEquals(fixture.opened, fixture.closed)
+            assertEquals(1, fixture.opened)
+            assertEquals(0, fixture.closed)
         }
+        assertEquals(fixture.opened, fixture.closed)
     }
 
     @Test
@@ -667,7 +677,7 @@ class ResumableMinimizeTest {
         val fixture = UnresolvedRealLeafFixture(true)
         ResumableMinimize(fixture.solver, fixture.objective, fixture.params, rebindable = true).use { search ->
             assertIs<MinimizeResult.BestFound>(search.runSlice(Cancellation.Never, 1000L, 256L) {})
-            fixture.assertVisitedLeaves()
+            fixture.assertVisitedLeaves(ownersReleased = false)
             search.rebind(Assumptions.None.withInt(0, 1L), 256L)
             fixture.acceptProof = { _, _ -> true }
             val offered = ArrayList<Double>()
@@ -679,9 +689,11 @@ class ResumableMinimizeTest {
             assertEquals(listOf(0.5), offered)
             assertEquals(1L, result.sample.ints.single())
             assertEquals(0.5, result.sample.reals.single())
-            assertEquals(3, fixture.opened)
-            assertEquals(fixture.opened, fixture.closed)
+            assertEquals(3, fixture.visited)
+            assertEquals(1, fixture.opened)
+            assertEquals(0, fixture.closed)
         }
+        assertEquals(fixture.opened, fixture.closed)
     }
 
     @Test

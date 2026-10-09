@@ -1,6 +1,11 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.unaryMinus
 
 internal sealed interface LpBoundBatchResult {
     val count: Int
@@ -134,6 +139,9 @@ internal class LpBoundTrail(initial: LpExactState) {
         if (state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
         val retained = state.scopes[targetDepth]
         val assertions = state.assertions.take(retained)
+        val rows = state.rows.popped(targetDepth)
+        val changedRows = (0 until rows.size).filter { rows.row(it) != state.rows.row(it) }
+        if (changedRows.isNotEmpty() && state.rowRevision == Long.MAX_VALUE) return false
         val removed = state.rows.entries().indices.filter {
             val row = state.rows.row(it)
             row.active && row.depth != null && row.depth > targetDepth
@@ -142,14 +150,14 @@ internal class LpBoundTrail(initial: LpExactState) {
         val next = snapshot(
             assertions = assertions,
             // The same rows object when none go, so the popped state can derive from this one.
-            rows = if (removed.isEmpty()) state.rows else state.rows.deactivate(removed),
-            rowRevision = state.rowRevision + if (removed.isEmpty()) 0L else 1L,
+            rows = rows,
+            rowRevision = state.rowRevision + if (changedRows.isEmpty()) 0L else 1L,
             scopes = state.scopes.take(targetDepth),
             boundRevision = state.boundRevision + 1L,
             popRevision = state.popRevision + 1L,
             changedColumns = (
                 state.assertions.drop(retained).map { it.column } +
-                    removed.map { state.model.n + it }
+                    changedRows.map { state.model.n + it }
                 ).distinct().sorted(),
         )
         return commit(next, token)
@@ -162,10 +170,32 @@ internal class LpBoundTrail(initial: LpExactState) {
         }
         if (pricesInactiveRow) return false
         val next = snapshot(
-            baseModel = state.baseModel.copy(objective = objective),
+            baseModel = state.baseModel.withObjective(objective),
             objectiveRevision = state.objectiveRevision + 1L,
         )
         return commit(next, token)
+    }
+
+    fun resetRoot(token: Cancellation = Cancellation.Never): Boolean {
+        if (token() || state.boundRevision == Long.MAX_VALUE || state.popRevision == Long.MAX_VALUE) return false
+        val rows = state.rows.popped(0)
+        val changedRows = (0 until rows.size).filter { rows.row(it) != state.rows.row(it) }
+        if (changedRows.isNotEmpty() && state.rowRevision == Long.MAX_VALUE) return false
+        if (!canDeactivate(changedRows.filterTo(HashSet()) { !rows.row(it).active }, emptyList())) return false
+        return commit(
+            snapshot(
+                assertions = emptyList(),
+                scopes = emptyList(),
+                rows = rows,
+                rowRevision = state.rowRevision + if (changedRows.isEmpty()) 0L else 1L,
+                boundRevision = state.boundRevision + 1L,
+                popRevision = state.popRevision + 1L,
+                changedColumns = (
+                    state.assertions.map { it.column } + changedRows.map { state.model.n + it }
+                    ).distinct().sorted(),
+            ),
+            token,
+        )
     }
 
     fun recenter(origins: List<ExactLpNumber>, token: Cancellation = Cancellation.Never): Boolean {
@@ -202,18 +232,51 @@ internal class LpBoundTrail(initial: LpExactState) {
         return commit(next, token)
     }
 
-    fun append(row: LpScopedRow, scoped: Boolean, token: Cancellation = Cancellation.Never): Boolean {
-        if (token() || row.id <= state.rows.lastId || !row.validFor(state.baseModel) ||
-            state.model.numVars >= Int.MAX_VALUE - 1 || !structuralRevisionAvailable()
+    fun append(row: LpScopedRow, scoped: Boolean, token: Cancellation = Cancellation.Never): Boolean =
+        append(emptyList(), listOf(row), scoped, token)
+
+    fun append(
+        columns: List<LpStructuralColumn>,
+        rows: List<LpScopedRow>,
+        scoped: Boolean,
+        token: Cancellation = Cancellation.Never,
+        permanentRows: Set<Long> = emptySet(),
+    ): Boolean {
+        if (token()) return false
+        if (columns.isEmpty() && rows.isEmpty()) return permanentRows.isEmpty()
+        val newN = state.model.n.toLong() + columns.size
+        val newM = state.model.m.toLong() + rows.size
+        if (newN + newM >= Int.MAX_VALUE || !structuralRevisionAvailable() ||
+            rows.any { it.id <= state.rows.lastId || !it.validFor(newN.toInt()) } ||
+            rows.zipWithNext().any { (left, right) -> left.id >= right.id }
         ) {
             return false
         }
-        val nnz = (0 until state.model.n).sumOf { state.model.entries(it).size.toLong() } + row.coefficients().size
-        if (nnz + state.model.m + 1L > Int.MAX_VALUE) return false
+        if (!rows.map { it.id }.containsAll(permanentRows) ||
+            rows.any { it.id in permanentRows && (!it.metadata.global || it.metadata.premises != null) }
+        ) {
+            return false
+        }
+        val nnz = (0 until state.model.n).sumOf { state.model.entries(it).size.toLong() } +
+            rows.sumOf { it.coefficients().size.toLong() }
+        if (nnz + newM > Int.MAX_VALUE || token()) return false
+        val identities = state.rows.append(rows.map { it.id }, if (scoped) state.depth else null, permanentRows)
+        val assertions = if (columns.isEmpty()) {
+            state.assertions
+        } else {
+            state.assertions.map { assertion ->
+                if (assertion.column < state.model.n) {
+                    assertion
+                } else {
+                    assertion.copy(column = assertion.column + columns.size)
+                }
+            }
+        }
         return commit(
             snapshot(
-                baseModel = state.baseModel.appendScopedRow(row),
-                rows = state.rows.append(row.id, if (scoped) state.depth else null),
+                baseModel = state.baseModel.appendScopedRows(columns, rows),
+                assertions = assertions,
+                rows = identities,
                 matrixRevision = state.matrixRevision + 1L,
                 boundRevision = state.boundRevision + 1L,
                 objectiveRevision = state.objectiveRevision + 1L,
@@ -223,32 +286,97 @@ internal class LpBoundTrail(initial: LpExactState) {
         )
     }
 
-    fun deactivate(id: Long, token: Cancellation = Cancellation.Never): Boolean {
+    fun replaceRows(
+        retired: Set<Long>,
+        columns: List<LpStructuralColumn>,
+        rows: List<LpScopedRow>,
+        scoped: Boolean,
+        token: Cancellation = Cancellation.Never,
+        permanentRows: Set<Long> = emptySet(),
+        objective: ExactLpObjective? = null,
+        assertions: List<LpBoundAssertion> = emptyList(),
+    ): Boolean {
+        val staged = LpBoundTrail(state)
+        val hidden = if (retired.isEmpty()) true else if (scoped) staged.suspend(retired, token)
+            else staged.deactivate(retired, token)
+        if (!hidden || !staged.append(columns, rows, scoped, token, permanentRows) ||
+            (objective != null && !staged.replaceObjective(objective, token)) ||
+            staged.assertBounds(assertions, token) is LpBoundBatchResult.Declined || token()
+        ) {
+            return false
+        }
+        state = staged.state
+        return true
+    }
+
+    fun deactivate(id: Long, token: Cancellation = Cancellation.Never): Boolean = deactivate(setOf(id), token)
+
+    fun deactivate(ids: Set<Long>, token: Cancellation = Cancellation.Never): Boolean {
         if (token()) return false
-        val index = state.rows.index(id)
-        if (index < 0) return false
-        if (!state.rows.row(index).active) return true
-        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(setOf(index), state.assertions)) return false
+        val indices = rowIndices(ids) ?: return false
+        val changed = indices.filterTo(HashSet()) {
+            state.rows.row(it).active || state.rows.row(it).suspendedAt != null
+        }
+        if (changed.isEmpty()) return true
+        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(changed, state.assertions)) return false
         return commit(
             snapshot(
-                rows = state.rows.deactivate(setOf(index)),
+                rows = state.rows.deactivate(changed),
                 boundRevision = state.boundRevision + 1L,
                 rowRevision = state.rowRevision + 1L,
-                changedColumns = listOf(state.model.n + index),
+                changedColumns = changed.map { state.model.n + it }.sorted(),
             ),
             token,
         )
     }
 
-    fun compact(token: Cancellation = Cancellation.Never): Boolean {
-        if (token()) return false
-        if (state.rows.activeCount == state.rows.size) return true
-        if (!structuralRevisionAvailable()) return false
-        val remap = LpRowRemap(state.model.n, state.rows)
+    fun suspend(ids: Set<Long>, token: Cancellation = Cancellation.Never): Boolean {
+        if (token() || state.depth == 0) return false
+        val indices = rowIndices(ids) ?: return false
+        val active = indices.filterTo(HashSet()) { state.rows.row(it).active }
+        if (active.isEmpty()) return true
+        if (state.boundRevision == Long.MAX_VALUE || !canDeactivate(active, state.assertions)) return false
         return commit(
             snapshot(
-                baseModel = state.baseModel.compactScopedRows(remap),
-                assertions = state.assertions.map { it.copy(column = remap.column(it.column)) },
+                rows = state.rows.suspend(active, state.depth),
+                boundRevision = state.boundRevision + 1L,
+                rowRevision = state.rowRevision + 1L,
+                changedColumns = active.map { state.model.n + it }.sorted(),
+            ),
+            token,
+        )
+    }
+
+    private fun rowIndices(ids: Set<Long>): Set<Int>? {
+        if (ids.isEmpty()) return emptySet()
+        val indices = HashSet<Int>()
+        for (index in 0 until state.rows.size) if (state.rows.row(index).id in ids) indices.add(index)
+        return indices.takeIf { it.size == ids.size }
+    }
+
+    fun compact(token: Cancellation = Cancellation.Never): Boolean =
+        compact(LpLayoutRemap(state.model.n, state.rows), token)
+
+    fun compact(remap: LpLayoutRemap, token: Cancellation = Cancellation.Never): Boolean {
+        if (token() || !remap.matches(state.model, state.rows)) return false
+        if (remap.unchanged) return true
+        if (!structuralRevisionAvailable()) return false
+        for (column in 0 until state.model.n) {
+            if (token()) return false
+            if (remap.column(column) < 0 && !canRemoveColumn(column, remap)) return false
+        }
+        val assertions = ArrayList<LpBoundAssertion>()
+        val marks = IntArray(state.assertions.size + 1)
+        state.assertions.forEachIndexed { index, assertion ->
+            val column = remap.column(assertion.column)
+            if (column >= 0) assertions.add(assertion.copy(column = column))
+            marks[index + 1] = assertions.size
+        }
+        return commit(
+            snapshot(
+                baseModel = state.baseModel.compactLayout(remap),
+                assertions = assertions,
+                scopes = state.scopes.map { marks[it] },
                 rows = state.rows.compact(),
                 matrixRevision = state.matrixRevision + 1L,
                 boundRevision = state.boundRevision + 1L,
@@ -257,6 +385,27 @@ internal class LpBoundTrail(initial: LpExactState) {
             ),
             token,
         )
+    }
+
+    private fun canRemoveColumn(column: Int, remap: LpLayoutRemap): Boolean {
+        val model = state.model
+        if (!model.objective.cost(column).value.isZero ||
+            model.columnEntries(column).any { remap.row(it.row) >= 0 && !it.number.value.isZero }
+        ) {
+            return false
+        }
+        val source = model.column(column)
+        if (!source.bounds.consistent) return false
+        if (!source.integral) return true
+        val lower = source.bounds.lower ?: return true
+        val upper = source.bounds.upper ?: return true
+        val lo = lower.number.value + source.origin.value
+        val hi = upper.number.value + source.origin.value
+        var minimum = lo.ceilInteger()
+        var maximum = -hi.negated().ceilInteger()
+        if (lower.strict && lo.den == BIG_ONE) minimum += BIG_ONE
+        if (upper.strict && hi.den == BIG_ONE) maximum -= BIG_ONE
+        return minimum <= maximum
     }
 
     private fun structuralRevisionAvailable(): Boolean = listOf(

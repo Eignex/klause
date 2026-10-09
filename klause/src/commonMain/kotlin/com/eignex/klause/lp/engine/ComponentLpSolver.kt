@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 
@@ -22,17 +23,20 @@ import com.eignex.klause.util.IntArrayList
  * pivot path, never the result).
  */
 internal class ComponentLpSolver(
-    private val model: LpModel,
-    private val parts: List<LpNeighborhood>,
+    private var model: LpModel,
+    private var parts: List<LpNeighborhood>,
     private val solvers: List<LpSolver>,
     private val isolated: IntArray,
-) : ComponentLpSolverCapability {
-    init {
-        require(model.exactState == null) { "exact state component reconstruction is unsupported" }
-    }
-    private val certificationKey = exactLpStateKey(model)
+) : RetainedComponentLpSolverCapability {
+    private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
     private var blockResults: List<FloatLpResult>? = null
     private var metrics = LpSolveMetrics()
+    private var closed = false
+    private var continuationTarget: Basis? = null
+    override var recessionDirection: DoubleArray? = null
+        private set
+    override var solvedExactState: LpExactState? = null
+        private set
     override var lastTermination: LpFloatTermination? = null
         private set
 
@@ -42,27 +46,88 @@ internal class ComponentLpSolver(
         private set
 
     override fun close() {
-        for (s in solvers) s.close()
+        if (closed) return
+        closed = true
+        clearEvidence()
+        closeComponentSolvers(solvers)
     }
 
     override fun solve(warm: Basis?): FloatLpResult? = invoke { s -> s.solve(null) }
 
     override fun solvePrimal(warm: Basis?): FloatLpResult? = invoke { s -> s.solvePrimal(null) }
 
+    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = invoke { solver ->
+        check(solver is RetainedLpSolver)
+        solver.resolveBounds(allowance)
+    }
+
+    @Suppress("TooGenericExceptionCaught") // Retire every child when adoption fails, including native failures.
+    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+        val previous = model.exactState ?: return false
+        if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
+        val nextModel = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
+        val nextParts = ArrayList<LpNeighborhood>(parts.size)
+        for (part in parts) nextParts += part.rebindExact(state, token) ?: return false
+        if (token()) return false
+        try {
+            for (index in solvers.indices) {
+                if (!(solvers[index] as RetainedLpSolver).adopt(
+                    checkNotNull(nextParts[index].model.exactState),
+                    token,
+                )) {
+                    close()
+                    return false
+                }
+            }
+            if (token()) {
+                close()
+                return false
+            }
+        } catch (primary: Throwable) {
+            if (!closed) {
+                closed = true
+                clearEvidence()
+                closeComponentSolvers(solvers, primary)
+            }
+            throw primary
+        }
+        model = nextModel
+        parts = nextParts
+        clearEvidence()
+        return true
+    }
+
+    private fun clearEvidence() {
+        blockResults = null
+        solvedExactState = null
+        continuationTarget = null
+        recessionDirection = null
+        infeasibleRay = null
+        lastTermination = null
+    }
+
     @Suppress("TooGenericExceptionCaught") // Clear the invocation reason for any child failure.
     private inline fun invoke(op: (LpSolver) -> FloatLpResult?): FloatLpResult? = try {
         stitch(op)
     } catch (primary: Throwable) {
         lastTermination = null
+        blockResults = null
+        solvedExactState = null
+        continuationTarget = null
+        recessionDirection = null
         throw primary
     }
 
     private inline fun stitch(op: (LpSolver) -> FloatLpResult?): FloatLpResult? {
+        check(!closed)
         lastTermination = null
         infeasibleRay = null
         blockResults = null
+        continuationTarget = null
+        recessionDirection = null
         metrics = LpSolveMetrics()
-        var objective = 0.0
+        solvedExactState = model.exactState
+        var objective = model.objConstantD
         val primal = DoubleArray(model.n)
         val duals = DoubleArray(model.m)
         val status = Array(model.numVars) { VarStatus.AT_LOWER }
@@ -75,17 +140,32 @@ internal class ComponentLpSolver(
         val results = ArrayList<FloatLpResult>(parts.size)
         for (j in isolated) {
             val c = model.costD(j)
-            var shifted = 0.0
-            if (c < 0.0) {
-                if (!model.hasFiniteUpper(j)) {
-                    lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
-                    return null // unbounded objective, as the engine reports
+            val shifted = if (model.exactState == null) {
+                if (c < 0.0) {
+                    if (!model.hasFiniteUpper(j)) {
+                        lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
+                        return null
+                    }
+                    model.upperD(j)
+                } else {
+                    0.0
                 }
-                shifted = model.upperD(j)
-                status[j] = VarStatus.AT_UPPER
+            } else {
+                (isolatedValue(j) ?: run {
+                    val direction = recessionDirection ?: DoubleArray(model.n).also { recessionDirection = it }
+                    direction[j] = if (c < 0.0) 1.0 else -1.0
+                    feasibleIsolatedValue(j)
+                }).toDouble()
+            }
+            status[j] = when {
+                model.fixed(j) -> VarStatus.FIXED
+                c < 0.0 && model.hasFiniteUpper(j) -> VarStatus.AT_UPPER
+                model.hasFiniteLower(j) && shifted == model.lowerD(j) -> VarStatus.AT_LOWER
+                model.hasFiniteUpper(j) && shifted == model.upperD(j) -> VarStatus.AT_UPPER
+                else -> VarStatus.FREE
             }
             primal[j] = shifted + model.loShiftD(j)
-            objective += c * shifted + c * model.loShiftD(j)
+            objective += c * shifted
         }
         for (k in parts.indices) {
             val part = parts[k]
@@ -99,12 +179,24 @@ internal class ComponentLpSolver(
                     for (i in ray.indices) full[part.rows[i]] = ray[i]
                     infeasibleRay = full
                 }
+                solvers[k].recessionDirection?.let { direction ->
+                    val full = DoubleArray(model.n)
+                    for (column in direction.indices) full[part.cols[column]] = direction[column]
+                    recessionDirection = full
+                }
+                if (recessionDirection != null) continuationTarget = componentBasis()
+                return null
+            }
+            if (part.model.exactState != null &&
+                (r.exactState !== part.model.exactState || solvers[k].solvedExactState !== part.model.exactState)
+            ) {
+                solvedExactState = null
                 return null
             }
             metrics += solvers[k].lastMetrics
             if (!r.optimal && lastTermination == null) lastTermination = solvers[k].lastTermination
             results.add(r)
-            objective += r.objective
+            objective += r.objective - part.model.objConstantD
             val sub = part.model
             for (c in 0 until sub.n) {
                 primal[part.cols[c]] = r.primal[c]
@@ -124,11 +216,18 @@ internal class ComponentLpSolver(
                 maxDim = r.luMaxDim
             }
         }
+        val basis = Basis(basicVars, status)
+        // A float optimum can violate an exact source row; continuation must retain its full-model target.
+        continuationTarget = basis
+        if (recessionDirection != null) {
+            lastTermination = LpFloatTermination.UNBOUNDED_CANDIDATE
+            return null
+        }
         blockResults = results
         if (results.all { it.optimal }) lastTermination = LpFloatTermination.OPTIMAL_CANDIDATE
         return FloatLpResult(
-            basis = Basis(basicVars, status),
-            objective = objective,
+            basis = basis,
+            objective = model.objectiveD(objective),
             duals = duals,
             primal = primal,
             pivots = pivots,
@@ -137,30 +236,53 @@ internal class ComponentLpSolver(
             luMaxDim = maxDim,
             blocks = parts.size,
             optimal = results.all { it.optimal },
+            warmStarted = results.any { it.warmStarted },
+            refactorizations = results.sumOf { it.refactorizations },
+            exactState = solvedExactState,
         )
     }
 
     override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {
-        // Neighborhood restrictions omit slack costs, so their bounds cannot certify that objective.
-        if ((model.n until model.numVars).any { !model.exactCost(it).isZero }) return null
-        val sourceKey = certificationKey ?: return null
-        if (exactLpStateKey(model)?.contentEquals(sourceKey) != true) return null
+        if (!currentAuthority()) return null
         val results = blockResults ?: return null
         var value = model.exactConstant()
+        val citedRows = HashSet<Int>()
+        val citedSides = ArrayList<LpExactCitedSide>()
         for (index in parts.indices) {
-            val bound = certifyLpBound(parts[index].model, results[index].duals, observer, policy) ?: return null
-            value += bound.value - parts[index].model.exactConstant()
+            val part = parts[index]
+            val bound = certifyLpBound(part.model, results[index].duals, observer, policy) ?: return null
+            value += bound.value - part.model.exactConstant()
+            model.exactState?.let { state ->
+                val support = bound.support ?: return null
+                for ((row, _) in support.rows) citedRows.add(part.rows[row])
+                for (side in support.sides) {
+                    val column = if (side.column < part.model.n) part.cols[side.column] else
+                        model.slackCol(part.rows[side.column - part.model.n])
+                    citedSides += side.copy(
+                        column = column,
+                        witness = state.activeSide(column, side.upper)?.takeIf { it.side == side.side }?.witness,
+                    )
+                }
+            }
         }
         for (column in isolated) {
             val cost = model.exactCost(column)
-            if (cost.signum() < 0) {
-                if (!model.hasFiniteUpper(column) || model.probeClampedHi[column]) return null
-                value += cost * model.exactUpper(column)
-            } else if (cost.signum() > 0 && model.probeClampedLo[column]) {
-                return null
+            if (!cost.isZero) {
+                val upper = cost.signum() < 0
+                val side = if (upper) model.exactBounds(column).upper else model.exactBounds(column).lower
+                if (side == null) return null
+                value += cost * side.number.value
+                model.exactState?.let { state ->
+                    citedSides += LpExactCitedSide(column, upper, side, state.activeSide(column, upper)?.witness)
+                }
             }
         }
-        return CertifiedLpBound(value)
+        return CertifiedLpBound(
+            model.sourceObjective(value),
+            support = model.exactState?.let { state ->
+                LpExactSupport(state, citedRows.sorted().map { it to state.model.row(it) }, citedSides)
+            },
+        )
     }
 
     override fun exactWitness(
@@ -168,8 +290,7 @@ internal class ComponentLpSolver(
         policy: LpCertificationPolicy,
         cancellation: Cancellation,
     ): ExactLpWitness? {
-        val sourceKey = certificationKey ?: return null
-        if (exactLpStateKey(model)?.contentEquals(sourceKey) != true || cancellation()) return null
+        if (!currentAuthority() || cancellation()) return null
         val results = blockResults ?: return null
         val point = MutableList(model.n) { model.exactShift(it) }
         for (index in parts.indices) {
@@ -193,11 +314,75 @@ internal class ComponentLpSolver(
             for (column in part.cols.indices) point[part.cols[column]] = witness.primal[column]
         }
         for (column in isolated) {
-            if (model.exactCost(column).signum() < 0 && model.hasFiniteUpper(column)) {
-                point[column] += model.exactUpper(column)
-            }
+            point[column] += isolatedValue(column) ?: return null
         }
         return checkedLpWitness(model, point)
+    }
+
+    private fun currentAuthority(): Boolean = !closed && if (model.exactState != null) {
+        solvedExactState === model.exactState
+    } else {
+        certificationKey?.let { exactLpStateKey(model)?.contentEquals(it) } == true
+    }
+
+    private fun isolatedValue(column: Int): BigFraction? {
+        val cost = model.exactCost(column)
+        val bounds = model.exactBounds(column)
+        if (!bounds.consistent) return null
+        if (cost.signum() < 0) return bounds.upper?.number?.value
+        if (cost.signum() > 0) return bounds.lower?.number?.value
+        return feasibleIsolatedValue(column)
+    }
+
+    private fun feasibleIsolatedValue(column: Int): BigFraction {
+        val bounds = model.exactBounds(column)
+        val lower = bounds.lower
+        val upper = bounds.upper
+        if (lower != null && upper != null) {
+            return (lower.number.value + upper.number.value) * BigFraction.ofLong(2L).reciprocal()
+        }
+        if (lower != null && (lower.number.value.signum() > 0 || lower.strict)) {
+            return lower.number.value + if (lower.strict) BigFraction.ONE else BigFraction.ZERO
+        }
+        if (upper != null && (upper.number.value.signum() < 0 || upper.strict)) {
+            return upper.number.value - if (upper.strict) BigFraction.ONE else BigFraction.ZERO
+        }
+        return BigFraction.ZERO
+    }
+
+    override fun continuationBasis(model: LpModel): Basis? {
+        if (model.exactState !== this.model.exactState || !currentAuthority()) return null
+        val basis = continuationTarget ?: return null
+        return Basis(basis.basicVars.copyOf(), basis.status.copyOf(), captureEligible = false)
+    }
+
+    private fun componentBasis(): Basis {
+        val status = Array(model.numVars) { column ->
+            when {
+                model.fixed(column) -> VarStatus.FIXED
+                model.hasFiniteLower(column) -> VarStatus.AT_LOWER
+                model.hasFiniteUpper(column) -> VarStatus.AT_UPPER
+                else -> VarStatus.FREE
+            }
+        }
+        val basic = IntArray(model.m)
+        var at = 0
+        for (index in parts.indices) {
+            val part = parts[index]
+            val sub = part.model
+            val basis = solvers[index].continuationBasis(sub) ?: Basis(
+                IntArray(sub.m) { sub.slackCol(it) },
+                Array(sub.numVars) { if (it >= sub.n) VarStatus.BASIC else status[part.cols[it]] },
+            )
+            for (column in 0 until sub.numVars) {
+                val parent = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
+                status[parent] = basis.status[column]
+            }
+            for (column in basis.basicVars) {
+                basic[at++] = if (column < sub.n) part.cols[column] else model.slackCol(part.rows[column - sub.n])
+            }
+        }
+        return Basis(basic, status, captureEligible = false)
     }
 }
 
@@ -212,10 +397,15 @@ internal fun componentLpSolverOrNull(
     model: LpModel,
     cancellation: Cancellation,
     engine: (LpModel, Cancellation) -> LpSolver,
-    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> ComponentLpSolverCapability =
-        ::ComponentLpSolver,
-): ComponentLpSolverCapability? {
-    if (model.exactState != null) return null
+): ComponentLpSolverCapability? = componentLpSolverOrNull(model, cancellation, engine, ::ComponentLpSolver)
+
+@Suppress("TooGenericExceptionCaught") // Construction owns every child it created, including after native failures.
+internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
+    model: LpModel,
+    cancellation: Cancellation,
+    engine: (LpModel, Cancellation) -> LpSolver,
+    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
+): T? {
     val n = model.n
     val m = model.m
     if (n == 0 || m < 2) return null
@@ -274,15 +464,28 @@ internal fun componentLpSolverOrNull(
         )
     }
     val solvers = ArrayList<LpSolver>(parts.size)
-    var ownershipTransferred = false
     try {
         for (part in parts) solvers += engine(part.model, cancellation)
-        return component(model, parts, solvers, isolated.toIntArray()).also {
-            ownershipTransferred = true
-        }
-    } finally {
-        if (!ownershipTransferred) {
-            for (solver in solvers) runCatching { solver.close() }
+        return component(model, parts, solvers, isolated.toIntArray())
+    } catch (primary: Throwable) {
+        closeComponentSolvers(solvers, primary)
+        throw primary
+    }
+}
+
+@Suppress("TooGenericExceptionCaught") // Release every child and preserve the original failure.
+private fun closeComponentSolvers(solvers: List<LpSolver>, primary: Throwable? = null) {
+    var failure = primary
+    for (solver in solvers) {
+        try {
+            solver.close()
+        } catch (closeFailure: Throwable) {
+            if (failure == null) {
+                failure = closeFailure
+            } else if (failure !== closeFailure) {
+                failure.addSuppressed(closeFailure)
+            }
         }
     }
+    if (primary == null && failure != null) throw failure
 }

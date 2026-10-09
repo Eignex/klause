@@ -10,10 +10,14 @@ import com.eignex.klause.lp.engine.CutRoundingRule
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.CutWeightedRow
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpPremise
+import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.exactRhs
 import com.eignex.klause.lp.engine.exactShift
+import com.eignex.klause.lp.engine.remapSources
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.simplex.exact.BigFraction
@@ -66,6 +70,7 @@ internal fun CutProvenance.retainReferencedDefinitions(additional: CutExpression
     for (rule in rules) for (row in rule.rows) expression(row.row.expression)
     val definitions = auxiliaryDefinitions
     if (referenced.any { it !in definitions }) return null
+    if (definitions.keys == referenced) return this
     return CutProvenance(
         model,
         epoch,
@@ -139,30 +144,49 @@ internal class SourceCut(
     val rhs: BigFraction,
     val provenance: CutProvenance,
 ) {
-    val key: String get() = expression.terms.entries.sortedWith(compareBy({ it.key.kind.ordinal }, { it.key.id }))
-        .joinToString(",") { "${it.key.kind}:${it.key.id}:${it.value}" } + "|$relation|${rhs - expression.constant}"
+    val key: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        val definitions = provenance.auxiliaryDefinitions
+        expression.terms.entries.map { (source, coefficient) ->
+            val identity = if (source.kind == CutSourceKind.AUXILIARY) {
+                "${source.kind}:{${definitions[source]?.identityKey ?: "missing:${source.id}"}}"
+            } else {
+                "${source.kind}:${source.id}"
+            }
+            "$identity:$coefficient"
+        }.sorted().joinToString(",") + "|$relation|${rhs - expression.constant}"
+    }
+
+    val poolKey: Any by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        val definitions = provenance.auxiliaryDefinitions
+        val ordered = definitions.values.distinct().sortedBy { it.identityKey }
+        val canonical = ordered.withIndex().associate { it.value to CutSource(CutSourceKind.AUXILIARY, it.index) }
+        val mapping = definitions.mapValues { requireNotNull(canonical[it.value]) }
+        listOf(key, provenance.model, provenance.facts.filter { !it.global }.mapTo(HashSet()) {
+            it.copy(premise = it.premise.remapSources(mapping))
+        }, provenance.assumptions, ordered)
+    }
 
     fun toCut(map: CutSourceMap, limits: CutMappingLimits = CutMappingLimits()): CutMapping<Cut> {
-        val provenance = this.provenance.retainReferencedDefinitions(expression)
+        val original = this.provenance.retainReferencedDefinitions(expression)
             ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
-        if (provenance.model !== map.model || !map.assumptions.containsAll(provenance.assumptions)) {
+        if (original.model !== map.model || !map.assumptions.containsAll(original.assumptions)) {
             return CutMapping.Declined(CutMappingDecline.MODEL_SCOPE)
         }
-        if (provenance.auxiliaryDefinitions.any { (source, definition) ->
-                map.auxiliaryDefinitions[source] != definition
-            } ||
-            expression.terms.keys.any { it.kind == CutSourceKind.AUXILIARY && it !in provenance.auxiliaryDefinitions }
-        ) {
-            return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
-        }
-        if (provenance.facts.any { !it.global && !map.isActive(it.premise) }) {
-            return CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD)
-        }
-        if (expression.terms.size > limits.terms || !limits.accepts(provenance) ||
+        if (expression.terms.size > limits.terms || !limits.accepts(original) ||
             !limits.accepts(rhs) || !limits.accepts(expression.constant) ||
             expression.terms.values.any { !limits.accepts(it) }
         ) {
             return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
+        }
+        val mapping = LinkedHashMap<CutSource, CutSource>()
+        for ((source, definition) in original.auxiliaryDefinitions) {
+            mapping[source] = map.auxiliarySource(source, definition)
+                ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
+        }
+        val provenance = original.remapSources(mapping)
+        val expression = this.expression.remapSources(mapping)
+        if (provenance.facts.any { !it.global && !map.isActive(it.premise) }) {
+            return CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD)
         }
         val coefficients = LinkedHashMap<Int, BigFraction>()
         var bound = rhs - expression.constant
@@ -214,13 +238,14 @@ internal class SourceCut(
         if (integers.any { !representable(it) }) {
             return CutMapping.Declined(CutMappingDecline.LONG_RANGE)
         }
-        val proof = CutProvenance(
+        val conclusion = CutPremise.Row(expression, relation, rhs)
+        val proof = if (provenance.conclusion == conclusion && facts == provenance.facts) provenance else CutProvenance(
             map.model,
             provenance.epoch,
             facts,
             provenance.assumptions,
             provenance.rules,
-            CutPremise.Row(expression, relation, rhs),
+            conclusion,
             provenance.auxiliaryDefinitions,
         )
         if (!limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
@@ -395,29 +420,40 @@ private class SourceCutMapper(
                 } else if (row.global) {
                     facts.add(CutProofFact(rowFact, true))
                 } else {
-                    val premises = row.premises ?: decline(CutMappingDecline.MISSING_PROVENANCE)
-                    if (premises.vars.isEmpty() && premises.boolLits.isEmpty()) {
-                        decline(
-                            CutMappingDecline.MISSING_PROVENANCE,
+                    val premises = row.exactPremises ?: run {
+                        val legacy = row.premises ?: decline(CutMappingDecline.MISSING_PROVENANCE)
+                        if (legacy.vars.size != legacy.isUpper.size || legacy.vars.size != legacy.thresholds.size ||
+                            legacy.vars.any { it < 0 }
+                        ) {
+                            decline(CutMappingDecline.MISSING_PROVENANCE)
+                        }
+                        ExactLpPremises(
+                            legacy.vars.indices.map {
+                                ExactLpPremise(
+                                    legacy.vars[it],
+                                    legacy.isUpper[it],
+                                    ExactLpNumber.of(legacy.thresholds[it]),
+                                )
+                            },
+                            legacy.boolLits.toList(),
                         )
                     }
-                    if (premises.vars.size != premises.isUpper.size || premises.vars.size != premises.thresholds.size ||
-                        premises.vars.any { it < 0 }
-                    ) {
-                        decline(CutMappingDecline.MISSING_PROVENANCE)
-                    }
-                    for (i in premises.vars.indices) {
+                    if (premises.size == 0L) decline(CutMappingDecline.MISSING_PROVENANCE)
+                    for (premise in premises.boundEntries()) {
                         val expr = CutExpression(
-                            mapOf(CutSource(CutSourceKind.INTEGER, premises.vars[i]) to BigFraction.ONE),
+                            mapOf(CutSource(CutSourceKind.INTEGER, premise.variable) to BigFraction.ONE),
                         )
                         facts.add(
                             CutProofFact(
-                                CutPremise.Bound(expr, premises.isUpper[i], BigFraction.ofLong(premises.thresholds[i])),
+                                CutPremise.Bound(expr, premise.upper, premise.threshold.value),
                                 false,
                             ),
                         )
                     }
-                    for (literal in premises.boolLits) facts.add(CutProofFact(CutPremise.Literal(literal), false))
+                    for (literal in premises.literalEntries()) facts.add(CutProofFact(
+                        CutPremise.Literal(literal),
+                        false,
+                    ))
                 }
                 weightedRows.add(CutWeightedRow(rowFact, row.multiplier))
             }

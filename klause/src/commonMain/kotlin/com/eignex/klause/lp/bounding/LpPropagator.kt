@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -22,6 +23,10 @@ import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.strongerThan
+import com.eignex.klause.lp.relaxation.LpCutEdit
+import com.eignex.klause.lp.relaxation.LpSourceCompaction
+import com.eignex.klause.lp.relaxation.LpSourceEdit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.solver.search.ComponentCheck
@@ -48,6 +53,7 @@ internal data class LpEffortProfile(
 )
 
 internal interface LpSearchPolicy {
+    val eagerAssertionScopes: Boolean get() = true
     fun initialize(context: SearchContext) = Unit
     fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = ComponentResult.Consistent
     fun propagate(context: SearchContext): ComponentResult = ComponentResult.Consistent
@@ -79,7 +85,6 @@ internal class LpPropagator(
     private var owner: LpScopedSolver? = null
     private var proofContext: SearchContext? = null
     private var modelKey: Any? = null
-    private var rootState: LpExactState? = null
 
     private var closed = false
     private var invalidated = false
@@ -97,6 +102,12 @@ internal class LpPropagator(
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
 
+    fun activeBoundPremise(column: Int, upper: Boolean): SearchAtomPremise? {
+        val active = state?.activeSide(column, upper) ?: return null
+        val premise = if (active.witness < 0L) SearchAtomPremise.All(emptyList()) else boundPremise(active.witness)
+        return active.side.premises?.let { SearchAtomPremise.All(listOf(premise, it.asPremise())) } ?: premise
+    }
+
     fun explainConflict(support: LpExactSupport?, context: SearchContext): SearchExplanation? {
         val current = state ?: return null
         if (support == null || support.state !== current || proofContext !== context || context.cancelled()) return null
@@ -113,9 +124,7 @@ internal class LpPropagator(
             if (cited.column !in 0 until current.model.numVars) return null
             val active = current.activeSide(cited.column, cited.upper) ?: return null
             if (active.side != cited.side || active.witness != cited.witness) return null
-            val declared = rootState?.takeIf { cited.column < it.model.numVars }
-                ?.activeSide(cited.column, cited.upper)
-            leaves += if (declared == active) {
+            leaves += if (active.witness < 0L) {
                 SearchAtomPremise.All(emptyList())
             } else {
                 boundPremise(active.witness)
@@ -139,10 +148,11 @@ internal class LpPropagator(
     fun install(key: Any, model: ExactLpModel): Boolean {
         if (closed || cancellation()) return false
         if (modelKey === key && owner != null) return true
+        val context = proofContext
         reset()
+        proofContext = context
         val initial = LpExactState(model)
         owner = newOwner(initial)
-        rootState = initial
         modelKey = key
         sourcePremises = LpSourcePremises(key)
         return true
@@ -155,8 +165,7 @@ internal class LpPropagator(
         for (column in 0 until current.model.numVars) {
             for (upper in listOf(false, true)) {
                 val active = current.activeSide(column, upper) ?: continue
-                val declared = rootState?.takeIf { column < it.model.numVars }?.activeSide(column, upper)
-                result[column to upper] = if (declared == active) {
+                result[column to upper] = if (active.witness < 0L) {
                     SearchAtomPremise.All(emptyList())
                 } else {
                     boundPremise(active.witness)
@@ -186,6 +195,7 @@ internal class LpPropagator(
         if (depth < current.state.depth) {
             onEdit(current.state.model.numVars.toLong())
             if (!current.pop(depth, token)) return invalidate()
+            retainWitnesses()
         }
         while (current.state.depth < depth) {
             onEdit(current.state.model.numVars.toLong())
@@ -203,7 +213,7 @@ internal class LpPropagator(
         val current = owner ?: return false
         if (column !in 0 until current.state.model.numVars) return invalidate()
         val previous = current.state.activeSide(column, upper)?.side
-        if (previous == side) return true
+        if (previous != null && !side.strongerThan(previous, upper)) return true
         val witness = nextWitness++
         onEdit(current.state.model.numVars.toLong())
         if (witness == Long.MAX_VALUE || !current.assertBound(column, upper, side, witness)) {
@@ -228,22 +238,18 @@ internal class LpPropagator(
                 if (cancellation()) return LpBoundBatchResult.Declined(assertions.size)
                 val side = if (upperSide) upper[column] else lower[column]
                 val previous = if (upperSide) activeUpper else activeLower
-                if (previous == side) continue
+                if (previous != null && !side.strongerThan(previous, upperSide)) continue
                 if (nextWitness > Long.MAX_VALUE - assertions.size - 1L) {
                     return LpBoundBatchResult.Declined(assertions.size + 1)
                 }
                 assertions.add(
                     LpBoundAssertion(column, upperSide, side, nextWitness + assertions.size, current.state.depth),
                 )
-                val comparison = previous?.let { side.number.value.compareTo(it.number.value) }
-                if (comparison == null || (if (upperSide) comparison < 0 else comparison > 0) ||
-                    (comparison == 0 && side.strict && !previous.strict)
-                ) {
-                    if (upperSide) activeUpper = side else activeLower = side
-                }
+                if (upperSide) activeUpper = side else activeLower = side
                 if (!ExactLpBounds(activeLower, activeUpper).consistent) break@columns
             }
         }
+        if (assertions.isEmpty()) return LpBoundBatchResult.Applied(0)
         onEdit(current.state.model.numVars.toLong())
         val result = current.assertBounds(assertions)
         if (result !is LpBoundBatchResult.Declined) {
@@ -258,6 +264,75 @@ internal class LpPropagator(
 
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true
+
+    fun compact(
+        before: LpExactState,
+        remap: LpLayoutRemap,
+        cuts: LpCutEdit,
+        sources: LpSourceCompaction? = null,
+    ): Boolean = withOwner { current ->
+        if (current.state !== before || cuts.sourceState !== before || !cuts.isCurrent() ||
+            cuts.retired.isNotEmpty() || cuts.rows.isNotEmpty() ||
+            (sources != null && (sources.sourceState !== before || sources.remap !== remap || !sources.isCurrent())) ||
+            cancellation()
+        ) {
+            return@withOwner false
+        }
+        onEdit(before.model.numVars.toLong())
+        if (!current.compact(remap)) return@withOwner false
+        retainWitnesses()
+        lastMetrics = LpSolveMetrics()
+        sources?.commit()
+        cuts.commit()
+        true
+    } == true
+
+    fun editCuts(edit: LpCutEdit): Boolean = withOwner { current ->
+        val before = current.state
+        if (edit.sourceState !== before || !edit.isCurrent() || cancellation()) return@withOwner false
+        if (edit.retired.isNotEmpty() || edit.rows.isNotEmpty()) {
+            onEdit(before.model.numVars.toLong() + edit.rows.size)
+            if (!current.replaceRows(edit.retired, emptyList(), edit.rows, before.depth > 0)) return@withOwner false
+            retainWitnesses()
+            lastMetrics = LpSolveMetrics()
+        }
+        edit.commit()
+        true
+    } == true
+
+    fun editSources(
+        edit: LpSourceEdit,
+        premise: (Int, Boolean) -> SearchAtomPremise = { _, _ -> SearchAtomPremise.Unavailable },
+    ): Boolean = withOwner { current ->
+        val before = current.state
+        if (edit.sourceState !== before || !edit.isCurrent() ||
+            edit.bounds.size != before.model.n + edit.columns.size || cancellation()
+        ) {
+            return@withOwner false
+        }
+        val assertions = edit.boundAssertions(nextWitness, cancellation) ?: return@withOwner false
+        if (edit.retired.isEmpty() && edit.columns.isEmpty() && edit.rows.isEmpty() && edit.objective == null &&
+            assertions.isEmpty()
+        ) {
+            edit.commit()
+            return@withOwner true
+        }
+        val premises = assertions.map { premise(it.column, it.upper) }
+        onEdit((before.model.numVars + edit.columns.size + edit.rows.size).toLong())
+        if (!current.replaceRows(
+                edit.retired, edit.columns, edit.rows, before.depth > 0,
+                permanentRows = edit.permanentRows, objective = edit.objective, assertions = assertions,
+            )
+        ) {
+            return@withOwner false
+        }
+        val count = current.state.assertions.size - before.assertions.size
+        for (index in 0 until count) witnesses[assertions[index].witness] = premises[index]
+        nextWitness += count
+        lastMetrics = LpSolveMetrics()
+        edit.commit()
+        true
+    } == true
 
     fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
         solveOwned { current ->
@@ -274,7 +349,7 @@ internal class LpPropagator(
                 fullContinuation = profile.fullContinuation,
                 observer = certificationObserver,
                 sparsePointRecovery = sparsePointRecovery,
-            )
+            ).also { solved = true }
         }
 
     private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? = withOwner { current ->
@@ -305,8 +380,7 @@ internal class LpPropagator(
 
     fun resetRoot(): Boolean {
         lastMetrics = LpSolveMetrics()
-        val initial = rootState ?: return false
-        if (withOwner { it.resetRoot(initial, cancellation) } != true) return invalidate()
+        if (withOwner { it.resetRoot(cancellation) } != true) return invalidate()
         witnesses.clear()
         nextWitness = 0L
         sourcePremises = LpSourcePremises(requireNotNull(modelKey))
@@ -336,7 +410,9 @@ internal class LpPropagator(
     internal fun assertWithin(decision: SearchDecision, context: SearchContext, token: Cancellation): ComponentResult {
         if (proofContext != null && proofContext !== context) return ComponentResult.Indeterminate
         proofContext = context
-        if (owner != null && !atLevel(context.decisionLevel, token)) return ComponentResult.Indeterminate
+        if (owner != null && policy.eagerAssertionScopes && !atLevel(context.decisionLevel, token)) {
+            return ComponentResult.Indeterminate
+        }
         sourcePremises?.record(decision, context)
         return policy.assert(decision, context)
     }
@@ -386,9 +462,13 @@ internal class LpPropagator(
             invalidate()
         }
         lastMetrics = LpSolveMetrics()
+        retainWitnesses()
+        policy.retract(decisionLevel)
+    }
+
+    private fun retainWitnesses() {
         val active = state?.assertions?.map { it.witness }?.toSet().orEmpty()
         witnesses.keys.retainAll(active)
-        policy.retract(decisionLevel)
     }
 
     override fun onRestart(context: SearchContext) = policy.restart(context)
@@ -409,7 +489,6 @@ internal class LpPropagator(
         owner = null
         invalidated = false
         modelKey = null
-        rootState = null
         proofContext = null
         sourcePremises = null
         witnesses.clear()

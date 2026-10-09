@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
@@ -108,6 +109,7 @@ class PropagationSession private constructor(
     private val intPinnedSet: BooleanArray = BooleanArray(problem.numIntVars)
     private val intPinnedVal: LongArray = LongArray(problem.numIntVars)
     private val trail: IntArrayList = IntArrayList()
+    private val impliedIntUndo: IntArray = IntArray(problem.numIntVars) { -1 }
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
     private fun trailIsBool(enc: Int): Boolean = enc < problem.numBoolVars
@@ -198,6 +200,8 @@ class PropagationSession private constructor(
 
     /** Current int domain after propagation. Always non-empty unless the session is Unsat. */
     fun intDomain(v: Int): IntDomain = state.intDomains[v]
+
+    internal val explanationState: PropagationState get() = state
 
     /**
      * Variables fixed at the root, however deep the search stands: bools assigned at decision level 0 and ints down
@@ -340,10 +344,12 @@ class PropagationSession private constructor(
     }
 
     /** [pinBool] as a probe — see [probeFixpoint]. */
-    internal fun probeBool(v: Int, value: Boolean): PropagationResult? = probeFixpoint { pushBool(v, value) }
+    internal fun probeBool(v: Int, value: Boolean): PropagationResult? =
+        probeFixpoint { pushBool(v, value, reportImplied = false) }
 
     /** [pinInt] as a probe — see [probeFixpoint]. */
-    internal fun probeInt(v: Int, value: Long): PropagationResult? = probeFixpoint { pushInt(v, value) }
+    internal fun probeInt(v: Int, value: Long): PropagationResult? =
+        probeFixpoint { pushInt(v, value, reportImplied = false) }
 
     /**
      * One probe pin: the fixpoint polls the deadline from its first fire (no [PROPAGATION_CANCEL_FLOOR]
@@ -692,7 +698,7 @@ class PropagationSession private constructor(
         state.nativeEngine?.importUses?.drain(action)
     }
 
-    private fun pushBool(v: Int, value: Boolean): PropagationResult {
+    private fun pushBool(v: Int, value: Boolean, reportImplied: Boolean = true): PropagationResult {
         val want = if (value) 1 else 0
         if (boolPinned[v] == want) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
@@ -702,10 +708,10 @@ class PropagationSession private constructor(
         boolPinned[v] = want
         trail.add(encBool(v))
         levelPush(state.mark())
-        return impliedSince(base)
+        return if (reportImplied) impliedSince(base) else PropagationResult.Implied.EMPTY
     }
 
-    private fun pushInt(v: Int, value: Long): PropagationResult {
+    private fun pushInt(v: Int, value: Long, reportImplied: Boolean = true): PropagationResult {
         if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         if (!state.setIntAsDecision(v, value)) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
@@ -715,7 +721,7 @@ class PropagationSession private constructor(
         intPinnedVal[v] = value
         trail.add(encInt(v))
         levelPush(state.mark())
-        return impliedSince(base)
+        return if (reportImplied) impliedSince(base) else PropagationResult.Implied.EMPTY
     }
 
     /**
@@ -873,7 +879,13 @@ class PropagationSession private constructor(
         val iRaw = IntArrayList()
         for (i in base until top) {
             val v = state.undoVarAt(i)
-            if (state.undoIsBoolAt(i)) bRaw.add(v) else iRaw.add(v)
+            if (state.undoIsBoolAt(i)) {
+                bRaw.add(v)
+            } else if (!intPinnedSet[v] && impliedIntUndo[v] < 0 && state.undo.domain[i] != null) {
+                // Interior carves preserve endpoints; the first full snapshot precedes every endpoint move.
+                impliedIntUndo[v] = i
+                iRaw.add(v)
+            }
         }
         val bKeys = IntArrayList()
         val bVals = ArrayList<Boolean>()
@@ -892,25 +904,49 @@ class PropagationSession private constructor(
         }
         val iKeys = IntArrayList()
         val iVals = LongArrayList()
+        var minKeys = EmptyIntArray
+        var minValues = EmptyLongArray
+        var maxKeys = EmptyIntArray
+        var maxValues = EmptyLongArray
         if (iRaw.size > 0) {
             val sorted = iRaw.toIntArray()
             sorted.sort()
-            var prev = -1
+            val mins = IntArrayList()
+            val minVals = LongArrayList()
+            val maxs = IntArrayList()
+            val maxVals = LongArrayList()
             for (v in sorted) {
-                if (v == prev) continue
-                prev = v
-                if (intPinnedSet[v]) continue // decision var — excluded
+                val prior = requireNotNull(state.undo.domain[impliedIntUndo[v]])
+                impliedIntUndo[v] = -1
                 val d = state.intDomains[v]
-                if (d.min != d.max) continue // not yet determined
-                iKeys.add(v)
-                iVals.add(d.min)
+                if (d.min == d.max) {
+                    iKeys.add(v)
+                    iVals.add(d.min)
+                } else {
+                    if (d.min > prior.min) {
+                        mins.add(v)
+                        minVals.add(d.min)
+                    }
+                    if (d.max < prior.max) {
+                        maxs.add(v)
+                        maxVals.add(d.max)
+                    }
+                }
             }
+            minKeys = mins.toIntArray()
+            minValues = minVals.toLongArray()
+            maxKeys = maxs.toIntArray()
+            maxValues = maxVals.toLongArray()
         }
         return PropagationResult.Implied(
             boolKeys = bKeys.toIntArray(),
             boolValues = BooleanArray(bVals.size) { bVals[it] },
             intKeys = iKeys.toIntArray(),
             intValues = iVals.toLongArray(),
+            intMinKeys = minKeys,
+            intMinValues = minValues,
+            intMaxKeys = maxKeys,
+            intMaxValues = maxValues,
         )
     }
 }

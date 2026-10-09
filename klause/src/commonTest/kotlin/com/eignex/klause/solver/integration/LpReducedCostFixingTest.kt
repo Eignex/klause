@@ -18,6 +18,10 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.integerCertify
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundTrail
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
@@ -37,6 +41,80 @@ import kotlin.test.assertTrue
 
 /** #21: LP reduced-cost fixing wired into BacktrackSolver branch-and-bound. */
 class LpReducedCostFixingTest {
+
+    @Test
+    fun `retained affine fixing reasons express the cutoff in absolute source units`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), emptyArray())
+        val session = PropagationSession(problem)
+        session.implyIntAtLeast(0, 5L)
+        session.implyIntAtMost(0, 6L)
+        val source = LpBuilder().apply { addVar(3L, 9L, cost = 2L) }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
+        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(3L)), 8L))
+        val model = assertNotNull(trail.state.toWorkingModel())
+        val certificate = assertNotNull(integerCertify(model, doubleArrayOf()))
+        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 10L, intArrayOf(0), intArrayOf())
+
+        val support = assertNotNull(reducedCostFixingReasons(relaxation, certificate, session, 0, 23L))
+
+        assertEquals(listOf(session.boundLeLit(0, 6L, false)), support.reasonFor(0).toList())
+        assertNull(reducedCostFixingReasons(relaxation, certificate, session, 0, 21L))
+    }
+
+    @Test
+    fun `retained reduced cost fixing declines stale certificates after bound rollback`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), emptyArray())
+        val session = PropagationSession(problem)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val source = LpBuilder().apply { addVar(3L, 9L, cost = 1L) }.build(Sense.MINIMIZE)
+        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
+        val certificate = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf()))
+        assertTrue(trail.pop(0))
+        val model = assertNotNull(trail.state.toWorkingModel())
+        val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
+        val sink = SolveStatsSink(backend = "retained-rollback")
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+
+            engine.applySparseReducedCostFixing(relaxation, certificate, session, 8.0, sink)
+
+            assertEquals(IntDomain(3, 9), session.intDomain(0))
+            assertNull(reducedCostFixingReasons(relaxation, certificate, session, 0, 7L))
+            val fresh = assertNotNull(integerCertify(model, doubleArrayOf()))
+            engine.applySparseReducedCostFixing(relaxation, fresh, session, 8.0, sink)
+            assertEquals(IntDomain(3, 7), session.intDomain(0))
+        }
+    }
+
+    @Test
+    fun `retained fixing starts at the live endpoint in the original source coordinates`() {
+        for (coefficient in listOf(-1L, 1L)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), emptyArray())
+            val objective = LinearObjective(intCoefficients = longArrayOf(coefficient))
+            val session = PropagationSession(problem)
+            session.implyIntAtLeast(0, 5L)
+            session.implyIntAtMost(0, 7L)
+            val source = LpBuilder().apply { addVar(3L, 9L, cost = coefficient) }.build(Sense.MINIMIZE)
+            val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
+            assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
+            assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(4L)), 8L))
+            val model = assertNotNull(trail.state.toWorkingModel())
+            val certificate = assertNotNull(integerCertify(model, doubleArrayOf()))
+            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf())
+            val sink = SolveStatsSink(backend = "retained-fixing")
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+
+                engine.applySparseReducedCostFixing(
+                    relaxation, certificate, session, if (coefficient > 0L) 7.0 else -5.0, sink,
+                )
+
+                val expected = IntDomain(if (coefficient > 0L) 5L else 6L, if (coefficient > 0L) 6L else 7L)
+                assertEquals(expected, session.intDomain(0))
+            }
+        }
+    }
 
     // min x0 + 10·x1 s.t. x0 + x1 >= 5, both in [0,10]. Optimum 5 at (5,0). With the constraint
     // active the objective is 5 + 9·x1, so x1's reduced cost is 9: under a tight incumbent it is

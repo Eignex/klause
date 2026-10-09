@@ -472,6 +472,12 @@ interface SearchContext {
     /** Tightest upper bound published for [variable], or null when no component has published one. */
     fun intUpperBound(variable: Int): Long?
 
+    /** Antecedents of the current lower bound, or [SearchAtomPremise.Unavailable] when it has no proof. */
+    fun intLowerBoundPremise(variable: Int): SearchAtomPremise = SearchAtomPremise.Unavailable
+
+    /** Antecedents of the current upper bound, with the same trail lifetime as its value. */
+    fun intUpperBoundPremise(variable: Int): SearchAtomPremise = SearchAtomPremise.Unavailable
+
     /**
      * Assert a Boolean consequence at the current shared level.
      *
@@ -490,6 +496,9 @@ interface SearchContext {
 
     /** Publish a non-Boolean consequence, such as a CP bound tightening, to peer components. */
     fun publish(decision: SearchDecision): ComponentResult
+
+    /** Publish an integer consequence with immutable source antecedents proved by its producer. */
+    fun publish(decision: SearchDecision, premise: SearchAtomPremise): ComponentResult = publish(decision)
 
     /**
      * Name immutable, exclusive and exhaustive theory payloads in this session's source scope.

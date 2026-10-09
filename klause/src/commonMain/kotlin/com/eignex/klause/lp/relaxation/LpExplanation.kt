@@ -3,17 +3,29 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.IntegerCertificate
+import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.exactBounds
+import com.eignex.klause.lp.engine.exactShift
+import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.engine.integerFarkasRay
-import com.eignex.klause.lp.engine.rationalizeToIntegerModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 
 /**
  * Turns LP certificates into learned-clause material over absolute variable-bound atoms, read off the
@@ -43,6 +55,8 @@ import com.eignex.klause.util.IntHashSet
  * `implyInt*WithReason` records reasons whose literals are currently false.
  */
 internal object LpExplanation {
+    private val minimumLong = bigIntOf(Long.MIN_VALUE)
+    private val maximumLong = bigIntOf(Long.MAX_VALUE)
 
     /** [premiseLit] result: the premise holds over the whole declared box — cite nothing. */
     const val PREMISE_NONE: Int = -1
@@ -65,24 +79,11 @@ internal object LpExplanation {
         val varId = relaxation.colVarId[col]
         if (varId < 0) return presencePremise(relaxation, session, col, lowerSide)
         val model = relaxation.model
-        val lo = model.loShift[col]
-        val hi = lo + model.upper[col]
-        if (relaxation.colIsBool[col]) {
-            return when {
-                lowerSide && lo == 1L -> Lit.make(varId, false)
-
-                // premise b (pinned true), negated
-                !lowerSide && hi == 0L -> Lit.make(varId, true)
-
-                // premise ¬b (pinned false), negated
-                else -> PREMISE_NONE // b ≥ 0 / b ≤ 1: vacuous
-            }
-        }
-        return if (lowerSide) {
-            session.boundGeLit(varId, lo, positive = false)
-        } else {
-            session.boundLeLit(varId, hi, positive = false)
-        }
+        val side = if (lowerSide) model.exactBounds(col).lower else model.exactBounds(col).upper
+        side ?: return PREMISE_AUX
+        val value = model.exactShift(col) + side.number.value
+        val kind = if (relaxation.colIsBool[col]) CutSourceKind.BOOLEAN else CutSourceKind.INTEGER
+        return boundLiteral(CutSource(kind, varId), value, !lowerSide, side.strict, session)
     }
 
     fun boundPremiseLits(
@@ -105,10 +106,19 @@ internal object LpExplanation {
         val required = relaxation.colReq.getOrNull(column) ?: return PREMISE_AUX
         if (required.size % 2 != 0 || relaxation.colPresentUpper[column] < 0L) return PREMISE_AUX
         val model = relaxation.model
-        if (model.loShift[column] != 0L || !model.hasUpper[column]) return PREMISE_AUX
-        if (lowerSide) return PREMISE_NONE
-        if (model.upper[column] == relaxation.colPresentUpper[column]) return PREMISE_NONE
-        if (model.upper[column] != 0L) return PREMISE_AUX
+        if (!model.exactShift(column).isZero) return PREMISE_AUX
+        val bounds = model.exactBounds(column)
+        if (lowerSide) {
+            return if (bounds.lower?.number?.value?.isZero == true && !bounds.lower.strict) {
+                PREMISE_NONE
+            } else {
+                PREMISE_AUX
+            }
+        }
+        val upper = bounds.upper ?: return PREMISE_AUX
+        if (upper.strict) return PREMISE_AUX
+        if (upper.number.value == BigFraction.ofLong(relaxation.colPresentUpper[column])) return PREMISE_NONE
+        if (!upper.number.value.isZero) return PREMISE_AUX
         for (index in required.indices step 2) {
             val variable = required[index]
             if (variable !in 0L until session.problem.numIntVars.toLong()) return PREMISE_AUX
@@ -134,10 +144,11 @@ internal object LpExplanation {
         relaxation: LpRelaxation,
         cert: IntegerCertificate,
         session: PropagationSession,
+        observer: LpCertificationObserver? = null,
     ): IntArray? {
         val lits = IntArrayList()
         val seen = IntHashSet()
-        if (!addDualRowPremiseLits(lits, seen, relaxation, cert, session)) return null
+        if (!addDualRowPremiseLits(lits, seen, relaxation, cert, session, observer)) return null
         for (col in relaxation.colVarId.indices) {
             val sign = cert.reducedCostSign(col)
             if (sign == 0) continue
@@ -159,36 +170,33 @@ internal object LpExplanation {
      */
     fun infeasibilityClause(relaxation: LpRelaxation, ray: LongArray, session: PropagationSession): IntArray? {
         val model = relaxation.model
-        // A real model's ray is certified against its real coefficients, which the integer store does not
-        // hold: a real row is all zeros there. Signing ρ·A_j from that store would drop every real row's
-        // share, seat columns on the wrong side, and leave out bounds the proof rests on. The scaled-integer
-        // rationalization the certificate was checked on has the same signs, since its scale is positive.
-        val coefficients = if (model.doubleView == null) {
-            model
-        } else {
-            rationalizeToIntegerModel(model, outwardRealUppers = true)?.model ?: return null
-        }
+        if (ray.size != model.m) return null
         val lits = IntArrayList()
         val seen = IntHashSet()
         val rows = (0 until model.m).filter { ray[it] != 0L }.toIntArray()
         if (!addRowPremiseLits(lits, seen, relaxation, rows, session)) return null
         for (col in relaxation.colVarId.indices) {
-            val ajAcc = Int128()
-            coefficients.forEachInColumn(col) { i, a -> ajAcc.addProduct(ray[i], a) }
-            if (ajAcc.overflow) return null // can't determine the premise side ⇒ inexpressible
-            val sign = if (ajAcc.hi == 0L && ajAcc.lo == 0L) {
-                0
-            } else if (ajAcc.isNonNegative()) {
-                1
-            } else {
-                -1
-            }
+            val sign = rayColumnSign(model, ray, col) ?: return null
             if (sign == 0) continue
             // ρ·A_j > 0 ⇒ the column's upper bound is load-bearing (upper side); < 0 ⇒ lower side.
             val premises = boundPremiseLits(relaxation, session, col, lowerSide = sign < 0) ?: return null
             for (lit in premises) if (seen.add(lit)) lits.add(lit)
         }
-        return if (lits.isEmpty()) null else lits.toIntArray()
+        return lits.toIntArray()
+    }
+
+    private fun rayColumnSign(model: LpModel, ray: LongArray, column: Int): Int? {
+        if (model.exactState != null || model.doubleView != null) {
+            var dot = BigFraction.ZERO
+            model.forEachRationalColumn(column) { row, value ->
+                if (ray[row] != 0L) dot += BigFraction.ofLong(ray[row]) * value
+            }
+            return dot.signum()
+        }
+        val dot = Int128()
+        model.forEachInColumn(column) { row, value -> dot.addProduct(ray[row], value) }
+        if (dot.overflow) return null
+        return if (dot.hi == 0L && dot.lo == 0L) 0 else if (dot.isNonNegative()) 1 else -1
     }
 
     /**
@@ -213,7 +221,7 @@ internal object LpExplanation {
                 for (literal in premises) if (seen.add(literal)) lits.add(literal)
             }
         }
-        return if (lits.size > 0) lits.toIntArray() else null
+        return lits.toIntArray()
     }
 
     /**
@@ -230,8 +238,12 @@ internal object LpExplanation {
         session: PropagationSession,
     ): Boolean {
         val model = relaxation.model
+        if (model.exactState == null && (model.rowGlobal.size != model.m || model.rowPremises.size != model.m)) {
+            return false
+        }
         for (r in rows) {
-            if (model.rowGlobal[r]) continue
+            if (r !in 0 until model.m || model.exactState?.rows?.row(r)?.active == false) return false
+            if (model.exactState?.model?.row(r)?.global ?: model.rowGlobal[r]) continue
             val source = relaxation.sourceMap?.parent(r)
             if (source != null) {
                 if (source.model !== session.problem || source.assumptions.isNotEmpty()) return false
@@ -240,18 +252,32 @@ internal object LpExplanation {
                 }
                 continue
             }
-            val prem = model.rowPremises[r] ?: return false
-            for (k in prem.vars.indices) {
-                val lit = if (prem.isUpper[k]) {
-                    session.boundLeLit(prem.vars[k], prem.thresholds[k], positive = false)
-                } else {
-                    session.boundGeLit(prem.vars[k], prem.thresholds[k], positive = false)
+            if (model.exactState != null) {
+                val premises = model.exactState.model.row(r).premises ?: return false
+                for (bound in premises.boundEntries()) {
+                    val premise = CutPremise.Bound(
+                        CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, bound.variable) to BigFraction.ONE)),
+                        bound.upper, bound.threshold.value,
+                    )
+                    if (!addSourcePremise(lits, seen, premise, session)) return false
                 }
-                if (seen.add(lit)) lits.add(lit)
+                for (literal in premises.literalEntries()) {
+                    if (!addSourcePremise(lits, seen, CutPremise.Literal(literal), session)) return false
+                }
+                continue
+            }
+            val prem = model.rowPremises[r] ?: return false
+            if (prem.vars.size != prem.isUpper.size || prem.vars.size != prem.thresholds.size) return false
+            for (k in prem.vars.indices) {
+                if (prem.vars[k] !in 0 until session.problem.numIntVars) return false
+                val premise = CutPremise.Bound(
+                    CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, prem.vars[k]) to BigFraction.ONE)),
+                    prem.isUpper[k], BigFraction.ofLong(prem.thresholds[k]),
+                )
+                if (!addSourcePremise(lits, seen, premise, session)) return false
             }
             for (bl in prem.boolLits) {
-                val neg = Lit.negate(bl)
-                if (seen.add(neg)) lits.add(neg)
+                if (!addSourcePremise(lits, seen, CutPremise.Literal(bl), session)) return false
             }
         }
         return true
@@ -264,7 +290,9 @@ internal object LpExplanation {
         relaxation: LpRelaxation,
         cert: IntegerCertificate,
         session: PropagationSession,
+        observer: LpCertificationObserver? = null,
     ): Boolean {
+        if (!cert.belongsTo(relaxation.model, observer)) return false
         val rows = (0 until relaxation.model.m).filter { cert.dualNonzeroRow(it) }.toIntArray()
         return addRowPremiseLits(lits, seen, relaxation, rows, session)
     }
@@ -303,32 +331,13 @@ internal object LpExplanation {
 
             is CutPremise.Bound -> {
                 val term = premise.expression.terms.entries.singleOrNull() ?: return false
-                if (term.value.isZero || premise.strict) return false
+                if (term.value.isZero) return false
                 val threshold = (premise.value - premise.expression.constant) * term.value.reciprocal()
-                val value = ExactLpNumber.of(threshold).legacyLong() ?: return false
                 val upper = premise.upper == (term.value.signum() > 0)
-                when (term.key.kind) {
-                    CutSourceKind.INTEGER -> {
-                        if (term.key.id !in 0 until session.problem.numIntVars) return false
-                        val domain = session.intDomain(term.key.id)
-                        if (upper) {
-                            if (domain.max > value) return false
-                            session.boundLeLit(term.key.id, value, positive = false)
-                        } else {
-                            if (domain.min < value) return false
-                            session.boundGeLit(term.key.id, value, positive = false)
-                        }
-                    }
-
-                    CutSourceKind.BOOLEAN -> {
-                        if (term.key.id !in 0 until session.problem.numBoolVars) return false
-                        if ((upper && value >= 1L) || (!upper && value <= 0L)) return true
-                        if ((upper && value != 0L) || (!upper && value != 1L)) return false
-                        if (session.boolValue(term.key.id) != !upper) return false
-                        Lit.make(term.key.id, upper)
-                    }
-
-                    else -> return false
+                when (val literal = boundLiteral(term.key, threshold, upper, premise.strict, session)) {
+                    PREMISE_AUX -> return false
+                    PREMISE_NONE -> return true
+                    else -> literal
                 }
             }
 
@@ -336,5 +345,65 @@ internal object LpExplanation {
         }
         if (seen.add(literal)) lits.add(literal)
         return true
+    }
+
+    private fun boundLiteral(
+        source: CutSource,
+        value: BigFraction,
+        upper: Boolean,
+        strict: Boolean,
+        session: PropagationSession,
+    ): Int = when (source.kind) {
+        CutSourceKind.INTEGER -> integerBoundLiteral(source.id, integerEndpoint(value, upper, strict), upper, session)
+        CutSourceKind.BOOLEAN -> booleanBoundLiteral(source.id, value, upper, strict, session)
+        else -> PREMISE_AUX
+    }
+
+    private fun integerEndpoint(value: BigFraction, upper: Boolean, strict: Boolean): BigInt {
+        // Integer inequalities use floor for <= and ceil for >=; strict sides use the neighboring lattice point.
+        val rounded = when {
+            value.den.compareTo(BIG_ONE) == 0 -> value.num
+            upper == strict -> value.ceilInteger()
+            else -> -value.negated().ceilInteger()
+        }
+        return if (!strict) rounded else if (upper) rounded - BIG_ONE else rounded + BIG_ONE
+    }
+
+    private fun integerBoundLiteral(
+        variable: Int,
+        threshold: BigInt,
+        upper: Boolean,
+        session: PropagationSession,
+    ): Int {
+        if (variable !in 0 until session.problem.numIntVars) return PREMISE_AUX
+        if (threshold < minimumLong) return if (upper) PREMISE_AUX else PREMISE_NONE
+        if (threshold > maximumLong) return if (upper) PREMISE_NONE else PREMISE_AUX
+        val endpoint = threshold.toLongExact()
+        val domain = session.intDomain(variable)
+        return if (upper) {
+            if (domain.max > endpoint) PREMISE_AUX else session.boundLeLit(variable, endpoint, positive = false)
+        } else {
+            if (domain.min < endpoint) PREMISE_AUX else session.boundGeLit(variable, endpoint, positive = false)
+        }
+    }
+
+    private fun booleanBoundLiteral(
+        variable: Int,
+        value: BigFraction,
+        upper: Boolean,
+        strict: Boolean,
+        session: PropagationSession,
+    ): Int {
+        if (variable !in 0 until session.problem.numBoolVars) return PREMISE_AUX
+        fun holds(point: BigFraction): Boolean = if (upper) {
+            point < value || (!strict && point == value)
+        } else {
+            point > value || (!strict && point == value)
+        }
+        val falseHolds = holds(BigFraction.ZERO)
+        val trueHolds = holds(BigFraction.ONE)
+        if (falseHolds && trueHolds) return PREMISE_NONE
+        if (falseHolds == trueHolds || session.boolValue(variable) != trueHolds) return PREMISE_AUX
+        return Lit.make(variable, !trueHolds)
     }
 }

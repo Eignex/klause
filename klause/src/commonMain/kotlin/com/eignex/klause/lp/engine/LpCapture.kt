@@ -43,6 +43,10 @@ internal class LpCapturedPremises(
     val thresholds: LongArray,
     val boolLits: IntArray,
 ) {
+    fun matches(premises: LpRowPremises): Boolean = vars.contentEquals(premises.vars) &&
+        isUpper.contentEquals(premises.isUpper) && thresholds.contentEquals(premises.thresholds) &&
+        boolLits.contentEquals(premises.boolLits)
+
     fun copy(): LpCapturedPremises = LpCapturedPremises(
         vars.copyOf(),
         isUpper.copyOf(),
@@ -106,6 +110,35 @@ internal class LpCapturedModel(
     val numericAuthority: LpNumericAuthority,
     val doubleView: LpCapturedDoubleView?,
 ) {
+    val integerAuthorityUnits: Long = colPtr.size.toLong() + rowIdx.size + colVal.size + rhs.size + cost.size +
+        upper.size + hasUpper.size + loShift.size + tag.size + rowGlobal.size + rowStrict.size + rowPremises.size +
+        flippedRhs.size + probeClampedLo.size + probeClampedHi.size + colContinuous.size + 2L +
+        rowPremises.sumOf { (it?.vars?.size ?: 0).toLong() * 3L + (it?.boolLits?.size ?: 0) }
+
+    // Integer Lagrangian data remains valid after an integrality flag changes; deductions check their own lattice.
+    fun matchesIntegerAuthority(model: LpModel): Boolean = numericAuthority == LpNumericAuthority.LONG_EXACT &&
+        model.exactState == null && model.doubleView == null && n == model.n && m == model.m &&
+        matchesIntegerMatrix(model) && matchesIntegerVectors(model) && matchesIntegerSources(model)
+
+    private fun matchesIntegerMatrix(model: LpModel): Boolean = colPtr.contentEquals(model.csc.colPtr) &&
+        rowIdx.contentEquals(model.csc.rowIdx) && colVal.contentEquals(model.csc.colVal)
+
+    private fun matchesIntegerVectors(model: LpModel): Boolean =
+        rhs.contentEquals(model.rhs) && cost.contentEquals(model.cost) &&
+        upper.contentEquals(model.upper) && hasUpper.contentEquals(model.hasUpper) &&
+        loShift.contentEquals(model.loShift) && objConstant == model.objConstant && sense == model.sense &&
+        flippedRhs.contentEquals(model.flippedRhs) && probeClampedLo.contentEquals(model.probeClampedLo) &&
+        probeClampedHi.contentEquals(model.probeClampedHi)
+
+    private fun matchesIntegerSources(model: LpModel): Boolean =
+        tag.contentEquals(model.tag) && rowGlobal.contentEquals(model.rowGlobal) &&
+        rowStrict.contentEquals(model.rowStrict) &&
+        rowPremises.size == model.rowPremises.size && rowPremises.indices.all { row ->
+            val before = rowPremises[row]
+            val after = model.rowPremises[row]
+            if (before == null) after == null else after != null && before.matches(after)
+        }
+
     fun copy(): LpCapturedModel = LpCapturedModel(
         n,
         m,
@@ -241,7 +274,15 @@ internal class LpCapturedModel(
             }
         }
 
-        fun capture(model: LpModel): LpCapturedModel {
+        fun capture(model: LpModel): LpCapturedModel = snapshot(model).also { it.validate() }
+
+        // Integer coefficients admit a Lagrangian over continuous columns without a replayable Long lattice.
+        fun snapshotIntegerAuthority(model: LpModel): LpCapturedModel {
+            require(model.doubleView == null)
+            return snapshot(model)
+        }
+
+        private fun snapshot(model: LpModel): LpCapturedModel {
             require(model.exactState == null) { "exact working state requires exact capture" }
             val dv = model.doubleView?.let {
                 LpCapturedDoubleView(
@@ -295,7 +336,7 @@ internal class LpCapturedModel(
                 model.colContinuous.copyOf(),
                 authority,
                 dv,
-            ).also { it.validate() }
+            )
         }
     }
 }
@@ -1010,13 +1051,29 @@ private fun eventId(event: LpReplayEvent): Int = when (event) {
 private fun DoubleArray.toRawBitsArray(): LongArray = LongArray(size) { this[it].toRawBits() }
 private fun LongArray.toDoubleArray(): DoubleArray = DoubleArray(size) { Double.fromBits(this[it]) }
 
-internal const val LP_EXACT_CAPTURE_VERSION: Int = 2
+internal const val LP_EXACT_CAPTURE_VERSION: Int = 3
 internal const val LP_EXACT_EVENT_VERSION: Int = 2
 
 internal sealed class LpExactReplayEvent(val eventVersion: Int = LP_EXACT_EVENT_VERSION) {
     class Append(val row: LpScopedRow, val scoped: Boolean) : LpExactReplayEvent()
     class Deactivate(val id: Long) : LpExactReplayEvent()
+    class Suspend(ids: Set<Long>) : LpExactReplayEvent() {
+        val ids: Set<Long> = ids.toSet()
+    }
+    class Extend(
+        columns: List<LpStructuralColumn>,
+        rows: List<LpScopedRow>,
+        val scoped: Boolean,
+        permanentRows: Set<Long> = emptySet(),
+    ) : LpExactReplayEvent() {
+        val columns: List<LpStructuralColumn> = columns.toList()
+        val rows: List<LpScopedRow> = rows.toList()
+        val permanentRows: Set<Long> = permanentRows.toSet()
+    }
     class Compact : LpExactReplayEvent()
+    class CompactColumns(columns: List<Int>) : LpExactReplayEvent() {
+        val columns: List<Int> = columns.toList()
+    }
     class Push : LpExactReplayEvent()
     class Assert(val column: Int, val upper: Boolean, val side: ExactLpSide, val witness: Long) : LpExactReplayEvent()
     class Pop(val targetDepth: Int) : LpExactReplayEvent()
@@ -1084,13 +1141,14 @@ internal class LpExactCapture private constructor(
                 "invalid exact LP capture magic"
             }
             val version = input.int()
-            require(version == LP_EXACT_CAPTURE_VERSION) { "unsupported exact LP capture version $version" }
+            require(version in 2..LP_EXACT_CAPTURE_VERSION) { "unsupported exact LP capture version $version" }
             val settings = input.settings()
             val maxRetainedRows = input.int()
-            val state = input.exactState()
-            val events = List(input.collectionCount()) { input.exactEvent() }
+            val state = input.exactState(version)
+            val events = List(input.collectionCount()) { input.exactEvent(version) }
             require(input.exhausted()) { "trailing bytes after exact LP capture" }
-            return LpExactCapture(version, settings, state, events, maxRetainedRows).also { it.validateFormat() }
+            return LpExactCapture(LP_EXACT_CAPTURE_VERSION, settings, state, events, maxRetainedRows)
+                .also { it.validateFormat() }
         }
 
         fun stateKey(state: LpExactState): ByteArray? = try {
@@ -1119,6 +1177,7 @@ private fun CaptureWriter.exactState(state: LpExactState) {
         long(it.id)
         int(it.depth ?: -1)
         bool(it.active)
+        int(it.suspendedAt ?: -1)
     }
     ints(state.scopes.toIntArray())
     ints(state.changedColumns.toIntArray())
@@ -1132,7 +1191,7 @@ private fun CaptureWriter.exactState(state: LpExactState) {
     }
 }
 
-private fun CaptureReader.exactState(): LpExactState {
+private fun CaptureReader.exactState(version: Int): LpExactState {
     val model = exactModel()
     val matrixRevision = long()
     val boundRevision = long()
@@ -1144,7 +1203,10 @@ private fun CaptureReader.exactState(): LpExactState {
         val id = long()
         val depth = int()
         require(depth >= -1) { "invalid row lifetime" }
-        LpRowIdentity(id, depth.takeIf { it >= 0 }, bool())
+        val active = bool()
+        val suspendedAt = if (version >= 3) int() else -1
+        require(suspendedAt >= -1) { "invalid row suspension lifetime" }
+        LpRowIdentity(id, depth.takeIf { it >= 0 }, active, suspendedAt.takeIf { it >= 0 })
     }
     val scopes = ints().toList()
     val changed = ints().toList()
@@ -1235,6 +1297,42 @@ private fun CaptureReader.exactSide(): ExactLpSide? = if (bool()) {
     ExactLpSide(exactNumber(), bool(), exactPremises())
 } else {
     null
+}
+
+private fun CaptureWriter.exactColumn(column: ExactLpColumn) {
+    exactSide(column.bounds.lower)
+    exactSide(column.bounds.upper)
+    exactNumber(column.origin)
+    bool(column.integral)
+    int(column.tag)
+}
+
+private fun CaptureReader.exactColumn(): ExactLpColumn =
+    ExactLpColumn(ExactLpBounds(exactSide(), exactSide()), exactNumber(), bool(), int())
+
+private fun CaptureWriter.scopedRow(row: LpScopedRow) {
+    long(row.id)
+    val terms = row.coefficients()
+    int(terms.size)
+    terms.forEach { (column, number) ->
+        int(column)
+        exactNumber(number)
+    }
+    exactNumber(row.rhs)
+    exactColumn(row.logical)
+    bool(row.metadata.global)
+    bool(row.metadata.strict)
+    exactPremises(row.metadata.premises)
+    exactNumber(row.cost)
+}
+
+private fun CaptureReader.scopedRow(): LpScopedRow {
+    val id = long()
+    val terms = List(collectionCount()) { int() to exactNumber() }
+    val rhs = exactNumber()
+    val logical = exactColumn()
+    val metadata = ExactLpRow(bool(), bool(), exactPremises())
+    return LpScopedRow(id, terms, rhs, logical, metadata, exactNumber())
 }
 
 private fun CaptureWriter.exactObjectivePayload(objective: ExactLpObjective) {
@@ -1342,6 +1440,9 @@ private fun CaptureWriter.exactEvent(event: LpExactReplayEvent) {
             is LpExactReplayEvent.Append -> 7
             is LpExactReplayEvent.Deactivate -> 8
             is LpExactReplayEvent.Compact -> 9
+            is LpExactReplayEvent.Suspend -> 10
+            is LpExactReplayEvent.Extend -> if (event.permanentRows.isEmpty()) 11 else 12
+            is LpExactReplayEvent.CompactColumns -> 13
         },
     )
     int(event.eventVersion)
@@ -1367,34 +1468,33 @@ private fun CaptureWriter.exactEvent(event: LpExactReplayEvent) {
         is LpExactReplayEvent.Solve -> exactBasis(event.warm)
 
         is LpExactReplayEvent.Append -> {
-            val row = event.row
-            long(row.id)
-            val terms = row.coefficients()
-            int(terms.size)
-            terms.forEach { (column, number) ->
-                int(column)
-                exactNumber(number)
-            }
-            exactNumber(row.rhs)
-            exactSide(row.logical.bounds.lower)
-            exactSide(row.logical.bounds.upper)
-            exactNumber(row.logical.origin)
-            bool(row.logical.integral)
-            int(row.logical.tag)
-            bool(row.metadata.global)
-            bool(row.metadata.strict)
-            exactPremises(row.metadata.premises)
-            exactNumber(row.cost)
+            scopedRow(event.row)
             bool(event.scoped)
         }
 
         is LpExactReplayEvent.Deactivate -> long(event.id)
 
+        is LpExactReplayEvent.Suspend -> longs(event.ids.sorted().toLongArray())
+
+        is LpExactReplayEvent.Extend -> {
+            int(event.columns.size)
+            event.columns.forEach {
+                exactColumn(it.column)
+                exactNumber(it.cost)
+            }
+            int(event.rows.size)
+            event.rows.forEach { scopedRow(it) }
+            bool(event.scoped)
+            if (event.permanentRows.isNotEmpty()) longs(event.permanentRows.sorted().toLongArray())
+        }
+
         is LpExactReplayEvent.Compact -> Unit
+
+        is LpExactReplayEvent.CompactColumns -> ints(event.columns.toIntArray())
     }
 }
 
-private fun CaptureReader.exactEvent(): LpExactReplayEvent {
+private fun CaptureReader.exactEvent(captureVersion: Int): LpExactReplayEvent {
     val code = int()
     require(int() == LP_EXACT_EVENT_VERSION) { "unsupported exact LP event version" }
     return when (code) {
@@ -1410,18 +1510,30 @@ private fun CaptureReader.exactEvent(): LpExactReplayEvent {
 
         6 -> LpExactReplayEvent.Solve(exactBasis())
 
-        7 -> {
-            val id = long()
-            val terms = List(collectionCount()) { int() to exactNumber() }
-            val rhs = exactNumber()
-            val logical = ExactLpColumn(ExactLpBounds(exactSide(), exactSide()), exactNumber(), bool(), int())
-            val metadata = ExactLpRow(bool(), bool(), exactPremises())
-            LpExactReplayEvent.Append(LpScopedRow(id, terms, rhs, logical, metadata, exactNumber()), bool())
-        }
+        7 -> LpExactReplayEvent.Append(scopedRow(), bool())
 
         8 -> LpExactReplayEvent.Deactivate(long())
 
         9 -> LpExactReplayEvent.Compact()
+
+        10 -> {
+            require(captureVersion >= 3) { "row suspension requires exact LP capture version 3" }
+            LpExactReplayEvent.Suspend(longs().toSet())
+        }
+
+        11, 12 -> {
+            require(captureVersion >= 3) { "structural extension requires exact LP capture version 3" }
+            val columns = List(collectionCount()) { LpStructuralColumn(exactColumn(), exactNumber()) }
+            val rows = List(collectionCount()) { scopedRow() }
+            val scoped = bool()
+            val permanent = if (code == 12) longs().toSet() else emptySet()
+            LpExactReplayEvent.Extend(columns, rows, scoped, permanent)
+        }
+
+        13 -> {
+            require(captureVersion >= 3) { "column compaction requires exact LP capture version 3" }
+            LpExactReplayEvent.CompactColumns(ints().toList())
+        }
 
         else -> error("unknown exact LP event type $code")
     }

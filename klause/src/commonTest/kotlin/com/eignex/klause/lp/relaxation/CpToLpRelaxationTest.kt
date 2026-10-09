@@ -21,12 +21,26 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CpToLpRelaxationTest {
 
     private val eps = 1e-9
+
+    @Test
+    fun `rebinding preserves the source factor of every row`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)),
+        )
+        val relaxation = CpToLpRelaxation(problem, null).build(PropagationSession(problem))
+
+        val rebound = relaxation.withModel(relaxation.model)
+
+        assertContentEquals(intArrayOf(0), rebound.rowFactorIds)
+    }
 
     /** Solve the relaxation of [problem] under [objective] and return (solution, relaxation). */
     private fun solve(problem: Problem, objective: LinearObjective?): Pair<LpSolution, LpRelaxation> {

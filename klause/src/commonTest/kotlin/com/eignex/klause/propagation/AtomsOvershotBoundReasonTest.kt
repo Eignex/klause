@@ -64,4 +64,19 @@ class AtomsOvershotBoundReasonTest {
         assertEquals(true, s.atomCurrentTruth(atomId))
         assertEquals(premise.toList(), s.atomAntecedentsDerived(atomId)?.toList())
     }
+
+    @Test
+    fun `a late equality exclusion keeps the level of the first bound crossing`() {
+        for (lower in listOf(false, true)) {
+            val s = freshState(numVars = 2, hi = 9)
+            s.beginLevel(0, fid = 0)
+            if (lower) s.tightenIntMin(0, 6, null) else s.tightenIntMax(0, 4, null)
+            val atomId = s.atomVarEq(0, 5) - s.problem.numBoolVars
+            s.beginLevel(1, fid = 1)
+            if (lower) s.tightenIntMin(0, 8, null) else s.tightenIntMax(0, 2, null)
+
+            assertEquals(false, s.atomCurrentTruth(atomId))
+            assertEquals(1, s.atomLevelForConflict(atomId))
+        }
+    }
 }

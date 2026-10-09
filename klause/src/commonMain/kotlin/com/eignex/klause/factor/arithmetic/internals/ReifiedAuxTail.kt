@@ -10,8 +10,8 @@ import com.eignex.klause.propagation.PropagationState
  * its polarity selects which body propagation runs.
  *
  * [alwaysHolds]/[neverHolds] are the relation's decidedness on the current range. [pinAntecedent]
- * supplies the reason for pinning the aux (same reason either way). [extraFalsePin] handles a
- * relation-specific early false-pin (e.g. a single-term equality whose target is unreachable inside
+ * supplies the reason for pinning the aux (same reason either way). [extraPin] handles a
+ * relation-specific early pin (e.g. a single-term equality whose target is unreachable inside
  * the bound interval); it returns the pin's result, or null when it does not apply. [propagateTrue]
  * and [propagateFalse] run the body under the assigned aux, receiving the aux pin as their extra
  * antecedent.
@@ -21,13 +21,13 @@ internal inline fun PropagationState.reifiedAuxTail(
     alwaysHolds: Boolean,
     neverHolds: Boolean,
     pinAntecedent: () -> IntArray?,
-    extraFalsePin: () -> Boolean? = { null },
+    extraPin: () -> Boolean? = { null },
     propagateTrue: (auxAntecedent: Int) -> Boolean,
     propagateFalse: (auxAntecedent: Int) -> Boolean,
 ): Boolean {
     if (alwaysHolds) return pinBool(auxBoolVar, true, pinAntecedent())
     if (neverHolds) return pinBool(auxBoolVar, false, pinAntecedent())
-    extraFalsePin()?.let { return it }
+    extraPin()?.let { return it }
     val aux = boolValues[auxBoolVar] ?: return true
     val auxAntecedent = Lit.make(auxBoolVar, !aux)
     return if (aux) propagateTrue(auxAntecedent) else propagateFalse(auxAntecedent)

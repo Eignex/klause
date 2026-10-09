@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.addExact
@@ -60,6 +61,10 @@ internal fun LpModel.rowIndex(): LpRowIndex {
 
 /** Iterate the union-sparsity rows of column [j] once each, ascending. */
 internal inline fun LpModel.forEachColumnRow(j: Int, action: (i: Int) -> Unit) {
+    exactState?.let { state ->
+        for (entry in state.model.columnEntries(j)) if (!entry.number.value.isZero) action(entry.row)
+        return
+    }
     val view = doubleView
     if (view == null) {
         for (k in csc.colPtr[j] until csc.colPtr[j + 1]) action(csc.rowIdx[k])
@@ -155,11 +160,17 @@ internal fun LpModel.restrictTo(
      *  out, so the buffer comes back all `-1` and the next call cannot see this one's rows. */
     rowMapScratch: IntArray? = null,
 ): LpNeighborhood {
-    require(exactState == null) { "exact state neighborhood reconstruction is unsupported" }
     val subN = takenCols.size
     val subM = takenRows.size
     val rowMap = rowMapScratch ?: IntArray(m) { -1 }
     for (r in 0 until subM) rowMap[takenRows[r]] = r
+    exactState?.let { state ->
+        try {
+            return state.restrictTo(takenCols, takenRows, colMap, copyCosts, rowMap)
+        } finally {
+            if (rowMapScratch != null) for (r in 0 until subM) rowMap[takenRows[r]] = -1
+        }
+    }
 
     // CSC restricted to the taken columns × taken rows (a taken column's entries in dropped rows
     // vanish with those rows).
@@ -221,6 +232,7 @@ internal fun LpModel.restrictTo(
         strictOut[r] = rowStrict[i]
         premisesOut[r] = rowPremises[i]
         val slack = slackCol(i)
+        if (copyCosts) cost[subN + r] = this.cost[slack]
         upperOut[subN + r] = upper[slack]
         hasUpperOut[subN + r] = hasUpper[slack]
     }
@@ -266,6 +278,7 @@ internal fun LpModel.restrictTo(
         for (r in 0 until subM) {
             val i = takenRows[r]
             dRhs[r] = view.rhs[i]
+            if (copyCosts) dCost[subN + r] = view.cost[n + i]
             dUpper[subN + r] = view.upper[n + i]
             dHasUpper[subN + r] = view.hasUpper[n + i]
         }
@@ -288,6 +301,72 @@ internal fun LpModel.restrictTo(
     // Hand a borrowed buffer back in the state it arrived in.
     if (rowMapScratch != null) for (r in 0 until subM) rowMap[takenRows[r]] = -1
     return LpNeighborhood(model, colMap, takenRows.toIntArray(), takenCols.toIntArray())
+}
+
+private fun LpExactState.restrictTo(
+    columns: IntArrayList,
+    rows: IntArrayList,
+    colMap: IntArray?,
+    copyCosts: Boolean,
+    rowMap: IntArray,
+): LpNeighborhood {
+    val source = model
+    val indices = columns.toIntArray() + IntArray(rows.size) { source.n + rows[it] }
+    val zero = ExactLpNumber.of(0L)
+    val restricted = ExactLpModel(
+        matrix = List(columns.size) { column ->
+            source.columnEntries(columns[column]).mapNotNull { entry ->
+                rowMap[entry.row].takeIf { it >= 0 }?.let { ExactLpEntry(it, entry.number) }
+            }.sortedBy { it.row }
+        },
+        rhs = List(rows.size) { source.rhs(rows[it]) },
+        columns = indices.map { source.column(it) },
+        rows = List(rows.size) { source.row(rows[it]) },
+        // Parts certify contributions in raw minimized units; the parent applies its affine objective once.
+        objective = ExactLpObjective(indices.map { if (copyCosts) source.objective.cost(it) else zero }),
+    )
+    val identities = LpScopedRows(
+        List(rows.size) { LpRowIdentity(it.toLong(), null, active = this.rows.row(rows[it]).active) },
+        rows.size - 1L,
+    )
+    val working = requireNotNull(LpExactState(restricted, rows = identities).ownerWorkingModel()) {
+        "restriction of a projected exact model must project"
+    }
+    return LpNeighborhood(working, colMap, rows.toIntArray(), columns.toIntArray())
+}
+
+internal fun LpNeighborhood.rebindExact(state: LpExactState, token: Cancellation): LpNeighborhood? {
+    val previous = model.exactState ?: return null
+    val source = state.model
+    val indices = cols + IntArray(rows.size) { source.n + rows[it] }
+    val columns = ArrayList<ExactLpColumn>(indices.size)
+    for ((local, original) in indices.withIndex()) {
+        if (token()) return null
+        val column = source.column(original)
+        if (column.origin != previous.model.column(local).origin) return null
+        columns += column
+    }
+    val identities = LpScopedRows(
+        List(rows.size) { LpRowIdentity(it.toLong(), null, active = state.rows.row(rows[it]).active) },
+        rows.size - 1L,
+    )
+    val next = LpExactState(
+        previous.baseModel.copy(
+            rhs = rows.map { source.rhs(it) }, columns = columns, rows = rows.map { source.row(it) },
+            objective = ExactLpObjective(indices.map { source.objective.cost(it) }),
+        ),
+        matrixRevision = previous.matrixRevision,
+        boundRevision = state.boundRevision,
+        objectiveRevision = state.objectiveRevision,
+        popRevision = state.popRevision,
+        rows = identities,
+        rowRevision = state.rowRevision,
+    )
+    if (!previous.sameMatrix(next)) return null
+    next.inheritProjection(previous)
+    next.inheritScalars(previous)
+    val working = next.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return null
+    return LpNeighborhood(working, colMap, rows, cols)
 }
 
 // A row keeps its parent's exact right-hand side: the shifts of every column it reads are already folded into it.

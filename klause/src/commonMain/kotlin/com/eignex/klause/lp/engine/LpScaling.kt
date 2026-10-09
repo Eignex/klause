@@ -100,32 +100,44 @@ internal class LpScalingView private constructor(
     /** Refresh vectors under the immutable matrix scale. Null leaves this view untouched. */
     fun refresh(next: LpModel): LpScalingView? {
         if (next.n != n || next.m != m) return null
+        next.exactState?.projectedScalarChanges(source, next)?.let { changes ->
+            return refreshTracked(next, changes)
+        }
         var nextRhs = rhs
         var nextCost = cost
         var nextLower = lower
         var nextUpper = upper
+        var copied = 0L
         if (!applied) {
-            for (i in rhs.indices) nextRhs = refreshedValue(rhs, nextRhs, i, next.rhsD(i))
-            for (j in cost.indices) nextCost = refreshedValue(cost, nextCost, j, next.costD(j))
-            for (j in lower.indices) nextLower = refreshedValue(lower, nextLower, j, next.lowerD(j))
-            for (j in upper.indices) nextUpper = refreshedValue(upper, nextUpper, j, next.upperD(j))
+            for (i in rhs.indices) {
+                nextRhs = refreshedValue(rhs, nextRhs, i, next.rhsD(i), prefixOnly = true) { copied += it }
+            }
+            for (j in cost.indices) {
+                nextCost = refreshedValue(cost, nextCost, j, next.costD(j), prefixOnly = true) { copied += it }
+            }
+            for (j in lower.indices) {
+                nextLower = refreshedValue(lower, nextLower, j, next.lowerD(j), prefixOnly = true) { copied += it }
+            }
+            for (j in upper.indices) {
+                nextUpper = refreshedValue(upper, nextUpper, j, next.upperD(j), prefixOnly = true) { copied += it }
+            }
         } else {
             if (projectionLostNonzero(next) || !next.objConstantD.isFinite()) return null
             for (i in rhs.indices) {
                 val value = checkedScale(next.rhsD(i), rowExponents[i]) ?: return null
-                nextRhs = refreshedValue(rhs, nextRhs, i, value)
+                nextRhs = refreshedValue(rhs, nextRhs, i, value, prefixOnly = true) { copied += it }
             }
             for (j in cost.indices) {
                 val costValue = checkedScale(next.costD(j), columnExponents[j]) ?: return null
-                nextCost = refreshedValue(cost, nextCost, j, costValue)
+                nextCost = refreshedValue(cost, nextCost, j, costValue, prefixOnly = true) { copied += it }
                 val lowerValue = checkedScale(next.lowerD(j), -columnExponents[j]) ?: return null
-                nextLower = refreshedValue(lower, nextLower, j, lowerValue)
+                nextLower = refreshedValue(lower, nextLower, j, lowerValue, prefixOnly = true) { copied += it }
                 val upperValue = if (next.hasFiniteUpper(j)) {
                     checkedScale(next.upperD(j), -columnExponents[j]) ?: return null
                 } else {
                     0.0
                 }
-                nextUpper = refreshedValue(upper, nextUpper, j, upperValue)
+                nextUpper = refreshedValue(upper, nextUpper, j, upperValue, prefixOnly = true) { copied += it }
             }
         }
         return LpScalingView(
@@ -143,7 +155,54 @@ internal class LpScalingView private constructor(
                 sourcePrimalResidual = 0.0,
                 sourceBoundViolation = 0.0,
                 sourceBasicDualResidual = 0.0,
-                work = vectorWork(next) + if (applied) next.m.toLong() + next.numVars else 0L,
+                work = vectorWork(next) + (if (applied) next.m.toLong() + next.numVars else 0L) + copied,
+            ),
+        )
+    }
+
+    private fun refreshTracked(next: LpModel, changes: LpProjectedScalarChanges): LpScalingView? {
+        var nextCost = cost
+        var nextLower = lower
+        var nextUpper = upper
+        if (applied && !next.objConstantD.isFinite()) return null
+        for (column in changes.bounds) {
+            val lowerValue = next.lowerD(column)
+            val upperValue = next.upperD(column)
+            if (applied) {
+                val bounds = requireNotNull(next.exactState).model.column(column).bounds
+                if ((lowerValue == 0.0 && bounds.lower?.number?.value?.isZero == false) ||
+                    (upperValue == 0.0 && bounds.upper?.number?.value?.isZero == false)
+                ) {
+                    return null
+                }
+                val scaledLower = checkedScale(lowerValue, -columnExponents[column]) ?: return null
+                val scaledUpper = if (next.hasFiniteUpper(column)) {
+                    checkedScale(upperValue, -columnExponents[column]) ?: return null
+                } else {
+                    0.0
+                }
+                nextLower = refreshedValue(lower, nextLower, column, scaledLower)
+                nextUpper = refreshedValue(upper, nextUpper, column, scaledUpper)
+            } else {
+                nextLower = refreshedValue(lower, nextLower, column, lowerValue)
+                nextUpper = refreshedValue(upper, nextUpper, column, upperValue)
+            }
+        }
+        for (column in changes.costs) {
+            val value = next.costD(column)
+            val scaled = if (applied) checkedScale(value, columnExponents[column]) ?: return null else value
+            nextCost = refreshedValue(cost, nextCost, column, scaled)
+        }
+        val work = 2L * changes.bounds.size + changes.costs.size +
+            (if (applied) changes.bounds.size.toLong() + changes.costs.size else 0L) +
+            copiedValues(cost, nextCost) + copiedValues(lower, nextLower) + copiedValues(upper, nextUpper)
+        return LpScalingView(
+            next, rowExponents, columnExponents, colPtr, rowIdx, colVal, rhs, nextCost, nextLower, nextUpper,
+            metrics.copy(
+                sourcePrimalResidual = 0.0,
+                sourceBoundViolation = 0.0,
+                sourceBasicDualResidual = 0.0,
+                work = work,
             ),
         )
     }
@@ -345,12 +404,31 @@ private fun sourceMatrixUnchecked(model: LpModel): NumericalMatrix {
     return NumericalMatrix(pointers, rows, values)
 }
 
-private fun refreshedValue(previous: DoubleArray, current: DoubleArray, index: Int, value: Double): DoubleArray {
+private inline fun refreshedValue(
+    previous: DoubleArray,
+    current: DoubleArray,
+    index: Int,
+    value: Double,
+    prefixOnly: Boolean = false,
+    onCopy: (Int) -> Unit = {},
+): DoubleArray {
     if (current[index].toRawBits() == value.toRawBits()) return current
-    val next = if (current === previous) previous.copyOf() else current
+    val next = if (current === previous) {
+        // A dense refresh writes the remaining suffix, so only its already-visited prefix needs copying.
+        val copied = if (prefixOnly) index else previous.size
+        val allocated = if (prefixOnly) DoubleArray(previous.size) else previous.copyOf()
+        if (prefixOnly) previous.copyInto(allocated, endIndex = copied)
+        onCopy(copied)
+        allocated
+    } else {
+        current
+    }
     next[index] = value
     return next
 }
+
+private fun copiedValues(previous: DoubleArray, current: DoubleArray): Long =
+    if (previous === current) 0L else previous.size.toLong()
 
 private fun sourceVectors(model: LpModel): NumericalVectors = NumericalVectors(
     DoubleArray(model.m) { model.rhsD(it) },
@@ -379,6 +457,7 @@ private fun scaledVectors(model: LpModel, rowExponents: IntArray, columnExponent
 }
 
 private fun projectionLostNonzero(model: LpModel): Boolean {
+    model.exactState?.projectionLostNonzero(model)?.let { return it }
     val exact = model.exactState?.model ?: return false
     for (i in 0 until model.m) if (!exact.rhs(i).value.isZero && model.rhsD(i) == 0.0) return true
     for (j in 0 until model.numVars) {

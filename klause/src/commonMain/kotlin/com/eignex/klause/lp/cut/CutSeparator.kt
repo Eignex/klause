@@ -3,12 +3,19 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutExpression
+import com.eignex.klause.lp.engine.CutPremise
+import com.eignex.klause.lp.engine.CutProofFact
+import com.eignex.klause.lp.engine.CutProvenance
+import com.eignex.klause.lp.engine.CutSource
+import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 
 /** Everything a separator needs: the problem, the current relaxation, its LP solution, the session. */
 internal class CutContext(
@@ -34,6 +41,24 @@ internal class CutContext(
 
     /** Whether both of [v]'s root endpoints are the model's own; see [statesLowerBound]. */
     fun statesBothBounds(v: Int): Boolean = problem.statesBothBounds(v)
+
+    fun withIntervalPremises(cut: Cut, variables: IntArray): Cut {
+        if (cut.global) return cut
+        val map = relaxation.sourceMap ?: return cut
+        val facts = ArrayList<CutProofFact>()
+        for (variable in variables) {
+            val domain = session.intDomain(variable)
+            val expression = CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE))
+            for (upper in listOf(false, true)) {
+                val premise = CutPremise.Bound(
+                    expression, upper, BigFraction.ofLong(if (upper) domain.max else domain.min),
+                )
+                facts.add(CutProofFact(premise, map.isGlobal(premise)))
+            }
+        }
+        val proof = CutProvenance(map.model, map.epoch, facts, map.assumptions)
+        return Cut(cut.cols, cut.coeffs, cut.rel, cut.rhs, global = proof.global, provenance = proof)
+    }
 }
 
 /**

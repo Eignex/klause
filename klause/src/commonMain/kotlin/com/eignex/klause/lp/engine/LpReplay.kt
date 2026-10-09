@@ -766,7 +766,16 @@ internal object LpExactReplay {
 
                 is LpExactReplayEvent.Deactivate -> trail.deactivate(event.id)
 
+                is LpExactReplayEvent.Suspend -> trail.suspend(event.ids)
+
+                is LpExactReplayEvent.Extend ->
+                    event.rows.size <= capture.maxRetainedRows - trail.state.model.m &&
+                        trail.append(event.columns, event.rows, event.scoped, permanentRows = event.permanentRows)
+
                 is LpExactReplayEvent.Compact -> trail.compact()
+
+                is LpExactReplayEvent.CompactColumns ->
+                    trail.compact(LpLayoutRemap(trail.state.model.n, trail.state.rows, event.columns))
 
                 is LpExactReplayEvent.Solve -> {
                     event.warm?.let { requireValidExactWarm(it, trail.state.model) }
@@ -786,7 +795,10 @@ private fun LpScopedSolver.applyEdit(event: LpExactReplayEvent): Boolean = when 
     is LpExactReplayEvent.Recenter -> recenter(event.origins)
     is LpExactReplayEvent.Append -> append(event.row, event.scoped)
     is LpExactReplayEvent.Deactivate -> deactivate(event.id)
+    is LpExactReplayEvent.Suspend -> suspend(event.ids)
+    is LpExactReplayEvent.Extend -> append(event.columns, event.rows, event.scoped, permanentRows = event.permanentRows)
     is LpExactReplayEvent.Compact -> compact()
+    is LpExactReplayEvent.CompactColumns -> compact(LpLayoutRemap(state.model.n, state.rows, event.columns))
     is LpExactReplayEvent.Solve -> false
 }
 

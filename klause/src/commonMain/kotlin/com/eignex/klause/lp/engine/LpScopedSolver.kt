@@ -131,10 +131,18 @@ internal class LpScopedSolver(
 
     fun pop(targetDepth: Int, token: Cancellation = cancellation): Boolean = edit(token) { it.pop(targetDepth, token) }
 
+    fun resetRoot(token: Cancellation = cancellation): Boolean = edit(token) { it.resetRoot(token) }
+
     fun resetRoot(initial: LpExactState, token: Cancellation = cancellation): Boolean {
         requireAvailable()
+        if (initial.depth != 0) return false
+        return adopt(initial, token)
+    }
+
+    fun adopt(initial: LpExactState, token: Cancellation = cancellation): Boolean {
+        requireAvailable()
         editAttempts++
-        if (closed || token() || initial.depth != 0 || !state.sameMatrix(initial)) return false
+        if (closed || token() || !state.sameMatrix(initial)) return false
         val current = solver
         if (current != null && !current.adopt(initial, token)) return false
         if (current == null && token()) return false
@@ -152,9 +160,38 @@ internal class LpScopedSolver(
         state.model.m < maxRetainedRows && it.append(row, scoped, token)
     }
 
+    fun append(
+        columns: List<LpStructuralColumn>,
+        rows: List<LpScopedRow>,
+        scoped: Boolean,
+        token: Cancellation = cancellation,
+        permanentRows: Set<Long> = emptySet(),
+    ): Boolean = edit(token, true) {
+        rows.size <= maxRetainedRows - state.model.m && it.append(columns, rows, scoped, token, permanentRows)
+    }
+
     fun deactivate(id: Long, token: Cancellation = cancellation): Boolean = edit(token) { it.deactivate(id, token) }
 
-    fun compact(token: Cancellation = cancellation): Boolean = edit(token) { it.compact(token) }
+    fun suspend(ids: Set<Long>, token: Cancellation = cancellation): Boolean = edit(token) { it.suspend(ids, token) }
+
+    fun replaceRows(
+        retired: Set<Long>,
+        columns: List<LpStructuralColumn>,
+        rows: List<LpScopedRow>,
+        scoped: Boolean,
+        token: Cancellation = cancellation,
+        permanentRows: Set<Long> = emptySet(),
+        objective: ExactLpObjective? = null,
+        assertions: List<LpBoundAssertion> = emptyList(),
+    ): Boolean = edit(token, rows.isNotEmpty() || columns.isNotEmpty()) {
+        if (rows.size > maxRetainedRows - state.model.m) return@edit false
+        it.replaceRows(retired, columns, rows, scoped, token, permanentRows, objective, assertions)
+    }
+
+    fun compact(token: Cancellation = cancellation): Boolean = compact(LpLayoutRemap(state.model.n, state.rows), token)
+
+    fun compact(remap: LpLayoutRemap, token: Cancellation = cancellation): Boolean =
+        edit(token, compaction = remap) { it.compact(remap, token) }
 
     val basisLifecycleWork: BasisOperationWork? get() = solver?.basisLifecycleWork
 
@@ -171,7 +208,7 @@ internal class LpScopedSolver(
     ): CertifiedLpResult? {
         val attempt = solveFloat(warm, token) ?: return null
         val certified = certifyLpResult(
-            requireNotNull(state.toWorkingModel()),
+            requireNotNull(state.ownerWorkingModel()),
             attempt.first,
             attempt.second,
             token,
@@ -236,7 +273,12 @@ internal class LpScopedSolver(
         return current to result
     }
 
-    private inline fun edit(token: Cancellation, append: Boolean = false, change: (LpBoundTrail) -> Boolean): Boolean {
+    private inline fun edit(
+        token: Cancellation,
+        append: Boolean = false,
+        compaction: LpLayoutRemap? = null,
+        change: (LpBoundTrail) -> Boolean,
+    ): Boolean {
         requireAvailable()
         editAttempts++
         if (closed || token()) return false
@@ -247,7 +289,7 @@ internal class LpScopedSolver(
             return true
         }
         if (next.state.matrixRevision != state.matrixRevision) {
-            return replace(next, token, append)
+            return replace(next, token, append, compaction)
         }
         val current = solver
         if (current != null && !current.adopt(next.state, token)) return false
@@ -340,15 +382,20 @@ internal class LpScopedSolver(
         editSuccesses++
     }
 
-    private fun replace(next: LpBoundTrail, token: Cancellation, append: Boolean): Boolean {
+    private fun replace(
+        next: LpBoundTrail,
+        token: Cancellation,
+        append: Boolean,
+        compaction: LpLayoutRemap? = null,
+    ): Boolean {
         if (append) solver?.let { recordPendingAppendSolve(it) }
-        val expected = if (next.state.model.m < state.model.m) {
+        val warm = if (append) solver?.retainedBasis()?.extended(state.model, next.state.model) else null
+        val expected = if (compaction != null) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
             var failure: Throwable? = null
             try {
-                val remap = LpRowRemap(state.model.n, state.rows)
-                staging.second.basicVars.map { remap.column(it) }.filter { it >= 0 }.toIntArray()
+                staging.second.basicVars.map { compaction.column(it) }.filter { it >= 0 }.toIntArray()
             } catch (primary: Throwable) {
                 failure = primary
                 throw primary
@@ -358,14 +405,14 @@ internal class LpScopedSolver(
         } else {
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
-        val replacement = prepared(next.state, token, append) ?: return false
+        val replacement = prepared(next.state, token, append, warm) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
             val replacementWork = if (append) appendBasisLifecycleWork(replacement.first) else null
             if (append) recordAppendWork(replacementWork)
             val pendingWork = basisWorkUnits(replacementWork)
-            if (!replacement.second.basicVars.contentEquals(expected) || token()) return false
+            if ((warm == null && !replacement.second.basicVars.contentEquals(expected)) || token()) return false
             val old = solver
             if (!append && old != null) recordPendingAppendSolve(old)
             solver = replacement.first
@@ -490,6 +537,7 @@ internal class LpScopedSolver(
         next: LpExactState,
         token: Cancellation,
         recordRejectedAppendWork: Boolean = false,
+        warm: Basis? = null,
     ): Pair<PersistentLpSolver, Basis>? {
         preparationAttempts++
         var candidate: PersistentLpSolver? = null
@@ -503,8 +551,8 @@ internal class LpScopedSolver(
             )
             var constructionBound = 0L
             val working = try {
-                next.toWorkingModel(projection)?.also {
-                    // The new numerical owner projects vectors again while adopting this state.
+                next.ownerWorkingModel(projection)?.also {
+                    // The numerical owner refreshes its scaled vectors while adopting this state.
                     projection.reserveVectors(next.model)
                     // Building it scales the matrix. Preparation caps take precedence, so the bound is reserved from
                     // this preparation's allowance and charged as spent; the ledger records the reported work.
@@ -531,15 +579,16 @@ internal class LpScopedSolver(
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
             if (!candidate.adopt(next, token)) return null
             val basis = try {
-                candidate.prepareLogicals(token)
+                if (warm == null) candidate.prepareLogicals(token) else candidate.prepareBasis(warm, token)
             } finally {
                 preparationWork = saturated(preparationWork, candidate.lastMetrics.workOps)
                 constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
-            if (basis.basicVars.size != next.model.m || basis.status.size != next.model.numVars ||
-                basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
-                basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) } || token()
+            if (!basis.validFor(next.model) || (warm == null &&
+                    (basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
+                        basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) })) ||
+                token()
             ) {
                 return null
             }

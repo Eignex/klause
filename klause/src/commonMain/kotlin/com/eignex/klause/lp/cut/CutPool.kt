@@ -4,6 +4,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.OriginCounts
 import kotlin.math.abs
@@ -73,12 +74,7 @@ internal class CutPool(
         val key: Any = if (source == null) {
             checkNotNull(cut).key()
         } else {
-            listOf(
-                source.key,
-                source.provenance.model,
-                source.provenance.facts.filter { !it.global },
-                source.provenance.assumptions,
-            )
+            source.poolKey
         }
         if (key in seen) return false
         val mixed = if (cut?.global == true) {
@@ -126,6 +122,10 @@ internal class CutPool(
 
     /** The pooled cuts, in insertion order (after any [retainMostActive] eviction). */
     fun cuts(): List<Cut> = entries.mapNotNull { it.cut }
+
+    fun constantContradiction(): Cut? = entries.firstNotNullOfOrNull { entry ->
+        entry.cut?.takeIf { it.cols.isEmpty() && efficacy(it, EmptyDoubleArray, 0.0) > 0.0 }
+    }
 
     /** Observe one solved LP point, update decayed tightness, and expire cuts inactive for too long. */
     fun observe(primal: DoubleArray) {
@@ -247,7 +247,8 @@ internal class CutPool(
             Relation.EQ -> abs(lhs - cut.rhs)
         }
         if (violation <= 0.0) return 0.0
-        return if (norm > 0.0) violation / norm else 0.0
+        // A violated constant row certifies infeasibility independently of the point's coordinates.
+        return if (norm > 0.0) violation / norm else Double.POSITIVE_INFINITY
     }
 
     /** Euclidean norm of [cut]'s coefficient vector. */

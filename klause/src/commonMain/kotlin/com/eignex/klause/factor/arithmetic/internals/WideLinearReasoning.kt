@@ -140,10 +140,8 @@ internal fun wideEnforceRow(
             val other = sumLo - termLo[i]
             if (other != sumHi - termHi[i]) continue // actionable only when every other term is pinned
             val rhs = bound - other
-            val q = rhs / c
-            if (q * c != rhs) continue // not an integer multiple — no value forbidden
-            if (!q.fitsLong()) continue
-            if (!state.excludeIntValue(vars[i], q.toLongExact(), ant(i))) return false
+            val forbidden = integralQuotientOrNull(rhs, c) ?: continue
+            if (!state.excludeIntValue(vars[i], forbidden, ant(i))) return false
         }
         return true
     }
@@ -185,6 +183,12 @@ private fun tightenMaxIfFits(state: PropagationState, v: Int, newMax: BigInt, an
 private fun tightenMinIfFits(state: PropagationState, v: Int, newMin: BigInt, ant: IntArray?): Boolean {
     if (newMin <= LONG_MIN) return true
     return state.tightenIntMin(v, newMin.toLongExact(), ant)
+}
+
+internal fun integralQuotientOrNull(value: BigInt, divisor: BigInt): Long? {
+    if (divisor == BIG_ZERO) return null
+    val quotient = value / divisor
+    return if (quotient * divisor == value && quotient.fitsLong()) quotient.toLongExact() else null
 }
 
 /** `⌊a / b⌋` (BigInt division truncates toward zero; adjust down when the exact quotient is negative

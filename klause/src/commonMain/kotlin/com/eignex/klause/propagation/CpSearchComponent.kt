@@ -6,17 +6,21 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.ConflictAnalysisStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.RegisteredTheoryDecision
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchConflictResolver
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchIntegerBound
 import com.eignex.klause.solver.search.SearchLearnedConflict
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelBlocker
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -46,6 +50,7 @@ class CpSearchComponent(
     private var sharedRootLevel = 0
     private val nativeLevelBySharedLevel = IntArrayList().apply { add(0) }
     private var lastResult: PropagationResult? = null
+    private var sharedContext: com.eignex.klause.solver.search.SearchContext? = null
 
     /** Where conflicts this component cannot learn from are counted; null counts nothing. */
     internal var conflictStats: ConflictAnalysisStatsSink? = null
@@ -63,6 +68,7 @@ class CpSearchComponent(
     }
 
     override fun initialize(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
+        sharedContext = context
         if (session.isUnsatAtRoot) return ComponentResult.Conflict()
         var result: ComponentResult = ComponentResult.Consistent
         for (variable in 0 until session.problem.numBoolVars) {
@@ -72,9 +78,15 @@ class CpSearchComponent(
         }
         for (variable in 0 until session.problem.numIntVars) {
             val domain = session.intDomain(variable)
-            val lower = context.publish(SearchDecision.IntAtLeast(sourceIntId(variable), domain.min))
+            val lower = context.publish(
+                SearchDecision.IntAtLeast(sourceIntId(variable), domain.min),
+                session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel),
+            )
             if (lower !is ComponentResult.Consistent) result = lower
-            val upper = context.publish(SearchDecision.IntAtMost(sourceIntId(variable), domain.max))
+            val upper = context.publish(
+                SearchDecision.IntAtMost(sourceIntId(variable), domain.max),
+                session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel),
+            )
             if (upper !is ComponentResult.Consistent) result = upper
         }
         return result
@@ -84,6 +96,7 @@ class CpSearchComponent(
         decision: SearchDecision,
         context: com.eignex.klause.solver.search.SearchContext,
     ): ComponentResult {
+        sharedContext = context
         if (decision is SearchDecision.Bool && Lit.variable(decision.literal) >= session.problem.numBoolVars) {
             return if (context.atomLiteral(decision) != null) {
                 ComponentResult.Consistent
@@ -110,18 +123,42 @@ class CpSearchComponent(
             }
 
             is SearchDecision.IntAtMost -> cpIntId(decision.variable)?.let {
-                result(session.pinIntAtMost(it, decision.upper), context)
+                if (session.intDomain(it).max <= decision.upper) {
+                    ComponentResult.Consistent
+                } else {
+                    result(session.pinIntAtMost(it, decision.upper), context)
+                }
             } ?: ComponentResult.Consistent
 
             is SearchDecision.IntAtLeast -> cpIntId(decision.variable)?.let {
-                result(session.pinIntAtLeast(it, decision.lower), context)
+                if (session.intDomain(it).min >= decision.lower) {
+                    ComponentResult.Consistent
+                } else {
+                    result(session.pinIntAtLeast(it, decision.lower), context)
+                }
             } ?: ComponentResult.Consistent
 
             is SearchDecision.IntEqual -> cpIntId(decision.variable)?.let {
                 result(session.pinInt(it, decision.value), context)
             } ?: ComponentResult.Consistent
 
-            is SearchDecision.Theory -> ComponentResult.Consistent
+            is SearchDecision.Theory -> {
+                val bound = (decision.decision as? RegisteredTheoryDecision)?.payload as? SearchIntegerBound
+                if (bound != null && bound.strict && cpIntId(bound.variable) != null) {
+                    val premise = if (bound.upper) {
+                        context.intLowerBoundPremise(bound.variable)
+                    } else {
+                        context.intUpperBoundPremise(bound.variable)
+                    }
+                    ComponentResult.Conflict(
+                        context.explainAtoms(
+                            SearchAtomPremise.All(listOf(SearchAtomPremise.Asserted(decision), premise)),
+                        ),
+                    )
+                } else {
+                    ComponentResult.Consistent
+                }
+            }
         }
         recordNativeLevel(context.decisionLevel)
         // A cut fixpoint reports no conflict, so this node stands on factors that never fired: hand it
@@ -163,34 +200,53 @@ class CpSearchComponent(
         result: PropagationResult.Implied,
         context: com.eignex.klause.solver.search.SearchContext,
         skippedVariable: Int = -1,
-    ): ComponentResult = publish(result, skippedVariable) { context.publish(it) }
+    ): ComponentResult = publish(result, context, skippedVariable) { decision, premise ->
+        context.publish(decision, premise)
+    }
 
     /** Import facts already applied by the native CP session at its current shared level. */
     fun import(result: PropagationResult.Implied, shared: SearchSession): ComponentResult =
-        publish(result, skippedVariable = -1) { shared.publishFrom(this, it) }
+        publish(result, shared, skippedVariable = -1) { decision, premise ->
+            shared.publishFrom(this, decision, premise)
+        }
 
     private fun publish(
         result: PropagationResult.Implied,
+        context: com.eignex.klause.solver.search.SearchContext,
         skippedVariable: Int,
-        publish: (SearchDecision) -> ComponentResult,
+        publish: (SearchDecision, SearchAtomPremise) -> ComponentResult,
     ): ComponentResult {
         var published: ComponentResult = ComponentResult.Consistent
         result.forEachBool { variable, value ->
             if (variable != skippedVariable) {
-                val publication = publish(SearchDecision.Bool(Lit.make(variable, value)))
+                val publication = publish(SearchDecision.Bool(Lit.make(variable, value)), SearchAtomPremise.Unavailable)
                 if (publication !is ComponentResult.Consistent) published = publication
             }
         }
         result.forEachInt { variable, value ->
-            val publication = publish(SearchDecision.IntEqual(sourceIntId(variable), value))
+            val publication = publish(
+                SearchDecision.IntEqual(sourceIntId(variable), value),
+                SearchAtomPremise.All(
+                    listOf(
+                        session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel),
+                        session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel),
+                    ),
+                ),
+            )
             if (publication !is ComponentResult.Consistent) published = publication
         }
         result.forEachIntMin { variable, value ->
-            val publication = publish(SearchDecision.IntAtLeast(sourceIntId(variable), value))
+            val publication = publish(
+                SearchDecision.IntAtLeast(sourceIntId(variable), value),
+                session.sharedBoundPremise(variable, false, context, ::sourceIntId, sharedRootLevel),
+            )
             if (publication !is ComponentResult.Consistent) published = publication
         }
         result.forEachIntMax { variable, value ->
-            val publication = publish(SearchDecision.IntAtMost(sourceIntId(variable), value))
+            val publication = publish(
+                SearchDecision.IntAtMost(sourceIntId(variable), value),
+                session.sharedBoundPremise(variable, true, context, ::sourceIntId, sharedRootLevel),
+            )
             if (publication !is ComponentResult.Consistent) published = publication
         }
         return published
@@ -198,8 +254,12 @@ class CpSearchComponent(
 
     override val retainsOwnExplanations: Boolean get() = true
 
-    override fun reasonFor(literal: Int): SearchExplanation? =
-        session.boolReasonClause(Lit.variable(literal))?.let(::SearchExplanation)
+    override fun reasonFor(literal: Int): SearchExplanation? {
+        val context = sharedContext ?: return null
+        val premise = session.sharedBooleanPremise(Lit.variable(literal), context, ::sourceIntId, sharedRootLevel)
+            ?: return null
+        return context.explainAtoms(premise, SearchDecision.Bool(literal))
+    }
 
     override fun retract(decisionLevel: Int) {
         val target = if (decisionLevel < nativeLevelBySharedLevel.size) {

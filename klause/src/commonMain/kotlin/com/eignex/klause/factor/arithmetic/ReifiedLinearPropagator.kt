@@ -1,14 +1,15 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearLiftedAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.explainLinearBound
+import com.eignex.klause.factor.arithmetic.internals.integralQuotientOrNull
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.factor.arithmetic.internals.reifiedAuxTail
 import com.eignex.klause.factor.arithmetic.internals.successorOrNull
+import com.eignex.klause.factor.arithmetic.internals.unreachableEqualityReason
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
@@ -26,12 +27,14 @@ internal class ReifiedLinearPropagator(
     private val bound: Long,
 ) : Propagator {
 
-    /**
-     * Advisor subscription: like [Linear], the integer reasoning is purely interval-based.
-     * Subscribe term variables to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED]; the indicator
-     * [auxBoolVar] keeps its separate Boolean wakeup.
-     */
-    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
+    private val singleEquality = vars.size == 1 && (op == LinearOp.EQ || op == LinearOp.NE)
+    private val equalityTarget: Long? =
+        if (singleEquality) integralQuotientOrNull(bound, coeffs[0]) else null
+
+    // A single-term equality also reads membership of its target, including under negated reification.
+    override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars).let {
+        if (singleEquality && equalityTarget != null) it + IntEvent.pack(vars[0], IntEvent.VALUE_REMOVED) else it
+    }
 
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
         explainLinearBound(state, coeffs, vars, payload, atTrail, atLevel)
@@ -40,16 +43,8 @@ internal class ReifiedLinearPropagator(
         val auxValue = state.boolValues[auxBoolVar]
         val extraLit = auxValue?.let { Lit.make(auxBoolVar, !it) } ?: 0
         val includeExtraLit = auxValue != null
-        // A single-term equality body (`c·v == bound`) can be infeasible because its required value
-        // is an *interior hole* of v, with v's bounds unchanged from root (the [eqTargetUnreachable]
-        // path). A bounds-only reason then cites nothing and degenerates to the bare indicator lit —
-        // an unsound unit nogood that forbids the indicator even on assignments where the hole is
-        // absent. Use the hole-aware collector so the carved value's eq-atom joins the reason. Other
-        // failure paths are bound-driven (the sum range is computed from bounds; a hole crossed by a
-        // body tighten is already chained through that bound atom's own reason), so they stay on the
-        // tighter bounds-only collector.
-        if (op == LinearOp.EQ && vars.size == 1) {
-            return collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit, includeExtraLit = includeExtraLit)
+        if (singleEquality && eqTargetUnreachable(state)) {
+            return unreachableEqualityReason(state, vars[0], equalityTarget, extraLit.takeIf { includeExtraLit })
         }
         // With the indicator set, the conflict is the body (indicator true) or its negation (false) failing on
         // one side of the sum, which [settlingSide] names for the bounds as they stand.
@@ -67,11 +62,7 @@ internal class ReifiedLinearPropagator(
             )
         } else {
             collectLinearTightenAntecedents(
-                state,
-                vars,
-                excludeIdx = -1,
-                extraLit = extraLit,
-                includeExtraLit = includeExtraLit,
+                state, vars, excludeIdx = -1, extraLit = extraLit, includeExtraLit = includeExtraLit,
             )
         }
     }
@@ -152,15 +143,12 @@ internal class ReifiedLinearPropagator(
                     collectLinearLiftedAntecedents(state, coeffs, vars, useLo = it.useLo, slack = it.slack)
                 } ?: state.composeIntVarAtomAntecedents(vars)
             },
-            // Bounds alone miss the case where a single-term EQ targets a value that is unreachable
-            // *inside* the bound interval — an interior domain hole, or a bound not divisible by the
-            // coefficient. The equality can then never hold, so pin the aux false now with a
-            // hole-aware antecedent. Without this the aux stays free, search may set it true, and the
-            // resulting empty-domain conflict carries a bounds-only (hole-blind) reason that yields an
-            // unsound learned clause — a latent false-UNSAT.
-            extraFalsePin = {
-                if (op == LinearOp.EQ && vars.size == 1 && eqTargetUnreachable(state)) {
-                    state.pinBool(auxBoolVar, false, eqUnreachableReason(state))
+            // Target absence decides EQ and NE even when the interval still straddles the target.
+            extraPin = {
+                if (singleEquality && eqTargetUnreachable(state)) {
+                    state.pinBool(
+                        auxBoolVar, op == LinearOp.NE, unreachableEqualityReason(state, vars[0], equalityTarget),
+                    )
                 } else {
                     null
                 }
@@ -186,41 +174,9 @@ internal class ReifiedLinearPropagator(
         )
     }
 
-    /**
-     * Reason for pinning the indicator false on an unreachable single-term `c·x == bound`. The
-     * equality holds iff `x == bound/c`, so the single fact "`x` cannot take that value" already
-     * implies the body is impossible — a strictly tighter, sound reason than citing every hole of
-     * `x` via [collectHoleAndBoundAntecedents]. Mirrors that collector's original-vs-current
-     * distinction: a value never in the declared domain (or a non-integer target) is structural, so
-     * the pin is a root fact with no antecedent; a value excluded by a bound tighten cites that
-     * bound; an interior hole carved during search cites its eq-atom (the soundness-critical case).
-     */
-    private fun eqUnreachableReason(state: PropagationState): IntArray? {
-        val c = coeffs[0]
-        if (c == 0L || bound % c != 0L) return null
-        val k = bound / c
-        if (k < Int.MIN_VALUE.toLong() || k > Int.MAX_VALUE.toLong()) return null
-        val v = vars[0]
-        val d = state.intDomains[v]
-        val orig = state.rootDomains[v]
-        return when {
-            k < orig.min || k > orig.max -> null
-            k < d.min -> intArrayOf(Lit.make(state.atomVarGe(v, d.min), false))
-            k > d.max -> intArrayOf(Lit.make(state.atomVarLe(v, d.max), false))
-            else -> intArrayOf(Lit.make(state.atomVarEq(v, k), true))
-        }
-    }
-
-    /** For a single-term `c·x = bound`, true when `bound/c` is not an integer in `x`'s current
-     *  domain — i.e. the equality is unsatisfiable even though `bound` lies within `x`'s bounds
-     *  (an interior hole) or `bound` is not divisible by `c`. */
     private fun eqTargetUnreachable(state: PropagationState): Boolean {
-        val c = coeffs[0]
-        val b = bound
-        if (c == 0L) return b != 0L
-        if (b % c != 0L) return true
-        val value = b / c
-        if (value < Int.MIN_VALUE.toLong() || value > Int.MAX_VALUE.toLong()) return true
+        if (coeffs[0] == 0L) return bound != 0L
+        val value = equalityTarget ?: return true
         return value !in state.intDomains[vars[0]]
     }
 }

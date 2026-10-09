@@ -11,13 +11,10 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.isZero
 import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
 import com.eignex.klause.util.shl
-import com.eignex.klause.util.signum
 import com.eignex.klause.util.toLongExact
+import com.eignex.klause.util.unaryMinus
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -204,28 +201,59 @@ private fun certifyAuthoritativeSolve(
     } finally {
         observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
     }
-    // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
-    if (floatAccept != null && result != null && result.optimal && !cancellation()) {
-        floatOptimum(model, result, floatAccept, floatOffset, cancellation)?.let { float ->
-            return@use CertifiedLpResult(float, null, null, null, null, false, { null }, floatOptimum = float)
-        }
+    LpCertificationSession(context, pricing).use { certification ->
+        certification.certify(model, solver, result, cancellation, observer, counterResults,
+            refinementLimits, floatAccept, floatOffset)
     }
-    val state = model.exactState
-    if (state == null || solver is ComponentLpSolverCapability) {
-        certifyLpResult(model, solver, result, cancellation, observer, context.certificationPolicy, counterResults)
-    } else {
-        LpScopedSolver(state, cancellation, context, pricing = pricing).use { anchor ->
-            certifyLpResult(
-                model,
-                solver,
-                result,
-                cancellation,
-                observer,
-                context.certificationPolicy,
-                counterResults,
-                refinement = LpRefinementRequest(anchor, anchor.refinementCache, refinementLimits),
-            )
+}
+
+internal class LpCertificationSession(
+    private val context: LpSolveContext,
+    private val pricing: LpPricingOptions,
+) : AutoCloseable {
+    private val continuation = LpExactContinuationCache()
+    private var anchor: LpScopedSolver? = null
+
+    fun certify(
+        model: LpModel,
+        solver: LpSolver,
+        result: FloatLpResult?,
+        cancellation: Cancellation,
+        observer: LpCertificationObserver?,
+        counterResults: LpCounterResults?,
+        refinementLimits: LpRefinementLimits = LpRefinementLimits(),
+        floatAccept: ((FloatLpResult) -> Boolean)? = null,
+        floatOffset: Double = 0.0,
+    ): CertifiedLpResult {
+        // Tolerance semantics accept a float optimum before any exact work; a rejected one falls through to it.
+        if (floatAccept != null && result != null && result.optimal && !cancellation()) {
+            floatOptimum(model, result, floatAccept, floatOffset, cancellation)?.let { float ->
+                return CertifiedLpResult(float, null, null, null, null, false, { null }, floatOptimum = float)
+            }
         }
+        val state = model.exactState
+        val refinement = if (state != null && solver !is ComponentLpSolverCapability && !cancellation()) {
+            val previous = anchor
+            val current = if (previous != null && previous.adopt(state, cancellation)) {
+                previous
+            } else {
+                anchor = null
+                previous?.close()
+                LpScopedSolver(state, context = context, pricing = pricing).also { anchor = it }
+            }
+            LpRefinementRequest(current, current.refinementCache, refinementLimits)
+        } else {
+            null
+        }
+        return certifyLpResult(model, solver, result, cancellation, observer, context.certificationPolicy,
+            counterResults, continuationCache = continuation, refinement = refinement)
+    }
+
+    override fun close() {
+        val previous = anchor
+        anchor = null
+        continuation.clear()
+        previous?.close()
     }
 }
 
@@ -735,14 +763,7 @@ internal fun LpModel.exactConflictSupport(conflict: BigRationalConflict): LpExac
 
 private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Boolean): LpExactSupport? {
     val state = exactState ?: return null
-    val y = multipliers.mapIndexed { row, value ->
-        val slack = slackCol(row)
-        if (objective && hasFiniteLower(slack) && !hasFiniteUpper(slack) && value > exactCost(slack)) {
-            exactCost(slack)
-        } else {
-            value
-        }
-    }
+    val y = if (objective) objectiveMultipliers(multipliers) else multipliers
     val sides = ArrayList<LpExactCitedSide>()
     for (j in 0 until numVars) {
         var coefficient = if (objective) exactCost(j).negated() else BigFraction.ZERO
@@ -763,25 +784,27 @@ private fun LpModel.exactSupport(multipliers: List<BigFraction>, objective: Bool
     return LpExactSupport(state, rows.map { it to state.model.row(it) }, sides)
 }
 
+private fun LpModel.objectiveMultipliers(multipliers: List<BigFraction>): List<BigFraction> {
+    var repaired: MutableList<BigFraction>? = null
+    for (row in 0 until m) {
+        val slack = slackCol(row)
+        val candidate = multipliers[row]
+        val cost = exactCost(slack)
+        if ((!hasFiniteLower(slack) && candidate < cost) || (!hasFiniteUpper(slack) && candidate > cost)) {
+            val target = repaired ?: multipliers.toMutableList().also { repaired = it }
+            target[row] = cost
+        }
+    }
+    return repaired ?: multipliers
+}
+
 internal fun exactLagrangian(
     model: LpModel,
     multipliers: List<BigFraction>,
     cancellation: Cancellation = Cancellation.Never,
 ): BigFraction? {
     if (multipliers.size != model.m || !model.finiteExactInput()) return null
-    val y = List(model.m) { row ->
-        val candidate = multipliers[row]
-        val slackCost = model.exactCost(model.slackCol(row))
-        val slack = model.slackCol(row)
-        if (model.hasFiniteLower(
-                slack,
-            ) && !model.hasFiniteUpper(slack) && candidate > slackCost
-        ) {
-            slackCost
-        } else {
-            candidate
-        }
-    }
+    val y = model.objectiveMultipliers(multipliers)
     var value = model.exactConstant()
     for (i in 0 until model.m) value += y[i] * model.exactRhs(i)
     for (j in 0 until model.numVars) {
@@ -1085,7 +1108,12 @@ internal fun LpModel.finiteExactInput(): Boolean {
     if (exactState != null) return exactState.model.n == n && exactState.model.m == m
     if (n < 0 || m < 0 || n > Int.MAX_VALUE - m) return false
     if (colContinuous.size != n || probeClampedLo.size != n || probeClampedHi.size != n ||
-        rowStrict.size != m || rowGlobal.size != m || rowPremises.size != m
+        rowStrict.size != m || rowGlobal.size != m || rowPremises.size != m || tag.size != n || flippedRhs.size != m
+    ) {
+        return false
+    }
+    if (rowPremises.any { it != null && (it.vars.size != it.isUpper.size || it.vars.size != it.thresholds.size ||
+            it.vars.any { variable -> variable < 0 } || it.boolLits.any { literal -> literal < 0 }) }
     ) {
         return false
     }
@@ -1122,7 +1150,7 @@ internal inline fun LpModel.forEachRationalColumn(j: Int, action: (Int, BigFract
     } else {
         val source = exactState?.model
         if (source != null) {
-            for (entry in source.entries(j)) action(entry.row, entry.number.value)
+            for (entry in source.columnEntries(j)) action(entry.row, entry.number.value)
             return
         }
         val dv = doubleView
@@ -1159,10 +1187,15 @@ internal fun LpModel.hasIntegralObjective(): Boolean {
 }
 
 internal fun BigFraction.ceilLong(): Long? {
-    var ceiling = num / den
-    if (num.signum() > 0 && !(num % den).isZero()) ceiling += BIG_ONE
+    val ceiling = ceilInteger()
     if (ceiling < bigIntOf(Long.MIN_VALUE) || ceiling > bigIntOf(Long.MAX_VALUE)) return null
     return ceiling.toLongExact()
+}
+
+internal fun BigFraction.floorLong(): Long? {
+    val floor = -negated().ceilInteger()
+    if (floor < bigIntOf(Long.MIN_VALUE) || floor > bigIntOf(Long.MAX_VALUE)) return null
+    return floor.toLongExact()
 }
 
 // A bounded value snapshot prevents sibling, objective and premise changes from reusing counters.

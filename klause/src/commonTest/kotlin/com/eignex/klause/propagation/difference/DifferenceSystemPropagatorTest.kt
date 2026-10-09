@@ -11,6 +11,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.mark
+import com.eignex.klause.propagation.undoTo
 import com.eignex.klause.solver.differenceFragmentOf
 import kotlin.random.Random
 import kotlin.test.Test
@@ -69,6 +71,95 @@ class DifferenceSystemPropagatorTest {
     private fun runSystem(problem: Problem, state: PropagationState): Boolean {
         val id = systemId(problem)
         return problem.propagators[id].propagate(state, id)
+    }
+
+    @Test
+    fun `a sweep visits distinct heads before its budget expires`() {
+        val rows = (0..64).map { row(it, (it + 1) % 65, it, 0L) } +
+            (1..64).map { row(64 + it, it, 0, -1L) }
+        val problem = problemOf(numBools = 129, numInts = 65, rows = rows)
+        val state = stateOf(problem)
+        for (aux in 0..64) assertTrue(state.pinLit(Lit.make(aux, true)))
+
+        assertTrue(runSystem(problem, state))
+
+        assertEquals(false, state.boolValues[65])
+        assertEquals((1..64).map { Lit.make(it, false) }.toSet(), state.boolAntecedents[65]?.toSet())
+    }
+
+    @Test
+    fun `closed heads do not consume the refutation budget`() {
+        val rows = (0..64).map { row(it, (it + 1) % 65, it, 0L) } + row(65, 64, 0, -1L)
+        val problem = problemOf(numBools = 66, numInts = 65, rows = rows)
+        val state = stateOf(problem)
+        for (aux in 0..64) assertTrue(state.pinLit(Lit.make(aux, true)))
+
+        assertTrue(runSystem(problem, state))
+
+        assertEquals(false, state.boolValues[65])
+        assertEquals(listOf(Lit.make(64, false)), state.boolAntecedents[65]?.toList())
+    }
+
+    @Test
+    fun `a deferred head is visited after a decision without new graph assertions`() {
+        val rows = (1..64).map { row(it - 1, it, 0, 0L) } + row(64, 0, 64, -1L)
+        val problem = problemOf(numBools = 65, numInts = 65, rows = rows, domains = boxed(65, 2L))
+        val state = stateOf(problem, Lit.make(64, true))
+        state.levelToDecisionVar.add(64)
+        assertTrue(runSystem(problem, state))
+        assertEquals(null, state.boolValues[63])
+        state.currentLevel = 2
+        state.levelToDecisionVar.add(problem.numBoolVars + 2)
+        assertTrue(state.tightenIntMin(2, 1L))
+
+        assertTrue(runSystem(problem, state))
+
+        assertEquals(false, state.boolValues[63])
+        assertEquals(listOf(Lit.make(64, false)), state.boolAntecedents[63]?.toList())
+    }
+
+    @Test
+    fun `a deferred head survives an assertion in an unrelated component`() {
+        val rows = (0..64).map { row(it, 65, it, if (it == 64) 0L else 2L) } +
+            row(65, 0, 65, -1L) + (1..64).map { row(65 + it, it, 0, 0L) } + row(130, 66, 67, 0L)
+        val problem = problemOf(numBools = 131, numInts = 68, rows = rows)
+        val state = stateOf(problem)
+        for (aux in 0..65) assertTrue(state.pinLit(Lit.make(aux, true)))
+        state.levelToDecisionVar.add(0)
+        assertTrue(runSystem(problem, state))
+        assertEquals(null, state.boolValues[129])
+        state.currentLevel = 2
+        state.levelToDecisionVar.add(130)
+        assertTrue(state.pinLit(Lit.make(130, true)))
+
+        assertTrue(runSystem(problem, state))
+
+        assertEquals(false, state.boolValues[129])
+        assertEquals(setOf(Lit.make(64, false), Lit.make(65, false)), state.boolAntecedents[129]?.toSet())
+    }
+
+    @Test
+    fun `a sibling revisits an implication released by rollback at the same decision depth`() {
+        val problem = problemOf(numBools = 4, numInts = 5,
+            rows = listOf(row(0, 1, 0, -1L), row(1, 2, 1, -1L), row(2, 0, 2, -1L), row(3, 3, 4, 0L)))
+        val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true))
+        state.levelToDecisionVar.add(0)
+        val root = state.mark()
+        state.currentLevel = 2
+        state.levelToDecisionVar.add(3)
+        assertTrue(state.pinLit(Lit.make(3, true)))
+        assertTrue(runSystem(problem, state))
+        assertEquals(false, state.boolValues[2])
+        state.undoTo(root)
+        assertEquals(null, state.boolValues[2])
+        state.currentLevel = 2
+        state.levelToDecisionVar.add(3)
+        assertTrue(state.pinLit(Lit.make(3, false)))
+
+        assertTrue(runSystem(problem, state))
+
+        assertEquals(false, state.boolValues[2])
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)), state.boolAntecedents[2]?.toSet())
     }
 
     @Test

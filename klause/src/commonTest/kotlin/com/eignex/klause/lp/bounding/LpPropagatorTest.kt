@@ -1,10 +1,12 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
 import com.eignex.klause.lp.engine.ExactLpEntry
@@ -15,10 +17,12 @@ import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -31,7 +35,11 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpRetainedCuts
+import com.eignex.klause.lp.relaxation.LpRetainedSources
+import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisSolver
@@ -43,6 +51,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -52,12 +61,269 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `compaction declines a cut edit that would publish uninstalled rows`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            assertTrue(lp.atLevel(1))
+            assertTrue(lp.append(LpScopedRow(0L, emptyList(), ExactLpNumber.of(0L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), true))
+            assertTrue(lp.atLevel(0))
+            val before = assertNotNull(lp.state)
+            val remap = LpLayoutRemap(before.model.n, before.rows)
+            val current = base.withModel(assertNotNull(before.ownerWorkingModel()))
+            val replacement = assertNotNull(cuts.prepare(before, current,
+                listOf(Cut(base.intColOf, longArrayOf(1L), Relation.GE, 0L, global = true))))
+
+            assertFalse(lp.compact(before, remap, replacement))
+
+            assertSame(before, lp.state)
+            assertTrue(cuts.parentRows(before).isEmpty())
+            assertTrue(replacement.isCurrent())
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `source publication declines a stale compaction without discarding the live owner`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 60)),
+            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 50)))
+        var live = problem.finiteIntDomain(0)
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = live
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
+            LinearObjective(intCoefficients = longArrayOf(1))))
+        val cuts = LpRetainedCuts()
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            live = live.withMinAtLeast(3L)
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            while (sources.prepareCompaction(assertNotNull(lp.state)) == null && live.max > live.min + 1L) {
+                live = live.withMaxAtMost(live.max - 1L)
+                assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            }
+            val before = assertNotNull(lp.state)
+            val plan = assertNotNull(sources.prepareCompaction(before))
+            val cutPlan = assertNotNull(cuts.prepareCompaction(before, plan.remap))
+            assertTrue(lp.editSources(sources.prepare(before, domains)))
+            assertSame(before, lp.state)
+
+            assertFalse(lp.compact(before, plan.remap, cutPlan, plan))
+
+            assertSame(before, lp.state)
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
+            val current = assertNotNull(sources.prepareCompaction(before))
+            assertTrue(lp.compact(before, current.remap,
+                assertNotNull(cuts.prepareCompaction(before, current.remap)), current))
+            assertEquals(1L, lp.metrics?.currentOwners)
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a published cut refresh invalidates prior preparations without invalidating numerical state`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val before = assertNotNull(lp.state)
+            val first = assertNotNull(cuts.prepare(before, base))
+            val stale = assertNotNull(cuts.prepare(before, base))
+            assertTrue(lp.editCuts(first))
+
+            assertFalse(lp.editCuts(stale))
+
+            assertSame(before, lp.state)
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a published source refresh invalidates prior preparations without invalidating numerical state`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val domains = RootDomains(problem)
+        val sources = LpRetainedSources(problem, CpToLpRelaxation(
+            problem, LinearObjective(intCoefficients = longArrayOf(1)),
+        ))
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            val before = assertNotNull(lp.state)
+            val first = sources.prepare(before, domains)
+            val stale = sources.prepare(before, domains)
+            assertTrue(lp.editSources(first))
+
+            assertFalse(lp.editSources(stale))
+
+            assertSame(before, lp.state)
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a cut edit prepared before a trail transition declines without publication`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        var work = 0L
+        LpPropagator(object : LpSearchPolicy {}, onEdit = { work += it }).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val cut = Cut(base.intColOf, longArrayOf(1), Relation.GE, 0, global = true)
+            val stale = assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(cut)))
+            assertTrue(lp.atLevel(1))
+            val before = lp.state
+            val metrics = lp.metrics
+            val beforeWork = work
+
+            assertFalse(lp.editCuts(stale))
+
+            assertSame(before, lp.state)
+            assertEquals(metrics, lp.metrics)
+            assertEquals(beforeWork, work)
+            assertEquals(0, cuts.depth)
+            assertTrue(lp.editCuts(assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(cut)))))
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a declined cut batch retains numerical state and source publication`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+            .build(PropagationSession(problem))
+        val cuts = LpRetainedCuts()
+        LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 1) }).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            val edit = assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(
+                Cut(base.intColOf, longArrayOf(1), Relation.GE, 0, global = true),
+                Cut(base.intColOf, longArrayOf(1), Relation.LE, 3, global = true),
+            )))
+            val before = lp.state
+
+            assertFalse(lp.editCuts(edit))
+
+            assertSame(before, lp.state)
+            assertTrue(cuts.parentRows(assertNotNull(lp.state)).isEmpty())
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `a source edit prepared before a trail transition declines without publication`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val domains = RootDomains(problem)
+        val sources = LpRetainedSources(
+            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            val stale = sources.prepare(assertNotNull(lp.state), domains)
+            assertTrue(lp.atLevel(1))
+            val before = lp.state
+            val metrics = lp.metrics
+
+            assertFalse(lp.editSources(stale))
+
+            assertSame(before, lp.state)
+            assertEquals(metrics, lp.metrics)
+            assertEquals(0, sources.depth)
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `source edits assert live bounds before numerical preparation and retain rollback`() {
+        val problem = Problem(
+            1, 1, arrayOf(IntDomain(3, 10)),
+            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8)),
+        )
+        var live = problem.finiteIntDomain(0).withMinAtLeast(4L)
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = live
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sources = LpRetainedSources(
+            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
+            val root = sources.prepare(assertNotNull(lp.state), domains)
+            assertTrue(lp.editSources(root) { _, _ -> SearchAtomPremise.All(emptyList()) })
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(lp.solve()).lowerBound)
+            assertEquals(1L, lp.metrics?.preparationAttempts)
+            assertTrue(assertIs<SearchAtomPremise.All>(lp.activeBoundPremise(0, false)).premises.isEmpty())
+            assertTrue(lp.atLevel(1))
+            live = live.withMinAtLeast(6L)
+            val child = sources.prepare(assertNotNull(lp.state), domains)
+
+            assertTrue(lp.editSources(child))
+
+            assertEquals(BigFraction.ofLong(6L), assertNotNull(lp.solve()).lowerBound)
+            assertEquals(2L, lp.metrics?.preparationAttempts)
+            assertEquals(SearchAtomPremise.Unavailable, lp.activeBoundPremise(0, false))
+            assertTrue(lp.atLevel(0))
+            sources.retract(0)
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(lp.solve()).lowerBound)
+            assertTrue(lp.resetRoot())
+            assertEquals(2L, lp.metrics?.createdOwners)
+            assertTrue(assertIs<SearchAtomPremise.All>(lp.activeBoundPremise(0, false)).premises.isEmpty())
+            live = problem.finiteIntDomain(0)
+            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
+            assertEquals(3L, lp.metrics?.createdOwners)
+        }
+    }
+
+    @Test
+    fun `a redundant bound batch spends no edit work`() {
+        val zero = ExactLpNumber.of(0L)
+        val source = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        var work = 0L
+        LpPropagator(object : LpSearchPolicy {}, onEdit = { work += it }).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            val lower = listOf(ExactLpSide(zero))
+            val upper = listOf(ExactLpSide(ExactLpNumber.of(3L)))
+            assertEquals(LpBoundBatchResult.Applied(2), lp.assertBounds(lower, upper))
+            val spent = work
+            val edits = assertNotNull(lp.metrics).editAttempts
+
+            assertEquals(LpBoundBatchResult.Applied(0), lp.assertBounds(lower, upper))
+            assertEquals(
+                LpBoundBatchResult.Applied(0),
+                lp.assertBounds(listOf(ExactLpSide(ExactLpNumber.of(-1L))), listOf(ExactLpSide(ExactLpNumber.of(4L)))),
+            )
+
+            assertEquals(spent, work)
+            assertEquals(edits, assertNotNull(lp.metrics).editAttempts)
+            assertEquals(BigFraction.ZERO, lp.state?.activeSide(0, false)?.side?.number?.value)
+            assertEquals(BigFraction.ofLong(3), lp.state?.activeSide(0, true)?.side?.number?.value)
+        }
+    }
+
     @Test
     fun `continuous CP rows decline the legacy bound adapter without changing domains`() {
         val problem = Problem(

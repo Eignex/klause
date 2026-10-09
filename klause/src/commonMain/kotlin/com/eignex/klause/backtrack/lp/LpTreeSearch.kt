@@ -83,7 +83,7 @@ internal fun LpEngine.lbTreeSearch(
                 split = null
                 targets = emptyMap()
                 if (expansions++ >= LB_TREE_BUDGET) return SearchNodeDisposition.Indeterminate
-                val relaxation = dive.nodeRelaxation(relaxer, native)
+                val relaxation = dive.nodeRelaxation(relaxer, native) ?: return SearchNodeDisposition.Indeterminate
                 val node = this@lbTreeSearch.solveRootNode(dive, relaxation.model, token, expansions == 1)
                 val model = node.model
                 val result = node.float

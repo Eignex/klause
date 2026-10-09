@@ -7,6 +7,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.ExactComparison
+import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.engine.ExactLpBounds
@@ -21,6 +23,7 @@ import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
+import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.search.SearchAtomPremise
@@ -122,7 +125,13 @@ internal fun LinearRow.booleanVariables(): Set<Int> = buildSet {
     }
 }
 
-internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPropagator) {
+internal class LiveQfLraSystem(
+    private val source: Problem,
+    private val lp: LpPropagator,
+    rowForms: List<List<ExactRowForm>> = source.factors.map { factor ->
+        factor.linearRows.map { it.exactForm(source.numRealVars) }
+    },
+) {
     private val columns = source.numRealVars + source.numIntVars
     private val sourceColumns = source.exactLpSourceColumns()
     private val declaredFixed = sourceColumns.mapIndexedNotNull { index, column ->
@@ -132,9 +141,13 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
         index to FixedSmtColumn(lower.value + column.origin.value, SearchAtomPremise.All(emptyList()))
     }.toMap()
     private val canonicalTerms = HashMap<Map<Int, BigFraction>, Map<Int, BigFraction>>()
-    private val normalized = source.factors.flatMap { it.linearRows }.map { row ->
-        row.exactComparison(source.numRealVars, true) { false }.terms
-    }.associateTo(HashMap()) { SmtTermKey.of(it) to SmtTermSlot(intern(it, declaredFixed)) }
+    private val preparedTerms = rowForms.flatten().associate { form ->
+        val comparison = form.comparison(true) { false }
+        comparison.ordered to SmtRowKeys(comparison.terms)
+    }
+    private val normalized = preparedTerms.values.associateTo(HashMap()) { keys ->
+        keys.positive to SmtTermSlot(intern(keys.positive.expression(), declaredFixed))
+    }
     private val terms = normalized.values.map { it.term.coefficients }.filter { it.size != 1 }.distinct()
     private val definitions = terms.withIndex().associate { (index, term) -> term to columns + index }.toMutableMap()
 
@@ -169,12 +182,51 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
     }
 
     fun assertRow(row: ExactRationalInequality, premise: SearchAtomPremise): Boolean = assertTerms(
-        SmtTermKey(row.columns, row.coefficients.toTypedArray()),
+        SmtTermKey(row.columns, row.coefficients),
         true,
         row.rhs,
         row.strict,
         premise,
     )
+
+    fun assertComparison(comparison: ExactComparison, direction: LinearOp?, premise: SearchAtomPremise): Boolean {
+        // Only source layouts are retained; transient comparisons must not grow a search-wide cache.
+        val keys = preparedTerms[comparison.ordered] ?: SmtRowKeys(comparison.terms)
+        val rows = ArrayList<ExactRationalInequality>(2)
+        comparison.rowsInto(rows, direction)
+        for ((index, row) in rows.withIndex()) {
+            val negated = comparison.op == LinearOp.GE ||
+                (comparison.op == LinearOp.NE && direction == LinearOp.GE) ||
+                (comparison.op == LinearOp.EQ && index == 1)
+            val key = if (negated) keys.negative else keys.positive
+            if (!assertTerms(key, true, row.rhs, row.strict, premise)) return false
+        }
+        return true
+    }
+
+    fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
+        val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
+        val fixed = rootFixedColumns(key.columns)
+        val slot = if (fixed.isEmpty()) {
+            key.slot ?: normalized[key] ?: return null
+        } else {
+            SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
+        }
+        val term = slot.term
+        val column = slot.column.takeIf { it >= 0 } ?: term.coefficients.keys.singleOrNull()
+            ?: definitions[term.coefficients] ?: return null
+        val threshold = term.bound(comparison.bound)
+        val state = lp.state ?: return null
+        for (sourceUpper in listOf(true, false)) {
+            val upper = if (term.scale.signum() < 0) !sourceUpper else sourceUpper
+            val active = state.activeSide(column, upper) ?: continue
+            val bound = active.side.number.value
+            if (if (upper) bound > threshold else bound < threshold) continue
+            val premise = lp.activeBoundPremise(column, upper) ?: return null
+            return DerivedDisequalitySide(if (sourceUpper) LinearOp.LE else LinearOp.GE, term.premise(premise))
+        }
+        return null
+    }
 
     fun assertAtom(atom: SourceBoundAtom, premise: SearchAtomPremise): Boolean {
         val expression = sourceTerms(atom) ?: return false
@@ -209,7 +261,8 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
     ): Boolean {
         val fixed = rootFixedColumns(key.columns)
         val slot = if (fixed.isEmpty()) {
-            normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
+            key.slot ?: normalized.getOrPut(key) { SmtTermSlot(intern(key.expression(), declaredFixed)) }
+                .also { key.slot = it }
         } else {
             SmtTermSlot(intern(key.expression(), declaredFixed + fixed))
         }
@@ -277,24 +330,32 @@ internal class LiveQfLraSystem(private val source: Problem, private val lp: LpPr
     }
 }
 
+internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
+
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.
-private class SmtTermKey(val columns: IntArray, private val coefficients: Array<BigFraction>) {
-    private val hash = 31 * columns.contentHashCode() + coefficients.contentHashCode()
+private class SmtTermKey(val columns: IntArray, private val coefficients: List<BigFraction>) {
+    private val hash = 31 * columns.contentHashCode() + coefficients.hashCode()
+    var slot: SmtTermSlot? = null
 
     fun expression(): Map<Int, BigFraction> = columns.indices.associate { columns[it] to coefficients[it] }
 
     override fun hashCode(): Int = hash
 
     override fun equals(other: Any?): Boolean = other is SmtTermKey && hash == other.hash &&
-        columns.contentEquals(other.columns) && coefficients.contentEquals(other.coefficients)
+        columns.contentEquals(other.columns) && coefficients == other.coefficients
 
     companion object {
         fun of(expression: Map<Int, BigFraction>): SmtTermKey {
             val entries = expression.entries.sortedBy { it.key }
-            return SmtTermKey(IntArray(entries.size) { entries[it].key }, Array(entries.size) { entries[it].value })
+            return SmtTermKey(IntArray(entries.size) { entries[it].key }, entries.map { it.value })
         }
     }
+}
+
+private class SmtRowKeys(terms: Map<Int, BigFraction>) {
+    val positive = SmtTermKey.of(terms)
+    val negative = SmtTermKey.of(terms.mapValues { (_, coefficient) -> coefficient.negated() })
 }
 
 private class SmtTermSlot(val term: NormalizedSmtTerm) {

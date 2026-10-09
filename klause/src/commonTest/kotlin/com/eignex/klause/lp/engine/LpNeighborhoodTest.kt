@@ -8,9 +8,35 @@ import com.eignex.klause.lp.engine.columnNeighborhood
 import com.eignex.klause.lp.engine.rowIndex
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpNeighborhoodTest {
+
+    @Test
+    fun `exact neighborhoods retain full support when traversal reverses row order`() {
+        val (base, x) = chain()
+        val state = LpExactState(assertNotNull(base.authoritativeModel()))
+        val working = assertNotNull(state.toWorkingModel())
+        assertNotNull(working.doubleView).colVal.fill(0.0)
+
+        val neighborhood = working.columnNeighborhood(intArrayOf(x[2]), 16, working.rowIndex())
+
+        assertEquals(3, neighborhood.model.m)
+        assertEquals(3, neighborhood.model.n)
+        val restricted = assertNotNull(neighborhood.model.exactState).model
+        for (column in neighborhood.cols.indices) {
+            val original = neighborhood.cols[column]
+            assertEquals(state.model.column(original), restricted.column(column))
+            for (entry in restricted.entries(column)) {
+                assertEquals(
+                    state.model.entries(original).single { it.row == neighborhood.rows[entry.row] }.number,
+                    entry.number,
+                )
+            }
+        }
+        assertTrue((0 until restricted.numVars).all { restricted.objective.cost(it).value.isZero })
+    }
 
     // Chain x0 <= x1 <= x2 <= 5: three rows, each linking to the next variable.
     private fun chain(): Pair<LpModel, IntArray> {

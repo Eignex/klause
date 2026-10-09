@@ -2,6 +2,9 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.lp.engine.EngineConstruction
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import kotlin.test.Test
@@ -11,6 +14,25 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ObbtBoundsTest {
+
+    @Test
+    fun `both open sides share one retained owner and receive exact bounds`() {
+        val rows = listOf(
+            realRow(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0, -1.0), LinearOp.EQ, 0.0),
+            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0),
+            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.LE, 7.0),
+            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.GE, -5.0),
+        )
+        val factory = RecordingLpEngineFactory()
+
+        val result = tightenOpenIntBounds(arrayOf(OpenIntBounds(null, null)), emptyList(), realConstraints = rows,
+            context = LpSolveContext(engineFactory = factory))
+
+        assertEquals(-5L, result.bounds[0].lo)
+        assertEquals(7L, result.bounds[0].hi)
+        assertEquals(1, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        assertEquals(0, factory.calls.count { it.kind == EngineConstruction.GENERAL })
+    }
 
     @Test
     fun `closes an open upper side a constraint bounds to the exact bound`() {

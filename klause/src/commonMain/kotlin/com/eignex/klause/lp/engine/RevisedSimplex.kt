@@ -195,6 +195,7 @@ internal class RevisedSimplex(
         private set
     private var cachedBeta: DoubleArray? = null
     private var cachedModel: LpModel? = null
+    private var cachedPrimalOnly = false
     private var cachedNumerical: LpScalingView? = null
     private var cachedStatus: Array<VarStatus>? = null
     private var pivots = 0
@@ -1013,7 +1014,21 @@ internal class RevisedSimplex(
         }
     }
 
-    override fun prepareLogicals(token: Cancellation): Basis? {
+    override fun prepareLogicals(token: Cancellation): Basis? = prepareSourceBasis(null, token)
+
+    override fun prepareBasis(basis: Basis, token: Cancellation): Basis? = prepareSourceBasis(basis, token)
+
+    override fun retainedBasis(): Basis? {
+        if (!basisKept || !basisFactorized || basicVar.distinct().size != m ||
+            status.count { it == VarStatus.BASIC } != m ||
+            basicVar.any { it !in status.indices || status[it] != VarStatus.BASIC }
+        ) {
+            return null
+        }
+        return Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
+    }
+
+    private fun prepareSourceBasis(warm: Basis?, token: Cancellation): Basis? {
         lastTermination = null
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -1027,8 +1042,16 @@ internal class RevisedSimplex(
         if (model.exactState == null || token()) return null
         stopToken = token
         return try {
-            coldStart()
-            if (refactorize(LpRefactorReason.INITIAL) == RefactorResult.FAILED || token() ||
+            val imported = warm != null && tryWarmStart(warm)
+            if (!imported) coldStart()
+            var prepared = refactorize(if (imported) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL)
+            if (prepared == RefactorResult.FAILED && imported && repairStop == null && !token() &&
+                (workLimit == 0L || work.ops < workLimit)
+            ) {
+                coldStart()
+                prepared = refactorize(LpRefactorReason.SINGULAR_RECOVERY)
+            }
+            if (prepared == RefactorResult.FAILED || token() ||
                 (workLimit > 0L && work.ops > workLimit)
             ) {
                 null
@@ -1047,7 +1070,7 @@ internal class RevisedSimplex(
         lastTermination = null
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
-        val next = state.toWorkingModel() ?: return false
+        val next = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
         if (token()) return false
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -1481,9 +1504,11 @@ internal class RevisedSimplex(
         val objectiveOnly = kept && before != null && after != null && before.sameMatrix(after) &&
             before.boundRevision == after.boundRevision && before.popRevision == after.popRevision &&
             before.rowRevision == after.rowRevision && before.model.objective != after.model.objective
-        if (objectiveOnly) {
-            objectiveWarmAttempts++
-            objectiveWarmHits++
+        if (objectiveOnly || (kept && before != null && cachedPrimalOnly)) {
+            if (before?.model?.objective != after?.model?.objective) {
+                objectiveWarmAttempts++
+                objectiveWarmHits++
+            }
             return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
         }
         val sameObjective = before?.model?.objective == after?.model?.objective
@@ -2141,10 +2166,11 @@ internal class RevisedSimplex(
         return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
     }
 
-    private fun retainBasicValues(beta: DoubleArray) {
+    private fun retainBasicValues(beta: DoubleArray, primalOnly: Boolean = false) {
         if (model.exactState == null) return
         cachedBeta = (cachedBeta ?: DoubleArray(m)).also { beta.copyInto(it) }
         cachedModel = model
+        cachedPrimalOnly = primalOnly
         cachedNumerical = numerical
         cachedStatus = cachedStatus?.also { status.copyInto(it) } ?: status.copyOf()
     }
@@ -2632,7 +2658,6 @@ internal class RevisedSimplex(
      *  last solve was not optimal. Integer-multiplier row aggregation + super-additive rounding in 128
      *  bits ([integerTableauCuts]), so the cuts are rigorously valid. */
     override fun gomoryCuts(maxCuts: Int): List<Cut> {
-        if (model.hasContinuous) return emptyList() // integer tableau cuts need an integer matrix
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = false)
@@ -2640,7 +2665,6 @@ internal class RevisedSimplex(
 
     /** Gomory mixed-integer (MIR) cuts from the last optimal basis, up to [maxCuts]. */
     override fun mirCuts(maxCuts: Int): List<Cut> {
-        if (model.hasContinuous) return emptyList() // integer tableau cuts need an integer matrix
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = true)
@@ -3012,7 +3036,13 @@ internal class RevisedSimplex(
                     leavingVar = basicVar[i]
                 }
             }
-            if (tMax >= Double.MAX_VALUE) return stopped(LpFloatTermination.UNBOUNDED_CANDIDATE)
+            if (tMax >= Double.MAX_VALUE) {
+                // This basis is primal feasible; an unbounded objective does not make it dual feasible.
+                basisKept = true
+                retainBasicValues(beta, primalOnly = true)
+                solvedExactState = model.exactState
+                return stopped(LpFloatTermination.UNBOUNDED_CANDIDATE)
+            }
             if (leaving == -1) {
                 // The entering variable reaches its opposite bound first: flip it, no basis change.
                 status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER

@@ -3,6 +3,15 @@ plugins {
     kotlin("plugin.serialization")
 }
 
+// Coverage belongs to this solver; instrumenting dependencies adds startup work unrelated to its report.
+kover {
+    currentProject {
+        instrumentation {
+            includedClasses.add("com.eignex.klause.*")
+        }
+    }
+}
+
 eignexPublish {
     description.set("Kotlin solver for Boolean and integer constraint problems. Finds and samples satisfying solutions, picks the best under a weighted objective, and exports to CNF for external SAT engines.")
     githubRepo.set("Eignex/klause")

@@ -23,6 +23,240 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `new columns rows and bound assertions publish in one preparation`() {
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val column = ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(5L))), integral = true)
+        val row = LpScopedRow(
+            0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        val empty = ExactLpModel(emptyList(), emptyList(), emptyList(), emptyList(), ExactLpObjective(emptyList()))
+        LpScopedSolver(LpExactState(empty)).use { owner ->
+            assertTrue(owner.push())
+
+            assertTrue(owner.replaceRows(
+                emptySet(), listOf(LpStructuralColumn(column, one)), listOf(row), true,
+                assertions = listOf(LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(3L)), 0L, 1)),
+            ))
+
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
+            assertEquals(1L, owner.metrics.preparationAttempts)
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            assertEquals(1L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `an invalid bound in a structural batch preserves the original authority`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val row = LpScopedRow(
+            1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+            val before = owner.state
+            val preparations = owner.metrics.preparationAttempts
+
+            assertFalse(owner.replaceRows(
+                setOf(0L), emptyList(), listOf(row), true,
+                assertions = listOf(LpBoundAssertion(2, false, ExactLpSide(ExactLpNumber.of(2L)), 0L, 0)),
+            ))
+
+            assertSame(before, owner.state)
+            assertEquals(preparations, owner.metrics.preparationAttempts)
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `root reset preserves extended columns permanent rows and numerical ownership`() {
+        val source = LpBuilder().apply { addVar(0L, 5L, cost = 1L) }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val row = LpScopedRow(
+            0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 0L))
+            assertTrue(owner.push())
+            assertTrue(owner.replaceRows(
+                emptySet(), listOf(LpStructuralColumn(ExactLpColumn(ExactLpBounds(ExactLpSide(zero))))),
+                listOf(row), true, permanentRows = setOf(0L),
+                assertions = listOf(LpBoundAssertion(0, false, ExactLpSide(ExactLpNumber.of(3L)), 1L, 1)),
+            ))
+            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
+            val owners = owner.metrics.createdOwners
+
+            assertTrue(owner.resetRoot())
+
+            assertEquals(0, owner.state.depth)
+            assertTrue(owner.state.assertions.isEmpty())
+            assertEquals(2, owner.state.model.n)
+            assertTrue(owner.state.rows.row(0).active)
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertEquals(owners, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `mixed row lifetimes prepare once and keep a permanent definition through pop`() {
+        val source = LpBuilder().apply { addVar(0L, 3L, cost = 1L) }.build(Sense.MINIMIZE)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))
+        val rows = listOf(
+            LpScopedRow(0L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-1L), logical),
+            LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L), logical),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+
+            assertTrue(owner.replaceRows(emptySet(), emptyList(), rows, true, permanentRows = setOf(0L)))
+
+            assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
+            assertEquals(2L, owner.metrics.createdOwners)
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.state.rows.row(0).active)
+            assertFalse(owner.state.rows.row(1).active)
+            assertTrue(owner.compact())
+            assertEquals(1, owner.state.model.m)
+        }
+    }
+
+    @Test
+    fun `adding a redundant row preserves the solved parent basis`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val redundant = LpScopedRow(
+            1, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+            assertTrue(owner.append(redundant, true))
+
+            val child = assertNotNull(assertNotNull(owner.solveFloat()).second)
+
+            assertTrue(child.warmStarted)
+            assertEquals(0, child.pivots)
+            assertEquals(1.0, child.objective)
+        }
+    }
+
+    @Test
+    fun `a source row replacement publishes one structural edit and restores the parent on pop`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val row = LpScopedRow(
+            1, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+
+            assertTrue(owner.replaceRows(setOf(0), emptyList(), listOf(row), true))
+
+            assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
+            assertEquals(2L, owner.metrics.createdOwners)
+            assertTrue(owner.pop(0))
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `an invalid replacement keeps the retired source row active`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val invalid = LpScopedRow(
+            1, listOf(1 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertTrue(owner.push())
+            val before = owner.state
+
+            assertFalse(owner.replaceRows(setOf(0), emptyList(), listOf(invalid), true))
+
+            assertSame(before, owner.state)
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `suspending and restoring a source row reuses its numerical owner`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 2L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+            assertTrue(owner.suspend(setOf(0)))
+
+            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.pop(0))
+
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertEquals(1L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `a structural batch prepares once and preserves the enclosing certified optimum after pop`() {
+        val source = LpBuilder().apply {
+            val x = addVar(0L, 3L, cost = 1L)
+            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
+        }.build(Sense.MINIMIZE)
+        val zero = ExactLpNumber.of(0L)
+        val one = ExactLpNumber.of(1L)
+        val minusOne = ExactLpNumber.of(-1L)
+        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))
+        val rows = listOf(
+            LpScopedRow(1, listOf(0 to minusOne, 1 to minusOne), ExactLpNumber.of(-3L), logical),
+            LpScopedRow(2, listOf(0 to one), ExactLpNumber.of(2L), logical),
+        )
+        LpScopedSolver(LpExactState(assertNotNull(source.authoritativeModel()))).use { owner ->
+            assertEquals(BigFraction.ONE, assertNotNull(owner.solve()).lowerBound)
+            assertTrue(owner.push())
+
+            assertTrue(
+                owner.append(
+                    listOf(LpStructuralColumn(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))))),
+                    rows,
+                    true,
+                ),
+            )
+
+            val child = assertNotNull(owner.solve())
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, child.verdict)
+            assertEquals(BigFraction.ofLong(2L), child.lowerBound)
+            assertTrue(owner.pop(0))
+            val parent = assertNotNull(owner.solve())
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, parent.verdict)
+            assertEquals(BigFraction.ONE, parent.lowerBound)
+            assertEquals(2L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
     fun `failed adoption cannot reuse a prior work stop`() {
         val state = LpExactState(lowerBoundModel())
         var reject = false
@@ -1038,6 +1272,9 @@ class LpScopedSolverTest {
                     override fun prepareLogicals(token: Cancellation): Basis? =
                         if (model.m > 0) throw primary else delegate.prepareLogicals(token)
 
+                    override fun prepareBasis(basis: Basis, token: Cancellation): Basis? =
+                        if (model.m > 0) throw primary else delegate.prepareBasis(basis, token)
+
                     override fun close() {
                         delegate.close()
                         if (model.m > 0) throw cleanup
@@ -1541,6 +1778,9 @@ class LpScopedSolverTest {
                     return object : PersistentLpSolver by delegate {
                         override fun prepareLogicals(token: Cancellation): Basis? =
                             if (fail && failure == "unsupported") null else delegate.prepareLogicals(token)
+
+                        override fun prepareBasis(basis: Basis, token: Cancellation): Basis? =
+                            if (fail && failure == "unsupported") null else delegate.prepareBasis(basis, token)
                         override fun close() {
                             closes++
                             delegate.close()

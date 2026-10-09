@@ -24,9 +24,31 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineInjectionTest {
+    @Test
+    fun `a fixed fractional real leaf retains its exact contradiction`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(0.1),
+                LinearOp.EQ, 0.010000000000000002)),
+            numRealVars = 1, realLower = doubleArrayOf(0.1), realUpper = doubleArrayOf(0.1),
+        )
+        val sink = SolveStatsSink(backend = "fractional-leaf")
+        val session = PropagationSession(problem)
+
+        LpEngine(problem, LinearObjective(),
+            LpParams(lpPlan = LpPlan(bounding = true, realResidual = true)), sink).use { engine ->
+            val relaxation = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), session))
+            assertNotNull(relaxation.model.exactState)
+            val result = engine.leafCertify(session)
+
+            assertEquals(LpVerdict.INFEASIBLE, result.verdict, "LP evidence: ${sink.snapshot().lp}")
+        }
+    }
+
 
     private val decline = LpCertificationPolicy { _, _ -> false }
 
@@ -332,7 +354,7 @@ class LpEngineInjectionTest {
             it.leafCertify(PropagationSession(problem))
         }
 
-        val construction = factory.calls.single { it.kind == EngineConstruction.GENERAL }
+        val construction = factory.calls.single { it.kind == EngineConstruction.PERSISTENT }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(47L, construction.tieSeed)
     }
@@ -409,11 +431,11 @@ class LpEngineInjectionTest {
 
         engine.use { it.leafCertify(PropagationSession(problem)) }
 
-        assertTrue(factory.calls.single { it.kind == EngineConstruction.GENERAL }.workLimit > 0L)
+        assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > 0L)
     }
 
     @Test
-    fun `open bound probes use the injected general factory and policy`() {
+    fun `open bound probes use one injected retained owner and preserve proof policy`() {
         val rows = listOf(
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
@@ -430,6 +452,7 @@ class LpEngineInjectionTest {
 
         assertEquals(null, rejected.bounds[0].hi)
         assertEquals(5L, accepted.bounds[0].hi)
-        assertTrue(factory.calls.any { it.kind == EngineConstruction.GENERAL })
+        assertEquals(1, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
+        assertEquals(0, factory.calls.count { it.kind == EngineConstruction.GENERAL })
     }
 }

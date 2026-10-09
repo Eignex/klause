@@ -20,6 +20,60 @@ import kotlin.test.assertTrue
 
 class LpSolveTest {
     @Test
+    fun `retained rational bounds omit inactive row weight and recover ancestor support after pop`() {
+        val source = assertNotNull(LpBuilder().apply {
+            val x = addRealVar(0.0, 4.0, cost = 1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.GE, 0.5)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val trail = LpBoundTrail(source)
+        assertTrue(trail.push())
+        assertTrue(trail.suspend(setOf(0L)))
+        assertTrue(trail.append(
+            LpScopedRow(
+                1L, listOf(0 to ExactLpNumber.of(assertNotNull(BigFraction.ofDouble(-0.5)))), ExactLpNumber.of(-1L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+            ),
+            true,
+        ))
+        val child = assertNotNull(trail.state.toWorkingModel())
+
+        val childBound = assertNotNull(certifyLpBound(child, doubleArrayOf(999.0, -2.0)))
+
+        assertEquals(BigFraction.ofLong(2L), childBound.value)
+        assertEquals(listOf(1), assertNotNull(childBound.support).rows.map { it.first })
+        assertEquals(2.0, safeObjectiveLowerBound(child, doubleArrayOf(999.0, -2.0)))
+        assertTrue(trail.pop(0))
+        val parent = assertNotNull(trail.state.toWorkingModel())
+        val parentBound = assertNotNull(certifyLpBound(parent, doubleArrayOf(-2.0, 999.0)))
+        assertEquals(BigFraction.ONE, parentBound.value)
+        assertEquals(listOf(0), assertNotNull(parentBound.support).rows.map { it.first })
+    }
+
+    @Test
+    fun `retained rational bounds repair upper only logicals without citing absent lower support`() {
+        val source = assertNotNull(LpBuilder().apply {
+            val x = addRealVar(0.0, 2.0, cost = -1.0)
+            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.5)
+        }.build(Sense.MINIMIZE).authoritativeModel())
+        val columns = List(source.numVars) {
+            if (it == source.n) {
+                source.column(it).copy(bounds = ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L))))
+            } else {
+                source.column(it)
+            }
+        }
+        val model = assertNotNull(LpExactState(source.copy(columns = columns)).toWorkingModel())
+
+        val bound = assertNotNull(certifyLpBound(model, doubleArrayOf(-999.0)))
+
+        assertEquals(BigFraction.ofLong(-2L), bound.value)
+        val support = assertNotNull(bound.support)
+        assertTrue(support.rows.isEmpty())
+        assertEquals(listOf(0), support.sides.map { it.column })
+        assertTrue(support.sides.single().upper)
+    }
+
+    @Test
     fun `native continuation preserves constant objective bounds in minimized source units`() {
         for (sense in Sense.entries) {
             for (fractional in listOf(false, true)) {
@@ -499,6 +553,7 @@ class LpSolveTest {
         val model = assertNotNull(trail.state.toWorkingModel())
         val counters = LpCounterResults()
         val result = solveAndCertify(model, counterResults = counters)
+        val earlier = assertNotNull(integerCertify(model, doubleArrayOf()))
 
         assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 2L))
         val next = assertNotNull(trail.state.toWorkingModel())
@@ -507,7 +562,10 @@ class LpSolveTest {
         assertEquals(3.0, result.safeLowerBound)
         assertEquals(1L, assertNotNull(result.bound?.support).sides.single().witness)
         assertEquals(2, trail.state.assertions.size)
-        assertNull(integerCertify(next, doubleArrayOf()))
+        val certificate = assertNotNull(integerCertify(next, doubleArrayOf()))
+        assertEquals(3L, certificate.objectiveBoundCeil(0L))
+        assertTrue(certificate.belongsTo(next))
+        assertEquals(false, earlier.belongsTo(next))
         assertNull(rationalizeToIntegerModel(next, outwardRealUppers = true))
     }
 
