@@ -1,7 +1,11 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -9,6 +13,41 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincConstructionTest {
+
+    @Test
+    fun `integer set aliases intersect the original domain`() {
+        val cases = listOf(
+            "1..3" to "3, 1, 3, 4",
+            "{1, 3, 5}" to "1, 2, 3",
+            "1..5" to "1, 3",
+        )
+        for ((domain, values) in cases) {
+            val program = parseFlatZinc("var $domain: x; var {$values}: y = x; solve satisfy;")
+
+            val declared = program.problem.declaredIntDomains.finiteDomain(0).span()
+            assertEquals(listOf(1L, 3L), List(declared.size) { declared.valueAt(it) })
+        }
+    }
+
+    @Test
+    fun `integer set aliases reject excluded pinned values`() {
+        for (declaration in listOf("var {1, 3}: y = x;", "var {1, 2}: y = x; var {1, 3}: z = y;")) {
+            val program = parseFlatZinc("var 1..3: x; $declaration constraint int_eq(x, 2); solve satisfy;")
+
+            val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+            assertIs<SolveResult.Unsat>(result)
+        }
+    }
+
+    @Test
+    fun `disjoint integer alias domains are unsatisfiable`() {
+        val program = parseFlatZinc("var {1, 3}: x; var {2, 4}: y = x; solve satisfy;")
+
+        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        assertIs<SolveResult.Unsat>(result)
+    }
 
     @Test
     fun `explicit integer sets preserve their distinct values across wide gaps`() {
