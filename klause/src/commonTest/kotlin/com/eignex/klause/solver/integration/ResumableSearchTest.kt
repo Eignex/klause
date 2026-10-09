@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -53,7 +54,7 @@ class ResumableSearchTest {
     private fun driveInSlices(
         problem: Problem,
         objective: LinearObjective,
-        onIncumbent: (Double) -> Unit = {},
+        onIncumbent: (MinimizeResult.WithSample) -> Unit = {},
     ): Pair<MinimizeResult, Int> {
         val handle = BacktrackSolver(problem.bake()).resumable(objective, BacktrackParams(randomSeed = 0L))
         var slices = 0
@@ -62,7 +63,7 @@ class ResumableSearchTest {
             // false on this slice's first poll, true thereafter → ~one cancel-check interval per slice.
             var checks = 0
             val pauseAfterOnePoll = Cancellation { checks++ > 0 }
-            terminal = handle.runSlice(pauseAfterOnePoll, sliceMillis = 60_000) { onIncumbent(it.objectiveValue) }
+            terminal = handle.runSlice(pauseAfterOnePoll, sliceMillis = 60_000, onIncumbent = onIncumbent)
             slices++
         }
         assertNotNull(terminal, "the sliced search must terminate")
@@ -109,10 +110,26 @@ class ResumableSearchTest {
             BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)),
         )
 
+        val declaredOptimum = (0 until (1 shl n)).mapNotNull { mask ->
+            val weight = weights.indices.sumOf { if (mask and (1 shl it) != 0) weights[it] else 0 }
+            if (weight > cap) null else -values.indices.sumOf { if (mask and (1 shl it) != 0) values[it] else 0 }
+        }.min().toDouble()
+        fun checkWitness(sample: Sample): Double {
+            assertTrue(sample.ints.all { it in 0L..1L })
+            assertTrue(weights.indices.sumOf { weights[it] * sample.ints[it] } <= cap)
+            return -values.indices.sumOf { values[it] * sample.ints[it] }.toDouble()
+        }
+        assertEquals(declaredOptimum, oneShot.objective)
+        assertEquals(oneShot.objective, checkWitness(oneShot.sample))
         val seen = ArrayList<Double>()
-        val (terminal, _) = driveInSlices(problem, obj, onIncumbent = { seen.add(it) })
+        val (terminal, _) = driveInSlices(problem, obj, onIncumbent = {
+            assertEquals(it.objectiveValue, checkWitness(it.sample))
+            seen.add(it.objectiveValue)
+        })
         val optimal = assertIs<MinimizeResult.Optimal>(terminal)
-        assertEquals(oneShot.objective, optimal.objective, "sliced resume must prove the same optimum")
+        assertEquals(declaredOptimum, optimal.objective, "sliced resume must prove the declared-space optimum")
+        assertEquals(optimal.objective, checkWitness(optimal.sample))
+        assertTrue(seen.isNotEmpty(), "the resumed search must publish a checked incumbent")
         // The incumbent improves monotonically across whatever slices it took to land it.
         for (i in 1 until seen.size) assertTrue(seen[i] < seen[i - 1], "incumbents must strictly improve")
     }

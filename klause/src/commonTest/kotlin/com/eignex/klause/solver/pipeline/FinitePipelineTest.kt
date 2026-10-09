@@ -220,8 +220,17 @@ class FinitePipelineTest {
         )
 
         assertTrue(preparation.problem.factors.isEmpty())
-        val reconstructed = preparation.reconstruct(Sample(BooleanArray(0), longArrayOf(2, 0)))
-        assertEquals(5L, reconstructed.ints[1])
+        val reconstructed = (0L..3L).map { x ->
+            val sample = preparation.reconstruct(Sample(BooleanArray(0), longArrayOf(x, 0)))
+            assertTrue(sample.ints[0] in 0L..3L)
+            assertTrue(sample.ints[1] in 0L..10L)
+            assertEquals(1L, sample.ints[1] - 2L * sample.ints[0])
+            sample.ints.toList()
+        }.toSet()
+        val declaredSolutions = (0L..3L).flatMap { x ->
+            (0L..10L).filter { y -> y - 2L * x == 1L }.map { y -> listOf(x, y) }
+        }.toSet()
+        assertEquals(declaredSolutions, reconstructed)
     }
 
     @Test
@@ -245,6 +254,8 @@ class FinitePipelineTest {
             Sample(BooleanArray(0), longArrayOf(2, 0), doubleArrayOf(1.5)),
         )
         assertEquals(1.5, reconstructed.reals.single())
+        assertTrue(reconstructed.reals.single() in 0.0..4.0)
+        assertEquals(1L, reconstructed.ints[1] - 2L * reconstructed.ints[0])
     }
 
     @Test

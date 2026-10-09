@@ -579,11 +579,18 @@ class LpPropagatorTest {
                     scoped = true,
                 ),
             )
-            assertEquals(BigFraction.ONE, assertNotNull(lp.solve()).witness?.objective)
+            val scoped = assertNotNull(assertNotNull(lp.solve()).witness)
+            assertEquals(BigFraction.ONE, scoped.objective)
+            assertEquals(BigFraction.ONE, scoped.primal[0])
+            assertEquals(BigFraction.ZERO, scoped.primal[1])
 
             lp.retract(0)
 
-            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).witness?.objective)
+            val restored = assertNotNull(assertNotNull(lp.solve()).witness)
+            assertEquals(BigFraction.ZERO, restored.objective)
+            assertEquals(listOf(BigFraction.ZERO), restored.primal)
+            assertEquals(listOf(BigFraction.ZERO), assertNotNull(initial.witness).primal)
+            assertEquals(BigFraction.ONE, scoped.primal[0])
             assertEquals(BigFraction.ZERO, initial.witness?.objective)
             assertEquals(0, assertNotNull(lp.state).rows.activeCount)
             assertEquals(ComponentCheck.Indeterminate, lp.check(SearchSession(emptyList())))

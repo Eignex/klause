@@ -42,6 +42,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private class TerminalRecordingFactory : LpEngineFactory {
@@ -265,6 +266,8 @@ class LpTerminalDeclineTest {
         assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
         assertEquals(1L, accepted.solutions)
         assertEquals(0.5, acceptedSamples.single().reals.single())
+        assertTrue(acceptedSamples.single().reals.single() in 0.0..1.0)
+        assertNull(declined.bestSample)
         assertTrue(rejectingFactory.solves >= 1)
         assertTrue(acceptingFactory.solves >= 1)
         assertTrue(rejectingFactory.persistentSolversCreated >= 1)
@@ -353,7 +356,12 @@ class LpTerminalDeclineTest {
         val accepted = run(mixed, optimize = true)
 
         assertEquals(FiniteSolveVerdict.BEST_FOUND, result.verdict)
-        assertNotNull(result.bestSample)
+        val incumbent = assertNotNull(result.bestSample)
+        assertEquals(0.5, incumbent.reals.single())
+        assertTrue(incumbent.ints.single() in 0L..1L)
+        val optimum = assertNotNull(accepted.bestSample)
+        assertEquals(0.5, optimum.reals.single())
+        assertTrue(optimum.ints.single() in 0L..1L)
         assertEquals(FiniteSolveVerdict.OPTIMAL, accepted.verdict)
         assertTrue(factory.solves >= 2)
         assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
@@ -407,9 +415,13 @@ class LpTerminalDeclineTest {
             context = LpSolveContext(factory, policy),
             cancellation = token,
         )
-        val accepted = run(continuous, optimize = false)
+        val acceptedSamples = ArrayList<Sample>()
+        val accepted = run(continuous, optimize = false, samples = acceptedSamples)
 
         assertEquals(FiniteSolveVerdict.UNKNOWN, declined.verdict)
+        assertEquals(0L, declined.solutions)
+        assertNull(declined.bestSample)
+        assertEquals(0.5, acceptedSamples.single().reals.single())
         assertEquals(FiniteSolveVerdict.SAT, accepted.verdict)
         assertTrue(factory.solves >= 1)
         assertTrue(factory.cancellations.isNotEmpty())

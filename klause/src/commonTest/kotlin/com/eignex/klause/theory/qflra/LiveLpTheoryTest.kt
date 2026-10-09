@@ -804,9 +804,17 @@ class LiveLpTheoryTest {
                 atoms = SearchAtomRegistry(0),
             )
             session.initialize()
-            assertIs<SearchResult.Satisfied>(session.solve(0))
+            val solved = assertIs<SearchResult.Satisfied>(session.solve(0))
+            val original = assertNotNull(solved.model.valueOf<ExactLiraAssignment>(component)).ints.single()
+            assertEquals(bigIntOf(0), original)
             stopped = true
             assertIs<ComponentCheck.Indeterminate>(session.check())
+            assertNull(session.model().valueOf<ExactLiraAssignment>(component))
+            assertIs<ComponentCheck.Indeterminate>(session.check())
+            stopped = false
+            assertIs<ComponentCheck.Feasible>(session.check())
+            val restored = assertNotNull(session.model().valueOf<ExactLiraAssignment>(component)).ints.single()
+            assertEquals(bigIntOf(0), restored)
         }
     }
 
@@ -840,6 +848,9 @@ class LiveLpTheoryTest {
 
                 assertNull(component.nextBranch(session))
                 assertIs<ComponentCheck.Indeterminate>(component.check(session))
+                assertNull(session.model().valueOf<Any>(component))
+                assertIs<SearchResult.Indeterminate>(session.solve(0))
+                assertNull(session.model().valueOf<Any>(component))
                 assertEquals(0L, stats.snapshot().sourceLp.operations)
                 assertTrue(stats.snapshot().continuation.calls > 0L)
                 assertTrue(stats.snapshot().continuation.work.values.sum() > 0L)
