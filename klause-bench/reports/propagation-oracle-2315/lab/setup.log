@@ -1,0 +1,16 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+fatal: unable to access 'https://github.com/Eignex/klause.git/': Failed to connect to github.com port 443 after 4020 ms: Couldn't connect to server
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+From https://github.com/Eignex/klause
+ - [deleted]             (none)                      -> codex/exact-projection-reproducer
+ + 2c9da0691...9d96e9e7f codex/rws-conflict-evidence -> codex/rws-conflict-evidence  (forced update)
+   dbe993b08..aeb14e3cf  main                        -> main
+[i-09ecb6658dc0ab009] reused the cached build of 5471419aa
+WARNING: Using incubator modules: jdk.incubator.vector
+3afe432b9 is not cached: building
+WARNING: Using incubator modules: jdk.incubator.vector
+80e6add30 is not cached: building
+WARNING: Using incubator modules: jdk.incubator.vector
+39dc3e2a8 is not cached: building
+WARNING: Using incubator modules: jdk.incubator.vector
+

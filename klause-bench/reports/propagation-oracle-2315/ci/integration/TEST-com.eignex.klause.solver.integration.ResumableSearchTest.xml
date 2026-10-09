@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ResumableSearchTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-09T21:07:37.986Z" hostname="runnervmmprz5" time="0.009">
+  <properties/>
+  <testcase name="a paused-and-resumed branch-and-bound reaches the same optimum as a one-shot minimize[jvm]" classname="com.eignex.klause.solver.integration.ResumableSearchTest" time="0.004"/>
+  <testcase name="a paused-and-resumed UNSAT proof reaches Infeasible across many slices[jvm]" classname="com.eignex.klause.solver.integration.ResumableSearchTest" time="0.003"/>
+  <testcase name="once done a handle returns the same terminal without further work[jvm]" classname="com.eignex.klause.solver.integration.ResumableSearchTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

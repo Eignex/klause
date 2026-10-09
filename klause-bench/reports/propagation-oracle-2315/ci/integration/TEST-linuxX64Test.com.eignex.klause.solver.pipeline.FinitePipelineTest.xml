@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-09T21:12:42.521Z" hostname="runnervmmprz5" time="0.0">
+  <properties/>
+  <testcase name="an unbounded leaf ray survives presolve as a source-model verdict[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="selects the portfolio composition for a finite route[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="keeps an unchanged finite model for the selected route[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="reports construction bake time through the preparation[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="pre-bake strengthening short-circuits a wide model with solve cancellation[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="a spent presolve allowance still hands the engine a fully baked model[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="a source model crosses the baked boundary before finite execution[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="reconstructs an affine-eliminated variable[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="reconstruction keeps the continuous part of a solution[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <testcase name="leaves a harvested model at the presolve fixpoint[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.pipeline.FinitePipelineTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

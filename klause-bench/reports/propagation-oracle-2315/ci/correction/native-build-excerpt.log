@@ -1,0 +1,6 @@
+2026-10-09T20:47:19.9302319Z HEAD is now at d4cb623 Merge 80e6add305cf2936804e4ce11dfc914543d4b9ea into 3afe432b9b8ac3b2a4ecd2d75404c12e7803dc75
+2026-10-09T20:47:19.9374366Z [command]/usr/bin/git log -1 --format=%H
+2026-10-09T20:47:19.9403280Z d4cb623d63ecbe62c1b71f39eb0261c2bc5452ad
+2026-10-09T20:47:42.1267935Z ##[group]Run ./gradlew --refresh-dependencies :klause:linuxX64Test :klause-cli:linuxX64Test
+2026-10-09T20:59:45.3331433Z BUILD SUCCESSFUL in 12m 3s
+2026-10-09T20:59:48.2379392Z SHA256 digest of uploaded artifact is 8f0f8e5458e27c286a29ca786a4471707befb1dc7774fdb8b9dfb994feb70a62

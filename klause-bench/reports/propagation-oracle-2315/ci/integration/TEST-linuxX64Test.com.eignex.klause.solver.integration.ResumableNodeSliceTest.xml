@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-09T21:12:40.517Z" hostname="runnervmmprz5" time="1.0">
+  <properties/>
+  <testcase name="a node-budgeted slice stops on its budget rather than running the search out[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.0"/>
+  <testcase name="the same node budget stops at the same place every time[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.0"/>
+  <testcase name="successive node-budgeted slices resume rather than restart[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.0"/>
+  <testcase name="a mixed search sliced one node at a time still proves its optimum[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="1.0"/>
+  <testcase name="an LP arm's slice spends its LP work as nodes[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.0"/>
+  <testcase name="an LP arm repays the LP work one slice overspent with slices that explore nothing[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.0"/>
+  <testcase name="propagation charged slices preserve the optimum and decision count[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.0"/>
+  <testcase name="leaf LP completions spend work even without a node LP arm[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.0"/>
+  <testcase name="a constructor refutation returns when root work consumes the slice[linuxX64]" classname="linuxX64Test.com.eignex.klause.solver.integration.ResumableNodeSliceTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,9 @@
+2026-10-09T21:00:41.7558572Z HEAD is now at db49654 Merge 39dc3e2a84c78984e2edff9588911a415734e5a1 into 80e6add305cf2936804e4ce11dfc914543d4b9ea
+2026-10-09T21:00:41.7651824Z db49654c3d2047c87d0447b926921fb310a58f66
+2026-10-09T21:01:01.7083864Z ##[group]Run ./gradlew --refresh-dependencies :klause:linuxX64Test :klause-cli:linuxX64Test
+2026-10-09T21:01:01.7085277Z [36;1m./gradlew --refresh-dependencies :klause:linuxX64Test :klause-cli:linuxX64Test[0m
+2026-10-09T21:12:46.2741391Z BUILD SUCCESSFUL in 11m 44s
+2026-10-09T21:12:49.2153101Z SHA256 digest of uploaded artifact is f67d8317fe4b16065c6bf193f5d458b9750f437313a3320942a9c1f3cfc65df8
+2026-10-09T21:12:49.6410922Z Artifact download URL: https://github.com/Eignex/klause/actions/runs/37990551875/artifacts/11645273017
+2026-10-09T21:12:58.0442581Z     Requested Key : gradle-home-v2|Linux-X64|native-test[debe7e2089933f89baa724f718db4c25]-db49654c3d2047c87d0447b926921fb310a58f66
+2026-10-09T21:12:58.0445609Z     Saved     Key : gradle-home-v2|Linux-X64|native-test[debe7e2089933f89baa724f718db4c25]-db49654c3d2047c87d0447b926921fb310a58f66
