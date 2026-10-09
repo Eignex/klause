@@ -1,0 +1,36 @@
+1791580412678 launched c7i.2xlarge instances [i-020c2ffc05a814d9f]
+1791580430698 waiting for i-020c2ffc05a814d9f to boot failed (try 1 of 45), retrying in 20 s: on 51.21.2.3 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-020c2ffc05a814d9f' (ED25519) to the list of known hosts.
+
+1791580455198 i-020c2ffc05a814d9f: booted; building 52193ef90
+1791580627780 i-020c2ffc05a814d9f: built
+1791580627781 i-020c2ffc05a814d9f: planning, which fetches the corpora the selections read
+1791580628904 selection 0 ('suite=mzn-bench' 'name=2017/city-position/city-5-05' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580629526 selection 1 ('suite=xcsp3-cop' 'name=Fortress1-03_c25' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580630133 selection 2 ('suite=pb-comp' 'name=normalized-PB15eval/OPT-LIN/dt-problems/normalized-lo_12x12_004.opb.metafix' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580630711 selection 3 ('suite=pb-comp' 'name=normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580630712 planned 4 problems × 6 arms = 72 cases, up to 6,0 h
+1791580630713 i-020c2ffc05a814d9f: compressing and pushing newly fetched corpora to s3://klause-lab-corpus-459222092693-eu-north-1
+1791580646107 running 4 problems on 1 instances, each taking the next problem as it has room
+1791580834049 launched c7i.2xlarge instances [i-0ade9ab1fcd0be34b]
+1791580853200 waiting for i-0ade9ab1fcd0be34b to boot failed (try 1 of 45), retrying in 20 s: on 16.16.215.15 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0ade9ab1fcd0be34b' (ED25519) to the list of known hosts.
+
+1791580873659 i-0ade9ab1fcd0be34b: booted; building 52193ef90
+1791581043628 i-0ade9ab1fcd0be34b: built
+1791581059775 i-0ade9ab1fcd0be34b joined; 2 instances now
+1791581255287 launched c7i.2xlarge instances [i-081cdbfd7ec9029f9]
+1791581273350 waiting for i-081cdbfd7ec9029f9 to boot failed (try 1 of 45), retrying in 20 s: on 51.21.127.51 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-081cdbfd7ec9029f9' (ED25519) to the list of known hosts.
+
+1791581293803 i-081cdbfd7ec9029f9: booted; building 52193ef90
+1791581460888 i-081cdbfd7ec9029f9: built
+1791581476922 i-081cdbfd7ec9029f9 joined; 3 instances now
+1791581487149 launched c7i.2xlarge instances [i-0637e80582c05209c]
+1791581504979 waiting for i-0637e80582c05209c to boot failed (try 1 of 45), retrying in 20 s: on 51.20.249.1 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-0637e80582c05209c' (ED25519) to the list of known hosts.
+
+1791581525415 i-0637e80582c05209c: booted; building 52193ef90
+1791581688652 i-0637e80582c05209c: built
+1791581704277 i-0637e80582c05209c joined; 4 instances now
+1791581733542 i-0637e80582c05209c has no problems left to take: terminated
+1791585789861 i-081cdbfd7ec9029f9 has no problems left to take: terminated
+1791586075364 i-020c2ffc05a814d9f has no problems left to take: terminated
+1791586489025 i-0ade9ab1fcd0be34b has no problems left to take: terminated
+1791586490371 job finished

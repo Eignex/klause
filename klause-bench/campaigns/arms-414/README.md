@@ -138,8 +138,9 @@ unfinished stage is a default recommendation.
 
 Baseline job 875 is complete with 156/156 records. Oversubscription p1 job 881 and reseeding p1
 job 879 are complete with 48/48 records each and no failed commands. Reseeding p4 job 880 is also
-complete with 48/48 records. Matched comparisons and source checks run in GitHub CI; pool sizing
-p4 job 882 is still collecting records.
+complete with 48/48 records. Pool sizing p4 job 882 completes 72/72 records without failed commands.
+All eight original stages are complete, totaling 660 cases. Matched comparisons and source checks
+run in GitHub CI; the integrated confirmation remains in progress.
 
 These measurements belong to the recorded SHAs. Exact-arithmetic normalization and Boolean
 undo-lifetime fixes reached main during collection; rebasing the plumbing does not retrospectively

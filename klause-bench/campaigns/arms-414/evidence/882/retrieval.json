@@ -1,0 +1,805 @@
+{
+  "job": 882,
+  "page": "http://192.168.50.104:8420/jobs/882",
+  "artifacts": [
+    {
+      "file": "job.json.gz",
+      "url": "http://192.168.50.104:8420/jobs/882",
+      "sha256": "81e42ebeca8f20eb14579fac96f1ab0171930daa65fabd7aa570ad929ac079dd"
+    },
+    {
+      "file": "arms.json.gz",
+      "url": "http://192.168.50.104:8420/experiments/882/arms",
+      "sha256": "ad7782e5e642d4a5b18843e007ac47b99b0383fe0e2ad35856fc841792c5b14c"
+    },
+    {
+      "file": "cases.json.gz",
+      "url": "http://192.168.50.104:8420/experiments/882/cases",
+      "sha256": "93b9af307aa83b71599a2b21fd1573a9aca4d3cce1b8e9dea83b5d2d658acabf"
+    },
+    {
+      "file": "lab-stats.json.gz",
+      "url": "http://192.168.50.104:8420/experiments/882/stats",
+      "sha256": "62295db73519ae5b59f74f16e652988f5cc10d2d59683e1d45a8d49b373ecfc2"
+    },
+    {
+      "file": "reference-comparison.json.gz",
+      "url": "http://192.168.50.104:8420/experiments/882/reference",
+      "sha256": "4aea48defebf44427385959b67ff4b1e5a83db58227a3baca58f2d6695a08206"
+    },
+    {
+      "file": "files.json.gz",
+      "url": "http://192.168.50.104:8420/jobs/882/files",
+      "sha256": "79629522eaada8416c850ad3942851620fa730acc89c0abab6750a2ecda724da"
+    },
+    {
+      "file": "job.log",
+      "sha256": "731576b97951ea8f6d211645ac95f4594fc9f8f49093b1fb88e5897a49948ced"
+    },
+    {
+      "file": "setup.log",
+      "sha256": "1baf0cd927676794fe7235a03601788d87ee580d3fdaa5c8eea852f7bd5e6bbc"
+    },
+    {
+      "file": "raw-records.json.gz",
+      "sha256": "05010244a49d6b29b53d15569b541607c5d9ac84fa10999f75e3891663303725"
+    }
+  ],
+  "raw_files": [
+    {
+      "path": "0.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/0.exit"
+    },
+    {
+      "path": "1.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/1.exit"
+    },
+    {
+      "path": "10.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/10.exit"
+    },
+    {
+      "path": "11.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/11.exit"
+    },
+    {
+      "path": "12.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/12.exit"
+    },
+    {
+      "path": "13.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/13.exit"
+    },
+    {
+      "path": "14.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/14.exit"
+    },
+    {
+      "path": "15.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/15.exit"
+    },
+    {
+      "path": "16.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/16.exit"
+    },
+    {
+      "path": "17.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/17.exit"
+    },
+    {
+      "path": "18.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/18.exit"
+    },
+    {
+      "path": "19.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/19.exit"
+    },
+    {
+      "path": "2.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/2.exit"
+    },
+    {
+      "path": "20.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/20.exit"
+    },
+    {
+      "path": "21.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/21.exit"
+    },
+    {
+      "path": "22.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/22.exit"
+    },
+    {
+      "path": "23.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/23.exit"
+    },
+    {
+      "path": "24.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/24.exit"
+    },
+    {
+      "path": "25.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/25.exit"
+    },
+    {
+      "path": "26.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/26.exit"
+    },
+    {
+      "path": "27.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/27.exit"
+    },
+    {
+      "path": "28.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/28.exit"
+    },
+    {
+      "path": "29.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/29.exit"
+    },
+    {
+      "path": "3.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/3.exit"
+    },
+    {
+      "path": "30.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/30.exit"
+    },
+    {
+      "path": "31.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/31.exit"
+    },
+    {
+      "path": "32.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/32.exit"
+    },
+    {
+      "path": "33.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/33.exit"
+    },
+    {
+      "path": "34.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/34.exit"
+    },
+    {
+      "path": "35.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/35.exit"
+    },
+    {
+      "path": "36.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/36.exit"
+    },
+    {
+      "path": "37.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/37.exit"
+    },
+    {
+      "path": "38.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/38.exit"
+    },
+    {
+      "path": "39.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/39.exit"
+    },
+    {
+      "path": "4.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/4.exit"
+    },
+    {
+      "path": "40.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/40.exit"
+    },
+    {
+      "path": "41.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/41.exit"
+    },
+    {
+      "path": "42.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/42.exit"
+    },
+    {
+      "path": "43.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/43.exit"
+    },
+    {
+      "path": "44.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/44.exit"
+    },
+    {
+      "path": "45.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/45.exit"
+    },
+    {
+      "path": "46.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/46.exit"
+    },
+    {
+      "path": "47.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/47.exit"
+    },
+    {
+      "path": "48.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/48.exit"
+    },
+    {
+      "path": "49.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/49.exit"
+    },
+    {
+      "path": "5.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/5.exit"
+    },
+    {
+      "path": "50.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/50.exit"
+    },
+    {
+      "path": "51.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/51.exit"
+    },
+    {
+      "path": "52.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/52.exit"
+    },
+    {
+      "path": "53.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/53.exit"
+    },
+    {
+      "path": "54.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/54.exit"
+    },
+    {
+      "path": "55.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/55.exit"
+    },
+    {
+      "path": "56.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/56.exit"
+    },
+    {
+      "path": "57.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/57.exit"
+    },
+    {
+      "path": "58.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/58.exit"
+    },
+    {
+      "path": "59.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/59.exit"
+    },
+    {
+      "path": "6.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/6.exit"
+    },
+    {
+      "path": "60.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/60.exit"
+    },
+    {
+      "path": "61.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/61.exit"
+    },
+    {
+      "path": "62.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/62.exit"
+    },
+    {
+      "path": "63.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/63.exit"
+    },
+    {
+      "path": "64.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/64.exit"
+    },
+    {
+      "path": "65.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/65.exit"
+    },
+    {
+      "path": "66.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/66.exit"
+    },
+    {
+      "path": "67.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/67.exit"
+    },
+    {
+      "path": "68.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/68.exit"
+    },
+    {
+      "path": "69.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/69.exit"
+    },
+    {
+      "path": "7.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/7.exit"
+    },
+    {
+      "path": "70.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/70.exit"
+    },
+    {
+      "path": "71.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/71.exit"
+    },
+    {
+      "path": "8.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/8.exit"
+    },
+    {
+      "path": "9.exit",
+      "bytes": 2,
+      "url": "http://192.168.50.104:8420/jobs/882/files/9.exit"
+    },
+    {
+      "path": "cases/0/record.json",
+      "bytes": 68770,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/0/record.json"
+    },
+    {
+      "path": "cases/1/record.json",
+      "bytes": 61454,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/1/record.json"
+    },
+    {
+      "path": "cases/10/record.json",
+      "bytes": 64881,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/10/record.json"
+    },
+    {
+      "path": "cases/11/record.json",
+      "bytes": 75948,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/11/record.json"
+    },
+    {
+      "path": "cases/12/record.json",
+      "bytes": 73183,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/12/record.json"
+    },
+    {
+      "path": "cases/13/record.json",
+      "bytes": 72486,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/13/record.json"
+    },
+    {
+      "path": "cases/14/record.json",
+      "bytes": 70090,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/14/record.json"
+    },
+    {
+      "path": "cases/15/record.json",
+      "bytes": 74380,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/15/record.json"
+    },
+    {
+      "path": "cases/16/record.json",
+      "bytes": 65561,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/16/record.json"
+    },
+    {
+      "path": "cases/17/record.json",
+      "bytes": 75006,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/17/record.json"
+    },
+    {
+      "path": "cases/18/record.json",
+      "bytes": 76011,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/18/record.json"
+    },
+    {
+      "path": "cases/19/record.json",
+      "bytes": 82001,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/19/record.json"
+    },
+    {
+      "path": "cases/2/record.json",
+      "bytes": 68371,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/2/record.json"
+    },
+    {
+      "path": "cases/20/record.json",
+      "bytes": 76703,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/20/record.json"
+    },
+    {
+      "path": "cases/21/record.json",
+      "bytes": 84372,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/21/record.json"
+    },
+    {
+      "path": "cases/22/record.json",
+      "bytes": 79000,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/22/record.json"
+    },
+    {
+      "path": "cases/23/record.json",
+      "bytes": 78271,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/23/record.json"
+    },
+    {
+      "path": "cases/24/record.json",
+      "bytes": 76612,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/24/record.json"
+    },
+    {
+      "path": "cases/25/record.json",
+      "bytes": 80968,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/25/record.json"
+    },
+    {
+      "path": "cases/26/record.json",
+      "bytes": 77538,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/26/record.json"
+    },
+    {
+      "path": "cases/27/record.json",
+      "bytes": 85894,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/27/record.json"
+    },
+    {
+      "path": "cases/28/record.json",
+      "bytes": 77491,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/28/record.json"
+    },
+    {
+      "path": "cases/29/record.json",
+      "bytes": 77429,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/29/record.json"
+    },
+    {
+      "path": "cases/3/record.json",
+      "bytes": 66952,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/3/record.json"
+    },
+    {
+      "path": "cases/30/record.json",
+      "bytes": 76995,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/30/record.json"
+    },
+    {
+      "path": "cases/31/record.json",
+      "bytes": 80115,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/31/record.json"
+    },
+    {
+      "path": "cases/32/record.json",
+      "bytes": 79847,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/32/record.json"
+    },
+    {
+      "path": "cases/33/record.json",
+      "bytes": 81672,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/33/record.json"
+    },
+    {
+      "path": "cases/34/record.json",
+      "bytes": 78956,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/34/record.json"
+    },
+    {
+      "path": "cases/35/record.json",
+      "bytes": 78697,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/35/record.json"
+    },
+    {
+      "path": "cases/36/record.json",
+      "bytes": 54057,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/36/record.json"
+    },
+    {
+      "path": "cases/37/record.json",
+      "bytes": 52205,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/37/record.json"
+    },
+    {
+      "path": "cases/38/record.json",
+      "bytes": 51079,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/38/record.json"
+    },
+    {
+      "path": "cases/39/record.json",
+      "bytes": 52889,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/39/record.json"
+    },
+    {
+      "path": "cases/4/record.json",
+      "bytes": 62177,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/4/record.json"
+    },
+    {
+      "path": "cases/40/record.json",
+      "bytes": 52728,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/40/record.json"
+    },
+    {
+      "path": "cases/41/record.json",
+      "bytes": 51376,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/41/record.json"
+    },
+    {
+      "path": "cases/42/record.json",
+      "bytes": 54004,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/42/record.json"
+    },
+    {
+      "path": "cases/43/record.json",
+      "bytes": 52196,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/43/record.json"
+    },
+    {
+      "path": "cases/44/record.json",
+      "bytes": 51090,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/44/record.json"
+    },
+    {
+      "path": "cases/45/record.json",
+      "bytes": 52888,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/45/record.json"
+    },
+    {
+      "path": "cases/46/record.json",
+      "bytes": 52730,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/46/record.json"
+    },
+    {
+      "path": "cases/47/record.json",
+      "bytes": 51392,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/47/record.json"
+    },
+    {
+      "path": "cases/48/record.json",
+      "bytes": 54060,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/48/record.json"
+    },
+    {
+      "path": "cases/49/record.json",
+      "bytes": 52211,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/49/record.json"
+    },
+    {
+      "path": "cases/5/record.json",
+      "bytes": 69780,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/5/record.json"
+    },
+    {
+      "path": "cases/50/record.json",
+      "bytes": 51109,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/50/record.json"
+    },
+    {
+      "path": "cases/51/record.json",
+      "bytes": 52901,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/51/record.json"
+    },
+    {
+      "path": "cases/52/record.json",
+      "bytes": 52730,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/52/record.json"
+    },
+    {
+      "path": "cases/53/record.json",
+      "bytes": 51524,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/53/record.json"
+    },
+    {
+      "path": "cases/54/record.json",
+      "bytes": 59126,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/54/record.json"
+    },
+    {
+      "path": "cases/55/record.json",
+      "bytes": 51436,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/55/record.json"
+    },
+    {
+      "path": "cases/56/record.json",
+      "bytes": 58880,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/56/record.json"
+    },
+    {
+      "path": "cases/57/record.json",
+      "bytes": 59829,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/57/record.json"
+    },
+    {
+      "path": "cases/58/record.json",
+      "bytes": 59597,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/58/record.json"
+    },
+    {
+      "path": "cases/59/record.json",
+      "bytes": 60460,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/59/record.json"
+    },
+    {
+      "path": "cases/6/record.json",
+      "bytes": 68146,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/6/record.json"
+    },
+    {
+      "path": "cases/60/record.json",
+      "bytes": 59600,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/60/record.json"
+    },
+    {
+      "path": "cases/61/record.json",
+      "bytes": 51036,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/61/record.json"
+    },
+    {
+      "path": "cases/62/record.json",
+      "bytes": 58917,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/62/record.json"
+    },
+    {
+      "path": "cases/63/record.json",
+      "bytes": 59809,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/63/record.json"
+    },
+    {
+      "path": "cases/64/record.json",
+      "bytes": 59197,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/64/record.json"
+    },
+    {
+      "path": "cases/65/record.json",
+      "bytes": 60263,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/65/record.json"
+    },
+    {
+      "path": "cases/66/record.json",
+      "bytes": 58041,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/66/record.json"
+    },
+    {
+      "path": "cases/67/record.json",
+      "bytes": 51436,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/67/record.json"
+    },
+    {
+      "path": "cases/68/record.json",
+      "bytes": 59853,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/68/record.json"
+    },
+    {
+      "path": "cases/69/record.json",
+      "bytes": 59413,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/69/record.json"
+    },
+    {
+      "path": "cases/7/record.json",
+      "bytes": 70847,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/7/record.json"
+    },
+    {
+      "path": "cases/70/record.json",
+      "bytes": 58986,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/70/record.json"
+    },
+    {
+      "path": "cases/71/record.json",
+      "bytes": 60058,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/71/record.json"
+    },
+    {
+      "path": "cases/8/record.json",
+      "bytes": 70904,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/8/record.json"
+    },
+    {
+      "path": "cases/9/record.json",
+      "bytes": 87486,
+      "url": "http://192.168.50.104:8420/jobs/882/files/cases/9/record.json"
+    },
+    {
+      "path": "job.log",
+      "bytes": 3291,
+      "url": "http://192.168.50.104:8420/jobs/882/files/job.log"
+    },
+    {
+      "path": "selection-0.jsonl",
+      "bytes": 169,
+      "url": "http://192.168.50.104:8420/jobs/882/files/selection-0.jsonl"
+    },
+    {
+      "path": "selection-1.jsonl",
+      "bytes": 148,
+      "url": "http://192.168.50.104:8420/jobs/882/files/selection-1.jsonl"
+    },
+    {
+      "path": "selection-2.jsonl",
+      "bytes": 229,
+      "url": "http://192.168.50.104:8420/jobs/882/files/selection-2.jsonl"
+    },
+    {
+      "path": "selection-3.jsonl",
+      "bytes": 257,
+      "url": "http://192.168.50.104:8420/jobs/882/files/selection-3.jsonl"
+    },
+    {
+      "path": "setup.log",
+      "bytes": 543,
+      "url": "http://192.168.50.104:8420/jobs/882/files/setup.log"
+    },
+    {
+      "path": "setup.pid",
+      "bytes": 19,
+      "url": "http://192.168.50.104:8420/jobs/882/files/setup.pid"
+    }
+  ]
+}
