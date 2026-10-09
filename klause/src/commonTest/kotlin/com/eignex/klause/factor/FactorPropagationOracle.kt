@@ -3,6 +3,7 @@ package com.eignex.klause.factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -171,7 +172,11 @@ object FactorPropagationOracle {
         repeat(problem.numBoolVars) { include(2L) }
         domains.forEach { include(it.valueCount) }
         // This projection evaluates factors over the declarations without running root deductions.
-        val state = LocalSearchState(LocalSearchModel.open(problem, domains), Random(0L))
+        val state = LocalSearchState(
+            LocalSearchModel.open(problem, domains), Random(0L),
+            // Exact invariant selection must see declarations even when local search would use a window.
+            projection = LocalSearchProblem(problem, domains),
+        )
         val samples = ArrayList<Sample>()
         repeat(space.toInt()) { ordinal ->
             var remaining = ordinal.toLong()

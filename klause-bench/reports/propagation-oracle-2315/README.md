@@ -87,6 +87,10 @@ The integration layer reuses the existing fixtures and checks their source seman
 - `LpTerminalDeclineTest`: validate mixed incumbents against the fractional row and declared bounds,
   preserve best-found status after decline, and withhold cancelled/declined satisfaction witnesses.
 
+A wide sparse declaration with three values also checks that exact invariant selection reads the
+original domains rather than local search's narrower window. Its direct predicate states `5*x <= 0`
+as `x <= 0`, avoiding overflow in the reference itself.
+
 These changes add no production algorithm, capability, configuration or session redesign.
 GitHub CI executes the JVM, Linux native and lint/docs gates for each stack layer.
 
