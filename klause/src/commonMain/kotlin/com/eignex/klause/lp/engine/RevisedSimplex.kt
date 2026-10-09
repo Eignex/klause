@@ -20,6 +20,7 @@ import com.eignex.klause.util.cancelledWhen
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import kotlin.math.abs
+import kotlin.time.TimeSource
 
 /**
  * Result of a [RevisedSimplex] solve: the optimal [basis] (to warm-start or exactly certify), the
@@ -275,6 +276,9 @@ internal class RevisedSimplex(
     private var sourcePrimalResidual = 0.0
     private var sourceBoundViolation = 0.0
     private var sourceBasicDualResidual = 0.0
+    private var sourceResidualCalls = 0L
+    private var sourceResidualNanos = 0L
+    private var sourceResidualScaledCalls = 0L
 
     override val scalingMetrics: LpScalingMetrics
         get() = numerical.metrics.copy(
@@ -487,6 +491,9 @@ internal class RevisedSimplex(
         objectiveWarmHits = objectiveWarmHits,
         objectiveWarmRepairs = objectiveWarmRepairs,
         preparationOps = lastPreparationOps,
+        sourceResidualCalls = sourceResidualCalls,
+        sourceResidualNanos = sourceResidualNanos,
+        sourceResidualScaledCalls = sourceResidualScaledCalls,
     )
 
     init {
@@ -1406,6 +1413,9 @@ internal class RevisedSimplex(
         sourcePrimalResidual = 0.0
         sourceBoundViolation = 0.0
         sourceBasicDualResidual = 0.0
+        sourceResidualCalls = 0L
+        sourceResidualNanos = 0L
+        sourceResidualScaledCalls = 0L
         refactorizations = 0
         initialRefactorizations = 0
         warmStartRefactorizations = 0
@@ -2555,6 +2565,17 @@ internal class RevisedSimplex(
     }
 
     private fun recordSourceResiduals(beta: DoubleArray, sourceDuals: DoubleArray) {
+        val started = TimeSource.Monotonic.markNow()
+        try {
+            computeSourceResiduals(beta, sourceDuals)
+        } finally {
+            sourceResidualCalls++
+            if (numerical.applied) sourceResidualScaledCalls++
+            sourceResidualNanos += started.elapsedNow().inWholeNanoseconds
+        }
+    }
+
+    private fun computeSourceResiduals(beta: DoubleArray, sourceDuals: DoubleArray) {
         val values = DoubleArray(numVars)
         for (j in 0 until numVars) {
             if (status[j] != VarStatus.BASIC) {

@@ -19,6 +19,18 @@ import kotlin.test.assertTrue
 
 class LpStatsTest {
     @Test
+    fun `source residual timing includes component costs on the reported route`() {
+        val sink = LpStatsSink()
+        val metrics = LpSolveMetrics(sourceResidualCalls = 2L, sourceResidualNanos = 17L,
+            sourceResidualScaledCalls = 1L) + LpSolveMetrics(sourceResidualCalls = 1L, sourceResidualNanos = 5L)
+
+        sink.certificationObserver().observeSolve(metrics, component = true)
+
+        assertEquals(LpPhaseStats(calls = 3L, nanos = 22L, outcomes = mapOf("SCALED" to 1L, "UNSCALED" to 2L)),
+            sink.snapshot().phases.getValue("SOURCE_RESIDUALS_COMPONENT"))
+    }
+
+    @Test
     fun `phase snapshots retain refusal costs and consumer routes after merging`() {
         val sink = LpStatsSink()
         sink.certificationObserver(LpRoute.STANDALONE).observePhase(
