@@ -15,6 +15,7 @@ import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.util.ArmCatalog
 
 /**
@@ -222,8 +223,18 @@ object BacktrackCatalog {
         catalog.ranked(rankedArms(kind, realColumns))
 
     /** One fresh recipe for every arm of [kind] the model behind [facts] offers the needs of, in credit order. */
-    internal fun ranked(kind: Kind, facts: ProblemFacts): List<BacktrackRecipe> =
-        catalog.ranked(rankedArms(kind, facts.profile.realColumns).filter { facts.offersAll(it.needs) })
+    internal fun ranked(kind: Kind, facts: ProblemFacts): List<BacktrackRecipe> {
+        val order = rankedArms(kind, facts.profile.realColumns)
+        // A small finite optimization pool needs a relaxation beside its SAT guard: the LP arm finds
+        // witnesses that the two LP-free cores miss, without probing an entire intensity palette.
+        val ranked = if (kind == Kind.COP && facts.profile.problemClass == ProblemClass.FiniteCp) {
+            val rest = order.filter { it != BacktrackArm.LpDefault }
+            rest.take(1) + BacktrackArm.LpDefault + rest.drop(1)
+        } else {
+            order
+        }
+        return catalog.ranked(ranked.filter { facts.offersAll(it.needs) })
+    }
 
     /** Per-arm recipe factories for [kind], in credit order — each builds a fresh recipe (the factory
      *  shape a campaign or the CLI feeds to `PortfolioScenario.btPool`). */
