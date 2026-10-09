@@ -470,5 +470,37 @@
     "family": "sum-opt-tiny",
     "format": "XCSP3",
     "category": "OPTIMIZATION"
+  },
+  {
+    "suite": "smtlib-qflira",
+    "problem": "LCTES/tdf.locals.nosummaries",
+    "collection": "smtlib-qf_lira",
+    "family": "LCTES",
+    "format": "SMTLIB",
+    "category": "CSP"
+  },
+  {
+    "suite": "mps-core",
+    "problem": "blend-tiny",
+    "collection": "klause-bench/smoke-corpus/mps",
+    "family": "blend-tiny",
+    "format": "MPS",
+    "category": "OPTIMIZATION"
+  },
+  {
+    "suite": "mps-core",
+    "problem": "feasible-tiny",
+    "collection": "klause-bench/smoke-corpus/mps",
+    "family": "feasible-tiny",
+    "format": "MPS",
+    "category": "CSP"
+  },
+  {
+    "suite": "wcnf-core",
+    "problem": "maxsat-tiny",
+    "collection": "klause-bench/smoke-corpus/dimacs",
+    "family": "maxsat-tiny",
+    "format": "WCNF",
+    "category": "OPTIMIZATION"
   }
 ]
