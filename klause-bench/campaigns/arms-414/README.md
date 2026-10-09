@@ -113,6 +113,13 @@ in GitHub CI by the existing pinned-source compiler check with MiniZinc 2.9.4; v
 unknown and missing checks remain distinct. This compiler gate does not run a reference solver and
 its times are not campaign measurements.
 
+The first/best times in the original stages use the CLI attribution clock, which starts after
+preparation; process elapsed time also includes startup and preparation. The integrated confirmation
+build additionally retains observed subprocess arrival times. CI keeps both clocks separate and
+exports direction-aware objective checkpoints at 1/10/30/60/120/300 seconds (and each run's final
+budget). Missing observations stay null. The checkpoints describe the archived attribution stream;
+the independent source gate checks final candidates.
+
 ## Submitted stages
 
 Witness pilot 873 is complete: 24/24 feasible records retain a final candidate and source hashes,
@@ -269,3 +276,32 @@ for off includes earlier, worse incumbents, so it is not an optimization speedup
 Thresholds 3/0/2/4 record 134/0/204/93 actual reseeds. The off configuration performs no reseeding,
 and the other values materially change execution. Per-arm initialization is retained separately;
 these frozen builds predate the construction-accounting repair and its integrated measurements.
+
+## P4 reseeding and preselected confirmation
+
+Job 880 completes 48/48 feasible records with source hashes and witnesses. Thresholds 3/2/4 prove
+the three knapsack cases; off proves those plus two linear-ordering cases. Per-record reference
+checks in [CI analysis 38000958406](https://github.com/Eignex/klause/actions/runs/38000958406)
+cover all 60 applicable stored rows with no disagreement or missing reference.
+All 49 distinct MiniZinc candidates across the completed witness stages pass the independent source
+gate. Thresholds 3/0/2/4 record 493/0/714/354 reseeds at p4.
+
+| Threshold against default 3 | Objective wins / ties / losses | Proof gains / losses | Problem mean quality | Descriptive 95% interval |
+| --- | --- | --- | --- | --- |
+| off (0) | 0 / 8 / 4 | 2 / 0 | -0.333 | [-0.75, 0] |
+| 2 | 3 / 9 / 0 | 0 / 0 | 0.250 | [0, 0.75] |
+| 4 | 1 / 9 / 2 | 0 / 0 | -0.083 | [-0.25, 0] |
+
+Threshold 2 wins every city seed (3297–4324 versus 5081–5805), ties Fortress at 459518 and ties the
+OPB objectives. Off loses all three city seeds and one Fortress seed, despite its extra proofs.
+Threshold 4 varies only on city, winning one seed and losing two. These are width-dependent
+tradeoffs: threshold 2 loses two Fortress seeds at p1.
+
+Before inspecting held-out variant outcomes, threshold 2 at p4 is selected for a single confirmation
+stage, [AWS job 909](http://192.168.50.104:8420/jobs/909). It compares thresholds 3/2 on integrated
+main `54101a2cb001c825d0a920779004f4b140a0b956`, including #2328, at 300 seconds and seeds 3/7/11.
+The six frozen held-out families provide transfer evidence; city and Fortress repeat the discovery
+signal, and CoinsGrid guards proof retention. This adds 54 cases, at most 4.5 solve case-hours
+before setup. Both variants share the build, input bytes, default arm count, slice policy, presolve
+policy and AWS allocation settings. No p1 threshold change is proposed. Confirmation is still
+running, so this selection does not authorize a default change by itself.
