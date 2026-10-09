@@ -12,8 +12,8 @@ pairwise proof contradiction or disagreement in 874 applicable frozen-reference 
 All 67 distinct MiniZinc final candidates pass independent source checks. There are 396 legacy
 records without durable witnesses/source hashes; the other 264 retain both. OPB/XCSP3 witnesses
 have internal solver checks and stored-reference checks, without an independent source gate.
-The arm-count sweeps support retaining the shipped counts. P4 threshold 2 is undergoing a
-preselected integrated-build confirmation before any threshold recommendation.
+The arm-count sweeps support retaining the shipped counts. The preselected integrated-build
+confirmation completes 54/54 cases without failed commands; its CI analysis is pending.
 
 ## Frozen design
 
@@ -49,7 +49,7 @@ applicable ALNS worker, so composed and executed worker counts can exceed N. `ls
 and engine mix; they do not pin an exact mixed split. Catalog composition remains model-dependent.
 
 `reseedStaleThreshold` belongs to `Portfolio`, the current replacement for the historical
-`SequentialPortfolio`. Main does not expose it through CLI. The measurement seam threads
+`SequentialPortfolio`. The frozen baseline does not expose it through CLI. The measurement seam threads
 `reseed-stale-threshold` through `PortfolioScenario` into the executor and reports it with per-arm
 `reseeds`. Zero disables it. It affects resumable optimization after an incumbent, on both sequential
 and parallel execution, and never discards a terminal verdict. Runs without such work provide no
@@ -59,8 +59,8 @@ Historical scripts are not measurement commands: fixed arms=6 at p4 is different
 default 8, and comparing default arms with arms=6 at p1 is an identical-setting comparison.
 Oversubscription uses p1 6/12 and p4 4/8/12; it measures composition and execution together, not a
 pure scheduler factor. No tuning of #1748 slice sizing is included. Construction budgeting #2328
-was integrated by [PR #2375](https://github.com/Eignex/klause/pull/2375) during collection. These
-frozen builds predate it; policy candidates need measurements on that integrated implementation.
+was integrated by [PR #2375](https://github.com/Eignex/klause/pull/2375) during collection. The
+original eight builds predate it; the confirmation uses the integrated implementation.
 
 ## Evidence and reproduction
 
@@ -134,7 +134,7 @@ exports direction-aware objective checkpoints at 1/10/30/60/120/300 seconds (and
 budget). Missing observations stay null. The checkpoints describe the archived attribution stream;
 the independent source gate checks final candidates.
 
-## Submitted stages
+## Recorded stages
 
 Witness pilot 873 is complete: 24/24 feasible records retain a final candidate and source hashes,
 covering both widths and both engines on all three formats. All eight MiniZinc candidates passed
@@ -154,7 +154,7 @@ Baseline job 875 is complete with 156/156 records. Oversubscription p1 job 881 a
 job 879 are complete with 48/48 records each and no failed commands. Reseeding p4 job 880 is also
 complete with 48/48 records. Pool sizing p4 job 882 completes 72/72 records without failed commands.
 All eight original stages are complete, totaling 660 cases. Matched comparisons and source checks
-run in GitHub CI; the integrated confirmation remains in progress.
+run in GitHub CI; the integrated confirmation is complete and awaits CI analysis.
 
 These measurements belong to the recorded SHAs. Exact-arithmetic normalization and Boolean
 undo-lifetime fixes reached main during collection; rebasing the plumbing does not retrospectively
@@ -318,8 +318,9 @@ main `54101a2cb001c825d0a920779004f4b140a0b956`, including #2328, at 300 seconds
 The six frozen held-out families provide transfer evidence; city and Fortress repeat the discovery
 signal, and CoinsGrid guards proof retention. This adds 54 cases, at most 4.5 solve case-hours
 before setup. Both variants share the build, input bytes, default arm count, slice policy, presolve
-policy and AWS allocation settings. No p1 threshold change is proposed. Confirmation is still
-running, so this selection does not authorize a default change by itself.
+policy and AWS allocation settings. No p1 threshold change is proposed. Confirmation completes
+54/54 cases with no failed commands. The full raw records are archived; CI analysis and independent
+source checks are pending, so this selection does not authorize a default change by itself.
 
 ## Completed p4 pool-size sweep
 

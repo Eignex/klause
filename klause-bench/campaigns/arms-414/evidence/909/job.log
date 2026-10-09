@@ -1,0 +1,34 @@
+1791586100818 launched c7i.2xlarge instances [i-041fa3f25f72ba6f1, i-05be37b823d1d3029]
+1791586120599 waiting for i-05be37b823d1d3029 to boot failed (try 1 of 45), retrying in 20 s: on 13.60.60.253 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-05be37b823d1d3029' (ED25519) to the list of known hosts.
+
+1791586120599 waiting for i-041fa3f25f72ba6f1 to boot failed (try 1 of 45), retrying in 20 s: on 51.20.181.113 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-041fa3f25f72ba6f1' (ED25519) to the list of known hosts.
+
+1791586141132 i-05be37b823d1d3029: booted; building 54101a2cb
+1791586141195 i-041fa3f25f72ba6f1: booted; building 54101a2cb
+1791586316048 i-05be37b823d1d3029: built
+1791586319324 i-041fa3f25f72ba6f1: built
+1791586319324 i-041fa3f25f72ba6f1: planning, which fetches the corpora the selections read
+1791586320554 selection 0 ('suite=mzn-bench' 'name=2017/city-position/city-5-05' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586321169 selection 1 ('suite=xcsp3-cop' 'name=Fortress1-03_c25' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586321782 selection 2 ('suite=xcsp3-cop' 'name=CoinsGrid-08-04_c22' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586322396 selection 3 ('suite=mzn-bench' 'name=2011/depot-placement/rat99_5' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586323011 selection 4 ('suite=mzn-bench' 'name=2012/amaze/2012-03-15' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586323588 selection 5 ('suite=xcsp3-cop' 'name=CyclicBandwidth-mesh2D05x08_c22' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586324234 selection 6 ('suite=xcsp3-cop' 'name=BinPacking2-n1c1w1a_c24' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586324855 selection 7 ('suite=pb-comp' 'name=normalized-PB06/OPT-LIN/mps-v2-20-10/MIPLIB/miplib/normalized-mps-v2-20-10-lseu' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586325430 selection 8 ('suite=pb-comp' 'name=normalized-PB06/OPT-LIN/submitted-PB05/manquinho/logic-synthesis/normalized-exam.pi' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791586325432 planned 9 problems × 2 arms = 54 cases, up to 4,5 h
+1791586325432 i-041fa3f25f72ba6f1: compressing and pushing newly fetched corpora to s3://klause-lab-corpus-459222092693-eu-north-1
+1791586341511 fetching the corpora on the other instances
+1791586360899 running 9 problems on 2 instances, each taking the next problem as it has room
+1791586495782 AWS gave no more instances (VcpuLimitExceeded); running on 2
+1791586627484 launched c7i.2xlarge instances [i-041cba7d9a97d2a38]
+1791586645507 waiting for i-041cba7d9a97d2a38 to boot failed (try 1 of 45), retrying in 20 s: on 16.170.155.145 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-041cba7d9a97d2a38' (ED25519) to the list of known hosts.
+
+1791586666027 i-041cba7d9a97d2a38: booted; building 54101a2cb
+1791586837474 i-041cba7d9a97d2a38: built
+1791586857339 i-041cba7d9a97d2a38 joined; 3 instances now
+1791589586348 i-041cba7d9a97d2a38 has no problems left to take: terminated
+1791589980113 i-041fa3f25f72ba6f1 has no problems left to take: terminated
+1791590319545 i-05be37b823d1d3029 has no problems left to take: terminated
+1791590329369 job finished
