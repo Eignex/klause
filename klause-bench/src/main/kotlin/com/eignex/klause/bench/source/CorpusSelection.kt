@@ -270,7 +270,7 @@ internal object CorpusSelection {
 
     /** Pick the canonical `.mzn` for [familyName] from [candidates]: exact basename, then
      *  `<family>_model` / `model` / `main`, then a family-prefixed non-`mznc` name, else
-     *  sorted-first. */
+     *  sorted-first. Equal-priority candidates use path order independently of filesystem enumeration. */
     fun pickPrimaryMzn(familyName: String, candidates: List<File>): File {
         val lower = familyName.lowercase()
         val priorities = listOf<(File) -> Boolean>(
@@ -284,8 +284,9 @@ internal object CorpusSelection {
                 ) && !it.nameWithoutExtension.lowercase().startsWith("mznc")
             },
         )
-        for (pred in priorities) candidates.firstOrNull(pred)?.let { return it }
-        return candidates.sortedBy { it.name }.first()
+        val ordered = candidates.sortedBy { it.path }
+        for (pred in priorities) ordered.firstOrNull(pred)?.let { return it }
+        return ordered.first()
     }
 
     /** Round-robin merge: iteration k takes element k from each list that still has one.
