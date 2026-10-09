@@ -116,6 +116,12 @@ def analyze(cases, control):
                             'max': max(values) if values else None}
         summaries[label] = {'planned': len(arm), 'outcomes': dict(Counter(category(c) for c in arm)),
                             'metrics': metrics,
+                            'elapsedMs': {'n': sum(r.get('elapsedMs') is not None for r in recorded),
+                                'median': statistics.median([r['elapsedMs'] for r in recorded if r.get('elapsedMs') is not None])
+                                    if any(r.get('elapsedMs') is not None for r in recorded) else None,
+                                'max': max((r['elapsedMs'] for r in recorded if r.get('elapsedMs') is not None), default=None)},
+                            'poolCardinality': dict(Counter(sum(k.startswith('arm.') for k in r.get('stats', {}))
+                                                          for r in recorded if r.get('command') != 'LOAD')),
                             'fingerprints': dict(Counter(r.get('buildFingerprint', 'missing') for r in recorded)),
                             'validationPolicies': dict(Counter(r.get('validationPolicy', 'missing') for r in recorded)),
                             'sourceValidation': dict(Counter(r.get('stats', {}).get('sourceValidation', 'absent')
