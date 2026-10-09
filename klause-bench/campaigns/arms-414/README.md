@@ -129,6 +129,14 @@ and repeated controls [883](http://192.168.50.104:8420/jobs/883). `jobs.json` re
 The measurement SHA stays frozen despite later formatting-only CI repairs. No result from an
 unfinished stage is a default recommendation.
 
+Oversubscription p1 job 881 is complete with 48/48 records and no failed commands. Its matched
+comparisons and source checks run in GitHub CI; the other 300-second stages remain in progress.
+
+These measurements belong to the recorded SHAs. Exact-arithmetic normalization and Boolean
+undo-lifetime fixes reached main during collection; rebasing the plumbing does not retrospectively
+include those changes in the campaign. A shipped policy change needs confirmation on an integrated
+build after construction budgeting #2328, with the same input bytes and held-out families.
+
 ## Identical-seed repeats
 
 Job 883 repeats seed 3 three times per configuration at 15 seconds. Knapsack reaches and proves

@@ -1,0 +1,10 @@
+$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+[i-04eb7e34e08d78f1c] reused the cached build of 52193ef90
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-0d5d81d954f282436] reused the cached build of 52193ef90
+WARNING: Using incubator modules: jdk.incubator.vector
+
+[i-05352bff9b29f50a0] reused the cached build of 52193ef90
+WARNING: Using incubator modules: jdk.incubator.vector
+
