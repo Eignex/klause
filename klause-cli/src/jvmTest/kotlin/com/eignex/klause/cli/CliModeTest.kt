@@ -409,6 +409,36 @@ class CliModeTest {
     }
 
     @Test
+    fun `open-only engine params are ignored on a model that takes the finite route`() {
+        val smt = File.createTempFile("finitewithopenparams", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (assert (>= x 2))
+                (assert (<= x 3))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture {
+            val args = arrayOf(
+                "-e",
+                "fixed",
+                "--param",
+                "open-branching=activity",
+                "--param",
+                "shared-restart=512",
+                smt.absolutePath,
+            )
+            assertEquals(0, runCli(args))
+        }
+
+        assertEquals("sat", out.lines().firstOrNull(), out)
+    }
+
+    @Test
     fun `an open theory hint allowance is off unless asked for and reports what it drew`() {
         val smt = File.createTempFile("clihint", ".smt2").apply {
             writeText(
