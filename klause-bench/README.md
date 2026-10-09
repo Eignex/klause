@@ -33,6 +33,14 @@ last rendered candidate, up to 8 MiB. A missing witness is not a validated assig
 are captured outside subprocess timing; legacy records and failed loads may omit them. AWS record
 files retain them even when a lab API built against an older schema omits them from its case view.
 
+Integer MiniZinc campaigns may opt in to the same final-witness source check with
+`param=source-validation=true`. The bench consumes this parameter before launching the CLI;
+checking remains outside the solve budget. Included files and the MiniZinc compiler
+are outside the original model/data hashes.
+`invalid` candidates lose solution/proof credit. Integer candidates with `unknown` checking
+remain reported witnesses and retain their checking status; checking a witness does not
+independently establish optimality or infeasibility. The default policy is unchanged.
+
 An existing output can be checked without solving again:
 
 ```
