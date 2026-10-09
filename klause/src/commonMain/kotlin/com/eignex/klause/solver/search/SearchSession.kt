@@ -68,6 +68,8 @@ class SearchSession(
     private var droppedClauses = 0L
     private var peakLearnedClauses = 0L
     private var glueClauses = 0L
+    private var assertingConflicts = 0L
+    private var nonAssertingConflicts = 0L
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.size
@@ -484,6 +486,7 @@ class SearchSession(
                     .sorted()
                     .toIntArray()
                 val backjump = levels.lastOrNull { it < conflictLevel } ?: 0
+                assertingConflicts++
                 return SearchConflictResolution.Backjump(
                     ExplainedLearnedConflict(SearchExplanation(clause.toIntArray()), backjump, levels),
                 )
@@ -503,6 +506,7 @@ class SearchSession(
      * non-asserting backjump would.
      */
     private fun retainUnasserting(clause: List<Int>): SearchConflictResolution {
+        nonAssertingConflicts++
         learn(SearchExplanation(clause.toIntArray()))
         return SearchConflictResolution.Chronological
     }
@@ -753,6 +757,8 @@ class SearchSession(
         learned.size.toLong(),
         peakLearnedClauses,
         learned.watchVisits,
+        assertingConflicts,
+        nonAssertingConflicts,
     )
 
     /** Retain a sound clause-form explanation for subsequent propagation. */

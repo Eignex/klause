@@ -436,6 +436,8 @@ class SearchSessionTest {
             SearchConflictResolution.Exhausted,
             session.explainedConflict(SearchExplanation(intArrayOf(1))),
         )
+        assertEquals(0L, session.learnedClauseStats().assertingConflicts)
+        assertEquals(0L, session.learnedClauseStats().nonAssertingConflicts)
     }
 
     @Test
@@ -955,6 +957,8 @@ class SearchSessionTest {
 
         val backjump = assertIs<SearchConflictResolution.Backjump>(resolution)
         assertEquals(1, backjump.conflict.decisionLevel)
+        assertEquals(1L, session.learnedClauseStats().assertingConflicts)
+        assertEquals(0L, session.learnedClauseStats().nonAssertingConflicts)
     }
 
     @Test
@@ -967,6 +971,8 @@ class SearchSessionTest {
 
         assertEquals(SearchConflictResolution.Chronological, resolution)
         assertEquals(1, session.learnedClauseCount, "an unasserting conflict is still retained")
+        assertEquals(0L, session.learnedClauseStats().assertingConflicts)
+        assertEquals(1L, session.learnedClauseStats().nonAssertingConflicts)
     }
 
     /** Publishes two literals without clauses once the second decision lands, explaining on demand. */

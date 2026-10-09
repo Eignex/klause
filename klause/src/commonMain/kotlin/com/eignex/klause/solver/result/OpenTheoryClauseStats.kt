@@ -18,6 +18,10 @@ data class OpenTheoryClauseStats(
     val peakRetained: Long = 0,
     /** Learned-clause watch entries inspected by propagation. */
     val watchVisits: Long = 0,
+    /** Shared conflicts resolved to an asserting first-UIP clause. */
+    val assertingConflicts: Long = 0,
+    /** Shared conflicts retained with chronological fallback because resolution could not make them asserting. */
+    val nonAssertingConflicts: Long = 0,
 ) {
     /** Combine counters from independent solve slices. */
     fun mergedWith(other: OpenTheoryClauseStats): OpenTheoryClauseStats = OpenTheoryClauseStats(
@@ -29,5 +33,7 @@ data class OpenTheoryClauseStats(
         retained + other.retained,
         maxOf(peakRetained, other.peakRetained),
         watchVisits + other.watchVisits,
+        assertingConflicts + other.assertingConflicts,
+        nonAssertingConflicts + other.nonAssertingConflicts,
     )
 }

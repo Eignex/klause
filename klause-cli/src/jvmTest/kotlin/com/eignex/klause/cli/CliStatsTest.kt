@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.LpPhaseStats
 import com.eignex.klause.solver.result.LpRouteSolveStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenHintStats
+import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
 import com.eignex.klause.solver.result.PortfolioStats
 import com.eignex.klause.solver.result.PresolveStats
@@ -37,6 +38,18 @@ class CliStatsTest {
         assertEquals("17", pairs["lpPhase_CLEANUP_STANDALONE_Work"])
         assertEquals("2", pairs["lpPhase_CLEANUP_STANDALONE_Pivots"])
         assertEquals("1", pairs["lpPhase_CLEANUP_STANDALONE_PIVOTS"])
+    }
+
+    @Test
+    fun `shared conflict coverage is visible in open theory stats`() {
+        val stats = SolveStats(
+            openTheoryClauses = OpenTheoryClauseStats(assertingConflicts = 7, nonAssertingConflicts = 3),
+        )
+
+        val pairs = openTheoryStatPairs(stats, 1L).toMap()
+
+        assertEquals("7", pairs["openAssertingConflicts"])
+        assertEquals("3", pairs["openNonAssertingConflicts"])
     }
 
     @Test
