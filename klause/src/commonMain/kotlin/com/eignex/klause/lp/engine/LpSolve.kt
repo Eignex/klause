@@ -139,6 +139,12 @@ internal fun solveAndCertify(
     floatAccept: ((FloatLpResult) -> Boolean)? = null,
     floatOffset: Double = 0.0,
 ): CertifiedLpResult {
+    if (floatAccept != null && workLimit == 0L && model.exactState == null && model.floatProjectionAuthoritative()) {
+        return solveProjectedAndCertify(
+            model, warm, cancellation, workLimit, componentSplit, observer, context, counterResults,
+            pricing, refinementLimits, floatAccept, floatOffset,
+        )
+    }
     val authoritative = if (model.exactState != null) {
         model
     } else {
@@ -163,6 +169,24 @@ internal fun solveAndCertify(
         refinementLimits, floatAccept,
         floatOffset,
     )
+    return sourceCertifiedResult(
+        model,
+        authoritative,
+        result,
+        cancellation,
+        counterResults,
+        context.certificationPolicy,
+    )
+}
+
+private fun sourceCertifiedResult(
+    model: LpModel,
+    authoritative: LpModel,
+    result: CertifiedLpResult,
+    cancellation: Cancellation,
+    counterResults: LpCounterResults?,
+    policy: LpCertificationPolicy,
+): CertifiedLpResult {
     if (result.floatOptimum != null) return result
     if (authoritative !== model) {
         if ((result.witness?.let { checkedLpWitness(model, it.primal) } == null && result.witness != null) ||
@@ -170,9 +194,69 @@ internal fun solveAndCertify(
         ) {
             return CertifiedLpResult(null, null, null, null, null, false, { null })
         }
-        counterResults?.remember(model, result, context.certificationPolicy)
+        counterResults?.remember(model, result, policy)
     }
     return result
+}
+
+// A faithful source projection supplies the same float candidate without allocating a trail or rational matrix.
+// A refusal imports authority for a warm solve and the proof ladder. A work-capped source keeps its single-pass
+// route: even a second warm factorization would consume part of that invocation's float allowance.
+private fun solveProjectedAndCertify(
+    model: LpModel,
+    warm: Basis?,
+    cancellation: Cancellation,
+    workLimit: Long,
+    componentSplit: Boolean,
+    observer: LpCertificationObserver?,
+    context: LpSolveContext,
+    counterResults: LpCounterResults?,
+    pricing: LpPricingOptions,
+    refinementLimits: LpRefinementLimits,
+    floatAccept: (FloatLpResult) -> Boolean,
+    floatOffset: Double,
+): CertifiedLpResult = newLpSolver(
+    model,
+    cancellation,
+    componentSplit,
+    context.engineFactory,
+    pricing,
+    workLimit,
+).use { solver ->
+    val result = try {
+        solver.solve(warm)
+    } finally {
+        observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
+    }
+    if (cancellation()) return@use CertifiedLpResult(null, null, null, null, null, false, { null })
+    var sourceRefused = false
+    if (result != null && result.optimal) {
+        val timer = LpPhaseTimer(observer, LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE)
+        val dualAccepted = floatDualFeasible(model, result, floatOffset)
+        val accepted = dualAccepted && floatAccept(result)
+        sourceRefused = dualAccepted && !accepted
+        timer.finish(if (accepted) "ACCEPTED" else "REFUSED")
+        if (accepted && !cancellation()) {
+            return@use CertifiedLpResult(result, null, null, null, null, false, { null }, floatOptimum = result)
+        }
+    }
+    if (cancellation()) return@use CertifiedLpResult(null, null, null, null, null, false, { null })
+    val timer = LpPhaseTimer(observer, LpSolvePhase.AUTHORITATIVE_IMPORT)
+    val authoritative = model.authoritativeModel()?.let { LpExactState(it).toWorkingModel() }
+    timer.finish(if (authoritative != null) "IMPORTED" else "DECLINED")
+    if (authoritative == null) return@use CertifiedLpResult(null, null, null, null, null, false, { null })
+    val counters = counterResults?.let { source ->
+        LpCounterResults().also { imported ->
+            source.read(model, context.certificationPolicy)?.let {
+                imported.remember(authoritative, it, context.certificationPolicy)
+            }
+        }
+    }
+    val certified = certifyAuthoritativeSolve(
+        authoritative, result?.basis ?: warm, cancellation, workLimit, componentSplit, observer, context, counters,
+        pricing, refinementLimits, floatAccept.takeUnless { sourceRefused }, floatOffset,
+    )
+    sourceCertifiedResult(model, authoritative, certified, cancellation, counterResults, context.certificationPolicy)
 }
 
 private fun certifyAuthoritativeSolve(
@@ -1123,8 +1207,8 @@ internal fun LpModel.finiteExactInput(): Boolean {
     if (rowPremises.any {
             it != null && (
                 it.vars.size != it.isUpper.size || it.vars.size != it.thresholds.size ||
-                it.vars.any { variable -> variable < 0 } || it.boolLits.any { literal -> literal < 0 }
-            )
+                    it.vars.any { variable -> variable < 0 } || it.boolLits.any { literal -> literal < 0 }
+                )
         }
     ) {
         return false

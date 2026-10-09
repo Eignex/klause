@@ -2,7 +2,14 @@ package com.eignex.klause.lp.engine
 
 import kotlin.time.TimeSource
 
-internal enum class LpSolvePhase { AUTHORITATIVE_IMPORT, FLOAT_ACCEPTANCE, EXACT_DUALS, CLEANUP, EXACT_LADDER }
+internal enum class LpSolvePhase {
+    AUTHORITATIVE_IMPORT,
+    SOURCE_FLOAT_ACCEPTANCE,
+    FLOAT_ACCEPTANCE,
+    EXACT_DUALS,
+    CLEANUP,
+    EXACT_LADDER,
+}
 
 internal data class LpPhaseMetrics(
     val phase: LpSolvePhase,
