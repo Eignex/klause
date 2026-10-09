@@ -26,7 +26,9 @@ class RevisedSimplexResidualsTest {
         val observer = object : LpCertificationObserver {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
             override fun observeExactInput(accepted: Boolean) = Unit
-            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) { scans += metrics.sourceResidualCalls }
+            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) {
+                scans += metrics.sourceResidualCalls
+            }
         }
 
         val result = solveAndCertify(model, observer = observer)
