@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 ROOT = Path(__file__).resolve().parent
 
@@ -44,7 +45,16 @@ def collect(job, server):
         data = fetch(f"{server}/jobs/{job}/files/{item['path']}")
         (target / item['path']).write_bytes(data)
         artifacts.append(dict(file=item['path'], sha256=hashlib.sha256(data).hexdigest()))
-    # Raw solver streams and installed/runtime manifests remain retrievable at these exact paths.
+    record_files = [x for x in listing if x['path'].startswith('cases/') and x['path'].endswith('/record.json')]
+    def record_file(item):
+        data = fetch(f"{server}/jobs/{job}/files/{item['path']}")
+        return item['path'].split('/')[1], json.loads(data)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        raw_records = dict(pool.map(record_file, record_files))
+    raw = json.dumps(raw_records, separators=(',', ':')).encode()
+    (target / 'raw-records.json.gz').write_bytes(gzip.compress(raw, mtime=0))
+    artifacts.append(dict(file='raw-records.json.gz', sha256=hashlib.sha256(raw).hexdigest()))
+    # Original record JSON retains fields that an older lab case schema can omit.
     manifest = dict(job=job, page=f'{server}/jobs/{job}', artifacts=artifacts,
                     raw_files=[dict(path=x['path'], bytes=x['bytes'],
                                     url=f"{server}/jobs/{job}/files/{x['path']}") for x in listing])

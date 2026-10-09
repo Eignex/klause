@@ -83,6 +83,10 @@ def time(rec, field):
 def analyze(job):
     folder = ROOT / 'evidence' / str(job)
     cases = read(folder / 'cases.json.gz')
+    raw = read(folder / 'raw-records.json.gz')
+    for case in cases:
+        if str(case['index']) in raw:
+            case['record'] = raw[str(case['index'])]
     jobdata = read(folder / 'job.json.gz')
     expected = [x['arm']['label'] for x in read(folder / 'arms.json.gz')]
     groups = defaultdict(list)
@@ -155,7 +159,9 @@ def analyze(job):
             disagreementCases=[x for x in matched if x['disagreement']],
             problemMeanQuality=statistics.mean(means) if means else None,
             problemBootstrap95=interval(means), cells=matched))
-    (folder / 'analysis.json').write_text(json.dumps(result, indent=2) + '\n')
+    (folder / 'analysis.json.gz').write_bytes(gzip.compress(json.dumps(result).encode(), mtime=0))
+    summary = dict(result, pairs=[{k: v for k, v in pair.items() if k != 'cells'} for pair in result['pairs']])
+    (folder / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
     for arm, summary in result['arms'].items():
         print(job, arm, summary['outcomes'], 'reseeds', sum(t['reseeds'] for t in summary['telemetry'].values()))
 
