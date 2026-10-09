@@ -1,0 +1,14 @@
+1791580440968 AWS refused another instance (VcpuLimitExceeded); trying again in 30 s
+1791580481499 launched c7i.2xlarge instances [i-00159038d52bf40f9]
+1791580502444 waiting for i-00159038d52bf40f9 to boot failed (try 1 of 45), retrying in 20 s: on 16.170.143.240 (exit 1): Warning: Permanently added 'klause-lab-eu-north-1-i-00159038d52bf40f9' (ED25519) to the list of known hosts.
+
+1791580524986 i-00159038d52bf40f9: booted; building 52193ef90
+1791580690654 i-00159038d52bf40f9: built
+1791580690655 i-00159038d52bf40f9: planning, which fetches the corpora the selections read
+1791580691677 selection 0 ('suite=mzn-bench' 'name=2017/city-position/city-5-05' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580692292 selection 1 ('suite=pb-comp' 'name=normalized-PB24/OPT-LIN/nordstrom/KNAP/profit_ceiling/normalized-knapPI_15_20_1000_2_-948' 'max=1' 'per-family=1', reference=any): 1 selected, 0 left out by the reference filter, 1 planned
+1791580692293 planned 2 problems × 4 arms = 24 cases, up to 0,1 h
+1791580692294 i-00159038d52bf40f9: compressing and pushing newly fetched corpora to s3://klause-lab-corpus-459222092693-eu-north-1
+1791580709346 running 2 problems on 1 instances, each taking the next problem as it has room
+1791580875747 i-00159038d52bf40f9 has no problems left to take: terminated
+1791580880967 job finished

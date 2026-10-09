@@ -115,7 +115,11 @@ its times are not campaign measurements.
 ## Submitted stages
 
 Witness pilot 873 is complete: 24/24 feasible records retain a final candidate and source hashes,
-covering both widths and both engines on all three formats. Baseline 875 and the split sweeps are
+covering both widths and both engines on all three formats. All eight MiniZinc candidates passed
+the pinned-source constraint and objective check in [CI run 37992827225](https://github.com/Eignex/klause/actions/runs/37992827225),
+with matching model/data hashes and no invalid or unknown verdict. Repeated controls 883 are also
+complete, with 24/24 records and no failed commands; their mining is pending the next CI update.
+Baseline 875 and the split sweeps are
 submitted: reseeding [879](http://192.168.50.104:8420/jobs/879) / [880](http://192.168.50.104:8420/jobs/880),
 oversubscription [881](http://192.168.50.104:8420/jobs/881) / [882](http://192.168.50.104:8420/jobs/882),
 and repeated controls [883](http://192.168.50.104:8420/jobs/883). `jobs.json` records exact submissions.
