@@ -571,8 +571,10 @@ final enum class com.eignex.klause.solver.result/TerminationReason : kotlin/Enum
 final enum class com.eignex.klause.solver.search/SearchLearnedDbPolicy : kotlin/Enum<com.eignex.klause.solver.search/SearchLearnedDbPolicy> { // com.eignex.klause.solver.search/SearchLearnedDbPolicy|null[0]
     enum entry Activity // com.eignex.klause.solver.search/SearchLearnedDbPolicy.Activity|null[0]
     enum entry GlueActivity // com.eignex.klause.solver.search/SearchLearnedDbPolicy.GlueActivity|null[0]
+    enum entry LbdActivity // com.eignex.klause.solver.search/SearchLearnedDbPolicy.LbdActivity|null[0]
     enum entry LbdUse // com.eignex.klause.solver.search/SearchLearnedDbPolicy.LbdUse|null[0]
     enum entry Tiered // com.eignex.klause.solver.search/SearchLearnedDbPolicy.Tiered|null[0]
+    enum entry UsedActivity // com.eignex.klause.solver.search/SearchLearnedDbPolicy.UsedActivity|null[0]
 
     final val entries // com.eignex.klause.solver.search/SearchLearnedDbPolicy.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.search/SearchLearnedDbPolicy> // com.eignex.klause.solver.search/SearchLearnedDbPolicy.entries.<get-entries>|<get-entries>#static(){}[0]

@@ -899,7 +899,12 @@ class SearchSessionTest {
 
     @Test
     fun `activity retention favors a relearned clause`() {
-        for (policy in listOf(SearchLearnedDbPolicy.Activity, SearchLearnedDbPolicy.GlueActivity)) {
+        for (policy in listOf(
+            SearchLearnedDbPolicy.Activity,
+            SearchLearnedDbPolicy.GlueActivity,
+            SearchLearnedDbPolicy.UsedActivity,
+            SearchLearnedDbPolicy.LbdActivity,
+        )) {
             val session = SearchSession(
                 emptyList(),
                 learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0, policy = policy),
@@ -935,6 +940,29 @@ class SearchSessionTest {
 
             assertEquals(3, session.learnedClauseCount, policy.id)
             assertEquals(true, session.boolValue(2), policy.id)
+        }
+    }
+
+    @Test
+    fun `hybrid retention keeps a clause that propagated below the root`() {
+        for (policy in listOf(SearchLearnedDbPolicy.UsedActivity, SearchLearnedDbPolicy.LbdActivity)) {
+            val session = SearchSession(
+                emptyList(),
+                learnedDb = SearchLearnedDbParams(maxClauses = 0, glueLbd = 0, policy = policy),
+            )
+            session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+            session.learn(SearchExplanation(intArrayOf(6, 8, 10)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+            assertEquals(true, session.boolValue(2), policy.id)
+
+            assertIs<ComponentResult.Consistent>(session.restart())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+
+            assertEquals(true, session.boolValue(2), policy.id)
+            assertEquals(1, session.learnedClauseCount, policy.id)
         }
     }
 

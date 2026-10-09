@@ -866,6 +866,9 @@ class SearchSession(
             val protected = learned.literalsAt(index).size <= 2 || handle in locked || when (learnedDb.policy) {
                 SearchLearnedDbPolicy.GlueActivity -> handle.lbd <= learnedDb.glueLbd
 
+                SearchLearnedDbPolicy.UsedActivity, SearchLearnedDbPolicy.LbdActivity ->
+                    handle.lbd <= learnedDb.glueLbd || learned.usedAt(index)
+
                 SearchLearnedDbPolicy.Tiered -> handle.lbd <= learnedDb.glueLbd ||
                     (handle.lbd <= MID_LBD && activity.epoch - handle.touched < MID_IDLE_REDUCTIONS)
 
@@ -874,7 +877,13 @@ class SearchSession(
             if (!protected) candidates.add(index)
         }
         val remaining = (cap - (learned.size - candidates.size)).coerceAtLeast(0)
-        candidates.sortWith(compareByDescending<Int> { requireNotNull(learned.handleAt(it)).activity }.thenBy { it })
+        val ranking = if (learnedDb.policy == SearchLearnedDbPolicy.LbdActivity) {
+            compareBy<Int> { requireNotNull(learned.handleAt(it)).lbd }
+                .thenByDescending { requireNotNull(learned.handleAt(it)).activity }
+        } else {
+            compareByDescending<Int> { requireNotNull(learned.handleAt(it)).activity }
+        }
+        candidates.sortWith(ranking.thenBy { it })
         val dropped = candidates.drop(remaining).toHashSet()
         learned.retain { it !in dropped }
         if (dropped.isNotEmpty()) reductions++

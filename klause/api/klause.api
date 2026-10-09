@@ -11224,8 +11224,10 @@ public final class com/eignex/klause/solver/search/SearchLearnedDbPolicy : java/
 	public static final field Activity Lcom/eignex/klause/solver/search/SearchLearnedDbPolicy;
 	public static final field Companion Lcom/eignex/klause/solver/search/SearchLearnedDbPolicy$Companion;
 	public static final field GlueActivity Lcom/eignex/klause/solver/search/SearchLearnedDbPolicy;
+	public static final field LbdActivity Lcom/eignex/klause/solver/search/SearchLearnedDbPolicy;
 	public static final field LbdUse Lcom/eignex/klause/solver/search/SearchLearnedDbPolicy;
 	public static final field Tiered Lcom/eignex/klause/solver/search/SearchLearnedDbPolicy;
+	public static final field UsedActivity Lcom/eignex/klause/solver/search/SearchLearnedDbPolicy;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getId ()Ljava/lang/String;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/search/SearchLearnedDbPolicy;

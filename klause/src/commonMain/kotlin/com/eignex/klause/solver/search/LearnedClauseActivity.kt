@@ -28,7 +28,7 @@ internal class LearnedClauseActivity(private val policy: SearchLearnedDbPolicy) 
         if (handle.activity > RESCALE_AT) rescale()
     }
 
-    fun analyzed(explanation: SearchExplanation, lbd: () -> Int) {
+    inline fun analyzed(explanation: SearchExplanation, lbd: () -> Int) {
         val handle = explanation.learnedHandle ?: return
         if (handle.owner !== this) return
         bump(handle)
