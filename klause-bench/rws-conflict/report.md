@@ -104,8 +104,12 @@ workflows run on each update; check its latest head through the PR's checks.
 The reproducer merged into main as `bc001bb90a10df3905cc04a6b009b92f1e956152`. The fix was
 rebased onto that commit as `4b8baad714d19ce5d144c3b3320f34984b5c08ed`; its entire Git tree
 is identical to the executed candidate's tree (`b209e2e169b693b6d4e7138bdc3db7f8edaf58ed`).
-This changes commit ancestry without changing the measured source or test. Fresh CI gates are
-required on the rebased PR head. The evidence layer remains a separate incremental report/audit diff.
+This changes commit ancestry without changing the measured source or test. Fresh JVM/native/lint/docs
+gates passed on that head in [CI 37991954533](https://github.com/Eignex/klause/actions/runs/37991954533),
+whose metadata is retained in `ci-fix-rebased.json`. The fix merged as
+`49faef15c325bf68b47641bb702d7c515a452721` and closed #2352. Intervening main changes add only
+unrelated benchmark evidence; the merged solver source still matches the executed candidate.
+The evidence layer remains a separate incremental report/audit diff.
 
 The lab HTTP records remain available. A separate `deploy/lab ssh 869 0` read attempted to check the
 AWS input hash during setup, but local SSH authentication to the lab server was denied (including
