@@ -269,6 +269,11 @@ is never overwritten. Equality rows coalesce consistency flips for the same indi
 ordinary repeated Boolean flips are interpreted by their final parity.
 Product definitions then maintain their outputs from the coordinated channel changes.
 Wider inputs and other row shapes retain their independent repair neighborhoods.
+Violated Table rows retain single-coordinate repairs and add at most two joint tuple
+repairs. Joint repairs and structured tuple jumps carry equality indicators and binary
+channels with every table coordinate protected from counter-shifts. A protected changed
+coordinate rejects the entire tuple move, preserving the chosen row's support; maintained
+columns decline tuple construction. The ordinary scorer grades the complete assignment.
 Cumulative overload repair can remove a maintained product duration through a unit
 binary equality channel and a unary equality choice predicate. It checks zero in the
 channel and duration domains, pins and implicit owners before proposing a complete
