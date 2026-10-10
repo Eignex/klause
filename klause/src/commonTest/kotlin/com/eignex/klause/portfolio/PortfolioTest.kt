@@ -23,6 +23,8 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.SearchInitializationCancelled
@@ -1140,6 +1142,80 @@ class PortfolioTest {
 
             assertEquals(expected, result.stats.portfolio.arms[0].work)
         }
+    }
+
+    @Test
+    fun `local search gets one prepared probe after an empty initialization turn`() {
+        for (optimizing in listOf(false, true)) {
+            var slices = 0
+            val search = object : InstructionSlicedSearch, ResumableSearch by TrackingResumableSearch(null) {
+                override val isDone: Boolean get() = slices >= 2
+                override val stats: SolveStats
+                    get() = SolveStats(ls = LocalSearchStats(moves = SumResult(if (slices >= 2) 1.0 else 0.0)))
+
+                override fun runInstructionSlice(
+                    global: Cancellation,
+                    sliceMillis: Long,
+                    sliceInstructions: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? = if (++slices == 1) null else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+            }
+            val solve = object : InstructionSlicedSolve, ResumableSolve by CountingResumableSolve(100) {
+                override val isDone: Boolean get() = slices >= 2
+                override val stats: SolveStats
+                    get() = SolveStats(ls = LocalSearchStats(moves = SumResult(if (slices >= 2) 1.0 else 0.0)))
+
+                override fun runInstructionSlice(
+                    global: Cancellation,
+                    sliceMillis: Long,
+                    sliceInstructions: Long,
+                ): SolveResult? = if (++slices == 1) null else SolveResult.Unknown(TerminationReason.BudgetExhausted)
+            }
+            val workers = if (optimizing) {
+                listOf(
+                    PortfolioWorker.ofMinimize("prepared", 0, countsInstructions = true, resumable = { search }) {
+                        _, _, _, _ -> error("one-shot optimization")
+                    },
+                    PortfolioWorker.ofMinimize("done", 1) { _, _, _, _ -> sequenceOf(MinimizeResult.Infeasible()) },
+                )
+            } else {
+                listOf(
+                    PortfolioWorker.ofSolve("prepared", 0, countsInstructions = true, resumable = { solve }) { _, _ ->
+                        error("one-shot solve")
+                    },
+                    PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
+                )
+            }
+
+            val stats = Portfolio.thompson(workers).use { if (optimizing) it.minimize().stats else it.solve().stats }
+
+            assertEquals(1.0, stats.ls.moves.sum, "optimizing=$optimizing")
+        }
+    }
+
+    @Test
+    fun `an empty prepared probe does not delay other arms again`() {
+        var slices = 0
+        val search = object : InstructionSlicedSearch, ResumableSearch by TrackingResumableSearch(null) {
+            override val isDone: Boolean get() = slices >= 3
+
+            override fun runInstructionSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceInstructions: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? = if (++slices < 3) null else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+        }
+        val workers = listOf(
+            PortfolioWorker.ofMinimize("prepared", 0, countsInstructions = true, resumable = { search }) {
+                _, _, _, _ -> error("one-shot optimization")
+            },
+            PortfolioWorker.ofMinimize("done", 1) { _, _, _, _ -> sequenceOf(MinimizeResult.Infeasible()) },
+        )
+
+        val result = Portfolio.thompson(workers).use { it.minimize() }
+
+        assertEquals(2L, result.stats.portfolio.arms[0].segments)
     }
 
     @Test

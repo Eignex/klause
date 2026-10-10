@@ -113,6 +113,9 @@ Boolean break/make vectors initialize on their first score query and are maintai
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Weighted compound probes snapshot and scan only factors whose degrees change, in
 factor-id order to retain the full-scan floating-point accumulation order.
+A local-search arm whose initial probe pauses without an instruction receives one
+base probe of its retained state before policy selection. Its preparation turn remains
+charged; a second empty probe does not extend exploration again.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
