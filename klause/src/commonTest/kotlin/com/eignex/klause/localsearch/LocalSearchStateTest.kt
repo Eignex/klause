@@ -40,6 +40,28 @@ class LocalSearchStateTest {
     )
 
     @Test
+    fun `states sharing a projection keep assignments and invariant payloads independent`() {
+        val model = LocalSearchModel.of(reifiedChannelingProblem().bake())
+        val projection = LocalSearchProblem(model.problem, model.domains)
+        val first = LocalSearchState(model, Random(1), projection = projection)
+        val second = LocalSearchState(model, Random(2), projection = projection)
+        for (state in listOf(first, second)) {
+            state.assignment.setInt(0, 0)
+            state.assignment.setBool(0, true)
+            state.recompute()
+        }
+        val cost = second.cost
+        val delta = second.netDelta(Move.IntSet(0, 1))
+
+        first.apply(Move.IntSet(0, 1))
+
+        assertTrue(first.cost > cost)
+        assertEquals(0L, second.assignment.intValue(0))
+        assertEquals(cost, second.cost)
+        assertEquals(delta, second.netDelta(Move.IntSet(0, 1)))
+    }
+
+    @Test
     fun `an objective variable's flip leaves the other objective variables' configuration as it was`() {
         // The model ties no variable to another; only the objective-bound overlay spans all three.
         val problem = Problem(3, 0, emptyArray<IntDomain>(), listOf(Clause(intArrayOf(Lit.make(0, true)))))
