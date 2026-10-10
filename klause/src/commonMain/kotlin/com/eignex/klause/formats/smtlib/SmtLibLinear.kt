@@ -116,7 +116,7 @@ private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
     val value = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
     return conditionalEqualities.reify(variable, value, this)?.also { literal ->
         if (intDomains[variable] is PresolveDomain.Finite) {
-            iteChains.noteAtom(literal, variable, value, allowsElement = false)
+            iteChains.noteAtom(literal, variable, value, allowsElement = !conditionalEqualities.isDefined(variable))
         }
     }
 }
@@ -129,6 +129,7 @@ private fun Compiler.Builder.noteEqAtom(lit: Int, op: LinearOp, coeffs: LongArra
     val c = coeffs[0]
     if (c != 1L && c != -1L) return
     if (c == -1L && bound == Long.MIN_VALUE) return
+    conditionalEqualities.rememberPrimitive(vars[0], bound * c, lit)
     if (intDomains[vars[0]] !is PresolveDomain.Finite) return
     iteChains.noteAtom(lit, vars[0], bound * c)
 }

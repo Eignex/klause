@@ -65,6 +65,12 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         if (factors.isNotEmpty()) booleanDefinitions[variable] = factors.toList()
     }
 
+    fun isDefined(variable: Int): Boolean = variable in definitions
+
+    fun rememberPrimitive(variable: Int, value: Long, literal: Int) {
+        if (variable !in definitions) equalities.putIfAbsent(Key(variable, value), literal)
+    }
+
     private fun constantImage(terms: List<LinComb>): Set<Long>? {
         val values = HashSet<Long>()
         for (term in terms) {
