@@ -22,6 +22,25 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `a constant conditional result completes without arithmetic predicate decisions`() {
+        for (guard in listOf("(<= x 0)", "(= x 0)")) {
+            val parsed = SmtLib.parse(
+                "(declare-const x Int) (assert (= (ite $guard 1 1) 1))",
+            )
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Satisfied>(
+                session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
+                guard,
+            )
+        }
+    }
+
+    @Test
     fun `a source Boolean retains a later arithmetic comparison after unused predicates are omitted`() {
         for (value in listOf(3, 4)) {
             val parsed = SmtLib.parse(
