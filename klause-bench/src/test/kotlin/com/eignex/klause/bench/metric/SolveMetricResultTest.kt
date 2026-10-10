@@ -9,6 +9,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SolveMetricResultTest {
+    @Test
+    fun `exact objective survives durable records and legacy records remain readable`() {
+        for (objective in listOf("9223372036854775808", "9007199254740993", "-1/3")) {
+            val record = rec(true, 1.0, 100, true).copy(exactObjective = objective)
+            val encoded = Reports.json.encodeToString(record)
+            val decoded = Reports.json.decodeFromString<SolveRecord>(encoded)
+            val legacy = JsonObject(Reports.json.parseToJsonElement(encoded).jsonObject - "exactObjective").toString()
+
+            assertEquals(objective, SolveMetric.resultRow("s", decoded, "cfg", null).exactObjective)
+            assertEquals(null, Reports.json.decodeFromString<SolveRecord>(legacy).exactObjective)
+        }
+    }
+
     private fun rec(feasible: Boolean?, objective: Double?, timeToBestMs: Long?, proven: Boolean) = SolveRecord(
         problem = "fam/inst",
         solver = "klause",
@@ -30,13 +43,14 @@ class SolveMetricResultTest {
 
     @Test
     fun `a source rejected result receives no solution or proof credit`() {
-        val record = rec(true, 1.001466, 100, true)
+        val record = rec(true, 1.001466, 100, true).copy(exactObjective = "500733/500000")
 
         val checked = record.sourceChecked(SourceValidation("invalid", "source contradiction"), approximation = false)
         val row = SolveMetric.resultRow("s", checked, "cfg", null)
 
         assertEquals(null, row.feasible)
         assertEquals(null, row.objective)
+        assertEquals(null, row.exactObjective)
         assertEquals(false, row.proven)
         assertEquals(10_000, row.elapsedMs)
         assertEquals("1.001466", checked.stats["reportedObjective"])

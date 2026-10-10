@@ -139,10 +139,17 @@ Analysis prefers witness time, then valid reported `stats.solveTime` in seconds,
 then elapsed time, then the budget. Undecided runs retain the budget penalty.
 
 SMT-LIB optimization records consume the CLI's objective comments and retain its
-terminal `optimizationStatus` in `stats`. An optimum requires `sat`, a finite objective
+terminal `optimizationStatus` in `stats`. An optimum requires `sat`, a valid exact objective
 and explicit `optimal` status. Plain `sat`, interrupted incumbents (`best-found`) and
 unbounded objectives receive no optimality proof credit; an unbounded record's objective
 belongs to its feasible witness.
+
+Parsed objectives retain canonical integer or reduced rational text in `exactObjective`.
+The legacy numeric `objective` remains an approximate display channel and can be null
+when the value exceeds binary64 range. JSON caches and CSV references retain both
+channels; comparison and reference replacement prefer exact values and fall back to
+legacy numeric values only when exact text is absent. Malformed exact values cannot
+receive objective credit. Cache keys include the objective representation version.
 
 Records retain plain model/data `sourceHashes` and the final rendered candidate
 as `finalWitness`, up to 8 MiB. These captures are outside subprocess timing.
