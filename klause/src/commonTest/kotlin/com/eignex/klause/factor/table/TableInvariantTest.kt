@@ -1,15 +1,116 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TableInvariantTest {
+
+    @Test
+    fun `an implicitly owned table can enter an interval support`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 3) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(3, 3, 0, 0), longArrayOf(3, 3, 2, 2))),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+        state.seedImplicitFeasible()
+        state.recompute()
+        assertEquals(3L, state.assignment.intValue(0))
+        assertEquals(3L, state.assignment.intValue(1))
+        state.moveSink.proposer = 0
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+        val move = state.moveSink.list.first()
+        state.apply(move)
+        assertTrue(state.assignment.intValue(0) in 0L..2L)
+        assertTrue(state.assignment.intValue(1) in 0L..2L)
+        assertFalse(state.factors[0].isViolated(state, 0))
+    }
+
+    @Test
+    fun `a wildcard coordinate remains searchable in an owned single row table`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 3) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(3, Long.MIN_VALUE), longArrayOf(3, Long.MAX_VALUE))),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+        state.seedImplicitFeasible()
+        state.recompute()
+        state.moveSink.proposer = 0
+
+        state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+        val move = state.moveSink.list.first()
+        state.apply(move)
+        assertEquals(3L, state.assignment.intValue(0))
+        assertTrue(state.assignment.intValue(1) in 1L..3L)
+        assertFalse(state.factors[0].isViolated(state, 0))
+    }
+
+    @Test
+    fun `repeated coordinates use a joint support value outside domain holes`() {
+        for (reachable in listOf(true, false)) {
+            var domain = IntDomain(0, 6).excludeValue(2).excludeValue(3)
+            if (!reachable) domain = domain.excludeValue(4)
+            val state = LocalSearchState(Problem(0, 1, arrayOf(domain), emptyArray()).bake(), Random(0))
+            state.assignment.setInt(0, 0)
+
+            val parts = tableBuildTupleMove(state, intArrayOf(0, 0), longArrayOf(0, 2), 2, longArrayOf(4, 4), 0)
+
+            if (reachable) assertEquals(listOf(Move.IntSet(0, 4)), assertNotNull(parts)) else assertNull(parts)
+        }
+    }
+
+    @Test
+    fun `an unreachable pinned support leaves the seed assignment untouched`() {
+        val problem = Problem(
+            0, 2, Array(2) { IntDomain(0, 3) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 3), longArrayOf(1, 3))),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0), Assumptions(ints = mapOf(1 to 2L)))
+        state.assignment.setInt(0, 2)
+        state.assignment.setInt(1, 2)
+        val before = state.assignment.snapshot()
+
+        val seeded = state.factors[0].seedFeasible(state, 0)
+
+        assertFalse(seeded)
+        assertEquals(before, state.assignment.snapshot())
+    }
+
+    @Test
+    fun `a table reading a defined integer declines implicit seeding`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 9)),
+            arrayOf<Factor>(
+                Product(0, 1, 2),
+                Table(intArrayOf(0, 2), longArrayOf(1, 1, 0, 0), longArrayOf(1, 1, 3, 9)),
+            ),
+        )
+        val state = LocalSearchState(problem.bake(), Random(0))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
+            .network(problem.numIntVars, problem.numBoolVars)
+        val before = state.assignment.snapshot()
+
+        val seeded = state.factors[1].seedFeasible(state, 1)
+
+        assertFalse(seeded)
+        assertEquals(before, state.assignment.snapshot())
+    }
 
     @Test
     fun `delta is negative when move brings assignment closer to a tuple`() {

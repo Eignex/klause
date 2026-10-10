@@ -161,6 +161,11 @@ coordinate repairs. Its tabu/activity epoch resets on both completion and cancel
 one variable's bounded value probes remain atomic.
 Its coordinate eligibility uses the generic move sink's pinned, defined and implicit-owner
 filters, preserving seeded globals and one-way definitions during repair.
+Implicit table moves select values from each support row intersected with root domains.
+Interval and wildcard cells remain searchable, including single-row supports; repeated
+variables use the intersection of all their cells. Frozen coordinates retain their values;
+tables reading defined integers decline implicit seeding and moves because a definition
+can rewrite them outside the chosen row. An unreachable row produces no partial move or seed.
 Built-in initial random restarts apply implicit seeding and the definition sweep
 before initializing factor costs, avoiding an evaluation of the intermediate
 random assignment. Custom restart policies retain their ordinary restart protocol.

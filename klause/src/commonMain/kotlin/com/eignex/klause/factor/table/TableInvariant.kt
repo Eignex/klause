@@ -1,6 +1,9 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.table.internals.TableLsState
+import com.eignex.klause.ir.ceilingOrNull
+import com.eignex.klause.ir.floorOrNull
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -71,7 +74,7 @@ internal class TableInvariant(
     override val providesImplicitNeighbourhood: Boolean get() = true
 
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
-        if (numTuples < 2) return
+        if (numTuples < 2 && hi == null) return
         var emitted = 0
         var attempts = 0
         while (emitted < TABLE_STRUCTURED_JUMP_CAP &&
@@ -79,7 +82,7 @@ internal class TableInvariant(
         ) {
             attempts++
             val row = state.rng.nextInt(numTuples)
-            val parts = tableBuildTupleMove(state, xs, tuples, arity, hi, row) ?: continue
+            val parts = tableBuildTupleMove(state, xs, tuples, arity, hi, row, randomize = true) ?: continue
             if (parts.isEmpty()) continue
             sink.addCompound(parts)
             emitted++
@@ -88,45 +91,8 @@ internal class TableInvariant(
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         for (row in 0 until numTuples) {
-            val base = row * arity
-            var usable = true
-            for (col in 0 until arity) {
-                // Wildcards impose nothing; only a point cell can be landed on exactly, so a table with
-                // interval cells is seeded only via its point rows (a heuristic, not a correctness path).
-                if (tableCellIsFree(tuples, hi, arity, row, col)) continue
-                if (!tableCellIsPoint(tuples, hi, arity, row, col)) {
-                    usable = false
-                    break
-                }
-                val v = xs[col]
-                val target = tuples[base + col]
-                if (target !in state.rootDomains[v]) {
-                    usable = false
-                    break
-                }
-                if (state.assumptions.isFrozenInt(v) && state.assignment.intValue(v) != target) {
-                    usable = false
-                    break
-                }
-                var conflict = false
-                for (prev in 0 until col) {
-                    if (tableCellIsFree(tuples, hi, arity, row, prev)) continue
-                    if (xs[prev] == v && tuples[base + prev] != target) {
-                        conflict = true
-                        break
-                    }
-                }
-                if (conflict) {
-                    usable = false
-                    break
-                }
-            }
-            if (!usable) continue
-            for (col in 0 until arity) {
-                if (!tableCellIsPoint(tuples, hi, arity, row, col)) continue
-                val v = xs[col]
-                if (!state.assumptions.isFrozenInt(v)) state.assignment.setInt(v, tuples[base + col])
-            }
+            val parts = tableBuildTupleMove(state, xs, tuples, arity, hi, row) ?: continue
+            for (part in parts) state.assignment.setInt(part.varId, part.newValue)
             return true
         }
         return false
@@ -202,8 +168,7 @@ internal fun tableRescanForChange(
     return minD
 }
 
-/** Build the set-moves that land [xs] exactly on tuple [row], or null when unreachable. Only point
- *  and wildcard cells are landable exactly, so a tuple with an interval cell is skipped. */
+// Repeated occurrences must choose one value from the intersection of all their cells.
 internal fun tableBuildTupleMove(
     state: LocalSearchState,
     xs: IntArray,
@@ -211,34 +176,45 @@ internal fun tableBuildTupleMove(
     arity: Int,
     hi: LongArray?,
     row: Int,
-): List<Move>? {
-    val base = row * arity
+    randomize: Boolean = false,
+): List<Move.IntSet>? {
+    val parts = ArrayList<Move.IntSet>(arity)
     for (col in 0 until arity) {
-        if (tableCellIsFree(tuples, hi, arity, row, col)) continue
-        if (!tableCellIsPoint(tuples, hi, arity, row, col)) return null
-        val v = xs[col]
-        val target = tuples[base + col]
-        if (target !in state.rootDomains[v]) return null
-        for (prev in 0 until col) {
-            if (tableCellIsFree(tuples, hi, arity, row, prev)) continue
-            if (xs[prev] == v && tuples[base + prev] != target) return null
-        }
-    }
-    val parts = ArrayList<Move>(arity)
-    for (col in 0 until arity) {
-        if (!tableCellIsPoint(tuples, hi, arity, row, col)) continue
         val v = xs[col]
         var dup = false
         for (prev in 0 until col) {
-            if (!tableCellIsPoint(tuples, hi, arity, row, prev)) continue
             if (xs[prev] == v) {
                 dup = true
                 break
             }
         }
         if (dup) continue
-        val target = tuples[base + col]
-        if (state.assignment.intValue(v) != target) parts.add(Move.IntSet(v, target))
+        // An input move can rewrite a defined coordinate through its cone, outside the chosen row.
+        if (state.invariants?.isDefinedInt(v) == true) return null
+        val domain = state.rootDomains[v]
+        var lo = domain.min
+        var upper = domain.max
+        for (other in col until arity) {
+            if (xs[other] != v) continue
+            lo = maxOf(lo, tableCellLo(tuples, arity, row, other))
+            upper = minOf(upper, tableCellHi(tuples, hi, arity, row, other))
+        }
+        if (lo > upper) return null
+        val first = domain.ceilingOrNull(lo)?.takeIf { it <= upper } ?: return null
+        val current = state.assignment.intValue(v)
+        val target = when {
+            state.assumptions.isFrozenInt(v) -> {
+                if (current !in lo..upper || current !in domain) return null
+                current
+            }
+            randomize && first < upper -> {
+                val last = domain.floorOrNull(upper) ?: return null
+                domain.withMinAtLeast(first).withMaxAtMost(last).randomValue(state.rng)
+            }
+            current in lo..upper && current in domain -> current
+            else -> first
+        }
+        if (current != target) parts.add(Move.IntSet(v, target))
     }
     return parts
 }
