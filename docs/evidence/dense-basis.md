@@ -35,12 +35,23 @@ A host-specific kernel win does not establish a complete-solver speedup or an
 improvement on every supported runtime. The rule must not be enlarged based on
 synthetic timing alone.
 
-Matched exact MPS source controls used pinned sparse main and the selected path,
-one processor, seed 1, a ten-second budget and five repeats. All 30 paired blocks
-on the six maintained MPS/component fixtures matched source hashes, acceptance
-policy, verdict, proof status and exact objective. An independent rational parser
-checked 50 final witnesses against original rows, bounds and integrality; direct
-enumeration checked the tiny objective optimum, and intersected singleton rows
-checked the tiny contradiction (20 repeated proof checks across both arms).
-Installed-build hashes remain in the external case records. These controls
-establish preserved outcomes on that selection, without a timing-gain claim.
+Matched source controls on macOS arm64 compared pinned sparse main
+`8a270e0a` with selected-path revision `86008bdc`, using one processor, seed 1,
+a ten-second budget and five repeats. The exact MPS selection comprised the six
+maintained MPS/component fixtures plus `markshare1` and `22433`: all 40 paired
+blocks preserved source hashes, acceptance policy, verdict and proof status, with
+no worse incumbent or changed proven objective. `markshare1` remained unproved;
+one selected repeat improved its incumbent from 119 to 88. Both arms left `22433`
+unknown. These budget outcomes do not establish new proofs.
+
+A separate default-MPS selection forced the existing `lp-default` backtracking
+arm on the three real MIPLIB models. All 15 paired blocks matched incumbent and
+proof status while exercising hundreds to thousands of node LP solves per run.
+The exact and default policies are compared only within their respective pairs.
+An independent rational parser checked all 90 final witnesses from the two
+selections against original rows, bounds, integrality and objectives. Direct
+enumeration checked the tiny optimum, and intersected singleton rows checked the
+tiny contradiction (20 repeated proof checks across both arms). Every case
+completed and retained installed-build provenance; failed worker setup attempts
+were excluded. These controls establish preserved outcomes on the selections,
+without a complete-solver timing-gain claim.
