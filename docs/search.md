@@ -360,10 +360,12 @@ SAT guard and conflict-driven core. A curated sequential mixed optimization pool
 with at least six configured slots appends an applicable default LP arm when its
 configured backtrack slots have not admitted it. The appended arm follows the
 configured workers and auxiliary ALNS arm, retaining their positions and seeds.
+When the objective has no continuous coefficient, the auxiliary LP arm joins after
+the first incumbent, retaining the incumbent workers' initial pool.
 LP ceilings that disable bounding omit the auxiliary LP arm and its reservation.
 Explicit arm pools control admission and techniques. Curated
 single-core mixed optimization reserves half the scheduled time for this LP arm
-on continuous-column models until the first incumbent. Individual segments retain
+when the objective has a continuous coefficient, until the first incumbent. Individual segments retain
 work charging and time caps; the remaining time follows the bandit. After the first
 incumbent, all scheduled time follows the bandit. Explicit backtrack pools and parallel
 lanes retain their requested scheduling.

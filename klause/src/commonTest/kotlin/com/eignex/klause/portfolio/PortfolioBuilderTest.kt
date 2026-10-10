@@ -9,9 +9,11 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -57,7 +59,8 @@ class PortfolioBuilderTest {
     fun `the default continuous optimization pool appends node LP after its incumbent workers`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
 
-        val workers = PortfolioBuilder.build(continuous, scenario)
+        val workers = PortfolioBuilder.build(continuous, scenario,
+            objective = LinearObjective(realCoefficients = doubleArrayOf(1.0)))
 
         try {
             assertEquals(
@@ -66,6 +69,20 @@ class PortfolioBuilderTest {
             )
             assertEquals(4, workers.count { it.family == ArmFamily.LocalSearch })
             assertEquals("bt/lp-default", workers.last().label)
+            assertFalse(workers.last().improvementOnly)
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `an auxiliary LP worker waits for a finite objective incumbent`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val workers = PortfolioBuilder.build(continuous, scenario,
+            objective = LinearObjective(intCoefficients = longArrayOf(1L)))
+
+        try {
+            assertEquals(listOf("bt/lp-default"), workers.filter { it.improvementOnly }.map { it.label })
         } finally {
             workers.forEach { it.close() }
         }

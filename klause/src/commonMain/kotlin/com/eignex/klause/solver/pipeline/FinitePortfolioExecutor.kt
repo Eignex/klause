@@ -48,7 +48,7 @@ fun FinitePipeline.portfolioExecutor(
         phaseRetention = scenario.phaseRetention,
         reseedStaleThreshold = scenario.reseedStaleThreshold,
         profile = profile,
-        minShares = continuousLpShares(scenario, profile, workers.map { it.label }),
+        minShares = continuousLpShares(scenario, profile, workers.map { it.label }, objective),
         onFault = onFault,
     ).also {
         it.reserveBeforeIncumbentOnly = true
@@ -66,14 +66,16 @@ internal fun continuousLpShares(
     scenario: PortfolioScenario,
     profile: ProblemProfile,
     labels: List<String>,
+    objective: LinearObjective?,
 ): DoubleArray {
+    if (objective?.realCoefficients?.any { it != 0.0 } != true) return DoubleArray(0)
     if (!LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return DoubleArray(0)
     if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.engine != EngineMix.MIXED ||
         !profile.realColumns || scenario.btPool != null || scenario.lsPool != null
     ) return DoubleArray(0)
     val lp = labels.indexOf("bt/lp-default")
     if (lp < 0) return DoubleArray(0)
-    // LP is the complete arm that propagates continuous rows. Its expensive first solves can
+    // LP is the complete arm that optimizes continuous objective columns. Its expensive first solves can
     // outweigh several cheap slices before it reaches a witness, so reserve time for that descent.
     return DoubleArray(labels.size).also { it[lp] = 0.5 }
 }

@@ -230,12 +230,17 @@ internal object PortfolioComposition {
     internal fun plan(scenario: PortfolioScenario, facts: ProblemFacts): PortfolioArmPlan {
         val composed = compose(scenario, facts)
         if (scenario.cores != 1 || scenario.engine != EngineMix.MIXED || scenario.kind != Kind.COP ||
-            scenario.arms <= PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null || scenario.btPool != null
+            scenario.arms < PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null || scenario.btPool != null
         ) {
             return PortfolioArmPlan(composed, composed.size)
         }
         // Keep the small pool's positions: materialization derives each arm's seed from its position.
-        val small = compose(scenario.copy(arms = PortfolioScenario.DEFAULT_ARMS), facts)
+        val small = compose(scenario.copy(arms = PortfolioScenario.DEFAULT_ARMS), facts).let { arms ->
+            // A finite objective can seed through incumbent workers without reserving continuous descent.
+            if (!facts.continuousObjective && arms.size > PortfolioScenario.DEFAULT_ARMS &&
+                arms.last().label == "lp-default"
+            ) arms.dropLast(1) else arms
+        }
         val remaining = composed.toMutableList()
         val first = small.mapNotNull { arm ->
             val index = remaining.indexOfFirst { it::class == arm::class && it.label == arm.label }

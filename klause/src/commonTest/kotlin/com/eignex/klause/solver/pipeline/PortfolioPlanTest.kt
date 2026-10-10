@@ -10,6 +10,7 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,7 +25,8 @@ class PortfolioPlanTest {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
 
-        val shares = continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed"))
+        val shares = continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed"),
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)))
 
         assertEquals(listOf(0.0, 0.5, 0.0), shares.toList())
     }
@@ -34,6 +36,7 @@ class PortfolioPlanTest {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
         val labels = listOf("bt/satOptimized", "bt/lp-default")
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val scenarios = listOf(
             scenario.copy(cores = 2),
             scenario.copy(kind = Kind.CSP),
@@ -43,9 +46,21 @@ class PortfolioPlanTest {
             scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") }),
         )
 
-        for (explicit in scenarios) assertTrue(continuousLpShares(explicit, profile, labels).isEmpty())
-        assertTrue(continuousLpShares(scenario, profile.copy(problemClass = ProblemClass.FiniteCp), labels).isEmpty())
-        assertTrue(continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/conflictDriven")).isEmpty())
+        for (explicit in scenarios) assertTrue(continuousLpShares(explicit, profile, labels, objective).isEmpty())
+        assertTrue(continuousLpShares(scenario, profile.copy(problemClass = ProblemClass.FiniteCp), labels, objective).isEmpty())
+        assertTrue(continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/conflictDriven"), objective).isEmpty())
+    }
+
+    @Test
+    fun `finite objectives keep unreserved scheduling with continuous constraints`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
+        val labels = listOf("bt/satOptimized", "bt/lp-default")
+
+        for (objective in listOf(null, LinearObjective(intCoefficients = longArrayOf(1L)),
+            LinearObjective(realCoefficients = doubleArrayOf(0.0)))) {
+            assertTrue(continuousLpShares(scenario, profile, labels, objective).isEmpty())
+        }
     }
 
     @Test
