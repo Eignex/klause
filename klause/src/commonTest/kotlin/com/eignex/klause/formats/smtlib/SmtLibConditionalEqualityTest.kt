@@ -21,6 +21,31 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `a decision list over a symbolic selector completes without numeric predicate decisions`() {
+        for (branch in listOf(true, false)) {
+            val chain = (0..15).toList().foldRight("99") { key, rest -> "(ite (= selector $key) $key $rest)" }
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool)
+                (assert ${if (branch) "b" else "(not b)"})
+                (assert (let ((selector (ite b 7 12))) (let ((result $chain)) (= result ${if (branch) 7 else 12}))))
+                """.trimIndent(),
+            )
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Satisfied>(
+                session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
+            )
+
+            assertEquals(branch, session.boolValue(parsed.boolVarNames.getValue("b")))
+        }
+    }
+
+    @Test
     fun `a determined conditional comparison completes without Boolean decisions`() {
         val parsed = SmtLib.parse(
             "(declare-const b Bool) (assert (= (ite b 1 2) 1))",

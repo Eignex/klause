@@ -114,7 +114,9 @@ private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
     } ?: return null
     val value = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
     return conditionalEqualities.reify(variable, value, this)?.also { literal ->
-        if (intDomains[variable] is PresolveDomain.Finite) iteChains.noteAtom(literal, variable, value)
+        if (intDomains[variable] is PresolveDomain.Finite) {
+            iteChains.noteAtom(literal, variable, value, allowsElement = false)
+        }
     }
 }
 
