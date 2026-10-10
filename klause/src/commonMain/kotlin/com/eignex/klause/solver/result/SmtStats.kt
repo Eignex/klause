@@ -161,10 +161,10 @@ internal class SmtStatsSink {
     fun snapshot(): SmtStats {
         diagnosticCounters?.invoke()
         return SmtStats(
-        conflicts, explainedConflicts, unexplainedConflicts, conflictLiterals,
-        reductionRequests, reductionCacheHits, reductionAccepted, reductionDeclined, reductionNs,
-        witnessCandidates, witnessAccepted, strictWitnessCandidates, strictWitnessAccepted,
-        wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp,
+            conflicts, explainedConflicts, unexplainedConflicts, conflictLiterals,
+            reductionRequests, reductionCacheHits, reductionAccepted, reductionDeclined, reductionNs,
+            witnessCandidates, witnessAccepted, strictWitnessCandidates, strictWitnessAccepted,
+            wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp,
         )
     }
 }
