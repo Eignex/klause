@@ -21,7 +21,9 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     override val consumesIntEventDelta: Boolean = true
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        state.propagatorFailures[this] ?: fixedSubtour(state)?.let { cycle -> Reason(state).apply { for (v in cycle) fixedVar(v) }.build() }
+        state.propagatorFailures[this] ?: fixedSubtour(state)?.let { cycle ->
+            Reason(state).apply { for (v in cycle) fixedVar(v) }.build()
+        }
             ?: collectHoleAndBoundAntecedents(state, succ)
 
     private fun fail(reason: Reason): Boolean {

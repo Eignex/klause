@@ -345,7 +345,8 @@ internal class GlobalCardinalityPropagator(
                 if (definite[k] > state.intDomains[cv].min &&
                     !state.tightenIntMin(cv, definite[k].toLong(), pinnedReason(state, effectiveXs, k).build())
                 ) {
-                    state.propagatorFailures[this] = pinnedReason(state, effectiveXs, k).apply { countBounds(k) }.build()
+                    state.propagatorFailures[this] =
+                        pinnedReason(state, effectiveXs, k).apply { countBounds(k) }.build()
                     return false
                 }
                 if (possible[k] < state.intDomains[cv].max &&
@@ -549,7 +550,8 @@ internal class GlobalCardinalityPropagator(
             val obtained = flow.maxFlow(superSource, superSink)
             if (obtained < requiredSSFlow) {
                 val reach = flow.residualReachable(superSource)
-                state.propagatorFailures[this] = cutReason(state, effectiveXs, reach, otherNode, xToOtherEdgeIdx).build()
+                state.propagatorFailures[this] =
+                    cutReason(state, effectiveXs, reach, otherNode, xToOtherEdgeIdx).build()
                 return false
             }
             // Persist the just-established flow so later fires reuse it without a rebuild or replay.

@@ -115,7 +115,8 @@ internal class ElementPropagator(
         collectHoleAndBoundAntecedents(state, intArrayOf(v))
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        (if (arrIsVars) state.propagatorFailures[this] else constantConflictReason(state)) ?: collectHoleAndBoundAntecedents(state, intVars)
+        (if (arrIsVars) state.propagatorFailures[this] else constantConflictReason(state))
+            ?: collectHoleAndBoundAntecedents(state, intVars)
 
     // Some position must be live in idx with its constant live in result, so the conflict cites, per position,
     // why it is not: idx's bound past it, its own hole, or its constant's absence from result. Null when a

@@ -112,7 +112,8 @@ internal class ValuePrecedePropagator(
             // A t at position firstForcedT needs an s before it.
             val pinnedT = Lit.make(state.atomVarEq(xs[firstForcedT], t), false)
             if (count == 0) {
-                state.propagatorFailures[this] = sBefore(state, firstForcedT, -1, state.undo.size).also { it.add(pinnedT) }.toIntArray()
+                state.propagatorFailures[this] =
+                    sBefore(state, firstForcedT, -1, state.undo.size).also { it.add(pinnedT) }.toIntArray()
                 return false
             }
             if (count == 1) {
