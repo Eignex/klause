@@ -57,8 +57,8 @@ internal class SmtLibConditionalEquality {
         sourceIntegers: Collection<Int>,
         sourceBooleans: Collection<Int>,
         objective: LinearObjectiveSpec?,
-    ) {
-        if (definitions.isEmpty()) return
+    ): Set<Int> {
+        if (definitions.isEmpty()) return emptySet()
         val owners = HashMap<Factor, Int>()
         val predicateOwners = HashMap<Int, Int>()
         for ((variable, definition) in definitions) {
@@ -91,6 +91,7 @@ internal class SmtLibConditionalEquality {
         for ((predicate, owner) in predicateOwners) {
             if (owner !in retained) factors.add(Clause(intArrayOf(Lit.make(predicate, false))))
         }
+        return definitions.keys.filterTo(HashSet()) { it !in retained }
     }
 
     fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {
