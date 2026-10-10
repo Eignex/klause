@@ -24,7 +24,7 @@ class OznApplier(oznSource: String) {
 
     private fun renderValues(program: FlatZincProgram, sample: FlatZincValues): String {
         val rendered = evaluator.render(extractBindings(program, sample))
-        val coordinates = writeFlatZincExactCoordinates(program, sample)
+        val coordinates = writeFlatZincExactCoordinates(program, sample, outputObjective = true)
         return rendered.removeSuffix("----------\n") + coordinates + "----------\n"
     }
 

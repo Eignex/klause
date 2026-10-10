@@ -37,7 +37,7 @@ class FlatZincSolutionWriterTest {
 
     @Test
     fun `output model rendering preserves authoritative coordinates`() {
-        val program = parseFlatZinc("var float: x; solve satisfy;", exactFloats = true)
+        val program = parseFlatZinc("var float: x; solve minimize x;", exactFloats = true)
         val third = BigFraction.of(bigIntOf(1), bigIntOf(3))
         val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(third.toDouble()), listOf(third))
         val applier = OznApplier("float: x; output [show(x)];")
@@ -45,6 +45,7 @@ class FlatZincSolutionWriterTest {
         val output = applier.render(program, sample)
 
         assertTrue("% klause-exact: x = 1/3;\n" in output)
+        assertTrue("% klause-exact: _objective = 1/3;\n" in output)
         assertTrue(output.endsWith("----------\n"))
     }
 
