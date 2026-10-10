@@ -5,10 +5,55 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
+import kotlin.time.TimeSource
 
 class CancellationTest {
+    @Test
+    fun `adjacent monotonic deadlines stop before following predicates`() {
+        for (reverse in listOf(false, true)) {
+            val now = TimeSource.Monotonic.markNow()
+            val future = Cancellation.until(now + 10.minutes)
+            val expired = Cancellation.until(now - 10.minutes)
+            val clocks = if (reverse) expired or future else future or expired
+            val visited = ArrayList<Int>()
+            val token = (Cancellation { visited += 1; false } or clocks) or Cancellation { visited += 2; false }
+
+            assertTrue(token())
+
+            assertEquals(listOf(1), visited)
+        }
+    }
+
+    @Test
+    fun `adjacent monotonic deadlines retain the earliest deadline snapshot`() {
+        for (reverse in listOf(false, true)) {
+            val now = TimeSource.Monotonic.markNow()
+            val early = now + 1.minutes
+            val late = now + 2.minutes
+            val first = Cancellation.until(if (reverse) late else early)
+            val second = Cancellation.until(if (reverse) early else late)
+
+            val token = first or second
+
+            assertEquals(early, token.deadline())
+        }
+    }
+
+    @Test
+    fun `predicates between monotonic deadlines retain their evaluation order`() {
+        val now = TimeSource.Monotonic.markNow()
+        val visited = ArrayList<Int>()
+        val token = ((Cancellation.until(now + 10.minutes) or Cancellation { visited += 1; false }) or
+            Cancellation.until(now - 10.minutes)) or Cancellation { visited += 2; false }
+
+        assertTrue(token())
+
+        assertEquals(listOf(1), visited)
+    }
+
     @Test
     fun `both polling surfaces observe rearmed adapter deadlines`() {
         for (direct in listOf(false, true)) {

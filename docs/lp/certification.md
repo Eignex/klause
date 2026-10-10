@@ -150,7 +150,10 @@ resource caps are checked on every charge, work-metered tokens remain immediate,
 and publication checks cancellation directly. Cancelled evidence is discarded.
 `shorten(fraction)` only divides remaining time when the token exposes a deadline.
 Dynamic adapters keep deadline reads live; ordered composition snapshots the
-earliest deadline and first work meter at construction. The
+earliest deadline and first work meter at construction. Adjacent library deadline
+tokens backed by the monotonic clock use one earliest deadline check. Predicates
+between clocks, dynamic adapters and other time sources retain their ordered
+checks. The
 [dispatch evidence](../evidence/cancellation-polling.md) supports retaining the
 current polling contract without a dispatch performance claim.
 
