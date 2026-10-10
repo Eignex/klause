@@ -2,7 +2,6 @@ package com.eignex.klause.bench.metric
 
 import java.math.BigInteger
 
-/** Checks source FlatZinc text without solver lowering, factors or certificates. */
 internal object ExactFlatZincValidation {
     private sealed interface Value {
         data class Number(val value: ExactObjective) : Value
