@@ -72,12 +72,18 @@ class LpSatisfactionFeasibilityTest {
     }
 
     @Test
-    fun `root cut harvest refutes an integer equality without an objective`() {
+    fun `root cut harvest refutes a fractional integer forced by continuous equations`() {
         val problem = Problem(
             numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = Array(3) { IntDomain(0, 1) },
-            factors = arrayOf<Factor>(Linear(intArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 3)),
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1)),
+            factors = arrayOf<Factor>(
+                Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.EQ, 1L),
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 1L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         )
 
         val result = BacktrackSolver(problem.bake()).solve(
