@@ -1,5 +1,8 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -42,5 +45,20 @@ class SharedVarBoundsTest {
 
         assertEquals(1, bounds.lowerOriginOf(0))
         assertEquals(0, bounds.upperOriginOf(0))
+    }
+    @Test
+    fun `mismatched and withheld certificates cannot prune shared domains`() {
+        val model = ModelIdentity.of(Any())
+        val other = ModelIdentity.of(Any())
+        val bounds = SharedVarBounds(1, identity = model)
+
+        bounds.publish(0, 8, 8, model = other, certificate = EvidenceCertificate.verified(other, EvidenceKind.Bound))
+        bounds.publish(0, 8, 8, model = model)
+        assertEquals(Long.MIN_VALUE, bounds.lowerOf(0))
+        assertEquals(Long.MAX_VALUE, bounds.upperOf(0))
+        bounds.publish(0, 2, 9, model = model, certificate = EvidenceCertificate.verified(model, EvidenceKind.Bound))
+
+        assertEquals(2L, bounds.lowerOf(0))
+        assertEquals(9L, bounds.upperOf(0))
     }
 }

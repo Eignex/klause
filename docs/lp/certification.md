@@ -20,7 +20,9 @@ result. MPS tolerance acceptance has its own
 A bound does not imply feasibility or attainment. A point does not imply
 unboundedness. Ceiling an objective bound requires a proved integral objective
 lattice. Combine packages only when authority, scope and objective units match.
-Exact rejection of one candidate is not a refutation of the model.
+Exact rejection of one candidate is not a refutation of the model. Cross-arm
+publication also requires the [portfolio model and objective scope](../search.md#portfolio-slices);
+its adapter certificate does not replace these numerical checks.
 
 ## Certification mechanisms
 

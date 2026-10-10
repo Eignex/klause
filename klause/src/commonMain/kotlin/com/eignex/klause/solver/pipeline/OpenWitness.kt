@@ -3,9 +3,13 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.portfolio.verifyRealCoordinates
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.fitsLong
@@ -20,26 +24,37 @@ import com.eignex.klause.util.toLongExact
  * continuous columns needs the sample's exact real values, which a candidate completion certified against the same
  * rows by an exact LP; a floating-point real value alone decides nothing.
  */
-internal fun refuteOpenWitness(model: Problem, sample: Sample): String? {
+internal fun refuteOpenWitness(model: Problem, sample: Sample): String? =
+    when (val verdict = verifyOpenWitness(model, sample)) {
+        is Verification.Accepted -> null
+        is Verification.Rejected -> verdict.reason
+        is Verification.Indeterminate -> verdict.reason
+    }
+
+internal fun verifyOpenWitness(model: Problem, sample: Sample): Verification<Sample, Unit> {
     if (sample.exactInts?.any { !it.fitsLong() } == true) {
-        return "wide integer coordinates require an exact theory witness check"
+        return Verification.Indeterminate("wide integer coordinates require an exact theory witness check")
     }
-    if (sample.bools.size != model.numBoolVars || sample.ints.size != model.numIntVars) {
-        return "assignment covers ${sample.bools.size}/${sample.ints.size} of the " +
-            "${model.numBoolVars}/${model.numIntVars} discrete variables"
+    if (sample.bools.size != model.numBoolVars || sample.numIntVars != model.numIntVars) {
+        return Verification.Rejected("assignment does not cover the model's discrete variables")
     }
-    if (model.numRealVars > 0 && sample.exactReals == null) return "continuous values are not certified"
+    when (val verdict = verifyRealCoordinates(model, sample)) {
+        is Verification.Rejected -> return verdict
+        is Verification.Indeterminate -> return verdict
+        is Verification.Accepted -> Unit
+    }
     val bounds = model.intBounds
     for (v in 0 until model.numIntVars) {
         val x = sample.ints[v]
         if ((bounds.hasLower(v) && x < bounds.lower(v)) || (bounds.hasUpper(v) && x > bounds.upper(v))) {
-            return "int $v = $x is outside its declared range"
+            return Verification.Rejected("int $v = $x is outside its declared range")
         }
-        if (model.intDomainOrNull(v)?.let { x !in it } == true) return "int $v = $x is outside its declared values"
+        if (model.intDomainOrNull(v)?.let { x !in it } == true) {
+            return Verification.Rejected("int $v = $x is outside its declared values")
+        }
     }
     val point = model.withIntDomains(Array(model.numIntVars) { IntDomain(sample.ints[it], sample.ints[it]) })
-    val verdict = composedFixpoint(point.bake(), Candidate(sample, Unit), Cancellation.Never)
-    return (verdict as? Verification.Rejected)?.reason
+    return composedFixpoint(point.bake(), Candidate(sample, Unit), Cancellation.Never)
 }
 
 internal fun OpenTheoryAssignment.toSample(model: Problem): Sample {
@@ -51,5 +66,5 @@ internal fun OpenTheoryAssignment.toSample(model: Problem): Sample {
         reals = DoubleArray(reals.size) { reals[it].toDouble() },
         exactReals = reals,
         exactInts = ints,
-    ).also { it.isTheoryWitness = true }
+    ).also { it.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(model), EvidenceKind.Witness) }
 }

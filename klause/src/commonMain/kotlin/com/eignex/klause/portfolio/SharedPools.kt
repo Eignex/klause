@@ -4,7 +4,15 @@ import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.localsearch.LocalSearchPreparation
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.ModelEvidence
+import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Publication
+import com.eignex.klause.solver.incumbent.Verification
 
 /**
  * The cross-arm sharing channels handed to every backtrack arm of one portfolio: the learned-clause
@@ -26,4 +34,24 @@ internal class SharedPools(
     val nativeProjection: PropagationProblem? = null,
     val localSearchProjection: LocalSearchPreparation? = null,
     val localSearchInvariants: Lazy<InvariantNetwork?>? = null,
-)
+    val identity: ModelIdentity? = null,
+) {
+    fun offerSolution(
+        model: ModelIdentity,
+        sample: Sample,
+        value: Double,
+        certificate: EvidenceCertificate?,
+    ): Publication<Sample, Double> {
+        val exchange = solutions ?: return Publication.Indeterminate("there is no solution exchange")
+        if (identity != null) {
+            if (certificate == null) return Publication.Indeterminate("witness certificate is withheld")
+            val verifier = ModelEvidenceVerifier<Sample, Double>(identity, CandidateVerifier.trusting())
+            when (val verdict = verifier.verify(ModelEvidence.Witness(model, Candidate(sample, value), certificate))) {
+                is Verification.Rejected -> return Publication.Rejected(verdict.reason)
+                is Verification.Indeterminate -> return Publication.Indeterminate(verdict.reason)
+                is Verification.Accepted -> Unit
+            }
+        }
+        return exchange.offer(sample, value)
+    }
+}

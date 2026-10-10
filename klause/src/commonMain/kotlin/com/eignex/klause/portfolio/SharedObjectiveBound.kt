@@ -1,5 +1,11 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.ModelEvidence
+import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
@@ -21,13 +27,21 @@ import com.eignex.kumulant.stream.lock
  * The [lock] comes from the executor's [Concurrency]: a no-op under the single-core sequential executor,
  * a platform mutex under the parallel one.
  */
-internal class SharedObjectiveBound(private val lock: Mutex = Concurrency.None.lock()) {
+internal class SharedObjectiveBound(
+    private val lock: Mutex = Concurrency.None.lock(),
+    private val identity: ModelIdentity? = null,
+) {
     private var lb = Double.NEGATIVE_INFINITY
 
     /** Fold a proven global lower bound on the optimum into the shared maximum, returning how far it raised a
      *  finite bound: `0` when it raised nothing or set the first one. Ignores a non-finite value (no information). */
-    fun publish(value: Double): Double {
+    fun publish(value: Double, model: ModelIdentity? = null, certificate: EvidenceCertificate? = null): Double {
         if (!value.isFinite()) return 0.0
+        if (identity != null) {
+            if (model == null) return 0.0
+            val verifier = ModelEvidenceVerifier<Unit, Double>(identity, CandidateVerifier.trusting())
+            if (verifier.verify(ModelEvidence.Bound(model, value, certificate)) !is Verification.Accepted) return 0.0
+        }
         return lock.withLock {
             val raise = if (value > lb && lb.isFinite()) value - lb else 0.0
             if (value > lb) lb = value
