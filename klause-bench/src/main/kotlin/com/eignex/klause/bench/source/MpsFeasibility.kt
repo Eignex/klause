@@ -1,9 +1,9 @@
 package com.eignex.klause.bench.source
 
 import java.io.File
-import java.security.MessageDigest
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 
 internal object MpsFeasibility {
     fun resolve(source: File): File {
@@ -26,7 +26,7 @@ internal object MpsFeasibility {
 
     @Suppress("CyclomaticComplexMethod")
     fun transform(text: String): String {
-        val lines = text.lineSequence().toList()
+        val lines = text.trimEnd('\n', '\r').lineSequence().toList()
         val freeRows = HashSet<String>()
         var section = ""
         var zeroRow: String? = null

@@ -6,8 +6,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.bounding.LpEngine
-import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -51,12 +51,12 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.cancelledWhen
+import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
-import com.eignex.klause.util.IntHashSet
-import kotlin.random.Random
 
 /** Map touched-seed-level [IntArray] to the subset of [input] assumptions at those
  *  levels. Returns `null` when the input was empty (no assumption layer to
