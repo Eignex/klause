@@ -114,5 +114,8 @@ Binary-column substitution accepts single-variable reified equalities `b ↔ (x 
 when every reader of `x` supports the Boolean replacement. These channels become
 Boolean equivalences; general reified rows and value-reading globals retain their
 integer columns. Objective integer columns remain excluded. Substituted integers
-are pinned during search and reconstructed from the added literals, preserving
-source values and solution counts for either indicator polarity.
+reuse an existing channel literal when one is available, including its polarity;
+columns without a channel receive a fresh Boolean. Reusing a channel removes its
+redundant equivalence clauses. Integers are pinned during search and reconstructed
+from their value literals, preserving source values and solution counts for either
+indicator polarity.

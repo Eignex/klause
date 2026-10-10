@@ -51,6 +51,7 @@ class BinaryColumnSubstitutionTest {
             )
 
             val result = checkNotNull(substitute(model))
+            assertEquals(model.numBoolVars, result.problem.numBoolVars)
             val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
                 .map(result.reconstruct).map { it.bools.single() to it.ints.single() }.toSet()
 
@@ -75,6 +76,65 @@ class BinaryColumnSubstitutionTest {
             .map(result.reconstruct).map { it.bools.toList() to it.ints.single() }.toSet()
 
         assertEquals(setOf(listOf(true, false) to 1L, listOf(false, true) to 0L), assignments)
+    }
+
+    @Test
+    fun `signed binary rows preserve source assignments with reused and fresh literals`() {
+        for (bound in listOf(0, 1)) {
+            val model = Problem(
+                numBoolVars = 1,
+                numIntVars = 2,
+                intDomains = binary(2),
+                factors = listOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
+                    Linear(longArrayOf(3, -2), intArrayOf(0, 1), LinearOp.LE, 1L),
+                ),
+            )
+            val result = checkNotNull(substitute(model))
+            val expected = buildSet {
+                for (indicator in listOf(false, true)) {
+                    for (x in 0L..1L) for (y in 0L..1L) {
+                        if (satisfies(model, booleanArrayOf(indicator), longArrayOf(x, y))) {
+                            add(listOf(indicator) to listOf(x, y))
+                        }
+                    }
+                }
+            }
+
+            val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+                .map(result.reconstruct).map { it.bools.toList() to it.ints.toList() }.toList()
+
+            assertEquals(expected, assignments.toSet())
+            assertEquals(expected.size, assignments.size)
+        }
+    }
+
+    @Test
+    fun `columns sharing an indicator preserve cardinality multiplicity and source assignments`() {
+        for (bound in listOf(0, 1)) {
+            val model = Problem(
+                numBoolVars = 1,
+                numIntVars = 2,
+                intDomains = binary(2),
+                factors = listOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+                    Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1L),
+                ),
+            )
+            val result = checkNotNull(substitute(model))
+
+            val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+                .map(result.reconstruct).map { it.bools.toList() to it.ints.toList() }.toList()
+
+            val expected = if (bound == 0) {
+                setOf(listOf(true) to listOf(1L, 0L), listOf(false) to listOf(0L, 1L))
+            } else {
+                emptySet()
+            }
+            assertEquals(expected, assignments.toSet())
+            assertEquals(expected.size, assignments.size)
+        }
     }
 
     @Test
