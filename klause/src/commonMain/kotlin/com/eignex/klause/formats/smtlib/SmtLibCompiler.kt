@@ -279,6 +279,7 @@ internal object Compiler {
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }
             lowerOpenIteChains() // an objective term can open chains of its own
+            conditionalEqualities.retainNeededDefinitions(factors, intNames.values, boolNames.values, objective)
             val sourceBounds = modelIntBounds()
 
             val model = Problem(

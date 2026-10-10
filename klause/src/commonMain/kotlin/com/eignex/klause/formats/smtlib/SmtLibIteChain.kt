@@ -145,8 +145,11 @@ internal fun Compiler.Builder.lowerOpenIteChains() {
 }
 
 private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
+    val start = factors.size
     if (!collapseToElement(chain)) lowerAsDecisionList(chain)
-    conditionalEqualities.define(chain.result, chain.conds, chain.arms, chain.default)
+    conditionalEqualities.define(
+        chain.result, chain.conds, chain.arms, chain.default, factors.subList(start, factors.size),
+    )
 }
 
 /**

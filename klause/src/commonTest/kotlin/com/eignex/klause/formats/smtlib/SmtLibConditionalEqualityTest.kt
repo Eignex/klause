@@ -6,12 +6,93 @@ import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `a conditional compared with a constant retains its independent arithmetic use`() {
+        for (branch in listOf(1, 2)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const x Int)
+                (assert (let ((t (ite b 1 2))) (and (= t $branch) (= (+ t x) 4))))
+                """.trimIndent(),
+            )
+            ExactLiraSearchComponent(parsed.model).use { component ->
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                assertEquals(bigIntOf(4 - branch), assignment.ints[parsed.intVarNames.getValue("x")])
+            }
+        }
+    }
+
+    @Test
+    fun `nested numeric conditional reads retain the definitions they depend on`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const c Bool) (declare-const x Int)
+            (assert b) (assert (not c))
+            (assert (let ((inner (ite c 4 9))) (let ((outer (ite b inner 8))) (= x outer))))
+            """.trimIndent(),
+        )
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(bigIntOf(9), assignment.ints[parsed.intVarNames.getValue("x")])
+        }
+    }
+
+    @Test
+    fun `a conditional used only by an objective retains its branch value`() {
+        for (branch in listOf(true, false)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool)
+                (assert ${if (branch) "b" else "(not b)"})
+                (minimize (ite b 3 8))
+                """.trimIndent(),
+            )
+            ExactLiraSearchComponent(parsed.model).use { component ->
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                val objective = assertNotNull(parsed.objective)
+                val value = objective.intCoefficients.withIndex().fold(bigIntOf(objective.constant)) { sum, (v, c) ->
+                    sum + assignment.ints[v] * bigIntOf(c)
+                }
+                assertEquals(bigIntOf(if (branch) 3 else 8), value)
+            }
+        }
+    }
+
     @Test
     fun `a conditional branch comparison retains exact arithmetic beyond a signed word`() {
         val parsed = SmtLib.parse(

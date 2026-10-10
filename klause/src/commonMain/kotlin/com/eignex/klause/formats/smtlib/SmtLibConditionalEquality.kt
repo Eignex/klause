@@ -1,5 +1,8 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.factor.ReifiedFactor
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
@@ -8,7 +11,12 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinOr
 
 internal class SmtLibConditionalEquality {
-    private class Definition(val guards: List<Int>, val arms: List<LinComb>, val default: LinComb) {
+    private class Definition(
+        val guards: List<Int>,
+        val arms: List<LinComb>,
+        val default: LinComb,
+        val factors: List<Factor>,
+    ) {
         var noArm: Int? = null
     }
 
@@ -22,8 +30,46 @@ internal class SmtLibConditionalEquality {
     private val equalities = HashMap<Key, Int>()
     private var work = 0
 
-    fun define(variable: Int, guards: List<Int>, arms: List<LinComb>, default: LinComb) {
-        definitions[variable] = Definition(guards.toList(), arms.toList(), default)
+    fun define(variable: Int, guards: List<Int>, arms: List<LinComb>, default: LinComb, factors: List<Factor>) {
+        definitions[variable] = Definition(guards.toList(), arms.toList(), default, factors.toList())
+    }
+
+    fun retainNeededDefinitions(
+        factors: MutableList<Factor>,
+        sourceIntegers: Collection<Int>,
+        sourceBooleans: Collection<Int>,
+        objective: LinearObjectiveSpec?,
+    ) {
+        if (definitions.isEmpty()) return
+        val owners = HashMap<Factor, Int>()
+        val predicateOwners = HashMap<Int, Int>()
+        for ((variable, definition) in definitions) {
+            for (factor in definition.factors) {
+                owners[factor] = variable
+                (factor as? ReifiedFactor)?.let { predicateOwners[it.auxBoolVar] = variable }
+            }
+        }
+        val retained = HashSet<Int>()
+        val pending = ArrayDeque<Int>()
+        fun need(variable: Int) {
+            if (variable in definitions && retained.add(variable)) pending.addLast(variable)
+        }
+        fun needPredicate(variable: Int) {
+            predicateOwners[variable]?.let(::need)
+        }
+        fun read(factor: Factor) {
+            factor.variables.ints.forEach(::need)
+            factor.variables.boolVars.forEach(::needPredicate)
+        }
+        sourceIntegers.forEach(::need)
+        sourceBooleans.forEach(::needPredicate)
+        objective?.intCoefficients?.forEachIndexed { variable, coefficient -> if (coefficient != 0L) need(variable) }
+        objective?.boolWeights?.forEachIndexed { variable, weight -> if (weight != 0L) needPredicate(variable) }
+        for (factor in factors) if (factor !in owners) read(factor)
+        while (pending.isNotEmpty()) {
+            definitions.getValue(pending.removeFirst()).factors.forEach(::read)
+        }
+        factors.removeAll { factor -> owners[factor]?.let { it !in retained } == true }
     }
 
     fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {

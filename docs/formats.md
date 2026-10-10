@@ -74,8 +74,11 @@ Asserted and reified equalities between an integer conditional result and a cons
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
 results are shared within one parse; nested definitions are traversed iteratively.
 A parse limits this expansion to 65,536 visits, after which comparisons retain
-their arithmetic encoding. Branch definitions remain enforced independently of
-the comparison, including open defaults and sparse decision-list selectors.
+their arithmetic encoding. Numeric branch definitions remain enforced whenever
+a surviving constraint, objective or shared reified predicate needs them. Unused
+fresh definitions are omitted after following these dependencies to a fixpoint;
+source declarations and arithmetic leaves remain authoritative, including open
+defaults and sparse decision-list selectors.
 
 Optimization emits `; objective=<value>` for each incumbent in the source objective's
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
