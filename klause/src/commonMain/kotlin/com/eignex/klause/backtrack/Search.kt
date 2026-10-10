@@ -230,9 +230,9 @@ internal class CpSatisfactionTraversal(
     }
 
     /** Poll cancellation on a fixed cadence, so a slice bounded by work pauses on the same node every run. */
-    var fixedCancellationCadence: Boolean
-        get() = run?.fixedCancellationCadence ?: false
+    var fixedCancellationCadence: Boolean = false
         set(value) {
+            field = value
             run?.fixedCancellationCadence = value
         }
 
@@ -265,11 +265,15 @@ internal class CpSatisfactionTraversal(
                     ComponentResult.Consistent -> null
                     is ComponentResult.Conflict -> SearchOutcome.Exhausted()
                     ComponentResult.Indeterminate -> {
-                        if (slice?.pauses() == true) return null
+                        if (params.cancellation() && slice?.pauses() == true) return null
                         SearchOutcome.BudgetCapped
                     }
                 }
-                if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
+                if (rootOutcome == null) {
+                    run = session.openRun(problem.numBoolVars, traversal).also {
+                        it.fixedCancellationCadence = fixedCancellationCadence
+                    }
+                }
             }
             sharedSession = null
         }
