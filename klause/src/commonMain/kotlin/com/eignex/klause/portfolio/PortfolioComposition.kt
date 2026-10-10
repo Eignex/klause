@@ -306,6 +306,17 @@ internal object PortfolioComposition {
                 )
             }
         }
+        // Root cut harvesting spends a satisfaction arm's first slice before node refutation.
+        val curatedEdit: ((BacktrackParams) -> BacktrackParams)? = if (scenario.kind == Kind.CSP) {
+            { params ->
+                val rootParams = if (params.lpConfig == null) params else {
+                    params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = false))
+                }
+                edit?.invoke(rootParams) ?: rootParams
+            }
+        } else {
+            edit
+        }
         val base = BacktrackWorkerConfig.diverse(
             scenario.kind,
             count,
@@ -313,7 +324,7 @@ internal object PortfolioComposition {
             nodeBudget,
             zeroObjectivePricing,
             facts,
-            edit,
+            curatedEdit,
         )
         if (annotationArm == null || count < 2) return base
         val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))
