@@ -223,7 +223,7 @@ and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
 | Field | Meaning |
 |---|---|
 | `propagationWork` | Monotonic dispatch, literal, watcher, level and linear-term/reason visits, including work across undo |
-| `rootPropagationWork`, `rootPropagationMs` | Constructor root-fixpoint work and time |
+| `rootPropagationWork`, `rootPropagationMs` | Initialization root-fixpoint work and time, including private preparation |
 | `propagationMs` | Fixpoint elapsed time; some counted reason scans are outside it |
 | Arm `maxMs`, `initMs` | Longest elapsed segment and handle construction cost |
 | `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
