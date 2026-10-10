@@ -53,6 +53,39 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `arithmetic assertions retract across decisions without arithmetic effects`() {
+        val model = Problem(
+            numBoolVars = 4,
+            intBounds = openBounds(),
+            factors = arrayOf(ReifiedLinear(3, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (variable in 0..2) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+            }
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(3, true))))
+            val first = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+            assertEquals(
+                bigIntOf(7), assertNotNull(first.model.valueOf<ExactLiraAssignment>(component)).ints.single(),
+            )
+            session.popTo(1)
+            for (variable in 1..3) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, false))))
+            }
+            val direction = assertNotNull(component.nextBranch(session)).first()
+            assertIs<ComponentResult.Consistent>(session.push(direction))
+
+            val sibling = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+
+            assertTrue(
+                assertNotNull(sibling.model.valueOf<ExactLiraAssignment>(component)).ints.single() != bigIntOf(7),
+            )
+        }
+    }
+
+    @Test
     fun `compound disjunct conflicts retain their Boolean names`() {
         for ((relation, values, fixed) in listOf(
             Triple(LinearOp.EQ, longArrayOf(0L, 1L), 2),

@@ -134,6 +134,7 @@ class ExactLiraSearchComponent(
     private val lpDelegate: Lazy<LpPropagator> = lazy {
         LpPropagator(
             object : LpSearchPolicy {
+                override val eagerAssertionScopes: Boolean = false
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                     accept(decision, context)
                 override fun propagate(context: SearchContext): ComponentResult = relax(context)
@@ -439,6 +440,7 @@ class ExactLiraSearchComponent(
                         } == true
                     }
                     node = node.copy(sourceBranches = node.sourceBranches + atom, retainedReduction = retained)
+                    if (!lp.atLevel(context.decisionLevel, operationStop)) return ComponentResult.Indeterminate
                     if (!system.assertAtom(atom, SearchAtomPremise.Asserted(decision))) {
                         return ComponentResult.Indeterminate
                     }
@@ -586,6 +588,7 @@ class ExactLiraSearchComponent(
         ) {
             return ComponentResult.Consistent
         }
+        if (!lp.atLevel(context.decisionLevel, operationStop)) return ComponentResult.Indeterminate
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
