@@ -17,7 +17,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * The handle is **single-threaded and stateful**; drive it from one
  * thread, one [runSlice] at a time.
  *
- * Obtain one from a [ResumableOptimizer]. [close] releases any per-search resources.
+ * Obtain one from a [ResumableOptimizer]. [close] releases per-search resources and is idempotent.
+ * A closed pending handle rejects slices; a terminal verdict remains readable after close.
  */
 interface ResumableSearch : AutoCloseable {
     /**
@@ -103,6 +104,7 @@ interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
  * A pause/resume handle over a satisfaction search: the [ResumableSearch] of a model with no objective. The
  * learned clauses, trail and heuristics persist across [runSlice] calls, so an arm scheduled in segments continues
  * its search rather than starting it over. Single-threaded and stateful; obtain one from a [ResumableSolver].
+ * Closing is idempotent: a closed pending handle rejects slices, while a terminal verdict remains readable.
  */
 interface ResumableSolve : AutoCloseable {
     /**

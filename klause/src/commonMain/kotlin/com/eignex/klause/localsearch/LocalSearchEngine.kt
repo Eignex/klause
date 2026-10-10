@@ -351,8 +351,8 @@ internal class LocalSearchEngine(
             }
 
             private fun advance(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult? {
-                check(!closed) { "the local-search handle is closed" }
                 verdict?.let { return it }
+                check(!closed) { "the local-search handle is closed" }
                 if (!supported) return unknown(TerminationReason.Unsupported)
                 if (effective == null) {
                     return if (model.refutesModel) {
@@ -562,8 +562,8 @@ internal class LocalSearchEngine(
                 sliceInstructions: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
             ): MinimizeResult? {
-                check(!closed) { "the local-search handle is closed" }
                 verdict?.let { return it }
+                check(!closed) { "the local-search handle is closed" }
                 token = if (sliceMillis == Long.MAX_VALUE) {
                     global
                 } else {
