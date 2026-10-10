@@ -358,7 +358,11 @@ own behavior.
 Continuous-column models rank the default LP backtrack arm immediately after the
 SAT guard. The default six-arm mixed optimization pool therefore admits node LP
 in its two backtrack slots while retaining four local-search slots. LP ceilings
-and explicit arm pools continue to control admission and techniques.
+and explicit arm pools continue to control admission and techniques. Curated
+single-core mixed optimization reserves half the scheduled time for this LP arm
+on continuous-column models. Individual segments retain work charging and time
+caps; the remaining time follows the bandit. Explicit backtrack pools and parallel
+lanes retain their requested scheduling.
 
 See [SliceBudget](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
 and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
