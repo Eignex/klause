@@ -30,7 +30,9 @@ import com.eignex.klause.solver.differenceFragmentOf
 internal fun BakedProblem.withDifferenceSystem(): BakedProblem {
     val fragment = differenceFragmentOf(factors, numIntVars, intBounds)?.withoutOverHeavyDomainEdges() ?: return this
     if (fragment.edges.none { it.guard != DifferenceEdge.ALWAYS }) return this
-    if (fragment.edges.none { it.source != DifferenceFragment.ZERO && it.target != DifferenceFragment.ZERO }) return this
+    if (fragment.edges.none {
+            it.source != DifferenceFragment.ZERO && it.target != DifferenceFragment.ZERO
+        }) return this
     // The system is redundant with the rows it reads, so it changes nothing the base fold derived:
     // `alreadyFolded` reuses that fold and `seedDeductions` carries the proven deductions forward.
     return withAppendedFactor(DifferenceSystem(fragment.edges))
