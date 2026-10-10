@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -40,7 +41,7 @@ internal class ExactLraPropagation(
     private val accept: (SearchDecision, SearchContext) -> ComponentResult = { _, _ -> ComponentResult.Consistent },
 ) {
     private val rows = model.factors.flatMapIndexed { factorIndex, factor ->
-        if (factor.linearForm is LinearForm.Disjunction) emptyList() else {
+        if (factor is Clause || factor.linearForm is LinearForm.Disjunction) emptyList() else {
             factor.linearRows.mapIndexed { rowIndex, row ->
                 PreparedRow(row, forms[factorIndex][rowIndex], row.booleanVariables())
             }
@@ -58,6 +59,8 @@ internal class ExactLraPropagation(
     private val booleanReaders = Array(model.numBoolVars) { ArrayList<Int>() }.also { readers ->
         rows.forEachIndexed { index, row -> for (variable in row.variables) readers[variable] += index }
     }
+    private val readColumns = columnReaders.indices.filter { columnReaders[it].isNotEmpty() }.toIntArray()
+    private val readBooleans = booleanReaders.indices.filter { booleanReaders[it].isNotEmpty() }.toIntArray()
     private val lower = arrayOfNulls<LpBoundAssertion>(columnReaders.size)
     private val upper = arrayOfNulls<LpBoundAssertion>(columnReaders.size)
     private val booleans = arrayOfNulls<Boolean>(model.numBoolVars)
@@ -97,8 +100,8 @@ internal class ExactLraPropagation(
     ): ComponentResult {
         implied = false
         // Interval narrowing may converge only asymptotically on real rows. The LP remains the complete check.
-        for (column in columnReaders.indices) refreshColumn(column)
-        for (variable in booleans.indices) {
+        for (column in readColumns) refreshColumn(column)
+        for (variable in readBooleans) {
             val value = context.boolValue(variable)
             if (value != booleans[variable]) {
                 booleans[variable] = value
