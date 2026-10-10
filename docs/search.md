@@ -117,6 +117,11 @@ reasons for deductions and conflicts. An assignment's undo lifetime can be deepe
 than the effective level of its reason: Boolean pins use the deeper of that level
 and the current decision depth so an asserting backjump retains its consequence.
 
+Factor cores traverse the full reason graph with session-owned dense-id scratch.
+The traversal clears visited ids between extractions and reads learned native clause
+variables directly, retaining the same factor-core membership across restarts and
+learned-clause compaction.
+
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump.
 Sound resolvents that cannot assert retain chronological fallback. Root
