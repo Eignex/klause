@@ -94,6 +94,8 @@ state. Root refutations remain authoritative; an unsuccessful local-search walk 
 incomplete.
 An active local-search handle requires exclusive use of its solver and session;
 portfolio workers use separate solvers and close a handle before reseeding it.
+Optimization handles open through their session so its assumptions and state apply.
+Sessions that decline resumable optimization retain their one-shot improvement stream.
 
 The immutable local-search projection is initialized lazily and reused across draws.
 Mixed-pool arms over the same model share it, including ALNS's inner local search.

@@ -1,6 +1,5 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -31,7 +30,7 @@ class PortfolioWorker private constructor(
     private val solveFn: (Cancellation, Long?) -> SolveResult,
     private val improvementsFn: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
-    private val resumableFn: ((() -> Double, Cancellation?, Sample?) -> ResumableSearch)?,
+    private val resumableFn: ((() -> Double, Cancellation?, Sample?) -> ResumableSearch?)?,
     private val resumableSolveFn: ((Cancellation?) -> ResumableSolve?)?,
     private val withInstructions: Boolean,
     private val closeFn: () -> Unit,
@@ -153,16 +152,13 @@ class PortfolioWorker private constructor(
                 val budget = withInstructionBudget
                 return if (maxInstructions != null && budget != null) budget(p, maxInstructions) else p
             }
-            // A pause/resume handle is available only for an optimising worker over a ResumableOptimizer
-            // engine. Opening uses the supplied token; the handle owns cancellation after that.
-            val resumableOpt = session.solver as? ResumableOptimizer<P>
-            val resumableFn: ((() -> Double, Cancellation?, Sample?) -> ResumableSearch)? =
-                if (objective != null && resumableOpt != null) {
+            val resumableFn: ((() -> Double, Cancellation?, Sample?) -> ResumableSearch?)? =
+                if (objective != null) {
                     { readBound, cancellation, warmStart ->
                         val base = cancellation?.let(::withCancel) ?: params
                         var p = withBound?.invoke(base, readBound) ?: base
                         if (warmStart != null && withWarmStart != null) p = withWarmStart(p, warmStart)
-                        session.resumable(objective, p) ?: resumableOpt.resumable(objective, p)
+                        session.resumable(objective, p)
                     }
                 } else {
                     null
