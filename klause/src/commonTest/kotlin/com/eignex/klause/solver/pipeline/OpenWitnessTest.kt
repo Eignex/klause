@@ -141,7 +141,8 @@ class OpenWitnessTest {
         )
         for ((truth, value, accepted) in cases) {
             val point = Sample(
-                booleanArrayOf(truth), LongArray(0), reals = doubleArrayOf(value.toDouble()), exactReals = listOf(value),
+                booleanArrayOf(truth), LongArray(0),
+                reals = doubleArrayOf(value.toDouble()), exactReals = listOf(value),
             )
             val verdict = openWitnessVerifier(source, null).verify(Candidate(point, null))
 
