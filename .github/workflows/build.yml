@@ -26,6 +26,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  source-checker-test:
+    if: github.event_name != 'workflow_dispatch' || inputs.lab_cases == ''
+    name: Check source verifier regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install source checking dependency
+        run: python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
+      - name: Check verdict, witness and optimum rejection
+        run: python3 -m unittest discover -s klause-bench/tools -p 'test_verify_source_results.py' -v
+
   test:
     if: github.event_name != 'workflow_dispatch' || inputs.lab_cases == ''
     name: Run JVM tests and collect coverage

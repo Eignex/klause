@@ -72,6 +72,35 @@ timing; frame disappearance after inlining is not an absolute CPU saving.
 
 ## Record handling
 
+[verify_source_results.py](../../klause-bench/tools/verify_source_results.py)
+checks completed `mps-core`, `smtlib-core` and `miplib3` lab records against
+original source constraints using exact arithmetic. It retrieves immutable
+vendored sources by recorded revision, or original MIPLIB3 inputs, and requires
+their SHA-256 hashes to match the records.
+
+```sh
+python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
+python3 klause-bench/tools/verify_source_results.py /path/to/cases.json \
+  --records-root /path/to/raw-job --output /path/to/source-checks.json
+```
+
+The input can be plain JSON, gzip or xz. `--records-root` selects raw
+`cases/<index>/record.json` files instead of embedded API records. Claimed SAT and
+UNSAT require a matching exact source verdict. Captured SMT constant models must
+be complete, have source sorts and satisfy the original constraints exactly.
+MPS points must cover every column; arms ending in `-exact` require exact source
+feasibility. Default-mode rounded MPS points can be labelled nonexact even when
+the original source is feasible. A feasible exact point must also match any
+reported objective.
+
+A proven finite optimum requires both a feasible source point at the reported
+objective and exclusion of every strictly better source objective. Unknown
+records carry no proof claim. Unbounded claims and unsupported source constructs
+are outside this checker's acceptance contract. It rejects unsupported MPS
+sections/bounds and SMT function or sort declarations rather than inferring
+their semantics. This check is separate from paired timing/provenance analysis
+and from Klause's internal certificates.
+
 Use the active harness's [result records](../benchmarking.md#saved-results) and
 [source checks](../benchmarking.md#source-validation) for new measurements.
 Freeze source hashes, settings and build/runtime identities before comparing
