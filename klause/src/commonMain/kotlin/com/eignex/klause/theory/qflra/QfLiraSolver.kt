@@ -27,6 +27,7 @@ import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
@@ -548,7 +549,8 @@ class ExactLiraSearchComponent(
         ) {
             return ComponentResult.Consistent
         }
-        if (node.sourceBranches.isEmpty()) {
+        // Graph evidence has no LP certifier identity to offer an overridden acceptance policy.
+        if (node.sourceBranches.isEmpty() && solveContext.certificationPolicy === ProductionLpCertificationPolicy) {
             realDifference?.let { graph ->
                 if (!context.consumeCheck()) return ComponentResult.Indeterminate
                 when (val result = graph.check(bools, operationStop)) {
