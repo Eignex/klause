@@ -1,6 +1,7 @@
 # Presolve effort campaign (#554)
 
-Status: AWS pilots and metadata integration complete; 300-second campaigns running.
+Status: AWS pilots, metadata integration and aggressive campaign complete;
+300-second discovery running.
 
 The solver baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`. The neutral
 controls build is `5ad3707c0c0bfb113f994828265b9f1bafef91c3` ([PR #2378](https://github.com/Eignex/klause/pull/2378)).
@@ -54,6 +55,12 @@ disagreements; do not run reference-solver arms on AWS. Any source/witness valid
 runs through the remote lab. JFR, if needed, gets a separate `host=aws`,
 `profileCli=true`, `parallel=1` job and contributes no production timing.
 
+Reported quality assigns +1 to a better candidate outcome, -1 to a worse outcome
+and zero to a tie, using feasibility, objective direction and proof claims. Its
+mean is an ordinal win/loss balance, not a relative objective-gap measurement.
+Proof claims are reported solver results; source checking verifies witnesses,
+not optimality or refutation certificates.
+
 `presolvePreparationMs` includes source-safe/finite preparation and base bake,
 excluding frontend routing, source compilation and search-arm construction.
 Legacy `timeToFirstFeasibleMs` and `timeToBestMs` use the search attribution clock,
@@ -98,7 +105,7 @@ From the repository root:
 
 ```
 /home/rasmus/Workspaces/klause-lab/deploy/lab run klause-bench/campaigns/presolve-554/experiments/pilot.json
-python3 klause-bench/campaigns/presolve-554/collect.py 863
+gh workflow run presolve-report.yml
 ```
 
 `collect.py` downloads and gzip-archives raw lab API responses with their URLs,
@@ -109,6 +116,8 @@ logs. Successful production cases retain records without their stdout streams;
 the pilots therefore preserve source-check verdicts, not replayable witnesses.
 Collect finished jobs again to replace partial snapshots. The live job's
 `files` endpoint and `/experiments/<id>/cases.csv` remain independently accessible.
+After the execution reminder, archives are downloaded directly with `curl` and
+packed with `gzip`; the collector and analysis scripts are not executed locally.
 
 ## Frozen split
 
@@ -235,9 +244,15 @@ The worker rotates arm order by problem and alternates arms within each seed and
 repeat; all configurations of an input stay on one AWS instance. Normal parallel
 and machine counts are unset and managed by the worker.
 
+The worker launches job-owned instances rather than sharing an instance between
+jobs. Its default concurrency is one case per two physical cores, and a single-core
+CLI receives `-XX:ActiveProcessorCount=1`. Cases can still share an instance's cache,
+memory bandwidth and operating system. The campaign did not measure host load or
+verify CPU affinity; reserved spare capacity is not evidence of complete isolation.
+
 Both specifications pin `f6944877bb7a4846d56ce2031b0843da6105515c`, containing the
 merged construction budget, fixed selector, controls and process timing. They are
-running as [discovery job 906](http://192.168.50.104:8420/jobs/906) and
+submitted as [discovery job 906](http://192.168.50.104:8420/jobs/906) and
 [aggressive job 907](http://192.168.50.104:8420/jobs/907). AWS setup planned exactly
 360 and 108 cases. The lab disables benchmark result caching for every
 production case. Process timing includes FlatZinc frontend loading; MiniZinc source
@@ -259,6 +274,11 @@ with uncertainty, per-family regressions and independent-check coverage disclose
 An inconclusive result or no eligible discovery candidate leaves shipped defaults
 unchanged; the frozen holdout is not used to rescue or select a failed candidate.
 
+Job 907 completed all 108 cases with no failed case statuses. Final cases, job,
+reference, file listing and worker/setup logs are archived under `evidence/907`.
+CI computes its focused comparison; discovery remains running and no holdout
+candidate has been selected.
+
 ## Separate deadline diagnostic
 
 Production job 907 case 55 spends 300,144 ms in aggressive preparation on
@@ -276,7 +296,24 @@ Its timings are excluded from campaign estimates. It completed with 319,871 ms i
 preparation and 320,657 ms in the CLI subprocess, returning unknown with the same
 43,915 aggregate probes. The retained JFR, record, measurement manifest and peak
 RSS are archived under `evidence/911`; CI summarizes execution samples using the
-existing JFR helper. The profile summary is pending.
+existing JFR helper. Production case 56 and the profile have identical CLI jar,
+solver jar and Java executable hashes; the profiling launcher and JVM options
+differ. [CI run 38005654519](https://github.com/Eignex/klause/actions/runs/38005654519)
+produced `evidence/911/profile-summary.json`: 29,196 execution samples, including
+7,109 with `PropagationState.<init>`, 5,790 with `PropagationState.fireQueue` and
+5,390 with `runRootPropagation` in the captured stack. Counts overlap and are
+statistical samples, not exclusive phase durations. The largest leaf is
+`IntEventMachinery.<init>` (2,042 samples); watcher occurrence indexes and factor
+registration also appear prominently. This identifies propagation construction
+and fixpoint work as substantial preparation costs on this diagnostic, without
+isolating the exact operation that caused the deadline overrun. Peak CLI RSS was
+245,964 KiB. This one recording does not establish a hard cost or memory bound.
+Source inspection agrees with the sampled construction cost: `RootBaker` SAC
+probes call `Problem.propagate`, whose `runRootPropagation` constructs a fresh
+`PropagationState` before running its cancellation-aware fixpoint. A cap bounds
+the number of integer probe calls per tier, not the cost of constructing and
+propagating each call. This is a mechanism consistent with the profile, not a
+measurement of which probe caused the overrun.
 
 Partial snapshots under `evidence/906/partial-*.json.gz` and
 `evidence/907/partial-*.json.gz` validate the analyzer on process-clock records

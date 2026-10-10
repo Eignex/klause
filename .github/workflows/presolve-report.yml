@@ -35,6 +35,7 @@ jobs:
           python3 analyze.py evidence/903/cases.json.gz --control default > "$PRESOLVE_REPORT_DIR/903.json"
           python3 analyze.py evidence/906/partial-cases.json.gz --control default > "$PRESOLVE_REPORT_DIR/906-partial.json"
           python3 analyze.py evidence/907/partial-cases.json.gz --control default > "$PRESOLVE_REPORT_DIR/907-partial.json"
+          python3 analyze.py evidence/907/final-cases.json.gz --control default > "$PRESOLVE_REPORT_DIR/907.json"
       - name: Summarize separate AWS recording
         env:
           PRESOLVE_REPORT_DIR: ${{ runner.temp }}/presolve-reports
