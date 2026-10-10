@@ -82,8 +82,9 @@ When a branch compares a simple integer variable with a constant, these meanings
 can exclude conflicting selector tests and omit guard tests implied by that comparison.
 Conflicting branches and excluded defaults are skipped before traversing their definitions.
 Equality keys whose sign reversal exceeds a signed word retain their arithmetic encoding.
-A parse limits this expansion to 65,536 visits, after which comparisons retain
-their arithmetic encoding. Numeric branch definitions remain enforced whenever
+A parse expands comparisons after lowering all assertions and objectives, visiting
+the newest comparisons first. Expansion shares a limit of 65,536 visits; comparisons
+that cannot finish retain their exact arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
 fresh definitions are omitted after following these dependencies to a fixpoint.
 Their unused integer columns and private reified predicates are removed with
