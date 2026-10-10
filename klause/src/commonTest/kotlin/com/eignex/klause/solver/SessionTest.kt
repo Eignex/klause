@@ -143,8 +143,12 @@ class SessionTest {
         session.push(Assumptions(bools = mapOf(0 to true)))
         val captured = session.samples(config, params)
         session.push(Assumptions(bools = mapOf(0 to false)))
-        assertTrue(captured.take(3).all { it.bools[0] && !it.bools[1] })
-        assertTrue(session.samples(config, params).take(3).all { !it.bools[0] && !it.bools[1] && it.bools[2] })
+        val capturedDraws = captured.take(3).toList()
+        val currentDraws = session.samples(config, params).take(3).toList()
+        assertEquals(3, capturedDraws.size)
+        assertEquals(3, currentDraws.size)
+        assertTrue(capturedDraws.all { it.bools[0] && !it.bools[1] })
+        assertTrue(currentDraws.all { !it.bools[0] && !it.bools[1] && it.bools[2] })
     }
 
     @Test
@@ -201,6 +205,33 @@ class SessionTest {
         }
         session.push(Assumptions.None)
         session.pop()
+    }
+
+    @Test
+    fun `closing a count stream releases its captured scope`() {
+        val session = BacktrackSolver(exactlyOneOver(3).bake()).session()
+        session.push(Assumptions(bools = mapOf(0 to true)))
+        val stream = session.openExactCount()
+        assertFailsWith<IllegalStateException> { session.pop() }
+        val count = stream.last()
+        assertTrue(count.exact)
+        assertEquals(1L, count.estimate)
+        session.pop()
+        val other = session.openExactCount()
+        stream.close()
+        assertFailsWith<IllegalStateException> { session.push(Assumptions.None) }
+        other.close()
+        assertEquals(3L, session.exactCount().last().estimate)
+    }
+
+    @Test
+    fun `failed enumeration releases its session`() {
+        val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
+        val stream = session.openEnumerate(BacktrackParams(componentFactory = { error("component initialization") }))
+        assertFailsWith<IllegalStateException> { stream.hasNext() }
+        assertTrue(stream.isDone)
+        session.push(Assumptions(bools = mapOf(0 to true)))
+        assertTrue(assertIs<SolveResult.Sat>(session.solve(BacktrackParams())).assignment.bools[0])
     }
 
     @Test
