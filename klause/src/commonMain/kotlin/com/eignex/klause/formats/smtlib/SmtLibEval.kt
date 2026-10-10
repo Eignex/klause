@@ -429,6 +429,7 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
         val self = LinComb(mapOf(newInt(loU, hiU) to 1), 0)
         factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a.lin)))) // cond ⇒ v = a
         factors.add(Clause(intArrayOf(cond, reifyEq(self, b.lin)))) // ¬cond ⇒ v = b
+        conditionalEqualities.define(checkNotNull(self.asSimpleVar()), listOf(cond), listOf(a.lin), b.lin)
         return narrowRes(self)
     }
     val magA = intCombMagnitude(a)
