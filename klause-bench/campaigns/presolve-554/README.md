@@ -1,7 +1,7 @@
 # Presolve effort campaign (#554)
 
-Status: AWS pilots, metadata integration and aggressive campaign complete;
-300-second discovery running.
+Status: AWS pilots, metadata integration and both 300-second campaigns complete;
+final discovery analysis pending.
 
 The solver baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`. The neutral
 controls build is `5ad3707c0c0bfb113f994828265b9f1bafef91c3` ([PR #2378](https://github.com/Eignex/klause/pull/2378)).
@@ -60,6 +60,10 @@ and zero to a tie, using feasibility, objective direction and proof claims. Its
 mean is an ordinal win/loss balance, not a relative objective-gap measurement.
 Proof claims are reported solver results; source checking verifies witnesses,
 not optimality or refutation certificates.
+CI also compares each retained witness's `_objective` with the recorded objective.
+A mismatch is excluded from paired analysis and requires investigation before
+selection. Missing witnesses/objective fields are disclosed. A match establishes
+archive consistency, not an independent computation of the source objective.
 
 `presolvePreparationMs` includes source-safe/finite preparation and base bake,
 excluding frontend routing, source compilation and search-arm construction.
@@ -70,8 +74,10 @@ The integrated benchmark also records `processTimeToFirstFeasibleMs` and
 `processTimeToBestMs` when it receives each incumbent line. These include JVM launch,
 frontend loading, preparation and search, plus output transport delay. They select
 the best objective across the stream rather than its last arrival. `elapsedMs`
-records total subprocess duration, before source checks. The analyzer reports
-these clocks separately and excludes unavailable legacy process witness timings.
+records total subprocess duration, before source checks. The benchmark parent on
+the AWS instance records the process clock; subsequent SSH transfer to the lab is
+outside it. The analyzer reports these clocks separately and excludes unavailable
+legacy process witness timings.
 Preparation-adjusted search timing is an additional diagnostic; it still excludes
 startup, frontend loading and routing. Unknowns receive twice the nominal budget
 in PAR2; duration summaries retain observed overshoot.
@@ -79,10 +85,13 @@ Time to a run's own best objective must be read alongside its final quality.
 The analyzer also reports process PAR2 on pairs with equal reported outcomes and
 objectives. This describes a subset selected by the observed outcomes; its coverage
 is disclosed and it does not estimate the causal effect of changing presolve.
-`presolveWork`, pass/round/probe counters share the metered source/finite allowance.
+`presolveWork`, pass/round/probe counters report charged source/finite effort.
 Round entries include the final empty schedule scan. Root probe counts include
-Boolean failed-literal probes and integer SAC propagation/repair calls across
-reseeds. Integer SAC caps apply per tier per bake; Boolean probes use cancellation.
+Boolean failed-literal probes and integer SAC propagation/repair calls where the
+baked problem retains the work meter. The diagnostic below identifies fresh
+rebakes that lose that meter, so these counters are incomplete and cannot be
+treated as total executed probe work. Integer SAC caps apply per tier per bake;
+Boolean probes use cancellation.
 An aggregate probe count above one cap does not alone indicate a cap violation.
 Work can exceed its allowance by the final charge before a cancellation poll.
 
@@ -276,11 +285,12 @@ unchanged; the frozen holdout is not used to rescue or select a failed candidate
 
 Job 907 completed all 108 cases with no failed case statuses. Final cases, job,
 reference, file listing and worker/setup logs are archived under `evidence/907`.
-[CI run 38007888429](https://github.com/Eignex/klause/actions/runs/38007888429)
+[CI run 38008545290](https://github.com/Eignex/klause/actions/runs/38008545290)
 produced `evidence/907/analysis.json.gz`. All 36 matched blocks are complete, with
 identical source hashes, one production fingerprint, one search arm, no excluded
-pairs and no invalid source checks. Discovery remains running; no holdout candidate
+pairs and no invalid source checks. Discovery analysis is pending; no holdout candidate
 has been selected.
+Every reported witness has a retained `_objective` matching its recorded objective.
 
 | Configuration | Reported witnesses (proved) | Source-valid witnesses | Median preparation ms | Maximum preparation ms | Process PAR2 ratio (95% family interval) | Mean quality (95% family interval) |
 | --- | ---: | ---: | ---: | ---: | --- | --- |
@@ -290,7 +300,7 @@ has been selected.
 
 Each comparison has 36 timing pairs across six base families and four independently
 checked witness pairs. Unknown source checks remain disclosed reported outcomes.
-Every paired work signature changes. Median aggregate probe calls fall from
+Every paired work signature changes. Median recorded probe calls fall from
 102,951.5 to 19,258.5 under the integer caps; default records zero probes. The largest
 observed round-entry count is seven, below the cap of 16, so this screen does not
 justify expanding the round limit.
@@ -374,6 +384,11 @@ then read that rebuilt token. This source finding is consistent with the observe
 continued hole-SAC and limits any claim that the integer caps enforce the solve
 deadline. No cancellation fix or post-fix performance estimate is included here;
 the scope/propagation of allowances remains relevant to [#2322](https://github.com/Eignex/klause/issues/2322).
+The same omission loses the work meter read at RootBaker's `recordProbe` call sites, so
+fresh-rebake probes and propagation charges are absent from the published counters.
+Round/pass counters still record their schedules, and process/preparation clocks
+include the unmetered work. Counter differences establish recorded work activity,
+not complete probe totals or compliance with a solve-wide work allowance.
 
 Partial snapshots under `evidence/906/partial-*.json.gz` and
 `evidence/907/partial-*.json.gz` validate the analyzer on process-clock records
