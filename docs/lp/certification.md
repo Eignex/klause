@@ -146,6 +146,9 @@ and the ledger records actual reported work. Work units, kernel visits,
 allocations and elapsed time are distinct measurements.
 
 Cancellation adapters preserve deadline metadata and work-meter forwarding.
+An open theory's LP adapter reads the current operation token and retains the
+solve token between operations. It polls a distinct enclosing session token too;
+when that token is already the operation's parent it does not poll it twice.
 Ordered OR composition short-circuits leaf predicates. Reconstruction and
 refinement stride ordinary token/clock polling at 64 calls or 4096 work, but
 resource caps are checked on every charge, work-metered tokens remain immediate,
