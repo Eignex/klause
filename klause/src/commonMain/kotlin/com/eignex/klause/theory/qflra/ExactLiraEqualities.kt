@@ -16,6 +16,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.PollStride
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.negate
@@ -59,16 +60,19 @@ internal class ExactLiraEqualities(
         implied = false
         if (stop()) return ComponentResult.Indeterminate
         if (rows.isEmpty()) return ComponentResult.Consistent
+        val stride = PollStride()
+        val metered = stop.workMeter() != null
+        val progressStop = Cancellation { (metered || stride.due()) && stop() }
         val forest = EqualityForest(zero + 1)
         for (integer in 0 until zero) {
-            if (stop()) return ComponentResult.Indeterminate
+            if (progressStop()) return ComponentResult.Indeterminate
             val lower = model.intBounds.lowerAsBigInteger(integer) ?: continue
             if (lower != model.intBounds.upperAsBigInteger(integer) || lower < room.negate() || lower > room) continue
             forest.join(integer, zero, lower.toLong(), ALWAYS)
         }
         var inconsistent: Prepared? = null
         for (row in rows) {
-            if (stop()) return ComponentResult.Indeterminate
+            if (progressStop()) return ComponentResult.Indeterminate
             val truth = if (row.activator == ALWAYS) true else context.boolValue(row.activator)
             val equality = (row.op == LinearOp.EQ && truth == true) || (row.op == LinearOp.NE && truth == false)
             if (!equality) continue
@@ -81,14 +85,14 @@ internal class ExactLiraEqualities(
                 break
             }
         }
-        if (!forest.preparePaths(stop)) return ComponentResult.Indeterminate
+        if (!forest.preparePaths(progressStop)) return ComponentResult.Indeterminate
         inconsistent?.let { row ->
-            val premises = forest.premises(row.target, row.source, stop) ?: return ComponentResult.Indeterminate
+            val premises = forest.premises(row.target, row.source, progressStop) ?: return ComponentResult.Indeterminate
             val truth = row.op == LinearOp.EQ
             return conflict(context, premises, row.literal(truth), stop)
         }
         for (row in rows) {
-            if (stop()) return ComponentResult.Indeterminate
+            if (progressStop()) return ComponentResult.Indeterminate
             val value = forest.difference(row.target, row.source)
             val nonintegral = (row.op == LinearOp.EQ || row.op == LinearOp.NE) && row.bound.den != BIG_ONE
             val truth = if (nonintegral) {
@@ -99,7 +103,7 @@ internal class ExactLiraEqualities(
             val assigned = if (row.activator == ALWAYS) true else context.boolValue(row.activator)
             if (assigned == truth) continue
             val premises = if (nonintegral) emptyList() else {
-                forest.premises(row.target, row.source, stop) ?: return ComponentResult.Indeterminate
+                forest.premises(row.target, row.source, progressStop) ?: return ComponentResult.Indeterminate
             }
             if (assigned != null) {
                 return conflict(context, premises, row.literal(assigned), stop)
@@ -113,7 +117,7 @@ internal class ExactLiraEqualities(
             if (accepted !is ComponentResult.Consistent) return accepted
             implied = true
         }
-        return ComponentResult.Consistent
+        return if (stop()) ComponentResult.Indeterminate else ComponentResult.Consistent
     }
 
     private fun conflict(

@@ -9,10 +9,12 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -93,6 +95,41 @@ class ExactLiraEqualitiesTest {
 
         assertEquals(false, session.boolValue(0))
         assertContentEquals(intArrayOf(Lit.make(0, false)), assertNotNull(session.reasonFor(0)).literals)
+    }
+
+    @Test
+    fun `cancellation during equality explanation withholds its implication`() {
+        for (metered in listOf(false, true)) {
+            val open = Bits(2).also { it.set(0); it.set(1) }
+            val source = Problem(
+                2,
+                intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                    ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                ),
+            )
+            val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+                factor.linearRows.map { it.exactForm(0) }
+            }) { _, _ -> ComponentResult.Consistent }
+            val session = SearchSession(emptyList())
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            var cancelled = false
+            val context = object : SearchContext by session {
+                override fun atomLiteral(decision: SearchDecision): Int? {
+                    if (decision == SearchDecision.Bool(Lit.make(1, true))) cancelled = true
+                    return session.atomLiteral(decision)
+                }
+            }
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = cancelled
+                override fun workMeter(): WorkMeter? = if (metered) WorkMeter { } else null
+            }
+
+            assertIs<ComponentResult.Indeterminate>(propagation.propagate(context, stop))
+
+            assertNull(session.boolValue(1))
+        }
     }
 
     @Test
