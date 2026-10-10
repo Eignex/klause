@@ -8,6 +8,7 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.bigIntOf
@@ -17,6 +18,22 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `a determined conditional comparison completes without Boolean decisions`() {
+        val parsed = SmtLib.parse(
+            "(declare-const b Bool) (assert (= (ite b 1 2) 1))",
+        )
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)))
+
+        assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b")))
+    }
+
     @Test
     fun `a conditional compared with a constant retains its independent arithmetic use`() {
         for (branch in listOf(1, 2)) {
