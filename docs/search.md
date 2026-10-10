@@ -147,8 +147,13 @@ The one-way definition network contains immutable reader indexes; matching mixed
 arms share its lazy construction while each state applies definitions to its own assignment.
 Boolean break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
-Weighted compound probes snapshot and scan only factors whose degrees change, in
-factor-id order to retain the full-scan floating-point accumulation order.
+Moves feeding definitions score the complete propagated assignment, including derived
+factor degrees and objective coordinates. Probes apply compound inputs together before
+one definition pass, save affected input/output values, and restore those values directly;
+an inverse definition that cannot write does not strand a derived output. Probe activity
+is suppressed and its best-cost observation is discarded. Weighted probes snapshot and
+scan only factors whose degrees change, in factor-id order to retain the full-scan
+floating-point accumulation order.
 Committed moves reconcile cost and violated membership from exact post-move degrees.
 Reified linear invariants fuse payload updates with that degree; their ordinary apply
 methods retain the delta-returning contract for other callers. Other invariants update
