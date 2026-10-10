@@ -1,0 +1,41 @@
+name: External campaign evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: Base64-encoded xz archive containing check.py and external campaign inputs
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    name: Check external campaign evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Unpack externally staged inputs
+        env:
+          PAYLOAD: ${{ inputs.payload }}
+        run: |
+          python3 - <<'PY'
+          import base64, io, os, pathlib, tarfile
+          root = pathlib.Path('campaign')
+          root.mkdir()
+          with tarfile.open(fileobj=io.BytesIO(base64.b64decode(os.environ['PAYLOAD'])), mode='r:xz') as source:
+              source.extractall(root, filter='data')
+          PY
+      - name: Run the retained checker
+        run: python3 campaign/check.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: external-campaign-evidence
+          path: campaign/
+          retention-days: 90

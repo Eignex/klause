@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -32,6 +33,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LiveQfLraSystemTest {
+    @Test
+    fun `sparse shared definitions preserve exact source equalities`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 2), doubleArrayOf(0.5, -1.5), LinearOp.EQ, -2.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(2, 3), doubleArrayOf(2.0, 1.0), LinearOp.EQ, 1.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 3), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 4.5),
+        )
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 4,
+            realLower = DoubleArray(4) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(4) { Double.POSITIVE_INFINITY },
+            factors = factors,
+        )
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            val system = LiveQfLraSystem(source, lp)
+            assertTrue(system.install())
+            for (factor in factors) {
+                val comparison = factor.linearRows.single().exactForm(4).comparison(true) { false }
+                assertTrue(system.assertComparison(comparison, null, axiom))
+            }
+
+            val result = assertNotNull(lp.solve())
+
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+            val point = assertNotNull(result.exactPrimal)
+            assertEquals(BigFraction.ofDouble(18.5), point[0])
+            assertEquals(BigFraction.ofDouble(7.5), point[2])
+            assertEquals(BigFraction.ofLong(-14), point[3])
+        }
+    }
+
     @Test
     fun `repeated and weaker rows preserve the active bound and its premise`() {
         for (upper in listOf(false, true)) {
