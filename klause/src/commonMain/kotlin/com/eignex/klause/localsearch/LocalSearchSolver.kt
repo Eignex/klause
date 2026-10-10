@@ -117,7 +117,10 @@ class LocalSearchSolver(
      */
     override fun resumableSolve(params: LocalSearchParams): ResumableSolve = engine.resumableSolve(params)
 
-    /** Open an optimisation walk retaining its assignment, random state and restart policy across slices. */
+    /**
+     * Open an optimisation walk retaining its assignment, random state and restart policy across slices.
+     * Consume and close the handle before another search uses this solver's strategy and restart policy.
+     */
     override fun resumable(objective: LinearObjective, params: LocalSearchParams): ResumableSearch =
         engine.resumable(objective, params)
 
