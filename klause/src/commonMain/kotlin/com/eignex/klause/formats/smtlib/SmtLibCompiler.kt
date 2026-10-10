@@ -46,6 +46,7 @@ internal object Compiler {
 
         /** Open `ite`-on-equality chains and the equality atoms their conditions are read from. */
         internal val iteChains = IteChainTable()
+        internal val conditionalEqualities = SmtLibConditionalEquality()
 
         override val factors = ArrayList<Factor>()
         internal val asserts = ArrayList<SExpr>()

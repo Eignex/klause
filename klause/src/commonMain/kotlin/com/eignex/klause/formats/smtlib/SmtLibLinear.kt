@@ -88,6 +88,18 @@ internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb)
 /** Reify `a ⟨op⟩ b` onto a fresh literal, using a wide [com.eignex.klause.factor.arithmetic.ReifiedLinear]
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): Int {
+    if (op == "=" && a is IntComb.Narrow && b is IntComb.Narrow) {
+        val variable = if (b.lin.coeffs.isEmpty()) a.lin.asSimpleVar() else {
+            if (a.lin.coeffs.isEmpty()) b.lin.asSimpleVar() else null
+        }
+        if (variable != null) {
+            val value = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
+            conditionalEqualities.reify(variable, value, this)?.let { literal ->
+                if (intDomains[variable] is PresolveDomain.Finite) iteChains.noteAtom(literal, variable, value)
+                return literal
+            }
+        }
+    }
     val linOp = relLinearOp(op)
     return when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
         is LinRelation.LongRel -> reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound).also {

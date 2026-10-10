@@ -70,6 +70,13 @@ The theory packages cover difference arithmetic, LIA and LRA/LIRA. Bitvectors,
 arrays, strings, quantifiers and unrestricted non-linear arithmetic are outside
 this frontend's supported theory surface.
 
+Equalities between an integer conditional result and a constant can lower directly
+to Boolean tests of its branches. Completed conditional definitions and equality
+results are shared within one parse; nested definitions are traversed iteratively.
+A parse limits this expansion to 65,536 visits, after which comparisons retain
+their arithmetic encoding. Branch definitions remain enforced independently of
+the comparison, including open defaults and sparse decision-list selectors.
+
 Optimization emits `; objective=<value>` for each incumbent in the source objective's
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
 `best-found` and `unbounded`. These comments appear without `-s`; `sat` alone
