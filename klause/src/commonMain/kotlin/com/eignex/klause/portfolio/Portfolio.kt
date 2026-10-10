@@ -428,6 +428,11 @@ class Portfolio(
                     return@locked
                 }
                 if (claim.foundFirst) run.startImprovementPhase()
+                if (opening && handle != null && terminal == null && !failed &&
+                    worker.family == ArmFamily.LocalSearch && stats?.ls?.moves?.sum == 0.0
+                ) {
+                    run.revisitPreparation(arm)
+                }
                 // Re-seed a plateaued resumable arm: only once an incumbent exists (the feasibility hunt is never
                 // reset), and never on a segment that already returned a terminal verdict.
                 if (handle != null && terminal == null && !failed && incumbent.current() != null) {
@@ -469,6 +474,7 @@ class Portfolio(
         val sliceWork: Long,
         val whole: Boolean = false,
         val probeCount: Int = 1,
+        val preparationRevisit: Boolean = false,
     ) {
         /** The work a resumable handle's slice may spend; a negative allowance leaves it to the run's token. */
         val handleNodes: Long get() = if (whole) -1L else sliceWork
@@ -517,6 +523,7 @@ class Portfolio(
         private val retired = BooleanArray(workers.size)
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
+        private val preparationRevisits = BooleanArray(workers.size)
 
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
         private val armNanos = LongArray(workers.size)
@@ -528,6 +535,10 @@ class Portfolio(
 
         /** Whether every arm has retired. */
         val allRetired: Boolean get() = remaining == 0
+
+        fun revisitPreparation(arm: Int) {
+            if (!improving) preparationRevisits[arm] = true
+        }
 
         fun <T> locked(action: () -> T): T = lock.withLock { action() }
 
@@ -583,10 +594,13 @@ class Portfolio(
             val dedicated = lanes == workers.size
             val eligible = eligibleArms()
             val probe = if (dedicated) null else eligible.firstOrNull { !probed[it] && !busy[it] && !retired[it] }
+            val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) null else
+                eligible.firstOrNull { preparationRevisits[it] && !busy[it] && !retired[it] }
             val probing = probe != null
             val arm = when {
                 dedicated -> lane
                 probe != null -> probe.also { probed[it] = true }
+                revisit != null -> revisit.also { preparationRevisits[it] = false }
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
@@ -594,10 +608,11 @@ class Portfolio(
             Claim(
                 arm,
                 probing,
-                if (probing) baseSliceMillis else slice,
-                if (probing) baseSliceWork else sliceWork,
+                if (probing || revisit != null) baseSliceMillis else slice,
+                if (probing || revisit != null) baseSliceWork else sliceWork,
                 whole = dedicated,
                 probeCount = eligible.size,
+                preparationRevisit = revisit != null,
             )
         }
 
@@ -680,7 +695,7 @@ class Portfolio(
             }
             log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
-            if (!claim.probing) {
+            if (!claim.probing && !claim.preparationRevisit) {
                 slice = grow(slice, maxSliceMillis)
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
