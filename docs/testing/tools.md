@@ -98,7 +98,8 @@ objective and exclusion of every strictly better source objective. Unknown
 records carry no proof claim. Unbounded claims and unsupported source constructs
 are outside this checker's acceptance contract. It rejects unsupported MPS
 sections/bounds and SMT function or sort declarations rather than inferring
-their semantics. This check is separate from paired timing/provenance analysis
+their semantics. Distinct RHS, range or bound vectors are rejected instead of
+combining different source selections. This check is separate from paired timing/provenance analysis
 and from Klause's internal certificates.
 
 Use the active harness's [result records](../benchmarking.md#saved-results) and
