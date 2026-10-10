@@ -692,6 +692,8 @@ internal object Suites {
         vendored("lira-rational-min", Category.OPTIMIZATION, Expected.Sat)
         vendored("lira-rational-max", Category.OPTIMIZATION, Expected.Sat)
         vendored("lira-wide-rational", Category.CSP, Expected.Sat)
+        vendored("lia-unbounded", Category.OPTIMIZATION, Expected.Sat)
+        vendored("lia-parity-unsat", Category.CSP, Expected.Unsat)
         vendored("lia-unsat", Category.UNSAT, Expected.Unsat)
         vendored("lia-disjunction", Category.CSP, Expected.Sat)
         vendored("lra-rational", Category.CSP, Expected.Sat)

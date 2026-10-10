@@ -1,5 +1,11 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.ModelEvidence
+import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
@@ -22,7 +28,11 @@ import com.eignex.kumulant.stream.lock
  * The [lock] comes from the executor's [Concurrency]: a no-op under the single-core sequential executor,
  * a platform mutex under the parallel one.
  */
-internal class SharedVarBounds(numIntVars: Int, private val lock: Mutex = Concurrency.None.lock()) {
+internal class SharedVarBounds(
+    numIntVars: Int,
+    private val lock: Mutex = Concurrency.None.lock(),
+    private val identity: ModelIdentity? = null,
+) {
     private val lo = LongArray(numIntVars) { Long.MIN_VALUE }
     private val hi = LongArray(numIntVars) { Long.MAX_VALUE }
 
@@ -32,8 +42,20 @@ internal class SharedVarBounds(numIntVars: Int, private val lock: Mutex = Concur
 
     /** Tighten the shared bounds of [varId] toward `[lower, upper]` (keeps the tightest seen each side), as
      *  published by arm [origin]. */
-    fun publish(varId: Int, lower: Long, upper: Long, origin: Int = NO_ORIGIN) {
+    fun publish(
+        varId: Int,
+        lower: Long,
+        upper: Long,
+        origin: Int = NO_ORIGIN,
+        model: ModelIdentity? = null,
+        certificate: EvidenceCertificate? = null,
+    ) {
         if (varId !in lo.indices) return
+        if (identity != null) {
+            if (model == null) return
+            val verifier = ModelEvidenceVerifier<Unit, Pair<Long, Long>>(identity, CandidateVerifier.trusting())
+            if (verifier.verify(ModelEvidence.Bound(model, lower to upper, certificate)) !is Verification.Accepted) return
+        }
         lock.withLock {
             if (lower > lo[varId]) {
                 lo[varId] = lower

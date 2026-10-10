@@ -6,7 +6,11 @@ import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -72,7 +76,7 @@ object PortfolioBuilder {
             lsObjective,
             definitionalSweep,
             onEvent,
-            pools = poolsFor(scenario, problem, definitionalSweep),
+            pools = poolsFor(scenario, problem, definitionalSweep, objective),
         ).onEach { it.improvementOnly = it.armId >= plan.firstSolutionCount }
     }
 
@@ -132,7 +136,7 @@ object PortfolioBuilder {
         val workers = arms.mapIndexed { i, config ->
             config.materialize(
                 problem, i, armIds[i], seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
-            )
+            ).bindEvidence(ModelIdentity.of(problem, objective))
         }
         check(workers.isNotEmpty()) { "portfolio produced no workers" }
         return workers
@@ -149,10 +153,13 @@ object PortfolioBuilder {
         scenario: PortfolioScenario,
         problem: BakedProblem,
         definitionalSweep: DefinitionalSweep?,
+        objective: LinearObjective?,
     ): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
+        val identity = ModelIdentity.of(problem, objective)
         val concurrency = if (scenario.cores == 1) Concurrency.None else Concurrency.Strict
         val cuts = if (scenario.shareCuts) SharedCutPool(concurrency.lock()) else null
+        val witnessVerifier = finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck)
         // The bound managers are the dual of the shared incumbent: harmless for a CSP pool (no arm
         // publishes), so they are always present and only an optimising arm feeds them.
         return SharedPools(
@@ -162,13 +169,29 @@ object PortfolioBuilder {
                 shareMaxLen = scenario.clauseShareMaxLen,
             ),
             cuts,
-            SharedObjectiveBound(concurrency.lock()),
-            SharedVarBounds(problem.numIntVars, concurrency.lock()),
-            IncumbentExchange.minimizing(),
+            SharedObjectiveBound(concurrency.lock(), identity),
+            SharedVarBounds(problem.numIntVars, concurrency.lock(), identity.forObjective(null)),
+            IncumbentExchange<Sample, Double>(
+                improves = { candidate, standing -> candidate < standing },
+                verifier = { candidate ->
+                    if (!candidate.objective.isFinite()) {
+                        Verification.Rejected("non-finite objective ${candidate.objective}")
+                    } else {
+                        when (val checked = witnessVerifier.verify(candidate)) {
+                            is Verification.Accepted -> Verification.Accepted(
+                                Candidate(candidate.assignment, candidate.objective),
+                            )
+                            is Verification.Rejected -> checked
+                            is Verification.Indeterminate -> checked
+                        }
+                    }
+                },
+            ),
             ContributionTally(concurrency.lock()),
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
             localSearchProjection = lazy { LocalSearchProblem(problem, LocalSearchModel.of(problem).domains) },
             localSearchInvariants = lazy { definitionalSweep?.network(problem.numIntVars, problem.numBoolVars) },
+            identity = identity,
         )
     }
 }

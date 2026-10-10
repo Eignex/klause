@@ -8,9 +8,9 @@ import com.eignex.klause.localsearch.localSearchSupports
 import com.eignex.klause.lp.relaxation.lpSeed
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.portfolio.WitnessCheck
 import com.eignex.klause.portfolio.kind
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemProfile
@@ -18,6 +18,10 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -69,7 +73,7 @@ internal class OpenPortfolio(
                 ?: OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY)
         }
         val workers = buildList {
-            request?.let { add(theoryWorker(it, armId = 0)) }
+            request?.let { add(theoryWorker(it, armId = 0).bindEvidence(ModelIdentity.of(model))) }
             addAll(localSearch)
         }
         // A refutation earns the theory nothing until it lands, and one that needs most of the budget is lost if
@@ -79,9 +83,9 @@ internal class OpenPortfolio(
             lanes = lanes.coerceIn(1, workers.size),
             seed = seed,
             profile = ProblemProfile.of(model, optimizing = false),
-            witnessCheck = witnessCheck(null),
             minShares = DoubleArray(workers.size).also { if (request != null) it[0] = THEORY_SHARE },
         )
+        portfolio.evidenceVerification = PortfolioEvidence(ModelIdentity.of(model), openWitnessVerifier(model, null))
         val result = portfolio.use { it.solve(cancellation) }
         return when (result) {
             is SolveResult.Sat -> OpenTheoryResult.Sat(assignmentOf(result.assignment), result.stats)
@@ -118,7 +122,10 @@ internal class OpenPortfolio(
             gain = { standing, candidate -> (standing - candidate).toDouble() },
         )
         val workers = buildList {
-            minimizer?.let { add(descentWorker(it, armId = 0) { incumbents.exchange.integerBound() }) }
+            minimizer?.let {
+                val worker = descentWorker(it, armId = 0) { incumbents.exchange.integerBound() }
+                add(worker.bindEvidence(ModelIdentity.of(model, objective)))
+            }
             addAll(localSearch)
         }
         // A descent rebuilt for making no progress would prepare the model again and lose the round it was proving.
@@ -130,8 +137,10 @@ internal class OpenPortfolio(
             seed = seed,
             reseedStaleThreshold = 0,
             profile = ProblemProfile.of(model, optimizing = true),
-            witnessCheck = witnessCheck(objective),
             minShares = DoubleArray(workers.size).also { if (minimizer != null) it[0] = DESCENT_SHARE },
+        )
+        portfolio.evidenceVerification = PortfolioEvidence(
+            ModelIdentity.of(model, objective), openWitnessVerifier(model, objective),
         )
         val result = portfolio.use { it.minimize(cancellation, onImprovement = null, incumbents) }
         return optimumOf(result, incumbents)
@@ -305,24 +314,7 @@ internal class OpenPortfolio(
                     engine.improvements(objective, params(slice, budget, from), warm = null)
                 }
             }
-        }
-    }
-
-    // A local-search witness is re-derived from the source model, and its objective must be the one it claims: exactly
-    // wherever a Double states an integral value exactly, and within a relative tolerance where continuous terms make
-    // the claim a floating-point sum. The theory arm's witnesses are exact by construction.
-    private fun witnessCheck(objective: LinearObjective?): WitnessCheck = WitnessCheck { sample, claimed ->
-        if (sample.isTheoryWitness) return@WitnessCheck null
-        refuteOpenWitness(model, sample)?.let { return@WitnessCheck it }
-        if (objective == null || claimed == null) return@WitnessCheck null
-        val exact = objective.evaluateExact(sample)
-        val value = exact.toDouble()
-        val agrees = if (objective.realCoefficients.any { it != 0.0 }) {
-            abs(value - claimed) <= OBJECTIVE_TOLERANCE * maxOf(1.0, abs(value))
-        } else {
-            exact.num.abs() > bigIntOf(EXACT_DOUBLE_INTEGER) || value == claimed
-        }
-        if (agrees) null else "objective $claimed, but the assignment scores $exact"
+        }.onEach { it.bindEvidence(ModelIdentity.of(model, objective), provesResults = false) }
     }
 
     private companion object {
@@ -339,6 +331,36 @@ internal class OpenPortfolio(
         val SEED_BUDGET: Duration = 500.milliseconds
     }
 }
+
+internal fun openWitnessVerifier(model: Problem, objective: LinearObjective?): CandidateVerifier<Sample, Double?> =
+    CandidateVerifier { candidate ->
+        val sample = candidate.assignment
+        val claimed = candidate.objective
+        val certificate = sample.witnessCertificate
+        if (certificate != null) {
+            if (!certificate.model.sameModel(ModelIdentity.of(model)) || certificate.kind != EvidenceKind.Witness) {
+                return@CandidateVerifier Verification.Rejected("witness certificate belongs to a different model or claim")
+            }
+        } else {
+            when (val checked = verifyOpenWitness(model, sample)) {
+                is Verification.Rejected -> return@CandidateVerifier checked
+                is Verification.Indeterminate -> return@CandidateVerifier checked
+                is Verification.Accepted -> Unit
+            }
+        }
+        if (claimed?.isNaN() == true) return@CandidateVerifier Verification.Rejected("objective is NaN")
+        if (objective == null || claimed == null) return@CandidateVerifier Verification.Accepted(candidate)
+        val exact = objective.evaluateExact(sample)
+        val value = exact.toDouble()
+        val agrees = if (objective.realCoefficients.any { it != 0.0 }) {
+            abs(value - claimed) <= OBJECTIVE_TOLERANCE * maxOf(1.0, abs(value))
+        } else {
+            exact.num.abs() > bigIntOf(EXACT_DOUBLE_INTEGER) || value == claimed
+        }
+        if (agrees) Verification.Accepted(candidate) else {
+            Verification.Rejected("objective $claimed, but the assignment scores $exact")
+        }
+    }
 
 // Relative slack between a local-search arm's claimed objective and the exact one when continuous terms weigh in.
 private const val OBJECTIVE_TOLERANCE = 1e-6

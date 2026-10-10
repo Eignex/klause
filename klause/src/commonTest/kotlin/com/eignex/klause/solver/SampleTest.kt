@@ -1,14 +1,17 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -19,7 +22,7 @@ class SampleTest {
         val values = mutableListOf(wide)
         val bools = booleanArrayOf(true)
         val original = Sample(bools, LongArray(0), exactInts = values)
-        original.isTheoryWitness = true
+        original.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
         values[0] = bigIntOf(0)
         bools[0] = false
         original.bools[0] = false
@@ -29,7 +32,7 @@ class SampleTest {
         assertEquals(wide, copied.exactInts?.single())
         assertEquals(1, copied.numIntVars)
         assertTrue(copied.bools.single())
-        assertTrue(copied.isTheoryWitness)
+        assertNotNull(copied.witnessCertificate)
         assertFailsWith<IllegalStateException> { copied.ints }
         assertEquals(original, copied)
         assertEquals(original.hashCode(), copied.hashCode())
@@ -38,14 +41,14 @@ class SampleTest {
     @Test
     fun `changing coordinates discards theory acceptance`() {
         val sample = Sample(booleanArrayOf(false), longArrayOf(2), exactInts = listOf(bigIntOf(2)))
-        sample.isTheoryWitness = true
+        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
 
         val changed = sample.copy(ints = longArrayOf(3))
         val changedBoolean = sample.copy(bools = booleanArrayOf(true))
 
         assertNull(changed.exactInts)
-        assertFalse(changed.isTheoryWitness)
-        assertFalse(changedBoolean.isTheoryWitness)
+        assertNull(changed.witnessCertificate)
+        assertNull(changedBoolean.witnessCertificate)
         assertEquals(bigIntOf(2), sample.exactInts?.single())
     }
 

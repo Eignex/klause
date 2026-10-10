@@ -12,6 +12,7 @@ import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -60,6 +61,8 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
     ): PortfolioWorker {
+        val evidenceModel = ModelIdentity.of(problem, objective)
+        val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
         val workerLabel = "alns/${profile.label}"
         // Cross-repair clause sharing: one pool persists globally-valid learned clauses across
         // fragments so later repairs re-descend under earlier repairs' learning. Gated for soundness —
@@ -71,7 +74,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
         // the incumbents backtrack and LS arms find.
         val alns = Alns(
             inner = LocalSearchSolver(problem).apply {
-                pools?.localSearchProjection?.let { engine.projection = it }
+                matchedPools?.localSearchProjection?.let { engine.projection = it }
             },
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),
@@ -82,7 +85,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
             ),
             minDestroyFraction = profile.minDestroyFraction,
             maxDestroyFraction = profile.maxDestroyFraction,
-            pooledIncumbents = pools?.solutions,
+            pooledIncumbents = matchedPools?.solutions,
             acceptanceFor = acceptanceFactory(),
         )
         val params = LocalSearchParams(
@@ -102,7 +105,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
             withInstructionBudget = { p, limit ->
                 p.copy(maxInstructions = minOf(p.maxInstructions ?: Long.MAX_VALUE, limit))
             },
-        ).also { it.family = ArmFamily.Lns }
+        ).bindEvidence(evidenceModel).also { it.family = ArmFamily.Lns }
     }
 
     /**

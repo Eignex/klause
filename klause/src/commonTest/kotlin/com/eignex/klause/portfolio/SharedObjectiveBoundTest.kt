@@ -1,5 +1,8 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -43,5 +46,20 @@ class SharedObjectiveBoundTest {
         val weaker = bounds.publish(5.0)
 
         assertEquals(listOf(0.0, 4.5, 0.0), listOf(first, raise, weaker))
+    }
+    @Test
+    fun `only a matching certified objective bound changes the shared floor`() {
+        val source = Any()
+        val model = ModelIdentity.of(source, Any())
+        val other = ModelIdentity.of(source, Any())
+        val bounds = SharedObjectiveBound(identity = model)
+
+        bounds.publish(100.0, other, EvidenceCertificate.verified(other, EvidenceKind.Bound))
+        bounds.publish(100.0, model)
+        bounds.publish(100.0, model, EvidenceCertificate.verified(model, EvidenceKind.Infeasible))
+        assertEquals(Double.NEGATIVE_INFINITY, bounds.current())
+        bounds.publish(7.0, model, EvidenceCertificate.verified(model, EvidenceKind.Bound))
+
+        assertEquals(7.0, bounds.current())
     }
 }

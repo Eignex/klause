@@ -57,6 +57,16 @@ internal class ExactComparison(
         return total
     }
 
+    fun holdsAt(values: ExactColumnValues): Boolean {
+        val value = activityAt(values)
+        return when (op) {
+            LinearOp.LE -> if (strict) value < bound else value <= bound
+            LinearOp.GE -> if (strict) value > bound else value >= bound
+            LinearOp.EQ -> value == bound
+            LinearOp.NE -> value != bound
+        }
+    }
+
     /**
      * The side of a disequality [values] holds it on.
      *
