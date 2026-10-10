@@ -1158,7 +1158,8 @@ class PortfolioTest {
                     sliceMillis: Long,
                     sliceInstructions: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
-                ): MinimizeResult? = if (++slices == 1) null else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+                ): MinimizeResult? =
+                    if (++slices == 1) null else MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
             }
             val solve = object : InstructionSlicedSolve, ResumableSolve by CountingResumableSolve(100) {
                 override val isDone: Boolean get() = slices >= 2
