@@ -112,6 +112,7 @@ private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
     val variable = if (b.lin.coeffs.isEmpty()) a.lin.asSimpleVar() else {
         if (a.lin.coeffs.isEmpty()) b.lin.asSimpleVar() else null
     } ?: return null
+    closeIteChain(variable)
     val value = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
     return conditionalEqualities.reify(variable, value, this)?.also { literal ->
         if (intDomains[variable] is PresolveDomain.Finite) {
