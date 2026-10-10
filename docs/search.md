@@ -118,6 +118,8 @@ handles directly. No preparation revisit delays an unadmitted sibling.
 Greedy initialization polls cancellation between variables and retains only completed
 coordinate repairs. Its tabu/activity epoch resets on both completion and cancellation;
 one variable's bounded value probes remain atomic.
+Its coordinate eligibility uses the generic move sink's pinned, defined and implicit-owner
+filters, preserving seeded globals and one-way definitions during repair.
 Built-in initial random restarts apply implicit seeding and the definition sweep
 before initializing factor costs, avoiding an evaluation of the intermediate
 random assignment. Custom restart policies retain their ordinary restart protocol.

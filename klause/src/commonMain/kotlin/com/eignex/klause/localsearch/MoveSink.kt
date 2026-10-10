@@ -85,10 +85,15 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         return owner >= 0 && owner != proposer
     }
 
+    internal fun allowsBool(varId: Int): Boolean =
+        !assumptions.isFrozenBool(varId) && invariants?.isDefinedBool(varId) != true
+
+    internal fun allowsInt(varId: Int): Boolean =
+        !assumptions.isFrozenInt(varId) && invariants?.isDefinedInt(varId) != true && !ownedByOther(varId)
+
     /** Queue a Boolean-flip move on `boolVar`. */
     fun addBoolFlip(varId: Int) {
-        if (assumptions.isFrozenBool(varId)) return
-        if (invariants?.isDefinedBool(varId) == true) return
+        if (!allowsBool(varId)) return
         lane.add(encodeBoolFlip(varId))
         valueLane.add(0L)
         cachedList = null
@@ -96,9 +101,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
     /** Queue an int-set move on `intVar`. */
     fun addIntSet(varId: Int, newValue: Long) {
-        if (assumptions.isFrozenInt(varId)) return
-        if (invariants?.isDefinedInt(varId) == true) return
-        if (ownedByOther(varId)) return
+        if (!allowsInt(varId)) return
         lane.add(encodeIntSet(varId))
         valueLane.add(newValue)
         cachedList = null
