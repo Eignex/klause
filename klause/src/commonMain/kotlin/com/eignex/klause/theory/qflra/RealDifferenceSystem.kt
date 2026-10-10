@@ -59,11 +59,17 @@ internal class RealDifferenceSystem private constructor(
     companion object {
         private const val ALWAYS = -1
 
-        fun prepare(model: Problem, forms: List<List<ExactRowForm>>): RealDifferenceSystem? {
+        fun prepare(
+            model: Problem,
+            forms: List<List<ExactRowForm>>,
+            stop: Cancellation = Cancellation.Never,
+        ): RealDifferenceSystem? {
+            if (stop()) return null
             if (model.numIntVars != 0 || model.numRealVars == 0 || model.numRealVars > 10000) return null
             val zero = model.numRealVars
             val edges = ArrayList<Edge>()
             for (real in 0 until model.numRealVars) {
+                if (stop()) return null
                 if (model.realLower[real].isFinite() &&
                     !append(exactBound(real, model.realLower[real], false), ALWAYS, zero, edges)
                 ) return null
@@ -74,6 +80,7 @@ internal class RealDifferenceSystem private constructor(
             for ((factorIndex, factor) in model.factors.withIndex()) {
                 if (factor.linearForm is LinearForm.Disjunction) return null
                 for ((rowIndex, row) in factor.linearRows.withIndex()) {
+                    if (stop()) return null
                     if (row.size > 0 && (0 until row.size).all { Term.isBool(row.ref(it)) }) continue
                     if ((0 until row.size).any { Term.isBool(row.ref(it)) }) return null
                     val truths = if (row.activator == LinearRow.ALWAYS) listOf(true) else listOf(true, false)
@@ -94,6 +101,7 @@ internal class RealDifferenceSystem private constructor(
             val room = Long.MAX_VALUE / (4L * (zero + 2L) * (edges.size + 1L))
             val graph = DifferenceGraph(zero + 1)
             for (edge in edges) {
+                if (stop()) return null
                 if (edge.bound < -room / scale || edge.bound > room / scale) return null
                 graph.addEdge(edge.source, edge.target, edge.bound * scale - if (edge.strict) 1L else 0L)
             }
