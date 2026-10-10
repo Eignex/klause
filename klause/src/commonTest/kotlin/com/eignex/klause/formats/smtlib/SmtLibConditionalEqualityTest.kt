@@ -21,6 +21,37 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `a complete symbolic selector table resolves from its source Boolean values`() {
+        for (branch in listOf(true, false)) {
+            var images = (0..15).map { it.toString() }
+            for (bit in 0..3) {
+                images = images.chunked(2).map { pair -> "(ite b$bit ${pair[1]} ${pair[0]})" }
+            }
+            val declarations = (0..3).joinToString(" ") { "(declare-const b$it Bool)" }
+            val assertions = (0..3).joinToString(" ") { "(assert ${if (branch) "b$it" else "(not b$it)"})" }
+            val chain = (0..15).toList().foldRight("99") { key, rest -> "(ite (= selector $key) ${key * 10} $rest)" }
+            val parsed = SmtLib.parse(
+                """
+                $declarations $assertions
+                (assert (let ((selector ${images.single()}))
+                    (let ((result $chain)) (= result ${if (branch) 150 else 0}))))
+                """.trimIndent(),
+            )
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Satisfied>(
+                session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
+            )
+
+            for (bit in 0..3) assertEquals(branch, session.boolValue(parsed.boolVarNames.getValue("b$bit")))
+        }
+    }
+
+    @Test
     fun `a decision list over a symbolic selector completes without numeric predicate decisions`() {
         for (branch in listOf(true, false)) {
             val chain = (0..15).toList().foldRight("99") { key, rest -> "(ite (= selector $key) $key $rest)" }
