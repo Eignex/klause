@@ -320,6 +320,10 @@ Factor data and engine projections are separate: the local-search projection sup
 an `Invariant`, while mutable payloads belong to each `LocalSearchState`.
 Comparison-clause integer scores substitute the target in every matching literal,
 including repeated variables, and retain the minimum saturated comparison shortfall.
+Violated comparison clauses offer admissible literal bounds in addition to neighboring
+values. Inequalities round toward the satisfying side of domain holes; unreachable
+equalities are declined. Targets use coordinated channeling and inverse repairs,
+with pinned and implicitly owned source coordinates protected before synthesis.
 Candidate `deltaIf*` methods return the exact degree change. Ordinary `apply*` methods
 update payloads after the assignment changes; their return values are implementation-specific
 and callers must read the post-move degree for scoring. Reified linear invariants offer

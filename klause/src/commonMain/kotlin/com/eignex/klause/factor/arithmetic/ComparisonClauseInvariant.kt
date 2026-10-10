@@ -3,8 +3,11 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.distance
 import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.ceilingOrNull
+import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.MoveSink
 
 /**
  * Local-search invariant for [ComparisonClause]: violated iff no literal holds under the current
@@ -27,6 +30,31 @@ internal class ComparisonClauseInvariant(
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int =
         degreeAt(state, intVar, newValue) - state.factorDegree[factorId]
+
+    override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (!isViolated(state, factorId)) return
+        for (i in vars.indices) {
+            val variable = vars[i]
+            if (!sink.allowsDefinedInt(variable)) continue
+            val domain = state.rootDomains[variable]
+            val target = when (ops[i]) {
+                LinearOp.LE -> domain.floorOrNull(consts[i])
+                LinearOp.GE -> domain.ceilingOrNull(consts[i])
+                LinearOp.EQ -> consts[i].takeIf { it in domain }
+                LinearOp.NE -> null
+            }
+            if (target != null && target != state.assignment.intValue(variable)) {
+                sink.addChannelingIntSet(state, variable, target)
+            }
+        }
+        for (variable in state.problem.factors[factorId].intVars) {
+            if (!sink.allowsDefinedInt(variable)) continue
+            val current = state.assignment.intValue(variable)
+            val domain = state.rootDomains[variable]
+            if (current < domain.max) sink.addChannelingIntSet(state, variable, domain.higher(current))
+            if (current > domain.min) sink.addChannelingIntSet(state, variable, domain.lower(current))
+        }
+    }
 
     private fun degreeAt(state: LocalSearchState, intVar: Int, newValue: Long): Int {
         var best = Long.MAX_VALUE
