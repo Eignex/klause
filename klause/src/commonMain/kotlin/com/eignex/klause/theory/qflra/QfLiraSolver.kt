@@ -549,6 +549,10 @@ class ExactLiraSearchComponent(
         ) {
             return ComponentResult.Consistent
         }
+        val asserted = assertSource(context)
+        if (!asserted || operationStop()) {
+            return ComponentResult.Indeterminate
+        }
         var checked = false
         // Graph evidence has no LP certifier identity to offer an overridden acceptance policy.
         if (node.sourceBranches.isEmpty() && solveContext.certificationPolicy === ProductionLpCertificationPolicy) {
@@ -572,10 +576,6 @@ class ExactLiraSearchComponent(
                     }
                 }
             }
-        }
-        val asserted = assertSource(context)
-        if (!asserted || operationStop()) {
-            return ComponentResult.Indeterminate
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve(sparsePointRecovery = true)

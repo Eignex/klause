@@ -90,7 +90,8 @@ Boolean guards select active edges. With `n` graph vertices, scaling bounds by
 `n+1` and subtracting one from strict edges preserves every simple cycle's sign,
 including zero-weight strict cycles. Feasible graphs supply rational potentials;
 witnesses still pass the complete source-row check. Infeasible graphs retain the
-shared LP route for conflict explanations and learning. Fractional normalized bounds, unsafe Long magnitudes, disequalities,
+shared LP route for conflict explanations and learning. Active source rows remain
+asserted in the shared LP scope even when a graph witness skips its solve. Fractional normalized bounds, unsafe Long magnitudes, disequalities,
 private disjunctions, Boolean arithmetic beyond shared clauses/cardinalities,
 and mixed integer/real models retain the exact LP route.
 Overridden LP certification policies retain the LP route because graph evidence
