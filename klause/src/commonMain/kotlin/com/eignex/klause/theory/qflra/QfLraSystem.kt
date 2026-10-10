@@ -206,6 +206,25 @@ internal class LiveQfLraSystem(
         return true
     }
 
+    fun termColumn(comparison: ExactComparison): Int? {
+        val key = preparedTerms[comparison.ordered]?.positive ?: return null
+        val term = normalized[key]?.term ?: return null
+        return term.coefficients.keys.singleOrNull() ?: definitions[term.coefficients]
+    }
+
+    fun activityBound(comparison: ExactComparison, upper: Boolean): SmtActivityBound? {
+        val key = preparedTerms[comparison.ordered]?.positive ?: return null
+        val term = normalized[key]?.term ?: return null
+        if (term.coefficients.isEmpty()) {
+            return SmtActivityBound(term.offset, false, term.premise(SearchAtomPremise.All(emptyList())))
+        }
+        val column = termColumn(comparison) ?: return null
+        val sideUpper = if (term.scale.signum() < 0) !upper else upper
+        val side = lp.state?.activeSide(column, sideUpper)?.side ?: return null
+        val premise = lp.activeBoundPremise(column, sideUpper) ?: return null
+        return SmtActivityBound(term.sourceValue(side.number.value), side.strict, term.premise(premise))
+    }
+
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
         val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
         val fixed = rootFixedColumns(key.columns)
@@ -333,6 +352,8 @@ internal class LiveQfLraSystem(
 }
 
 internal data class DerivedDisequalitySide(val direction: LinearOp, val premise: SearchAtomPremise)
+
+internal data class SmtActivityBound(val value: BigFraction, val strict: Boolean, val premise: SearchAtomPremise)
 
 // A term as a lookup key: columns ascending, with the hash taken once, since every theory check reasserts the same
 // rows and a map-keyed lookup pays a hash probe per entry to compare.

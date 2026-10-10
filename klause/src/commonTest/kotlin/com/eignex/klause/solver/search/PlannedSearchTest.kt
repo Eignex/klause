@@ -131,7 +131,7 @@ class PlannedSearchTest {
         assertEquals(FactorOwner.THEORY, plan.factorOwner(1))
         assertEquals(FactorOwner.THEORY, plan.factorOwner(2))
 
-        assertIs<ComponentResult.Consistent>(planned.session.initialize())
+        assertIs<ComponentResult.Conflict>(planned.session.initialize())
 
         assertIs<SearchResult.Exhausted>(planned.session.solve(0))
     }
