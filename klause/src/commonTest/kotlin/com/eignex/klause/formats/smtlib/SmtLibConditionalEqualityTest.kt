@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -20,6 +21,32 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `a mixed real constraint retains its conditional value after unused definitions are omitted`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const x Int) (declare-const r Real)
+            (assert b) (assert (= x 9))
+            (assert (= (ite b 0 1) 0))
+            (assert (= r (+ (to_real (ite b x 7)) 0.5)))
+            """.trimIndent(),
+        )
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(
+                BigFraction.of(bigIntOf(19), bigIntOf(2)), assignment.reals[parsed.realVarNames.getValue("r")],
+            )
+        }
+    }
+
     @Test
     fun `a complete symbolic selector table resolves from its source Boolean values`() {
         for (branch in listOf(true, false)) {
@@ -140,12 +167,13 @@ class SmtLibConditionalEqualityTest {
     }
 
     @Test
-    fun `a conditional used only by an objective retains its branch value`() {
+    fun `a conditional objective retains its branch value after unused definitions are omitted`() {
         for (branch in listOf(true, false)) {
             val parsed = SmtLib.parse(
                 """
                 (declare-const b Bool)
                 (assert ${if (branch) "b" else "(not b)"})
+                (assert (= (ite b 1 2) ${if (branch) 1 else 2}))
                 (minimize (ite b 3 8))
                 """.trimIndent(),
             )
