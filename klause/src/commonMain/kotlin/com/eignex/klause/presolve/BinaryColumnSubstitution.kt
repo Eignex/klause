@@ -41,7 +41,7 @@ import com.eignex.klause.util.LongArrayList
  *    is a fixpoint — disqualifying one column disqualifies its rows, and those rows' other columns with
  *    them.
  *
- * A single-variable reified equality `b ↔ (x = 0|1)` over a binary column becomes a Boolean
+ * A single-variable reified relation whose truth differs at 0 and 1 becomes a Boolean
  * literal carrying the integer value. Additional indicators become Boolean equivalences to that literal.
  * Other factor kinds read their integer variables value-wise (a global, a general reified
  * row, a product), so a column they mention stays an integer column.
@@ -149,10 +149,16 @@ internal object BinaryColumnSubstitution {
     private fun Factor.binaryChannelLiteral(): Int {
         val channel = this as? ReifiedLinear ?: return Lit.NONE
         val row = channel.integerConstants ?: return Lit.NONE
-        if (channel.vars.size != 1 || channel.op != LinearOp.EQ || row.coeff(0) != 1L ||
-            row.bound !in 0L..1L
-        ) return Lit.NONE
-        return Lit.make(channel.auxBoolVar, row.bound == 1L)
+        if (channel.vars.size != 1) return Lit.NONE
+        fun holds(value: Long): Boolean = when (channel.op) {
+            LinearOp.LE -> value <= row.bound
+            LinearOp.GE -> value >= row.bound
+            LinearOp.EQ -> value == row.bound
+            LinearOp.NE -> value != row.bound
+        }
+        val atZero = holds(0L)
+        val atOne = holds(row.coeff(0))
+        return if (atZero == atOne) Lit.NONE else Lit.make(channel.auxBoolVar, atOne)
     }
 
     /** Recover the substituted columns' integer values from their literals and drop the added Booleans, so

@@ -60,6 +60,38 @@ class BinaryColumnSubstitutionTest {
     }
 
     @Test
+    fun `unary binary inequalities and disequalities preserve their source assignments`() {
+        for ((op, coefficient, bound) in listOf(
+            Triple(LinearOp.LE, 2L, 0L),
+            Triple(LinearOp.LE, -2L, -1L),
+            Triple(LinearOp.GE, 2L, 1L),
+            Triple(LinearOp.GE, -2L, -1L),
+            Triple(LinearOp.NE, 2L, 0L),
+            Triple(LinearOp.NE, 2L, 2L),
+            Triple(LinearOp.EQ, Long.MIN_VALUE, Long.MIN_VALUE),
+        )) {
+            val model = Problem(
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = binary(1),
+                factors = listOf(ReifiedLinear(0, longArrayOf(coefficient), intArrayOf(0), op, bound)),
+            )
+            val result = checkNotNull(substitute(model))
+            val expected = buildSet {
+                for (indicator in listOf(false, true)) for (value in 0L..1L) {
+                    if (satisfies(model, booleanArrayOf(indicator), longArrayOf(value))) add(indicator to value)
+                }
+            }
+
+            val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+                .map(result.reconstruct).map { it.bools.single() to it.ints.single() }.toList()
+
+            assertEquals(expected, assignments.toSet())
+            assertEquals(expected.size, assignments.size)
+        }
+    }
+
+    @Test
     fun `multiple binary indicators retain their shared integer meaning`() {
         val model = Problem(
             numBoolVars = 2,
