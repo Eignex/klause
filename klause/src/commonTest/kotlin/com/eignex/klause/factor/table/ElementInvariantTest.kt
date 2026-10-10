@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -17,6 +18,30 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ElementInvariantTest {
+
+    @Test
+    fun `index repair rejects conflicting targets for a shared coordinate`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 0),
+            Linear(intArrayOf(2, 1, -1), intArrayOf(1, 2, 3), LinearOp.EQ, 0),
+            Element(3, 4, longArrayOf(1, 9, 1, 9), arrIsVars = false, indexOffset = 0),
+        )
+        val problem = Problem(
+            0, 5,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(9, 9)),
+            factors,
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setInt(4, 9)
+        state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 5, intArrayOf(1, 2, 3))).network(5, 0)
+        state.recompute()
+
+        state.factors[3].proposeRepairMoves(state, 3, state.moveSink)
+        state.apply(state.moveSink.list.single())
+
+        assertEquals(0L, state.cost)
+    }
 
     @Test
     fun `affine index repairs reach matching cells through coordinate moves`() {

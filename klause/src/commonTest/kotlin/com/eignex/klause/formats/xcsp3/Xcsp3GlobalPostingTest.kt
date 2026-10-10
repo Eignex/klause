@@ -173,6 +173,8 @@ class Xcsp3GlobalPostingTest {
         val state = LocalSearchState(problem.bake(), Random(5))
         val row = parsed.intVarNames.getValue("i")
         val col = parsed.intVarNames.getValue("j")
+        state.assignment.setInt(parsed.intVarNames.getValue("b"), 1)
+        state.assignment.setInt(parsed.intVarNames.getValue("v"), 1)
         state.assignment.setInt(row, 0)
         state.assignment.setInt(col, 1)
         state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
@@ -259,8 +261,11 @@ class Xcsp3GlobalPostingTest {
     @Test
     fun `an element repair moves through a materialized affine index`() {
         val parsed = parse(
-            "<element startIndex=\"1\"><list>0 9</list><index>add(day,1)</index><value>v</value></element>",
-            "<var id=\"day\">0..1</var><var id=\"v\">9</var>",
+            """
+            <sum><list>add(day,1)</list><condition>(eq,index)</condition></sum>
+            <element startIndex="1"><list>0 9</list><index>index</index><value>v</value></element>
+            """.trimIndent(),
+            "<var id=\"day\">0..1</var><var id=\"v\">9</var><var id=\"index\">1..2</var>",
         )
         val problem = parsed.problem
         val day = parsed.intVarNames.getValue("day")
@@ -270,6 +275,7 @@ class Xcsp3GlobalPostingTest {
         state.assignment.setInt(day, 0)
         state.assignment.setInt(element.idx, 1)
         state.assignment.setInt(element.result, 9)
+        for (v in parsed.definedVars) state.assignment.setInt(v, 1)
         state.invariants = assertNotNull(
             DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars),
         ).network(problem.numIntVars, problem.numBoolVars)
