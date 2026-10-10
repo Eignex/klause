@@ -107,6 +107,11 @@ and its heap belong to the solve, retain conflict bumps across restarts, and app
 received before the first selection once during initialization. Fresh selectors isolate
 solves that share a projection.
 
+Cumulative edge-finding runs in both time directions over fixed durations, demands
+and capacity. Reversed deductions tighten latest starts and cite the historical
+integer bounds and definitely-present task premises. Arithmetic ranges that cannot
+be represented safely decline the reversed pass.
+
 Propagators supply sound source
 reasons for deductions and conflicts. An assignment's undo lifetime can be deeper
 than the effective level of its reason: Boolean pins use the deeper of that level

@@ -14,9 +14,13 @@ import com.eignex.klause.propagation.boolPinnedAt
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.addExact
 import com.eignex.klause.util.argsortBy
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 
 /**
  * CP propagator for [Cumulative]. Constructed by the propagation projection and holds the
@@ -63,6 +67,10 @@ internal class CumulativePropagator(
         when (p[0]) {
             TIME_TABLE -> shaveReason(p[1], lower = p[2] == 1, unpack(p, 3))
             EDGE -> edgeReason(p[1], tau = unpack(p, 2))
+            REVERSE_EDGE -> {
+                for (v in intVars) domainOf(v)
+                for (i in 0 until n) if (present(i)) task(i)
+            }
             ENERGY -> energyReason(p[1], kind = p[2], xMin = unpack(p, 3), xMax = unpack(p, 5))
             else -> heightReason(p[1])
         }
@@ -157,6 +165,7 @@ internal class CumulativePropagator(
             }
         }
         if (!edgeFindingPass(state, effDur, effRes, effCap)) return false
+        if (!edgeFindingPass(state, effDur, effRes, effCap, reverse = true)) return false
         val profile = MandatoryProfile()
         for (i in 0 until n) {
             if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
@@ -300,7 +309,13 @@ internal class CumulativePropagator(
         return true
     }
 
-    private fun edgeFindingPass(state: PropagationState, effDur: LongArray, effRes: LongArray, effCap: Long): Boolean {
+    private fun edgeFindingPass(
+        state: PropagationState,
+        effDur: LongArray,
+        effRes: LongArray,
+        effCap: Long,
+        reverse: Boolean = false,
+    ): Boolean {
         if (n < 2 || effCap == 0L) return true
         val active = IntArrayList()
         for (i in 0 until n) {
@@ -311,10 +326,36 @@ internal class CumulativePropagator(
         if (m < 2) return true
 
         val taskIds = IntArray(m) { active[it] }
-        val ests = LongArray(m) { state.intDomains[starts[taskIds[it]]].min }
-        val lcts = LongArray(m) { state.intDomains[starts[taskIds[it]]].max + effDur[taskIds[it]] }
+        val ests = LongArray(m)
+        val lcts = LongArray(m)
+        try {
+            for (i in 0 until m) {
+                val task = taskIds[i]
+                val domain = state.intDomains[starts[task]]
+                ests[i] = if (reverse) subExact(0, addExact(domain.max, effDur[task])) else domain.min
+                lcts[i] = if (reverse) subExact(0, domain.min) else addExact(domain.max, effDur[task])
+            }
+        } catch (_: CheckedLongOverflowException) {
+            return true
+        }
         val energies = LongArray(m) { effDur[taskIds[it]] * effRes[taskIds[it]] }
         val cs = LongArray(m) { effRes[taskIds[it]] }
+        if (reverse) {
+            try {
+                var totalEnergy = 0L
+                for (i in 0 until m) {
+                    totalEnergy = addExact(totalEnergy, mulExact(effDur[taskIds[i]], cs[i]))
+                    if (mulExact(effCap, ests[i]) <= CumulativeThetaTree.NO_ENV) return true
+                    addExact(mulExact(effCap, lcts[i]), totalEnergy)
+                }
+                val width = subExact(lcts.max(), ests.min())
+                addExact(mulExact(effCap, width), totalEnergy)
+                addExact(mulExact(effCap, ests.max()), totalEnergy)
+            } catch (_: CheckedLongOverflowException) {
+                return true
+            }
+        }
+
 
         val estOrder = argsortBy(m) { a, b -> ests[a].compareTo(ests[b]) }
         val leafPos = IntArray(m)
@@ -334,7 +375,14 @@ internal class CumulativePropagator(
                 k++
             }
             val envTheta = tree.envOfTheta()
-            if (envTheta > effCap * tau) return fail(state) { thetaOverload(tau) }
+            if (envTheta > effCap * tau) return fail(state) {
+                if (reverse) {
+                    for (v in intVars) domainOf(v)
+                    for (i in 0 until n) if (present(i)) task(i)
+                } else {
+                    thetaOverload(tau)
+                }
+            }
             for (ki in k until m) {
                 val i = lctOrder[ki]
                 val envWith = tree.envIfActivated(i, ests[i], energies[i])
@@ -342,7 +390,16 @@ internal class CumulativePropagator(
                 if (omegas.thetaSize != k) omegas.build(k, lctOrder, ests, lcts, energies)
                 val newEst = omegas.earliestStartAfter(cs[i], effCap) ?: continue
                 val task = taskIds[i]
-                if (!tightenMin(state, starts[task], newEst, packed(EDGE, task, tau))) return false
+                if (reverse) {
+                    val newMax = try {
+                        subExact(subExact(0, newEst), effDur[task])
+                    } catch (_: CheckedLongOverflowException) {
+                        continue
+                    }
+                    if (!tightenMax(state, starts[task], newMax, intArrayOf(REVERSE_EDGE))) return false
+                } else {
+                    if (!tightenMin(state, starts[task], newEst, packed(EDGE, task, tau))) return false
+                }
             }
         }
         return true
@@ -624,6 +681,7 @@ internal class CumulativePropagator(
         const val EDGE = 1
         const val ENERGY = 2
         const val HEIGHT = 3
+        const val REVERSE_EDGE = 4
 
         const val RESOURCE = 0
         const val DURATION = 1
