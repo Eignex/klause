@@ -16,6 +16,7 @@ Keep source/build identities, selection, settings and raw records in the bundle.
 The checker must distinguish reported outcomes from independent source/proof
 validation and reject incomplete comparisons before interpreting timings.
 The workflow uploads inputs, checking code and results even when checking fails.
-Artifacts expire after 90 days; preserve measurement archives separately.
+Artifacts expire after 90 days. Retain external archives while the campaign is
+active, then retire them after promoting useful conclusions, tools or fixtures.
 Promote reusable harness tools and fixtures into `klause-bench`; keep campaign-only
 scripts and generated results in the external staging directory.
