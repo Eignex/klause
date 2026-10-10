@@ -77,7 +77,7 @@ class LocalSearchState(
 
     /** Per-invariant graded violation degree (0 = satisfied), the source of truth for both
      *  [violated]-set membership (`degree > 0`) and [cost] (`Σ factorDegree`). Maintained
-     *  incrementally from each invariant's `deltaIf*`/`apply*` and recomputed from
+     *  from exact post-move degrees after updating invariant payloads, and recomputed from
      *  [Invariant.violationDegree] at [recompute]. The graded sum gives CBLS a descent gradient on
      *  tight arithmetic/global constraints rather than a flat count of violated invariants. */
     val factorDegree: IntArray = IntArray(problem.numFactors)
