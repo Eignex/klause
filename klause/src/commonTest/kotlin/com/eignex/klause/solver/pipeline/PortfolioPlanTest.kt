@@ -39,7 +39,7 @@ class PortfolioPlanTest {
             scenario.copy(kind = Kind.CSP),
             scenario.copy(engine = EngineMix.BACKTRACK),
             scenario.copy(lpCeiling = LpConfig.OFF),
-            scenario.copy(lpCeiling = LpConfig.DEFAULT.copy(overrides = mapOf(LpTechnique.BOUNDING to false))),
+            scenario.copy(lpCeiling = LpConfig(overrides = mapOf(LpTechnique.BOUNDING to false))),
             scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") }),
         )
 
