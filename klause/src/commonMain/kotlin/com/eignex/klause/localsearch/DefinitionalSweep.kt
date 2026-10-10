@@ -463,16 +463,21 @@ class InvariantNetwork internal constructor(
     private val boolReaders: Array<IntArray>
 
     init {
-        val intLists = Array(numIntVars) { IntArrayList(0) }
-        val boolLists = Array(numBoolVars) { IntArrayList(0) }
         for (i in nodeArr.indices) {
             val n = nodeArr[i]
             if (n.outIsBool) definedBool[n.out] = true else definedInt[n.out] = true
-            for (v in n.intInputs) intLists[v].add(i)
-            for (v in n.boolInputs) boolLists[v].add(i)
         }
-        intReaders = Array(numIntVars) { intLists[it].toIntArray() }
-        boolReaders = Array(numBoolVars) { boolLists[it].toIntArray() }
+        intReaders = readers(numIntVars) { it.intInputs }
+        boolReaders = readers(numBoolVars) { it.boolInputs }
+    }
+
+    private inline fun readers(slots: Int, inputs: (DefinitionalSweep.SweepNode) -> IntArray): Array<IntArray> {
+        val counts = IntArray(slots)
+        for (node in nodeArr) for (v in inputs(node)) counts[v]++
+        val result = Array(slots) { if (counts[it] == 0) EmptyIntArray else IntArray(counts[it]) }
+        counts.fill(0)
+        for (i in nodeArr.indices) for (v in inputs(nodeArr[i])) result[v][counts[v]++] = i
+        return result
     }
 
     /** Number of indexed definitions. */

@@ -107,6 +107,8 @@ before initializing factor costs, avoiding an evaluation of the intermediate
 random assignment. Custom restart policies retain their ordinary restart protocol.
 ALNS skips its local-search fallback when the complete-engine bootstrap returns
 without an incumbent after cancellation, avoiding fresh seeding after the deadline.
+The one-way definition network contains immutable reader indexes; matching mixed-pool
+arms share its lazy construction while each state applies definitions to its own assignment.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.

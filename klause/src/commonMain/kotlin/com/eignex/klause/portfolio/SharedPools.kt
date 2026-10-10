@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.Sample
@@ -24,4 +25,5 @@ internal class SharedPools(
     /** Shared clause arena and occurrence indices; native arms keep their watches and trail private. */
     val nativeProjection: PropagationProblem? = null,
     val localSearchProjection: Lazy<LocalSearchProblem>? = null,
+    val localSearchInvariants: Lazy<InvariantNetwork?>? = null,
 )

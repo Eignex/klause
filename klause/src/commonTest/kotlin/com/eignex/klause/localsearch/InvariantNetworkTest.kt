@@ -36,6 +36,30 @@ class InvariantNetworkTest {
     """.trimIndent()
 
     @Test
+    fun `states sharing a definition network propagate their own assignments`() {
+        val execution = parseFlatZincExecution(src)
+        val program = execution.program
+        val network = assertNotNull(execution.definitionalSweep)
+            .network(program.problem.numIntVars, program.problem.numBoolVars)
+        val problem = program.problem.bake()
+        val first = LocalSearchState(problem, Random(5))
+        val second = LocalSearchState(problem, Random(7))
+        val iv = program.intVarsByName
+        for (state in listOf(first, second)) {
+            state.recompute()
+            state.invariants = network
+            state.apply(Move.IntSet(iv.getValue("x"), 7))
+            state.apply(Move.IntSet(iv.getValue("y"), 0))
+        }
+
+        first.apply(Move.IntSet(iv.getValue("x"), 10))
+        second.apply(Move.IntSet(iv.getValue("y"), 2))
+
+        assertEquals(5, first.assignment.intValue(iv.getValue("s")))
+        assertEquals(0, second.assignment.intValue(iv.getValue("s")))
+    }
+
+    @Test
     fun `defined vars track their inputs across applied moves`() {
         val execution = parseFlatZincExecution(src)
         val program = execution.program

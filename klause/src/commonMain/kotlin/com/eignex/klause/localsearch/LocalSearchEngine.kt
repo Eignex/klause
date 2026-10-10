@@ -60,6 +60,9 @@ internal class LocalSearchEngine(
 ) {
     private val problem: Problem = model.problem
     internal var projection: Lazy<LocalSearchProblem> = lazy { LocalSearchProblem(problem, model.domains) }
+    internal var invariantNetwork: Lazy<InvariantNetwork?> = lazy {
+        definitionalSweep?.network(problem.numIntVars, problem.numBoolVars)
+    }
 
     // Decides each candidate of a model with continuous columns, whose rows are only scored within a tolerance.
     // Null on a model without them, which scores every row exactly and needs no decision.
@@ -122,8 +125,7 @@ internal class LocalSearchEngine(
 
     private fun installInvariants(state: LocalSearchState) {
         if (!perMoveInvariants) return
-        val sweep = definitionalSweep ?: return
-        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        state.invariants = invariantNetwork.value
     }
 
     /** A one-line summary of this engine's configuration under [params]. */
