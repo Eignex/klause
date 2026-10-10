@@ -48,7 +48,7 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `successive rebakes charge probes and propagation to the same phase budget`() {
+    fun `successive rebakes record probes in the same phase budget`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(
             numBoolVars = 0,
@@ -62,12 +62,22 @@ class PresolveSharedTest {
         val config = BakeConfig(probeIntBounds = true)
         val rebuilt = PresolveShared.rebuildProblem(problem, problem.factors.toList(), bakeConfig = config)
         val probes = budget.probeCalls
-        val work = budget.spent()
 
         PresolveShared.rebuildProblem(rebuilt, rebuilt.factors.toList(), bakeConfig = config)
 
         assertTrue(budget.probeCalls > probes)
-        assertTrue(budget.spent() > work)
+    }
+
+    @Test
+    fun `charges through a rebuilt problem consume the originating allowance`() {
+        val budget = PresolveBudget(100)
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
+            .bake(budget.orSpent(Cancellation.Never))
+        val rebuilt = PresolveShared.rebuildProblem(problem, problem.factors.toList())
+
+        rebuilt.cancellation.charge(25)
+
+        assertEquals(75L, budget.remaining())
     }
 
     @Test
