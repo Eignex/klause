@@ -1,6 +1,6 @@
 # Koblas integration
 
-Klause owns sparse LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic and scratch
+Klause owns sparse and small dense LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic and scratch
 lifetime. Koblas supplies validated CSC containers, indexed/vector Level 1 kernels and generic sparse
 primitives. There is one floating simplex with exact certification; vendor selection does not change
 numerical authority or create another solver.
@@ -58,7 +58,7 @@ dependencies when updating either library.
 
 | Consumer | Integration contract |
 |---|---|
-| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Each builder owns fixed-size LU scratch; solve-quality checks reuse one dense product buffer. Factor materialization and updates allocate their owned output arrays directly. |
+| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Each builder owns fixed-size LU scratch; solve-quality checks reuse one dense product buffer. Factor materialization and updates allocate their owned output arrays directly. The bounded dense LU path uses GER with owner-local matrix/vector buffers and publishes owned CSC factors; arithmetic guards and failed-attempt work remain in Klause. |
 | Sparse slice workflows | Validate windows, indices, capacity and overlap before mutation. Unique scatter/touched support, first-touch order, structural zeros until explicit compaction, positive-zero clearing. Checked scatter delegates to generic primitives; checked dot preserves scalar input order and underflow/nonfinite diagnostics. |
 | `lp.engine` | Pricing and column updates use indexed kernels; checked workflows retain solver semantics. Scaling/refinement keep guarded powers of two, exact accumulation and source maps. No dense vendor Level 2/3 call is required. |
 | `util.SparseSlices` | Shared validated slice workflows serve the LP engine and basis without adding a solver-layer dependency. Other array/permutation/domain helpers have no koblas consumers. |
