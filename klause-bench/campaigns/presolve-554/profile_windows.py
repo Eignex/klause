@@ -23,7 +23,7 @@ def summarize(root):
         if hashlib.sha256(record_bytes).hexdigest() != manifest['recordSha256']:
             raise ValueError('record differs from measurement manifest')
         events = json.loads(subprocess.check_output([
-            'jfr', 'print', '--json', '--events',
+            'jfr', 'print', '--json', '--stack-depth', '32', '--events',
             'jdk.JVMInformation,jdk.ExecutionSample', str(path),
         ]))['recording']['events']
         jvm = next(event['values'] for event in events if event['type'] == 'jdk.JVMInformation')
@@ -58,6 +58,7 @@ def summarize(root):
                                     if name.startswith('com.eignex.klause')][:30],
             }
         yield {'problem': record['problem'], 'measurementId': manifest['measurementId'],
+               'printedStackDepth': 32,
                'budgetMs': record['budgetMs'], 'elapsedMs': record['elapsedMs'],
                'presolvePreparationMs': record['stats'].get('presolvePreparationMs'),
                'clock': 'CLI JVM uptime; its nominal-budget boundary is not an exact presolve deadline timestamp.',

@@ -276,8 +276,48 @@ unchanged; the frozen holdout is not used to rescue or select a failed candidate
 
 Job 907 completed all 108 cases with no failed case statuses. Final cases, job,
 reference, file listing and worker/setup logs are archived under `evidence/907`.
-CI computes its focused comparison; discovery remains running and no holdout
-candidate has been selected.
+[CI run 38007888429](https://github.com/Eignex/klause/actions/runs/38007888429)
+produced `evidence/907/analysis.json.gz`. All 36 matched blocks are complete, with
+identical source hashes, one production fingerprint, one search arm, no excluded
+pairs and no invalid source checks. Discovery remains running; no holdout candidate
+has been selected.
+
+| Configuration | Reported witnesses (proved) | Source-valid witnesses | Median preparation ms | Maximum preparation ms | Process PAR2 ratio (95% family interval) | Mean quality (95% family interval) |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| Default | 30 (2) | 12 | 390.5 | 3,172 | 1 | 0 |
+| Aggressive | 16 (2) | 4 | 20,259.5 | 300,237 | 1.881 (1.198–3.144) | -0.444 (-0.833–-0.111) |
+| Aggressive capped | 17 (2) | 4 | 4,571 | 423,792 | 1.428 (0.720–2.788) | -0.389 (-0.722–-0.111) |
+
+Each comparison has 36 timing pairs across six base families and four independently
+checked witness pairs. Unknown source checks remain disclosed reported outcomes.
+Every paired work signature changes. Median aggregate probe calls fall from
+102,951.5 to 19,258.5 under the integer caps; default records zero probes. The largest
+observed round-entry count is seven, below the cap of 16, so this screen does not
+justify expanding the round limit.
+
+| Family | Aggressive quality | Capped quality | Aggressive process ratio | Capped process ratio | Median preparation ms: default / aggressive / capped |
+| --- | ---: | ---: | ---: | ---: | --- |
+| carpet-cutting | -0.667 | -0.667 | 1.088 | 0.357 | 141.5 / 14,557 / 4,366 |
+| multi-knapsack | 0 | 0 | 1.022 | 1.017 | 294.5 / 7,136 / 1,893.5 |
+| cargo | 0 | 0 | 1.402 | 0.913 | 315 / 25,924.5 / 4,718.5 |
+| gfd-schedule | -1 | -1 | 3.286 | 3.286 | 406 / 300,203.5 / 416,935 |
+| gbac | -1 | -0.667 | 5.775 | 5.122 | 3,099 / 299,946 / 302,134.5 |
+| filters | 0 | 0 | 1.500 | 1.518 | 617.5 / 1,331 / 1,327.5 |
+
+Each family contributes six pairs. Cargo has two candidate improvements, two
+regressions and two ties in each comparison; its mean zero hides that variation.
+Both aggressive variants lose all six GFD witnesses; aggressive also loses all
+six GBAC witnesses, while capped aggressive reports one GBAC improvement and five
+regressions. The capped carpet ratio below one includes worse final objectives in
+four pairs. On its two equal-outcome carpet pairs the ratio is 9.167; aggressive's
+is 26.763. Across the 16 equal-outcome pairs (four families, including unknown ties),
+the ratios are 2.531 (1.011–11.830) and 1.939 (1.008–5.290). These selected subsets
+are descriptive, not causal estimates or quality-adjusted speedups.
+
+The focused screen supports keeping aggressive opt-in. Integer caps reduce probe
+counts and typical preparation cost, but do not provide a hard elapsed-time bound
+and do not recover default quality on this sample. Neither aggressive variant is
+a global-default candidate under the registered selection rule.
 
 ## Separate deadline diagnostic
 
