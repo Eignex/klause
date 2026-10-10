@@ -223,7 +223,7 @@ internal class MpsOutput(
         sourceObjective()?.let(::exactMpsNumber) ?: scaledDecimal(objective, objectiveScale)
 
     override fun formatExactObjective(objective: BigFraction): String =
-        exactMpsNumber(sourceObjective() ?: (objective / BigFraction.ofLong(objectiveScale)))
+        exactMpsNumber(sourceObjective() ?: (objective * BigFraction.ofLong(objectiveScale).reciprocal()))
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
