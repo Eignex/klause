@@ -38,10 +38,11 @@ interface Invariant {
      *
      * **Contract (must hold for cost/gradient consistency):** for every move kind,
      * `deltaIf*` and `apply*` must return exactly `violationDegree(after) - violationDegree(before)`.
-     * The engine maintains `cost` and the per-factor degree incrementally from those deltas
-     * and only calls [violationDegree] at [LocalSearchState.recompute]; a delta that disagrees
-     * with this method silently desyncs the cost. Degrees should be clamped to a sane range
-     * to avoid `Int` overflow when summed across the factor set.
+     * Move scoring uses these deltas. After committing a move, the engine reconciles `cost`,
+     * per-factor degrees and violated membership from the exact post-move degree rather than
+     * the returned apply delta. A delta that disagrees with this method mis-scores candidates.
+     * Degrees should be clamped to a sane range to avoid `Int` overflow in degree arithmetic;
+     * the engine sums them into a `Long` cost.
      */
     fun violationDegree(state: LocalSearchState, factorId: Int): Int = if (isViolated(state, factorId)) 1 else 0
 

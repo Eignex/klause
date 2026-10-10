@@ -172,6 +172,10 @@ Boolean break/make vectors initialize on their first score query and are maintai
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Weighted compound probes snapshot and scan only factors whose degrees change, in
 factor-id order to retain the full-scan floating-point accumulation order.
+Committed moves reconcile cost and violated membership from exact post-move degrees.
+Reified linear invariants fuse payload updates with that degree; their ordinary apply
+methods retain the delta-returning contract for other callers. Other invariants update
+payloads and then read their degree, independently of the returned apply delta.
 Optimization retains its best infeasible restart anchor as a private packed assignment.
 Strict cost improvements copy into that storage; a restart materializes an independent
 sample only when no feasible incumbent supersedes the anchor. Published samples and

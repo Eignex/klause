@@ -8,7 +8,7 @@ import com.eignex.klause.factor.bool.internals.reifiedDegree
 import com.eignex.klause.factor.bool.internals.snapLinearTarget
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.ChannelingSink
-import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.localsearch.DegreeUpdatingInvariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.Move.IntSet
@@ -21,7 +21,7 @@ internal class ReifiedLinearInvariant(
     private val vars: IntArray,
     private val op: LinearOp,
     private val bound: Long,
-) : Invariant {
+) : DegreeUpdatingInvariant {
 
     // O(1) coefficient queries keep wide-row move scoring linear; see [LinearCoeffIndex].
     private val coeffIndex = LinearCoeffIndex(coeffs, vars)
@@ -67,12 +67,25 @@ internal class ReifiedLinearInvariant(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val coeff = coeffIndex.coeffOf(intVar)
         val oldSum = state.longPayload[factorId]
-        val newSum = oldSum + coeff * (state.assignment.intValue(intVar) - oldValue)
-        state.longPayload[factorId] = newSum
+        val newSum = updateSum(state, factorId, intVar, oldValue)
         return reifiedDegreeFor(newSum, aux, state.violationSoftCap) -
             reifiedDegreeFor(oldSum, aux, state.violationSoftCap)
+    }
+
+    override fun applyBoolFlipDegree(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        violationDegree(state, factorId)
+
+    override fun applyIntSetDegree(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
+        updateSum(state, factorId, intVar, oldValue)
+        return violationDegree(state, factorId)
+    }
+
+    private fun updateSum(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Long {
+        val coeff = coeffIndex.coeffOf(intVar)
+        val sum = state.longPayload[factorId] + coeff * (state.assignment.intValue(intVar) - oldValue)
+        state.longPayload[factorId] = sum
+        return sum
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {

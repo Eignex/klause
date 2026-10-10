@@ -675,12 +675,10 @@ class LocalSearchState(
         }
     }
 
-    // Each factor updates its own payload. The exact cost delta is re-read from violationDegree rather than the
-    // returned status delta, which is sometimes approximate.
-    private inline fun refreshFactors(touchedFactors: IntArray, applyToFactor: (factorId: Int) -> Unit) {
+    // Each factor updates its own payload and supplies an exact degree; apply* status deltas are not cost inputs.
+    private inline fun refreshFactors(touchedFactors: IntArray, applyToFactor: (factorId: Int) -> Int) {
         for (factorId in touchedFactors) {
-            applyToFactor(factorId)
-            updateViolation(factorId)
+            updateViolation(factorId, applyToFactor(factorId))
         }
     }
 
@@ -716,8 +714,15 @@ class LocalSearchState(
     private fun retractForBoolFlip(touched: IntArray) =
         retractBruteForce(touched) { it.maintainsBreakMakeIncrementally }
 
-    private fun refreshForBoolFlip(touched: IntArray, boolVar: Int) =
-        refreshFactors(touched) { factors[it].applyBoolFlip(this, it, boolVar) }
+    private fun refreshForBoolFlip(touched: IntArray, boolVar: Int) = refreshFactors(touched) {
+        val factor = factors[it]
+        if (factor is DegreeUpdatingInvariant) {
+            factor.applyBoolFlipDegree(this, it, boolVar)
+        } else {
+            factor.applyBoolFlip(this, it, boolVar)
+            factor.violationDegree(this, it)
+        }
+    }
 
     private fun settleForBoolFlip(touched: IntArray, boolVar: Int) = settleBreakMake(
         touched,
@@ -743,8 +748,15 @@ class LocalSearchState(
     private fun retractForIntSet(touched: IntArray) =
         retractBruteForce(touched) { it.maintainsIntBreakMakeIncrementallyForIntSet }
 
-    private fun refreshForIntSet(touched: IntArray, intVar: Int, old: Long) =
-        refreshFactors(touched) { factors[it].applyIntSet(this, it, intVar, old) }
+    private fun refreshForIntSet(touched: IntArray, intVar: Int, old: Long) = refreshFactors(touched) {
+        val factor = factors[it]
+        if (factor is DegreeUpdatingInvariant) {
+            factor.applyIntSetDegree(this, it, intVar, old)
+        } else {
+            factor.applyIntSet(this, it, intVar, old)
+            factor.violationDegree(this, it)
+        }
+    }
 
     private fun settleForIntSet(touched: IntArray, intVar: Int, old: Long) = settleBreakMake(
         touched,
@@ -761,7 +773,12 @@ class LocalSearchState(
             slot = problem.numBoolVars + problem.numIntVars + realVar,
             retract = { retractBruteForce(touched) { false } },
             commit = { assignment.setReal(realVar, newValue) },
-            refresh = { refreshFactors(touched) { factors[it].applyRealSet(this, it, realVar, old) } },
+            refresh = {
+                refreshFactors(touched) {
+                    factors[it].applyRealSet(this, it, realVar, old)
+                    factors[it].violationDegree(this, it)
+                }
+            },
             settle = { settleBreakMake(touched, { false }, {}) },
             markMovedVar = {},
         )
@@ -927,12 +944,8 @@ class LocalSearchState(
 
     private data class CompoundEval(val breakScore: Int, val netDelta: Long, val weightedNetDelta: Double)
 
-    /** Re-read the factor's [Invariant.violationDegree] from its just-updated payload and reconcile the
-     *  maintained [factorDegree], [cost] (`Σ degree`), and [violated]-set membership. Using the
-     *  recomputed degree rather than `apply*`'s returned delta makes cost tracking exact even for
-     *  globals whose returned status delta is approximate. */
-    private fun updateViolation(factorId: Int) {
-        val newDegree = factors[factorId].violationDegree(this, factorId)
+    // Reconcile exact degrees independently of apply status deltas; fused updates avoid a second degree read.
+    private fun updateViolation(factorId: Int, newDegree: Int = factors[factorId].violationDegree(this, factorId)) {
         val delta = newDegree - factorDegree[factorId]
         if (delta == 0) return
         if (breakProbeActive && !probeTouched[factorId]) {
