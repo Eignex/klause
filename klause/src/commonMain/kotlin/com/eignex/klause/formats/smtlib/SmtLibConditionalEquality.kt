@@ -23,12 +23,19 @@ internal class SmtLibConditionalEquality {
     ) {
         var noArm: Int? = null
         val guardColumns = guardTests.mapNotNull { it?.variable }.toSet()
+
+        fun excludesDefault(value: Long): Boolean {
+            val source = default.asSimpleVar()
+            return source != null && source in guardColumns &&
+                guardTests.any { it?.truthWhen(source, value) == true }
+        }
     }
 
     private data class Key(val variable: Int, val value: Long)
     private data class Owner(val variable: Int, val integer: Boolean)
     private sealed interface Frame {
         class Eval(val term: LinComb) : Frame
+        class Known(val literal: Int) : Frame
         class Join(val variable: Int, val definition: Definition) : Frame
     }
 
@@ -141,6 +148,10 @@ internal class SmtLibConditionalEquality {
         pending.addLast(Frame.Eval(LinComb(mapOf(variable to 1L), 0)))
         while (pending.isNotEmpty()) {
             when (val frame = pending.removeLast()) {
+                is Frame.Known -> {
+                    if (++work > WORK_LIMIT) return null
+                    literals.addLast(frame.literal)
+                }
                 is Frame.Eval -> {
                     if (++work > WORK_LIMIT) return null
                     val term = frame.term
@@ -159,8 +170,7 @@ internal class SmtLibConditionalEquality {
                         }
                         source != null && definition != null -> {
                             pending.addLast(Frame.Join(source, definition))
-                            pending.addLast(Frame.Eval(definition.default))
-                            for (arm in definition.arms.asReversed()) pending.addLast(Frame.Eval(arm))
+                            scheduleBranches(definition, value, builder, pending)
                         }
                         else -> {
                             val literal = builder.reifyRelation(
@@ -197,6 +207,23 @@ internal class SmtLibConditionalEquality {
             }
         }
         return literals.single()
+    }
+
+    private fun scheduleBranches(
+        definition: Definition,
+        value: Long,
+        builder: Compiler.Builder,
+        pending: ArrayDeque<Frame>,
+    ) {
+        pending.addLast(
+            if (definition.excludesDefault(value)) Frame.Known(Lit.negate(builder.trueLit()))
+            else Frame.Eval(definition.default),
+        )
+        for (index in definition.arms.indices.reversed()) {
+            val arm = definition.arms[index]
+            val excluded = definition.guardTests[index]?.truthWhen(arm.asSimpleVar(), value) == false
+            pending.addLast(if (excluded) Frame.Known(Lit.negate(builder.trueLit())) else Frame.Eval(arm))
+        }
     }
 
     private fun defaultAlternative(

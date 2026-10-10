@@ -73,6 +73,7 @@ An integer conditional with a constant guard returns its selected branch directl
 Conditional definitions retain immutable equality meanings for their guards.
 When a branch compares a simple integer variable with a constant, these meanings
 can exclude conflicting selector tests and omit guard tests implied by that comparison.
+Conflicting branches and excluded defaults are skipped before traversing their definitions.
 Equality keys whose sign reversal exceeds a signed word retain their arithmetic encoding.
 A parse limits this expansion to 65,536 visits, after which comparisons retain
 their arithmetic encoding. Numeric branch definitions remain enforced whenever
