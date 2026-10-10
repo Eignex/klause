@@ -30,11 +30,15 @@ class LocalSearchStateBreakCacheTest {
             val cached = state.breakScore(Move.BoolFlip(v))
             val naive = naiveBreakScore(state, v)
             assertEquals(naive, cached, "boolVar=$v $label")
+            val naiveMake = state.problem.boolOccurrences[v].count { factorId ->
+                state.factors[factorId].deltaIfBoolFlipped(state, factorId, v) < 0
+            }
+            assertEquals(naiveMake, state.makeScore(Move.BoolFlip(v)), "make boolVar=$v $label")
         }
     }
 
     @Test
-    fun `cache matches scan after random move sequence on mixed problem`() {
+    fun `scores match scans when first queried before or after mixed moves`() {
         val numBool = 4
         val numInt = 2
         val intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5))
@@ -55,24 +59,26 @@ class LocalSearchStateBreakCacheTest {
             ),
         )
         val problem = Problem(numBool, numInt, intDomains, factors)
-        val state = LocalSearchState(problem.bake(), Random(42))
-        state.restart()
-        assertCacheConsistent(state, "after restart")
+        for (queryBeforeMoves in listOf(false, true)) {
+            val state = LocalSearchState(problem.bake(), Random(42))
+            state.restart()
+            if (queryBeforeMoves) assertCacheConsistent(state, "after restart")
 
-        val rng = Random(123)
-        repeat(200) { step ->
-            val pickInt = numInt > 0 && rng.nextInt(3) == 0
-            if (pickInt) {
-                val v = rng.nextInt(numInt)
-                val d = state.rootDomains[v]
-                val target = d.values.valueAt(rng.nextInt(d.values.size))
-                state.apply(Move.IntSet(v, target))
-                assertCacheConsistent(state, "after IntSet($v=$target) at step=$step")
-            } else {
-                val v = rng.nextInt(numBool)
-                state.apply(Move.BoolFlip(v))
-                assertCacheConsistent(state, "after BoolFlip($v) at step=$step")
+            val rng = Random(123)
+            repeat(200) { step ->
+                val pickInt = numInt > 0 && rng.nextInt(3) == 0
+                if (pickInt) {
+                    val v = rng.nextInt(numInt)
+                    val d = state.rootDomains[v]
+                    val target = d.values.valueAt(rng.nextInt(d.values.size))
+                    state.apply(Move.IntSet(v, target))
+                } else {
+                    val v = rng.nextInt(numBool)
+                    state.apply(Move.BoolFlip(v))
+                }
+                if (queryBeforeMoves) assertCacheConsistent(state, "after step=$step")
             }
+            assertCacheConsistent(state, "after mixed moves")
         }
     }
 

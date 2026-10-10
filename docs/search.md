@@ -109,6 +109,10 @@ ALNS skips its local-search fallback when the complete-engine bootstrap returns
 without an incumbent after cancellation, avoiding fresh seeding after the deadline.
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
+Boolean break/make vectors initialize on their first score query and are maintained
+incrementally thereafter; strategies that do not query them avoid their initialization pass.
+Weighted compound probes snapshot and scan only factors whose degrees change, in
+factor-id order to retain the full-scan floating-point accumulation order.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
