@@ -70,7 +70,7 @@ internal class ExactLiraEqualities(
         for (row in rows) {
             if (stop()) return ComponentResult.Indeterminate
             val truth = if (row.activator == ALWAYS) true else context.boolValue(row.activator)
-            val equality = row.op == LinearOp.EQ && truth == true || row.op == LinearOp.NE && truth == false
+            val equality = (row.op == LinearOp.EQ && truth == true) || (row.op == LinearOp.NE && truth == false)
             if (!equality) continue
             if (row.bound.den != BIG_ONE) {
                 return conflict(context, emptyList(), row.literal(checkNotNull(truth)), stop)

@@ -164,6 +164,42 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `disequality directions retain inherited bounds and restore their sibling`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.NE, 0.0),
+                ReifiedRealLinear(
+                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0,
+                ),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val sides = assertNotNull(SourceBoundAtom.rationalSplit(
+                session, listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO,
+            ))
+            for (upper in listOf(true, false)) {
+                val side = if (upper) sides.positive else sides.negative
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side)))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, upper))))
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                assertEquals(upper, assignment.bools[0])
+                assertEquals(!upper, assignment.reals.single() > BigFraction.ZERO)
+                session.popTo(0)
+            }
+        }
+    }
+
+    @Test
     fun `an integer bound conflict contains its shared witness`() {
         val model = Problem(
             numBoolVars = 1,

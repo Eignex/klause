@@ -392,11 +392,7 @@ class ExactLiraSearchComponent(
                 val variable = decision.literal ushr 1
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
-                node = node.copy(
-                    retainedReduction = null,
-                    disequalityDirections = emptyMap(),
-                    directionPremises = emptyMap(),
-                )
+                node = node.copy(retainedReduction = null)
                 if (variable !in arithmeticVariables && bools.any { it == UNASSIGNED }) {
                     nodesByLevel.put(context.decisionLevel, node)
                     dirty = wasDirty
