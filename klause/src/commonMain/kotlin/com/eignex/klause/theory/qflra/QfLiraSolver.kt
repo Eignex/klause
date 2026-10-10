@@ -102,6 +102,7 @@ class ExactLiraSearchComponent(
     private val disjunctOwner = Any()
     private var disjunctionRegistrationDeclined = false
     private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    private val sourceAssertionLevels = model.factors.map { factor -> IntArray(factor.linearRows.size) { -1 } }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
@@ -449,9 +450,12 @@ class ExactLiraSearchComponent(
     }
 
     private fun assertSource(context: SearchContext): Boolean {
+        val retainAssertions = solveContext.certificationPolicy === ProductionLpCertificationPolicy &&
+            realDifference != null
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((factorIndex, factor) in model.factors.withIndex()) {
             for ((index, row) in factor.linearRows.withIndex()) {
+                if (retainAssertions && sourceAssertionLevels[factorIndex][index] >= 0) continue
                 val address = RowAddress(factorIndex, index)
                 val asserted = node.rowAssertions[address]
                 if (factor.linearForm is LinearForm.Disjunction && asserted == null) continue
@@ -466,6 +470,8 @@ class ExactLiraSearchComponent(
                     disequalities += Triple(address, comparison, premise)
                 } else if (!system.assertComparison(comparison, null, premise)) {
                     return false
+                } else if (retainAssertions) {
+                    sourceAssertionLevels[factorIndex][index] = context.decisionLevel
                 }
             }
         }
@@ -753,6 +759,11 @@ class ExactLiraSearchComponent(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        for (levels in sourceAssertionLevels) {
+            for (index in levels.indices) {
+                if (levels[index] > decisionLevel || lp.state == null) levels[index] = -1
+            }
+        }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
                 bools[variable] = UNASSIGNED
