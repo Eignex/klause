@@ -222,7 +222,18 @@ internal class CpSatisfactionTraversal(
             } else {
                 null
             }
-            if (rootOutcome == null) sharedSession = session
+            if (rootOutcome == null) {
+                if (lp?.preparesRoot == true) {
+                    sharedSession = session
+                } else {
+                    rootOutcome = when (session.initialize()) {
+                        ComponentResult.Consistent -> null
+                        is ComponentResult.Conflict -> SearchOutcome.Exhausted()
+                        ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
+                    }
+                    if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
+                }
+            }
         } catch (failure: Throwable) {
             closeAfter(failure)
             throw failure
@@ -654,6 +665,13 @@ private class LpFeasibilityComponent(
     )
 
     val component: SearchComponent = engine.propagator.also { engine.cpAdapter.attach(cp.session, feasibility = true) }
+
+    val preparesRoot: Boolean
+        get() {
+            val plan = engine.params.lpPlan
+            return plan.pruneHulls || plan.variableShaving ||
+                (plan.rootCutHarvest && (engine.lpSeparators.isNotEmpty() || plan.gomoryEnabled || plan.mirEnabled))
+        }
 
     fun prepareRoot(): Boolean {
         val plan = engine.params.lpPlan
