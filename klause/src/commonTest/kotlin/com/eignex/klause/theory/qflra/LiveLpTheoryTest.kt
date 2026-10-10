@@ -308,6 +308,7 @@ class LiveLpTheoryTest {
                 assertEquals(!Lit.isPositive(transformed.literal), session.boolValue(transformed.literal ushr 1))
                 assertEquals(!Lit.isPositive(excluded.literal), session.boolValue(excluded.literal ushr 1))
             }
+            assertEquals(2, session.learnedClauseCount)
             // A learned backjump can retract a pushed decision; keep the witness premise at root.
             session.popTo(0)
             assertIs<ComponentResult.Consistent>(session.publish(Lit.make(0, true)))
@@ -328,7 +329,6 @@ class LiveLpTheoryTest {
                 }
                 assertTrue(if (atom.upper) activity > atom.threshold else activity < atom.threshold)
             }
-            assertEquals(2, session.learnedClauseCount)
         }
     }
 
