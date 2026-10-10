@@ -163,6 +163,83 @@ class SolverInvocationTest {
     }
 
     @Test
+    fun `an SMT optimum requires explicit status and a finite objective`() {
+        val r = SolverInvocation.invoke(
+            listOf("sh", "-c", "printf '%s\\n' '; objective=9' '; objective=7' 'sat' '; optimizationStatus=optimal'"),
+            SolverInvocation.Dialect.SMT_LIB,
+        )
+
+        assertEquals(true, r.feasible)
+        assertEquals(7.0, r.objective)
+        assertTrue(r.proven)
+        assertNotNull(r.timeToBestMs)
+        assertNotNull(r.timeToFirstFeasibleMs)
+    }
+
+    @Test
+    fun `plain SMT sat provides no optimality proof`() {
+        val r = SolverInvocation.invoke(listOf("sh", "-c", "echo sat"), SolverInvocation.Dialect.SMT_LIB)
+
+        assertEquals(true, r.feasible)
+        assertNull(r.objective)
+        assertFalse(r.proven)
+    }
+
+    @Test
+    fun `SMT partial and unbounded objectives remain distinct from proved optima`() {
+        for (status in listOf("best-found", "unbounded", "unknown", "satisfiable", "unrecognized")) {
+            val r = SolverInvocation.invoke(
+                listOf("sh", "-c", "printf '%s\\n' '; objective=-1/3' 'sat' '; optimizationStatus=$status'"),
+                SolverInvocation.Dialect.SMT_LIB,
+            )
+
+            assertEquals(true, r.feasible, status)
+            assertEquals(-1.0 / 3.0, r.objective, status)
+            assertFalse(r.proven, status)
+            assertEquals(status, r.stats["optimizationStatus"])
+            val cached = Reports.json.decodeFromString<SolverInvocation.Result>(Reports.json.encodeToString(r))
+            assertEquals(status, cached.stats["optimizationStatus"])
+        }
+    }
+
+    @Test
+    fun `SMT optimization metadata alone cannot prove an optimum`() {
+        val r = SolverInvocation.invoke(
+            listOf("sh", "-c", "printf '%s\\n' '; objective=7' '; optimizationStatus=optimal'"),
+            SolverInvocation.Dialect.SMT_LIB,
+        )
+
+        assertEquals(7.0, r.objective)
+        assertFalse(r.proven)
+    }
+
+    @Test
+    fun `SMT malformed objectives receive no optimum credit`() {
+        for (objective in listOf("", "NaN", "Infinity", "1/0")) {
+            val r = SolverInvocation.invoke(
+                listOf("sh", "-c", "printf '%s\\n' '; objective=$objective' 'sat' '; optimizationStatus=optimal'"),
+                SolverInvocation.Dialect.SMT_LIB,
+            )
+
+            assertEquals(true, r.feasible, objective)
+            assertNull(r.objective, objective)
+            assertFalse(r.proven, objective)
+        }
+    }
+
+    @Test
+    fun `SMT unsat retains its infeasibility proof`() {
+        val r = SolverInvocation.invoke(
+            listOf("sh", "-c", "printf '%s\\n' 'unsat' '; optimizationStatus=unsatisfiable'"),
+            SolverInvocation.Dialect.SMT_LIB,
+        )
+
+        assertEquals(false, r.feasible)
+        assertNull(r.objective)
+        assertTrue(r.proven)
+    }
+
+    @Test
     fun `competition objectives parse decimal exponent and large finite fractions`() {
         val huge = "1" + "0".repeat(400)
         val cases = listOf("-2.5" to -2.5, "1e2" to 100.0, "+1/-4" to -0.25, "$huge/$huge" to 1.0)

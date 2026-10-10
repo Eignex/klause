@@ -18,6 +18,11 @@ uses the incumbent time for a witness, then a valid reported `stats.solveTime` (
 unproven reference witnesses prefer first-feasible time. Undecided runs keep the budget penalty.
 Lab consumers must read `elapsedMs` as the fallback after `solveTime`; older lab builds ignore it.
 
+SMT-LIB optimization records consume the CLI's objective comments and retain its terminal
+`optimizationStatus` in `stats`. An optimum requires `sat`, a finite objective and explicit
+`optimal` status. Plain `sat`, interrupted incumbents (`best-found`) and unbounded objectives
+receive no optimality proof credit; an unbounded record's objective belongs to its feasible witness.
+
 MiniZinc float runs validate their final candidate by recompiling the original model with
 its DZN assignments pinned, using MiniZinc's standard library and the same data seed.
 No reference solver runs. Records include `sourceValidation` (`valid`, `invalid`, or `unknown`)

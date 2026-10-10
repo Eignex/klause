@@ -8,7 +8,7 @@ import com.eignex.klause.solver.result.SolveStats
  * The buffered model is printed only on a feasible verdict; statistics render as `<prefix> key=value`
  * comment lines. Subclasses supply the comment [commentPrefix], the per-verdict [statusLine], and the
  * [keepStat] filter selecting which search counters that format reports; [streamObjective] opts into
- * printing an `o <cost>` line per incumbent.
+ * printing an objective line per incumbent.
  */
 internal abstract class BufferedBestOutput : OutputProtocol {
     protected var best: String? = null
@@ -16,8 +16,12 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     /** Comment-line prefix for the statistics block (e.g. `;`, `c`). */
     protected abstract val commentPrefix: String
 
-    /** When true, print `o <objective>` as each improving incumbent streams in. */
+    /** When true, print the objective as each improving incumbent streams in. */
     protected open val streamObjective: Boolean = false
+
+    protected open val objectivePrefix: String = "o "
+
+    protected open fun completionMetadata(verdict: Verdict): String? = null
 
     /** Render an incumbent objective for an output protocol. */
     protected open fun formatObjective(objective: Long): String = objective.toString()
@@ -56,14 +60,15 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         // A continuous contribution has no exact integer form, so it supersedes the discrete value
         // rather than riding alongside it.
         if (continuousObjective != null) {
-            println("o ${formatContinuousObjective(continuousObjective)}")
+            println("$objectivePrefix${formatContinuousObjective(continuousObjective)}")
         } else if (objective != null) {
-            println("o ${formatObjective(objective)}")
+            println("$objectivePrefix${formatObjective(objective)}")
         }
     }
 
     final override fun onComplete(verdict: Verdict) {
         println(statusLine(verdict))
+        completionMetadata(verdict)?.let { println("$commentPrefix $it") }
         // A comment, so it rides alongside the status line without touching what either protocol
         // promises: `;` is an SMT-LIB comment and `c` is one in the competition protocol.
         verdictReason(verdict)?.let { println("$commentPrefix $it") }
