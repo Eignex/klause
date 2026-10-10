@@ -220,6 +220,23 @@ class PortfolioTest {
     }
 
     @Test
+    fun `unfinished preparation rotates after every initial sibling admission`() {
+        val order = mutableListOf<Int>()
+        val workers = List(3) { arm ->
+            val handle = TrackingResumableSearch(null, onRun = { order += arm })
+            PortfolioWorker.ofMinimize(
+                "preparing$arm", arm, countsInstructions = true, resumable = { handle },
+            ) { _, _, _, _ ->
+                error("the retained handle must resume")
+            }
+        }
+
+        Portfolio.thompson(workers).use { it.minimize(Cancellation { order.size >= 9 }) }
+
+        assertEquals(listOf(0, 1, 2, 0, 1, 2, 0, 1, 2), order)
+    }
+
+    @Test
     fun `exact improvements install when their floating projections tie`() {
         val bases = listOf(
             "9007199254740992" to "1",

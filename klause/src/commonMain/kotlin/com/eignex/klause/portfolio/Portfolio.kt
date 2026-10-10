@@ -449,7 +449,7 @@ class Portfolio(
                     return@locked
                 }
                 if (claim.foundFirst) run.startImprovementPhase()
-                if (opening && handle != null && terminal == null && !failed &&
+                if (handle != null && terminal == null && !failed &&
                     worker.family == ArmFamily.LocalSearch && stats?.ls?.moves?.sum == 0.0
                 ) {
                     run.revisitPreparation(arm)
@@ -566,6 +566,7 @@ class Portfolio(
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
         private val preparationRevisits = BooleanArray(workers.size)
+        private var nextPreparationArm = 0
 
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
         private val armNanos = LongArray(workers.size)
@@ -637,12 +638,16 @@ class Portfolio(
             val eligible = eligibleArms()
             val probe = if (dedicated) null else eligible.firstOrNull { !probed[it] && !busy[it] && !retired[it] }
             val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) null else
-                eligible.firstOrNull { preparationRevisits[it] && !busy[it] && !retired[it] }
+                eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
+                    .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
             val probing = probe != null
             val arm = when {
                 dedicated -> lane
                 probe != null -> probe.also { probed[it] = true }
-                revisit != null -> revisit.also { preparationRevisits[it] = false }
+                revisit != null -> revisit.also {
+                    preparationRevisits[it] = false
+                    nextPreparationArm = (it + 1) % workers.size
+                }
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
