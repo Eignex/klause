@@ -92,7 +92,8 @@ including zero-weight strict cycles. The graph supplies rational potentials and
 source-guard cycle explanations; witnesses still pass the complete source-row
 check. Fractional normalized bounds, unsafe Long magnitudes, disequalities,
 private disjunctions and mixed integer/real models retain the exact LP route.
-No finite CP domains are created by this graph.
+Overridden LP certification policies retain the LP route because graph evidence
+has no LP certifier identity. No finite CP domains are created by this graph.
 
 Optimization emits `; objective=<value>` for each incumbent in the source objective's
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
