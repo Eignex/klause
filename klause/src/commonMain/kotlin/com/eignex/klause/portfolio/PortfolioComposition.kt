@@ -338,18 +338,24 @@ internal object PortfolioComposition {
             arms += backtrack
         }
         if (alns) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
-        if (scenario.cores == 1 && scenario.kind == Kind.COP && count >= PortfolioScenario.DEFAULT_ARMS &&
-            scenario.lsPool == null && scenario.btPool == null && facts.profile.realColumns &&
-            arms.none { it.label == "lp-default" }
-        ) {
-            // Appending retains the incumbent cores and every existing worker's seed position.
-            BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-default" }?.let { recipe ->
-                arms += BacktrackWorkerConfig(
-                    recipe.editing(scenario.btEdit).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
-                    scenario.zeroObjectivePricing,
-                )
-            }
-        }
+        // Appending retains the incumbent cores and every existing worker's seed position.
+        continuousLpArm(scenario, facts, arms)?.let { arms += it }
         return arms
+    }
+
+    private fun continuousLpArm(
+        scenario: PortfolioScenario,
+        facts: ProblemFacts,
+        arms: List<WorkerConfig>,
+    ): BacktrackWorkerConfig? {
+        if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
+            scenario.lsPool != null || scenario.btPool != null || !facts.profile.realColumns ||
+            arms.any { it.label == "lp-default" }
+        ) return null
+        val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-default" } ?: return null
+        return BacktrackWorkerConfig(
+            recipe.editing(scenario.btEdit).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+            scenario.zeroObjectivePricing,
+        )
     }
 }
