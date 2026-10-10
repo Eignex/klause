@@ -64,7 +64,9 @@ class LpSatisfactionFeasibilityTest {
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(2.0),
         )
-        val search = BacktrackSolver(problem.bake()).resumableSolve(BacktrackParams(lpConfig = LpConfig.AGGRESSIVE))
+        val search = BacktrackSolver(problem.bake()).resumableSolve(
+            BacktrackParams(lpConfig = LpConfig.AGGRESSIVE, lpPlan = LpPlan(variableShaving = true)),
+        )
 
         search.use {
             assertNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L))
