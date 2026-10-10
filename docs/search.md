@@ -144,6 +144,8 @@ queue, including restored bounds after retraction. Equivalent normalized terms
 share their exact activity bounds even when individual source columns are open.
 The theory records its own Boolean implications through the assertion path;
 shared delivery excludes the component that produced them.
+Source assertion accumulates derived disequality directions and their premises in
+private maps, then publishes one immutable node snapshot for the completed pass.
 Each propagation call limits row visits before the complete LP check, so a
 partial interval pass cannot establish feasibility or exhaustion. There is no
 explanation weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
