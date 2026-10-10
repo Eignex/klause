@@ -7,6 +7,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.objective.LinearObjective
 
 /**
  * What an arm needs from a model to do anything its siblings do not. A curated pool builds an arm only on
@@ -29,6 +30,7 @@ internal class ProblemFacts(
     /** The model's classification. */
     val profile: ProblemProfile,
     val binaryIntegers: Boolean = false,
+    val continuousObjective: Boolean = false,
     private val relaxation: (LpEmphasis) -> Boolean,
 ) {
     private val relaxations = HashMap<LpEmphasis, Boolean>()
@@ -45,12 +47,18 @@ internal class ProblemFacts(
     /** The two ways to learn a model's facts. */
     companion object {
         /** The facts of [problem], classified as [profile], with the arms' LP capped under [lpCeiling]. */
-        fun of(problem: BakedProblem, profile: ProblemProfile, lpCeiling: LpConfig): ProblemFacts = ProblemFacts(
+        fun of(
+            problem: BakedProblem,
+            profile: ProblemProfile,
+            lpCeiling: LpConfig,
+            objective: LinearObjective? = null,
+        ): ProblemFacts = ProblemFacts(
             profile,
             binaryIntegers = (0 until problem.numIntVars).all {
                 problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) &&
                     problem.intBounds.lower(it) >= 0L && problem.intBounds.upper(it) <= 1L
             },
+            continuousObjective = objective?.realCoefficients?.any { it != 0.0 } == true,
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },

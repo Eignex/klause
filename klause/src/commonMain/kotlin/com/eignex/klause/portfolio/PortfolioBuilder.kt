@@ -51,7 +51,7 @@ object PortfolioBuilder {
         onEvent: ((worker: String, event: SearchEvent) -> Unit)? = null,
         profile: ProblemProfile = ProblemProfile.of(problem, scenario.kind == Kind.COP),
     ): List<PortfolioWorker> {
-        val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling)
+        val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective)
         val plan = PortfolioComposition.plan(scenario, facts)
         val composed = plan.arms
         // Expand the composed arms to one entry per lane. A lane is a worker slot; a parallel track
