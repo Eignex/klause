@@ -275,7 +275,8 @@ completed `cli.jfr`. The subprocess harness summarizes it on the runner after th
 captured CLI elapsed time ends. Tables attribute Java CPU samples and sampled
 allocation weights to projection preparation, state allocation, seeding, invariant
 setup, move selection/application, backtrack and presolve. Initial factor scoring
-resumed across slices remains part of seeding. ALNS bootstrap and
+resumed across slices remains part of seeding; retained projection construction
+remains projection preparation. ALNS bootstrap and
 repair stacks carry separate prefixes. Allocation weights estimate bytes; CPU
 sample shares are not wall-time attribution. Retain the raw recording and process
 resource report outside the repository, and compare performance with uninstrumented

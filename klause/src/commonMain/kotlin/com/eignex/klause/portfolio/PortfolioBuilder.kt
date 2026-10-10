@@ -2,7 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
-import com.eignex.klause.localsearch.LocalSearchProblem
+import com.eignex.klause.localsearch.LocalSearchPreparation
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.ProblemProfile
@@ -167,7 +167,7 @@ object PortfolioBuilder {
             IncumbentExchange.minimizing(),
             ContributionTally(concurrency.lock()),
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
-            localSearchProjection = lazy { LocalSearchProblem(problem, LocalSearchModel.of(problem).domains) },
+            localSearchProjection = LocalSearchPreparation(problem, LocalSearchModel.of(problem).domains, concurrency.lock()),
             localSearchInvariants = lazy { definitionalSweep?.network(problem.numIntVars, problem.numBoolVars) },
         )
     }
