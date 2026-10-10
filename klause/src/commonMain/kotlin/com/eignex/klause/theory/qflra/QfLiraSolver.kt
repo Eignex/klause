@@ -154,7 +154,7 @@ class ExactLiraSearchComponent(
     }
     private val lp: LpPropagator by lpDelegate
     private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
-    private val propagation by lazy { ExactLraPropagation(model, lp, exactForms) }
+    private val propagation by lazy { ExactLraPropagation(model, lp, system, exactForms) }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
