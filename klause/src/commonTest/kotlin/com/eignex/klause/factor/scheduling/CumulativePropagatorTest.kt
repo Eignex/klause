@@ -341,6 +341,28 @@ class CumulativePropagatorTest {
     }
 
     @Test
+    fun `edge-finding tightens a latest start without compulsory parts`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(8, 10), IntDomain(8, 10), IntDomain(0, 10)),
+            factors = arrayOf<Factor>(
+                Cumulative(
+                    starts = intArrayOf(0, 1, 2),
+                    durations = longArrayOf(2, 2, 2),
+                    resources = longArrayOf(2, 2, 3),
+                    capacity = 3,
+                ),
+            ),
+        )
+
+        val result = problem.propagate()
+
+        assertIs<PropagationResult.Implied>(result)
+        assertEquals(7, result.intMaxOrNullCompat(2))
+    }
+
+    @Test
     fun `edge-finding does not push a task that can run before the cluster`() {
         // Regression guard for the unsound env(Θ)+e_i detection. Capacity 1. Task 0 is fixed
         // at t=1 (dur 1, res 1) → busy [1, 2). Task 1 (dur 1, res 1, dom [0, 3]) can legitimately
