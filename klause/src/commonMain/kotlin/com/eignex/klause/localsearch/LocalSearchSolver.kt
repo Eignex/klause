@@ -2,7 +2,10 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
+import com.eignex.klause.count.SampleQuality
 import com.eignex.klause.count.SamplingConfig
+import com.eignex.klause.count.accurateSamples
+import com.eignex.klause.count.countingScope
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
@@ -135,12 +138,28 @@ class LocalSearchSolver(
 
     override fun openSamples(params: LocalSearchParams): SearchStream<Sample> = engine.openSamples(params, warm = null)
 
-    override fun openEnumerate(params: LocalSearchParams): SearchStream<Sample> = engine.openSamples(params, warm = null)
+    override fun openEnumerate(params: LocalSearchParams): SearchStream<Sample> =
+        engine.openSamples(params, warm = null)
 
     override fun openSamples(config: SamplingConfig, params: LocalSearchParams): SearchStream<Sample> =
-        engine.openSamples(config, params, warm = null)
+        openSamples(config, params, warm = null)
 
-    override fun openImprovements(objective: LinearObjective, params: LocalSearchParams): SearchStream<MinimizeResult> =
+    internal fun openSamples(
+        config: SamplingConfig,
+        params: LocalSearchParams,
+        warm: WarmState?,
+    ): SearchStream<Sample> =
+        when (config.quality) {
+            SampleQuality.CHEAP -> engine.openSamples(params, warm)
+            SampleQuality.ACCURATE -> engine.openSamples(params, warm) { fallback ->
+                problem.countingScope(params.assumptions).accurateSamples(config) { fallback }
+            }
+        }
+
+    override fun openImprovements(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+    ): SearchStream<MinimizeResult> =
         engine.openImprovements(objective, params, warm = null)
 
     /** Return a [LocalSearchSession] that persists DDFW-style factor weights across

@@ -140,11 +140,16 @@ class LocalSearchSessionTest {
     fun `early stream close retains published warm state and releases the solver`() {
         val factories = listOf<(LocalSearchSession, LocalSearchParams) -> SearchStream<*>>(
             { session, params -> session.openSamples(params) },
-            { session, params -> session.openSamples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 1L), params) },
+            { session, params ->
+                session.openSamples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 1L), params)
+            },
             { session, params -> session.openImprovements(LinearObjective(boolWeights = longArrayOf(1, 2)), params) },
         )
         for ((index, open) in factories.withIndex()) {
-            val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))))
+            val problem = Problem(
+                2, 0, emptyArray(),
+                arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            )
             val solver = LocalSearchSolver(problem.bake())
             val session = solver.session()
             val params = LocalSearchParams(maxFlips = 2L, randomSeed = 1L)
@@ -168,9 +173,12 @@ class LocalSearchSessionTest {
     fun `closing a session closes its pending walk`() {
         val solver = LocalSearchSolver(weightLearningProblem().bake())
         val session = solver.session()
-        val handle = session.resumable(LinearObjective(boolWeights = LongArray(6) { 1L }), LocalSearchParams(maxFlips = 10L))
+        val handle = session.resumable(
+            LinearObjective(boolWeights = LongArray(6) { 1L }), LocalSearchParams(maxFlips = 10L),
+        )
         assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) {})
         session.close()
+        assertNull(session.warmState.factorWeights)
         assertFailsWith<IllegalStateException> { session.reset() }
         assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
         solver.session().resumable(LinearObjective(), LocalSearchParams(maxFlips = 1L)).close()

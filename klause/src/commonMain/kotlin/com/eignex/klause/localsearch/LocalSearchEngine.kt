@@ -3,10 +3,6 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
-import com.eignex.klause.count.SampleQuality
-import com.eignex.klause.count.SamplingConfig
-import com.eignex.klause.count.accurateSamples
-import com.eignex.klause.count.countingScope
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.factor.objective.objectiveSumIsWide
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -20,7 +16,6 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
@@ -274,28 +269,18 @@ internal class LocalSearchEngine(
         return guarded(streamImpl(params, eff, warm).filterNotNull())
     }
 
-    fun openSamples(params: LocalSearchParams, warm: WarmState?): SearchStream<Sample> {
+    fun openSamples(
+        params: LocalSearchParams,
+        warm: WarmState?,
+        transform: (Sequence<Sample>) -> Sequence<Sample> = { it },
+    ): SearchStream<Sample> {
         val ownership = acquireSearch()
         return runCatching {
-            val effective = if (localSearchSupports(model, completion != null)) model.pinsUnder(params.assumptions) else null
-            val sequence = if (effective == null) emptySequence() else streamImpl(params, effective, warm).filterNotNull()
-            sequence.asSearchStream(release = ownership::release)
-        }.getOrElse {
-            ownership.release()
-            throw it
-        }
-    }
-
-    fun openSamples(config: SamplingConfig, params: LocalSearchParams, warm: WarmState?): SearchStream<Sample> {
-        if (config.quality == SampleQuality.CHEAP) return openSamples(params, warm)
-        val ownership = acquireSearch()
-        return runCatching {
-            val effective = if (localSearchSupports(model, completion != null)) model.pinsUnder(params.assumptions) else null
-            val source = (problem as? BakedProblem)
-                ?: throw UnsupportedOperationException("accurate sampling requires a finite model")
-            source.countingScope(params.assumptions).accurateSamples(config) {
-                if (effective == null) emptySequence() else streamImpl(params, effective, warm).filterNotNull()
-            }.asSearchStream(release = ownership::release)
+            val supported = localSearchSupports(model, completion != null)
+            val effective = if (supported) model.pinsUnder(params.assumptions) else null
+            val sequence = if (effective == null) emptySequence()
+            else streamImpl(params, effective, warm).filterNotNull()
+            transform(sequence).asSearchStream(release = ownership::release)
         }.getOrElse {
             ownership.release()
             throw it
