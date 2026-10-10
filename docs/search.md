@@ -88,6 +88,9 @@ LP explanations cite selected source bound witnesses and recursively expanded
 row, fixing and cutoff premises. Open linear theories narrow source-column bounds
 from exact row intervals and imply reified comparisons with immutable row and
 bound premises. These bounds follow the LP trail and retract with their decisions.
+Interval deductions read staged bounds within a propagation pass and publish the
+strongest side per column in one LP batch. Abandoned passes requeue their rows;
+crossed staged bounds cite both derivations without publishing a partial batch.
 Strict real endpoints stay strict; integer endpoints round on the source lattice.
 Affected rows follow source Boolean and exact bound changes through a retained
 queue, including restored bounds after retraction. Equivalent normalized terms
