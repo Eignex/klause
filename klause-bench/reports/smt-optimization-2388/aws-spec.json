@@ -1,0 +1,13 @@
+{
+  "name": "smt-2388-optimization-reporting",
+  "description": "Compare fixed main and the SMT optimization metadata fix on ten existing SMT-LIB/MPS fixtures, two seeds each. Verify lia-opt reports model-oriented objective 7 and explicit optimal status with proof credit, preserve source feasibility verdicts and MPS objectives, and retain installed-build provenance. Reported results are not independent source validation; no timing claim.",
+  "problems": [{"suite": "smtlib-core,mps-core", "reference": "any"}],
+  "base": {"engine": "cp", "processors": "1", "timeout": "5000"},
+  "configs": [
+    {"label": "main", "ref": "c82d8f3f7461602340c8dbebffeca2dd0b02db93"},
+    {"label": "smt-metadata", "ref": "5beb76bcc6e234a1bcf2701a2f49b881e16deb56"}
+  ],
+  "seeds": [0, 1],
+  "host": "aws",
+  "machines": 1
+}
