@@ -110,17 +110,42 @@ internal class LocalSearchEngine(
         }
     }
 
-    private fun initialRestart(state: LocalSearchState) {
+    private suspend fun <T> SequenceScope<T?>.initialRestart(
+        state: LocalSearchState,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+    ) {
         // These reset policies start from an unanchored random draw; scoring before the sweep is redundant.
         val randomDraw = configuredRestart is FixedCadenceRestart || configuredRestart is AdaptivePerturbationRestart ||
             configuredRestart is IteratedLocalSearchRestart || configuredRestart is StagnationRestart
-        if (!randomDraw || (definitionalSweep == null && !seedImplicitOnRestart)) {
+        if (!randomDraw || (!slicedInitialization(checkpoint) && definitionalSweep == null && !seedImplicitOnRestart)) {
             restarts.restart(state, bestSoFar = null)
             return
         }
         state.randomizeAssignment()
         prepareAssignment(state)
-        state.recompute()
+        recomputeInitial(state, params, checkpoint)
+    }
+
+    private fun slicedInitialization(checkpoint: LocalSearchCheckpoint?): Boolean =
+        checkpoint != null && problem.numFactors > INITIAL_FACTOR_BATCH
+
+    private suspend fun <T> SequenceScope<T?>.recomputeInitial(
+        state: LocalSearchState,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+    ) {
+        if (!slicedInitialization(checkpoint)) {
+            state.recompute()
+            return
+        }
+        // Partial degrees and payloads stay private to the suspended stream until every factor is initialized.
+        state.clearViolationState()
+        for (from in 0 until problem.numFactors step INITIAL_FACTOR_BATCH) {
+            while (params.cancellation()) yield(null)
+            state.initializeFactors(from, minOf(from + INITIAL_FACTOR_BATCH, problem.numFactors))
+        }
+        state.finishRecompute()
     }
 
     private fun installInvariants(state: LocalSearchState) {
@@ -448,7 +473,7 @@ internal class LocalSearchEngine(
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val maxFlips = moveCap(params)
         return sequence {
-            val state = newSatisfyState(params, effectiveAssumptions, warm, seed)
+            val state = newSatisfyState(params, effectiveAssumptions, warm, seed, checkpoint)
             var flipsSinceRestart = 0
             // Best-cost-so-far snapshot (even while infeasible): an IteratedLocalSearchRestart
             // perturbs from this instead of full-randomising, accumulating progress across restarts.
@@ -611,7 +636,7 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint? = null,
         onFinished: () -> Unit = {},
     ) {
-        val state = newMinimizeState(guide, params, effectiveAssumptions, warm)
+        val state = newMinimizeState(guide, params, effectiveAssumptions, warm, checkpoint)
         // An objective whose sum can pass the 64-bit range is scored from snapshots, which sum it exactly; the live
         // assignment's Long evaluation would wrap.
         val wideObjective = objective is LinearObjective && objective.isWideOver(state.rootDomains)
@@ -914,11 +939,12 @@ internal class LocalSearchEngine(
      *  its shaping lambda, then reach a start pose — warm-seed (with a definitional reconcile) when the
      *  caller supplied [LocalSearchParams.initialAssignment], else a random restart followed by the
      *  size-gated greedy repair. Ends where the loop's own bookkeeping begins. */
-    private fun newMinimizeState(
+    private suspend fun <T> SequenceScope<T?>.newMinimizeState(
         objective: Objective,
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
         warm: WarmState?,
+        checkpoint: LocalSearchCheckpoint?,
     ): LocalSearchState {
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = LocalSearchState(model, Random(seed), effectiveAssumptions, projection.value)
@@ -937,7 +963,8 @@ internal class LocalSearchEngine(
         state.shaping.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
         // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
         // restart; null by default. See [LocalSearchParams.initialAssignment].
-        val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
+        val sliced = slicedInitialization(checkpoint)
+        val seeded = params.initialAssignment?.let { seedFrom(state, it, recompute = !sliced) } ?: false
         if (seeded) {
             // Reconcile the warm-loaded assignment exactly as the restart path does: the seed sets only
             // the variables its producing engine emitted, so any *defined* variable must be re-derived
@@ -947,10 +974,11 @@ internal class LocalSearchEngine(
                 sweep.sweep(state.assignment, state.rootDomains, problem.factors) {
                     state.assumptions.isFrozenBool(it)
                 }
-                state.recompute()
+                if (!sliced) state.recompute()
             }
+            if (sliced) recomputeInitial(state, params, checkpoint)
         } else {
-            initialRestart(state)
+            initialRestart(state, params, checkpoint)
         }
         // Greedy-repair is gated on problem size: on tiny problems LS reaches feasibility in
         // microseconds and the repair pass is pure overhead. Skip it on a warm start: the seed is
@@ -964,11 +992,12 @@ internal class LocalSearchEngine(
     /** Build and prime the per-call [LocalSearchState] for a [streamImpl] satisfy draw: config the
      *  violation cap / weight normalisation, install invariants and warm state, reset the (possibly
      *  reused) restart policy's per-solve state, then take the first random restart. */
-    private fun newSatisfyState(
+    private suspend fun <T> SequenceScope<T?>.newSatisfyState(
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
         warm: WarmState?,
         seed: Long,
+        checkpoint: LocalSearchCheckpoint?,
     ): LocalSearchState {
         val state = LocalSearchState(model, Random(seed), effectiveAssumptions, projection.value)
         state.violationSoftCap = params.violationSoftCap
@@ -985,8 +1014,9 @@ internal class LocalSearchEngine(
         // Streaming has no notion of "best so far" to anchor an adaptive restart
         // around — pass null so policies that need a sample fall back to a fresh
         // random restart.
-        val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
-        if (!seeded) initialRestart(state)
+        val sliced = slicedInitialization(checkpoint)
+        val seeded = params.initialAssignment?.let { seedFrom(state, it, recompute = !sliced) } ?: false
+        if (!seeded) initialRestart(state, params, checkpoint) else if (sliced) recomputeInitial(state, params, checkpoint)
         return state
     }
 
@@ -1033,7 +1063,7 @@ internal class LocalSearchEngine(
      *  epoch, and recompute cost/degrees — the warm-start seed path for
      *  [LocalSearchParams.initialAssignment]. Returns false (leaving the state untouched for a
      *  normal random restart) when the sample's arity doesn't match this problem. */
-    private fun seedFrom(state: LocalSearchState, sample: Sample): Boolean {
+    private fun seedFrom(state: LocalSearchState, sample: Sample, recompute: Boolean = true): Boolean {
         if (sample.bools.size != problem.numBoolVars || sample.ints.size != problem.numIntVars) return false
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
         for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
@@ -1044,7 +1074,7 @@ internal class LocalSearchEngine(
         state.assumptions.forEachInt { id, value -> state.assignment.setInt(id, value) }
         state.seedReals(sample)
         state.resetStepCounters()
-        state.recompute()
+        if (recompute) state.recompute()
         return true
     }
 
@@ -1133,6 +1163,8 @@ internal class LocalSearchEngine(
     }
 
     private companion object {
+        const val INITIAL_FACTOR_BATCH: Int = 256
+
         /** Polling interval for cooperative cancellation; see Cancellation.kt. */
         const val CANCEL_CHECK_INTERVAL: Int = 1024
 
