@@ -71,6 +71,17 @@ class MpsCompiledTest {
     }
 
     @Test
+    fun `an infinity marker does not define a continuous column`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -1e30\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1e30\nRHS\n RHS DEF 1e30\n" +
+                "BOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        assertEquals(1, compiled.model.numRealVars)
+    }
+
+    @Test
     fun `source check rejects a marker integer above its implicit binary bound`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 1\n" +

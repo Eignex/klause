@@ -667,7 +667,7 @@ private val MPS_INFINITY_EXACT = BigFraction.of(
     BIG_ONE,
 )
 
-private fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
+internal fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
     it.fraction > MPS_INFINITY_EXACT.negated() && it.fraction < MPS_INFINITY_EXACT
 }
 

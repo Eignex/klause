@@ -10,8 +10,8 @@ internal fun MpsModel.integralDefinitions(source: MpsSourceNumbers): Array<IntDo
     for ((rowIndex, row) in constraints.withIndex()) {
         if (row.indicator != null) continue
         val (lower, upper) = source.constraintBounds[rowIndex]
-        val rhs = lower?.fraction ?: continue
-        if (upper?.fraction != rhs) continue
+        val rhs = lower.finiteMps()?.fraction ?: continue
+        if (upper.finiteMps()?.fraction != rhs) continue
         val realEntries = row.indices.indices.filter { !variables[row.indices[it]].integer }
         if (realEntries.size != 1 || row.indices.size < 2) continue
         val entry = realEntries.single()
