@@ -5,20 +5,6 @@ on:
     branches: [ main ]
   pull_request:
   workflow_dispatch:
-    inputs:
-      lab_cases:
-        description: Compressed lab cases in base64; empty runs the full gate
-        type: string
-        default: ''
-      lab_control:
-        description: Control label for paired lab record analysis
-        type: string
-        default: default
-      lab_compression:
-        description: Compression format for supplied lab cases
-        type: choice
-        options: [gz, xz]
-        default: gz
 
 # A newer push supersedes any in-flight run for the same ref.
 concurrency:
@@ -26,20 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  source-checker-test:
-    if: github.event_name != 'workflow_dispatch' || inputs.lab_cases == ''
-    name: Check source verifier regressions
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-      - name: Install source checking dependency
-        run: python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
-      - name: Check verdict, witness and optimum rejection
-        run: python3 -m unittest discover -s klause-bench/tools -p 'test_verify_source_results.py' -v
-
   test:
-    if: github.event_name != 'workflow_dispatch' || inputs.lab_cases == ''
     name: Run JVM tests and collect coverage
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -102,7 +75,6 @@ jobs:
           fail_ci_if_error: false
 
   native-test:
-    if: github.event_name != 'workflow_dispatch' || inputs.lab_cases == ''
     name: Run Linux native tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -150,7 +122,6 @@ jobs:
   # so it runs as its own job — still a required check, but in parallel with `test` rather
   # than serially in front of it.
   lint:
-    if: github.event_name != 'workflow_dispatch' || inputs.lab_cases == ''
     name: Lint and validate docs
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -180,26 +151,3 @@ jobs:
 
       - name: Run linter
         run: ./gradlew --refresh-dependencies lintDocs
-
-  lab-evidence:
-    name: Analyze supplied lab records
-    if: github.event_name == 'workflow_dispatch' && inputs.lab_cases != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6
-      - name: Analyze paired records
-        env:
-          LAB_CASES: ${{ inputs.lab_cases }}
-          LAB_CONTROL: ${{ inputs.lab_control }}
-          LAB_COMPRESSION: ${{ inputs.lab_compression }}
-        run: |
-          printf '%s' "$LAB_CASES" | base64 --decode > "$RUNNER_TEMP/lab-cases.json.$LAB_COMPRESSION"
-          python3 klause-bench/tools/analyze_lab.py "$RUNNER_TEMP/lab-cases.json.$LAB_COMPRESSION" --control "$LAB_CONTROL" > "$RUNNER_TEMP/lab-analysis.json"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: lab-evidence
-          path: |
-            ${{ runner.temp }}/lab-cases.json.*
-            ${{ runner.temp }}/lab-analysis.json
-          if-no-files-found: error

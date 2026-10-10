@@ -79,6 +79,13 @@ Read `docs/benchmarking.md` before benchmarking. In short:
 - Keep `klause-bench` focused on the active harness, corpus inputs, named sets and reusable tools. Do not
   commit generated solve outputs, historical campaign bundles or one-off evidence reports there; keep
   measurement archives outside the repository.
+- Do not commit generated lab/campaign archives, raw records, payloads, manifests or campaign-only
+  scripts anywhere in the repository, including compressed or encoded bundles. `docs/evidence/` may
+  contain short Markdown summaries supporting current design decisions, never lab archives.
+- Keep `.github` limited to the build/release workflows and issue/PR templates. Do not add campaign,
+  lab or benchmark-evidence workflows, dispatch inputs, jobs or artifact uploads to existing workflows.
+  Run measurement checking outside the repository's GitHub workflows; do not add companion guides for
+  campaign CI dispatch. Reusable local analysis tools and regression fixtures belong in `klause-bench`.
 - Store temporary campaign notes, scripts, manifests, raw results and reports in
   `klause-evidence/campaigns/<name>/`, alongside the primary checkout and outside this repository.
   All worktrees share that evidence directory; do not create separate archives beside each worktree.

@@ -23,11 +23,10 @@ This tree is the internal implementation contract and developer workflow referen
 | [CLI](cli.md) | Frontend registry, engine selection, flags and environment defaults |
 | [MiniZinc](minizinc.md) | Solver registration, wrappers and native predicate coverage |
 | [Benchmarking](benchmarking.md) | Selection, saved results, source validation, caching and profiling |
-| [Paired lab records](benchmark-records.md) | Matched record analysis, timing scopes and external CI evidence |
+| [Paired lab records](benchmark-records.md) | Matched record analysis and timing scopes |
 | [LP capture and replay](lp/replay.md) | Basis traces and retained/fresh consumer diagnostics |
 | [Fixture provenance](testing/fixtures.md) | Committed test and benchmark data, identities and licenses |
 | [Diagnostic tools](testing/tools.md) | Reusable opt-in probes and profiling |
-| [External campaign evidence](testing/campaign-evidence.md) | CI checking of externally staged measurements |
 
 Architecture contracts constrain implementation: preserve their dependency,
 authority, soundness and lifecycle rules when changing code. A deliberate contract
