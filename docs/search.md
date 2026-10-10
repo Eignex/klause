@@ -116,6 +116,9 @@ Propagators supply sound source
 reasons for deductions and conflicts. An assignment's undo lifetime can be deeper
 than the effective level of its reason: Boolean pins use the deeper of that level
 and the current decision depth so an asserting backjump retains its consequence.
+Reified arithmetic skips reason construction when a settled relation agrees with
+its assigned indicator. New indicator pins and opposing assignments retain the
+pin and conflict explanation protocol.
 
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump.
