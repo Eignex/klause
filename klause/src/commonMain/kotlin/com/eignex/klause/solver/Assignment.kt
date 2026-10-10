@@ -4,8 +4,12 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.toLongExact
 import kotlin.random.Random
 
 /**
@@ -76,22 +80,42 @@ class Assignment(
     )
 }
 
-/** Assignment snapshot yielded by the solver. [exactReals] is authoritative when present. */
+/** Assignment snapshot yielded by the solver. [exactInts] and [exactReals] are authoritative when present. */
 class Sample(
     /** Boolean values indexed by variable id. */
-    val bools: BooleanArray,
+    bools: BooleanArray,
     /** Integer values indexed by variable id. */
-    val ints: LongArray,
+    ints: LongArray,
     /** Values of the LP-only continuous (real) variables, indexed by real var id; empty for the
      *  integer/Boolean core. Populated at a search leaf from the residual LP solution, so a
      *  hybrid MIP/CP solution carries its continuous part. */
     reals: DoubleArray = EmptyDoubleArray,
     exactReals: List<BigFraction>? = null,
+    exactInts: List<BigInt>? = null,
 ) {
-    /** Certified real values indexed by real variable id, when a residual LP supplied them. */
-    val exactReals: List<BigFraction>? = exactReals?.let {
-        if (it is ExactRealValues) it else ExactRealValues(it)
+    /** Arbitrary-precision integer coordinates, when supplied by an exact open theory. */
+    val exactInts: List<BigInt>? = exactInts?.let { ExactValues(it) }
+    private val booleanValues = if (this.exactInts == null) bools else bools.copyOf()
+    private val integerValues = if (this.exactInts == null) ints else ints.copyOf()
+
+    /** Boolean coordinates; exact witnesses return a copy to protect their authority. */
+    val bools: BooleanArray get() = if (exactInts == null) booleanValues else booleanValues.copyOf()
+
+    /** Finite integer coordinates. Throws when an authoritative coordinate lies outside Long. */
+    val ints: LongArray get() {
+        check(exactInts == null || integerValues.size == exactInts.size) {
+            "an arbitrary-precision witness needs an explicit finite projection"
+        }
+        return if (exactInts == null) integerValues else integerValues.copyOf()
     }
+
+    /** Number of integer coordinates, including arbitrary-precision coordinates. */
+    val numIntVars: Int get() = exactInts?.size ?: integerValues.size
+
+    internal var isTheoryWitness: Boolean = false
+
+    /** Certified real values indexed by real variable id, when a residual LP supplied them. */
+    val exactReals: List<BigFraction>? = exactReals?.let { ExactValues(it) }
     private val approximateReals = if (this.exactReals == null) reals else reals.copyOf()
 
     /** Approximate real values. A certified sample returns a copy so its exact and approximate views stay aligned. */
@@ -104,6 +128,15 @@ class Sample(
     fun approximateRealValue(id: Int): Double = approximateReals[id]
 
     init {
+        this.exactInts?.let { values ->
+            if (values.all { it.fitsLong() }) {
+                require(values.size == integerValues.size && values.indices.all {
+                    values[it].toLongExact() == integerValues[it]
+                }) { "exact and finite integer coordinates differ" }
+            } else {
+                require(integerValues.isEmpty()) { "a wide witness has no finite integer coordinates" }
+            }
+        }
         require(this.exactReals == null || this.exactReals.size == approximateReals.size) {
             "exact and approximate real coordinates differ"
         }
@@ -114,34 +147,48 @@ class Sample(
         }
     }
 
-    /** Copy this assignment; replacing the approximate reals discards their exact authority unless supplied. */
+    /** Copy this assignment; replacing a finite view discards its exact authority unless supplied. */
     fun copy(
-        bools: BooleanArray = this.bools,
-        ints: LongArray = this.ints,
+        bools: BooleanArray = booleanValues,
+        ints: LongArray = integerValues,
         reals: DoubleArray = approximateReals,
         exactReals: List<BigFraction>? = if (reals === approximateReals) this.exactReals else null,
-    ): Sample = Sample(bools, ints, reals, exactReals)
+        exactInts: List<BigInt>? = if (ints === integerValues) this.exactInts else null,
+    ): Sample = Sample(bools, ints, reals, exactReals, exactInts).also {
+        it.isTheoryWitness = isTheoryWitness && bools.contentEquals(booleanValues) &&
+            ints.contentEquals(integerValues) && reals.contentEquals(approximateReals) &&
+            exactInts == this.exactInts && exactReals == this.exactReals
+    }
 
     /** Number of Boolean and integer values that differ from [other]. */
     fun hammingDistanceTo(other: Sample): Int {
         var d = 0
-        for (i in bools.indices) if (bools[i] != other.bools[i]) d++
-        for (i in ints.indices) if (ints[i] != other.ints[i]) d++
+        for (i in booleanValues.indices) if (booleanValues[i] != other.booleanValues[i]) d++
+        if (exactInts == null && other.exactInts == null) {
+            for (i in integerValues.indices) if (integerValues[i] != other.integerValues[i]) d++
+        } else {
+            for (i in 0 until numIntVars) if (exactIntValue(i) != other.exactIntValue(i)) d++
+        }
         return d
     }
 
     override fun equals(other: Any?): Boolean {
         if (other !is Sample) return false
-        return bools.contentEquals(other.bools) && ints.contentEquals(other.ints) &&
-            approximateReals.contentEquals(other.approximateReals) && exactReals == other.exactReals
+        return booleanValues.contentEquals(other.booleanValues) && integerValues.contentEquals(other.integerValues) &&
+            exactInts == other.exactInts && approximateReals.contentEquals(other.approximateReals) &&
+            exactReals == other.exactReals
     }
     override fun hashCode(): Int =
-        31 * (31 * (31 * bools.contentHashCode() + ints.contentHashCode()) + approximateReals.contentHashCode()) +
-            (exactReals?.hashCode() ?: 0)
+        31 * (31 * (31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
+            (exactInts?.hashCode() ?: 0)) + approximateReals.contentHashCode()) + (exactReals?.hashCode() ?: 0)
+
+    internal fun exactIntValue(id: Int): BigInt = exactInts?.get(id) ?: bigIntOf(integerValues[id])
+
+    internal fun boolValue(id: Int): Boolean = booleanValues[id]
 }
 
-private class ExactRealValues(values: List<BigFraction>) : AbstractList<BigFraction>() {
-    private val snapshot = values.toTypedArray()
+private class ExactValues<T>(values: List<T>) : AbstractList<T>() {
+    private val snapshot = values.toList()
     override val size: Int get() = snapshot.size
-    override fun get(index: Int): BigFraction = snapshot[index]
+    override fun get(index: Int): T = snapshot[index]
 }

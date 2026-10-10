@@ -111,12 +111,13 @@ data class LinearObjective(
     /** Exact value of [sample], using certified real values when present and binary64 coefficients. */
     fun evaluateExact(sample: Sample): BigFraction {
         var total = bigIntOf(constant)
+        val bools = sample.bools
         for (v in intCoefficients.indices) {
             if (intCoefficients[v] == 0L) continue
-            total += bigIntOf(intCoefficients[v]) * bigIntOf(sample.ints[v])
+            total += bigIntOf(intCoefficients[v]) * sample.exactIntValue(v)
         }
         for (b in boolWeights.indices) {
-            if (boolWeights[b] != 0L && sample.bools[b]) total += bigIntOf(boolWeights[b])
+            if (boolWeights[b] != 0L && bools[b]) total += bigIntOf(boolWeights[b])
         }
         var value = BigFraction.of(total, BIG_ONE)
         for (r in realCoefficients.indices) {
@@ -129,6 +130,7 @@ data class LinearObjective(
     }
 
     override fun evaluate(sample: Sample): Double {
+        if (sample.exactInts != null) return evaluateExact(sample).toDouble()
         // The discrete part is exact; the continuous part is the LP-only real terms, present in [sample]
         // only at a leaf where the residual LP resolved them. A discrete sum past the 64-bit range is summed
         // exactly and rounded once, rather than wrapping.

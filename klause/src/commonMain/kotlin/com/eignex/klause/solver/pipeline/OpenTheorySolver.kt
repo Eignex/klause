@@ -54,18 +54,18 @@ sealed interface OpenTheoryAssignment {
         /** Difference-theory witness. */
         val sample: Sample,
     ) : OpenTheoryAssignment {
-        override fun boolValue(id: Int): Boolean = sample.bools[id]
-        override fun intValue(id: Int): String = sample.ints[id].toString()
+        override fun boolValue(id: Int): Boolean = sample.boolValue(id)
+        override fun intValue(id: Int): String = sample.exactIntValue(id).toString()
         override fun realValue(id: Int): String = sample.reals.getOrElse(id) { 0.0 }.toString()
     }
 
-    /** A local-search witness the open portfolio checked against the source model; its real values are certified. */
+    /** An assignment carried by the open portfolio, preserving its exact integer and real coordinates. */
     data class Sampled(
         /** Checked witness. */
         val sample: Sample,
     ) : OpenTheoryAssignment {
-        override fun boolValue(id: Int): Boolean = sample.bools[id]
-        override fun intValue(id: Int): String = sample.ints[id].toString()
+        override fun boolValue(id: Int): Boolean = sample.boolValue(id)
+        override fun intValue(id: Int): String = sample.exactIntValue(id).toString()
         override fun realValue(id: Int): String =
             requireNotNull(sample.exactReals) { "a sampled witness carries certified real values" }[id].toString()
     }

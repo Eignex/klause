@@ -2,13 +2,63 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SampleTest {
+    @Test
+    fun `a copied wide witness keeps exact integers without a finite stand-in`() {
+        val wide = parseBigInt("9223372036854775808")
+        val values = mutableListOf(wide)
+        val bools = booleanArrayOf(true)
+        val original = Sample(bools, LongArray(0), exactInts = values)
+        original.isTheoryWitness = true
+        values[0] = bigIntOf(0)
+        bools[0] = false
+        original.bools[0] = false
+
+        val copied = original.copy()
+
+        assertEquals(wide, copied.exactInts?.single())
+        assertEquals(1, copied.numIntVars)
+        assertTrue(copied.bools.single())
+        assertTrue(copied.isTheoryWitness)
+        assertFailsWith<IllegalStateException> { copied.ints }
+        assertEquals(original, copied)
+        assertEquals(original.hashCode(), copied.hashCode())
+    }
+
+    @Test
+    fun `changing coordinates discards theory acceptance`() {
+        val sample = Sample(booleanArrayOf(false), longArrayOf(2), exactInts = listOf(bigIntOf(2)))
+        sample.isTheoryWitness = true
+
+        val changed = sample.copy(ints = longArrayOf(3))
+        val changedBoolean = sample.copy(bools = booleanArrayOf(true))
+
+        assertNull(changed.exactInts)
+        assertFalse(changed.isTheoryWitness)
+        assertFalse(changedBoolean.isTheoryWitness)
+        assertEquals(bigIntOf(2), sample.exactInts?.single())
+    }
+
+    @Test
+    fun `exact integer coordinates must agree with the finite view`() {
+        assertFailsWith<IllegalArgumentException> {
+            Sample(BooleanArray(0), longArrayOf(1), exactInts = listOf(bigIntOf(2)))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            Sample(BooleanArray(0), longArrayOf(0), exactInts = listOf(parseBigInt("9223372036854775808")))
+        }
+    }
+
     @Test
     fun `certified reals survive discrete reconstruction and snapshot their source list`() {
         val exact = BigFraction.ofLong(2) * BigFraction.ofLong(3).reciprocal()
