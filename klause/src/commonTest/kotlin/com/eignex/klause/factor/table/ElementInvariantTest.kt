@@ -88,9 +88,10 @@ class ElementInvariantTest {
     @Test
     fun `matching cell repairs respect domains and index pins`() {
         val start = Int.MAX_VALUE.toLong()
-        val problem = Problem(0, 2, arrayOf(IntDomain(start, start + 2).excludeValue(start + 1), IntDomain(10, 20)),
-            arrayOf<Factor>(Element(0, 1, longArrayOf(10, 20, 10), false, Int.MAX_VALUE)))
         for (pins in listOf(Assumptions.None, Assumptions(ints = mapOf(0 to start)))) {
+            val domain = if (pins.isEmpty) IntDomain(start, start + 2).excludeValue(start + 1) else IntDomain(start, start + 2)
+            val problem = Problem(0, 2, arrayOf(domain, IntDomain(10, 20)),
+                arrayOf<Factor>(Element(0, 1, longArrayOf(10, 20, 10), false, Int.MAX_VALUE)))
             val state = LocalSearchState(problem.bake(), Random(0), pins)
             state.assignment.setInt(0, start)
             state.assignment.setInt(1, 20)
