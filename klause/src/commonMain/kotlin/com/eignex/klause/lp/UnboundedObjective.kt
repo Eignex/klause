@@ -201,13 +201,3 @@ private fun Problem.branchRowsAt(witness: ExactWitness, token: Cancellation): Li
 private fun Problem.movesNoRay(factor: Factor): Boolean =
     factor.intVars.all { intBounds.hasLower(it) && intBounds.hasUpper(it) } &&
         factor.variables.reals.all { realLower[it].isFinite() && realUpper[it].isFinite() }
-
-private fun ExactComparison.holdsAt(witness: ExactWitness): Boolean {
-    val value = activityAt(witness)
-    return when (op) {
-        LinearOp.LE -> if (strict) value < bound else value <= bound
-        LinearOp.GE -> if (strict) value > bound else value >= bound
-        LinearOp.EQ -> value == bound
-        LinearOp.NE -> value != bound
-    }
-}

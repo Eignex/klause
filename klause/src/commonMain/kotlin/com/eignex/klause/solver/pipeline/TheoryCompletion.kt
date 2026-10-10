@@ -42,11 +42,7 @@ internal class TheoryCompletion(private val model: Problem, private val params: 
         val result = (decided as OpenTheoryExecution.Satisfy).result
         val work = ceil(result.stats.openTheory.openWork * LS_INSTRUCTIONS_PER_WORK).toLong().coerceAtLeast(1L)
         return when (result) {
-            is OpenTheoryResult.Sat -> {
-                val exact = List(model.numRealVars) { parseRational(result.assignment.realValue(it)) }
-                val reals = DoubleArray(exact.size) { exact[it].toDouble() }
-                Completion.Witness(candidate.copy(reals = reals, exactReals = exact), work)
-            }
+            is OpenTheoryResult.Sat -> Completion.Witness(result.assignment.toSample(model), work)
 
             is OpenTheoryResult.Unsat -> Completion.Refuted(work = work)
 

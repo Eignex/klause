@@ -6,6 +6,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -59,6 +62,17 @@ class PortfolioWorker private constructor(
     internal var family: ArmFamily = if (withInstructions) ArmFamily.LocalSearch else ArmFamily.Backtrack
 
     internal var improvementOnly: Boolean = false
+
+    internal var evidenceModel: ModelIdentity? = null
+        private set
+    private var certificates: (EvidenceKind) -> EvidenceCertificate? = { null }
+
+    internal fun bindEvidence(model: ModelIdentity, provesResults: Boolean = true): PortfolioWorker = also {
+        evidenceModel = model
+        certificates = { kind -> if (provesResults) EvidenceCertificate.verified(model, kind) else null }
+    }
+
+    internal fun certificateFor(kind: EvidenceKind): EvidenceCertificate? = certificates(kind)
 
     /**
      * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine

@@ -78,6 +78,36 @@ A wide exact sample exposes no finite integer array. Local-search warm starts
 explicitly project the integers into their search windows and discard theory
 acceptance. This search seed cannot replace the exact incumbent or justify a bound.
 
+Portfolio evidence names its source model and objective. These are opaque in-memory
+identities: a fresh or transformed model needs its own check, even if structurally
+equivalent. Copies of unchanged exact witnesses retain their source certificate;
+coordinate changes and warm-start projections discard it. Objective changes cannot
+reuse objective bounds or unboundedness claims. Unconditional variable bounds use
+the model scope without an objective.
+
+Verification preserves three outcomes. Accepted witnesses may become incumbents;
+rejected proposals quarantine their producer without proving the model infeasible;
+indeterminate checks publish nothing and do not count as a fault. Finite fixpoint
+cancellation stays indeterminate. Uncertified real coordinates require a complete
+source-row check, including strictness, reification and declared bounds, or the
+configured source tolerance check. Unsupported checkers decline.
+
+Bounds, infeasibility and unboundedness require a matching completed-proof
+certificate in addition to identity. Native adapters issue these certificates only
+for their engines' completed proof results; open local search has witness authority
+only. A missing certificate cannot justify pruning or a terminal proof, although a
+separately accepted feasible point can remain the best incumbent. The certificate
+is an in-memory attestation of the engine's check, not a serialized proof or an
+independent proof checker. Numerical proofs remain owned by their engines; a point
+alone never certifies a recession direction.
+
+Built-in shared channels belong to the same model and objective. Workers reject
+foreign pools; objective and variable bound imports require matching certificates.
+The shared incumbent exchange runs the source witness checker before installing a
+cutoff, including direct engine publications. The low-level public portfolio API
+continues to support caller-trusted unbound workers and its explicit witness checker;
+source pipeline portfolios install the scoped verification contract.
+
 Resumable backtrack arms charge decisions, propagation visits and completed LP
 work to their scheduler. The current conversion is one slice node per 4000
 propagation visits and per 600 LP work units. Construction is charged once;

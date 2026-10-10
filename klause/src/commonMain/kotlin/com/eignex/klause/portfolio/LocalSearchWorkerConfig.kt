@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -42,6 +43,8 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?, // solutions only: local search neither learns nor consumes clauses or cuts
     ): PortfolioWorker {
+        val evidenceModel = ModelIdentity.of(problem, objective)
+        val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
         // On a COP, every arm optimizes. A recipe that drives objective descent itself (CBLS, SA) needs
         // nothing; a violation-native one (probSAT / WalkSAT / feasibility-jump) gets an `objective ≤
         // incumbent` ratchet overlaid on its problem and the shared bound to tighten — so no arm bails at
@@ -65,8 +68,8 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
         ).apply {
             objectiveBound = boundHandle
             if (effectiveProblem === problem) {
-                pools?.localSearchProjection?.let { engine.projection = it }
-                pools?.localSearchInvariants?.let { engine.invariantNetwork = it }
+                matchedPools?.localSearchProjection?.let { engine.projection = it }
+                matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
             }
         }.session()
         val workerLabel = "ls/$label"
@@ -81,7 +84,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
             normalizeWeightsByClass = true,
             // Bidirectional cross-engine flow: publish incumbents this arm finds and, on restart, anchor
             // on the verified global best — so LS and backtrack incumbents circulate both ways.
-            pooledIncumbents = pools?.solutions,
+            pooledIncumbents = matchedPools?.solutions,
             nodeBudget = nodeBudget,
         )
         return PortfolioWorker.of(
@@ -94,7 +97,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
             withInstructionBudget = { p, limit ->
                 p.copy(maxInstructions = minOf(p.maxInstructions ?: Long.MAX_VALUE, limit))
             },
-        )
+        ).bindEvidence(evidenceModel)
     }
 
     companion object {

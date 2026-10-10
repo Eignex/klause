@@ -4,6 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
@@ -112,7 +113,7 @@ class Sample(
     /** Number of integer coordinates, including arbitrary-precision coordinates. */
     val numIntVars: Int get() = exactInts?.size ?: integerValues.size
 
-    internal var isTheoryWitness: Boolean = false
+    internal var witnessCertificate: EvidenceCertificate? = null
 
     /** Certified real values indexed by real variable id, when a residual LP supplied them. */
     val exactReals: List<BigFraction>? = exactReals?.let { ExactValues(it) }
@@ -155,9 +156,9 @@ class Sample(
         exactReals: List<BigFraction>? = if (reals === approximateReals) this.exactReals else null,
         exactInts: List<BigInt>? = if (ints === integerValues) this.exactInts else null,
     ): Sample = Sample(bools, ints, reals, exactReals, exactInts).also {
-        it.isTheoryWitness = isTheoryWitness && bools.contentEquals(booleanValues) &&
-            ints.contentEquals(integerValues) && reals.contentEquals(approximateReals) &&
-            exactInts == this.exactInts && exactReals == this.exactReals
+        if (bools.contentEquals(booleanValues) && ints.contentEquals(integerValues) &&
+            reals.contentEquals(approximateReals) && exactInts == this.exactInts && exactReals == this.exactReals
+        ) it.witnessCertificate = witnessCertificate
     }
 
     /** Number of Boolean and integer values that differ from [other]. */

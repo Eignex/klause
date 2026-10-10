@@ -10,6 +10,9 @@ import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.incumbent.EvidenceCertificate
+import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -52,6 +55,8 @@ internal class BacktrackWorkerConfig(
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
     ): PortfolioWorker {
+        val evidenceModel = ModelIdentity.of(problem, objective)
+        val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }
         val workerLabel = "bt/${recipe.label}"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
@@ -59,55 +64,64 @@ internal class BacktrackWorkerConfig(
         // Shared entries name the worker's position as their origin, so replicas of one arm are credited apart.
         val sharing = HashSet<Contribution>()
         val meter = SharingMeter()
-        pools?.clauses?.let {
+        matchedPools?.clauses?.let {
             params = params.copy(
-                clauseExchange = PoolClauseExchange(it, origin = index, tally = pools.contributions, meter = meter),
+                clauseExchange = PoolClauseExchange(it, origin = index, tally = matchedPools.contributions, meter = meter),
             )
             sharing += Contribution.Clause
         }
-        pools?.cuts?.let {
+        matchedPools?.cuts?.let {
             params = params.copy(
-                cutExchange = PoolCutExchange(it, origin = index, tally = pools.contributions, meter = meter),
+                cutExchange = PoolCutExchange(it, origin = index, tally = matchedPools.contributions, meter = meter),
             )
             if (params.separatesCuts()) sharing += Contribution.Cut
         }
         // Wire this arm to the shared objective lower-bound manager when optimising: publish
         // the bounds it proves and tighten its objective floor to the cross-arm maximum.
         if (objective != null) {
-            pools?.bounds?.let { bounds ->
+            matchedPools?.bounds?.let { bounds ->
                 params = params.copy(
                     objectiveLowerBoundSink = { v ->
                         meter.exported(SharingChannel.Floor, 1)
-                        pools.contributions.note(Contribution.Floor, index, bounds.publish(v))
+                        val certificate = EvidenceCertificate.verified(evidenceModel, EvidenceKind.Bound)
+                        val raise = bounds.publish(v, evidenceModel, certificate)
+                        matchedPools.contributions.note(Contribution.Floor, index, raise)
                     },
                     objectiveLowerBoundSupplier = bounds::current,
                     sharingTimer = meter::charge,
                 )
                 sharing += Contribution.Floor
             }
-            pools?.varBounds?.let { vb ->
+            matchedPools?.varBounds?.let { vb ->
                 params = params.copy(
                     globalVarBoundSink = { v, lo, hi ->
                         meter.exported(SharingChannel.Bounds, 1)
-                        vb.publish(v, lo, hi, origin = index)
+                        vb.publish(
+                            v, lo, hi, origin = index, model = evidenceModel.forObjective(null),
+                            certificate = EvidenceCertificate.verified(evidenceModel.forObjective(null), EvidenceKind.Bound),
+                        )
                     },
                     globalVarLowerSupplier = vb::lowerOf,
                     globalVarUpperSupplier = vb::upperOf,
                     globalVarImportSink = { v, lower ->
                         meter.imported(SharingChannel.Bounds, 1)
                         val from = if (lower) vb.lowerOriginOf(v) else vb.upperOriginOf(v)
-                        if (from != index) pools.contributions.note(Contribution.Bound, from)
+                        if (from != index) matchedPools.contributions.note(Contribution.Bound, from)
                     },
                 )
                 sharing += Contribution.Bound
             }
             // Publish this arm's incumbents and, in the other direction, dive toward the verified global
             // best during stable phases (solution phasing). Only STABLE windows consult it, so arms explore.
-            pools?.solutions?.let { sols ->
+            matchedPools?.solutions?.let { sols ->
                 params = params.copy(
-                    improvedSolutionSink = { sample, objective ->
+                    improvedSolutionSink = { sample, value ->
                         meter.exported(SharingChannel.Incumbents, 1)
-                        meter.timed(SharingChannel.Incumbents) { sols.offer(sample, objective) }
+                        meter.timed(SharingChannel.Incumbents) {
+                            matchedPools.offerSolution(
+                                evidenceModel, sample, value, EvidenceCertificate.verified(evidenceModel, EvidenceKind.Witness),
+                            )
+                        }
                     },
                     pooledIncumbents = sols.metered(meter),
                     solutionPhasing = true,
@@ -120,12 +134,12 @@ internal class BacktrackWorkerConfig(
         return PortfolioWorker.of(
             workerLabel,
             armId,
-            (pools?.nativeProjection?.let { BacktrackSolver(problem, it) } ?: BacktrackSolver(problem)).session(),
+            (matchedPools?.nativeProjection?.let { BacktrackSolver(problem, it) } ?: BacktrackSolver(problem)).session(),
             params,
             objective = objective,
             withBound = withBound,
-        ).also {
-            it.sharedPools = pools
+        ).bindEvidence(evidenceModel).also {
+            it.sharedPools = matchedPools
             it.sharing = sharing
             it.sharingMeter = meter
         }

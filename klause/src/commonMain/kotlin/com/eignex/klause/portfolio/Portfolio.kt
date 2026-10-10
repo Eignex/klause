@@ -8,10 +8,14 @@ import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
-import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
+import com.eignex.klause.solver.incumbent.CandidateVerifier
+import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.Publication
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -140,6 +144,10 @@ class Portfolio(
      */
     private val minShares: DoubleArray = DoubleArray(0),
 ) : PortfolioExecutor {
+    internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
+        PortfolioEvidence(it, CandidateVerifier.trusting())
+    }
+
     private val lanes = minOf(lanes, workers.size)
 
     // The policy shares the run's time between families, not arms; see [remainingShare].
@@ -223,11 +231,12 @@ class Portfolio(
             val failed = failure != null && failure !is SearchInitializationCancelled
             // A failing arm leaves the others to answer; an unsound one answered wrongly, so it is quarantined too.
             if (failure is UnsoundnessException) claim.fault = failure.message
-            if (r is SolveResult.Sat) {
-                witnessCheck?.refute(r.assignment, null)?.let {
-                    claim.fault = "claimed a model the problem refutes: $it"
-                }
+            val verification = when (r) {
+                is SolveResult.Sat -> verifyWitness(worker, r.assignment, null)
+                is SolveResult.Unsat -> evidenceVerification?.proof(worker, EvidenceKind.Infeasible)
+                else -> null
             }
+            claim.verified(verification)
             run.locked {
                 run.record(
                     claim, handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
@@ -237,12 +246,14 @@ class Portfolio(
                     run.quarantine(claim)
                     return@locked
                 }
-                if ((r is SolveResult.Sat || r is SolveResult.Unsat) && decided == null) {
+                if ((r is SolveResult.Sat || r is SolveResult.Unsat) && !claim.indeterminate && decided == null) {
                     decided = r
                     run.finish()
                 }
                 // An arm that threw is retired like one that finished: rescheduling it would only fail again.
-                if (failure != null || (handle != null && r != null)) {
+                if (failure != null || (handle != null && r != null) ||
+                    (claim.indeterminate && (r is SolveResult.Sat || r is SolveResult.Unsat))
+                ) {
                     r?.let(verdicts::add)
                     run.retire(arm)
                 }
@@ -329,10 +340,9 @@ class Portfolio(
             val r = candidate.assignment
             if (claim.fault != null || !incumbents.isImproving(candidate.objective)) return
             val started = TimeSource.Monotonic.markNow()
-            witnessCheck?.refute(r.sample, r.objective)?.let {
-                claim.fault = "claimed an incumbent the problem refutes: $it"
-                return
-            }
+            val verification = verifyWitness(workers[claim.arm], r.sample, r.objective)
+            claim.verified(verification)
+            if (verification !is Verification.Accepted) return
             claim.checked(started.elapsedNow())
             run.locked { install(claim, candidate) }
         }
@@ -420,6 +430,15 @@ class Portfolio(
             if (terminal is MinimizeResult.Infeasible && incumbent.current() != null) {
                 claim.fault = "claimed infeasibility while the pool holds a verified solution"
             }
+            val proofKind = when {
+                terminal is MinimizeResult.Unbounded -> EvidenceKind.Unbounded
+                terminal is MinimizeResult.Infeasible -> EvidenceKind.Infeasible
+                PortfolioReduction.isExhausted(terminal) -> EvidenceKind.Bound
+                else -> null
+            }
+            if (proofKind != null) {
+                claim.verified(evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue))
+            }
             run.locked {
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
                 run.record(claim, stats, cumulative = handle != null, work = work, failed = failed)
@@ -447,22 +466,32 @@ class Portfolio(
                 }
                 // A ray proves the model unbounded whatever bound the arm ran under.
                 (terminal as? MinimizeResult.Unbounded)?.let {
-                    if (unbounded == null) unbounded = it
-                    run.finish()
+                    if (!claim.indeterminate) {
+                        if (unbounded == null) unbounded = it
+                        run.finish()
+                    }
                 }
                 // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
-                if (PortfolioReduction.isExhausted(terminal)) {
+                if (!claim.indeterminate && PortfolioReduction.isExhausted(terminal)) {
                     exhausted = true
                     run.finish()
                 }
                 // An arm that threw is retired like one that finished: rescheduling it would only fail again.
-                if (failure != null || (handle != null && terminal != null)) run.retire(arm)
+                if (failure != null || (handle != null && terminal != null) ||
+                    (claim.indeterminate && (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded))
+                ) run.retire(arm)
             }
         }
         val stats = run.folded()
         unbounded?.let { return it.copy(stats = stats) }
         // Cancellation or retirement stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
         return PortfolioReduction.terminal(incumbents.projected(), dirty = !exhausted, stats)
+    }
+
+    private fun verifyWitness(worker: PortfolioWorker, sample: Sample, value: Double?): Verification<Sample, Double?> {
+        evidenceVerification?.let { return it.witness(worker, sample, value) }
+        val reason = witnessCheck?.refute(sample, value)
+        return if (reason == null) Verification.Accepted(Candidate(sample, value)) else Verification.Rejected(reason)
     }
 
     /** One segment's assignment: the arm a lane claimed and what it may spend, plus what its segment found. A
@@ -481,6 +510,16 @@ class Portfolio(
 
         /** When the lane claimed the segment. */
         val started = TimeSource.Monotonic.markNow()
+
+        var indeterminate = false
+
+        fun verified(verdict: Verification<*, *>?) {
+            when (verdict) {
+                is Verification.Rejected -> fault = "claimed evidence the problem refutes: ${verdict.reason}"
+                is Verification.Indeterminate -> indeterminate = true
+                else -> Unit
+            }
+        }
 
         var hadIncumbent = false
         var improved = false
