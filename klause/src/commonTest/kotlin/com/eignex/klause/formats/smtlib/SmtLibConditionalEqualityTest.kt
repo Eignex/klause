@@ -12,6 +12,8 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
