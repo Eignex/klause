@@ -72,4 +72,27 @@ class PropagationPreparationTest {
         while (session == null) session = preparation.advance()
         assertEquals(IntDomain(0, 10), assertNotNull(session).intDomain(0))
     }
+
+    @Test
+    fun `cancellation before a root fire preserves the pending queue`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            Array(260) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3) },
+        )
+        var polls = 0
+        var cancelOnPoll = Int.MAX_VALUE
+        val preparation = PropagationPreparation(problem, Cancellation { ++polls >= cancelOnPoll }, 0, false)
+        repeat(4) { assertNull(preparation.advance()) }
+        cancelOnPoll = polls + 2
+
+        assertNull(preparation.advance())
+        assertEquals(0L, preparation.work)
+
+        cancelOnPoll = Int.MAX_VALUE
+        var session: PropagationSession? = null
+        while (session == null) session = preparation.advance()
+        assertEquals(PropagationSession(problem).work, session.work)
+        assertEquals(IntDomain(0, 3), session.intDomain(0))
+        assertFalse(session.fixpointCancelled)
+    }
 }

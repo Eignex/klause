@@ -1000,7 +1000,7 @@ class PropagationState(
         try {
             return fireQueue(
                 cancellation !== Cancellation.Never, 0, cancellation, false,
-                maxFires = PROPAGATION_PREPARATION_BATCH_SIZE,
+                maxFires = PROPAGATION_PREPARATION_BATCH_SIZE, cancelIsPause = true,
             )
         } finally {
             propagationNanos += start.elapsedNow().inWholeNanoseconds
@@ -1063,6 +1063,7 @@ class PropagationState(
         cancellation: Cancellation,
         skipExpensiveBake: Boolean,
         maxFires: Int = Int.MAX_VALUE,
+        cancelIsPause: Boolean = false,
     ): IntArray? {
         var fireCount = 0
         while (propQueue.isNotEmpty()) {
@@ -1074,7 +1075,7 @@ class PropagationState(
             // pauses at decision granularity) untouched: the poll is never even consulted there.
             if (pollable) {
                 if (fireCount >= floor && (fireCount and CANCEL_POLL_MASK) == 0 && cancellation()) {
-                    runCancelled = true
+                    if (!cancelIsPause) runCancelled = true
                     return null
                 }
             }

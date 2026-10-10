@@ -121,6 +121,9 @@ publish a sample or refutation. Completion installs its fixpoint or derived conf
 once, then enables the ordinary trail and branch-and-bound search. Propagator objects
 remain private to the handle. Preparation work, fractional charges and overspend debt
 carry into search without being charged again; the stats sink retains its timing window.
+A cancellation between root fires pauses the private queue without marking the
+fixpoint unusable. Final assumption seeding and search installation can abort
+initialization, and their partial state cannot resume or publish a result.
 The packed native-SAT optimization path and satisfaction/repair construction retain
 their constructor lifecycle. State allocation, occurrence indexes, individual factor
 calls, assumption seeding and LP construction remain atomic work.

@@ -8417,6 +8417,7 @@ public final class com/eignex/klause/solver/ResumableOptimizer$DefaultImpls {
 public abstract interface class com/eignex/klause/solver/ResumableSearch : java/lang/AutoCloseable {
 	public fun close ()V
 	public fun getInitialWork ()J
+	public fun getPreparationPending ()Z
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun getWork ()J
 	public abstract fun isDone ()Z
@@ -8427,6 +8428,7 @@ public abstract interface class com/eignex/klause/solver/ResumableSearch : java/
 public final class com/eignex/klause/solver/ResumableSearch$DefaultImpls {
 	public static fun close (Lcom/eignex/klause/solver/ResumableSearch;)V
 	public static fun getInitialWork (Lcom/eignex/klause/solver/ResumableSearch;)J
+	public static fun getPreparationPending (Lcom/eignex/klause/solver/ResumableSearch;)Z
 	public static fun getWork (Lcom/eignex/klause/solver/ResumableSearch;)J
 	public static fun runSlice (Lcom/eignex/klause/solver/ResumableSearch;Lcom/eignex/klause/util/Cancellation;JLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
 }
@@ -12176,4 +12178,3 @@ public final class com/eignex/klause/util/StringCharSource : com/eignex/klause/u
 public abstract interface class com/eignex/klause/util/WorkMeter {
 	public abstract fun charge (J)V
 }
-

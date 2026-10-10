@@ -19,11 +19,10 @@ internal class PropagationPreparation(
 
     val work: Long get() = state?.work ?: 0L
     val propagationNanos: Long get() = state?.propagationNanos ?: 0L
-    val cancelled: Boolean get() = state?.runCancelled == true
 
     fun advance(): PropagationSession? {
         result?.let { return it }
-        if (cancelled || cancellation()) return null
+        if (cancellation()) return null
         val projected = projection ?: run {
             projection = projections.next()
             return null
@@ -40,7 +39,7 @@ internal class PropagationPreparation(
             return null
         }
         val conflict = live.advanceRootFixpoint(cancellation)
-        if (live.runCancelled || (conflict == null && live.rootFixpointPending)) return null
+        if (conflict == null && live.rootFixpointPending) return null
         return PropagationSession.prepared(live, cancellation, conflict).also { result = it }
     }
 }

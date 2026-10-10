@@ -1246,6 +1246,8 @@ abstract interface com.eignex.klause.solver/ResumableSearch : kotlin/AutoCloseab
         abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/ResumableSearch.stats.<get-stats>|<get-stats>(){}[0]
     open val initialWork // com.eignex.klause.solver/ResumableSearch.initialWork|{}initialWork[0]
         open fun <get-initialWork>(): kotlin/Long // com.eignex.klause.solver/ResumableSearch.initialWork.<get-initialWork>|<get-initialWork>(){}[0]
+    open val preparationPending // com.eignex.klause.solver/ResumableSearch.preparationPending|{}preparationPending[0]
+        open fun <get-preparationPending>(): kotlin/Boolean // com.eignex.klause.solver/ResumableSearch.preparationPending.<get-preparationPending>|<get-preparationPending>(){}[0]
     open val work // com.eignex.klause.solver/ResumableSearch.work|{}work[0]
         open fun <get-work>(): kotlin/Long // com.eignex.klause.solver/ResumableSearch.work.<get-work>|<get-work>(){}[0]
 

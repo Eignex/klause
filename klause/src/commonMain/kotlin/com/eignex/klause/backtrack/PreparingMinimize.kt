@@ -2,7 +2,6 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.PropagationPreparation
 import com.eignex.klause.solver.ResumableSearch
-import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -59,7 +58,6 @@ internal class PreparingMinimize(
             while (!globalToken() && !budget.expired()) {
                 val session = preparing.advance()
                 budget.charge()
-                if (preparing.cancelled) throw SearchInitializationCancelled(stats, work)
                 if (session != null) {
                     budget.noteOverspend()
                     val preparedWork = work
@@ -83,7 +81,6 @@ internal class PreparingMinimize(
                 }
             }
             budget.noteOverspend()
-            if (globalToken() || preparing.cancelled) throw SearchInitializationCancelled(stats, work)
             return null
         } catch (failure: Throwable) {
             try {
