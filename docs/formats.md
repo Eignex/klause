@@ -72,8 +72,9 @@ An integer conditional with a constant guard returns its selected branch directl
 A parse limits this expansion to 65,536 visits, after which comparisons retain
 their arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
-fresh definitions are omitted after following these dependencies to a fixpoint;
-source declarations and arithmetic leaves remain authoritative, including open
+fresh definitions are omitted after following these dependencies to a fixpoint.
+Their unused integer columns are removed with surviving constraints and objectives remapped.
+Source declarations and arithmetic leaves remain authoritative, including open
 defaults and sparse decision-list selectors. Fresh reified predicates belonging
 only to omitted definitions are fixed false, so shared search does not branch
 on their unconstrained values.

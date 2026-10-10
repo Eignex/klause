@@ -1,9 +1,11 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 
@@ -269,11 +271,14 @@ internal object Compiler {
             inferBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
-            val objective = objectiveSpec?.let { (t, neg) ->
+            val compiledObjective = objectiveSpec?.let { (t, neg) ->
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }
             lowerOpenIteChains() // an objective term can open chains of its own
-            conditionalEqualities.retainNeededDefinitions(factors, intNames.values, boolNames.values, objective)
+            val removed = conditionalEqualities.retainNeededDefinitions(
+                factors, intNames.values, boolNames.values, compiledObjective,
+            )
+            val objective = compactConditionalColumns(removed, compiledObjective)
             val sourceBounds = modelIntBounds()
 
             val model = Problem(
@@ -292,6 +297,40 @@ internal object Compiler {
                 realVarNames = LinkedHashMap(realNames),
                 sense = if (objectiveSpec?.second == true) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
             )
+        }
+
+        private fun compactConditionalColumns(
+            removed: Set<Int>,
+            objective: LinearObjectiveSpec?,
+        ): LinearObjectiveSpec? {
+            if (removed.isEmpty()) return objective
+            val mapping = IntArray(nextInt) { -1 }
+            val retained = ArrayList<PresolveDomain>()
+            for (variable in mapping.indices) {
+                if (variable !in removed) {
+                    mapping[variable] = retained.size
+                    retained.add(intDomains[variable])
+                }
+            }
+            val remap = VarRemap(IntArray(nextBool) { it }, mapping)
+            for (index in factors.indices) {
+                val factor = factors[index]
+                if (factor.variables.ints.isNotEmpty()) {
+                    check(factor.variables.ints.all { mapping[it] >= 0 })
+                    factors[index] = factor.remap(remap)
+                }
+            }
+            for (entry in intNames.entries) entry.setValue(mapping[entry.value])
+            intDomains.clear()
+            intDomains.addAll(retained)
+            nextInt = retained.size
+            if (objective == null || objective.intCoefficients.isEmpty()) return objective
+            val coefficients = LongArray(nextInt)
+            for (variable in mapping.indices) {
+                val target = mapping[variable]
+                if (target >= 0) coefficients[target] = objective.intCoefficients.getOrElse(variable) { 0L }
+            }
+            return objective.copy(intCoefficients = coefficients)
         }
     }
 
