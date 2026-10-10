@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.ReifiedFactor
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
@@ -12,6 +11,8 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinOr
 
 internal class SmtLibConditionalEquality {
+    class UnusedColumns(val ints: Set<Int>, val bools: Set<Int>)
+
     private class Definition(
         val guards: List<Int>,
         val arms: List<LinComb>,
@@ -66,8 +67,8 @@ internal class SmtLibConditionalEquality {
         sourceIntegers: Collection<Int>,
         sourceBooleans: Collection<Int>,
         objective: LinearObjectiveSpec?,
-    ): Set<Int> {
-        if (definitions.isEmpty()) return emptySet()
+    ): UnusedColumns {
+        if (definitions.isEmpty()) return UnusedColumns(emptySet(), emptySet())
         val owners = HashMap<Factor, Int>()
         val predicateOwners = HashMap<Int, Int>()
         for ((variable, definition) in definitions) {
@@ -97,10 +98,10 @@ internal class SmtLibConditionalEquality {
             definitions.getValue(pending.removeFirst()).factors.forEach(::read)
         }
         factors.removeAll { factor -> owners[factor]?.let { it !in retained } == true }
-        for ((predicate, owner) in predicateOwners) {
-            if (owner !in retained) factors.add(Clause(intArrayOf(Lit.make(predicate, false))))
-        }
-        return definitions.keys.filterTo(HashSet()) { it !in retained }
+        return UnusedColumns(
+            definitions.keys.filterTo(HashSet()) { it !in retained },
+            predicateOwners.keys.filterTo(HashSet()) { predicateOwners.getValue(it) !in retained },
+        )
     }
 
     fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {
