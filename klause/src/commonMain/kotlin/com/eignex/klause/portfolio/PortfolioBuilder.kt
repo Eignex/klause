@@ -167,7 +167,9 @@ object PortfolioBuilder {
             IncumbentExchange.minimizing(),
             ContributionTally(concurrency.lock()),
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
-            localSearchProjection = LocalSearchPreparation(problem, LocalSearchModel.of(problem).domains, concurrency.lock()),
+            localSearchProjection = LocalSearchPreparation(
+                problem, LocalSearchModel.of(problem).domains, concurrency.lock(),
+            ),
             localSearchInvariants = lazy { definitionalSweep?.network(problem.numIntVars, problem.numBoolVars) },
         )
     }
