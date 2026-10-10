@@ -121,10 +121,12 @@ class ElementInvariantTest {
             assertTrue(state.moveSink.list.none { it is Move.IntSet && it.varId == 0 })
         }
     }
+
     @Test
     fun `index repairs skip unreachable matching cells in a retained extremum cone`() {
         val problem = Problem(
-            0, 5,
+            0,
+            5,
             arrayOf(IntDomain(0, 2), IntDomain(0, 4), IntDomain(0, 4), IntDomain(4, 4), IntDomain(10, 20)),
             arrayOf<Factor>(
                 Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
@@ -148,5 +150,4 @@ class ElementInvariantTest {
         assertEquals(2L, state.assignment.intValue(2))
         assertEquals(0L, state.cost)
     }
-
 }

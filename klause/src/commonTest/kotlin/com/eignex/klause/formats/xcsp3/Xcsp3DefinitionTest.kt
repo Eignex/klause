@@ -26,7 +26,7 @@ class Xcsp3DefinitionTest {
                 <intension>eq(r,$extreme(add(x,1),$extreme(y,1)))</intension>
                 <intension>eq(s,r)</intension>
                 </constraints></instance>
-            """.trimIndent()
+                """.trimIndent(),
             )
             val problem = parsed.problem
             val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
@@ -47,15 +47,15 @@ class Xcsp3DefinitionTest {
             state.recompute()
             for (x in 0L..1L) {
                 for (y in 0L..1L) {
-                state.apply(Move.Compound(listOf(Move.IntSet(0, x), Move.IntSet(1, y))))
-                val r = if (extreme == "min") minOf(x + 1, minOf(y, 1)) else maxOf(x + 1, maxOf(y, 1))
-                assertEquals(r, state.assignment.intValue(2))
-                assertEquals(r, state.assignment.intValue(3))
-                assertEquals(0L, state.cost)
-                val cost = state.cost
-                state.recompute()
-                assertEquals(cost, state.cost)
-            }
+                    state.apply(Move.Compound(listOf(Move.IntSet(0, x), Move.IntSet(1, y))))
+                    val r = if (extreme == "min") minOf(x + 1, minOf(y, 1)) else maxOf(x + 1, maxOf(y, 1))
+                    assertEquals(r, state.assignment.intValue(2))
+                    assertEquals(r, state.assignment.intValue(3))
+                    assertEquals(0L, state.cost)
+                    val cost = state.cost
+                    state.recompute()
+                    assertEquals(cost, state.cost)
+                }
             }
         }
     }
@@ -70,7 +70,7 @@ class Xcsp3DefinitionTest {
                 <intension>eq(r,$extreme(x,y))</intension>
                 <intension>ne(r,x)</intension>
                 </constraints></instance>
-            """.trimIndent()
+                """.trimIndent(),
             )
             val problem = parsed.problem
             val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
@@ -101,7 +101,7 @@ class Xcsp3DefinitionTest {
             <instance><variables><var id="x">0..3</var><var id="y">0..3</var>
             <var id="r">0..3</var></variables><constraints>
             <intension>eq(r,min(x,y))</intension></constraints></instance>
-        """.trimIndent()
+            """.trimIndent(),
         )
         val problem = parsed.problem
         val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
@@ -133,7 +133,7 @@ class Xcsp3DefinitionTest {
                 <var id="r">1..3</var></variables><constraints>
                 <intension>eq(r,$extreme(x,y))</intension>
                 <intension>ne(r,x)</intension></constraints></instance>
-            """.trimIndent()
+                """.trimIndent(),
             )
             val problem = parsed.problem
             val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
