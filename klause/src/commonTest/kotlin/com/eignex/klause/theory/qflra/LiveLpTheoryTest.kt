@@ -308,8 +308,14 @@ class LiveLpTheoryTest {
                 assertEquals(!Lit.isPositive(transformed.literal), session.boolValue(transformed.literal ushr 1))
                 assertEquals(!Lit.isPositive(excluded.literal), session.boolValue(excluded.literal ushr 1))
             }
+            // A learned backjump can retract a pushed decision; keep the witness premise at root.
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.publish(Lit.make(0, true)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
             val result = assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars))
-            val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertTrue(assignment.bools[0])
+            val values = assignment.ints
             assertEquals(BIG_ONE, values[0] - values[1])
             assertTrue(values[0] + values[1] >= BIG_ONE)
             for (excluded in listOf(transformed, free)) {
