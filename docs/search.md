@@ -149,6 +149,12 @@ complemented disequalities; an inconsistent offset path refutes its active guard
 Larger source expressions are also constant when their coefficients cancel within
 each open forest component. Their comparison reasons cite the equality paths that
 justify the offsets; no individual column bound is required.
+Active larger equalities reduce against the forest for at most four passes.
+Supported residuals add integer offset facts; nonintegral or inconsistent residuals
+refute their active guards. Each batch captures immutable source and offset premises
+before adding its facts, so later deductions expand all contributing guards.
+Unsupported residuals stay with the complete theory; reaching the pass limit
+establishes no verdict.
 The forest is rebuilt from current assertions, so retraction drops their effects.
 Wide offsets are omitted from this redundant check and remain with the full theory.
 Equality-forest scans poll ordinary cancellation within 64 visits and check it
