@@ -43,7 +43,8 @@ built-in search paths release native LP solvers before each legacy yield.
 
 An open stream or resumable handle owns its session. Other operations, push/pop and
 local-search reset throw while that owner is active. Closing the session closes its
-active owner, clears scopes and rejects later operations. Closing is idempotent.
+active owner, clears scopes and retained local-search weights, and rejects later
+operations. Closing is idempotent.
 Terminal resumable verdicts remain readable without further work, including after
 close or subsequent scope changes; a closed pending handle rejects further slices.
 Counters and preparation progress remain owned by the delegated backend handle.
@@ -220,8 +221,8 @@ including searches through another session of that solver. Completion, failure a
 idempotent close release ownership; a cancelled slice remains paused and retains it.
 The owning session rejects assumption changes and warm-state reset until release.
 Strategy and restart policy are shared by the solver; legacy streaming draws must
-be consumed sequentially, while open streams hold exclusive ownership. Portfolio workers use separate solvers and close a handle
-before reseeding it.
+be consumed sequentially, while open streams hold exclusive ownership. Portfolio
+workers use separate solvers and close a handle before reseeding it.
 Optimization handles open through their session so its assumptions and state apply.
 Sessions that decline resumable optimization retain their one-shot improvement stream.
 
