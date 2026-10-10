@@ -204,13 +204,15 @@ intermediate domain and rejecting conflicting targets for a shared leaf.
 Single-coordinate repairs precede joint moves; joint repair enumerates at most 64
 present members of one input domain. Input domains,
 pins and implicit owners filter the complete move before publication. Equality indicators
-join coordinate moves, while arithmetic counter-shifts cannot overwrite the requested
+join coordinate moves and carry admissible binary channels after protecting all
+requested coordinates, while arithmetic counter-shifts cannot overwrite those
 coordinates. Unsupported definitions, overflow and nonintegral inverses decline the
 candidate; an unreachable matching cell does not stop the remaining element scan.
 Value-driven moves carry equality indicator flips through directly connected unit
 equality channels over 0/1 integers. Channel targets must be present in the root domain
 and pass the generic pinned, defined and implicit-owner filters; a claimed coordinate
-is never overwritten. Repeated Boolean flips are interpreted by their final parity.
+is never overwritten. Equality rows coalesce consistency flips for the same indicator;
+ordinary repeated Boolean flips are interpreted by their final parity.
 Product definitions then maintain their outputs from the coordinated channel changes.
 Wider inputs and other row shapes retain their independent repair neighborhoods.
 Boolean break/make vectors initialize on their first score query and are maintained

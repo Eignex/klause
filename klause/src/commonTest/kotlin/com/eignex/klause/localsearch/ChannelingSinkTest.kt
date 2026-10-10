@@ -24,7 +24,7 @@ class ChannelingSinkTest {
             val sink = ChannelingSink(0, 1)
             repeat(flips) { sink.add(Move.BoolFlip(0)) }
 
-            sink.carryBinaryChannels(state)
+            sink.carryBinaryChannels(state, state.moveSink)
             state.apply(sink.toMove())
 
             assertEquals((flips % 2).toLong(), state.assignment.intValue(1))

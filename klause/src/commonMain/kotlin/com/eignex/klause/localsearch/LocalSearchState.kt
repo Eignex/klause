@@ -573,7 +573,7 @@ class LocalSearchState(
         for (fid in projection.intOccurrences[intVar]) {
             factors[fid].contributeChanneling(this, fid, intVar, cur, newValue, sink)
         }
-        sink.carryBinaryChannels(this)
+        sink.carryBinaryChannels(this, moveSink)
         return sink.toMove()
     }
 

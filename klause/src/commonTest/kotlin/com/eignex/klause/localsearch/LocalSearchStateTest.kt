@@ -24,6 +24,29 @@ import kotlin.test.assertTrue
  */
 class LocalSearchStateTest {
     @Test
+    fun `duplicate equality rows maintain the indicator and its binary channel`() {
+        val problem = Problem(
+            1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
+            arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setBool(0, false)
+        state.recompute()
+
+        state.apply(state.synthesizeChannelingMove(0, 1))
+
+        assertTrue(state.assignment.boolValue(0))
+        assertEquals(1L, state.assignment.intValue(1))
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
     fun `indicator channels and their product outputs follow coordinate moves`() {
         for (bound in listOf(0, 1)) {
             val problem = Problem(

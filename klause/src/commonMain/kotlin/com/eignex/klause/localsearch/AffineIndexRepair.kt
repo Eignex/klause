@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
@@ -71,16 +72,25 @@ internal class AffineIndexRepair(
         val coordinates = targets.filter { (v, value) -> value != state.assignment.intValue(v) }
             .map { (v, value) -> Move.IntSet(v, value) }
         if (coordinates.isEmpty()) return false
-        val parts = ArrayList<Move>(coordinates.size + 2)
-        parts.addAll(coordinates)
+        val firstCoordinate = coordinates[0]
+        val coordinated = ChannelingSink(firstCoordinate.varId, firstCoordinate.newValue)
+        for (variable in targets.keys) coordinated.pin(variable)
+        for (i in 1 until coordinates.size) coordinated.add(coordinates[i])
+        val indicators = IntHashSet()
         for (coordinate in coordinates) {
             val channeling = state.synthesizeChannelingMove(coordinate.varId, coordinate.newValue)
-            // Counter-shifts can overwrite a requested coordinate; only equality indicators join
-            // this repair. The definition network maintains its outputs after the joint move.
-            if (channeling is Move.Compound) parts.addAll(channeling.parts.filterIsInstance<Move.BoolFlip>())
+            // Arithmetic counter-shifts can overwrite a requested coordinate. Binary channels
+            // follow the joint indicator changes with every requested coordinate pinned.
+            if (channeling is Move.Compound) {
+                for (part in channeling.parts) {
+                    if (part is Move.BoolFlip && indicators.add(part.varId)) coordinated.add(part)
+                }
+            }
         }
+        coordinated.carryBinaryChannels(state, sink)
+        val move = coordinated.toMove()
         val before = sink.size
-        sink.addCompound(parts.distinct())
+        sink.addCompound(if (move is Move.Compound) move.parts else listOf(move))
         return sink.size > before
     }
 

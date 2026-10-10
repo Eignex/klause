@@ -16,6 +16,7 @@ import com.eignex.klause.util.IntHashSet
 class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
     private val parts = ArrayList<Move>(INITIAL_PARTS)
     private val pinned = IntHashSet()
+    private var indicatorFlips: IntHashSet? = null
 
     init {
         pinned.add(intVar)
@@ -36,7 +37,12 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
         parts += move
     }
 
-    internal fun carryBinaryChannels(state: LocalSearchState) {
+    internal fun addIndicatorFlip(boolVar: Int) {
+        val indicators = indicatorFlips ?: IntHashSet().also { indicatorFlips = it }
+        if (indicators.add(boolVar)) parts += Move.BoolFlip(boolVar)
+    }
+
+    internal fun carryBinaryChannels(state: LocalSearchState, eligibility: MoveSink) {
         if (parts.none { it is Move.BoolFlip }) return
         val flipped = IntHashSet()
         for (part in parts) {
@@ -47,18 +53,18 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
         for (i in 0 until initialSize) {
             val part = parts[i] as? Move.BoolFlip ?: continue
             val boolVar = part.varId
-            if (boolVar !in flipped || !visited.add(boolVar) || !state.moveSink.allowsBool(boolVar)) continue
-            carryBinaryChannels(state, boolVar)
+            if (boolVar !in flipped || !visited.add(boolVar) || !eligibility.allowsBool(boolVar)) continue
+            carryBinaryChannels(state, boolVar, eligibility)
         }
     }
 
-    private fun carryBinaryChannels(state: LocalSearchState, boolVar: Int) {
+    private fun carryBinaryChannels(state: LocalSearchState, boolVar: Int, eligibility: MoveSink) {
         val desired = !state.assignment.boolValue(boolVar)
         for (fid in state.projection.boolOccurrences[boolVar]) {
             val row = state.problem.factors[fid] as? ReifiedLinear ?: continue
             val value = binaryChannelValue(state, row, desired) ?: continue
             val variable = row.vars[0]
-            if (isPinned(variable) || !state.moveSink.allowsInt(variable)) continue
+            if (isPinned(variable) || !eligibility.allowsInt(variable)) continue
             if (value == state.assignment.intValue(variable)) continue
             pin(variable)
             parts += Move.IntSet(variable, value)

@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -18,6 +19,83 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ElementInvariantTest {
+    @Test
+    fun `joint index repairs carry indicator channels into product outputs`() {
+        for (bound in listOf(0, 1)) {
+            val factors = arrayOf<Factor>(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                Element(2, 3, longArrayOf(1, 1, 1, 9), arrIsVars = false, indexOffset = 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(4), LinearOp.EQ, bound),
+                Product(4, 6, 5),
+            )
+            val problem = Problem(
+                1, 7, arrayOf(
+                    IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(9, 9),
+                    IntDomain(0, 1), IntDomain(0, 3), IntDomain(3, 3),
+                ),
+                factors,
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(1, 0)
+            state.assignment.setInt(2, 0)
+            state.assignment.setInt(3, 9)
+            state.assignment.setInt(4, 1L - bound)
+            state.assignment.setInt(5, 3L * (1L - bound))
+            state.assignment.setInt(6, 3)
+            state.assignment.setBool(0, false)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 7, intArrayOf(2))).network(7, 1)
+            state.recompute()
+            val before = state.cost
+
+            state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+            val move = state.moveSink.list.single()
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(3L, state.assignment.intValue(2))
+            assertEquals(bound.toLong(), state.assignment.intValue(4))
+            assertEquals(3L * bound, state.assignment.intValue(5))
+            assertEquals(-before, predicted)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `index repairs preserve requested coordinates against binary channels`() {
+        for ((target, bound) in listOf(2 to 1, 3 to 0)) {
+            val cells = LongArray(4) { if (it == target) 9L else 1L }
+            val factors = arrayOf<Factor>(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                Element(2, 3, cells, arrIsVars = false, indexOffset = 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+            )
+            val problem = Problem(
+                1, 4, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(9, 9)),
+                factors,
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(1, 0)
+            state.assignment.setInt(2, 0)
+            state.assignment.setInt(3, 9)
+            state.assignment.setBool(0, false)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2))).network(4, 1)
+            state.recompute()
+
+            state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+            state.apply(state.moveSink.list.single())
+
+            assertEquals(target.toLong(), state.assignment.intValue(2))
+            assertEquals((target % 2).toLong(), state.assignment.intValue(1))
+            assertEquals(0, state.factorDegree[1])
+            assertEquals(1L, state.cost)
+        }
+    }
 
     @Test
     fun `index repair rejects conflicting targets for a shared coordinate`() {
