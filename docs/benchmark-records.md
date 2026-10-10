@@ -11,6 +11,9 @@ Reported witnesses, independently source-checked witnesses and proof claims have
 different meanings. A retained witness's `_objective` matching the record checks
 archive consistency; it does not independently recompute the source objective.
 Source checking verifies witnesses, not optimality or refutation certificates.
+Objective comparisons and witness consistency checks prefer canonical
+`exactObjective` integer or rational text; legacy records use their numeric
+`objective`. Approximate numeric equality cannot tie distinct exact values.
 
 Process incumbent clocks include subprocess launch, frontend loading, preparation,
 search and output delivery. Legacy attribution clocks start during search.

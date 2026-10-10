@@ -10,6 +10,17 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsModeTest {
+    @Test
+    fun `exact open objectives undo the MPS scale without rounding`() {
+        for (sign in listOf(-1L, 1L)) {
+            val output = MpsOutput(objectiveScale = 3L)
+
+            val text = capture { output.onExactSolution("v X=$sign", BigFraction.ofLong(sign)) }
+
+            assertTrue("o ${if (sign < 0) "-" else ""}1/3" in text, text)
+        }
+    }
+
     private fun capture(block: () -> Unit): String {
         val output = ByteArrayOutputStream()
         val previous = System.out
