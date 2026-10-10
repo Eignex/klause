@@ -218,7 +218,9 @@ class AlnsTest {
             repairOperators = listOf(RepairOperator { context ->
                 val repair = assertNotNull(context.repairSearch)
                 handles += repair
-                assertNotNull(repair.repair(Assumptions.None, 100, Double.POSITIVE_INFINITY, context.params.cancellation))
+                assertNotNull(
+                    repair.repair(Assumptions.None, 100, Double.POSITIVE_INFINITY, context.params.cancellation),
+                )
                 expired = true
                 context.incumbent
             }),
@@ -352,6 +354,41 @@ class AlnsTest {
         assertEquals("CP close", failure.message)
         assertEquals(1, cpCloses)
         assertEquals(1, lsCloses)
+    }
+
+    @Test
+    fun `the outer instruction cap spans retained neighborhood slices`() {
+        val problem = selectProblem()
+        val sample = selectOptimum()
+        val allowances = mutableListOf<Long>()
+        val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun minimize(objective: LinearObjective, params: LocalSearchParams) =
+                MinimizeResult.BestFound(sample, objective.evaluate(sample), TerminationReason.BudgetExhausted)
+        }
+        val alns = Alns(
+            inner = inner,
+            destroyOperators = listOf(DestroyOperator.Random),
+            repairOperators = listOf(RepairOperator { context ->
+                allowances += context.params.maxFlips
+                context.incumbent
+            }),
+            minDestroyFraction = 1.0,
+            maxDestroyFraction = 1.0,
+            maxIterations = 8,
+            flipsPerIteration = 50,
+        )
+        val handle = assertIs<InstructionSlicedSearch>(
+            alns.resumable(selectObjective, LocalSearchParams(maxInstructions = 120)),
+        )
+
+        repeat(2) { assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {}) }
+        val result = assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+
+        assertEquals(listOf(50L, 50L, 20L), allowances)
+        assertSame(sample, result.assignment)
+        assertEquals(120L, result.stats.alns.outerAllowance)
+        assertEquals(150L, handle.chargedInstructions)
+        assertTrue(handle.isDone)
     }
 
     @Test
