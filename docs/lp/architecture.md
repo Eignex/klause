@@ -178,8 +178,9 @@ is no general problem presolve inside the tree or elimination of shared variable
 IDs after portfolio forks. Owner-local exact factors, bounded refinement reuse,
 counter-proofs and component OBBT remain scoped mechanisms. Triangular crash
 initialization belongs to the optional LP tree-search route. Production primal
-pricing recomputes scores; there is no optional exact-row propagation or
-conflict-weakening framework.
+pricing recomputes scores. Open theory adapters propagate exact source-row
+intervals with source premises; this stays outside the numerical engine. There
+is no conflict-weakening framework.
 
 [Certification](certification.md) defines accepted proof packages and budgets.
 [Capture and replay](replay.md) describes diagnostics without equating a kernel
