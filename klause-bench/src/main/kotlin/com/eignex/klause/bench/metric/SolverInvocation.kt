@@ -492,9 +492,7 @@ internal object SolverInvocation {
         )
     }
 
-    internal fun parsePbObjective(text: String): Double? {
-        return ExactObjective.parse(text)?.approximate()
-    }
+    internal fun parsePbObjective(text: String): Double? = ExactObjective.parse(text)?.approximate()
 
     /**
      * The reason a solver declined a model it had already parsed, or null when the failure is anything

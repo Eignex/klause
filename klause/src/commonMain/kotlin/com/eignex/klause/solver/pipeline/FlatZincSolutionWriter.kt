@@ -114,7 +114,11 @@ internal fun writeFlatZincExactCoordinates(
         if (outputObjective) {
             objectiveVarName(program.solve)?.let { name ->
                 val b = program.floatVarsByName[name]
-                val value = if (b?.lpOnly == true) sample.exactRealValue(b.varId) else renderScalar(program, sample, name)
+                val value = if (b?.lpOnly == true) {
+                    sample.exactRealValue(b.varId)
+                } else {
+                    renderScalar(program, sample, name)
+                }
                 sb.append("% klause-exact: _objective = $value;\n")
             }
         }

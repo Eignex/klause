@@ -11,6 +11,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -60,13 +61,14 @@ internal class MiniZincRunner(
         val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
         val workDir = File(root, "klause-bench/build/mzn-fzn-output-v2-seed$MZN_RANDOM_SEED").apply { mkdirs() }
         val digest = MessageDigest.getInstance("SHA-256")
-        for (source in listOfNotNull(mzn, dzn) +
+        for (
+        source in listOfNotNull(mzn, dzn) +
             File(root, "klause-mzn-lib/share/minizinc").walkTopDown().filter { it.isFile }.sortedBy { it.path }.toList()
         ) {
             digest.update(source.readBytes())
             digest.update(0.toByte())
         }
-        val hash = digest.digest().joinToString("") { "%02x".format(it) }
+        val hash = digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it) }
         val fzn = File(workDir, "${ref.name.replace('/', '_')}-$hash.fzn")
         val upToDate = fzn.exists() && outputFile(fzn).exists() &&
             fzn.lastModified() >= mzn.lastModified() &&
@@ -121,7 +123,12 @@ internal class MiniZincRunner(
             }
             require(tmp.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }
             require(tmpOzn.length() > 0) { "minizinc compile produced no output mapping" }
-            Files.move(tmpOzn.toPath(), outputFile(out).toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            Files.move(
+                tmpOzn.toPath(),
+                outputFile(out).toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
             Files.move(tmp.toPath(), out.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } finally {
             if (proc.isAlive) proc.destroyForcibly().waitFor()

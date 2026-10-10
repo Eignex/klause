@@ -1,9 +1,9 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.bench.runner.MiniZincRunner
-import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
@@ -30,19 +30,28 @@ internal object MiniZincSourceValidation {
     private const val TIMEOUT_SECONDS = 10L
     private val ASSIGNMENT = Regex("^\\s*[A-Za-z_][A-Za-z_0-9]*\\s*=")
 
-    fun validate(ref: ProblemRef, rawOutput: String, objective: Double?, exactObjective: String? = null): SourceValidation {
+    fun validate(
+        ref: ProblemRef,
+        rawOutput: String,
+        objective: Double?,
+        exactObjective: String? = null,
+    ): SourceValidation {
         val hashes = SolveEvidence.sourceHashes(ref)
-        val candidate = candidate(rawOutput) ?: if (exactCoordinates(rawOutput) != null) "" else
+        val candidate = candidate(rawOutput) ?: if (exactCoordinates(rawOutput) != null) {
+            ""
+        } else {
             return SourceValidation("unknown", "no complete DZN solution", hashes)
+        }
         val directory = Files.createTempDirectory("klause-source-check-").toFile()
         return runCatching {
             val runner = MiniZincRunner()
             val exact = exactCoordinates(rawOutput)
             if (exact != null) {
                 return@runCatching ExactFlatZincValidation.inspect(
-                    runner.compileFzn(ref).readText(), exact,
+                    runner.compileFzn(ref).readText(),
+                    exact,
                     exactObjective ?: exact.lineSequence().firstOrNull { it.startsWith("_objective = ") }
-                        ?.substringAfter('=' )?.trim()?.removeSuffix(";") ?: objective?.toString(),
+                        ?.substringAfter('=')?.trim()?.removeSuffix(";") ?: objective?.toString(),
                 )
             }
             val mapped = if (Regex("\\bX_INTRODUCED_[0-9]+_").containsMatchIn(candidate)) {
@@ -113,10 +122,16 @@ internal object MiniZincSourceValidation {
         ?.lineSequence()?.filter { it.startsWith("% klause-exact: ") }
         ?.map { it.removePrefix("% klause-exact: ") }?.toList()?.takeIf { it.isNotEmpty() }?.joinToString("\n")
 
-    fun retainedWitness(rawOutput: String): String? = (candidate(rawOutput) ?:
-        if (exactCoordinates(rawOutput) != null) "" else null)?.let { candidate ->
+    fun retainedWitness(rawOutput: String): String? = (
+        candidate(rawOutput)
+            ?: if (exactCoordinates(rawOutput) != null) "" else null
+        )?.let { candidate ->
         val exact = exactCoordinates(rawOutput)
-        if (exact == null) candidate else candidate + "\n" + exact.lineSequence().joinToString("\n") { "% klause-exact: $it" }
+        if (exact == null) {
+            candidate
+        } else {
+            candidate + "\n" + exact.lineSequence().joinToString("\n") { "% klause-exact: $it" }
+        }
     }
 
     fun candidate(rawOutput: String): String? {
@@ -138,7 +153,11 @@ internal object MiniZincSourceValidation {
         )
     }
 
-    private fun inspectProgram(program: FlatZincProgram, objective: Double?, exactObjective: String?): SourceValidation {
+    private fun inspectProgram(
+        program: FlatZincProgram,
+        objective: Double?,
+        exactObjective: String?,
+    ): SourceValidation {
         if (program.solve != SolveDirective.Satisfy && objective == null && exactObjective == null) {
             return SourceValidation("unknown", "missing reported source objective")
         }
@@ -177,8 +196,12 @@ internal object MiniZincSourceValidation {
             SourceValidation("unknown", "source compilation leaves residual variables or constraints")
         } else if ((objective != null || exactObjective != null) &&
             ExactObjective.parse(fixedObjective(program, values).orEmpty())?.compareTo(
-                ExactObjective.value(exactObjective, objective) ?: return SourceValidation("unknown", "malformed reported objective"),
-            ) != 0) {
+                ExactObjective.value(exactObjective, objective) ?: return SourceValidation(
+                    "unknown",
+                    "malformed reported objective",
+                ),
+            ) != 0
+        ) {
             SourceValidation("invalid", "reported objective differs from pinned source objective")
         } else {
             SourceValidation("valid", "source constraints evaluate true with candidate pinned")

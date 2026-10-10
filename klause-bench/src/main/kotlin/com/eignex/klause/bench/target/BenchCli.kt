@@ -301,7 +301,8 @@ object BenchCli {
             ?: error("no problem '$name' in suite '$suite'")
         require(ref.format == Format.MINIZINC) { "source validation requires a MiniZinc model" }
         val candidate = MiniZincSourceValidation.candidate(output).orEmpty()
-        val objective = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);").find(MiniZincSourceValidation.exactCoordinates(output) ?: candidate)
+        val objective = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);")
+            .find(MiniZincSourceValidation.exactCoordinates(output) ?: candidate)
             ?.groupValues?.get(1)?.trim()
         val validation = MiniZincSourceValidation.validate(ref, output, objective?.toDoubleOrNull(), objective)
             .copy(sourceHashes = SolveEvidence.sourceHashes(ref))

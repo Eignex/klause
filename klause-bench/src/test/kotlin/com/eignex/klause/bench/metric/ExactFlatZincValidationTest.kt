@@ -56,14 +56,18 @@ class ExactFlatZincValidationTest {
     fun `source binary64 bounds are checked without witness rounding`() {
         val model = "var 0.1..0.3: x; solve satisfy;"
 
-        assertEquals("invalid", ExactFlatZincValidation.inspect(model, "x = 30000000000000001/100000000000000000;", null).status)
+        val result = ExactFlatZincValidation.inspect(model, "x = 30000000000000001/100000000000000000;", null)
+
+        assertEquals("invalid", result.status)
     }
 
     @Test
     fun `missing coordinates and unsupported predicates remain unknown`() {
         val missing = ExactFlatZincValidation.inspect("var float: x; solve satisfy;", "y = 1/3;", null)
         val unsupported = ExactFlatZincValidation.inspect(
-            "var float: x; constraint unsupported(x); solve satisfy;", "x = 1/3;", null,
+            "var float: x; constraint unsupported(x); solve satisfy;",
+            "x = 1/3;",
+            null,
         )
 
         assertEquals("unknown", missing.status)
@@ -74,6 +78,8 @@ class ExactFlatZincValidationTest {
     fun `exact source objective rejects values that share a Double`() {
         val model = "var int: x; solve minimize x;"
 
-        assertEquals("invalid", ExactFlatZincValidation.inspect(model, "x = 9007199254740993;", "9007199254740992").status)
+        val result = ExactFlatZincValidation.inspect(model, "x = 9007199254740993;", "9007199254740992")
+
+        assertEquals("invalid", result.status)
     }
 }

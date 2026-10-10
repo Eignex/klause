@@ -15,7 +15,8 @@ internal class ExactObjective private constructor(
         if (denominator == BigInteger.ONE) numerator.toString() else "$numerator/$denominator"
 
     operator fun plus(other: ExactObjective): ExactObjective = normalized(
-        numerator * other.denominator + other.numerator * denominator, denominator * other.denominator,
+        numerator * other.denominator + other.numerator * denominator,
+        denominator * other.denominator,
     )
 
     operator fun times(other: ExactObjective): ExactObjective =
