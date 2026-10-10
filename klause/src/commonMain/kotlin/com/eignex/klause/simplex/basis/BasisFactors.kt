@@ -29,6 +29,7 @@ internal data class LuBuildWork(
     val schurUpdates: Long,
     val fillCreated: Long,
     val factorEntries: Int,
+    val denseEntryVisits: Long = 0,
 )
 
 internal data class LuBuildReport(
@@ -38,8 +39,15 @@ internal data class LuBuildReport(
     val proposedRejection: LuBuildRejection?,
     val proposedWork: LuBuildWork?,
     val selectedWork: LuBuildWork,
+    val dense: Boolean = false,
+    val denseRejection: LuBuildRejection? = null,
+    val denseRejectedWork: LuBuildWork? = null,
+    val selectionUnits: Long = 0,
 ) {
-    val units: Long = saturatedAdd(proposedWork?.units ?: 0, selectedWork.units)
+    val units: Long = saturatedAdd(
+        saturatedAdd(proposedWork?.units ?: 0, selectedWork.units),
+        saturatedAdd(denseRejectedWork?.units ?: 0, selectionUnits),
+    )
 }
 
 // These are floating-point declines, including exhausted numerical pivots, never exact rank claims.

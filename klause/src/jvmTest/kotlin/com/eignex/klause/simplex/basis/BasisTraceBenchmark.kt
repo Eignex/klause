@@ -20,9 +20,35 @@ fun main(args: Array<String>) {
         "replay" -> tracePaths(options).forEach { replay(it, benchmark = false) }
         "benchmark" -> tracePaths(options).forEach { replay(it, benchmark = true) }
         "compare" -> compareRebuilds(options)
+        "compare-dense" -> compareDense(options)
         "capture" -> capture(options)
         "verify" -> verifyCorpus(tracePaths(options))
-        else -> error("usage: basisTrace list|replay|benchmark|compare|capture|verify [key=value ...]")
+        else -> error("usage: basisTrace list|replay|benchmark|compare|compare-dense|capture|verify [key=value ...]")
+    }
+}
+
+private fun compareDense(options: Map<String, String>) {
+    val repetitions = options["repetitions"]?.toInt() ?: 5
+    require(repetitions in 1..100)
+    for (path in tracePaths(options)) {
+        val trace = BasisTraceCodec.read(path)
+        val artifactSha = sha256(Files.readAllBytes(path))
+        val factories = listOf<(SparseMatrix) -> BasisSolver>(
+            { KotlinBasisSolver(it, denseDimensionLimit = 0) },
+            { KotlinBasisSolver(it) },
+        )
+        factories.forEach { BasisTraceReplay.replay(trace, it) }
+        for (pair in 0 until repetitions) {
+            val order = if (pair % 2 == 0) listOf(0, 1) else listOf(1, 0)
+            for (arm in order) {
+                val report = BasisTraceReplay.replay(trace, factories[arm])
+                val fields = commonFields("compare-dense", trace, artifactSha, report, 1) + listOf(
+                    "pair" to pair, "arm" to if (arm == 0) "sparse" else "selected", "selectedFirst" to (pair % 2 == 1),
+                )
+                println(json(*fields.toTypedArray()))
+                check(report.stateErrors == 0) { "dense comparison failed: ${report.errors}" }
+            }
+        }
     }
 }
 
@@ -330,6 +356,7 @@ private fun commonFields(
     "repetitions" to repetitions,
     "allocationCoverage" to "java-thread",
     "builds" to report.builds,
+    "denseBuildAttempts" to report.denseBuildAttempts,
     "ftrans" to report.ftrans,
     "btrans" to report.btrans,
     "acceptedUpdates" to report.acceptedUpdates,

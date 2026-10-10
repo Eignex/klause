@@ -129,3 +129,20 @@ configuration, not a production policy change. Java current-thread allocation co
 allocation and may be unavailable. Elapsed totals are paired in alternating arm order with one warmup;
 they are descriptive on a shared host. The committed `.kbtrace` corpus records basis operations, not
 complete CP consumer states, so it cannot substitute for this lifecycle comparison. Full search performance requires separate consumer measurements.
+
+## Dense selection comparison
+
+```
+./gradlew :klause:basisTrace --args="compare-dense trace=/path/to/captured.kbtrace repetitions=5"
+```
+
+`compare-dense` runs one warmup per arm and alternating pairs of the whole recorded
+operation stream. `sparse` sets `denseDimensionLimit = 0`; `selected` uses the
+production dimension/density rule. Each record includes the pair/order, source and
+artifact hashes, runtime and Koblas identity, dense build attempts, phase timing,
+Java allocation counts, update observations and independent source residuals in both
+directions. The fresh numerical reference always disables dense selection. Any
+state/residual error stops the comparison. A truncated trace establishes only its
+recorded prefix. Short trace timings include JIT/noise and do not establish a
+complete-solver gain or a universal crossover. Matched source solves and repeated
+factor batches are separate controls.

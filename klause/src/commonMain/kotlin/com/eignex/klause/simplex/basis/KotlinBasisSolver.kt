@@ -23,6 +23,8 @@ internal class KotlinBasisSolver(
     private val fillFactor: Double = 5.0,
     private val densityThreshold: Double = 0.2,
     private val reusePivotOrder: Boolean = true,
+    private val denseDimensionLimit: Int = 6,
+    private val denseMinimumDensity: Double = 0.5,
 ) : BasisSolver {
     private val sourcePointers = matrix.copyColumnPointers()
     private val sourceRows = matrix.copyRowIndices()
@@ -35,6 +37,7 @@ internal class KotlinBasisSolver(
         sourceValues,
     )
     private val builder = BasisFactors(source)
+    private var denseBuilder: DenseBasisFactors? = null
     override val n = source.rows
     private val solveWorkspace = BasisWorkspace(n)
     private val mapped = BasisWorkspace(n)
@@ -64,6 +67,8 @@ internal class KotlinBasisSolver(
 
     init {
         require(updateLimit > 0)
+        require(denseDimensionLimit in 0..64)
+        require(denseMinimumDensity.isFinite() && denseMinimumDensity in 0.0..1.0)
         require(fillFactor.isFinite() && fillFactor >= 1.0)
         require(densityThreshold.isFinite() && densityThreshold in 0.0..1.0)
     }
@@ -101,12 +106,7 @@ internal class KotlinBasisSolver(
         // Invalidate before a numerical attempt: even an exceptional build cannot expose stale factors.
         invalidate()
         val meter = BasisBuildAccumulator(BasisBuildKind.REFACTORIZATION)
-        val result = builder.build(
-            basicIndex,
-            IntArray(n) { -1 },
-            policy,
-            proposedOrder,
-        )
+        val result = build(basicIndex, proposedOrder)
         meter.add(result.report)
         val report = meter.report(
             result is LuBuildResult.Built,
@@ -120,6 +120,39 @@ internal class KotlinBasisSolver(
         operationMeter.success(BasisOperationKind.REFACTORIZATION, report.units)
         install(result, basicIndex, IntArray(n) { -1 })
         return true
+    }
+
+    private fun build(basicIndex: IntArray, proposedOrder: SymbolicLu?): LuBuildResult {
+        var selectionUnits = 0L
+        var entries = 0
+        if (n in 1..denseDimensionLimit) {
+            for (column in basicIndex) {
+                source.forEachInColumn(column) { _, value ->
+                    selectionUnits++
+                    if (value != 0.0) entries++
+                }
+            }
+        }
+        var dense: LuBuildResult.Rejected? = null
+        if (n in 1..denseDimensionLimit && entries.toDouble() >= denseMinimumDensity * n * n) {
+            val owner = denseBuilder ?: DenseBasisFactors(source).also {
+                denseBuilder = it
+                selectionUnits += n.toLong() * n + 3L * n
+            }
+            val result = owner.build(basicIndex, policy)
+            if (result is LuBuildResult.Built) {
+                return LuBuildResult.Built(result.factors, result.work, result.report.copy(selectionUnits = selectionUnits))
+            }
+            dense = result as LuBuildResult.Rejected
+        }
+        val sparse = builder.build(basicIndex, IntArray(n) { -1 }, policy, proposedOrder)
+        val report = sparse.report.copy(
+            denseRejection = dense?.reason, denseRejectedWork = dense?.work, selectionUnits = selectionUnits,
+        )
+        return when (sparse) {
+            is LuBuildResult.Built -> LuBuildResult.Built(sparse.factors, sparse.work, report)
+            is LuBuildResult.Rejected -> LuBuildResult.Rejected(sparse.reason, sparse.work, report)
+        }
     }
 
     @Suppress("TooGenericExceptionCaught")
@@ -554,6 +587,7 @@ internal class KotlinBasisSolver(
         check(!repairActive) { "basis repair is active" }
         if (closed) return
         closed = true
+        denseBuilder = null
         cache = null
         columns = IntArray(0)
         unitRows = IntArray(0)
