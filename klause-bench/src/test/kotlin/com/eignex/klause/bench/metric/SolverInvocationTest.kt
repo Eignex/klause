@@ -20,7 +20,10 @@ class SolverInvocationTest {
     fun `exact FlatZinc objective comments override decimal display`() {
         val lines = "_objective = 0.3333333333333333;\n% klause-exact: _objective = 1/3;\n----------"
 
-        val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"), SolverInvocation.Dialect.MINIZINC)
+        val result = SolverInvocation.invoke(
+            listOf("sh", "-c", "printf '%s\\n' '$lines'"),
+            SolverInvocation.Dialect.MINIZINC,
+        )
 
         assertEquals("1/3", result.exactObjective)
     }

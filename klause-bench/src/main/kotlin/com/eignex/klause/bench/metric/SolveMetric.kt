@@ -364,8 +364,14 @@ internal object SolveMetric {
                 } else {
                     SourceValidation("unknown", "no feasible candidate to check")
                 }
-                val boundValidation = if (validation.sourceHashes.isNotEmpty() && validation.sourceHashes != reported.sourceHashes) {
-                    SourceValidation("unknown", "validation source hashes differ from solve record", reported.sourceHashes)
+                val boundValidation = if (validation.sourceHashes.isNotEmpty() &&
+                    validation.sourceHashes != reported.sourceHashes
+                ) {
+                    SourceValidation(
+                        "unknown",
+                        "validation source hashes differ from solve record",
+                        reported.sourceHashes,
+                    )
                 } else {
                     validation
                 }

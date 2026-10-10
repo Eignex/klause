@@ -12,7 +12,11 @@ internal object ExactFlatZincValidation {
     fun inspect(source: String, coordinates: String, objective: String?): SourceValidation = runCatching {
         Checker(source, coordinates).check(objective).copy(scope = "flatzinc-binary64")
     }.getOrElse {
-        SourceValidation("unknown", "exact FlatZinc checking incomplete: ${it.message.orEmpty().take(300)}", scope = "flatzinc-binary64")
+        SourceValidation(
+            "unknown",
+            "exact FlatZinc checking incomplete: ${it.message.orEmpty().take(300)}",
+            scope = "flatzinc-binary64",
+        )
     }
 
     private class Checker(source: String, coordinates: String) {
@@ -36,7 +40,9 @@ internal object ExactFlatZincValidation {
             for (statement in statements) {
                 when {
                     statement.startsWith("predicate ") -> Unit
+
                     statement.startsWith("constraint ") -> constraints.add(statement.removePrefix("constraint "))
+
                     statement.startsWith("solve ") -> {
                         require(!hasSolve) { "multiple solve directives" }
                         hasSolve = true
@@ -46,7 +52,9 @@ internal object ExactFlatZincValidation {
                             "unsupported solve directive"
                         }
                     }
+
                     statement.startsWith("output ") -> Unit
+
                     else -> declaration(statement)
                 }
             }
@@ -89,8 +97,11 @@ internal object ExactFlatZincValidation {
                 for (element in elements) {
                     when (scalarType) {
                         "bool" -> require(element is Value.Bool) { "non-Boolean coordinate $name" }
+
                         "float" -> require(element is Value.Number) { "non-numeric coordinate $name" }
+
                         "int" -> require(element is Value.Number && element.value.integral) { "non-integer $name" }
+
                         else -> {
                             val range = scalarType.split("..")
                             require(range.size == 2) { "unsupported domain $scalarType" }
@@ -107,7 +118,9 @@ internal object ExactFlatZincValidation {
                 }
             }
             for (constraint in constraints) {
-                if (!predicate(constraint)) return SourceValidation("invalid", "source predicate rejects candidate: ${constraint.take(160)}")
+                if (!predicate(constraint)) {
+                    return SourceValidation("invalid", "source predicate rejects candidate: ${constraint.take(160)}")
+                }
             }
             objective?.let { name ->
                 val expected = reportedObjective?.let(ExactObjective::parse)
@@ -116,7 +129,11 @@ internal object ExactFlatZincValidation {
                     return SourceValidation("invalid", "reported objective differs from source objective")
                 }
             }
-            return SourceValidation("valid", "exact original FlatZinc checks $bounds bounds and ${constraints.size} predicates with binary64 literals")
+            return SourceValidation(
+                "valid",
+                "exact original FlatZinc checks $bounds bounds and ${constraints.size} predicates " +
+                    "with binary64 literals",
+            )
         }
 
         private fun predicate(text: String): Boolean {
@@ -129,13 +146,25 @@ internal object ExactFlatZincValidation {
                 return array(args[0]).any { boolean(it) } || array(args[1]).any { !boolean(it) }
             }
             val base = name.removeSuffix("_reif").removeSuffix("_imp")
-            val arity = if ("_lin_" in base || base.endsWith("_times") || base.endsWith("_plus") || base == "float_div") 3 else 2
-            require(args.size == arity + if (name.endsWith("_reif") || name.endsWith("_imp")) 1 else 0) { "predicate arity" }
+            val arity = if ("_lin_" in base || base.endsWith("_times") ||
+                base.endsWith("_plus") || base == "float_div"
+            ) {
+                3
+            } else {
+                2
+            }
+            require(args.size == arity + if (name.endsWith("_reif") || name.endsWith("_imp")) 1 else 0) {
+                "predicate arity"
+            }
             val relation = when (base) {
                 "float_eq", "int_eq", "bool_eq" -> equal(args[0], args[1])
+
                 "float_ne", "int_ne" -> !equal(args[0], args[1])
+
                 "float_le", "int_le" -> numeric(args[0]) <= numeric(args[1])
+
                 "float_lt", "int_lt" -> numeric(args[0]) < numeric(args[1])
+
                 "float_lin_eq", "int_lin_eq", "float_lin_le", "int_lin_le" -> {
                     val coefficients = array(args[0])
                     val variables = array(args[1])
@@ -143,13 +172,21 @@ internal object ExactFlatZincValidation {
                     val activity = coefficients.indices.fold(zero) { sum, i ->
                         sum + numeric(coefficients[i]) * numeric(variables[i])
                     }
-                    if (base.endsWith("_eq")) activity.compareTo(numeric(args[2])) == 0 else activity <= numeric(args[2])
+                    if (base.endsWith("_eq")) {
+                        activity.compareTo(numeric(args[2])) == 0
+                    } else {
+                        activity <= numeric(args[2])
+                    }
                 }
+
                 "float_times", "int_times" ->
                     (numeric(args[0]) * numeric(args[1])).compareTo(numeric(args[2])) == 0
+
                 "float_plus", "int_plus" ->
                     (numeric(args[0]) + numeric(args[1])).compareTo(numeric(args[2])) == 0
+
                 "float_div" -> (numeric(args[0]) / numeric(args[1])).compareTo(numeric(args[2])) == 0
+
                 else -> error("unsupported predicate $name")
             }
             return when {
@@ -175,7 +212,7 @@ internal object ExactFlatZincValidation {
             if ('.' !in text && 'e' !in text.lowercase()) return number(text)
             val value = text.toDouble()
             require(value.isFinite()) { "nonfinite source literal" }
-            val bits = java.lang.Double.doubleToLongBits(value)
+            val bits = value.toBits()
             val exponentBits = ((bits ushr 52) and 2047).toInt()
             val significand = (bits and 0xfffffffffffffL) or if (exponentBits == 0) 0L else (1L shl 52)
             val exponent = if (exponentBits == 0) -1074 else exponentBits - 1075
@@ -185,13 +222,18 @@ internal object ExactFlatZincValidation {
             return number("$numerator/$denominator")
         }
 
-        private fun number(text: String): ExactObjective = requireNotNull(ExactObjective.parse(text)) { "unsupported number $text" }
+        private fun number(text: String): ExactObjective =
+            requireNotNull(ExactObjective.parse(text)) { "unsupported number $text" }
         private fun numeric(value: Value): ExactObjective = (value as Value.Number).value
         private fun boolean(value: Value): Boolean = (value as Value.Bool).value
         private fun array(value: Value): List<Value> = (value as Value.Array).values
         private fun equal(a: Value, b: Value): Boolean = when {
             a is Value.Number && b is Value.Number -> a.value.compareTo(b.value) == 0
-            a is Value.Array && b is Value.Array -> a.values.size == b.values.size && a.values.indices.all { equal(a.values[it], b.values[it]) }
+
+            a is Value.Array && b is Value.Array ->
+                a.values.size == b.values.size &&
+                    a.values.indices.all { equal(a.values[it], b.values[it]) }
+
             else -> a == b
         }
 
@@ -203,7 +245,9 @@ internal object ExactFlatZincValidation {
             for ((i, c) in text.withIndex()) {
                 when (c) {
                     '[' -> depth++
+
                     ']' -> depth--
+
                     ',' -> if (depth == 0) {
                         result.add(text.substring(start, i).trim())
                         start = i + 1

@@ -67,9 +67,19 @@ class MiniZincSourceValidationTest {
             assertEquals("unknown", MiniZincSourceValidation.inspect(fzn, null).status)
         }
     }
+
     @Test
     fun `retained witness keeps exact coordinates only from the last complete solution`() {
-        val raw = "x = 0.5;\n% klause-exact: x = 1/2;\n----------\nx = 0.3333333333333333;\n% klause-exact: x = 1/3;\n----------\nx = 0.25;\n% klause-exact: x = 1/4;"
+        val raw = """
+            x = 0.5;
+            % klause-exact: x = 1/2;
+            ----------
+            x = 0.3333333333333333;
+            % klause-exact: x = 1/3;
+            ----------
+            x = 0.25;
+            % klause-exact: x = 1/4;
+        """.trimIndent()
 
         assertEquals("x = 1/3;", MiniZincSourceValidation.exactCoordinates(raw))
         assertEquals("x = 0.3333333333333333;\n% klause-exact: x = 1/3;", MiniZincSourceValidation.retainedWitness(raw))
@@ -82,6 +92,7 @@ class MiniZincSourceValidationTest {
         assertEquals("valid", MiniZincSourceValidation.inspect(fzn, null, "9007199254740993").status)
         assertEquals("invalid", MiniZincSourceValidation.inspect(fzn, null, "9007199254740992").status)
     }
+
     @Test
     fun `optimization checking without a reported objective remains unknown`() {
         val fzn = "var 1..1: z; solve minimize z;"
