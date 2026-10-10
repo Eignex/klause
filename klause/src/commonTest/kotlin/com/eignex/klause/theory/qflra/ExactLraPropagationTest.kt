@@ -39,8 +39,8 @@ class ExactLraPropagationTest {
                 ReifiedLinear(1, intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
             ),
         )
-        source.componentPlan().search(source, emptyMap()).use { planned ->
-            val session = planned.session
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
             session.initialize()
             for (truth in listOf(true, false)) {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, truth))))

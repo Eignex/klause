@@ -558,19 +558,20 @@ class LiveLpTheoryTest {
             }
             val source = Problem(
                 0,
-                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
                 numRealVars = 1,
                 realLower = doubleArrayOf(0.0),
                 realUpper = doubleArrayOf(0.0),
                 factors = arrayOf(
                     Linear(
-                        intVars = intArrayOf(0),
-                        intCoeffs = doubleArrayOf(2.0),
+                        intVars = intArrayOf(0, 1),
+                        intCoeffs = doubleArrayOf(2.0, 2.0),
                         realVars = intArrayOf(0),
                         realCoeffs = doubleArrayOf(1.0),
                         op = LinearOp.GE,
-                        bound = if (scenario == "conflict") 3.0 else 1.0,
+                        bound = if (scenario == "conflict") 5.0 else 1.0,
                     ),
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                 ),
             )
             source.componentPlan().search(source, emptyMap()).use { planned ->
