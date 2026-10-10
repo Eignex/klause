@@ -140,6 +140,10 @@ refinement stride ordinary token/clock polling at 64 calls or 4096 work, but
 resource caps are checked on every charge, work-metered tokens remain immediate,
 and publication checks cancellation directly. Cancelled evidence is discarded.
 `shorten(fraction)` only divides remaining time when the token exposes a deadline.
+Dynamic adapters keep deadline reads live; ordered composition snapshots the
+earliest deadline and first work meter at construction. The
+[dispatch evidence](../evidence/cancellation-polling.md) supports retaining the
+current polling contract without a dispatch performance claim.
 
 Continuous leaf solves use solve-wide cancellation rather than a portfolio node
 slice. An undecided leaf can be skipped chronologically without learning a
