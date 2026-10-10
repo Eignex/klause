@@ -363,8 +363,9 @@ configured workers and auxiliary ALNS arm, retaining their positions and seeds.
 LP ceilings that disable bounding omit the auxiliary LP arm and its reservation.
 Explicit arm pools control admission and techniques. Curated
 single-core mixed optimization reserves half the scheduled time for this LP arm
-on continuous-column models. Individual segments retain work charging and time
-caps; the remaining time follows the bandit. Explicit backtrack pools and parallel
+on continuous-column models until the first incumbent. Individual segments retain
+work charging and time caps; the remaining time follows the bandit. After the first
+incumbent, all scheduled time follows the bandit. Explicit backtrack pools and parallel
 lanes retain their requested scheduling.
 
 See [SliceBudget](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)

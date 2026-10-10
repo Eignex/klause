@@ -1559,6 +1559,31 @@ class PortfolioTest {
     }
 
     @Test
+    fun `the first incumbent releases a feasibility only reservation`() {
+        for (feasibilityOnly in listOf(false, true)) {
+            val reached = ArrayList<Int>()
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+                trackingWorker("improver", 1, TrackingResumableSearch(null, onRun = { reached += 1 })),
+            )
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = 2
+                override val random = Random(0)
+                override fun choose() = 1
+                override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+                override fun reset() = Unit
+            }
+
+            Portfolio(workers, bandit, minShares = doubleArrayOf(1.0, 0.0)).use {
+                it.reserveBeforeIncumbentOnly = feasibilityOnly
+                it.minimize(Cancellation { reached.size >= 3 })
+            }
+
+            assertEquals(listOf(0, 1, if (feasibilityOnly) 1 else 0), reached)
+        }
+    }
+
+    @Test
     fun `a short budget still splits into segments however long the slices are`() {
         val reached = ArrayList<Int>()
         val deadline = Cancellation.until(TimeSource.Monotonic.markNow() + 200.milliseconds)
