@@ -39,8 +39,8 @@ internal fun MpsModel.integralDefinitions(source: MpsSourceNumbers): Array<IntDo
             }
             val a = coefficient * lo.fraction
             val b = coefficient * hi.fraction
-            minimum += minOf(a, b)
-            maximum += maxOf(a, b)
+            minimum += if (a < b) a else b
+            maximum += if (a < b) b else a
         }
         // The defining equality proves integrality; a bounded range keeps its finite projection exact.
         if (integral && minimum.num.fitsLong() && maximum.num.fitsLong()) {
