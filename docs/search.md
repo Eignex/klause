@@ -85,8 +85,13 @@ The reversible live prefix is committed once per completed sweep, including
 empty-prefix conflicts; sibling branches restore filtering from trailed state.
 
 LP explanations cite selected source bound witnesses and recursively expanded
-row, fixing and cutoff premises. Open linear theories narrow source-column bounds
-from exact row intervals and imply reified comparisons with immutable row and
+row, fixing and cutoff premises. Open linear theories check integer difference-row
+cycles within larger linear fragments. This
+redundant graph includes declared bounds and guarded rows without Boolean terms;
+cycle conflicts cite their active source guards. Wide rows and unsupported forms
+are omitted from this graph and remain enforced by the complete theory. It never
+publishes feasibility or materializes CP domains. They also narrow source-column
+bounds from exact row intervals and imply reified comparisons with immutable row and
 bound premises. These bounds follow the LP trail and retract with their decisions.
 Interval deductions read staged bounds within a propagation pass and publish the
 strongest side per column in one LP batch. Abandoned passes requeue their rows;
