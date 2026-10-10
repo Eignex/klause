@@ -4,6 +4,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.InstructionSlicedSolve
+import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -359,7 +360,8 @@ class Portfolio(
             val armToken = segmentToken(worker, run.token, claim)
             val setup = TimeSource.Monotonic.markNow()
             val opened = runCatching {
-                run.handles[arm] ?: worker.newResumableSearch(readBound, armToken)?.also { run.handles[arm] = it }
+                run.handles[arm] ?: worker.newResumableSearch(readBound, armToken, incumbent.current()?.assignment)
+                    ?.also { run.handles[arm] = it }
             }
             val handle = opened.getOrNull()
             val openingFailure = opened.exceptionOrNull()
@@ -378,15 +380,23 @@ class Portfolio(
                 work = (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
             } else if (handle != null) {
                 val workBefore = handle.work - if (opening) handle.initialWork else 0L
+                val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
-                    handle.runSlice(run.token, remainingMillis(armToken), claim.handleNodes) {
-                        accept(claim, it)
+                    val millis = remainingMillis(armToken)
+                    if (worker.acceptsInstructionBudget && handle is InstructionSlicedSearch) {
+                        handle.runInstructionSlice(run.token, millis, instructionsOf(claim)) { accept(claim, it) }
+                    } else {
+                        handle.runSlice(run.token, millis, claim.handleNodes) { accept(claim, it) }
                     }
                 }
                 terminal = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
-                work = handle.work - workBefore
+                work = if (worker.acceptsInstructionBudget) {
+                    countedInstructions(claim, handle.stats.ls.moves.sum - instructionsBefore)
+                } else {
+                    handle.work - workBefore
+                }
             } else {
                 // Local-search segments restart from the shared incumbent, bounded by their own counted work.
                 failure = runCatching {

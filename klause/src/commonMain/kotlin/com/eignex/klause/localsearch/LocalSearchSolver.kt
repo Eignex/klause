@@ -10,7 +10,8 @@ import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Optimizer
+import com.eignex.klause.solver.ResumableOptimizer
+import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
@@ -75,7 +76,7 @@ class LocalSearchSolver(
      *  it. */
     val completion: CandidateCompletion? = null,
 ) : ResumableSolver<LocalSearchParams>,
-    Optimizer<LocalSearchParams> {
+    ResumableOptimizer<LocalSearchParams> {
 
     /** Solve a [CompiledSchema]'s problem with the default local-search configuration. */
     constructor(compiled: CompiledSchema) : this(compiled.problem.bake())
@@ -115,6 +116,10 @@ class LocalSearchSolver(
      * the handle before another search uses this solver's strategy and restart policy.
      */
     override fun resumableSolve(params: LocalSearchParams): ResumableSolve = engine.resumableSolve(params)
+
+    /** Open an optimisation walk retaining its assignment, random state and restart policy across slices. */
+    override fun resumable(objective: LinearObjective, params: LocalSearchParams): ResumableSearch =
+        engine.resumable(objective, params)
 
     override fun samples(params: LocalSearchParams): Sequence<Sample> = engine.samples(params, warm = null)
 

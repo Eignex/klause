@@ -8,7 +8,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * A pause/resume handle over a branch-and-bound optimisation. Unlike [Optimizer.improvements] — whose
+ * A pause/resume handle over an optimisation. Unlike [Optimizer.improvements] — whose
  * `Sequence` rebuilds the engine on every call and so loses all learned state between calls — a
  * [ResumableSearch] holds the **entire search state explicitly** in object fields: the live
  * propagation state (learned-clause database, the DFS trail), the variable/value heuristics, the
@@ -20,9 +20,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * needs to schedule an arm in segments without the cold-restart re-learning that dominated its
  * time-to-best: each scheduled segment resumes the arm where the previous one paused.
  *
- * No coroutine suspension is involved — the search loop is a sequence of atomic steps gated by a
- * top-of-loop slice check, so returning at that check and re-entering from the top is a faithful
- * resume given the retained fields. The handle is **single-threaded and stateful**; drive it from one
+ * Backtrack retains its trail and local search retains its assignment, random state and restart policy.
+ * The handle is **single-threaded and stateful**; drive it from one
  * thread, one [runSlice] at a time.
  *
  * Obtain one from a [ResumableOptimizer]. [close] releases any per-search resources.
@@ -95,9 +94,8 @@ interface ResumableSearch : AutoCloseable {
 }
 
 /**
- * An [Optimizer] that can hand out a [ResumableSearch] over a given objective — i.e. one whose B&B
- * search state can be paused and resumed across slices. [com.eignex.klause.backtrack.BacktrackSolver]
- * implements this; local search does not (it restarts cheaply from a warm-started incumbent instead).
+ * An [Optimizer] whose search state can be paused and resumed across slices, such as
+ * [com.eignex.klause.backtrack.BacktrackSolver] and [com.eignex.klause.localsearch.LocalSearchSolver].
  */
 interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
     /** Open a fresh [ResumableSearch] minimising [objective] under [params]. The returned handle owns
@@ -138,6 +136,15 @@ interface ResumableSolve : AutoCloseable {
 
 internal interface InstructionSlicedSolve : ResumableSolve {
     fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult?
+}
+
+internal interface InstructionSlicedSearch : ResumableSearch {
+    fun runInstructionSlice(
+        global: Cancellation,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult?
 }
 
 /** A [Solver] that can hand out a [ResumableSolve], such as [com.eignex.klause.backtrack.BacktrackSolver]

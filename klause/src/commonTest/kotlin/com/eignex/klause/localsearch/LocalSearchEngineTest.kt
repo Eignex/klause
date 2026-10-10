@@ -10,6 +10,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
@@ -55,6 +57,35 @@ class LocalSearchEngineTest {
             assertEquals(0.0, handle.stats.ls.moves.sum)
             val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
             assertEquals(initial, result.assignment)
+        }
+    }
+
+    @Test
+    fun `optimization resumes a candidate whose completion was cancelled`() {
+        val initial = Sample(BooleanArray(0), longArrayOf(2), reals = doubleArrayOf(0.5))
+        var expired = false
+        var calls = 0
+        val search = engine { candidate, _ ->
+            if (++calls == 1) {
+                expired = true
+                Completion.Undecided()
+            } else {
+                Completion.Witness(candidate)
+            }
+        }
+        val found = mutableListOf<Sample>()
+
+        search.resumable(
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LocalSearchParams(maxFlips = 1L, initialAssignment = initial),
+        ).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) { found += it.sample })
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            expired = false
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { found += it.sample }
+
+            assertEquals(initial, assertIs<MinimizeResult.BestFound>(result).sample)
+            assertEquals(listOf(initial), found)
         }
     }
 
