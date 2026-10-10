@@ -73,7 +73,7 @@ class PortfolioBuilderTest {
 
     @Test
     fun `a disabled bounding ceiling keeps the continuous incumbent pool`() {
-        val ceilings = listOf(LpConfig.OFF, LpConfig.DEFAULT.copy(overrides = mapOf(LpTechnique.BOUNDING to false)))
+        val ceilings = listOf(LpConfig.OFF, LpConfig(overrides = mapOf(LpTechnique.BOUNDING to false)))
 
         for (ceiling in ceilings) {
             val scenario = PortfolioScenario.sequential(Kind.COP).copy(lpCeiling = ceiling)
