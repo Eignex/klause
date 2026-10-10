@@ -17,7 +17,8 @@ class Xcsp3DefinitionTest {
     @Test
     fun `min and max chains retain aliases and exact source solutions`() {
         for (extreme in listOf("min", "max")) {
-            val parsed = Xcsp3.parse("""
+            val parsed = Xcsp3.parse(
+                """
                 <instance><variables>
                 <var id="x">0..1</var><var id="y">0..1</var>
                 <var id="r">0..2</var><var id="s">0..2</var>
@@ -25,23 +26,27 @@ class Xcsp3DefinitionTest {
                 <intension>eq(r,$extreme(add(x,1),$extreme(y,1)))</intension>
                 <intension>eq(s,r)</intension>
                 </constraints></instance>
-            """.trimIndent())
+            """.trimIndent()
+            )
             val problem = parsed.problem
             val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
             val state = LocalSearchState(problem.bake(), Random(0))
             state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
             assertTrue(state.invariants!!.isDefinedInt(2))
             assertTrue(state.invariants!!.isDefinedInt(3))
-            val expected = (0L..1L).flatMap { x -> (0L..1L).map { y ->
-                val r = if (extreme == "min") minOf(x + 1, minOf(y, 1)) else maxOf(x + 1, maxOf(y, 1))
-                listOf(x, y, r, r)
-            } }.toSet()
+            val expected = (0L..1L).flatMap { x ->
+                (0L..1L).map { y ->
+                    val r = if (extreme == "min") minOf(x + 1, minOf(y, 1)) else maxOf(x + 1, maxOf(y, 1))
+                    listOf(x, y, r, r)
+                }
+            }.toSet()
             val actual = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
                 .map { it.ints.take(4) }.toSet()
             assertEquals(expected, actual)
             sweep.sweep(state.assignment, state.rootDomains)
             state.recompute()
-            for (x in 0L..1L) for (y in 0L..1L) {
+            for (x in 0L..1L) {
+                for (y in 0L..1L) {
                 state.apply(Move.Compound(listOf(Move.IntSet(0, x), Move.IntSet(1, y))))
                 val r = if (extreme == "min") minOf(x + 1, minOf(y, 1)) else maxOf(x + 1, maxOf(y, 1))
                 assertEquals(r, state.assignment.intValue(2))
@@ -51,19 +56,22 @@ class Xcsp3DefinitionTest {
                 state.recompute()
                 assertEquals(cost, state.cost)
             }
+            }
         }
     }
 
     @Test
     fun `clipped min and max outputs remain violated and repair searched inputs`() {
         for (extreme in listOf("min", "max")) {
-            val parsed = Xcsp3.parse("""
+            val parsed = Xcsp3.parse(
+                """
                 <instance><variables><var id="x">0..4</var><var id="y">0..4</var>
                 <var id="r">1..3</var></variables><constraints>
                 <intension>eq(r,$extreme(x,y))</intension>
                 <intension>ne(r,x)</intension>
                 </constraints></instance>
-            """.trimIndent())
+            """.trimIndent()
+            )
             val problem = parsed.problem
             val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
             val fixed = if (extreme == "min") 3L else 1L
@@ -88,11 +96,13 @@ class Xcsp3DefinitionTest {
 
     @Test
     fun `pinned outputs survive sweep and per move updates`() {
-        val parsed = Xcsp3.parse("""
+        val parsed = Xcsp3.parse(
+            """
             <instance><variables><var id="x">0..3</var><var id="y">0..3</var>
             <var id="r">0..3</var></variables><constraints>
             <intension>eq(r,min(x,y))</intension></constraints></instance>
-        """.trimIndent())
+        """.trimIndent()
+        )
         val problem = parsed.problem
         val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
         val pins = Assumptions(ints = mapOf(2 to 2L, 0 to 3L))
@@ -113,15 +123,18 @@ class Xcsp3DefinitionTest {
         assertEquals(2L, state.assignment.intValue(1))
         assertEquals(0L, state.cost)
     }
+
     @Test
     fun `independent output constraints repair through maintained extrema`() {
         for (extreme in listOf("min", "max")) {
-            val parsed = Xcsp3.parse("""
+            val parsed = Xcsp3.parse(
+                """
                 <instance><variables><var id="x">0..4</var><var id="y">0..4</var>
                 <var id="r">1..3</var></variables><constraints>
                 <intension>eq(r,$extreme(x,y))</intension>
                 <intension>ne(r,x)</intension></constraints></instance>
-            """.trimIndent())
+            """.trimIndent()
+            )
             val problem = parsed.problem
             val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
             val fixed = if (extreme == "min") 3L else 1L
@@ -145,5 +158,4 @@ class Xcsp3DefinitionTest {
             assertEquals(0L, state.cost)
         }
     }
-
 }

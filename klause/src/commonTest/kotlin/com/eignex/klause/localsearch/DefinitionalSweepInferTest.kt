@@ -42,6 +42,7 @@ class DefinitionalSweepInferTest {
         val factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0))
         assertNull(DefinitionalSweep.infer(factors, numIntVars = 3, definedHints = intArrayOf(2)))
     }
+
     @Test
     fun `unhinted extrema remain searched`() {
         for (max in listOf(false, true)) {
@@ -57,16 +58,20 @@ class DefinitionalSweepInferTest {
 
     @Test
     fun `a cyclic extremum and alias cone remains searched`() {
-        val factors = arrayOf<Factor>(ArrayMinMax(2, intArrayOf(0, 3), false),
-            Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.EQ, 0))
+        val factors = arrayOf<Factor>(
+            ArrayMinMax(2, intArrayOf(0, 3), false),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.EQ, 0),
+        )
         assertNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2, 3)))
     }
 
     @Test
     fun `competing affine aliases leave their output searched`() {
-        val factors = arrayOf<Factor>(ArrayMinMax(2, intArrayOf(0, 1), false),
+        val factors = arrayOf<Factor>(
+            ArrayMinMax(2, intArrayOf(0, 1), false),
             Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.EQ, 0),
-            Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.EQ, 0))
+            Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.EQ, 0),
+        )
         val net = assertNotNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2, 3))).network(4, 0)
         assertEquals(false, net.isDefinedInt(3))
         assertEquals(true, net.isDefinedInt(2))
@@ -75,8 +80,11 @@ class DefinitionalSweepInferTest {
     @Test
     fun `duplicate aliases leave their output searched`() {
         val alias = Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.EQ, 0)
-        val factors = arrayOf<Factor>(ArrayMinMax(2, intArrayOf(0, 1), false), alias,
-            Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.EQ, 0))
+        val factors = arrayOf<Factor>(
+            ArrayMinMax(2, intArrayOf(0, 1), false),
+            alias,
+            Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.EQ, 0),
+        )
         val net = assertNotNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2, 3))).network(4, 0)
         assertEquals(false, net.isDefinedInt(3))
     }
@@ -88,5 +96,4 @@ class DefinitionalSweepInferTest {
             assertNull(DefinitionalSweep.infer(arrayOf<Factor>(extremum, duplicate), 3, intArrayOf(2)))
         }
     }
-
 }

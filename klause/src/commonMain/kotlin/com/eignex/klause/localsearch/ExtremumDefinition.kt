@@ -8,11 +8,7 @@ import com.eignex.klause.ir.StructuralKey
 
 internal class ExtremumDefinition(val variable: Int, val factor: Factor, val outputIndex: Int)
 
-internal fun extremumDefinitions(
-    factors: Array<Factor>,
-    numIntVars: Int,
-    hints: IntArray,
-): List<ExtremumDefinition> {
+internal fun extremumDefinitions(factors: Array<Factor>, numIntVars: Int, hints: IntArray): List<ExtremumDefinition> {
     val hinted = BooleanArray(numIntVars)
     for (v in hints) if (v in hinted.indices) hinted[v] = true
     val known = BooleanArray(numIntVars)
