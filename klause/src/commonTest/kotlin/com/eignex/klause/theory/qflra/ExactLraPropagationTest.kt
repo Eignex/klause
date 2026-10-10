@@ -100,9 +100,10 @@ class ExactLraPropagationTest {
                 assertTrue(LiveQfLraSystem(source, lp).install())
                 val session = SearchSession(listOf(lp))
                 session.initialize()
-                val propagation = ExactLraPropagation(source, lp, LiveQfLraSystem(source, lp), source.factors.map { factor ->
+                val forms = source.factors.map { factor ->
                     factor.linearRows.map { it.exactForm(source.numRealVars) }
-                })
+                }
+                val propagation = ExactLraPropagation(source, lp, LiveQfLraSystem(source, lp), forms)
 
                 assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
 
