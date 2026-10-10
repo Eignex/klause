@@ -560,8 +560,8 @@ class LocalSearchState(
      * violations the engine chases one flip at a time, so this rolls the update into one Compound.
      *
      * Returns a plain [Move.IntSet] when no sibling indicators need updating, else a [Move.Compound].
-     * Sibling factors of other shapes (multi-var reified linear, LE/GE reified, etc.) are skipped —
-     * only single-var EQ channeling has a deterministic "which indicator flips" answer.
+     * Indicator flips also carry unit equality channels over 0/1 integers to their matching value.
+     * Multi-var and inequality indicators are skipped by this neighborhood.
      */
     fun synthesizeChannelingMove(intVar: Int, newValue: Long): Move {
         val cur = assignment.intValue(intVar)
@@ -573,6 +573,7 @@ class LocalSearchState(
         for (fid in projection.intOccurrences[intVar]) {
             factors[fid].contributeChanneling(this, fid, intVar, cur, newValue, sink)
         }
+        sink.carryBinaryChannels(this)
         return sink.toMove()
     }
 

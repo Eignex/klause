@@ -207,6 +207,12 @@ pins and implicit owners filter the complete move before publication. Equality i
 join coordinate moves, while arithmetic counter-shifts cannot overwrite the requested
 coordinates. Unsupported definitions, overflow and nonintegral inverses decline the
 candidate; an unreachable matching cell does not stop the remaining element scan.
+Value-driven moves carry equality indicator flips through directly connected unit
+equality channels over 0/1 integers. Channel targets must be present in the root domain
+and pass the generic pinned, defined and implicit-owner filters; a claimed coordinate
+is never overwritten. Repeated Boolean flips are interpreted by their final parity.
+Product definitions then maintain their outputs from the coordinated channel changes.
+Wider inputs and other row shapes retain their independent repair neighborhoods.
 Boolean break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Moves feeding definitions score the complete propagated assignment, including derived
