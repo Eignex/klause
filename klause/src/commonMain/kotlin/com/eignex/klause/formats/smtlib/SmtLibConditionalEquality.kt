@@ -68,7 +68,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     fun isDefined(variable: Int): Boolean = variable in definitions
 
     fun rememberPrimitive(variable: Int, value: Long, literal: Int) {
-        if (variable !in definitions) equalities.putIfAbsent(Key(variable, value), literal)
+        if (variable !in definitions) equalities.getOrPut(Key(variable, value)) { literal }
     }
 
     private fun constantImage(terms: List<LinComb>): Set<Long>? {
