@@ -10,6 +10,40 @@ import kotlin.time.TestTimeSource
 
 class CancellationTest {
     @Test
+    fun `both polling surfaces observe live adapter cancellation and deadline`() {
+        for (direct in listOf(false, true)) {
+            val clock = TestTimeSource()
+            var deadline = clock.markNow() + 2.seconds
+            var external = false
+            val token = cancelledWhen({ deadline }) { external || deadline.hasPassedNow() }
+            val read = if (direct) token::isCancelled else token::invoke
+            assertFalse(read())
+
+            deadline = clock.markNow() + 4.seconds
+            clock += 3.seconds
+
+            assertEquals(deadline, token.deadline())
+            assertFalse(read())
+            external = true
+            assertTrue(read())
+        }
+    }
+
+    @Test
+    fun `both polling surfaces observe external cancellation`() {
+        for (direct in listOf(false, true)) {
+            var stopped = false
+            val token = (Cancellation { stopped } or Cancellation.Never) or Cancellation { false }
+            val read = if (direct) token::isCancelled else token::invoke
+            assertFalse(read())
+
+            stopped = true
+
+            assertTrue(read())
+        }
+    }
+
+    @Test
     fun `nested or compositions preserve predicate order and short circuiting`() {
         val visited = ArrayList<Int>()
         var stopped = false
