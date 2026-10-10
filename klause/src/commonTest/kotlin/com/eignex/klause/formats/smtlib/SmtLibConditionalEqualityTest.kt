@@ -109,7 +109,7 @@ class SmtLibConditionalEqualityTest {
 
     @Test
     fun `a completed decision list excludes constants outside its arms and default`() {
-        val chain = (0..15).foldRight("99") { key, rest -> "(ite (= s $key) $key $rest)" }
+        val chain = (0..15).toList().foldRight("99") { key, rest -> "(ite (= s $key) $key $rest)" }
         val parsed = SmtLib.parse(
             """
             (declare-const s Int)
