@@ -159,6 +159,7 @@ internal fun Compiler.Builder.elementVarMatrix(
     factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.GE, colOff.toLong()))
     factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.LE, colOff.toLong() + nCols - 1L))
     val index = newAuxVar(0L, cells - 1L)
+    definedVars.add(index)
     factors.add(
         Linear(
             longArrayOf(nCols.toLong(), 1L, -1L), intArrayOf(i, j, index),

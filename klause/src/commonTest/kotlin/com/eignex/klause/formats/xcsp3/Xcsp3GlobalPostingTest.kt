@@ -8,10 +8,15 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.bake
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -151,6 +156,31 @@ class Xcsp3GlobalPostingTest {
 
             assertEquals(expected, solutions(parsed, if (value == "v") 5 else 4))
         }
+    }
+
+    @Test
+    fun `coordinate moves select matrix cells without an index repair`() {
+        val parsed = parse(
+            "<element><matrix>(a,b)(b,a)</matrix><index>i j</index><value>v</value></element>",
+            """
+            <var id="a">0</var><var id="b">1</var>
+            <var id="i">0..1</var><var id="j">0..1</var><var id="v">1</var>
+            """.trimIndent(),
+        )
+        val problem = parsed.problem
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
+        val state = LocalSearchState(problem.bake(), Random(5))
+        val row = parsed.intVarNames.getValue("i")
+        val col = parsed.intVarNames.getValue("j")
+        state.assignment.setInt(row, 0)
+        state.assignment.setInt(col, 1)
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        state.recompute()
+
+        state.apply(Move.IntSet(row, 1))
+        state.apply(Move.IntSet(col, 0))
+
+        assertEquals(0L, state.cost)
     }
 
     @Test

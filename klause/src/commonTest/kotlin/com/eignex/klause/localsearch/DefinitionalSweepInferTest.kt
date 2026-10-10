@@ -2,10 +2,15 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -40,5 +45,55 @@ class DefinitionalSweepInferTest {
         // (excluding it from search) would only stall repair. The hint must not claim it.
         val factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0))
         assertNull(DefinitionalSweep.infer(factors, numIntVars = 3, definedHints = intArrayOf(2)))
+    }
+
+    @Test
+    fun `a hinted element index follows coordinate moves`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Element(2, 3, longArrayOf(0, 1, 2, 3), arrIsVars = false, indexOffset = 0),
+        )
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(0, 3))
+        val problem = Problem(0, 4, domains, factors).bake()
+        val sweep = assertNotNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2)))
+        val state = LocalSearchState(problem, Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.invariants = sweep.network(4, 0)
+        state.recompute()
+
+        state.apply(Move.IntSet(0, 1))
+        state.apply(Move.IntSet(1, 0))
+
+        assertEquals(2L, state.assignment.intValue(2))
+        val cost = state.cost
+        state.recompute()
+        assertEquals(cost, state.cost)
+    }
+
+    @Test
+    fun `an element index constrained outside its definition stays searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Element(2, 3, longArrayOf(0, 1, 2, 3), arrIsVars = false, indexOffset = 0),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 2),
+        )
+
+        assertNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2)))
+    }
+
+    @Test
+    fun `an element index with another element role stays searched`() {
+        for (element in listOf(
+            Element(2, 2, longArrayOf(0, 1, 2, 3), arrIsVars = false, indexOffset = 0),
+            Element(2, 3, longArrayOf(0, 1, 2, 3), arrIsVars = true, indexOffset = 0),
+        )) {
+            val factors = arrayOf<Factor>(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                element,
+            )
+
+            assertNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2)))
+        }
     }
 }
