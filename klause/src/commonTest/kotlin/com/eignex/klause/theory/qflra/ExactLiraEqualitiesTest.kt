@@ -265,7 +265,7 @@ class ExactLiraEqualitiesTest {
     }
 
     @Test
-    fun `guarded equality offsets imply a comparison over unbounded columns and retract`() {
+    fun `guarded equality offsets and exclusions imply comparisons and retract`() {
         val open = Bits(3).also { for (variable in 0..2) it.set(variable) }
         val source = Problem(
             2,
@@ -287,6 +287,9 @@ class ExactLiraEqualitiesTest {
             session.popTo(0)
             assertNull(session.boolValue(1))
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertEquals(false, session.boolValue(1))
+            assertEquals(setOf(Lit.make(0, true), Lit.make(1, false)), session.reasonFor(1)?.literals?.toSet())
+            session.popTo(0)
             assertNull(session.boolValue(1))
         }
     }
