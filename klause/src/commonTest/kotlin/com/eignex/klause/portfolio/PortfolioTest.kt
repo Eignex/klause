@@ -1053,6 +1053,28 @@ class PortfolioTest {
     }
 
     @Test
+    fun `a silent complete arm reaches its first witness despite a competing bandit preference`() {
+        val slices = IntArray(2)
+        val workers = listOf(
+            trackingWorker("preferred", 0, ScriptedSearch({ false }) { slices[0]++ }),
+            trackingWorker("finder", 1, ScriptedSearch({ it == 2 }) { slices[1]++ }),
+        )
+        val bandit = object : UnivariateBandit {
+            override val nbrArms = 2
+            override val random = Random(0)
+            override fun choose() = 0
+            override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+            override fun reset() = Unit
+        }
+
+        val result = Portfolio(workers, bandit).use {
+            it.minimize(Cancellation { slices.sum() >= 8 })
+        }
+
+        assertEquals(999.0, assertIs<MinimizeResult.WithSample>(result).objectiveValue)
+    }
+
+    @Test
     fun `the arm that found the first solution loses its lead to the arm improving it`() {
         val slices = IntArray(2)
         val finder = ScriptedSearch({ it == 0 }, start = 1_000.0) { slices[0]++ }

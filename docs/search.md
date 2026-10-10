@@ -154,6 +154,13 @@ propagation visits and per 600 LP work units. Construction is charged once;
 fractional charges carry forward and overspending is repaid by later slices.
 Decision/move limits still count their original events.
 
+Before the first accepted witness, a selected complete-search family runs its
+available arm with the least charged work. Shared clauses, root fixings and
+objective floors remain credited, but cannot exclude a silent search from its
+family's coverage. Family selection retains its progress policy; after the first
+witness, arm selection also follows that policy. Initial admission, preparation
+revisits and explicit minimum time shares retain precedence.
+
 Slices yield before consuming an alternative or after a completed node. A
 pending sibling cannot be skipped when yielding, and reset discards a pending
 alternative. Constructor refutations return immediately. A rejected last root
