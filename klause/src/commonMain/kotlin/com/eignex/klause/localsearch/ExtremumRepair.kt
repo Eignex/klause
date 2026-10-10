@@ -48,6 +48,7 @@ internal fun extremumRepair(
                 writes.clear()
                 writes.putAll(saved)
             }
+
             is FunctionalObjective.Lin -> {
                 val saved = LinkedHashMap(writes)
                 for (k in definition.ins.indices) {
@@ -59,7 +60,9 @@ internal fun extremumRepair(
                     try {
                         var rhs = subExact(definition.c, mulExact(definition.outCoeff, goal))
                         for (j in definition.ins.indices) {
-                            if (j != k) rhs = subExact(rhs, mulExact(definition.coeffs[j], definition.ins[j].value(::value)))
+                            if (j != k) {
+                                rhs = subExact(rhs, mulExact(definition.coeffs[j], definition.ins[j].value(::value)))
+                            }
                         }
                         if (rhs == Long.MIN_VALUE && coefficient == -1L) continue
                         if (rhs % coefficient == 0L && solve(operand.varId, rhs / coefficient)) return true
@@ -70,6 +73,7 @@ internal fun extremumRepair(
                 writes.clear()
                 writes.putAll(saved)
             }
+
             else -> return false
         }
         return false

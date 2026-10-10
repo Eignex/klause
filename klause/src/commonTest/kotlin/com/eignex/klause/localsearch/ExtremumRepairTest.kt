@@ -13,12 +13,14 @@ class ExtremumRepairTest {
     @Test
     fun `alias repairs backsolve affine min and max operands`() {
         for (extreme in listOf("min", "max")) {
-            val parsed = Xcsp3.parse("""
+            val parsed = Xcsp3.parse(
+                """
                 <instance><variables><var id="x">0..2</var><var id="y">0..3</var>
                 <var id="r">0..3</var><var id="s">0..3</var></variables><constraints>
                 <intension>eq(r,$extreme(add(x,1),y))</intension>
                 <intension>eq(s,r)</intension></constraints></instance>
-            """.trimIndent())
+            """.trimIndent()
+            )
             val problem = parsed.problem
             val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
             val state = LocalSearchState(problem.bake(), Random(0))
@@ -43,11 +45,13 @@ class ExtremumRepairTest {
     fun `inverse repairs respect input domains pins and implicit owners`() {
         for (restriction in listOf("domain", "pin", "owner")) {
             val domain = if (restriction == "domain") "0 2" else "0..2"
-            val parsed = Xcsp3.parse("""
+            val parsed = Xcsp3.parse(
+                """
                 <instance><variables><var id="x">$domain</var><var id="y">3</var>
                 <var id="r">0..3</var></variables><constraints>
                 <intension>eq(r,min(add(x,1),y))</intension></constraints></instance>
-            """.trimIndent())
+            """.trimIndent()
+            )
             val problem = parsed.problem
             val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
             val pins = if (restriction == "pin") Assumptions(ints = mapOf(0 to 0L)) else Assumptions.None
@@ -57,7 +61,9 @@ class ExtremumRepairTest {
             state.assignment.setInt(1, 3L)
             sweep.sweep(state.assignment, state.rootDomains)
             state.recompute()
-            if (restriction == "owner") state.moveSink.setOwners(IntArray(problem.numIntVars) { if (it == 0) 42 else -1 })
+            if (restriction == "owner") {
+                state.moveSink.setOwners(IntArray(problem.numIntVars) { if (it == 0) 42 else -1 })
+            }
 
             state.moveSink.addChannelingIntSet(state, 2, 2L)
 
@@ -69,10 +75,12 @@ class ExtremumRepairTest {
 
     @Test
     fun `shared input collisions cannot publish an unreachable extremum repair`() {
-        val parsed = Xcsp3.parse("""
+        val parsed = Xcsp3.parse(
+            """
             <instance><variables><var id="x">-2..2</var><var id="r">-2..2</var></variables>
             <constraints><intension>eq(r,min(x,neg(x)))</intension></constraints></instance>
-        """.trimIndent())
+        """.trimIndent()
+        )
         val problem = parsed.problem
         val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
         val state = LocalSearchState(problem.bake(), Random(0))

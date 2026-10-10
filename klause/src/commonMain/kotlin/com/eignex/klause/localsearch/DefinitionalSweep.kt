@@ -16,7 +16,6 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedIntArray
@@ -150,7 +149,11 @@ class DefinitionalSweep internal constructor(
                     inputs = intArrayOf(f.a, f.b)
                 } else if (f is ArrayMinMax) {
                     for (input in f.xs) visit(input)
-                    node = FunctionalObjective.Extreme(v, Array(f.xs.size) { FunctionalObjective.Operand.v(f.xs[it]) }, f.max)
+                    node = FunctionalObjective.Extreme(
+                        v,
+                        Array(f.xs.size) { FunctionalObjective.Operand.v(f.xs[it]) },
+                        f.max,
+                    )
                     inputs = f.xs
                 } else {
                     val lin = f as Linear
