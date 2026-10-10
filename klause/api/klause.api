@@ -12178,3 +12178,4 @@ public final class com/eignex/klause/util/StringCharSource : com/eignex/klause/u
 public abstract interface class com/eignex/klause/util/WorkMeter {
 	public abstract fun charge (J)V
 }
+

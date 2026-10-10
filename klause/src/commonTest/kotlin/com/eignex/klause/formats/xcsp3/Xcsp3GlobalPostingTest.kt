@@ -6,6 +6,7 @@ import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
@@ -99,5 +100,71 @@ class Xcsp3GlobalPostingTest {
         )
 
         assertEquals(1, factorsOf(parsed).filterIsInstance<Cumulative>().size)
+    }
+
+    @Test
+    fun `variable matrix selection preserves source values with axis offsets`() {
+        for ((rowOffset, colOffset) in listOf(0L to 0L, -3L to 5L, Int.MAX_VALUE.toLong() to 0L)) {
+            val parsed = parse(
+                """
+                <element startRowIndex="$rowOffset" startColIndex="$colOffset">
+                  <matrix>m[][]</matrix><index>i j</index><value>v</value>
+                </element>
+                """.trimIndent(),
+                """
+                <array id="m" size="[2][2]">
+                  <domain for="m[0][0]">1</domain><domain for="m[0][1]">2</domain>
+                  <domain for="m[1][0]">3</domain><domain for="m[1][1]">4</domain>
+                </array>
+                <var id="i">$rowOffset..${rowOffset + 1L}</var>
+                <var id="j">$colOffset..${colOffset + 1L}</var><var id="v">1..4</var>
+                """.trimIndent(),
+            )
+
+            assertEquals(1, factorsOf(parsed).filterIsInstance<Element>().size)
+            val expected = (0..1).flatMap { row ->
+                (0..1).map { col ->
+                    listOf(1L, 2L, 3L, 4L, rowOffset + row, colOffset + col, (2 * row + col + 1).toLong())
+                }
+            }.toSet()
+            assertEquals(expected, solutions(parsed, 7))
+        }
+    }
+
+    @Test
+    fun `variable matrix selection preserves repeated cells and result aliases`() {
+        for (value in listOf("v", "a")) {
+            val parsed = parse(
+                "<element><matrix>(a,b)(b,a)</matrix><index>i j</index><value>$value</value></element>",
+                """
+                <var id="a">0..1</var><var id="b">0..1</var>
+                <var id="i">0..1</var><var id="j">0..1</var>
+                ${if (value == "v") "<var id=\"v\">0..1</var>" else ""}
+                """.trimIndent(),
+            )
+            val expected = mutableSetOf<List<Long>>()
+            for (a in 0L..1L) for (b in 0L..1L) for (row in 0L..1L) for (col in 0L..1L) {
+                val selected = if (row == col) a else b
+                if (value == "v") expected += listOf(a, b, row, col, selected)
+                else if (a == selected) expected += listOf(a, b, row, col)
+            }
+
+            assertEquals(expected, solutions(parsed, if (value == "v") 5 else 4))
+        }
+    }
+
+    @Test
+    fun `out of range matrix axes cannot select an aliased flat position`() {
+        for ((row, col) in listOf(-1 to 2, 1 to -1)) {
+            val parsed = parse(
+                "<element><matrix>(a,b)(b,a)</matrix><index>i j</index><value>a</value></element>",
+                """
+                <var id="a">0..1</var><var id="b">0..1</var>
+                <var id="i">$row</var><var id="j">$col</var>
+                """.trimIndent(),
+            )
+
+            assertTrue(solutions(parsed, 4).isEmpty())
+        }
     }
 }
