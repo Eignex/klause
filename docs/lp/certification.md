@@ -44,6 +44,15 @@ Oversized authority starts wide, and fixed-width overflow restarts the whole
 operation from authority. Failed attempts and precision restarts are charged.
 An off-status feasible point cannot furnish the claimed warm basis.
 
+`BigFraction` factories preserve reduced numerators and positive denominators.
+Zero has denominator one. A unit numerator or denominator is already coprime;
+an already-coprime general fraction needs no division after the GCD check.
+Finite-double conversion removes trailing powers of two from the significand,
+so its odd numerator is coprime to the remaining power-of-two denominator.
+These factory paths preserve exact values and normalization while avoiding
+redundant arithmetic. Their measured scope is recorded in
+[rational normalization evidence](../evidence/rational-normalization.md).
+
 A verification attempt makes at most one factor-factory call, charging its
 internal reorder/precision restarts. Owner-local exact factors require the same
 matrix and ordered basis. Edits still require fresh RHS, seats, costs and proof
