@@ -596,6 +596,7 @@ class ExactLiraSearchComponent(
         }
         if (propagated !is ComponentResult.Consistent) return propagated
         if (propagation.implied) return ComponentResult.Consistent
+        if (context.decisionLevel != 0 && unassignedBooleans != 0) return ComponentResult.Consistent
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve(token = operationStop, sparsePointRecovery = true)
             ?: return ComponentResult.Indeterminate
