@@ -150,6 +150,9 @@ and the ledger records actual reported work. Work units, kernel visits,
 allocations and elapsed time are distinct measurements.
 
 Cancellation adapters preserve deadline metadata and work-meter forwarding.
+An LP solve uses its owner token directly when no distinct call token is supplied.
+Open linear search keeps the current operation in that owner adapter, avoiding a
+second operation poll. A distinct call token remains an additional stop.
 An open theory's LP adapter reads the current operation token and retains the
 solve token between operations. It polls a distinct enclosing session token too;
 when that token is already the operation's parent it does not poll it twice.
