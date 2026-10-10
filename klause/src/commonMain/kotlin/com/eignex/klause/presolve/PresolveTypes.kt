@@ -95,7 +95,8 @@ internal class SourceDelta(
             if (next === rootDomains[v]) continue
             (narrowed ?: rootDomains.copyOf().also { narrowed = it })[v] = next
         }
-        return PassDelta(droppedIndices, addedFactors, narrowed, lift, infeasible = infeasible).also { it.rebuild = rebuild }
+        return PassDelta(droppedIndices, addedFactors, narrowed, lift, infeasible = infeasible)
+            .also { it.rebuild = rebuild }
     }
 }
 
@@ -129,7 +130,8 @@ class PassDelta(
     internal var rebuild: SourceRebuilds = SourceRebuilds.NONE
 
     /** Whether the pass left factors, domains and reconstruction unchanged. */
-    val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && domains == null && reconstruct == null && rebuild.isEmpty
+    val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() &&
+        domains == null && reconstruct == null && rebuild.isEmpty
 }
 
 /**

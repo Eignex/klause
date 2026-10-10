@@ -9,7 +9,7 @@ internal fun BacktrackSolver.projectedOutcomes(
     mapping: SourceMapping? = null,
 ): Sequence<SearchOutcome> {
     val source = mapping?.source ?: problem
-    require(mapping == null || mapping.target === problem && mapping.guarantees.projectedSolutions) {
+    require(mapping == null || (mapping.target === problem && mapping.guarantees.projectedSolutions)) {
         "projected enumeration requires complete source coverage for this reduced model"
     }
     require(boolVars.all { it in 0 until source.numBoolVars })

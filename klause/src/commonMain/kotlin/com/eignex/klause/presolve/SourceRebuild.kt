@@ -113,12 +113,16 @@ internal class SourceRebuilds(steps: List<RebuildStep>) {
             is RebuildStep.RepairClause -> RebuildStep.RepairClause(step.clause.copyOf(), step.literal)
             is RebuildStep.AffineValue -> {
                 require(step.divisor != 0L && step.termVars.size == step.termCoeffs.size)
-                RebuildStep.AffineValue(step.variable, step.constTerm, step.termVars.copyOf(), step.termCoeffs.copyOf(), step.divisor)
+                RebuildStep.AffineValue(
+                    step.variable, step.constTerm, step.termVars.copyOf(), step.termCoeffs.copyOf(), step.divisor,
+                )
             }
             is RebuildStep.QuotientValue -> {
                 require(step.divisor != 0L && step.termVars.size == step.termCoeffs.size)
-                RebuildStep.QuotientValue(step.variable, step.constTerm, step.termVars.copyOf(), step.termCoeffs.copyOf(),
-                    step.divisor, step.roundDown, step.clamp)
+                RebuildStep.QuotientValue(
+                    step.variable, step.constTerm, step.termVars.copyOf(), step.termCoeffs.copyOf(),
+                    step.divisor, step.roundDown, step.clamp,
+                )
             }
         }
     }
@@ -299,7 +303,11 @@ internal fun SourceRebuilds.asSampleLift(): ((Sample) -> Sample)? = if (isEmpty)
         } else {
             val ints = exact.toTypedArray()
             rebuildInto(bools, ints)
-            val finite = if (ints.all { it.fitsLong() }) LongArray(ints.size) { ints[it].toLongExact() } else EmptyLongArray
+            val finite = if (ints.all { it.fitsLong() }) {
+                LongArray(ints.size) { ints[it].toLongExact() }
+            } else {
+                EmptyLongArray
+            }
             sample.copy(bools = bools, ints = finite, exactInts = ints.toList())
         }
     }
