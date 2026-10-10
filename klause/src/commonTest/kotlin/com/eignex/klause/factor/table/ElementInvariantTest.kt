@@ -1,8 +1,12 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
@@ -10,6 +14,7 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ElementInvariantTest {
@@ -116,4 +121,32 @@ class ElementInvariantTest {
             assertTrue(state.moveSink.list.none { it is Move.IntSet && it.varId == 0 })
         }
     }
+    @Test
+    fun `index repairs skip unreachable matching cells in a retained extremum cone`() {
+        val problem = Problem(
+            0, 5,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 4), IntDomain(0, 4), IntDomain(4, 4), IntDomain(10, 20)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                ArrayMinMax(2, intArrayOf(1, 3), false),
+                Element(2, 4, longArrayOf(10, 20, 20, 10, 10), false, 0),
+            ),
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, 5, intArrayOf(1, 2)))
+        val state = LocalSearchState(problem.bake(), Random(0), Assumptions(ints = mapOf(4 to 20L)))
+        state.invariants = sweep.network(5, 0)
+        state.assignment.setInt(0, 0L)
+        state.assignment.setInt(3, 4L)
+        state.assignment.setInt(4, 20L)
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+
+        state.factors[2].proposeRepairMoves(state, 2, state.moveSink)
+        state.apply(state.moveSink.list.single())
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(2L, state.assignment.intValue(2))
+        assertEquals(0L, state.cost)
+    }
+
 }
