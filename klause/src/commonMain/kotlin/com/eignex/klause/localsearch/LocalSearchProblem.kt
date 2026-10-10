@@ -29,40 +29,40 @@ class LocalSearchProblem private constructor(
         this(preparation(problem, domains).asSequence().filterNotNull().first())
 
     internal companion object {
-        fun preparation(problem: Problem, domains: Array<IntDomain>?): Iterator<LocalSearchProblem?> = sequence<LocalSearchProblem?> {
-            val invariants = Array<Invariant>(problem.numFactors) { NoInvariant }
-            val boolCounts = IntArray(problem.numBoolVars)
-            val intCounts = IntArray(problem.numIntVars)
-            val realCounts = IntArray(problem.numRealVars)
-            for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
-                for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
-                    val factor = problem.factors[fid]
-                    invariants[fid] = factor.invariantProjection(domains)
-                    if (invariants[fid] === NoInvariant) continue
-                    for (v in factor.boolVars) boolCounts[v]++
-                    for (v in factor.intVars) intCounts[v]++
-                    for (v in factor.variables.reals) realCounts[v]++
+        fun preparation(problem: Problem, domains: Array<IntDomain>?): Iterator<LocalSearchProblem?> =
+            sequence<LocalSearchProblem?> {
+                val invariants = Array<Invariant>(problem.numFactors) { NoInvariant }
+                val boolCounts = IntArray(problem.numBoolVars)
+                val intCounts = IntArray(problem.numIntVars)
+                val realCounts = IntArray(problem.numRealVars)
+                for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
+                    for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
+                        val factor = problem.factors[fid]
+                        invariants[fid] = factor.invariantProjection(domains)
+                        if (invariants[fid] === NoInvariant) continue
+                        for (v in factor.boolVars) boolCounts[v]++
+                        for (v in factor.intVars) intCounts[v]++
+                        for (v in factor.variables.reals) realCounts[v]++
+                    }
+                    yield(null)
                 }
-                yield(null)
-            }
-            val boolOccurrences = allocateOccurrences(boolCounts)
-            val intOccurrences = allocateOccurrences(intCounts)
-            val realOccurrences = allocateOccurrences(realCounts)
-            boolCounts.fill(0)
-            intCounts.fill(0)
-            realCounts.fill(0)
-            for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
-                for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
-                    if (invariants[fid] === NoInvariant) continue
-                    val factor = problem.factors[fid]
-                    for (v in factor.boolVars) boolOccurrences[v][boolCounts[v]++] = fid
-                    for (v in factor.intVars) intOccurrences[v][intCounts[v]++] = fid
-                    for (v in factor.variables.reals) realOccurrences[v][realCounts[v]++] = fid
+                val boolOccurrences = allocateOccurrences(boolCounts)
+                val intOccurrences = allocateOccurrences(intCounts)
+                val realOccurrences = allocateOccurrences(realCounts)
+                boolCounts.fill(0)
+                intCounts.fill(0)
+                realCounts.fill(0)
+                for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
+                    for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
+                        if (invariants[fid] === NoInvariant) continue
+                        val factor = problem.factors[fid]
+                        for (v in factor.boolVars) boolOccurrences[v][boolCounts[v]++] = fid
+                        for (v in factor.intVars) intOccurrences[v][intCounts[v]++] = fid
+                        for (v in factor.variables.reals) realOccurrences[v][realCounts[v]++] = fid
+                    }
+                    yield(null)
                 }
-                yield(null)
-            }
-            yield(LocalSearchProblem(problem, invariants, boolOccurrences, intOccurrences, realOccurrences))
-        }.iterator()
+                yield(LocalSearchProblem(problem, invariants, boolOccurrences, intOccurrences, realOccurrences))            }.iterator()
 
         private suspend fun SequenceScope<LocalSearchProblem?>.allocateOccurrences(counts: IntArray): Array<IntArray> {
             val out = Array(counts.size) { EmptyIntArray }

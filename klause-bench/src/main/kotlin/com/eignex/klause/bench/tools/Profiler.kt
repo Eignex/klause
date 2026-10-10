@@ -69,7 +69,8 @@ internal object Profiler {
         }
         val phase = when {
             methods.any {
-                it.contains("LocalSearchProblem") || it.contains("LocalSearchPreparation.get")
+                it.contains("LocalSearchProblem.<init>") || it.contains("LocalSearchPreparation.get") ||
+                    (it.contains("LocalSearchProblem") && it.contains("preparation"))
             } -> "local-search projection preparation"
             localState -> "local-search state allocation"
             methods.any { it.contains("LocalSearchEngine.installInvariants") } -> "local-search invariant setup"

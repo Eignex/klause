@@ -33,6 +33,8 @@ class LocalSearchPreparationTest {
             }
         }
         val problem = Problem(1, 0, emptyArray(), factors)
+        visits.fill(0)
+        expired = false
         val preparation = LocalSearchPreparation(problem, emptyArray())
 
         assertNull(preparation.get(Cancellation { expired }))
