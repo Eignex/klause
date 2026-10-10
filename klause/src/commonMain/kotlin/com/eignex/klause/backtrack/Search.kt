@@ -6,7 +6,10 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.bounding.harvestRootRelaxation
+import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.propagation.Assumptions
@@ -43,11 +46,15 @@ import com.eignex.klause.solver.search.SearchRunDisposition
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchRunObserver
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.EmptyIntArray
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
 
@@ -139,7 +146,7 @@ internal class TraversalSlice(val pauses: () -> Boolean, val beforeBranch: () ->
 @Suppress("TooGenericExceptionCaught") // ownership boundaries must preserve arbitrary primary and cleanup failures
 internal class CpSatisfactionTraversal(
     private val problem: BakedProblem,
-    params: BacktrackParams,
+    private val params: BacktrackParams,
     private val sink: SolveStatsSink?,
     solveContext: LpSolveContext,
     propagationCancellation: Cancellation = params.cancellation,
@@ -174,6 +181,9 @@ internal class CpSatisfactionTraversal(
     )
     private lateinit var completion: BacktrackCompletion
     private var run: SearchRun? = null
+    private var sharedSession: SearchSession? = null
+    private var rootLp: LpFeasibilityComponent? = null
+    private var rootPrepared = false
 
     // The verdict the root reached before any search, handed out by the first [next].
     private var rootOutcome: SearchOutcome? = null
@@ -184,8 +194,11 @@ internal class CpSatisfactionTraversal(
         try {
             completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
             completion.lpResource?.let(lpResources::add)
-            val lp = if (params.lpConfig != null) {
-                LpFeasibilityComponent(problem, cp, params, sink, solveContext).also(lpResources::add)
+            val lp = if (params.lpConfig != null || params.lpPlan != LpPlan()) {
+                LpFeasibilityComponent(problem, cp, params, sink, solveContext).also {
+                    lpResources.add(it)
+                    rootLp = it
+                }
             } else {
                 null
             }
@@ -207,13 +220,9 @@ internal class CpSatisfactionTraversal(
                 } ?: EmptyIntArray
                 SearchOutcome.Exhausted(core, touched)
             } else {
-                when (session.initialize()) {
-                    ComponentResult.Consistent -> null
-                    is ComponentResult.Conflict -> SearchOutcome.Exhausted()
-                    ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
-                }
+                null
             }
-            if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
+            if (rootOutcome == null) sharedSession = session
         } catch (failure: Throwable) {
             closeAfter(failure)
             throw failure
@@ -244,6 +253,26 @@ internal class CpSatisfactionTraversal(
      */
     fun next(): SearchOutcome? {
         check(!closed) { "traversal is closed" }
+        sharedSession?.let { session ->
+            if (!rootPrepared) {
+                rootPrepared = true
+                if (rootLp?.prepareRoot() == true) rootOutcome = SearchOutcome.Exhausted()
+                cp.rebase()
+            }
+            if (rootOutcome == null) {
+                if (params.cancellation() && slice?.pauses() == true) return null
+                rootOutcome = when (session.initialize()) {
+                    ComponentResult.Consistent -> null
+                    is ComponentResult.Conflict -> SearchOutcome.Exhausted()
+                    ComponentResult.Indeterminate -> {
+                        if (slice?.pauses() == true) return null
+                        SearchOutcome.BudgetCapped
+                    }
+                }
+                if (rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
+            }
+            sharedSession = null
+        }
         rootOutcome?.let { outcome ->
             rootOutcome = null
             close()
@@ -591,23 +620,27 @@ private sealed interface BacktrackCompletion {
  * unreachable on a model with no objective, however the arm is configured.
  *
  * The engine is handed a zero objective, so the bound arms it also carries can never prune: the
- * lower bound of a zero objective is zero and the bound to beat is infinite. Only the infeasibility
- * prune fires, which is what a satisfaction node can act on.
+ * lower bound of a zero objective is zero and the bound to beat is infinite. Root cut harvesting,
+ * hull pruning and variable shaving are objective-independent; node pruning uses infeasibility.
  */
 private class LpFeasibilityComponent(
     problem: Problem,
     private val cp: CpSearchComponent,
-    params: BacktrackParams,
+    private val params: BacktrackParams,
     sink: SolveStatsSink?,
     solveContext: LpSolveContext,
 ) : LpSearchResource {
+    private var preparationToken: Cancellation? = null
+    private val cancellation = cancelledWhen({ params.cancellation.deadline() }) {
+        params.cancellation() || preparationToken?.invoke() == true
+    }
     val engine = LpEngine(
         problem,
         LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
         LpParams(
             lpPlan = params.lpPlan,
             lpConfig = params.lpConfig,
-            cancellation = params.cancellation,
+            cancellation = cancellation,
             solveBudgetMillis = params.solveBudgetMillis,
             randomSeed = params.randomSeed,
             zeroObjectivePricing = params.zeroObjectivePricing,
@@ -617,6 +650,39 @@ private class LpFeasibilityComponent(
     )
 
     val component: SearchComponent = engine.propagator.also { engine.cpAdapter.attach(cp.session, feasibility = true) }
+
+    fun prepareRoot(): Boolean {
+        val plan = engine.params.lpPlan
+        val remaining = params.cancellation.deadline()?.let {
+            (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds
+        } ?: params.solveBudgetMillis
+        val millis = remaining?.let { minOf((it * plan.rootBudgetFraction).toLong(), plan.rootBudgetMillis) }
+            ?: plan.rootBudgetMillis
+        val before = engine.totalSolveWork()
+        val token = params.cancellation or Cancellation {
+            (plan.rootMaxWork > 0L && engine.totalSolveWork() - before >= plan.rootMaxWork) ||
+                engine.lpWorkAllowanceSpent()
+        } or if (plan.rootBudgetFraction > 0.0) {
+            Cancellation.after(millis.coerceAtLeast(0L).milliseconds)
+        } else {
+            Cancellation.Never
+        }
+        preparationToken = token
+        try {
+            engine.harvestRootRelaxation(token)
+            if (plan.variableShaving) {
+                for (bound in engine.shaveVariableBounds(token)) {
+                    if (cp.session.implyIntAtLeast(bound.varId, bound.lo) is PropagationResult.Unsat ||
+                        cp.session.implyIntAtMost(bound.varId, bound.hi) is PropagationResult.Unsat
+                    ) return true
+                }
+            }
+            return false
+        } finally {
+            preparationToken = null
+            engine.cpAdapter.reset()
+        }
+    }
 
     override fun releasePersistentSolvers() = engine.releasePersistentSolvers()
 

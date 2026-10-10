@@ -48,6 +48,13 @@ solving the problem asks of klause, as `select features=true` classifies it (`In
 integers, linear reals, scheduling, routing or packing globals, other globals, MIP, SAT, MaxSAT, PB. `sweep` includes every focused set. A set changes only on purpose,
 and a material change takes a new name, so results under one name stay comparable.
 
+The `miplib2017-csp` suite strips MPS free (`N`) rows and their column/RHS/range
+references. Constraint coefficients, ranged sides, column bounds and integrality
+remain source-identical. Objective-only columns retain zero coefficients in a
+constraint row; a model without any constraint uses a zero equality. Derived
+inputs are content-addressed in the external corpus cache and have a separate
+reference namespace, source hash and feasibility semantics.
+
 ## Filters
 
 | filter | meaning |

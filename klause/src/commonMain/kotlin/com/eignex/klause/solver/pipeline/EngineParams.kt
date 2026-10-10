@@ -152,7 +152,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-bound-max-pivots", "lp-adaptive-work",
-    "lp-branching",
+    "lp-branching", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
     "pb-learning", "pb-objective-cutoff",
     "objective-guided-values",
     "var-selector", "val-selector",
@@ -197,6 +197,9 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
     val lpBoundMaxPivots = p.int("lp-bound-max-pivots")
     val lpAdaptiveWork = p.bool("lp-adaptive-work")
     val lpBranching = p.bool("lp-branching")
+    val lpVariableShaving = p.bool("lp-variable-shaving")
+    val lpPruneHulls = p.bool("lp-prune-hulls")
+    val lpRootCuts = p.bool("lp-root-cuts")
     val pbLearning = p.bool("pb-learning")
     val pbObjectiveCutoff = p.bool("pb-objective-cutoff")
     val objectiveGuidedValues = p.bool("objective-guided-values")
@@ -206,7 +209,7 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         subsumption, subsumeBatch, inprocessingCadence,
-        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, pbLearning,
+        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff,
         objectiveGuidedValues,
     )
@@ -238,6 +241,9 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
         lpBoundMaxPivots?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundMaxPivots = it)) }
         lpAdaptiveWork?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundAdaptiveWork = it)) }
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }
+        lpVariableShaving?.let { out = out.copy(lpPlan = out.lpPlan.copy(variableShaving = it)) }
+        lpPruneHulls?.let { out = out.copy(lpPlan = out.lpPlan.copy(pruneHulls = it)) }
+        lpRootCuts?.let { out = out.copy(lpPlan = out.lpPlan.copy(rootCutHarvest = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
         pbObjectiveCutoff?.let { out = out.copy(pbObjectiveCutoff = it) }
         objectiveGuidedValues?.let { out = out.copy(objectiveGuidedValues = it) }
