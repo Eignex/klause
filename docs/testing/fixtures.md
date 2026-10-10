@@ -99,3 +99,13 @@ The witness in half-pennies is `(2,4,6)`, `(2,3,10)`, `(1,8,9)`, `(1,6,14)`,
 bound with direct arithmetic; the dyadic values are exactly representable in
 binary64. The MIT copyright/permission notice remains in the fixture
 [README](../../klause/src/jvmTest/resources/flatzinc/README.md).
+
+[voltage_divider.fzn](../../klause-bench/src/test/resources/flatzinc/voltage_divider.fzn)
+is Hakan Kjellerstrand's `minizinc/voltage_divider/voltage_divider.mzn` from the
+Hakank corpus, compiled with MiniZinc 2.9.7 and Klause's globals library. Local-path
+comments were removed. All 15 original flattened predicates and six scalar range
+bounds remain. The test checks exact witness coordinates without solver lowering.
+Source SHA-256 is
+`ab64d949341580bf5ea6c556e6d708b2285f40593f0de49b881f15869aa4d88e`;
+fixture SHA-256 is
+`854bae066abe5ad5c3e7b32e0ff92bc878e52963105dbe29704a9aabd313a1a7`.

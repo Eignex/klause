@@ -52,6 +52,13 @@ for continuous objectives. It declines unsupported float operations and expansio
 above the alternative limit. Arithmetic overflow during lowering also declines
 with a diagnostic.
 
+Authoritative rational witness coordinates are emitted as `% klause-exact:`
+comments while standard assignments retain MiniZinc-compatible decimal rendering.
+The benchmark's independent checker reads the original FlatZinc text, interpreting
+float literals as binary64 rationals and checking exact coordinates without rounding.
+Its `flatzinc-binary64` scope is distinct from pinning original MiniZinc source;
+it does not change the policy for compiler-rounded bounds or relax constraints.
+
 See [FlatZincFloatPolicy](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincFloatPolicy.kt)
 and [FlatZincIntegerFloatImages](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincIntegerFloatImages.kt).
 

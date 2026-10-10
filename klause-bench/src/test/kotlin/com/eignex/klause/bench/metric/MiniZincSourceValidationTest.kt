@@ -67,4 +67,25 @@ class MiniZincSourceValidationTest {
             assertEquals("unknown", MiniZincSourceValidation.inspect(fzn, null).status)
         }
     }
+    @Test
+    fun `retained witness keeps exact coordinates only from the last complete solution`() {
+        val raw = "x = 0.5;\n% klause-exact: x = 1/2;\n----------\nx = 0.3333333333333333;\n% klause-exact: x = 1/3;\n----------\nx = 0.25;\n% klause-exact: x = 1/4;"
+
+        assertEquals("x = 1/3;", MiniZincSourceValidation.exactCoordinates(raw))
+        assertEquals("x = 0.3333333333333333;\n% klause-exact: x = 1/3;", MiniZincSourceValidation.retainedWitness(raw))
+    }
+
+    @Test
+    fun `pinned integer objective remains exact above binary64 consecutive integers`() {
+        val fzn = "var 9007199254740993..9007199254740993: z; solve minimize z;"
+
+        assertEquals("valid", MiniZincSourceValidation.inspect(fzn, null, "9007199254740993").status)
+        assertEquals("invalid", MiniZincSourceValidation.inspect(fzn, null, "9007199254740992").status)
+    }
+    @Test
+    fun `optimization checking without a reported objective remains unknown`() {
+        val fzn = "var 1..1: z; solve minimize z;"
+
+        assertEquals("unknown", MiniZincSourceValidation.inspect(fzn, null).status)
+    }
 }

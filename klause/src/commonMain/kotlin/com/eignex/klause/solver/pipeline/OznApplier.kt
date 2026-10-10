@@ -15,13 +15,18 @@ class OznApplier(oznSource: String) {
 
     /** Render one solution block ending with `----------\n`. */
     fun render(program: FlatZincProgram, sample: Sample): String {
-        val bindings = extractBindings(program, FlatZincValues(sample))
-        return evaluator.render(bindings)
+        return renderValues(program, FlatZincValues(sample))
     }
 
     /** Render an open-theory witness through the output model. */
     fun render(program: FlatZincProgram, assignment: OpenTheoryAssignment): String =
-        evaluator.render(extractBindings(program, FlatZincValues(assignment)))
+        renderValues(program, FlatZincValues(assignment))
+
+    private fun renderValues(program: FlatZincProgram, sample: FlatZincValues): String {
+        val rendered = evaluator.render(extractBindings(program, sample))
+        val coordinates = writeFlatZincExactCoordinates(program, sample)
+        return rendered.removeSuffix("----------\n") + coordinates + "----------\n"
+    }
 
     private fun extractBindings(program: FlatZincProgram, sample: FlatZincValues): Map<String, OznValue> {
         val out = HashMap<String, OznValue>()

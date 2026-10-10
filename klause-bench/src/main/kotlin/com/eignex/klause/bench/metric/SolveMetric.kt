@@ -360,11 +360,16 @@ internal object SolveMetric {
                 )
             val checked = if (checkSource) {
                 val validation = if (r.feasible == true) {
-                    MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective)
+                    MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective, r.exactObjective)
                 } else {
                     SourceValidation("unknown", "no feasible candidate to check")
                 }
-                reported.sourceChecked(validation, entry.floatApproximation)
+                val boundValidation = if (validation.sourceHashes.isNotEmpty() && validation.sourceHashes != reported.sourceHashes) {
+                    SourceValidation("unknown", "validation source hashes differ from solve record", reported.sourceHashes)
+                } else {
+                    validation
+                }
+                reported.sourceChecked(boundValidation, entry.floatApproximation)
             } else {
                 reported
             }

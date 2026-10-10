@@ -190,11 +190,30 @@ proof: those checks use the original unrelaxed constraints and exact objective.
 Run the verifier's regression tests with the pinned dependencies in
 [`requirements-source-checks.txt`](../klause-bench/tools/requirements-source-checks.txt).
 
-MiniZinc float runs pin the final DZN candidate into the original source and
-recompile with MiniZinc's standard library and the same data seed. `sourceValidation`
-is `valid`, `invalid` or `unknown`; `floatApproximation` records the lowering policy.
-Residual constraints/variables, compiler failure or the ten-second checking timeout
-leave validation unknown. Checking is outside the solve budget.
+MiniZinc float runs independently check the final complete witness. Integer runs
+can request the same check with `param=source-validation=true`. The compiler cache
+retains paired FlatZinc and DZN `.ozn` mappings, keyed by model/data and solver-library
+contents. Compiler-introduced outputs are reconstructed through MiniZinc's output
+model before pinning source variables and recompiling with its standard library
+and the same data seed. The pinned source objective is compared exactly.
+
+Certified FlatZinc witnesses retain `% klause-exact: name = value;` comments alongside
+standard decimal assignments and separators. Values come from authoritative
+`Sample` or open-theory coordinates without a binary64 round trip. Saved
+`finalWitness` includes these comments; an exact objective comment overrides its
+decimal display in `exactObjective`.
+
+`sourceValidation` is `valid`, `invalid` or `unknown`. `sourceValidationScope` is
+`minizinc-source` for source pinning, or `flatzinc-binary64` for the independent
+text checker over the original flattened declarations and predicates. The latter
+interprets source float literals as exact binary64 rationals, matching FlatZinc
+lowering, and checks authoritative rational coordinates against every supported
+predicate and bound. It does not establish decimal-rational MiniZinc semantics.
+`floatApproximation` records the lowering policy. Unsupported syntax/predicates,
+missing coordinates, residual source constraints, compiler failure or the ten-second
+external checking timeout leave validation unknown. Checking is outside the solve
+budget; model/data hashes must match the record and remain stable during validation.
+The validation-policy version prevents reuse of older checking results.
 
 Rejected candidates and unchecked grid witnesses receive no solution credit.
 A checked grid witness establishes source feasibility, but a grid optimum or

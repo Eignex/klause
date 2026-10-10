@@ -27,11 +27,13 @@ internal class FlatZincValues(
     val boolValue: (Int) -> Boolean,
     val intValue: (Int) -> String,
     val realValue: (Int) -> Double,
+    val exactRealValue: (Int) -> String?,
 ) {
     constructor(sample: Sample) : this(
         { sample.bools[it] },
-        { sample.ints[it].toString() },
+        { sample.exactIntValue(it).toString() },
         { sample.approximateRealValue(it) },
+        { sample.exactReals?.get(it)?.toString() },
     )
 
     constructor(assignment: OpenTheoryAssignment) : this(
@@ -44,6 +46,7 @@ internal class FlatZincValues(
                 if (parts.size == 1) BIG_ONE else parseBigInt(parts[1]),
             ).toDouble()
         },
+        assignment::realValue,
     )
 
     fun floatValue(b: FloatBucketing): Double =
@@ -82,7 +85,40 @@ private fun writeFlatZincSolution(program: FlatZincProgram, sample: FlatZincValu
     if (outputObjective) {
         objectiveVarName(program.solve)?.let { sb.append("_objective = ${renderScalar(program, sample, it)};\n") }
     }
+    sb.append(writeFlatZincExactCoordinates(program, sample, outputObjective))
     sb.append("----------\n")
+    return sb.toString()
+}
+
+internal fun writeFlatZincExactCoordinates(
+    program: FlatZincProgram,
+    sample: FlatZincValues,
+    outputObjective: Boolean = false,
+): String {
+    val sb = StringBuilder()
+    if (program.floatVarsByName.values.any { it.lpOnly } &&
+        program.floatVarsByName.values.all { it.lpOnly && sample.exactRealValue(it.varId) != null }
+    ) {
+        for ((name, id) in program.boolVarsByName) {
+            sb.append("% klause-exact: $name = ${sample.boolValue(id)};\n")
+        }
+        for ((name, id) in program.intVarsByName) {
+            if (name !in program.floatVarsByName) {
+                sb.append("% klause-exact: $name = ${sample.intValue(id)};\n")
+            }
+        }
+        for ((name, b) in program.floatVarsByName) {
+            val value = sample.exactRealValue(b.varId)
+            sb.append("% klause-exact: $name = $value;\n")
+        }
+        if (outputObjective) {
+            objectiveVarName(program.solve)?.let { name ->
+                val b = program.floatVarsByName[name]
+                val value = if (b?.lpOnly == true) sample.exactRealValue(b.varId) else renderScalar(program, sample, name)
+                sb.append("% klause-exact: _objective = $value;\n")
+            }
+        }
+    }
     return sb.toString()
 }
 

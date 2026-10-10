@@ -17,6 +17,15 @@ import kotlin.test.assertTrue
 class SolverInvocationTest {
 
     @Test
+    fun `exact FlatZinc objective comments override decimal display`() {
+        val lines = "_objective = 0.3333333333333333;\n% klause-exact: _objective = 1/3;\n----------"
+
+        val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"), SolverInvocation.Dialect.MINIZINC)
+
+        assertEquals("1/3", result.exactObjective)
+    }
+
+    @Test
     fun `portfolio diagnostics survive protocol parsing`() {
         val diagnostic = """{"armId":7,"phase":"slice","message":"row \"R\"\u000aarm failure"}"""
         for (dialect in SolverInvocation.Dialect.entries) {
