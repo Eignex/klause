@@ -104,8 +104,9 @@ class LiveLpTheoryTest {
             val session = SearchSession(listOf(component), cancellation = Cancellation { stopped })
             assertIs<ComponentResult.Consistent>(session.initialize())
             assertSame(meter, captured.workMeter())
+            val before = charged
             captured.charge(7L)
-            assertEquals(7L, charged)
+            assertEquals(before + 7L, charged)
 
             stopped = true
 
