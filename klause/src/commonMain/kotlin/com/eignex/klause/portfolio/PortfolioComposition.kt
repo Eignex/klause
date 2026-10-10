@@ -44,7 +44,7 @@ enum class EngineMix {
  * A point in the portfolio configuration space. Its axes are **cores** (compute width) and **arms**
  * (pool size) — kept separate so they don't conflate — plus **kind** (COP vs CSP) and
  * **engine** (LS / backtrack / mixed). [PortfolioComposition.compose] turns a scenario into an ordered
- * arm list of size [arms], and [PortfolioBuilder.build] materialises it into runnable
+ * list of configured and applicable auxiliary arms, and [PortfolioBuilder.build] materialises it into runnable
  * [PortfolioWorker]s — so every scenario flows through one construction path.
  *
  * [cores] is the number of lanes a [Portfolio] schedules the [arms] arms on, one segment at a time per lane.
@@ -59,7 +59,7 @@ enum class EngineMix {
 data class PortfolioScenario(
     /** Compute width. `1` selects the single-core sequential executor; `> 1` the parallel one. */
     val cores: Int,
-    /** Pool size — how many distinct arms [PortfolioComposition.compose] produces. Independent of
+    /** Configured pool size, before applicable auxiliary arms. Independent of
      *  [cores]: when `arms < cores` a parallel track replicates the composed arms across the extra
      *  lanes (with distinct seeds); when `arms >= cores` every lane is a distinct composed arm. */
     val arms: Int,
@@ -212,8 +212,8 @@ internal object PortfolioComposition {
     }
 
     /**
-     * The ordered arm list for [scenario]: [PortfolioScenario.arms] arms, and a hybrid-ALNS arm beside them in a
-     * scheduled mixed optimization pool. The curated pools keep only
+     * The ordered arm list for [scenario]: [PortfolioScenario.arms] arms, with applicable hybrid-ALNS and
+     * continuous-row LP arms beside a curated sequential mixed optimization pool. The curated pools keep only
      * the arms the model behind [facts] offers the needs of. A pool the caller chose outright — an injected one, or
      * a single-engine mix — is built as asked, so a model it cannot run is declined rather than replaced.
      */
@@ -338,6 +338,18 @@ internal object PortfolioComposition {
             arms += backtrack
         }
         if (alns) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
+        if (scenario.cores == 1 && scenario.kind == Kind.COP && count >= PortfolioScenario.DEFAULT_ARMS &&
+            scenario.lsPool == null && scenario.btPool == null && facts.profile.realColumns &&
+            arms.none { it.label == "lp-default" }
+        ) {
+            // Appending retains the incumbent cores and every existing worker's seed position.
+            BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-default" }?.let { recipe ->
+                arms += BacktrackWorkerConfig(
+                    recipe.editing(scenario.btEdit).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+                    scenario.zeroObjectivePricing,
+                )
+            }
+        }
         return arms
     }
 }

@@ -339,10 +339,12 @@ continuous-column capability determine which arms run; unsupported local-search
 arms are filtered from mixed pools while local-search-only requests retain their
 own behavior.
 
-Continuous-column optimization models rank the default LP backtrack arm immediately after the
-SAT guard. The default six-arm mixed optimization pool therefore admits node LP
-in its two backtrack slots while retaining four local-search slots. LP ceilings
-and explicit arm pools continue to control admission and techniques. Curated
+Continuous-column optimization models rank the default LP backtrack arm after the
+SAT guard and conflict-driven core. A curated sequential mixed optimization pool
+with at least six configured slots appends an applicable default LP arm when its
+configured backtrack slots have not admitted it. The appended arm follows the
+configured workers and auxiliary ALNS arm, retaining their positions and seeds.
+LP ceilings and explicit arm pools control admission and techniques. Curated
 single-core mixed optimization reserves half the scheduled time for this LP arm
 on continuous-column models. Individual segments retain work charging and time
 caps; the remaining time follows the bandit. Explicit backtrack pools and parallel
