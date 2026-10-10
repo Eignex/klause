@@ -94,15 +94,30 @@ internal class LocalSearchEngine(
 
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 configuredRestart.restart(state, bestSoFar)
-                if (seedImplicitOnRestart) state.seedImplicitFeasible()
-                definitionalSweep?.sweep(
-                    state.assignment,
-                    state.rootDomains,
-                    problem.factors,
-                ) { state.assumptions.isFrozenBool(it) }
+                prepareAssignment(state)
                 state.recompute()
             }
         }
+    }
+
+    private fun prepareAssignment(state: LocalSearchState) {
+        if (seedImplicitOnRestart) state.seedImplicitFeasible()
+        definitionalSweep?.sweep(state.assignment, state.rootDomains, problem.factors) {
+            state.assumptions.isFrozenBool(it)
+        }
+    }
+
+    private fun initialRestart(state: LocalSearchState) {
+        // These reset policies start from an unanchored random draw; scoring before the sweep is redundant.
+        val randomDraw = configuredRestart is FixedCadenceRestart || configuredRestart is AdaptivePerturbationRestart ||
+            configuredRestart is IteratedLocalSearchRestart || configuredRestart is StagnationRestart
+        if (!randomDraw || (definitionalSweep == null && !seedImplicitOnRestart)) {
+            restarts.restart(state, bestSoFar = null)
+            return
+        }
+        state.randomizeAssignment()
+        prepareAssignment(state)
+        state.recompute()
     }
 
     private fun installInvariants(state: LocalSearchState) {
@@ -933,7 +948,7 @@ internal class LocalSearchEngine(
                 state.recompute()
             }
         } else {
-            restarts.restart(state, bestSoFar = null)
+            initialRestart(state)
         }
         // Greedy-repair is gated on problem size: on tiny problems LS reaches feasibility in
         // microseconds and the repair pass is pure overhead. Skip it on a warm start: the seed is
@@ -969,7 +984,7 @@ internal class LocalSearchEngine(
         // around — pass null so policies that need a sample fall back to a fresh
         // random restart.
         val seeded = params.initialAssignment?.let { seedFrom(state, it) } ?: false
-        if (!seeded) restarts.restart(state, bestSoFar = null)
+        if (!seeded) initialRestart(state)
         return state
     }
 

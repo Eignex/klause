@@ -210,6 +210,11 @@ class LocalSearchState(
 
     /** Reset to a fresh random assignment and reinitialise all factors. */
     fun restart() {
+        randomizeAssignment()
+        recompute()
+    }
+
+    internal fun randomizeAssignment() {
         assignment.randomize(rng, rootDomains)
         if (model.anchoredSampling) {
             for (v in rootDomains.indices) assignment.setInt(v, anchoredValue(rootDomains[v], rootDomains[v].clamp(0L)))
@@ -221,7 +226,6 @@ class LocalSearchState(
         assumptions.forEachInt { id, value -> assignment.setInt(id, value) }
         for (r in 0 until problem.numRealVars) assignment.setReal(r, startingReal(r))
         resetStepCounters()
-        recompute()
     }
 
     /** Set the continuous columns to [sample]'s values when it carries one per column, else to their starting

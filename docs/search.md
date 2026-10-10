@@ -98,6 +98,9 @@ Mixed-pool arms over the same model share it, including ALNS's inner local searc
 Objective-bound overlays keep their own projections. Assignments, RNGs, weights and
 invariant payloads belong to each live state. Projection construction, seeding,
 factor calls and repair searches remain atomic work that can overrun a segment.
+Built-in initial random restarts apply implicit seeding and the definition sweep
+before initializing factor costs, avoiding an evaluation of the intermediate
+random assignment. Custom restart policies retain their ordinary restart protocol.
 ALNS skips its local-search fallback when the complete-engine bootstrap returns
 without an incumbent after cancellation, avoiding fresh seeding after the deadline.
 
