@@ -12,9 +12,8 @@ import com.eignex.klause.util.WorkMeter
  * [remaining] closes that gap, and [slice] turns it into a per-pass stop.
  *
  * The allowance is counted in deterministic work units that each pass [charge]s where it polls its
- * cancellation, never in elapsed time. A clock-backed budget made what presolve did, and so which route
- * a model took, depend on how loaded the machine was; a charged one gives the same model and flags the
- * same reductions on every run. The tokens [slice] and [orSpent] hand out carry this budget as their
+ * cancellation. Elapsed cancellation supplied by callers can stop a pass before its work allowance
+ * is spent. The tokens [slice] and [orSpent] hand out carry this budget as their
  * [Cancellation.workMeter], so work charged through them lands here without the budget being threaded
  * beside the token.
  *
