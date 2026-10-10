@@ -104,11 +104,10 @@ internal class ExactLraPropagation(
                         val upper = coefficient.signum() > 0
                         if (column >= model.numRealVars) {
                             bound = if (upper) {
-                                (bound.floor() - if (strict && bound.isInteger()) BIG_ONE else BIG_ZERO)
+                                (bound.negated().ceilInteger().negate() - if (strict && bound.den == BIG_ONE) BIG_ONE else BIG_ZERO)
                                     .asFraction()
                             } else {
-                                (bound.negated().floor().negate() +
-                                    if (strict && bound.isInteger()) BIG_ONE else BIG_ZERO).asFraction()
+                                (bound.ceilInteger() + if (strict && bound.den == BIG_ONE) BIG_ONE else BIG_ZERO).asFraction()
                             }
                             strict = false
                         }
