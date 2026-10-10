@@ -494,6 +494,7 @@ class InvariantNetwork internal constructor(
     private val definedInt = BooleanArray(numIntVars)
     private val definedBool = BooleanArray(numBoolVars)
     private val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
+    private val extremumRepairs = BooleanArray(numIntVars)
 
     /** Node indexes reading each int var. */
     private val intReaders: Array<IntArray>
@@ -506,7 +507,10 @@ class InvariantNetwork internal constructor(
             val n = nodeArr[i]
             if (n.outIsBool) definedBool[n.out] = true else definedInt[n.out] = true
             val intDef = n as? DefinitionalSweep.SweepNode.IntDef
-            if (intDef?.inverseRepair == true) intDefinitions.put(n.out, intDef.node)
+            if (intDef != null) {
+                intDefinitions.put(n.out, intDef.node)
+                extremumRepairs[n.out] = intDef.inverseRepair
+            }
         }
         intReaders = readers(numIntVars) { it.intInputs }
         boolReaders = readers(numBoolVars) { it.boolInputs }
@@ -531,6 +535,8 @@ class InvariantNetwork internal constructor(
     fun isDefinedBool(v: Int): Boolean = definedBool[v]
 
     internal fun intDefinition(v: Int): FunctionalObjective.Node? = intDefinitions[v]
+
+    internal fun hasExtremumRepair(v: Int): Boolean = extremumRepairs[v]
 
     internal fun readsInt(v: Int): Boolean = intReaders[v].isNotEmpty()
 

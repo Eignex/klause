@@ -197,7 +197,8 @@ definitions and cyclic cones remain searched; independent constraints on a defin
 still contribute violations. Evaluation clips values to root domains and preserves pinned
 outputs during seeding and moves. Repair proposals into these cones backsolve affine rows
 and extrema into admissible searched inputs, respecting domains, pins and implicit owners.
-Shared-input repairs are checked against the complete maintained cone before publication.
+Non-witness operands receive the required bound, allowing domain gaps and affine rounding.
+Shared-input repairs recompute every affected definition before checking the complete maintained cone.
 Element matching-cell indexes and range endpoints use Long arithmetic, including offsets
 whose valid array indexes cross the Int boundary. Matching-cell scans skip unreachable
 inverse targets until an admissible index repair is found.
