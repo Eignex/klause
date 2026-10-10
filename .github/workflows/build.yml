@@ -60,6 +60,10 @@ jobs:
           path: |
             klause/build/reports/tests/
             klause/build/test-results/
+            klause-cli/build/reports/tests/
+            klause-cli/build/test-results/
+            klause-bench/build/reports/tests/
+            klause-bench/build/test-results/
           if-no-files-found: ignore
 
       - name: Upload results to Codecov (main only)
