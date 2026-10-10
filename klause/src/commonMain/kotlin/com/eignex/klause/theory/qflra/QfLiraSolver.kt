@@ -189,6 +189,9 @@ class ExactLiraSearchComponent(
 
     internal fun observeWith(stats: SmtStatsSink) {
         smtStats = stats
+        stats.diagnosticCounters = {
+            if (equalitiesDelegate.isInitialized()) equalities.printDiagnosticCounters()
+        }
     }
 
     init {
@@ -252,7 +255,6 @@ class ExactLiraSearchComponent(
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) = lp.onRestart(context)
     override fun close() {
-        if (equalitiesDelegate.isInitialized()) equalities.printDiagnosticCounters()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
     }
 
