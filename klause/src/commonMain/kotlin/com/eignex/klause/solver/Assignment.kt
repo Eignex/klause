@@ -79,6 +79,15 @@ class Assignment(
         ints = ints.copyOf(),
         reals = if (numRealVars == 0) EmptyDoubleArray else reals.copyOf(),
     )
+
+    internal fun copyInto(target: Assignment) {
+        require(
+            numBoolVars == target.numBoolVars && numIntVars == target.numIntVars && numRealVars == target.numRealVars,
+        )
+        target.bits.copyFrom(bits)
+        ints.copyInto(target.ints)
+        reals.copyInto(target.reals)
+    }
 }
 
 /** Assignment snapshot yielded by the solver. [exactInts] and [exactReals] are authoritative when present. */

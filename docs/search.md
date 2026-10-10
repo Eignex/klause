@@ -170,6 +170,10 @@ Boolean break/make vectors initialize on their first score query and are maintai
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Weighted compound probes snapshot and scan only factors whose degrees change, in
 factor-id order to retain the full-scan floating-point accumulation order.
+Optimization retains its best infeasible restart anchor as a private packed assignment.
+Strict cost improvements copy into that storage; a restart materializes an independent
+sample only when no feasible incumbent supersedes the anchor. Published samples and
+samples retained by custom restart policies remain independent of subsequent updates.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.

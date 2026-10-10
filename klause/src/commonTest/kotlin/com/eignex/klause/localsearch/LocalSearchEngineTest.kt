@@ -9,6 +9,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.strategy.FeasibleDescent
+import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -25,6 +27,42 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+
+    @Test
+    fun `custom restarts retain independent best infeasible anchors`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 3)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+        )
+        val anchors = mutableListOf<Sample>()
+        val restart = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 2
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                if (bestSoFar != null) anchors += bestSoFar
+                state.assignment.setInt(0, 0)
+                state.recompute()
+            }
+        }
+        var picks = 0
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(),
+            perturbation = { Move.IntSet(0, longArrayOf(1, 0, 2, 0)[picks++]) },
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy,
+            restartPolicy = restart, greedyRepairOnRestart = false,
+        )
+
+        search.resumable(
+            LinearObjective(intCoefficients = longArrayOf(1)),
+            LocalSearchParams(maxFlips = 6L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0))),
+        ).use { handle ->
+            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+        }
+
+        assertEquals(listOf(Sample(BooleanArray(0), longArrayOf(1)), Sample(BooleanArray(0), longArrayOf(2))), anchors)
+    }
 
     @Test
     fun `satisfaction resumes after projection preparation expires`() {
