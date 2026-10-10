@@ -56,7 +56,7 @@ polls can exceed a deadline. Probe-call caps do not establish a wall-clock bound
 ## Phase allowance and telemetry
 
 [PresolveBudget](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveBudget.kt)
-owns the phase's deterministic allowance. Its tokens carry the budget as their
+owns the phase's deterministic work allowance. Its tokens carry the budget as their
 work meter, so explicit `Cancellation.charge` calls reduce the original allowance.
 Rebuilding a problem does not create another allowance or reset consumed work.
 
@@ -82,3 +82,11 @@ at-most-one cliques into cardinalities. This preserves native SAT propagation an
 learning and avoids repeated clique preparation. An explicit `+amo-clique` or
 aggressive emphasis permits conversion; nonclausal models and feasibility queries
 keep their configured clique policy.
+
+The CLI pairs its work allowance with a shared elapsed-time ceiling of the same
+derived duration. Routing and source/finite preparation retain that ceiling
+without restarting it. Either limit can stop optional passes; partial reductions
+remain sound, but elapsed cancellation can change the deductions and selected route
+with host speed. The solve-wide deadline still applies, and mandatory construction
+and work between cancellation polls can overrun the preparation ceiling. An explicit
+nonpositive presolve budget disables both phase limits.

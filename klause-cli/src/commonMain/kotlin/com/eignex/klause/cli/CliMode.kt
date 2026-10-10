@@ -24,6 +24,7 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration.Companion.milliseconds
 
 /*
  * Generic multi-mode CLI framework.
@@ -48,8 +49,7 @@ import com.eignex.klause.util.Cancellation
  * [com.eignex.klause.solver.pipeline.pipelineRoute] runs to decide which lane owns an open model.
  *
  * A slice of the shared presolve work allowance, stopped as well by the run's own deadline, so proving a
- * bound can never consume the run it was supposed to route. Counted in work rather than time, so a model
- * takes the same route however loaded the machine is.
+ * bound leaves time for search. The work allowance and elapsed ceiling both apply to routing.
  *
  * Consumes `open-bound-proof` from [CommonOptions.engineParams] once and retains the same token if a
  * frontend asks again. A route cannot restart its slice or change a disabled proof into an enabled one.
@@ -58,15 +58,14 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
     routingToken?.let { return it }
     if (!takeOpenBoundProof()) return Cancellation { true }.also { routingToken = it }
     val solveStop = Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
-    val token = sharedPresolveBudget()?.let { routingSlice(it, solveStop) } ?: solveStop
+    val token = sharedPresolveBudget()?.let { routingSlice(it, presolveTimeCancellation or solveStop) } ?: solveStop
     routingToken = token
     return token
 }
 
 /**
- * The lane routing chose under `-v`, beside the time it took and the work its bound proof charged. The
- * lane and the work are functions of the model and flags alone, so two runs of one model agree on them
- * however loaded the machine was; the time is what relates the work unit to the clock.
+ * The lane routing chose under `-v`, beside the time it took and the work its bound proof charged. The elapsed
+ * ceiling can stop routing before its work allowance is exhausted.
  */
 internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) {
     cliLogger(verbose).v {
@@ -87,8 +86,8 @@ internal fun routingSlice(budget: PresolveBudget, solveStop: Cancellation): Canc
 /**
  * One work allowance for routing and the source preparation that follows it, or `null` when the cap is
  * disabled. The milliseconds [SolveCore.derivedPresolveBudgetMs] derives from `-t` are converted at
- * [CliKnobs.PRESOLVE_WORK_PER_MS], so `-t` still scales the phase while the phase itself never reads a
- * clock.
+ * [CliKnobs.PRESOLVE_WORK_PER_MS], so `-t` scales deterministic effort. A shared elapsed ceiling stops preparation
+ * when the work calibration underestimates its cost.
  */
 internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
     if (!presolveAllowanceInitialized) {
@@ -97,6 +96,7 @@ internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
             ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION
         val budgetMs = explicit ?: SolveCore.derivedPresolveBudgetMs(timeLimitMs, fraction)
         presolveBudget = if (budgetMs <= 0L) null else PresolveBudget(presolveWorkFor(budgetMs))
+        presolveTimeCancellation = if (budgetMs <= 0L) Cancellation.Never else Cancellation.after(budgetMs.milliseconds)
         presolveAllowanceInitialized = true
     }
     return presolveBudget
@@ -155,6 +155,7 @@ internal class CommonOptions {
     /** Null also represents an explicitly disabled cap, so initialization is tracked separately. */
     internal var presolveAllowanceInitialized = false
     internal var presolveBudget: PresolveBudget? = null
+    internal var presolveTimeCancellation: Cancellation = Cancellation.Never
     internal var routingToken: Cancellation? = null
 
     /** Wall time (ms) the front-end load took — parse + construction-time bake — set by the driver

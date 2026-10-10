@@ -22,7 +22,7 @@ internal object CliKnobs {
      *  / `KLAUSE_PRESOLVE_BUDGET_MS`. Converted to work units at [PRESOLVE_WORK_PER_MS]; the presolve
      *  round engine and its long-running passes charge their work against it and bail with the reductions
      *  made so far, so a pathologically large model can't spend unbounded effort in presolve. `0` or
-     *  negative disables the cap. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
+     *  negative disables both the work and elapsed phase caps. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
     val presolveBudgetMs by propertyKnob()
 
     /** Share of the solve budget presolve may spend: `klause.presolve.budget.fraction` /
