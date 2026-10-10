@@ -29,7 +29,7 @@ internal object Compiler {
         val unboundedIntHi: Long,
         val strictBounds: Boolean,
         private val settings: ProblemSettings = ProblemSettings(),
-        internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(),
+        internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(workLimit = 0),
     ) :
         CnfLowering {
         internal val boolNames = HashMap<String, Int>()
