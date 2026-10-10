@@ -65,7 +65,7 @@ internal class TheoryCompletion(private val model: Problem, private val params: 
         return model.withFactors(model.factors + pins, mask)
     }
 
-    private companion object {
+    companion object {
         // An exact witness value as the theory prints it: an integer or `numerator/denominator`.
         fun parseRational(text: String): BigFraction {
             val parts = text.split('/')

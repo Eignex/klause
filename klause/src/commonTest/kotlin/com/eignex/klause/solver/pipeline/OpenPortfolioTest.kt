@@ -118,6 +118,30 @@ class OpenPortfolioTest {
     }
 
     @Test
+    fun `the portfolio returns all exact coordinates of a mixed satisfying witness`() {
+        val wide = parseBigInt("9223372036854775808")
+        val integerModel = openColumns(1, Linear(intArrayOf(0), arrayOf(BIG_ONE), LinearOp.EQ, wide))
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = integerModel.intBounds,
+            factors = integerModel.factors + Linear(
+                intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0,
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val request = OpenTheoryRequest(model, componentPlan = model.componentPlan())
+
+        val result = satisfied(OpenTheoryPipeline.executePortfolio(request, params()))
+
+        val sat = assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals(wide.toString(), sat.assignment.intValue(0))
+        assertEquals("1/3", sat.assignment.realValue(0))
+        assertTrue(sat.stats.portfolio.arms.isNotEmpty())
+    }
+
+    @Test
     fun `local search bounds the optimum of an open model no theory decides`() {
         val model = openColumns(
             3,
