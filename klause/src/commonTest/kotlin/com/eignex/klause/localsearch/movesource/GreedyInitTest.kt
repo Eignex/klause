@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.Move
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -50,5 +51,25 @@ class GreedyInitTest {
         GreedyInit().run(state) { true }
 
         assertEquals(listOf(0L, 0L), listOf(state.assignment.intValue(0), state.assignment.intValue(1)))
+    }
+
+    @Test
+    fun `cancellation after a coordinate keeps its repair and skips the next coordinate`() {
+        val state = freshState(problem(), 7L)
+        var checks = 0
+
+        GreedyInit().run(state) { ++checks > 1 }
+
+        assertEquals(1L, state.cost)
+    }
+
+    @Test
+    fun `a cancelled pass clears repair activity before the search resumes`() {
+        val state = freshState(problem(), 7L)
+        state.apply(Move.IntSet(0, 1L))
+
+        GreedyInit().run(state) { true }
+
+        assertEquals(0L, state.step)
     }
 }
