@@ -13,6 +13,7 @@ import com.eignex.klause.lp.asFraction
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
+import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -31,6 +32,7 @@ import com.eignex.klause.util.plus
 internal class ExactLraPropagation(
     private val model: Problem,
     private val lp: LpPropagator,
+    private val system: LiveQfLraSystem,
     forms: List<List<ExactRowForm>>,
 ) {
     private val rows = model.factors.flatMapIndexed { factorIndex, factor ->
@@ -40,24 +42,53 @@ internal class ExactLraPropagation(
             }
         }
     }
+    private val queue = ArrayDeque<Int>().apply { addAll(rows.indices) }
+    private val queued = BooleanArray(rows.size) { true }
+    private val columnReaders = Array(requireNotNull(lp.state).model.numVars) { ArrayList<Int>() }.also { readers ->
+        rows.forEachIndexed { index, row ->
+            val comparison = row.form.comparison(true) { false }
+            for (column in comparison.terms.keys) readers[column] += index
+            system.termColumn(comparison)?.let { readers[it] += index }
+        }
+    }
+    private val booleanReaders = Array(model.numBoolVars) { ArrayList<Int>() }.also { readers ->
+        rows.forEachIndexed { index, row -> for (variable in row.variables) readers[variable] += index }
+    }
+    private val lower = arrayOfNulls<LpBoundAssertion>(columnReaders.size)
+    private val upper = arrayOfNulls<LpBoundAssertion>(columnReaders.size)
+    private val booleans = arrayOfNulls<Boolean>(model.numBoolVars)
     var implied = false
         private set
 
     fun propagate(context: SearchContext, stop: Cancellation): ComponentResult {
         implied = false
         // Interval narrowing may converge only asymptotically on real rows. The LP remains the complete check.
-        repeat(4) {
-            var changed = false
-            for ((row, form, variables) in rows) {
+        for (column in columnReaders.indices) refreshColumn(column)
+        for (variable in booleans.indices) {
+            val value = context.boolValue(variable)
+            if (value != booleans[variable]) {
+                booleans[variable] = value
+                booleanReaders[variable].forEach(::enqueue)
+            }
+        }
+        var visits = 0
+        while (queue.isNotEmpty() && visits++ < rows.size * 4) {
                 if (stop()) return ComponentResult.Indeterminate
+                val rowIndex = queue.removeFirst()
+                queued[rowIndex] = false
+                val (row, form, variables) = rows[rowIndex]
                 if (variables.any { it != row.activator && context.boolValue(it) == null }) continue
                 if (context.boolValue(row.activator) == null && (0 until row.size).any {
                         Term.isBool(row.ref(it)) && Lit.variable(Term.lit(row.ref(it))) == row.activator
                     }
                 ) continue
                 val comparison = form.comparison(true) { context.boolValue(it) == true }
-                val minimum = activity(comparison.terms, upper = false)
-                val maximum = activity(comparison.terms, upper = true)
+                val minimum = stronger(
+                    activity(comparison.terms, upper = false), system.activityBound(comparison, false), false,
+                )
+                val maximum = stronger(
+                    activity(comparison.terms, upper = true), system.activityBound(comparison, true), true,
+                )
                 val truth = comparison.truth(minimum, maximum)
                 val activated = row.activator == LinearRow.ALWAYS || context.boolValue(row.activator) == true
                 val assigned = row.activator == LinearRow.ALWAYS || context.boolValue(row.activator) != null
@@ -72,6 +103,7 @@ internal class ExactLraPropagation(
                     val result = context.imply(literal, reason)
                     if (result !is ComponentResult.Consistent) return result
                     implied = true
+                    booleanReaders[row.activator].forEach(::enqueue)
                     continue
                 }
                 if (!assigned) continue
@@ -91,7 +123,10 @@ internal class ExactLraPropagation(
                 active.rowsInto(inequalities)
                 for (inequality in inequalities) {
                     for (index in inequality.columns.indices) {
-                        if (stop()) return ComponentResult.Indeterminate
+                        if (stop()) {
+                            enqueue(rowIndex)
+                            return ComponentResult.Indeterminate
+                        }
                         val column = inequality.columns[index]
                         val coefficient = inequality.coefficients[index]
                         val rest = activity(
@@ -103,18 +138,14 @@ internal class ExactLraPropagation(
                         var strict = inequality.strict || rest.strict
                         val upper = coefficient.signum() > 0
                         if (column >= model.numRealVars) {
-                            bound = if (upper) {
-                                (bound.negated().ceilInteger().negate() - if (strict && bound.den == BIG_ONE) BIG_ONE else BIG_ZERO)
-                                    .asFraction()
-                            } else {
-                                (bound.ceilInteger() + if (strict && bound.den == BIG_ONE) BIG_ONE else BIG_ZERO).asFraction()
-                            }
+                            bound = integerBound(bound, upper, strict)
                             strict = false
                         }
                         val previous = lp.state?.activeSide(column, upper)?.side
                         val side = ExactLpSide(ExactLpNumber.of(bound), strict)
                         if (previous != null && !side.strongerThan(previous, upper)) continue
-                        if (!lp.assertBound(column, upper, side, SearchAtomPremise.All(listOf(premise, rest.premise)))) {
+                        val reason = SearchAtomPremise.All(listOf(premise, rest.premise))
+                        if (!lp.assertBound(column, upper, side, reason)) {
                             return ComponentResult.Indeterminate
                         }
                         if (lp.state?.conflict != null) {
@@ -123,16 +154,47 @@ internal class ExactLraPropagation(
                                 lp.activeBoundPremise(column, true) ?: SearchAtomPremise.Unavailable,
                             ))))
                         }
-                        if (previous != lp.state?.activeSide(column, upper)?.side) changed = true
+                        refreshColumn(column)
                     }
                 }
-            }
-            if (!changed || implied) return ComponentResult.Consistent
         }
         return ComponentResult.Consistent
     }
 
-    private fun activity(terms: Map<Int, BigFraction>, upper: Boolean): Activity? {
+    private fun enqueue(row: Int) {
+        if (!queued[row]) {
+            queued[row] = true
+            queue.addLast(row)
+        }
+    }
+
+    private fun integerBound(value: BigFraction, upper: Boolean, strict: Boolean): BigFraction {
+        val rounded = if (upper) value.negated().ceilInteger().negate() else value.ceilInteger()
+        val adjustment = if (strict && value.den == BIG_ONE) BIG_ONE else BIG_ZERO
+        return (if (upper) rounded - adjustment else rounded + adjustment).asFraction()
+    }
+
+    private fun refreshColumn(column: Int) {
+        val state = lp.state ?: return
+        val nextLower = state.activeSide(column, false)
+        val nextUpper = state.activeSide(column, true)
+        if (nextLower !== lower[column] || nextUpper !== upper[column]) {
+            lower[column] = nextLower
+            upper[column] = nextUpper
+            columnReaders[column].forEach(::enqueue)
+        }
+    }
+
+    private fun stronger(first: SmtActivityBound?, second: SmtActivityBound?, upper: Boolean): SmtActivityBound? {
+        if (first == null) return second
+        if (second == null) return first
+        val difference = second.value.compareTo(first.value)
+        return if ((if (upper) difference < 0 else difference > 0) ||
+            (difference == 0 && second.strict && !first.strict)
+        ) second else first
+    }
+
+    private fun activity(terms: Map<Int, BigFraction>, upper: Boolean): SmtActivityBound? {
         var value = BigFraction.ZERO
         var strict = false
         val premises = ArrayList<SearchAtomPremise>(terms.size)
@@ -144,26 +206,26 @@ internal class ExactLraPropagation(
             strict = strict || side.strict
             premises += lp.activeBoundPremise(column, sideUpper) ?: SearchAtomPremise.Unavailable
         }
-        return Activity(value, strict, SearchAtomPremise.All(premises))
+        return SmtActivityBound(value, strict, SearchAtomPremise.All(premises))
     }
 
-    private fun ExactComparison.truth(minimum: Activity?, maximum: Activity?): Truth? {
-        val below = maximum?.let { it.value < bound || it.value == bound && (!strict || it.strict) } == true
-        val above = minimum?.let { it.value > bound || it.value == bound && (!strict || it.strict) } == true
-        val excludedBelow = maximum?.let { it.value < bound || it.value == bound && it.strict } == true
-        val excludedAbove = minimum?.let { it.value > bound || it.value == bound && it.strict } == true
+    private fun ExactComparison.truth(minimum: SmtActivityBound?, maximum: SmtActivityBound?): Truth? {
+        val below = maximum?.let { it.value < bound || (it.value == bound && (!strict || it.strict)) } == true
+        val above = minimum?.let { it.value > bound || (it.value == bound && (!strict || it.strict)) } == true
+        val excludedBelow = maximum?.let { it.value < bound || (it.value == bound && it.strict) } == true
+        val excludedAbove = minimum?.let { it.value > bound || (it.value == bound && it.strict) } == true
         val fixed = minimum != null && maximum != null && minimum.value == bound && maximum.value == bound &&
             !minimum.strict && !maximum.strict
         return when (op) {
             LinearOp.LE -> when {
                 below -> Truth(true, checkNotNull(maximum).premise)
-                minimum != null && (minimum.value > bound || minimum.value == bound && (strict || minimum.strict)) ->
+                minimum != null && (minimum.value > bound || (minimum.value == bound && (strict || minimum.strict))) ->
                     Truth(false, minimum.premise)
                 else -> null
             }
             LinearOp.GE -> when {
                 above -> Truth(true, checkNotNull(minimum).premise)
-                maximum != null && (maximum.value < bound || maximum.value == bound && (strict || maximum.strict)) ->
+                maximum != null && (maximum.value < bound || (maximum.value == bound && (strict || maximum.strict))) ->
                     Truth(false, maximum.premise)
                 else -> null
             }
@@ -179,6 +241,5 @@ internal class ExactLraPropagation(
     }
 
     private data class PreparedRow(val row: LinearRow, val form: ExactRowForm, val variables: Set<Int>)
-    private data class Activity(val value: BigFraction, val strict: Boolean, val premise: SearchAtomPremise)
     private data class Truth(val value: Boolean, val premise: SearchAtomPremise)
 }

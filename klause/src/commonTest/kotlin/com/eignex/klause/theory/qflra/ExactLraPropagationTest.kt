@@ -12,10 +12,6 @@ import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.pipeline.OpenTheoryEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.solver.pipeline.ProblemPipeline
-import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.search.ComponentResult
@@ -30,6 +26,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactLraPropagationTest {
+    @Test
+    fun `scaled comparisons share activity bounds over open source columns`() {
+        val source = Problem(
+            2,
+            intBounds = IntBounds.fromModelBounds(
+                LongArray(2), LongArray(2), Bits(2).also { it.set(0); it.set(1) },
+                Bits(2).also { it.set(0); it.set(1) },
+            ),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(2, -2), intArrayOf(0, 1), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 0),
+            ),
+        )
+        source.componentPlan().search(source, emptyMap()).use { planned ->
+            val session = planned.session
+            session.initialize()
+            for (truth in listOf(true, false)) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, truth))))
+                assertEquals(truth, session.boolValue(1))
+                assertEquals(
+                    setOf(Lit.make(0, !truth), Lit.make(1, truth)),
+                    session.reasonFor(1)?.literals?.toSet(),
+                )
+                session.popTo(0)
+                assertNull(session.boolValue(1))
+            }
+        }
+    }
+
     @Test
     fun `reified bounds propagate through equalities and retract with their premise`() {
         val source = Problem(
@@ -75,7 +100,7 @@ class ExactLraPropagationTest {
                 assertTrue(LiveQfLraSystem(source, lp).install())
                 val session = SearchSession(listOf(lp))
                 session.initialize()
-                val propagation = ExactLraPropagation(source, lp, source.factors.map { factor ->
+                val propagation = ExactLraPropagation(source, lp, LiveQfLraSystem(source, lp), source.factors.map { factor ->
                     factor.linearRows.map { it.exactForm(source.numRealVars) }
                 })
 
@@ -93,15 +118,17 @@ class ExactLraPropagationTest {
                 """
                 (set-logic QF_LRA)
                 (declare-const x Real)
+                (declare-const b Bool)
                 (assert (< x 0))
-                (assert ($operator x 0))
+                (assert (= b ($operator x 0)))
                 (check-sat)
                 """.trimIndent(),
             ).model
 
-            val result = OpenTheoryEngine(source, ProblemPipeline.EXACT_LRA).solve(TheoryParams())
-
-            if (verdict) assertIs<OpenTheoryResult.Sat>(result) else assertIs<OpenTheoryResult.Unsat>(result)
+            source.componentPlan().search(source, emptyMap()).use { planned ->
+                assertIs<ComponentResult.Consistent>(planned.session.initialize())
+                assertEquals(verdict, planned.session.boolValue(0))
+            }
         }
     }
 }
