@@ -19,13 +19,15 @@ import com.eignex.klause.localsearch.MoveSink
  * a low-violation pose, so a pass stopped early leaves a valid, partly repaired start.
  */
 class GreedyInit {
-    private val eligibility = MoveSink()
-
     /** Run one greedy-repair pass over [state], mutating its assignment in place, until [stop] says to end it. */
     fun run(state: LocalSearchState, stop: () -> Boolean = { false }) {
+        pass(state).advance(stop)
+    }
+
+    internal fun pass(state: LocalSearchState): Pass {
         val problem = state.problem
         val varCount = problem.numBoolVars + problem.numIntVars
-        if (varCount == 0) return
+        val eligibility = MoveSink()
         eligibility.setAssumptions(state.assumptions)
         eligibility.setInvariants(state.invariants)
         eligibility.setOwners(state.seeding.ownerInt)
@@ -37,55 +39,68 @@ class GreedyInit {
             order[i] = order[j]
             order[j] = tmp
         }
-        state.repairInitialization { repairCoordinates(state, order, stop) }
+        return Pass(state, order, eligibility)
     }
 
-    private fun repairCoordinates(state: LocalSearchState, order: IntArray, stop: () -> Boolean) {
-        val numBoolVars = state.problem.numBoolVars
-        for (v in order) {
-            if (stop()) break
-            if (v < numBoolVars) {
-                val boolId = v
-                if (!eligibility.allowsBool(boolId)) continue
-                val baselineCost = state.cost
-                state.apply(Move.BoolFlip(boolId))
-                if (state.cost > baselineCost) state.apply(Move.BoolFlip(boolId))
-            } else {
-                val intId = v - numBoolVars
-                if (!eligibility.allowsInt(intId)) continue
-                val d = state.rootDomains[intId]
-                val cur = state.assignment.intValue(intId)
-                if (d.isFixed) continue
-                // Sweep tiny domains exhaustively; sample larger ones to bound per-pass cost.
-                val maxTries = 16
-                var bestCost = state.cost
-                var bestVal = cur
-                val few = d.spanOrNull(maxTries.toLong())
-                if (few != null) {
-                    for (idx in 0 until few.size) {
-                        val candidate = few.valueAt(idx)
-                        if (candidate == cur) continue
-                        state.apply(Move.IntSet(intId, candidate))
-                        if (state.cost < bestCost) {
-                            bestCost = state.cost
-                            bestVal = candidate
-                        }
-                        state.apply(Move.IntSet(intId, cur))
-                    }
-                } else {
-                    repeat(maxTries) {
-                        val candidate = state.randomIntValue(intId)
-                        if (candidate == cur) return@repeat
-                        state.apply(Move.IntSet(intId, candidate))
-                        if (state.cost < bestCost) {
-                            bestCost = state.cost
-                            bestVal = candidate
-                        }
-                        state.apply(Move.IntSet(intId, cur))
-                    }
-                }
-                if (bestVal != cur) state.apply(Move.IntSet(intId, bestVal))
+    internal inner class Pass(
+        private val state: LocalSearchState,
+        private val order: IntArray,
+        private val eligibility: MoveSink,
+    ) {
+        private var next = 0
+
+        fun advance(stop: () -> Boolean): Boolean {
+            if (next == order.size) return true
+            state.repairInitialization {
+                while (next < order.size && !stop()) repairCoordinate(state, order[next++], eligibility)
             }
+            return next == order.size
+        }
+    }
+
+    private fun repairCoordinate(state: LocalSearchState, v: Int, eligibility: MoveSink) {
+        val numBoolVars = state.problem.numBoolVars
+        if (v < numBoolVars) {
+            val boolId = v
+            if (!eligibility.allowsBool(boolId)) return
+            val baselineCost = state.cost
+            state.apply(Move.BoolFlip(boolId))
+            if (state.cost > baselineCost) state.apply(Move.BoolFlip(boolId))
+        } else {
+            val intId = v - numBoolVars
+            if (!eligibility.allowsInt(intId)) return
+            val d = state.rootDomains[intId]
+            val cur = state.assignment.intValue(intId)
+            if (d.isFixed) return
+            // Sweep tiny domains exhaustively; sample larger ones to bound per-pass cost.
+            val maxTries = 16
+            var bestCost = state.cost
+            var bestVal = cur
+            val few = d.spanOrNull(maxTries.toLong())
+            if (few != null) {
+                for (idx in 0 until few.size) {
+                    val candidate = few.valueAt(idx)
+                    if (candidate == cur) continue
+                    state.apply(Move.IntSet(intId, candidate))
+                    if (state.cost < bestCost) {
+                        bestCost = state.cost
+                        bestVal = candidate
+                    }
+                    state.apply(Move.IntSet(intId, cur))
+                }
+            } else {
+                repeat(maxTries) {
+                    val candidate = state.randomIntValue(intId)
+                    if (candidate == cur) return@repeat
+                    state.apply(Move.IntSet(intId, candidate))
+                    if (state.cost < bestCost) {
+                        bestCost = state.cost
+                        bestVal = candidate
+                    }
+                    state.apply(Move.IntSet(intId, cur))
+                }
+            }
+            if (bestVal != cur) state.apply(Move.IntSet(intId, bestVal))
         }
     }
 }

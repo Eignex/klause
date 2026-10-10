@@ -141,6 +141,23 @@ class GreedyInitTest {
     }
 
     @Test
+    fun `resuming a partial pass completes the same repair as an uninterrupted pass`() {
+        val expected = freshState(problem(), 7L)
+        val resumed = freshState(problem(), 7L)
+        val initializer = GreedyInit()
+        val pass = initializer.pass(resumed)
+        var checks = 0
+        initializer.run(expected)
+        assertFalse(pass.advance { ++checks > 1 })
+
+        assertTrue(pass.advance { false })
+
+        assertEquals(expected.assignment.snapshot(), resumed.assignment.snapshot())
+        assertEquals(expected.cost, resumed.cost)
+        assertEquals(expected.rng.nextLong(), resumed.rng.nextLong())
+    }
+
+    @Test
     fun `a cancelled pass clears repair activity before the search resumes`() {
         val state = freshState(problem(), 7L)
         state.apply(Move.IntSet(0, 1L))

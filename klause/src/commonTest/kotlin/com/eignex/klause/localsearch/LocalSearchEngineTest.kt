@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -165,26 +166,26 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `custom restarts retain independent best infeasible anchors`() {
+    fun `custom restarts retain independent feasible incumbent anchors`() {
         val problem = Problem(
             0,
             1,
             arrayOf(IntDomain(0, 3)),
-            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
         )
         val anchors = mutableListOf<Sample>()
         val restart = object : RestartPolicy {
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 2
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 if (bestSoFar != null) anchors += bestSoFar
-                state.assignment.setInt(0, 0)
+                state.assignment.setInt(0, 3)
                 state.recompute()
             }
         }
         var picks = 0
         val strategy = SourceDrivenStrategy(
             sources = emptyList(),
-            perturbation = { Move.IntSet(0, longArrayOf(1, 0, 2, 0)[picks++]) },
+            perturbation = { if (it.cost == 0L) null else Move.IntSet(0, longArrayOf(1, 2)[picks++]) },
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val search = LocalSearchEngine(
@@ -195,10 +196,10 @@ class LocalSearchEngineTest {
         )
 
         search.resumable(
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            LocalSearchParams(maxFlips = 6L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0))),
+            LinearObjective(intCoefficients = longArrayOf(-1)),
+            LocalSearchParams(maxFlips = 4L, initialAssignment = Sample(BooleanArray(0), longArrayOf(3))),
         ).use { handle ->
-            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            assertIs<MinimizeResult.BestFound>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
         }
 
         assertEquals(listOf(Sample(BooleanArray(0), longArrayOf(1)), Sample(BooleanArray(0), longArrayOf(2))), anchors)
@@ -339,6 +340,94 @@ class LocalSearchEngineTest {
             assertEquals(0.0, handle.stats.ls.moves.sum)
             val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
             assertEquals(initial, result.assignment)
+        }
+    }
+
+    @Test
+    fun `optimization restarts without an anchor before finding a feasible incumbent`() {
+        val problem = Problem(
+            2, 0, emptyArray(),
+            arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(1, true)))),
+        )
+        val anchors = mutableListOf<Sample?>()
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 1
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                anchors += bestSoFar
+                state.restart()
+            }
+        }
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), restartPolicy = policy)
+
+        search.resumable(
+            LinearObjective(boolWeights = longArrayOf(1, 1)),
+            LocalSearchParams(
+                maxFlips = 3L,
+                randomSeed = 3L,
+                assumptions = Assumptions(bools = mapOf(0 to false)),
+                initialAssignment = Sample(booleanArrayOf(false, false), LongArray(0)),
+            ),
+        ).use { handle ->
+            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+        }
+
+        assertTrue(anchors.isNotEmpty())
+        assertTrue(anchors.all { it == null })
+    }
+
+    @Test
+    fun `optimization restarts from its feasible incumbent`() {
+        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
+        val anchors = mutableListOf<Sample?>()
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 1
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                anchors += bestSoFar
+                state.assignment.setBool(0, true)
+                state.recompute()
+            }
+        }
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem),
+            strategy = SourceDrivenStrategy(
+                sources = emptyList(),
+                feasibleDescent = FeasibleDescent.RatchetAsConstraint,
+            ),
+            restartPolicy = policy,
+        )
+
+        search.resumable(
+            LinearObjective(boolWeights = longArrayOf(1)),
+            LocalSearchParams(maxFlips = 3L, randomSeed = 3L),
+        ).use { handle ->
+            assertIs<MinimizeResult.BestFound>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+        }
+
+        assertTrue(anchors.size > 1)
+        assertTrue(anchors.drop(1).all { it?.bools?.single() == true })
+    }
+
+    @Test
+    fun `optimization completes initial greedy repair after a cancelled slice`() {
+        val problem = Problem(
+            32, 0, emptyArray(),
+            Array<Factor>(32) { Clause(intArrayOf(Lit.make(it, true))) },
+        )
+        val search = LocalSearchEngine(LocalSearchModel.open(problem))
+        val found = mutableListOf<Sample>()
+        var polls = 0
+
+        search.resumable(
+            LinearObjective(boolWeights = LongArray(32) { 1L }),
+            LocalSearchParams(maxFlips = 1L, randomSeed = 3L),
+        ).use { handle ->
+            assertNull(handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L) { found += it.sample })
+            assertTrue(found.isEmpty())
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { found += it.sample }
+
+            assertIs<MinimizeResult.BestFound>(result)
+            assertTrue(found.single().bools.all { it })
         }
     }
 
