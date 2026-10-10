@@ -54,7 +54,8 @@ internal class SharedVarBounds(
         if (identity != null) {
             if (model == null) return
             val verifier = ModelEvidenceVerifier<Unit, Pair<Long, Long>>(identity, CandidateVerifier.trusting())
-            if (verifier.verify(ModelEvidence.Bound(model, lower to upper, certificate)) !is Verification.Accepted) return
+            val verified = verifier.verify(ModelEvidence.Bound(model, lower to upper, certificate))
+            if (verified !is Verification.Accepted) return
         }
         lock.withLock {
             if (lower > lo[varId]) {

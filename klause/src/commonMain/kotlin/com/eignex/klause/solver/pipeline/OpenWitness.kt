@@ -24,11 +24,12 @@ import com.eignex.klause.util.toLongExact
  * continuous columns needs the sample's exact real values, which a candidate completion certified against the same
  * rows by an exact LP; a floating-point real value alone decides nothing.
  */
-internal fun refuteOpenWitness(model: Problem, sample: Sample): String? = when (val verdict = verifyOpenWitness(model, sample)) {
-    is Verification.Accepted -> null
-    is Verification.Rejected -> verdict.reason
-    is Verification.Indeterminate -> verdict.reason
-}
+internal fun refuteOpenWitness(model: Problem, sample: Sample): String? =
+    when (val verdict = verifyOpenWitness(model, sample)) {
+        is Verification.Accepted -> null
+        is Verification.Rejected -> verdict.reason
+        is Verification.Indeterminate -> verdict.reason
+    }
 
 internal fun verifyOpenWitness(model: Problem, sample: Sample): Verification<Sample, Unit> {
     if (sample.exactInts?.any { !it.fitsLong() } == true) {

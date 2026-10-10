@@ -36,7 +36,9 @@ internal class PortfolioEvidence(
         val evidence: ModelEvidence<Sample, Double?> = when (kind) {
             EvidenceKind.Bound -> ModelEvidence.Bound(identity, value, certificate)
             EvidenceKind.Infeasible -> ModelEvidence.Infeasible(identity, certificate)
-            EvidenceKind.Unbounded -> ModelEvidence.Unbounded(identity, Candidate(checkNotNull(sample), value), certificate)
+            EvidenceKind.Unbounded -> ModelEvidence.Unbounded(
+                identity, Candidate(checkNotNull(sample), value), certificate,
+            )
             EvidenceKind.Witness -> error("a witness is checked separately")
         }
         return when (val verdict = verifier.verify(evidence)) {
