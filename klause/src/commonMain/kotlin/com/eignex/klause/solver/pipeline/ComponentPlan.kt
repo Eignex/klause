@@ -119,6 +119,7 @@ class ComponentPlan internal constructor(
             .toTypedArray()
         return CpProblemProjection(
             BakedProblem(
+                settings = spec.settings,
                 numBoolVars = spec.numBoolVars,
                 numIntVars = domains.size,
                 intDomains = domains,

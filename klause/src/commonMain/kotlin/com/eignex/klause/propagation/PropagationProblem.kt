@@ -23,7 +23,10 @@ class PropagationProblem private constructor(
 
     /** One propagator per model factor, materialized only by consumers of the general CP lane. */
     val propagators: Array<out Propagator> by lazy {
-        preparedPropagators ?: Array(problem.numFactors) { problem.factors[it].propagatorProjection() }
+        preparedPropagators ?: run {
+            val preparation = FactorProjectionPreparation()
+            Array(problem.numFactors) { problem.factors[it].propagatorProjection(preparation) }
+        }
     }
 
     /** Propagator occurrences indexed by Boolean variable. */
@@ -95,9 +98,10 @@ class PropagationProblem private constructor(
 
     internal companion object {
         fun preparation(problem: Problem): Iterator<PropagationProblem?> = sequence {
+            val preparation = FactorProjectionPreparation()
             val propagators = Array<Propagator>(problem.numFactors) { NoPropagator }
             for (fid in propagators.indices) {
-                propagators[fid] = problem.factors[fid].propagatorProjection()
+                propagators[fid] = problem.factors[fid].propagatorProjection(preparation)
                 if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
             yield(PropagationProblem(problem, propagators))

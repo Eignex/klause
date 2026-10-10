@@ -17,8 +17,8 @@ import com.eignex.klause.ir.materializeKey
 /**
  * A reified real linear atom `aux ⟺ (Σ intCoeffs·vars + Σ realCoeffs·realVars ⟨op⟩ bound)` — the
  * real-atom half of boolean structure over linear real arithmetic. [aux] is an ordinary CP Boolean
- * the search branches on; the row is LP-only, so it has no CP propagator or local-search invariant and
- * its two directions are enforced by the LP relaxation:
+ * the search branches on. Its finite CP projection is inert; local search uses floating heuristic
+ * scores. Exact feasibility checks enforce both directions through the LP/source arithmetic route:
  *
  *  - The LP relaxation consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
  *    false emits its exact complement (`¬(a ≤ b) ⟺ a > b`, strictness flipping through the

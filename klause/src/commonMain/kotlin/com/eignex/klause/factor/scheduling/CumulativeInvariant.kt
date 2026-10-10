@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.factor.scheduling.internals.CumulativeLsState
 import com.eignex.klause.factor.scheduling.internals.applyCumulativeCapacityDelta
@@ -19,6 +18,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.localsearch.OptionalPresence
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
@@ -64,7 +64,7 @@ internal class CumulativeInvariant(
         val size = max(0L, tHigh - tLow).toInt()
         val usage = LongArray(size)
         for (i in 0 until n) {
-            if (!OptPresence.isPresentInAssignment(presents, i, state)) continue
+            if (!OptionalPresence.isPresentInAssignment(presents, i, state)) continue
             val s = state.assignment.intValue(starts[i])
             val d = curDur(state, i)
             val r = curRes(state, i)
@@ -104,7 +104,7 @@ internal class CumulativeInvariant(
             else -> {
                 val sp = startPosOf(intVar)
                 if (sp >= 0) {
-                    if (!OptPresence.isPresentInAssignment(presents, sp, state)) {
+                    if (!OptionalPresence.isPresentInAssignment(presents, sp, state)) {
                         0L
                     } else {
                         val d = curDur(state, sp)
@@ -118,7 +118,7 @@ internal class CumulativeInvariant(
                 } else {
                     val dp = durPosOf(intVar)
                     if (dp >= 0) {
-                        if (!OptPresence.isPresentInAssignment(presents, dp, state)) {
+                        if (!OptionalPresence.isPresentInAssignment(presents, dp, state)) {
                             0L
                         } else {
                             val r = curRes(state, dp)
@@ -132,7 +132,7 @@ internal class CumulativeInvariant(
                     } else {
                         val rp = resPosOf(intVar)
                         if (rp >= 0) {
-                            if (!OptPresence.isPresentInAssignment(presents, rp, state)) {
+                            if (!OptionalPresence.isPresentInAssignment(presents, rp, state)) {
                                 0L
                             } else {
                                 val d = curDur(state, rp)
@@ -165,7 +165,7 @@ internal class CumulativeInvariant(
             else -> {
                 val sp = startPosOf(intVar)
                 if (sp >= 0) {
-                    if (!OptPresence.isPresentInAssignment(presents, sp, state)) return 0
+                    if (!OptionalPresence.isPresentInAssignment(presents, sp, state)) return 0
                     val d = curDur(state, sp)
                     val r = curRes(state, sp)
                     if (d <= 0 || r <= 0) return 0
@@ -173,7 +173,7 @@ internal class CumulativeInvariant(
                 } else {
                     val dp = durPosOf(intVar)
                     if (dp >= 0) {
-                        if (!OptPresence.isPresentInAssignment(presents, dp, state)) return 0
+                        if (!OptionalPresence.isPresentInAssignment(presents, dp, state)) return 0
                         val r = curRes(state, dp)
                         if (r <= 0) return 0
                         val s = state.assignment.intValue(starts[dp])
@@ -181,7 +181,7 @@ internal class CumulativeInvariant(
                     } else {
                         val rp = resPosOf(intVar)
                         if (rp < 0) return 0
-                        if (!OptPresence.isPresentInAssignment(presents, rp, state)) return 0
+                        if (!OptionalPresence.isPresentInAssignment(presents, rp, state)) return 0
                         val d = curDur(state, rp)
                         if (d <= 0) return 0
                         val s = state.assignment.intValue(starts[rp])
@@ -205,7 +205,7 @@ internal class CumulativeInvariant(
             val d = curDur(state, i)
             val r = curRes(state, i)
             if (d <= 0 || r <= 0) continue
-            val wasP = OptPresence.isPresentInAssignment(presents, i, state)
+            val wasP = OptionalPresence.isPresentInAssignment(presents, i, state)
             val sign = if (wasP) -1 else +1
             val s = state.assignment.intValue(starts[i])
             val from = max(0L, s - ls.tLow).toInt()
@@ -231,7 +231,7 @@ internal class CumulativeInvariant(
             val d = curDur(state, i)
             val r = curRes(state, i)
             if (d <= 0 || r <= 0) continue
-            val nowP = OptPresence.isPresentInAssignment(presents, i, state)
+            val nowP = OptionalPresence.isPresentInAssignment(presents, i, state)
             val sign = if (nowP) +1 else -1
             val s = state.assignment.intValue(starts[i])
             val from = max(0L, s - ls.tLow).toInt()
@@ -307,7 +307,7 @@ internal class CumulativeInvariant(
             val r = curRes(state, i)
             val d = curDur(state, i)
             if (r <= 0 || d <= 0) continue
-            if (!OptPresence.isPresentInAssignment(presents, i, state)) continue
+            if (!OptionalPresence.isPresentInAssignment(presents, i, state)) continue
             val cur = state.assignment.intValue(starts[i])
             if (cur <= absT && absT < cur + d) out.add(i)
         }
@@ -327,7 +327,7 @@ internal class CumulativeInvariant(
                 val dj0 = curDur(state, j)
                 val rj0 = curRes(state, j)
                 if (dj0 <= 0 || rj0 <= 0) continue
-                if (!OptPresence.isPresentInAssignment(presents, j, state)) continue
+                if (!OptionalPresence.isPresentInAssignment(presents, j, state)) continue
                 val jV = starts[j]
                 val jCur = state.assignment.intValue(jV)
                 if (jCur !in iDom || iCur !in state.rootDomains[jV]) continue
@@ -359,11 +359,11 @@ internal class CumulativeInvariant(
             val i = state.rng.nextInt(n)
             val j = state.rng.nextInt(n)
             if (i == j || starts[i] == starts[j]) continue
-            if (!OptPresence.isPresentInAssignment(
+            if (!OptionalPresence.isPresentInAssignment(
                     presents,
                     i,
                     state,
-                ) || !OptPresence.isPresentInAssignment(presents, j, state)
+                ) || !OptionalPresence.isPresentInAssignment(presents, j, state)
             ) {
                 continue
             }
@@ -386,7 +386,7 @@ internal class CumulativeInvariant(
         var prevEnd = Long.MIN_VALUE
         for (oi in order.indices) {
             val i = order[oi]
-            if (!OptPresence.isPresentInAssignment(presents, i, state)) continue
+            if (!OptionalPresence.isPresentInAssignment(presents, i, state)) continue
             if (curRes(state, i) > cap) return false
             val dur = curDur(state, i)
             val v = starts[i]

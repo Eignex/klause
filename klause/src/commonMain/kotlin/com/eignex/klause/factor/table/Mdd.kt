@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.table
 
-import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.FactorReduction
@@ -55,12 +54,6 @@ class Mdd(
     val cost: Int = -1,
 ) : Factor {
 
-    /** CSR index over [transitions], shared with the factors of a `<group>` of identical diagrams so it
-     *  is built once rather than per factor. Set by the front-end that shares the diagram structure; it
-     *  survives [remap] (var ids) and [remapValues] (symbols only), so both carry it forward. Null ⇒ the
-     *  propagator builds its own — the case for a lone diagram (e.g. the FlatZinc `mdd` front-end). */
-    internal var transitionIndex: MddTransitionIndex? = null
-
     init {
         require(seq.isNotEmpty()) { "Mdd: empty seq" }
         require(numStatesPerLayer.size == seq.size + 1) { "Mdd: numStatesPerLayer must be seq.size+1" }
@@ -79,7 +72,7 @@ class Mdd(
         accepting,
         recordStride,
         if (cost >= 0) mapping.int(cost) else cost,
-    ).also { it.transitionIndex = transitionIndex }
+    )
 
     /** Position-faithful (layer i matters): keeps the sequence vars in order and folds in the whole
      *  diagram — per-layer state counts, layer offsets, the transition records, the initial and
@@ -119,7 +112,6 @@ class Mdd(
             p += recordStride
         }
         return Mdd(seq, numStatesPerLayer, layerStarts, newTransitions, initial, accepting, recordStride, cost)
-            .also { it.transitionIndex = transitionIndex }
     }
 
     override val variables: VarList = SpanIntVars(if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf())

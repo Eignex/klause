@@ -1,9 +1,12 @@
 package com.eignex.klause.ir.intdomain
 
+import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.util.LongArrayList
 
-internal abstract class AbstractIntDomain : IntDomain {
+internal abstract class AbstractIntDomain(val storage: DomainStorageSettings) : IntDomain {
+
+    abstract fun withStorage(settings: DomainStorageSettings): IntDomain
 
     // Holes = span − present. Exact for the reps whose `size` is an exact present count (bitset,
     // survivors); ContiguousDomain (no holes) and RunsDomain (whose `size` saturates) override.
@@ -40,7 +43,7 @@ internal abstract class AbstractIntDomain : IntDomain {
         }
         if (out.size == span.size) return this
         if (out.size == 0) return null
-        return intDomainFromSurvivors(out.toLongArray())
+        return intDomainFromSurvivors(out.toLongArray(), storage)
     }
 
     override fun equals(other: Any?): Boolean {

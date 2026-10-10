@@ -10,6 +10,7 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.tseitinAnd
@@ -74,16 +75,19 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.skema.SchemaDef
 import kotlin.math.roundToInt
 
-internal class Compiler(private val config: KlauseConfig = KlauseConfig.current) {
-    fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(config).run(def)
+internal class Compiler(config: KlauseConfig) {
+    private val pinAbsentOptVars = config.pinAbsentOptVars
+    private val settings = config.problemSettings()
+
+    fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(pinAbsentOptVars, settings).run(def)
 }
 
 /** Compile this schema definition into a solver-ready [CompiledSchema]. */
 fun SchemaDef<SchemaEntry>.compile(config: KlauseConfig = KlauseConfig.current): CompiledSchema =
     Compiler(config).compile(this)
 
-internal class Lowering(val config: KlauseConfig) : CnfLowering {
-    private val problemBuilder = ProblemBuilder()
+internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings) : CnfLowering {
+    private val problemBuilder = ProblemBuilder(settings)
 
     override val factors get() = problemBuilder.factors
     val boolVarIdByName get() = problemBuilder.boolVarIdByName
@@ -520,7 +524,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     // Opt-var pinning: when an optional variable is absent (its `__present` bool is
     // false), fix its value to a canonical in-domain default so absent vars don't
     // contribute dead-value symmetry. Gated by config so it can be turned off.
-    if (config.pinAbsentOptVars) emitOptVarPins(def)
+    if (pinAbsentOptVars) emitOptVarPins(def)
 
     // The compiler builds a plain base-baked `Problem`; the SAC / failed-literal probing tiers, resolved
     // from the presolve config, run in the presolve lane via [RootBaker] (kernel → presolve would

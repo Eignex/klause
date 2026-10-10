@@ -4,10 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.mergeCliques
+import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
@@ -17,6 +19,19 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class PresolveSharedTest {
+
+    @Test
+    fun `rebuilding and reseeding preserve captured resource settings`() {
+        val settings = ProblemSettings(DomainStorageSettings(8), 17, 101, 203)
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList(), settings = settings).bake()
+
+        val rebuilt = PresolveShared.rebuildProblem(problem, problem.factors.toList())
+        val reseeded = RootBaker.reseed(rebuilt, BakeConfig())
+
+        assertEquals(settings, reseeded.settings)
+        assertEquals(problem.rootIntDomain(0), reseeded.rootIntDomain(0))
+    }
+
 
     private fun pos(v: Int) = Lit.make(v, true)
 

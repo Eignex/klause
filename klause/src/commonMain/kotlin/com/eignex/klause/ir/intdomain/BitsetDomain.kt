@@ -1,8 +1,10 @@
 package com.eignex.klause.ir.intdomain
 
+import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
+import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.klause.util.Bits
 
 /** Bitset over a narrow span: bit `(value - bitsetLo)` is set iff `value` is present. The backing
@@ -13,8 +15,12 @@ internal class BitsetDomain(
     override val max: Long,
     private val bitset: LongArray,
     private val bitsetLo: Long,
-) : AbstractIntDomain(),
+    storage: DomainStorageSettings = defaultDomainStorageSettings,
+) : AbstractIntDomain(storage),
     IntSpan {
+    override fun withStorage(settings: DomainStorageSettings): IntDomain =
+        if (storage == settings) this else BitsetDomain(min, max, bitset, bitsetLo, settings)
+
     init {
         require(min <= max) { "Empty domain: $min..$max" }
         // The endpoints must be members — a violation here means a caller built the bit array wrong
@@ -68,7 +74,7 @@ internal class BitsetDomain(
             check(lastSet >= 0) { "Empty domain after excludeValue($value)" }
             newMax = bitsetLo + lastSet
         }
-        return BitsetDomain(newMin, newMax, newBits, bitsetLo)
+        return BitsetDomain(newMin, newMax, newBits, bitsetLo, storage)
     }
 
     override fun withMinAtLeast(newMin: Long): IntDomain {
@@ -80,7 +86,7 @@ internal class BitsetDomain(
         check(firstSet >= 0) { "withMinAtLeast($newMin) emptied bitset domain" }
         val m = bitsetLo + firstSet
         check(m <= max) { "withMinAtLeast($newMin): only zero bits remained" }
-        return BitsetDomain(m, max, newBits, bitsetLo)
+        return BitsetDomain(m, max, newBits, bitsetLo, storage)
     }
 
     override fun withMaxAtMost(newMax: Long): IntDomain {
@@ -92,14 +98,14 @@ internal class BitsetDomain(
         check(lastSet >= 0) { "withMaxAtMost($newMax) emptied bitset domain" }
         val m = bitsetLo + lastSet
         check(m >= min) { "withMaxAtMost($newMax): only zero bits remained" }
-        return BitsetDomain(min, m, newBits, bitsetLo)
+        return BitsetDomain(min, m, newBits, bitsetLo, storage)
     }
 
     override fun includeInteriorValue(value: Long): IntDomain {
         require(value > min && value < max) { "includeInteriorValue($value) outside ($min, $max)" }
         val newBits = bitset.copyOf()
         Bits.set(newBits, (value - bitsetLo).toInt())
-        return BitsetDomain(min, max, newBits, bitsetLo)
+        return BitsetDomain(min, max, newBits, bitsetLo, storage)
     }
 
     override fun forEach(action: IntConsumer) {

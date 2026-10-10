@@ -20,5 +20,5 @@ internal fun BakedProblem.foldRootDeductionsIntoDomains(result: PropagationResul
             "baked holes emptied domain $v despite an Implied bake"
         }
     }
-    result.forEachIntSet { v, survivors -> domains[v] = intDomainFromSurvivors(survivors) }
+    result.forEachIntSet { v, survivors -> domains[v] = intDomainFromSurvivors(survivors, settings.storage) }
 }

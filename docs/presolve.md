@@ -7,7 +7,9 @@ carries the originating cancellation token into a fresh `BakedProblem`.
 [RootBaker.reseed](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/RootBaker.kt)
 preserves that token when it creates a problem carrying probe deductions. The
 deadline, work-stop predicate and work meter therefore keep their originating
-scope across fresh rebuilds and reseeds.
+scope across fresh rebuilds and reseeds. Rebuilds and reseeds also preserve the
+source model's immutable `ProblemSettings`; the pre-bake span gate cannot change
+when another invocation changes ambient configuration.
 
 A fired token skips root-probe phases and stops cancellation-aware propagation
 at its polling boundaries. Partial propagation is sound but can forgo deductions.

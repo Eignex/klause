@@ -1,15 +1,25 @@
 package com.eignex.klause.ir.intdomain
 
+import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
+import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.klause.util.LongArrayList
 
 /** Interval-run list: flattened sorted disjoint present runs `[lo0,hi0, lo1,hi1, …]`, `>= 2` runs,
  *  strict gaps between them, `runs[0] == min`, `runs[last] == max`. */
-internal class RunsDomain(override val min: Long, override val max: Long, private val runs: LongArray) :
-    AbstractIntDomain(),
+internal class RunsDomain(
+    override val min: Long,
+    override val max: Long,
+    private val runs: LongArray,
+    storage: DomainStorageSettings = defaultDomainStorageSettings,
+) :
+    AbstractIntDomain(storage),
     IntSpan {
+    override fun withStorage(settings: DomainStorageSettings): IntDomain =
+        if (storage == settings) this else RunsDomain(min, max, runs, settings)
+
     init {
         require(min <= max) { "Empty domain: $min..$max" }
         require(runs.size >= 4 && runs.size % 2 == 0) { "RunsDomain needs >= 2 runs" }
@@ -175,7 +185,7 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
             out.add(runs[i shl 1])
             out.add(runs[(i shl 1) + 1])
         }
-        return intDomainFromRuns(out)
+        return intDomainFromRuns(out, storage)
     }
 
     override fun withMinAtLeast(newMin: Long): IntDomain {
@@ -201,7 +211,7 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
             k++
         }
         check(out.size > 0) { "withMinAtLeast($newMin): only holes remained above $newMin" }
-        return intDomainFromRuns(out)
+        return intDomainFromRuns(out, storage)
     }
 
     override fun withMaxAtMost(newMax: Long): IntDomain {
@@ -219,7 +229,7 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
             k++
         }
         check(out.size > 0) { "withMaxAtMost($newMax): only holes remained below $newMax" }
-        return intDomainFromRuns(out)
+        return intDomainFromRuns(out, storage)
     }
 
     override fun includeInteriorValue(value: Long): IntDomain {
@@ -270,7 +280,7 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
                 i++
             }
         }
-        return intDomainFromRuns(out)
+        return intDomainFromRuns(out, storage)
     }
 
     override fun forEach(action: IntConsumer) {

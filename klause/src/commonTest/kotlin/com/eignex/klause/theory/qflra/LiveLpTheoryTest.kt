@@ -53,6 +53,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
@@ -62,9 +63,58 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LiveLpTheoryTest {
+    @Test
+    fun `LP cancellation retains its parent meter and distinct session stop`() {
+        var stopped = false
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val parent = object : Cancellation {
+            override fun isCancelled() = false
+            override fun workMeter() = meter
+        }
+        lateinit var captured: Cancellation
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel,
+                cancellation: Cancellation,
+                refactorUpdateLimit: Int,
+                iterationLimit: Int,
+                workLimit: Long,
+                trackDegeneracy: Boolean,
+                pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                captured = cancellation
+                return ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+            }
+        }
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 1)),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            component.useSolveStop(parent)
+            component.solveWith(LpSolveContext(factory))
+            val session = SearchSession(listOf(component), cancellation = Cancellation { stopped })
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertSame(meter, captured.workMeter())
+            val before = charged
+            captured.charge(7L)
+            assertEquals(before + 7L, charged)
+
+            stopped = true
+
+            assertTrue(captured())
+            assertIs<ComponentCheck.Indeterminate>(session.check())
+        }
+    }
+
     @Test
     fun `returned theory statistics include cleanup and remain immutable across rounds`() {
         for (cancelAfterWork in listOf(false, true)) {

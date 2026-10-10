@@ -1,7 +1,6 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
@@ -58,7 +57,7 @@ internal object SolveCore {
         // hurt local search); solutions are reconstructed at render time. An explicit `--presolve`
         // overrides this default verbatim, so an LS run can be benchmarked *with* those passes on
         // (the A/B that decides whether the LS-specific stripping is worth keeping).
-        val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolveConfig()
+        val base = common.presolve?.let { PresolveConfig.parse(it) } ?: common.config.presolveConfig()
         // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only — the
         // orders differ in what they fold first, never in what the problem means — exposed so the choice
         // can be A/B'd on a corpus rather than argued about.

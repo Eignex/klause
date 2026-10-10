@@ -3,6 +3,8 @@ package com.eignex.klause.lowering
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.withStorage
 
 /**
  * Mutable construction context for a solver `Problem`.
@@ -11,7 +13,7 @@ import com.eignex.klause.ir.Problem
  * context, emit factors into [factors], and finish with [build]. Source names remain available to
  * callers that need to decode or render a solution, while the built problem stays name-free.
  */
-internal class ProblemBuilder : CnfLowering {
+internal class ProblemBuilder(private val settings: ProblemSettings = ProblemSettings()) : CnfLowering {
     override val factors = mutableListOf<Factor>()
     override var trueLitCache: Int = -1
 
@@ -45,7 +47,7 @@ internal class ProblemBuilder : CnfLowering {
 
     fun newInt(domain: IntDomain, name: String? = null): Int {
         val id = allocatedIntDomains.size
-        allocatedIntDomains += domain
+        allocatedIntDomains += domain.withStorage(settings.storage)
         if (name != null) bindIntName(name, id)
         return id
     }
@@ -77,6 +79,7 @@ internal class ProblemBuilder : CnfLowering {
     }
 
     fun build(): Problem = Problem(
+        settings = settings,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = allocatedIntDomains.toTypedArray(),

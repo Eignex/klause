@@ -206,6 +206,10 @@ Keep lowering and source-publication changes consistent with that contract.
 
 ## Environment knobs
 
+The CLI captures its core configuration in `CommonOptions` before loading the input.
+Format lowering, finite domain storage, preparation and automatic LP planning share
+that snapshot; later changes to the ambient library default cannot change the run.
+
 Process-wide defaults a packaged image can ship without touching the command line. Each is read as
 a JVM system property (the dotted name) or an environment variable (the same name uppercased with
 `.` → `_`, e.g. `KLAUSE_FLOAT_BUCKETS`). A command-line flag, where one exists, overrides it. The

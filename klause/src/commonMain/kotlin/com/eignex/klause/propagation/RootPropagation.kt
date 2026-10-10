@@ -1,6 +1,5 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
@@ -72,7 +71,7 @@ internal fun runRootPropagation(
             continue
         }
         val span = domain.max - domain.min + 1
-        val values = if (span > KlauseConfig.current.bitsetThreshold) domain.spanOrNull() else null
+        val values = if (span > problem.settings.storage.bitsetThreshold) domain.spanOrNull() else null
         if (values != null && values.size <= domain.holeCount) {
             intSetKeys.add(variable)
             values.forEach { intSetValues.add(it) }

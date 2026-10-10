@@ -41,6 +41,7 @@ internal data class BasisReplayReport(
     val stateErrors: Int,
     val errors: List<String>,
     val timing: BasisReplayTiming,
+    val denseBuildAttempts: Long = 0,
 )
 
 internal object BasisTraceReplay {
@@ -94,7 +95,7 @@ internal object BasisTraceReplay {
             preparedSolver = factory(matrix)
             // The rebuild is deliberately not built through [factory]: a replay that injects a faulty
             // solver must not be able to corrupt the basis it is checked against.
-            freshSolver = KotlinBasisSolver(matrix)
+            freshSolver = KotlinBasisSolver(matrix, denseDimensionLimit = 0)
             return Arm(solver, preparedSolver, freshSolver, trace, bean, nanos, bytes)
         } catch (failure: Throwable) {
             primaryFailure = failure
@@ -124,6 +125,7 @@ internal object BasisTraceReplay {
         private var advised = 0
         private var declined = 0
         private var checkpoints = 0
+        private var denseBuildAttempts = 0L
         private var peakFill = 0
         private var chainAge = 0
         private var maxChainAge = 0
@@ -160,6 +162,7 @@ internal object BasisTraceReplay {
             timing.buildBytes += measured.bytes
             timing.lifecycleNanos += measured.nanos
             builds++
+            denseBuildAttempts += solver.basisWork?.build?.denseAttempts ?: 0
             if (measured.value != operation.success) {
                 fail(index, "factorization outcome ${measured.value} != captured ${operation.success}")
                 headings = null
@@ -379,6 +382,7 @@ internal object BasisTraceReplay {
             stateErrors,
             errors.toList(),
             timing,
+            denseBuildAttempts,
         )
 
         private fun <T> measure(block: () -> T): Measurement<T> {

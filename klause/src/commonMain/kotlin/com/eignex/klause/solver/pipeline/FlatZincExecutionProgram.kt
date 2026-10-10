@@ -6,9 +6,11 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
@@ -65,6 +67,7 @@ fun parseFlatZincExecution(
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
 ): FlatZincExecutionProgram = parseFlatZincExecution(
     StringCharSource(source),
     floatBuckets,
@@ -75,6 +78,7 @@ fun parseFlatZincExecution(
     unboundedFloatLo,
     unboundedFloatHi,
     exactFloats,
+    settings,
 )
 
 /** Parse a streamed FlatZinc source and build its finite-execution metadata. */
@@ -88,6 +92,7 @@ fun parseFlatZincExecution(
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
 ): FlatZincExecutionProgram {
     var metadata: FlatZincExecutionMetadata? = null
     val program = parseFlatZincWithMetadata(
@@ -100,6 +105,7 @@ fun parseFlatZincExecution(
         unboundedFloatLo,
         unboundedFloatHi,
         exactFloats,
+        settings,
     ) { compiler, solve ->
         metadata = compiler.buildExecutionMetadata(solve)
     }

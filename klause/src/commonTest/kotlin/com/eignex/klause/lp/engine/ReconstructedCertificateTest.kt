@@ -4,6 +4,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.negate
+import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -74,6 +76,33 @@ class ReconstructedCertificateTest {
         assertEquals(third, result.bound?.value)
         assertTrue(result.complementary)
         assertTrue(result.metrics.attempts > 0)
+    }
+
+    @Test
+    fun `rational witnesses preserve signs across word boundaries`() {
+        val values = listOf(
+            BigFraction.of(bigIntOf(-2), bigIntOf(3)),
+            BigFraction.ofLong(Long.MIN_VALUE),
+            BigFraction.ofLong(Long.MAX_VALUE),
+            BigFraction.of((BIG_ONE shl 64) + BIG_ONE, BIG_ONE),
+            BigFraction.of(((BIG_ONE shl 64) + BIG_ONE).negate(), BIG_ONE),
+            BigFraction.of(BIG_ONE, (BIG_ONE shl 64) + BIG_ONE),
+        )
+        for (value in values) {
+            val source = ExactLpModel(
+                listOf(emptyList()), emptyList(),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(value))))),
+                emptyList(), ExactLpObjective(listOf(ExactLpNumber.of(1L))),
+            )
+
+            val result = verifyRationalCertificate(
+                assertNotNull(LpExactState(source).toWorkingModel()), listOf(value), emptyList(),
+            )
+
+            assertEquals(listOf(value), assertNotNull(result.witness).primal)
+            assertEquals(value, result.witness?.objective)
+            assertEquals(value, result.bound?.value)
+        }
     }
 
     @Test

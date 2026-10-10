@@ -30,6 +30,7 @@ val Problem.baked: PropagationResult
 fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem {
     if (this is BakedProblem) return this
     return BakedProblem(
+        settings = this.settings,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = finiteIntDomains(),
@@ -46,6 +47,7 @@ fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem 
 
 /** Append a root-inert factor to an already baked propagation projection. */
 internal fun BakedProblem.withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
+    settings = this.settings,
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
     intDomains = rootIntDomainsInPlace,
@@ -92,6 +94,7 @@ internal fun BakedProblem.conditionedRoot(assumptions: Assumptions, token: Cance
         )
     }
     val conditioned = BakedProblem(
+        settings = this.settings,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = state.intDomains.copyOf(),

@@ -8,15 +8,14 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.NoPropagator
 
 /**
  * `result = intOperand · realOperand`: a mixed integer·continuous product where
  * [intOperand] is an integer CP search variable and [realOperand] / [result] are LP-only continuous
- * (real) columns — ids in the problem's real-variable namespace, absent from CP search. It carries no
- * CP or local-search semantics ([NoPropagator] / [NoInvariant]); its feasibility is enforced entirely by
- * the LP relaxation and the search leaf, like a real-bearing [Linear] row.
+ * (real) columns — ids in the problem's real-variable namespace, absent from CP search. Its CP
+ * projection is [NoPropagator]. Local search uses floating heuristic scores; feasibility authority
+ * belongs to the LP search leaf and exact source witness checks.
  *
  * Its LP projection adapts to how tightly [intOperand] is pinned in the build's domains:
  *  - **Fixed** (`lo == hi == k`, always true at a search leaf, where every integer variable is a

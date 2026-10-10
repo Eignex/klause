@@ -1,9 +1,11 @@
 package com.eignex.klause.formats.xcsp3
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -27,12 +29,16 @@ data class Xcsp3Problem(
 /** XCSP3 integer format facade. */
 object Xcsp3 {
     /** Decode and lower XCSP3 [text]. */
-    fun parse(text: String): Xcsp3Problem = parse(StringCharSource(text))
+    fun parse(text: String, settings: ProblemSettings = KlauseConfig.current.problemSettings()): Xcsp3Problem =
+        parse(StringCharSource(text), settings)
 
     /** Decode and lower a streamed XCSP3 [source], retaining only bounded subtrees. */
     @Suppress("SwallowedException")
-    fun parse(source: CharSource): Xcsp3Problem = try {
-        Compiler.Builder().run {
+    fun parse(
+        source: CharSource,
+        settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    ): Xcsp3Problem = try {
+        Compiler.Builder(settings).run {
             val reader = XmlReader(source)
             reader.openRoot()
             // Single forward pass over `<instance>`'s children keeps the container order and tolerates

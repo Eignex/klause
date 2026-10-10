@@ -30,6 +30,7 @@ internal data class BasisBuildWork(
     val fallbacks: Long,
     val units: Long,
     val installedBuildUnits: Long?,
+    val denseAttempts: Long = 0,
 )
 
 // Solve and update phases accumulate from the latest numerical build attempt. A build attempt resets the
@@ -219,10 +220,12 @@ internal class BasisBuildAccumulator(private val kind: BasisBuildKind) {
     private var orderingAttempts = 0L
     private var reusedOrders = 0L
     private var fallbacks = 0L
+    private var denseAttempts = 0L
     private var units = 0L
 
     fun add(report: LuBuildReport) {
         builds = saturatedAdd(builds, 1)
+        if (report.dense || report.denseRejectedWork != null) denseAttempts = saturatedAdd(denseAttempts, 1)
         if (report.proposedOrder) orderingAttempts = saturatedAdd(orderingAttempts, 1)
         if (report.reusedOrder) reusedOrders = saturatedAdd(reusedOrders, 1)
         if (report.fallback) fallbacks = saturatedAdd(fallbacks, 1)
@@ -238,6 +241,7 @@ internal class BasisBuildAccumulator(private val kind: BasisBuildKind) {
         fallbacks,
         units,
         installed?.units,
+        denseAttempts,
     )
 }
 
@@ -246,7 +250,7 @@ internal val LuBuildWork.units: Long
         saturatedAdd(inputEntries.toLong(), candidates),
         saturatedAdd(
             saturatedAdd(columnMaximumEntries, schurUpdates),
-            factorEntries.toLong() * 2,
+            saturatedAdd(factorEntries.toLong() * 2, denseEntryVisits),
         ),
     )
 

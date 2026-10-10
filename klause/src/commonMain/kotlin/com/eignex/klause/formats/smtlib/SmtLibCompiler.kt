@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 
@@ -21,7 +22,12 @@ internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: Linea
 internal object Compiler {
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
      *  `internal fun Compiler.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
-    internal class Builder(val unboundedIntLo: Long, val unboundedIntHi: Long, val strictBounds: Boolean) :
+    internal class Builder(
+        val unboundedIntLo: Long,
+        val unboundedIntHi: Long,
+        val strictBounds: Boolean,
+        private val settings: ProblemSettings = ProblemSettings(),
+    ) :
         CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()
@@ -275,6 +281,7 @@ internal object Compiler {
             val sourceBounds = modelIntBounds()
 
             val model = Problem(
+                settings = settings,
                 numBoolVars = nextBool,
                 intBounds = sourceBounds,
                 factors = factors.toTypedArray(),

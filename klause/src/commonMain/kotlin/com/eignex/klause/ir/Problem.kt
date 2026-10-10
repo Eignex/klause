@@ -57,6 +57,8 @@ open class Problem(
     val realLower: DoubleArray = EmptyDoubleArray,
     /** Upper bound of each real variable (length [numRealVars]); `Double.POSITIVE_INFINITY` for open. */
     val realUpper: DoubleArray = EmptyDoubleArray,
+    /** Captured resource policy; independent of the logical model semantics. */
+    val settings: ProblemSettings = ProblemSettings(),
 ) {
     /**
      * Model-level bounds of the integer columns. Either side may be absent when a finite search domain
@@ -84,13 +86,13 @@ open class Problem(
      * materialization a bake is built from, a column a rebuild is about to box. A finite engine does not
      * reach for it — it takes a `BakedProblem` and branches on `rootIntDomain`.
      */
-    internal fun finiteIntDomain(v: Int): IntDomain = declaredIntDomains.finiteDomain(v)
+    internal fun finiteIntDomain(v: Int): IntDomain = declaredIntDomains.finiteDomain(v).withStorage(settings.storage)
 
     /**
      * Every [finiteIntDomain], in column order, copied so a caller may narrow the result in place — the
      * materialization a bake or an explicitly boxed candidate model is built from.
      */
-    internal fun finiteIntDomains(): Array<IntDomain> = declaredIntDomains.finiteDomains()
+    internal fun finiteIntDomains(): Array<IntDomain> = Array(numIntVars) { finiteIntDomain(it) }
 
     init {
         require(declaredIntDomains.size == numIntVars) {
@@ -136,6 +138,7 @@ open class Problem(
         numRealVars: Int = 0,
         realLower: DoubleArray = EmptyDoubleArray,
         realUpper: DoubleArray = EmptyDoubleArray,
+        settings: ProblemSettings = ProblemSettings(),
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = intBounds.size,
@@ -146,6 +149,7 @@ open class Problem(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
+        settings = settings,
     )
 
     /**
@@ -170,6 +174,7 @@ open class Problem(
         packedOpenIntLo: Bits? = null,
         packedOpenIntHi: Bits? = null,
         modelBounds: IntBounds? = null,
+        settings: ProblemSettings = ProblemSettings(),
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -187,6 +192,7 @@ open class Problem(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
+        settings = settings,
     )
 
     /**
@@ -209,6 +215,7 @@ open class Problem(
         packedOpenIntLo: Bits? = null,
         packedOpenIntHi: Bits? = null,
         modelBounds: IntBounds? = null,
+        settings: ProblemSettings = ProblemSettings(),
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -219,11 +226,26 @@ open class Problem(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
+        settings = settings,
         openIntLo = openIntLo,
         openIntHi = openIntHi,
         packedOpenIntLo = packedOpenIntLo,
         packedOpenIntHi = packedOpenIntHi,
         modelBounds = modelBounds,
+    )
+
+    /** Copy the logical model with explicit resource [settings], leaving preparation deferred. */
+    fun withSettings(settings: ProblemSettings): Problem = Problem(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        declaredIntDomains = declaredIntDomains,
+        factors = factors,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        settings = settings,
     )
 
     /**
@@ -245,6 +267,7 @@ open class Problem(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
+        settings = settings,
         modelBounds = intBounds,
     )
 
@@ -268,6 +291,7 @@ open class Problem(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
+        settings = settings,
     )
 
     /**
@@ -288,6 +312,7 @@ open class Problem(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
+        settings = settings,
     )
 
     /** Total number of factors. */

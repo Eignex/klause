@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
@@ -140,6 +141,8 @@ private const val OPEN_BOUND_PROOF_KEY = "open-bound-proof"
 
 /** Solver-control flags shared by every mode; populated by [commonFlagSpecs] during parsing. */
 internal class CommonOptions {
+    var config: KlauseConfig = KlauseConfig.current
+
     var engine: String? = null
     var timeLimitMs: Long? = null
 

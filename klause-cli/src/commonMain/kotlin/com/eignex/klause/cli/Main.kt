@@ -95,7 +95,7 @@ private fun run(args: Array<String>) {
     // Translate env vars / system properties into the central config and install it as the
     // process-wide ambient config before any front-end loads or compiles. Done once here (not
     // per-mode) so every front-end — MiniZinc, XCSP3, SMT-LIB — picks up the same env overrides.
-    installCliConfig()
+    common.config = installCliConfig()
     // Anchor the `-t` budget once, before parsing/baking, so the bake and the solve share one
     // deadline instead of each restarting the clock.
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }

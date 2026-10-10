@@ -91,7 +91,7 @@ limits, cancellation and cleanup. A later scoped projection decline does not
 enter that fallback. Fresh fallback does not retain factors between calls.
 Factor retention alone is not a complete-consumer speed guarantee.
 
-## Floating simplex and sparse basis
+## Floating simplex and basis factors
 
 Dual leaving selection uses verified Devex: correct and reselect a maintained
 weight below `0.25 * norm(rho)^2`. Entering selection uses a scaled Harris window,
@@ -116,10 +116,22 @@ must be released or widened before fallback; the artificial box cannot authorize
 a source proof, ray or truncated bound.
 
 [simplex.basis](../../klause/src/commonMain/kotlin/com/eignex/klause/simplex/basis/)
-owns sparse elimination, DFS reach/density switching, Forrest-Tomlin updates,
+owns sparse and small dense elimination, DFS reach/density switching, Forrest-Tomlin updates,
 logical repair, indexed forward/transpose solves and rational factors. Each
 owner has fixed dimension, named columns, both permutations and three-valued
 update results. Operation-owned buffers control scratch lifetime.
+`KotlinBasisSolver.refactorize` selects dense partial-row-pivot LU only for dimensions
+2–6 with at least 50% nonzero selected entries and more nonzeros than rows. The selected basis, rather than the
+whole source matrix or stored zeros, determines density. Koblas GER performs Schur
+updates; finite arithmetic and nonzero-underflow guards precede factor publication.
+Dense elimination materializes the same owned CSC factors and permutations used by
+sparse solves and Forrest-Tomlin updates. A numerical decline retries sparse LU and
+charges both attempts. Logical repair retains sparse construction and its existing
+cancellation control. `denseDimensionLimit = 0` is the internal sparse comparison
+control; the `BasisSolver` factory remains the extension seam. Exact factors never
+reuse floating numeric factors. The measured selection envelope is documented in
+[dense basis evidence](../evidence/dense-basis.md).
+
 Koblas supplies containers and compatible numerical kernels; see
 [integration contracts](koblas.md).
 

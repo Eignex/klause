@@ -4,7 +4,9 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SourceIntDomains
+import com.eignex.klause.ir.withStorage
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -51,7 +53,9 @@ class BakedProblem private constructor(
     packedOpenIntHi: Bits?,
     modelBounds: IntBounds?,
     internal val cancellation: Cancellation,
+    settings: ProblemSettings,
 ) : Problem(
+    settings = settings,
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
     declaredIntDomains = SourceIntDomains.ofDomains(
@@ -131,12 +135,18 @@ class BakedProblem private constructor(
         modelBounds: IntBounds? = null,
         cancellation: Cancellation = Cancellation.Never,
         alreadyFolded: Boolean = false,
+        settings: ProblemSettings = ProblemSettings(),
     ) : this(
+        settings = settings,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         // The fold rewrites what every reader of this projection sees, so it needs an array of its own:
         // only a caller handing over domains that already carry the fold keeps its identity here.
-        foldedIntDomains = if (alreadyFolded) intDomains else intDomains.copyOf(),
+        foldedIntDomains = if (alreadyFolded) {
+            intDomains
+        } else {
+            Array(intDomains.size) { intDomains[it].withStorage(settings.storage) }
+        },
         alreadyFolded = alreadyFolded,
         factors = factors,
         seedDeductions = seedDeductions,
@@ -171,7 +181,9 @@ class BakedProblem private constructor(
         modelBounds: IntBounds? = null,
         cancellation: Cancellation = Cancellation.Never,
         alreadyFolded: Boolean = false,
+        settings: ProblemSettings = ProblemSettings(),
     ) : this(
+        settings = settings,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = intDomains,

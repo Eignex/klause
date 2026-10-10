@@ -6,6 +6,7 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
@@ -13,6 +14,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.FloatBucketing
@@ -37,6 +39,7 @@ internal class FlatZincCompiler(
     internal val unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     internal val unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     internal val exactFloats: Boolean = false,
+    private val settings: ProblemSettings = ProblemSettings(),
     internal val floatChoiceLimit: Int = DEFAULT_FLOAT_CHOICE_LIMIT,
 ) : CnfLowering {
     init {
@@ -131,6 +134,7 @@ internal class FlatZincCompiler(
         // A plain base-baked `Problem`; the SAC / failed-literal probing resolved from the presolve
         // config runs later in the presolve lane via [RootBaker] (the kernel never probes itself).
         val problem = Problem(
+            settings = settings,
             numBoolVars = numBoolVars,
             numIntVars = intDomains.size,
             intDomains = intDomains.toTypedArray(),
@@ -208,7 +212,7 @@ internal class FlatZincCompiler(
                 if (values.isEmpty()) {
                     postFalseFactor()
                 } else {
-                    intDomains[id] = intDomainFromSurvivors(values)
+                    intDomains[id] = intDomainFromSurvivors(values, settings.storage)
                 }
                 intVars[name] = id
             }
@@ -401,7 +405,7 @@ internal class FlatZincCompiler(
     }
     internal fun allocInt(name: String, lo: Long, hi: Long): Int {
         val id = intDomains.size
-        intDomains.add(IntDomain(lo, hi))
+        intDomains.add(IntDomain(lo, hi, settings.storage))
         intVars[name] = id
         return id
     }
@@ -411,7 +415,7 @@ internal class FlatZincCompiler(
         val sorted = t.values.distinct().sorted().toLongArray()
         if (sorted.isEmpty()) failHere("int variable `$name` has an empty domain")
         val id = allocInt(name, sorted.first(), sorted.last())
-        intDomains[id] = intDomainFromSurvivors(sorted)
+        intDomains[id] = intDomainFromSurvivors(sorted, settings.storage)
         return id
     }
 
@@ -649,6 +653,7 @@ fun parseFlatZinc(
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
 ): FlatZincProgram = parseFlatZinc(
     StringCharSource(source),
     floatBuckets = floatBuckets,
@@ -659,6 +664,7 @@ fun parseFlatZinc(
     unboundedFloatLo = unboundedFloatLo,
     unboundedFloatHi = unboundedFloatHi,
     exactFloats = exactFloats,
+    settings = settings,
 )
 
 /** Parse and compile FlatZinc from a streamed [source], pulling one token at a time so the whole file
@@ -674,6 +680,7 @@ fun parseFlatZinc(
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
 ): FlatZincProgram = parseFlatZincWithMetadata(
     source,
     floatBuckets,
@@ -684,6 +691,7 @@ fun parseFlatZinc(
     unboundedFloatLo,
     unboundedFloatHi,
     exactFloats,
+    settings,
 ) { _, _ -> }
 
 internal fun parseFlatZincWithMetadata(
@@ -696,6 +704,7 @@ internal fun parseFlatZincWithMetadata(
     unboundedFloatLo: Double = DEFAULT_UNBOUNDED_FLOAT_LO,
     unboundedFloatHi: Double = DEFAULT_UNBOUNDED_FLOAT_HI,
     exactFloats: Boolean = false,
+    settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     onLowered: (FlatZincCompiler, SolveDirective) -> Unit,
 ): FlatZincProgram {
     val model = FlatZincParser(FlatZincLexer(CharReader(source))).parse()
@@ -709,5 +718,6 @@ internal fun parseFlatZincWithMetadata(
         unboundedFloatLo = unboundedFloatLo,
         unboundedFloatHi = unboundedFloatHi,
         exactFloats = exactFloats,
+        settings = settings,
     ).compile(onLowered)
 }

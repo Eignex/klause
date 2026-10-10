@@ -1,14 +1,24 @@
 package com.eignex.klause.ir.intdomain
 
+import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
+import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.klause.util.binarySearchLong
 
 /** Survivor list: the sorted present values, with `>= 1` interior gap. */
-internal class SurvivorsDomain(override val min: Long, override val max: Long, private val survivors: LongArray) :
-    AbstractIntDomain(),
+internal class SurvivorsDomain(
+    override val min: Long,
+    override val max: Long,
+    private val survivors: LongArray,
+    storage: DomainStorageSettings = defaultDomainStorageSettings,
+) :
+    AbstractIntDomain(storage),
     IntSpan {
+    override fun withStorage(settings: DomainStorageSettings): IntDomain =
+        if (storage == settings) this else SurvivorsDomain(min, max, survivors, settings)
+
     init {
         require(min <= max) { "Empty domain: $min..$max" }
         require(survivors.size >= 2) { "SurvivorsDomain needs >= 2 survivors" }
@@ -28,7 +38,7 @@ internal class SurvivorsDomain(override val min: Long, override val max: Long, p
         val out = LongArray(survivors.size - 1)
         survivors.copyInto(out, 0, 0, idx)
         survivors.copyInto(out, idx, idx + 1, survivors.size)
-        return intDomainFromSurvivors(out)
+        return intDomainFromSurvivors(out, storage)
     }
 
     override fun withMinAtLeast(newMin: Long): IntDomain {
@@ -37,7 +47,7 @@ internal class SurvivorsDomain(override val min: Long, override val max: Long, p
         val lb = survivors.binarySearchLong(newMin)
         val start = if (lb >= 0) lb else -(lb + 1) // first survivor >= newMin
         check(start < survivors.size) { "withMinAtLeast($newMin): only holes remained above $newMin" }
-        return intDomainFromSurvivors(survivors.copyOfRange(start, survivors.size))
+        return intDomainFromSurvivors(survivors.copyOfRange(start, survivors.size), storage)
     }
 
     override fun withMaxAtMost(newMax: Long): IntDomain {
@@ -46,7 +56,7 @@ internal class SurvivorsDomain(override val min: Long, override val max: Long, p
         val lb = survivors.binarySearchLong(newMax)
         val end = if (lb >= 0) lb + 1 else -(lb + 1) // first index strictly above newMax
         check(end > 0) { "withMaxAtMost($newMax): only holes remained below $newMax" }
-        return intDomainFromSurvivors(survivors.copyOfRange(0, end))
+        return intDomainFromSurvivors(survivors.copyOfRange(0, end), storage)
     }
 
     override fun includeInteriorValue(value: Long): IntDomain {
@@ -58,7 +68,7 @@ internal class SurvivorsDomain(override val min: Long, override val max: Long, p
         survivors.copyInto(out, 0, 0, insertAt)
         out[insertAt] = value
         survivors.copyInto(out, insertAt + 1, insertAt, survivors.size)
-        return intDomainFromSurvivors(out)
+        return intDomainFromSurvivors(out, storage)
     }
 
     override fun forEach(action: IntConsumer) {
