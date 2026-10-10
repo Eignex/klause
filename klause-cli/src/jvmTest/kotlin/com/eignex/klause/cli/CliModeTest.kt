@@ -565,11 +565,20 @@ class CliModeTest {
     fun `SMT optimization objectives use the source direction`() {
         for ((sort, bound) in listOf("Int" to "2", "Real" to "1.5")) {
             for (direction in listOf("minimize", "maximize")) {
+                val bounds = if (sort == "Int") {
+                    "(assert (>= x (- $bound))) (assert (<= x $bound))"
+                } else {
+                    """
+                    (declare-const y Int)
+                    (assert (= (* 2 x) y))
+                    (assert (>= y (- 3))) (assert (<= y 3))
+                    """.trimIndent()
+                }
                 val smt = File.createTempFile("clidirection", ".smt2").apply {
                     writeText(
                         """
                         (declare-const x $sort)
-                        (assert (>= x (- $bound))) (assert (<= x $bound))
+                        $bounds
                         ($direction x)
                         (check-sat)
                         """.trimIndent(),
