@@ -57,7 +57,7 @@ public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klau
 	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/BacktrackParams;Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;IZIZIZIILkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZIILjava/lang/Object;)Lcom/eignex/klause/backtrack/BacktrackParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAdaptiveRestart ()Z
-	public final fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
+	public fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getClauseExchange ()Lcom/eignex/klause/propagation/ClauseExchange;
 	public final fun getComponentFactory ()Lkotlin/jvm/functions/Function0;
@@ -148,6 +148,15 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public final fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public synthetic fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public fun openEnumerate (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openEnumerate (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openExactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openSamples (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/ResumableSearch;
 	public synthetic fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSearch;
 	public fun resumableSolve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/ResumableSolve;
@@ -559,6 +568,7 @@ public final class com/eignex/klause/brute/BruteForceParams : com/eignex/klause/
 	public final fun copy (Ljava/lang/Long;IIJLjava/lang/Long;)Lcom/eignex/klause/brute/BruteForceParams;
 	public static synthetic fun copy$default (Lcom/eignex/klause/brute/BruteForceParams;Ljava/lang/Long;IIJLjava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/brute/BruteForceParams;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
 	public final fun getMaxInstructions ()Ljava/lang/Long;
 	public final fun getMaxSteps ()J
 	public final fun getMinHammingDistance ()I
@@ -587,6 +597,15 @@ public final class com/eignex/klause/brute/BruteForceSolver : com/eignex/klause/
 	public synthetic fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/brute/BruteForceParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public synthetic fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public fun openEnumerate (Lcom/eignex/klause/brute/BruteForceParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openEnumerate (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openExactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/brute/BruteForceParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/brute/BruteForceParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/brute/BruteForceParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openSamples (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public fun sample (Lcom/eignex/klause/brute/BruteForceParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public synthetic fun sample (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public fun samples (Lcom/eignex/klause/brute/BruteForceParams;)Lkotlin/sequences/Sequence;
@@ -3634,7 +3653,7 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public final fun copy (JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZ)Lcom/eignex/klause/localsearch/LocalSearchParams;
 	public static synthetic fun copy$default (Lcom/eignex/klause/localsearch/LocalSearchParams;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/localsearch/CostShaping;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/incumbent/IncumbentExchange;IZILjava/lang/Object;)Lcom/eignex/klause/localsearch/LocalSearchParams;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
+	public fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getCostShaping ()Lcom/eignex/klause/localsearch/CostShaping;
 	public final fun getInitialAssignment ()Lcom/eignex/klause/solver/Sample;
@@ -3665,37 +3684,27 @@ public final class com/eignex/klause/localsearch/LocalSearchProblem {
 	public final fun getRealOccurrences ()[[I
 }
 
-public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex/klause/solver/Session {
+public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex/klause/solver/StatelessSession {
 	public fun <init> (Lcom/eignex/klause/localsearch/LocalSearchSolver;)V
-	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public fun close ()V
-	public fun count (Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
-	public fun enumerate (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
-	public synthetic fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
-	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
-	public fun getDepth ()I
-	public fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public synthetic fun enumerateScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun getSolver ()Lcom/eignex/klause/localsearch/LocalSearchSolver;
 	public synthetic fun getSolver ()Lcom/eignex/klause/solver/Solver;
-	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
-	public synthetic fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
-	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
-	public synthetic fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
-	public fun pop ()V
-	public fun push (Lcom/eignex/klause/propagation/Assumptions;)V
+	public synthetic fun improvementsScoped$com_eignex_klause (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
+	public synthetic fun minimizeScoped$com_eignex_klause (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public synthetic fun openEnumerateScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openImprovementsScoped$com_eignex_klause (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openQualitySamplesScoped$com_eignex_klause (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openSamplesScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public final fun reset ()V
 	public fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/ResumableSearch;
 	public synthetic fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSearch;
+	public synthetic fun resumableScoped$com_eignex_klause (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSearch;
 	public fun resumableSolve (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/ResumableSolve;
 	public synthetic fun resumableSolve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSolve;
-	public fun sample (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/result/SampleResult;
-	public synthetic fun sample (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
-	public fun samples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
-	public synthetic fun samples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
-	public fun samples (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
-	public synthetic fun samples (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
-	public fun solve (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/SolveResult;
-	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
+	public synthetic fun resumableSolveScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSolve;
+	public synthetic fun samplesScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
+	public synthetic fun solveScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver {
@@ -3725,6 +3734,15 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 	public final fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public synthetic fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public fun openEnumerate (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openEnumerate (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openExactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/SearchStream;
+	public synthetic fun openSamples (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/ResumableSearch;
 	public synthetic fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSearch;
 	public fun resumableSolve (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/ResumableSolve;
@@ -8401,6 +8419,7 @@ public final class com/eignex/klause/solver/Assignment {
 public abstract interface class com/eignex/klause/solver/Optimizer : com/eignex/klause/solver/Solver {
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public abstract fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 }
 
 public final class com/eignex/klause/solver/Optimizer$DefaultImpls {
@@ -8409,6 +8428,11 @@ public final class com/eignex/klause/solver/Optimizer$DefaultImpls {
 	public static fun describe (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/solver/SolverParams;)Ljava/lang/String;
 	public static fun exactCount (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public static fun improvements (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
+	public static fun openEnumerate (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openExactCount (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openImprovements (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public static fun sample (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public static fun samples (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public static fun session (Lcom/eignex/klause/solver/Optimizer;)Lcom/eignex/klause/solver/Session;
@@ -8465,6 +8489,11 @@ public final class com/eignex/klause/solver/ResumableOptimizer$DefaultImpls {
 	public static fun describe (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/solver/SolverParams;)Ljava/lang/String;
 	public static fun exactCount (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public static fun improvements (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
+	public static fun openEnumerate (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openExactCount (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openImprovements (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public static fun sample (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public static fun samples (Lcom/eignex/klause/solver/ResumableOptimizer;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public static fun session (Lcom/eignex/klause/solver/ResumableOptimizer;)Lcom/eignex/klause/solver/Session;
@@ -8511,6 +8540,10 @@ public final class com/eignex/klause/solver/ResumableSolver$DefaultImpls {
 	public static fun count (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
 	public static fun describe (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/solver/SolverParams;)Ljava/lang/String;
 	public static fun exactCount (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
+	public static fun openEnumerate (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openExactCount (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public static fun sample (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public static fun samples (Lcom/eignex/klause/solver/ResumableSolver;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public static fun session (Lcom/eignex/klause/solver/ResumableSolver;)Lcom/eignex/klause/solver/Session;
@@ -8534,6 +8567,11 @@ public final class com/eignex/klause/solver/Sample {
 	public fun hashCode ()I
 }
 
+public abstract interface class com/eignex/klause/solver/SearchStream : java/lang/AutoCloseable, java/util/Iterator, kotlin/jvm/internal/markers/KMappedMarker, kotlin/sequences/Sequence {
+	public abstract fun close ()V
+	public abstract fun isDone ()Z
+}
+
 public abstract interface class com/eignex/klause/solver/Session : java/lang/AutoCloseable {
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public static synthetic fun approximateCount$default (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/ApproxCountConfig;ILjava/lang/Object;)Lcom/eignex/klause/count/Count;
@@ -8548,6 +8586,12 @@ public abstract interface class com/eignex/klause/solver/Session : java/lang/Aut
 	public abstract fun getSolver ()Lcom/eignex/klause/solver/Solver;
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public fun openEnumerate (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openExactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public static synthetic fun openExactCount$default (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public abstract fun pop ()V
 	public abstract fun push (Lcom/eignex/klause/propagation/Assumptions;)V
 	public fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSearch;
@@ -8569,6 +8613,12 @@ public final class com/eignex/klause/solver/Session$DefaultImpls {
 	public static fun getProblem (Lcom/eignex/klause/solver/Session;)Lcom/eignex/klause/ir/Problem;
 	public static fun improvements (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public static fun minimize (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public static fun openEnumerate (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openExactCount (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public static synthetic fun openExactCount$default (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openImprovements (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public static fun resumable (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSearch;
 	public static fun resumableSolve (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSolve;
 	public static fun sample (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
@@ -8634,6 +8684,11 @@ public abstract interface class com/eignex/klause/solver/Solver {
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public static synthetic fun exactCount$default (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lkotlin/sequences/Sequence;
 	public abstract fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
+	public fun openEnumerate (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openExactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public static synthetic fun openExactCount$default (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public fun sample (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public fun samples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public abstract fun samples (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
@@ -8649,17 +8704,24 @@ public final class com/eignex/klause/solver/Solver$DefaultImpls {
 	public static fun describe (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/solver/SolverParams;)Ljava/lang/String;
 	public static fun exactCount (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public static synthetic fun exactCount$default (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lkotlin/sequences/Sequence;
+	public static fun openEnumerate (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openExactCount (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public static synthetic fun openExactCount$default (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public static fun openSamples (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public static fun sample (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public static fun samples (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public static fun session (Lcom/eignex/klause/solver/Solver;)Lcom/eignex/klause/solver/Session;
 }
 
 public abstract interface class com/eignex/klause/solver/SolverParams {
+	public fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
 	public fun withAssumptions (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public fun withCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
 
 public final class com/eignex/klause/solver/SolverParams$DefaultImpls {
+	public static fun getAssumptions (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/propagation/Assumptions;
 	public static fun withAssumptions (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public static fun withCancellation (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
@@ -8670,6 +8732,7 @@ public class com/eignex/klause/solver/StatelessSession : com/eignex/klause/solve
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public fun close ()V
 	public fun count (Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
+	protected final fun ensureAvailable ()V
 	public fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public fun getDepth ()I
@@ -8677,6 +8740,11 @@ public class com/eignex/klause/solver/StatelessSession : com/eignex/klause/solve
 	public fun getSolver ()Lcom/eignex/klause/solver/Solver;
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public fun openEnumerate (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openExactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openImprovements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
+	public fun openSamples (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public fun pop ()V
 	public fun push (Lcom/eignex/klause/propagation/Assumptions;)V
 	public fun resumable (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSearch;
