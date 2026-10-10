@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from decimal import Decimal, InvalidOperation
 import gzip
 import json
+import lzma
 import math
 from pathlib import Path
 import random
@@ -16,6 +17,8 @@ def read(path):
     raw = Path(path).read_bytes()
     if str(path).endswith('.gz'):
         raw = gzip.decompress(raw)
+    elif str(path).endswith('.xz'):
+        raw = lzma.decompress(raw)
     return json.loads(raw)
 
 
