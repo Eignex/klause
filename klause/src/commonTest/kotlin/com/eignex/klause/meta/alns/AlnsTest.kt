@@ -12,8 +12,11 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
+import com.eignex.klause.solver.ResumableOptimizer
+import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
@@ -27,6 +30,8 @@ import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
@@ -35,6 +40,319 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AlnsTest {
+
+    @Test
+    fun `complete bootstrap resumes one search until its first incumbent`() {
+        val problem = selectProblem()
+        val sample = selectOptimum()
+        var opened = 0
+        var slices = 0
+        var closes = 0
+        val backtrack = object :
+            ResumableOptimizer<BacktrackParams>,
+            Optimizer<BacktrackParams> by BacktrackSolver(problem) {
+            override fun minimize(objective: LinearObjective, params: BacktrackParams) = error("cold bootstrap")
+            override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch {
+                opened++
+                return object : ResumableSearch {
+                    override val isDone: Boolean get() = slices == 2
+                    override val stats: SolveStats
+                        get() = SolveStats(search = SearchStats(nodes = SumResult(slices * 13.0)))
+                    override fun runSlice(
+                        global: Cancellation,
+                        sliceMillis: Long,
+                        sliceNodes: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                    ): MinimizeResult? {
+                        slices++
+                        if (slices == 1) return null
+                        val result = MinimizeResult.BestFound(
+                            sample, objective.evaluate(sample), TerminationReason.BudgetExhausted, stats,
+                        )
+                        onIncumbent(result)
+                        return result
+                    }
+                    override fun close() { closes++ }
+                }
+            }
+        }
+        val alns = Alns(inner = NoFeasibleLs(problem), backtrack = backtrack, maxIterations = 0)
+        val callbacks = mutableListOf<Sample>()
+        val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
+
+        assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) { callbacks += it.sample })
+        assertEquals(13L, handle.stats.alns.bootstrapCpNodes)
+        val result = assertNotNull(
+            handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) { callbacks += it.sample },
+        )
+        handle.close()
+
+        assertSame(sample, result.assignment)
+        assertEquals(listOf(sample), callbacks)
+        assertEquals(1, opened)
+        assertEquals(2, slices)
+        assertEquals(1, closes)
+        assertEquals(26L, result.stats.alns.bootstrapCpNodes)
+        assertEquals(100L, handle.chargedInstructions)
+        assertEquals(0L, result.stats.alns.outerAllowance)
+        assertTrue(handle.isDone)
+    }
+
+    @Test
+    fun `local bootstrap retains its walk across instruction slices`() {
+        val problem = selectProblem()
+        val sample = selectOptimum()
+        var opened = 0
+        var slices = 0
+        var closes = 0
+        val inner = object :
+            ResumableOptimizer<LocalSearchParams>,
+            Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun minimize(objective: LinearObjective, params: LocalSearchParams) = error("cold bootstrap")
+            override fun resumable(objective: LinearObjective, params: LocalSearchParams): ResumableSearch {
+                opened++
+                return object : InstructionSlicedSearch {
+                    override val isDone: Boolean get() = slices == 2
+                    override val stats: SolveStats
+                        get() = SolveStats(ls = LocalSearchStats(moves = SumResult(slices * 7.0)))
+                    override fun runSlice(
+                        global: Cancellation,
+                        sliceMillis: Long,
+                        sliceNodes: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                    ): MinimizeResult? = error("instruction slice required")
+                    override fun runInstructionSlice(
+                        global: Cancellation,
+                        sliceMillis: Long,
+                        sliceInstructions: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                    ): MinimizeResult? {
+                        assertEquals(50L, sliceInstructions)
+                        slices++
+                        if (slices == 1) return null
+                        return MinimizeResult.BestFound(
+                            sample, objective.evaluate(sample), TerminationReason.BudgetExhausted, stats,
+                        ).also(onIncumbent)
+                    }
+                    override fun close() { closes++ }
+                }
+            }
+        }
+        val alns = Alns(inner = inner, maxIterations = 0)
+        val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
+
+        assertTrue(handle.preparationPending)
+        assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        assertFalse(handle.preparationPending)
+        val result = assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+
+        assertSame(sample, result.assignment)
+        assertEquals(1, opened)
+        assertEquals(2, slices)
+        assertEquals(1, closes)
+        assertEquals(14L, handle.stats.alns.bootstrapLsMoves)
+        assertEquals(100L, handle.chargedInstructions)
+        assertEquals(0L, result.stats.alns.outerAllowance)
+    }
+
+    @Test
+    fun `neighborhood slices retain the accepted incumbent and acceptance policy`() {
+        val problem = selectProblem()
+        val initial = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))
+        var bootstraps = 0
+        var acceptancePolicies = 0
+        val incumbents = mutableListOf<Sample>()
+        val repairs = mutableListOf<Sample>()
+        val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
+                bootstraps++
+                return MinimizeResult.BestFound(initial, objective.evaluate(initial), TerminationReason.BudgetExhausted)
+            }
+        }
+        val alns = Alns(
+            inner = inner,
+            destroyOperators = listOf(DestroyOperator.Random),
+            repairOperators = listOf(RepairOperator { context ->
+                incumbents += context.incumbent
+                Sample(
+                    context.incumbent.bools.copyOf().also { it[SELECT_DEAREST[repairs.size]] = false }, LongArray(0),
+                ).also(repairs::add)
+            }),
+            acceptanceFor = { acceptancePolicies++; AcceptanceCriterion.Improving },
+            minDestroyFraction = 1.0,
+            maxDestroyFraction = 1.0,
+            maxIterations = 3,
+            flipsPerIteration = 50,
+        )
+        val callbacks = mutableListOf<Sample>()
+        val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
+
+        repeat(2) {
+            assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) { callbacks += it.sample })
+        }
+        val result = assertNotNull(
+            handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) { callbacks += it.sample },
+        )
+        assertSame(result, handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+
+        assertEquals(listOf(initial) + repairs.take(2), incumbents)
+        assertEquals(listOf(initial) + repairs, callbacks)
+        assertSame(repairs.last(), result.assignment)
+        assertEquals(1, bootstraps)
+        assertEquals(1, acceptancePolicies)
+        assertEquals(3, alns.iterationLog.size)
+        assertEquals(150L, result.stats.alns.outerAllowance)
+        assertEquals(150L, handle.chargedInstructions)
+    }
+
+    @Test
+    fun `retained CP repairs replace an expired slice token`() {
+        val problem = selectProblem()
+        var expired = false
+        val handles = mutableListOf<RepairSearch>()
+        val alns = Alns(
+            inner = NoFeasibleLs(problem),
+            backtrack = BacktrackSolver(problem),
+            backtrackParams = BacktrackParams(randomSeed = 0L),
+            destroyOperators = listOf(DestroyOperator.Random),
+            repairOperators = listOf(RepairOperator { context ->
+                val repair = assertNotNull(context.repairSearch)
+                handles += repair
+                assertNotNull(repair.repair(Assumptions.None, 100, Double.POSITIVE_INFINITY, context.params.cancellation))
+                expired = true
+                context.incumbent
+            }),
+            minDestroyFraction = 1.0,
+            maxDestroyFraction = 1.0,
+            maxIterations = 2,
+            flipsPerIteration = 50,
+        )
+        val handle = assertIs<InstructionSlicedSearch>(alns.resumable(LinearObjective(), LocalSearchParams()))
+
+        assertNull(handle.runInstructionSlice(Cancellation { expired }, Long.MAX_VALUE, 50) {})
+        assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+
+        assertEquals(2, handles.size)
+        assertSame(handles[0], handles[1])
+    }
+
+    @Test
+    fun `CP bootstrap and destroyed neighborhoods respect caller pins`() {
+        val problem = selectProblem()
+        val pins = Assumptions(bools = SELECT_DEAREST.associateWith { true })
+        for (resumable in listOf(false, true)) {
+            var repairs = 0
+            val alns = Alns(
+                inner = NoFeasibleLs(problem),
+                backtrack = BacktrackSolver(problem),
+                backtrackParams = BacktrackParams(randomSeed = 0L),
+                destroyOperators = listOf(DestroyOperator.Random),
+                repairOperators = listOf(RepairOperator { context ->
+                    repairs++
+                    assertTrue(SELECT_DEAREST.all { context.incumbent.bools[it] })
+                    assertTrue(SELECT_DEAREST.none { it in context.freed.bools })
+                    assertTrue(SELECT_DEAREST.all { context.pinAssumptions.boolValueOrNull(it) == true })
+                    context.incumbent
+                }),
+                minDestroyFraction = 1.0,
+                maxDestroyFraction = 1.0,
+                maxIterations = 1,
+            )
+            val params = LocalSearchParams(assumptions = pins)
+
+            val result = if (resumable) {
+                alns.resumable(selectObjective, params).use {
+                    assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE) {})
+                }
+            } else {
+                alns.minimize(selectObjective, params)
+            }
+
+            assertTrue(SELECT_DEAREST.all { assertNotNull(result.assignment).bools[it] })
+            assertEquals(1, repairs)
+        }
+    }
+
+    @Test
+    fun `a bootstrap callback failure closes the child and releases the ALNS handle`() {
+        val problem = selectProblem()
+        val sample = selectOptimum()
+        var closes = 0
+        val inner = object :
+            ResumableOptimizer<LocalSearchParams>,
+            Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun resumable(objective: LinearObjective, params: LocalSearchParams) = object : ResumableSearch {
+                override val isDone: Boolean get() = false
+                override val stats: SolveStats get() = SolveStats.EMPTY
+                override fun runSlice(
+                    global: Cancellation,
+                    sliceMillis: Long,
+                    sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? {
+                    onIncumbent(
+                        MinimizeResult.BestFound(sample, objective.evaluate(sample), TerminationReason.BudgetExhausted),
+                    )
+                    return null
+                }
+                override fun close() { closes++; error("child close") }
+            }
+        }
+        val alns = Alns(inner = inner)
+        val handle = alns.resumable(selectObjective, LocalSearchParams())
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            handle.runSlice(Cancellation.Never, Long.MAX_VALUE) { throw IllegalArgumentException("callback") }
+        }
+        handle.close()
+        alns.resumable(selectObjective, LocalSearchParams()).close()
+
+        assertEquals("callback", failure.message)
+        assertEquals("child close", failure.suppressedExceptions.single().message)
+        assertEquals(1, closes)
+    }
+
+    @Test
+    fun `closing a paused bootstrap releases both searches when one close fails`() {
+        val problem = selectProblem()
+        var cpCloses = 0
+        var lsCloses = 0
+        val cp = object : ResumableSearch {
+            override val isDone: Boolean get() = false
+            override val stats: SolveStats get() = SolveStats.EMPTY
+            override fun runSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? = null
+            override fun close() { cpCloses++; error("CP close") }
+        }
+        val ls = object : ResumableSearch by cp {
+            override fun close() { lsCloses++ }
+        }
+        val backtrack = object :
+            ResumableOptimizer<BacktrackParams>,
+            Optimizer<BacktrackParams> by BacktrackSolver(problem) {
+            override fun resumable(objective: LinearObjective, params: BacktrackParams) = cp
+        }
+        val inner = object :
+            ResumableOptimizer<LocalSearchParams>,
+            Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun resumable(objective: LinearObjective, params: LocalSearchParams) = ls
+        }
+        val alns = Alns(inner = inner, backtrack = backtrack)
+        val handle = alns.resumable(selectObjective, LocalSearchParams())
+
+        assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        val failure = assertFailsWith<IllegalStateException> { handle.close() }
+        handle.close()
+        alns.resumable(selectObjective, LocalSearchParams()).close()
+
+        assertEquals("CP close", failure.message)
+        assertEquals(1, cpCloses)
+        assertEquals(1, lsCloses)
+    }
 
     @Test
     fun `failed bootstrap reports both engines without charging an outer repair`() {

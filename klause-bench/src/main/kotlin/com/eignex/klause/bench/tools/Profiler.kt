@@ -84,7 +84,7 @@ internal object Profiler {
             else -> "other or unclassified"
         }
         val context = when {
-            methods.any { it.contains("Alns.bootstrapIncumbent") } -> "ALNS bootstrap: "
+            methods.any { it.contains("Alns") && it.endsWith(".bootstrapIncumbent") } -> "ALNS bootstrap: "
             methods.any { it.contains("RepairOperator") || it.contains("Repair.repair") } -> "ALNS repair: "
             else -> ""
         }

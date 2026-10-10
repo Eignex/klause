@@ -401,7 +401,11 @@ class Portfolio(
                 work = (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
             } else if (handle != null) {
                 val workBefore = handle.work - if (opening) handle.initialWork else 0L
-                val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
+                val instructionsBefore = if (worker.acceptsInstructionBudget) {
+                    (handle as? InstructionSlicedSearch)?.chargedInstructions ?: handle.stats.ls.moves.sum.toLong()
+                } else {
+                    0L
+                }
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
                     val millis = remainingMillis(armToken)
@@ -414,7 +418,9 @@ class Portfolio(
                 terminal = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
                 work = if (worker.acceptsInstructionBudget) {
-                    countedInstructions(claim, handle.stats.ls.moves.sum - instructionsBefore)
+                    val instructions = (handle as? InstructionSlicedSearch)?.chargedInstructions
+                        ?: handle.stats.ls.moves.sum.toLong()
+                    countedInstructions(claim, (instructions - instructionsBefore).toDouble())
                 } else {
                     handle.work - workBefore
                 }

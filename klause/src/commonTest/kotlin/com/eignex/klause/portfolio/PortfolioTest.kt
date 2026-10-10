@@ -23,6 +23,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -1397,6 +1398,46 @@ class PortfolioTest {
         val result = Portfolio.thompson(arms, baseSliceWork = 100L).use { it.solve() }
 
         assertEquals(100L, result.stats.portfolio.arms[0].work)
+    }
+
+    @Test
+    fun `a retained ALNS arm charges scheduling instructions without reporting inner moves`() {
+        val handle = object : InstructionSlicedSearch {
+            override var chargedInstructions = 0L
+                private set
+            override val isDone: Boolean get() = false
+            override val stats: SolveStats get() = SolveStats.EMPTY
+            override fun runSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? = error("instruction slice required")
+            override fun runInstructionSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceInstructions: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? {
+                chargedInstructions += sliceInstructions
+                return null
+            }
+        }
+        val arms = listOf(
+            PortfolioWorker.ofMinimize("lns", 0, countsInstructions = true, resumable = { handle }) { _, _, _, _ ->
+                error("retained search required")
+            }.also { it.family = ArmFamily.Lns },
+            PortfolioWorker.ofMinimize("done", 1) { _, _, _, _ -> sequenceOf(MinimizeResult.Infeasible()) },
+        )
+
+        val result = Portfolio(
+            arms, DiscountedThompson(arms.size, Random(0), Portfolio.DEFAULT_HALF_LIFE),
+            baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
+        ).use { it.minimize() }
+
+        assertEquals(10L, handle.chargedInstructions)
+        assertEquals(7L, result.stats.portfolio.arms[0].work)
+        assertEquals(0.0, result.stats.ls.moves.sum)
     }
 
     @Test

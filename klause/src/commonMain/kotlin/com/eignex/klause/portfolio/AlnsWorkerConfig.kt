@@ -38,12 +38,11 @@ import kotlin.math.ln
  * count against the cap nor stop at it. The outer destroy/repair loop also charges each iteration's flip
  * allowance as local-search moves, so a run whose repairs never search still stops at the cap.
  *
- * This worker has
- * no pause/resume handle — [PortfolioWorker.newResumableSearch] is null — and accepts a counted
- * [PortfolioWorker.acceptsInstructionBudget] segment instead: [Portfolio] maps its per-segment
- * flip allowance onto [com.eignex.klause.localsearch.LocalSearchParams.maxInstructions], which
- * [com.eignex.klause.meta.alns.Alns] spends against its own outer destroy/repair loop (see
- * [com.eignex.klause.meta.alns.Alns]'s class KDoc for how one iteration is costed).
+ * [PortfolioWorker.newResumableSearch] retains CP and LS bootstrap preparation across counted
+ * [PortfolioWorker.acceptsInstructionBudget] segments. After the first incumbent it retains the
+ * neighborhood, acceptance policy and CP repair session. Each finite segment charges its offered
+ * scheduling allowance; [com.eignex.klause.solver.result.AlnsStats] records actual inner work separately.
+ * Repairs remain bounded atomic fragment searches.
  */
 internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, val nodeBudget: NodeBudget? = null) :
     WorkerConfig {

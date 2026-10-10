@@ -137,6 +137,9 @@ internal interface InstructionSlicedSolve : ResumableSolve {
 }
 
 internal interface InstructionSlicedSearch : ResumableSearch {
+    /** Cumulative scheduling instructions; LNS allowances can differ from observed inner-engine work. */
+    val chargedInstructions: Long get() = stats.ls.moves.sum.toLong()
+
     fun runInstructionSlice(
         global: Cancellation,
         sliceMillis: Long,
