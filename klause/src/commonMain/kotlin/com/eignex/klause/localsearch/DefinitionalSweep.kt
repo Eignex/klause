@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -8,6 +9,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -24,8 +26,8 @@ import com.eignex.klause.util.toSortedIntArray
  * ordered functional definitions of a model — every functionally-defined variable whose shape a
  * [SweepNode] can mirror exactly, over the *whole* model rather than just the objective cone. The
  * class is engine-side and format-agnostic (it depends only on the factor / objective IR); the
- * front-end supplies the definitions — FlatZinc, via `:: defines_var(V)` annotations, is the only
- * builder today. Definitions cover both value spaces:
+ * front-end supplies definition hints, or nodes built from source annotations. Definitions cover
+ * both value spaces:
  * int DAGs (abs / min / linear aux chains) via [SweepNode.IntDef], and the bool-shaped
  * definitions decompositions lean on — comparison reifications, `bool2int` channels, literal
  * set membership, bool conjunction/disjunction — plus variable-index element access.
@@ -51,12 +53,13 @@ class DefinitionalSweep internal constructor(
     /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
     companion object {
         /** Infer a sweep from the factor IR, so local search derives functionally-defined vars from the
-         *  decision vars instead of searching them. Two sound sources:
+         *  decision vars instead of searching them. Supported sources:
          *  - every `Product(a, b, out)` defines `out = a·b` (a product always determines its output);
          *  - a `Linear` equality is oriented to define var v ONLY when v is in [definedHints] — the
          *    front-end's `defines_var` info (e.g. a `(eq, v)` sum). Orienting a bare equality without that
          *    hint could pick a decision var as the output and derive it to an infeasible value, so it is
          *    never done unhinted.
+         *  - hinted min/max expression cones and their affine operands and aliases.
          *  A var claimed by more than one definition, or transitively by itself, is left searched. Nodes
          *  come out in topological order; returns null when nothing is definable. */
         fun infer(
@@ -114,6 +117,15 @@ class DefinitionalSweep internal constructor(
                     if (j != null) claim(f.vars[j], f, j)
                 }
             }
+            val extrema = extremumDefinitions(factors, numIntVars, definedHints)
+            val priorDefinitions = def.copyOf()
+            val extremumOutputs = BooleanArray(numIntVars)
+            for (definition in extrema) {
+                extremumOutputs[definition.variable] = true
+                if (priorDefinitions[definition.variable] !== definition.factor) {
+                    claim(definition.variable, definition.factor, definition.outputIndex)
+                }
+            }
             val nodes = ArrayList<SweepNode>()
             val state = ByteArray(numIntVars) // 0 unseen, 1 on-stack, 2 done
             val cyclic = BooleanArray(numIntVars)
@@ -136,6 +148,10 @@ class DefinitionalSweep internal constructor(
                         FunctionalObjective.Operand.v(f.b),
                     )
                     inputs = intArrayOf(f.a, f.b)
+                } else if (f is ArrayMinMax) {
+                    for (input in f.xs) visit(input)
+                    node = FunctionalObjective.Extreme(v, Array(f.xs.size) { FunctionalObjective.Operand.v(f.xs[it]) }, f.max)
+                    inputs = f.xs
                 } else {
                     val lin = f as Linear
                     val linRow = checkNotNull(lin.integerConstants) { "a claimed definition is an integer row" }
@@ -158,7 +174,8 @@ class DefinitionalSweep internal constructor(
                     )
                     inputs = IntArray(ins.size) { lin.vars[if (it < j) it else it + 1] }
                 }
-                if (!cyclic[v]) nodes.add(SweepNode.IntDef(node, inputs))
+                if (inputs.any { it in cyclic.indices && cyclic[it] }) cyclic[v] = true
+                if (!cyclic[v]) nodes.add(SweepNode.IntDef(node, inputs, extremumOutputs[v]))
                 state[v] = 2
             }
             for (v in 0 until numIntVars) visit(v)
@@ -272,6 +289,7 @@ class DefinitionalSweep internal constructor(
         class IntDef internal constructor(
             internal val node: FunctionalObjective.Node,
             override val intInputs: IntArray,
+            internal val inverseRepair: Boolean = false,
         ) : SweepNode {
             override val out: Int get() = node.out
             override val outIsBool: Boolean get() = false
@@ -399,6 +417,20 @@ class DefinitionalSweep internal constructor(
         }
     }
 
+    internal fun sweepPinned(
+        assignment: Assignment,
+        domains: Array<IntDomain>,
+        factors: Array<out Factor>,
+        assumptions: Assumptions,
+    ) {
+        var effective = domains
+        assumptions.forEachInt { id, value ->
+            if (effective === domains) effective = domains.copyOf()
+            effective[id] = IntDomain(value, value)
+        }
+        sweep(assignment, effective, factors) { assumptions.isFrozenBool(it) }
+    }
+
     /** Number of swept definitions. */
     val size: Int get() = nodes.size
 
@@ -421,7 +453,10 @@ class DefinitionalSweep internal constructor(
         factors: Array<out Factor> = emptyArray(),
         frozenBool: (Int) -> Boolean = { false },
     ) {
-        for (n in nodes) n.apply(assignment, domains)
+        for (n in nodes) {
+            if (n.outIsBool && frozenBool(n.out)) continue
+            n.apply(assignment, domains)
+        }
         for (f in factors) {
             if (f !is ReifiedLinear) continue
             if (frozenBool(f.auxBoolVar)) continue
@@ -455,6 +490,7 @@ class InvariantNetwork internal constructor(
     private val nodeArr: Array<DefinitionalSweep.SweepNode> = nodes.toTypedArray()
     private val definedInt = BooleanArray(numIntVars)
     private val definedBool = BooleanArray(numBoolVars)
+    private val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
 
     /** Node indexes reading each int var. */
     private val intReaders: Array<IntArray>
@@ -466,6 +502,8 @@ class InvariantNetwork internal constructor(
         for (i in nodeArr.indices) {
             val n = nodeArr[i]
             if (n.outIsBool) definedBool[n.out] = true else definedInt[n.out] = true
+            val intDef = n as? DefinitionalSweep.SweepNode.IntDef
+            if (intDef?.inverseRepair == true) intDefinitions.put(n.out, intDef.node)
         }
         intReaders = readers(numIntVars) { it.intInputs }
         boolReaders = readers(numBoolVars) { it.boolInputs }
@@ -488,6 +526,8 @@ class InvariantNetwork internal constructor(
 
     /** True iff bool var `v` is definitionally determined (should not be searched). */
     fun isDefinedBool(v: Int): Boolean = definedBool[v]
+
+    internal fun intDefinition(v: Int): FunctionalObjective.Node? = intDefinitions[v]
 
     internal fun readsInt(v: Int): Boolean = intReaders[v].isNotEmpty()
 

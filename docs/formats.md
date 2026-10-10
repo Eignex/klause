@@ -134,3 +134,8 @@ product and soft-constraint encodings. XCSP3 supplies finite-domain variables,
 supported globals and optional objectives. Each frontend retains its source
 objective orientation and output names. Unsupported constructs decline through
 the common solve surface.
+
+XCSP min/max arithmetic expressions mark deterministic auxiliaries and materialized affine
+operands as definition hints. Top-level equalities retain output aliases; hints alone do
+not orient unrelated sums or unhinted min/max globals. Domains and independently posted
+output constraints remain authoritative during local-search definition maintenance.
