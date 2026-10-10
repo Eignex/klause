@@ -82,7 +82,7 @@ data class BacktrackParams(
      */
     val nodeBudget: NodeBudget? = null,
     val randomSeed: Long? = null,
-    val assumptions: Assumptions = Assumptions.None,
+    override val assumptions: Assumptions = Assumptions.None,
     val variableSelector: VariableSelector = Vsids(),
     val valueSelector: ValueSelector = IndomainRandom,
     val minHammingDistance: Int = 0,
