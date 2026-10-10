@@ -142,6 +142,7 @@ internal fun lpRootBoundsReporting(
     cancellation: Cancellation = Cancellation.Never,
     zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     randomSeed: Long? = null,
+    minimumSpan: Long = 0L,
 ): LpRootBoundsResult {
     val sink = SolveStatsSink(backend = "lp-obbt", lpProbeRoute = LpRoute.ROOT)
     val engine = LpEngine(
@@ -155,7 +156,7 @@ internal fun lpRootBoundsReporting(
         ),
         sink,
     )
-    val shaved = engine.rootLpBoundsNoBake(cancellation)
+    val shaved = engine.rootLpBoundsNoBake(cancellation, minimumSpan)
     if (shaved.isEmpty()) return LpRootBoundsResult(problem, sink.snapshot().lp)
     val domains = problem.finiteIntDomains()
     for (sb in shaved) domains[sb.varId] = domains[sb.varId].withMinAtLeast(sb.lo).withMaxAtMost(sb.hi)

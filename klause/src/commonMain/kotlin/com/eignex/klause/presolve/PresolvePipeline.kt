@@ -203,6 +203,7 @@ object PresolvePipeline {
                 preBakeSlice(cancellation, presolveBudget),
                 zeroObjectivePricing,
                 randomSeed,
+                minimumSpan = sourceProblem.settings.largeSpanThreshold,
             )
         } else {
             LpRootBoundsResult(sourceProblem, LpStats())
