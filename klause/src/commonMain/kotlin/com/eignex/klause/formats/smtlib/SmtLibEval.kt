@@ -17,9 +17,6 @@ import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.lowering.scaleIntComb
 import com.eignex.klause.lowering.sumIntCombs
 import com.eignex.klause.lowering.trueLit
-import com.eignex.klause.lowering.tseitinAnd
-import com.eignex.klause.lowering.tseitinIff
-import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.maxOf
 import com.eignex.klause.util.parseBigInt
@@ -313,15 +310,15 @@ private fun Compiler.Builder.combineReal(head: String, args: List<Res>): Res = w
 private fun Compiler.Builder.combineBool(node: SExpr.SList, head: String, args: List<Res>): Res = when (head) {
     "not" -> Res.B(Lit.negate(args[0].asLit()))
 
-    "and" -> Res.B(tseitinAnd(args.map { it.asLit() }))
+    "and" -> Res.B(reifyAnd(args.map { it.asLit() }))
 
-    "or" -> Res.B(tseitinOr(args.map { it.asLit() }))
+    "or" -> Res.B(reifyOr(args.map { it.asLit() }))
 
-    "xor" -> Res.B(args.map { it.asLit() }.reduce { a, b -> Lit.negate(tseitinIff(a, b)) })
+    "xor" -> Res.B(args.map { it.asLit() }.reduce { a, b -> Lit.negate(reifyIff(a, b)) })
 
     "=>" -> {
         val lits = args.map { it.asLit() }
-        Res.B(lits.dropLast(1).foldRight(lits.last()) { a, acc -> tseitinOr(listOf(Lit.negate(a), acc)) })
+        Res.B(lits.dropLast(1).foldRight(lits.last()) { a, acc -> reifyOr(listOf(Lit.negate(a), acc)) })
     }
 
     "<=", "<", ">=", ">" -> if (args.any { it is Res.R }) {
@@ -340,7 +337,7 @@ private fun Compiler.Builder.combineBool(node: SExpr.SList, head: String, args: 
                 neLits.add(Lit.negate(reifyRealRel("=", terms[i], terms[j])))
             }
         }
-        Res.B(tseitinAnd(neLits))
+        Res.B(reifyAnd(neLits))
     } else {
         Res.B(distinctFromArgs(args))
     }
@@ -356,7 +353,7 @@ private fun Compiler.Builder.combineBool(node: SExpr.SList, head: String, args: 
             Res.B(chainEqToFirst(args.map { it.asIntComb() }) { x, y -> reifyRelation("=", x, y) })
         }
     } else {
-        Res.B(chainEqToFirst(args.map { it.asLit() }, ::tseitinIff))
+        Res.B(chainEqToFirst(args.map { it.asLit() }, ::reifyIff))
     }
 
     else -> smtUnsupported("unsupported boolean op '$head'")
@@ -541,7 +538,7 @@ private fun Compiler.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: L
  *  n−1 consecutive pairs. The native chain factor is hard-only (no reified form), so a chain under
  *  boolean structure stays a conjunction of reified pairs. */
 private inline fun Compiler.Builder.chainReified(n: Int, reifyPair: (Int) -> Int): Int =
-    if (n == 2) reifyPair(0) else tseitinAnd((0 until n - 1).map(reifyPair))
+    if (n == 2) reifyPair(0) else reifyAnd((0 until n - 1).map(reifyPair))
 
 /** Reified `distinct` over folded operands (bool operands channelled to a 0/1 int term): the linear-size
  *  witness encoding where every operand is a bare finite-domain variable, else pairwise strict-order choices. */
@@ -556,10 +553,10 @@ private fun Compiler.Builder.distinctFromArgs(args: List<Res>): Int {
         for (j in i + 1 until terms.size) {
             val less = reifyRelation("<", terms[i], terms[j])
             val greater = reifyRelation(">", terms[i], terms[j])
-            orderLits.add(tseitinOr(listOf(less, greater)))
+            orderLits.add(reifyOr(listOf(less, greater)))
         }
     }
-    return tseitinAnd(orderLits)
+    return reifyAnd(orderLits)
 }
 
 /** The witness reification of `distinct`, or null when an operand is not a bare variable, repeats another,

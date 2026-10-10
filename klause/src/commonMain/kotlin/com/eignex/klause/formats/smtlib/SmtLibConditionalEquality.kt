@@ -7,8 +7,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.trueLit
-import com.eignex.klause.lowering.tseitinAnd
-import com.eignex.klause.lowering.tseitinOr
 
 internal class SmtLibConditionalEquality {
     class UnusedColumns(val ints: Set<Int>, val bools: Set<Int>)
@@ -103,7 +101,7 @@ internal class SmtLibConditionalEquality {
             own(owner, parts)
         }
         for (factor in factors) {
-            if (factor is ReifiedFactor && factor !in owners) {
+            if (factor is ReifiedFactor && factor !in owners && factor.auxBoolVar !in booleanOwners) {
                 val owner = Owner(factor.auxBoolVar, integer = false)
                 own(owner, listOf(factor))
             }
@@ -267,7 +265,7 @@ private fun Compiler.Builder.foldConditionalAnd(literals: List<Int>): Int {
     return when (retained.size) {
         0 -> truth
         1 -> retained.first()
-        else -> retainConditionalGate { tseitinAnd(retained.toList()) }
+        else -> reifyAnd(retained.toList())
     }
 }
 
@@ -281,13 +279,6 @@ private fun Compiler.Builder.foldConditionalOr(literals: List<Int>): Int {
     return when (retained.size) {
         0 -> Lit.negate(truth)
         1 -> retained.first()
-        else -> retainConditionalGate { tseitinOr(retained.toList()) }
+        else -> reifyOr(retained.toList())
     }
-}
-
-private inline fun Compiler.Builder.retainConditionalGate(define: () -> Int): Int {
-    val start = factors.size
-    val literal = define()
-    conditionalEqualities.definePredicate(Lit.variable(literal), factors.subList(start, factors.size))
-    return literal
 }
