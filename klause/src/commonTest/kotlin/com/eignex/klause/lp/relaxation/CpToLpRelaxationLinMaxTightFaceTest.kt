@@ -5,7 +5,6 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.FloatLpStatus
-import com.eignex.klause.lp.engine.LpSolution
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -22,27 +21,6 @@ import kotlin.test.assertTrue
 class CpToLpRelaxationLinMaxTightFaceTest {
 
     private val eps = 1e-7
-
-    private fun solve(p: Problem, obj: LinearObjective, tightFace: Boolean): LpSolution {
-        val r = CpToLpRelaxation(p, obj, linMaxTightFace = tightFace).build(PropagationSession(p))
-        return solveLp(r.model)
-    }
-
-    @Test
-    fun `tight face keeps the max bound sound`() {
-        // result = max(x1∈[1,5], x2∈[2,7]); maximize result ⇒ true integer max = 7 (x2=7).
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 100), IntDomain(1, 5), IntDomain(2, 7)),
-            factors = arrayOf<Factor>(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)),
-        )
-        // maximize result ⇔ minimize −result.
-        val sol = solve(p, LinearObjective(intCoefficients = longArrayOf(-1L, 0L, 0L)), tightFace = true)
-        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-        // Sound: the relaxation contains result = 7, so LP max ≥ 7 ⇒ objective (−result) ≤ −7.
-        assertTrue(sol.objectiveValue <= -7.0 + eps, "UNSOUND: LP max ${-sol.objectiveValue} below integer optimum 7")
-    }
 
     @Test
     fun `tight face adds selector rows and stays exact for a single operand max`() {
@@ -63,21 +41,6 @@ class CpToLpRelaxationLinMaxTightFaceTest {
         val sol = solveLp(withFace.model)
         assertEquals(FloatLpStatus.OPTIMAL, sol.status)
         assertEquals(-5.0, sol.objectiveValue, eps) // result = x1 max = 5, exact and sound
-    }
-
-    @Test
-    fun `tight face keeps the min bound sound`() {
-        // result = min(x1∈[1,5], x2∈[2,7]); minimize result ⇒ true integer min = 1 (x1=1).
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 100), IntDomain(1, 5), IntDomain(2, 7)),
-            factors = arrayOf<Factor>(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = false)),
-        )
-        val sol = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L)), tightFace = true)
-        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-        // Sound: the relaxation contains result = 1, so LP min ≤ 1.
-        assertTrue(sol.objectiveValue <= 1.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} above integer optimum 1")
     }
 
     /** `result = max(x1, x2)` with the sides [openHi] marks as ones the finite lane invented. */

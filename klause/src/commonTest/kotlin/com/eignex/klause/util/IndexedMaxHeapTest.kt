@@ -1,6 +1,5 @@
 package com.eignex.klause.util
 
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -86,67 +85,4 @@ class IndexedMaxHeapTest {
         assertFailsWith<IllegalArgumentException> { h.resetAllKeysInIdOrder(1.0) }
     }
 
-    @Test
-    fun `random ops track a reference model and drain in sorted order`() {
-        val rng = Random(104)
-        repeat(40) {
-            val cap = rng.nextInt(1, 30)
-            val h = IndexedMaxHeap(cap)
-            val key = DoubleArray(cap) // last-known key per id (valid once ever inserted)
-            val present = BooleanArray(cap)
-            val everSeen = BooleanArray(cap)
-            repeat(400) {
-                val id = rng.nextInt(cap)
-                when (rng.nextInt(5)) {
-                    0 -> if (!present[id]) {
-                        val k = rng.nextDouble()
-                        h.insert(
-                            id,
-                            k,
-                        )
-                        key[id] = k
-                        present[id] = true
-                        everSeen[id] = true
-                    }
-
-                    1 -> if (present[id]) {
-                        val k = rng.nextDouble()
-                        h.updateKey(id, k)
-                        key[id] = k
-                    }
-
-                    2 -> if (present[id]) {
-                        h.remove(id)
-                        present[id] = false
-                    }
-
-                    3 -> if (!present[id] && everSeen[id]) {
-                        h.restore(id)
-                        present[id] = true
-                    }
-
-                    4 -> if (h.size > 0) {
-                        val expectedMax = (0 until cap).filter { id -> present[id] }.maxByOrNull { id -> key[id] }!!
-                        val top = h.extractMax()
-                        assertTrue(present[top], "extractMax returned an absent id")
-                        assertEquals(key[expectedMax], key[top], "extractMax must return a max-key id")
-                        present[top] = false
-                    }
-                }
-                assertEquals(present.count { p -> p }, h.size)
-                if (h.size > 0) {
-                    val maxId = (0 until cap).filter { id -> present[id] }.maxByOrNull { id -> key[id] }!!
-                    assertEquals(key[maxId], key[h.peekMax()], "peekMax must expose a max-key id")
-                }
-            }
-            // Drain: keys must come out non-increasing.
-            var prev = Double.POSITIVE_INFINITY
-            while (h.size > 0) {
-                val k = h.keyOf(h.peekMax())
-                assertTrue(k <= prev + 1e-12, "drain order must be non-increasing")
-                prev = k
-                h.extractMax()
-            }
-        }
-    }
 }

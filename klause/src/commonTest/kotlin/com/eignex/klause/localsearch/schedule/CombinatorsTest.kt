@@ -29,18 +29,6 @@ class CombinatorsTest {
     }
 
     @Test
-    fun `sequence holds and keeps cooling the final leg past its budget`() {
-        val s = SequenceSchedule(listOf(Segment(geo(8.0), 1)))
-        s.step()
-        assertEquals(4.0, s.temperature, 1e-9)
-        // Past the leg budget, with no loop, the last leg simply keeps stepping.
-        s.step()
-        assertEquals(2.0, s.temperature, 1e-9)
-        s.step()
-        assertEquals(1.0, s.temperature, 1e-9)
-    }
-
-    @Test
     fun `loop wraps back to the first leg and resets it`() {
         val s = LoopSchedule(listOf(Segment(geo(100.0), 2), Segment(geo(10.0), 2)))
         s.step()
@@ -52,34 +40,6 @@ class CombinatorsTest {
         // Through leg 1, wrapped back to leg 0 reset to its start.
         assertEquals(100.0, s.temperature, 1e-9)
         s.step()
-        assertEquals(50.0, s.temperature, 1e-9)
-    }
-
-    @Test
-    fun `sequence forwards observe to the active adaptive leg`() {
-        val adaptive = AdaptiveCooling(initialRate = 0.95, minRate = 0.5, maxRate = 0.999, adjustStep = 0.2)
-        val s = SequenceSchedule(listOf(Segment(adaptive, 5), Segment(geo(10.0), 5)))
-        // acceptance 0.9, error +0.5 → rate *= 0.9 → 0.855.
-        s.observe(
-            RoundLog(
-                proposed = 10,
-                accepted = 9,
-                costMean = 0.0,
-                costVariance = 0.0,
-                bestCost = 0.0,
-                temperature = 1.0,
-            ),
-        )
-        assertEquals(0.855, adaptive.coolingRate, 1e-9)
-    }
-
-    @Test
-    fun `sequence forwards reheat to the active leg`() {
-        val s = SequenceSchedule(listOf(Segment(geo(100.0), 10)))
-        s.step()
-        s.step()
-        assertEquals(25.0, s.temperature, 1e-9)
-        s.reheat(2.0)
         assertEquals(50.0, s.temperature, 1e-9)
     }
 

@@ -7,12 +7,10 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -98,64 +96,4 @@ class SharedCutTest {
         assertTrue(shared.toCut(unrelated) == null, "a variable with no column cannot be expressed and is dropped")
     }
 
-    private fun satisfies(f: Linear, x: IntArray): Boolean {
-        var s = 0L
-        for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * x[f.vars[i]]
-        return when (f.op) {
-            LinearOp.LE -> s <= checkNotNull(f.integerConstants).bound
-            LinearOp.GE -> s >= checkNotNull(f.integerConstants).bound
-            LinearOp.EQ -> s == checkNotNull(f.integerConstants).bound
-            else -> true
-        }
-    }
-
-    @Test
-    fun `imported cuts stay valid at every integer-feasible point`() {
-        val rng = Random(20260625)
-        var checked = 0
-        repeat(300) {
-            val n = rng.nextInt(2, 4)
-            val domains = Array(n) { IntDomain(0, rng.nextInt(2, 5).toLong()) }
-            val factors = ArrayList<Factor>()
-            repeat(rng.nextInt(1, 4)) {
-                val k = rng.nextInt(2, n + 1)
-                val vars = (0 until n).shuffled(rng).take(k).toIntArray()
-                val coeffs = IntArray(k) { rng.nextInt(1, 4) }
-                val op = if (rng.nextBoolean()) LinearOp.LE else LinearOp.GE
-                factors.add(Linear(coeffs, vars, op, rng.nextInt(0, 3 * k + 1)))
-            }
-            val p = Problem(0, n, domains, factors.toTypedArray())
-            // Separate real global cuts on r1, then share them into r2.
-            val r1 = relax(p, LinearObjective(intCoefficients = LongArray(n) { rng.nextLong(-3, 4) }))
-            val sol = RevisedSimplex(r1.model).solve() ?: return@repeat
-            val cuts = AggregationMirSeparator().separate(CutContext(p, r1, sol.primal, PropagationSession(p)))
-            if (cuts.isEmpty()) return@repeat
-            val r2 = relax(p, LinearObjective(intCoefficients = LongArray(n) { rng.nextLong(-3, 4) }))
-            val lins = p.factors.filterIsInstance<Linear>()
-            for (cut in cuts) {
-                val imported = SharedCut.fromCut(cut, r1)?.toCut(r2) ?: continue
-                checked++
-                val x = IntArray(n)
-                fun recurse(v: Int) {
-                    if (v == n) {
-                        if (lins.all { f -> satisfies(f, x) }) {
-                            var lhs = 0L
-                            for (kk in imported.cols.indices) {
-                                lhs +=
-                                    imported.coeffs[kk] * x[r2.colVarId[imported.cols[kk]]]
-                            }
-                            assertTrue(lhs <= imported.rhs, "imported cut cuts off feasible ${x.toList()}")
-                        }
-                        return
-                    }
-                    for (value in domains[v].min..domains[v].max) {
-                        x[v] = value.toInt()
-                        recurse(v + 1)
-                    }
-                }
-                recurse(0)
-            }
-        }
-        assertTrue(checked > 0, "no cuts were imported across 300 instances")
-    }
 }

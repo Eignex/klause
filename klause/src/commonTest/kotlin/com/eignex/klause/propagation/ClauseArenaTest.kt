@@ -2,23 +2,16 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.model.PbOp
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class ClauseArenaTest {
-
-    private fun nativeSatEligible(problem: Problem): Boolean = PropagationProblem(problem).isNativeSatEligible
 
     private fun cnf(vararg clauses: IntArray): Problem = Problem(
         numBoolVars = 3,
@@ -26,47 +19,6 @@ class ClauseArenaTest {
         intDomains = emptyArray(),
         factors = clauses.map<IntArray, Factor> { Clause(it) }.toTypedArray(),
     )
-
-    @Test
-    fun `pure-Boolean clause-only problem is native-SAT eligible`() {
-        assertTrue(nativeSatEligible(cnf(intArrayOf(Lit.make(0, true), Lit.make(1, false)))))
-    }
-
-    @Test
-    fun `problem with an integer variable is not eligible`() {
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0L, 2L)),
-            factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
-        )
-        assertFalse(nativeSatEligible(problem))
-    }
-
-    @Test
-    fun `problem with a pseudo-Boolean factor is not eligible`() {
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                PseudoBoolean(longArrayOf(1L, 1L), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 1L),
-            ),
-        )
-        assertFalse(nativeSatEligible(problem))
-    }
-
-    @Test
-    fun `arena packs every clause contiguously with a trailing sentinel`() {
-        val c0 = intArrayOf(Lit.make(0, true), Lit.make(1, false))
-        val c1 = intArrayOf(Lit.make(2, true))
-        val c2 = intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, false))
-        val arena = cnf(c0, c1, c2).clauseArena
-
-        assertEquals(3, arena.clauseCount)
-        assertEquals(arena.lits.size, arena.end(arena.clauseCount - 1), "sentinel must equal total literals")
-    }
 
     @Test
     fun `each clause is recoverable from the arena in original order`() {

@@ -1,6 +1,5 @@
 package com.eignex.klause.util
 
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,14 +8,6 @@ import kotlin.test.assertTrue
 /** #104: coverage for [IntIntMap] across the dense (offset-array) and sparse (open-addressing
  *  hash) backings, including collision probing and key-range overflow. */
 class IntIntMapTest {
-
-    @Test
-    fun `empty map returns absent for any key`() {
-        val m = IntIntMap.build(IntArray(0), IntArray(0), absent = -1)
-        assertEquals(-1, m[0])
-        assertEquals(-1, m[12345])
-        assertFalse(m.contains(0))
-    }
 
     @Test
     fun `a compact key range resolves present and absent keys`() {
@@ -68,32 +59,4 @@ class IntIntMapTest {
         assertFalse(m.contains(6))
     }
 
-    @Test
-    fun `matches a HashMap reference for dense and sparse builds`() {
-        val rng = Random(104)
-        repeat(60) { trial ->
-            // Even trials: dense key span; odd: sparse span forcing the hash backing.
-            val dense = trial % 2 == 0
-            val count = rng.nextInt(1, 40)
-            val span = if (dense) count else count * 1000
-            val ref = LinkedHashMap<Int, Int>()
-            while (ref.size < count) {
-                val k = rng.nextInt(-span, span + 1)
-                ref[k] = rng.nextInt(-1000, 1000)
-            }
-            val keys = ref.keys.toIntArray()
-            val values = IntArray(keys.size) { ref.getValue(keys[it]) }
-            val m = IntIntMap.build(keys, values, absent = Int.MIN_VALUE)
-            // Present keys.
-            for ((k, v) in ref) {
-                assertEquals(v, m[k], "present key $k")
-                assertTrue(m.contains(k))
-            }
-            // Random probes (mostly absent).
-            repeat(50) {
-                val k = rng.nextInt(-span * 2, span * 2 + 1)
-                if (k in ref) assertEquals(ref.getValue(k), m[k]) else assertEquals(Int.MIN_VALUE, m[k])
-            }
-        }
-    }
 }

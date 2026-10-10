@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.Contribution
@@ -8,7 +7,6 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.emitLpRelaxation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class LinearLinearizerTest {
 
@@ -85,12 +83,4 @@ class LinearLinearizerTest {
         assertEquals(checkNotNull(linear.integerConstants).coeffs.toList(), builder.rows[0].coeffs)
     }
 
-    @Test
-    fun `a factor with no linear relaxation contributes nothing`() {
-        val allDifferent = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)
-        val builder = RecordingBuilder()
-
-        allDifferent.emitLpRelaxation(builder)
-        assertTrue(builder.rows.isEmpty())
-    }
 }

@@ -1,21 +1,15 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -64,19 +58,4 @@ class CpToLpRelaxationSubcircuitArcTest {
         assertTrue(r.colVarId.all { it >= 0 }, "an open-sided successor must contribute no arc columns")
     }
 
-    @Test
-    fun `arc relaxation keeps the optimum correct end to end`() {
-        val p = problem()
-        val base = BacktrackParams(randomSeed = 1L)
-        val noLp = BacktrackSolver(p.bake()).minimize(objective, base)
-        val lp = BacktrackSolver(
-            p.bake(),
-        ).minimize(objective, base.copy(lpPlan = LpPlan(bounding = true, circuit = true)))
-        assertTrue(noLp is MinimizeResult.Optimal, "baseline should solve, got $noLp")
-        assertTrue(lp is MinimizeResult.Optimal, "subcircuit-LP solve should be optimal, got $lp")
-        // succ[0] >= 1 forces node 0 included; the cheapest is succ[0] = 1 (e.g. the 2-cycle 0->1->0).
-        assertEquals(1.0, lp.objective, 1e-9, "minimum succ[0] under the forced inclusion")
-        assertEquals(noLp.objective, lp.objective, 1e-9, "the arc relaxation must not change the optimum")
-        assertTrue(lp.stats.lp.solves.sum > 0.0, "the LP should actually run, got ${lp.stats.lp.solves.sum}")
-    }
 }

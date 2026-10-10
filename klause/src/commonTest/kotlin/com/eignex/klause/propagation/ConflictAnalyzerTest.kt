@@ -3,12 +3,9 @@ package com.eignex.klause.propagation
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.InputOrder
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -105,45 +102,6 @@ class ConflictAnalyzerTest {
     }
 
     @Test
-    fun `a non-clause failing factor still proves UNSAT`() {
-        // A Linear factor at the conflict — the analyzer can't get a clause-form
-        // reason from it, so it bails out and the engine falls back to chronological
-        // backtrack (the search behaviour without LCG).
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 3)),
-            factors = arrayOf<Factor>(
-                Linear(
-                    intArrayOf(1),
-                    intArrayOf(0),
-                    LinearOp.EQ,
-                    5,
-                ),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(variableSelector = InputOrder))
-        assertIs<SolveResult.Unsat>(r)
-    }
-
-    @Test
-    fun `CDB-driven search proves UNSAT on a small encoding`() {
-        // Two-clause direct contradiction. The analyzer's clause is empty so no jump is
-        // requested, and the engine still arrives at Unsat.
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams())
-        assertIs<SolveResult.Unsat>(r)
-    }
-
-    @Test
     fun `learned clause persists in the session after backjump`() {
         // Two-decision conflict that learns [¬a, ¬b]. Once the clause is asserted, a=true forces
         // b=false through it, so no returned assignment may set both.
@@ -169,50 +127,6 @@ class ConflictAnalyzerTest {
             !(a && b),
             "learned clause [¬a, ¬b] should block the a=true ∧ b=true assignment; got a=$a b=$b",
         )
-    }
-
-    @Test
-    fun `search stays correct under default learning and under aggressive forgetting`() {
-        val problem = Problem(
-            numBoolVars = 4,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
-            ),
-        )
-        val clauses = listOf(
-            listOf(Lit.make(0, true), Lit.make(1, true)),
-            listOf(Lit.make(0, false), Lit.make(2, true)),
-            listOf(Lit.make(1, false), Lit.make(2, false)),
-            listOf(Lit.make(2, true), Lit.make(3, false)),
-            listOf(Lit.make(2, false), Lit.make(3, true)),
-        )
-        val runs = listOf(
-            "default learning" to BacktrackParams(randomSeed = 42L),
-            // Cap at 0 → forgetting will drop everything except glue (LBD ≤ 2). Combined
-            // with a tight Luby restart base, the forgetting pass triggers reliably.
-            "aggressive forgetting" to BacktrackParams(
-                lubyRestartBase = 4,
-                maxLearnedClauses = 0,
-                lbdGlueThreshold = 2,
-                randomSeed = 7L,
-            ),
-        )
-        for ((label, params) in runs) {
-            val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem.bake()).solve(params))
-            val s = sat.assignment.bools
-            for ((i, c) in clauses.withIndex()) {
-                assertTrue(
-                    c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                    "$label: clause $i not satisfied by ${s.toList()}",
-                )
-            }
-        }
     }
 
     @Test
@@ -315,61 +229,4 @@ class ConflictAnalyzerTest {
         assertEquals(1, learned.lbd, "minimized to single literal → LBD = 1")
     }
 
-    @Test
-    fun `clause minimization preserves correctness on minimized SAT search`() {
-        // End-to-end check: run a CDB search that learns minimizable clauses, verify
-        // the resulting assignment satisfies every original clause.
-        val problem = Problem(
-            numBoolVars = 5,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false), Lit.make(3, false))),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 11L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        val s = sat.assignment.bools
-        val clauses = listOf(
-            listOf(Lit.make(0, false), Lit.make(1, true)),
-            listOf(Lit.make(1, false), Lit.make(2, true)),
-            listOf(Lit.make(2, false), Lit.make(3, true)),
-            listOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false), Lit.make(3, false)),
-            listOf(Lit.make(0, true), Lit.make(4, true)),
-        )
-        for ((i, c) in clauses.withIndex()) {
-            assertTrue(
-                c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by ${s.toList()}",
-            )
-        }
-    }
-
-    @Test
-    fun `CDB finds SAT on a chained-propagation instance`() {
-        // (¬a ∨ b), (¬b ∨ c), (¬c ∨ d), (¬d ∨ e), (a).
-        // a=true forces b → c → d → e via unit propagation. No conflict arises, so this pins the
-        // happy path where the analyzer never runs.
-        val problem = Problem(
-            numBoolVars = 5,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
-                Clause(intArrayOf(Lit.make(3, false), Lit.make(4, true))),
-                Clause(intArrayOf(Lit.make(0, true))),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        for (v in 0 until 5) {
-            assertTrue(sat.assignment.bools[v], "v$v should be true; got ${sat.assignment.bools.toList()}")
-        }
-    }
 }

@@ -72,14 +72,6 @@ class HermiteFormTest {
     }
 
     @Test
-    fun `each row is zero to the right of its pivot`() {
-        val f = form(longArrayOf(6, 4, 10), longArrayOf(3, 9, 6))
-        // Row 0 pivots in column 0, so everything right of it is zero — the lower-triangular shape the
-        // reduction relies on to derive a bound for one variable per pivot row.
-        for (j in 1 until 3) assertEquals(BIG_ZERO, f.h[0][j], "row 0 column $j must be cleared")
-    }
-
-    @Test
     fun `the pivot entry is made positive`() {
         val f = form(longArrayOf(-4, 6))
         assertTrue(f.h[0][0] > BIG_ZERO, "pivot must be positive, was ${f.h[0][0]}")
@@ -93,25 +85,9 @@ class HermiteFormTest {
     }
 
     @Test
-    fun `an identity input is already in form`() {
-        val f = form(longArrayOf(1, 0), longArrayOf(0, 1))
-        assertEquals(BIG_ONE, f.h[0][0])
-        assertEquals(BIG_ONE, f.h[1][1])
-    }
-
-    @Test
     fun `a zero row leaves the remaining columns to later pivots`() {
         val f = form(longArrayOf(0, 0), longArrayOf(2, 3))
         assertEquals(BIG_ONE, f.h[1][0], "row 1 pivots at the gcd of 2 and 3")
-    }
-
-    @Test
-    fun `an untouched transform column costs a single entry`() {
-        // The reason the transform fits at all: it is the identity outside the columns the reduction
-        // reached, and an identity column is stored as its one entry rather than a full column.
-        val f = hermiteNormalForm(sparseRows(longArrayOf(0, 0, 0, 0, 3)), 5)
-        assertNotNull(f)
-        assertEquals(5, f.v.nonZeroCount, "one entry per column when only a swap took place")
     }
 
     @Test

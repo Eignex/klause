@@ -88,47 +88,6 @@ class RevisedSimplexScalingTest {
     }
 
     @Test
-    fun `equilibration selects the stronger live numerical pivot`() {
-        val builder = LpBuilder()
-        val narrow = builder.addRealVar(0.0, 2_000_000.0, cost = 1e-6)
-        val stable = builder.addRealVar(0.0, 2.0, cost = 1.0005)
-        builder.addRealRow(intArrayOf(narrow, stable), doubleArrayOf(1e-6, 1.0), Relation.GE, 1.0)
-        val model = builder.build(Sense.MINIMIZE)
-        val solver = RevisedSimplex(model)
-
-        val result = assertNotNull(solver.solve())
-
-        assertTrue(solver.scalingMetrics.applied)
-        assertEquals(narrow, result.basis.basicVars.single())
-        assertEquals(1.0, result.objective, 1e-9)
-        assertTrue(1e-6 * result.primal[narrow] + result.primal[stable] >= 1.0 - 1e-7)
-        assertTrue(solver.scalingMetrics.sourcePrimalResidual <= 1e-7)
-        assertTrue(solver.scalingMetrics.sourceBasicDualResidual <= 1e-12)
-    }
-
-    @Test
-    fun `equilibration makes theory pricing magnitude eligible in live units`() {
-        val builder = LpBuilder()
-        val x0 = builder.addRealVar(0.0, 2e8)
-        val x1 = builder.addRealVar(0.0, 2e8)
-        builder.addRealRow(intArrayOf(x0, x1), doubleArrayOf(5e-7, 4e-7), Relation.GE, 1.0)
-        val model = builder.build(Sense.MINIMIZE)
-        val solver = RevisedSimplex(
-            model,
-            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
-        )
-
-        val result = assertNotNull(solver.solve())
-
-        assertTrue(solver.scalingMetrics.applied)
-        assertTrue(solver.lastTheoryPricingSamples > 0)
-        assertEquals(1, solver.lastTheoryPricingSelections)
-        assertTrue(5e-7 * result.primal[x0] + 4e-7 * result.primal[x1] >= 1.0 - 1e-7)
-        assertEquals(0.0, result.objective, 0.0)
-        assertTrue(solver.scalingMetrics.sourcePrimalResidual <= 1e-7)
-    }
-
-    @Test
     fun `scaled optimum exposes primal dual objective and residuals in source units`() {
         val model = mixedRealModel()
         val scaledSolver = RevisedSimplex(model)
@@ -151,22 +110,6 @@ class RevisedSimplexScalingTest {
     }
 
     @Test
-    fun `unscaled factory provides a callable rollback`() {
-        val solver = UnscaledLpEngineFactory.newGeneralSolver(
-            mixedRealModel(),
-            Cancellation.Never,
-            0L,
-            LpPricingOptions(),
-        )
-
-        assertNotNull(solver.solve())
-
-        assertFalse(solver.scalingMetrics.applied)
-        assertEquals(LpScalingDecline.DISABLED, solver.scalingMetrics.decline)
-        solver.close()
-    }
-
-    @Test
     fun `scaled dual infeasibility ray certifies the source model`() {
         val model = infeasibleRealModel()
         val solver = RevisedSimplex(model)
@@ -184,30 +127,6 @@ class RevisedSimplexScalingTest {
                 basisRow = solver.infeasibleRow,
             ),
         )
-    }
-
-    @Test
-    fun `scaled primal phase one ray certifies the source model`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.ofIeee(-1e-6)))),
-            listOf(ExactLpNumber.ofIeee(-2e-6)),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(1L))), integral = false),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
-        val solver = RevisedSimplex(model)
-
-        val result = solver.solvePrimal()
-
-        assertNull(result)
-        assertTrue(solver.scalingMetrics.applied)
-        assertNotNull(solver.infeasibleRay)
-        assertEquals(LpVerdict.INFEASIBLE, certifyLpResult(model, solver, result).verdict)
     }
 
     @Test
@@ -347,21 +266,6 @@ class RevisedSimplexScalingTest {
         assertEquals(1, solver.scalingMetrics.fallbacks)
         assertTrue(result.refactorizations >= 2)
         assertTrue(solver.lastWorkOps > unscaled.lastWorkOps)
-    }
-
-    @Test
-    fun `current basis stays usable across safe scaled bound updates`() {
-        val source = exactScaledModel()
-        val trail = LpBoundTrail(source)
-        val solver = RevisedSimplex(assertNotNull(trail.state.toWorkingModel()))
-        assertNotNull(solver.solve())
-        assertTrue(solver.scalingMetrics.applied)
-        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
-        assertTrue(solver.adopt(trail.state, Cancellation.Never))
-
-        assertNotNull(solver.resolveBounds())
-        assertTrue(solver.scalingMetrics.applied)
-        solver.close()
     }
 
     private fun mixedRealModel(): LpModel {

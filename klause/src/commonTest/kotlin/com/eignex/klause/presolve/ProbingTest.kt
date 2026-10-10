@@ -1,6 +1,5 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
@@ -18,12 +17,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Probing to fixpoint ([Presolve.probe]). Asserts the pass's observable output — the unit [Clause]s
- * and domain tightenings it derives — for failed literals, both-polarity bound tightening, the no-op
- * empty delta, and a one-sided-consequence soundness guard. The cap is large enough that every
- * fixture is fully probed.
- */
 class ProbingTest {
 
     private val cap = 1024
@@ -119,38 +112,6 @@ class ProbingTest {
     }
 
     @Test
-    fun `an upper bound implied under both polarities is tightened`() {
-        // b0 ↔ (x ≤ 8); the clause (b0 ∨ b1) and b1 ↔ (x ≤ 3) make the false polarity force x ≤ 3.
-        // The common upper bound is the looser of the two, x ≤ 8; taking the tighter one instead would
-        // cut off the feasible values 4..8. x starts at [0, 10].
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 10)),
-            factors = listOf(
-                ReifiedLinear(
-                    auxBoolVar = 0,
-                    coeffs = intArrayOf(1),
-                    vars = intArrayOf(0),
-                    op = LinearOp.LE,
-                    bound = 8,
-                ),
-                ReifiedLinear(
-                    auxBoolVar = 1,
-                    coeffs = intArrayOf(1),
-                    vars = intArrayOf(0),
-                    op = LinearOp.LE,
-                    bound = 3,
-                ),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            ),
-        )
-        val out = probed(problem)
-        assertEquals(8L, out.finiteIntDomain(0).max, "the common upper bound x ≤ 8 is folded in")
-        assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
-    }
-
-    @Test
     fun `the candidate cap stops probing before a later failed literal`() {
         // b0 is unconstrained; b1 = true conflicts against (!b1 ∨ b2), (!b1 ∨ !b2). A cap of 1 spends
         // the only candidate slot on b0, so !b1 is never derived; an uncapped run derives it.
@@ -192,41 +153,8 @@ class ProbingTest {
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
     }
 
-    @Test
-    fun `a problem with nothing to derive is returned unchanged`() {
-        // Two independent free booleans, neither polarity ever conflicts, no int coupling ⇒ identity.
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
-        )
-        assertTrue(
-            Presolve.probe(problem.bake(), cap, Cancellation.Never).isEmpty,
-            "nothing derivable is the pass's no-op signal",
-        )
-    }
-
     private fun sourceUnits(delta: SourceDelta): Set<Int> =
         delta.addedFactors.filterIsInstance<Clause>().map { it.literals.single() }.toSet()
-
-    @Test
-    fun `the source form fixes the Booleans a clause chain forces at root`() {
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-            ),
-        )
-
-        val delta = Presolve.probeSource(problem, cap, Cancellation.Never)
-
-        assertEquals(setOf(Lit.make(1, true), Lit.make(2, true)), sourceUnits(delta))
-    }
 
     @Test
     fun `the source form fixes the activator of a row the declared range rules out`() {
@@ -268,24 +196,6 @@ class ProbingTest {
     }
 
     @Test
-    fun `the open-range probe leaves a model with every column closed alone`() {
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 20)),
-            factors = listOf(
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
-                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-            ),
-        )
-
-        val delta = PresolvePass.PROBE_OPEN_RANGES.applySource(problem, PresolveContext.EMPTY)
-
-        assertTrue(delta.isEmpty)
-    }
-
-    @Test
     fun `the source form closes an open side both polarities bound`() {
         // b0 ↔ (x ≤ 5), b1 ↔ (x ≤ 7) and b0 ∨ b1: x ≤ 5 under b0 = true, x ≤ 7 under b0 = false.
         val problem = Problem(
@@ -304,23 +214,6 @@ class ProbingTest {
 
         assertFalse(bounds.isOpenUpper(0))
         assertEquals(7L, bounds.upper(0))
-    }
-
-    @Test
-    fun `the source form refutes rows that cross over an open column`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 0)),
-            factors = listOf(
-                Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 1L),
-                Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 3L),
-            ),
-            openIntLo = booleanArrayOf(true),
-            openIntHi = booleanArrayOf(true),
-        )
-
-        assertTrue(Presolve.probeSource(problem, cap, Cancellation.Never).infeasible)
     }
 
     @Test

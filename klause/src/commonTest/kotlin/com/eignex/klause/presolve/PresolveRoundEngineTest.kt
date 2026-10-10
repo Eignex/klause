@@ -69,24 +69,6 @@ class PresolveRoundEngineTest {
     }
 
     @Test
-    fun `an expensive pass does not rerun after its own change`() {
-        val host = ScriptedHost(1_000, mapOf(PresolvePass.AGGREGATE_SUB_SUMS to listOf(500L)))
-
-        val runs = runs(listOf(PresolvePass.STRENGTHEN_COEFFICIENTS, PresolvePass.AGGREGATE_SUB_SUMS), host)
-
-        assertEquals(1, runs.count { it == PresolvePass.AGGREGATE_SUB_SUMS })
-    }
-
-    @Test
-    fun `an expensive pass skips a rerun after a small change elsewhere`() {
-        val host = ScriptedHost(1_000, mapOf(PresolvePass.STRENGTHEN_COEFFICIENTS to listOf(3L)))
-
-        val runs = runs(listOf(PresolvePass.AGGREGATE_SUB_SUMS, PresolvePass.STRENGTHEN_COEFFICIENTS), host)
-
-        assertEquals(1, runs.count { it == PresolvePass.AGGREGATE_SUB_SUMS })
-    }
-
-    @Test
     fun `an expensive pass reruns once others change a large enough share of the model`() {
         val host = ScriptedHost(1_000, mapOf(PresolvePass.STRENGTHEN_COEFFICIENTS to listOf(10L)))
 

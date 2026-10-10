@@ -75,47 +75,6 @@ class RevisedSimplexWorkTest {
     }
 
     @Test
-    fun `the same model charges the same work every time`() {
-        val first = RevisedSimplex(cover())
-        assertNotNull(first.solve(null))
-
-        val second = RevisedSimplex(cover())
-        assertNotNull(second.solve(null))
-
-        assertEquals(first.lastWorkOps, second.lastWorkOps, "the count must not depend on anything but the solve")
-    }
-
-    @Test
-    fun `a solve stopped early charges less than one run to the optimum`() {
-        val full = RevisedSimplex(cover())
-        val fullResult = assertNotNull(full.solve(null))
-        assertTrue(fullResult.pivots >= 2, "fixture must cost more than one pivot")
-
-        val capped = RevisedSimplex(cover(), iterationLimit = 1)
-        assertNotNull(capped.solve(null))
-
-        assertTrue(
-            capped.lastWorkOps < full.lastWorkOps,
-            "stopping short must cost less: ${capped.lastWorkOps} vs ${full.lastWorkOps}",
-        )
-    }
-
-    /** A denser, larger relaxation: every row touches every column. */
-    private fun wide(n: Int): LpModel {
-        val b = LpBuilder()
-        val v = IntArray(n) { b.addVar(0L, 10L, cost = (it % 4 + 1).toLong()) }
-        for (r in 0 until n) {
-            b.addRow(
-                IntArray(n) { v[it] },
-                LongArray(n) { if ((it + r) % 3 == 0) 2L else 1L },
-                Relation.GE,
-                (3 * n / 2).toLong(),
-            )
-        }
-        return b.build(Sense.MINIMIZE)
-    }
-
-    @Test
     fun `a work budget stops the solve and still bounds below`() {
         val full = RevisedSimplex(cover())
         val fullResult = assertNotNull(full.solve(null))
@@ -148,21 +107,4 @@ class RevisedSimplexWorkTest {
         )
     }
 
-    @Test
-    fun `a pivot costs a different amount on a different model`() {
-        val small = RevisedSimplex(cover())
-        val smallResult = assertNotNull(small.solve(null))
-        val large = RevisedSimplex(wide(12))
-        val largeResult = assertNotNull(large.solve(null))
-
-        val smallPerPivot = small.lastWorkOps / smallResult.pivots
-        val largePerPivot = large.lastWorkOps / largeResult.pivots
-
-        // This is the whole reason the meter exists: budgeting in pivots assumes they cost the same,
-        // and they do not — so a pivot budget means something different on every model.
-        assertTrue(
-            largePerPivot > 3 * smallPerPivot,
-            "work per pivot must track the model, saw $largePerPivot vs $smallPerPivot",
-        )
-    }
 }

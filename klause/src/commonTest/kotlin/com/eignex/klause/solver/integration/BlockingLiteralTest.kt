@@ -1,20 +1,14 @@
 package com.eignex.klause.solver.integration
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.pinBoolAsDecision
-import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -54,64 +48,6 @@ class BlockingLiteralTest {
                 state.watches.blockersByLit[lit].size,
                 "watcher and blocker lists must stay aligned for lit $lit",
             )
-        }
-    }
-
-    /** Pigeonhole P(n+1, n): place n+1 pigeons in n holes, at most one pigeon per hole — the
-     *  classic UNSAT clause family. Variable `p*n + h` means "pigeon p sits in hole h". */
-    private fun pigeonhole(pigeons: Int, holes: Int): Problem {
-        val factors = ArrayList<Factor>()
-        fun v(p: Int, h: Int) = p * holes + h
-        // Each pigeon occupies at least one hole.
-        for (p in 0 until pigeons) {
-            factors.add(Clause(IntArray(holes) { h -> Lit.make(v(p, h), true) }))
-        }
-        // No hole holds two pigeons: for each hole and each pigeon pair, ¬p1h ∨ ¬p2h.
-        for (h in 0 until holes) {
-            for (p1 in 0 until pigeons) {
-                for (p2 in p1 + 1 until pigeons) {
-                    factors.add(Clause(intArrayOf(Lit.make(v(p1, h), false), Lit.make(v(p2, h), false))))
-                }
-            }
-        }
-        return Problem(
-            numBoolVars = pigeons * holes,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = factors.toTypedArray(),
-        )
-    }
-
-    @Test
-    fun `clause-dense unsat pigeonhole still proves unsat under blocking literals`() {
-        val verdict = BacktrackSolver(pigeonhole(pigeons = 4, holes = 3).bake()).solve(
-            BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 5_000),
-        )
-        assertIs<SolveResult.Unsat>(verdict)
-    }
-
-    @Test
-    fun `clause-dense satisfiable pigeonhole finds a valid placement`() {
-        val holes = 4
-        val pigeons = 4 // P(4,4) is satisfiable: a perfect matching exists.
-        val sat = assertIs<SolveResult.Sat>(
-            BacktrackSolver(pigeonhole(pigeons, holes).bake()).solve(
-                BacktrackParams(randomSeed = 2L, variableSelector = Vsids(), maxLearnedClauses = 5_000),
-            ),
-        )
-        val b = sat.assignment.bools
-        // Each pigeon in at least one hole; no hole shared.
-        val holeUsed = BooleanArray(holes)
-        for (p in 0 until pigeons) {
-            var placed = 0
-            for (h in 0 until holes) {
-                if (b[p * holes + h]) {
-                    placed++
-                    assertTrue(!holeUsed[h], "hole $h used twice")
-                    holeUsed[h] = true
-                }
-            }
-            assertTrue(placed >= 1, "pigeon $p unplaced")
         }
     }
 }

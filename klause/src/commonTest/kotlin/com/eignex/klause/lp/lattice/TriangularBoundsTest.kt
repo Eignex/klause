@@ -22,13 +22,6 @@ class TriangularBoundsTest {
     private fun sides(vararg v: Long?): Array<BigInt?> = Array(v.size) { i -> v[i]?.let { big(it) } }
 
     @Test
-    fun `a diagonal row bounds its own column`() {
-        val b = triangularBounds(sparseRows(longArrayOf(1)), 1, sides(-3), sides(7))
-        assertEquals(big(-3), b.lo[0])
-        assertEquals(big(7), b.hi[0])
-    }
-
-    @Test
     fun `a later row bounds its pivot from the column already bounded`() {
         // y0 in [0, 10]; y0 + y1 in [0, 12]  =>  y1 <= 12 - 0 = 12 and y1 >= 0 - 10 = -10.
         val h = sparseRows(longArrayOf(1, 0), longArrayOf(1, 1))
@@ -71,14 +64,6 @@ class TriangularBoundsTest {
     }
 
     @Test
-    fun `a column pivoting in no row stays open`() {
-        val b = triangularBounds(sparseRows(longArrayOf(1, 0)), 2, sides(0), sides(4))
-        assertEquals(big(4), b.hi[0])
-        assertNull(b.lo[1], "column 1 is in no row's pivot position")
-        assertNull(b.hi[1])
-    }
-
-    @Test
     fun `bounds past Long are derived exactly`() {
         // 8·y0 <= 2^70, whose bound no Long domain could hold.
         val huge = BIG_ONE shl 70
@@ -86,10 +71,4 @@ class TriangularBoundsTest {
         assertEquals(BIG_ONE shl 67, b.hi[0])
     }
 
-    @Test
-    fun `a zero row bounds nothing`() {
-        val b = triangularBounds(sparseRows(longArrayOf(0, 0)), 2, sides(-1), sides(1))
-        assertNull(b.lo[0])
-        assertNull(b.hi[0])
-    }
 }

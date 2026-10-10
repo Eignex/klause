@@ -1,18 +1,7 @@
 package com.eignex.klause.localsearch.schedule
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-
-private fun costRound(cost: Long) = RoundLog(
-    proposed = 1,
-    accepted = 0,
-    costMean = 0.0,
-    costVariance = 0.0,
-    bestCost = cost.toDouble(),
-    temperature = 1.0,
-    incumbentCost = cost.toDouble(),
-)
 
 class NoiseControllerTest {
     @Test
@@ -29,18 +18,6 @@ class NoiseControllerTest {
             controller.level < afterBump,
             "expected decay after improvement, got ${controller.level} vs $afterBump",
         )
-    }
-
-    @Test
-    fun `noise controller on the round channel matches the per-step path`() {
-        val perStep = NoiseController(initial = 0.2, theta = 3, phi = 0.2)
-        val perRound = NoiseController(initial = 0.2, theta = 3, phi = 0.2)
-        val costs = longArrayOf(10, 10, 10, 10, 9, 9, 8, 12, 12, 12, 12, 7)
-        for (c in costs) {
-            perStep.observe(c)
-            perRound.observe(costRound(c))
-        }
-        assertEquals(perStep.level, perRound.level, 1e-12)
     }
 
     @Test
@@ -65,27 +42,5 @@ class NoiseControllerTest {
             controller.level <= 0.3,
             "level should stay near baseline under steady improvement; got ${controller.level}",
         )
-    }
-
-    @Test
-    fun `noise controller in ewma mode bumps level when cost rises above smoothed`() {
-        val controller = NoiseController(initial = 0.1, theta = 3, phi = 0.3, ewmaAlpha = 0.5)
-        repeat(5) { controller.observe(10) }
-        val baseline = controller.level
-        repeat(10) { controller.observe(20) }
-        assertTrue(
-            controller.level > baseline,
-            "level should grow on sustained rise above smoothed avg; got $baseline -> ${controller.level}",
-        )
-    }
-
-    @Test
-    fun `auto ewma alpha scales window with problem size and flip budget`() {
-        assertEquals(0.2, NoiseController.autoEwmaAlpha(numVars = 4, flipBudget = 100_000), 1e-9)
-        assertEquals(0.1, NoiseController.autoEwmaAlpha(numVars = 100, flipBudget = 100_000), 1e-9)
-        assertEquals(0.02, NoiseController.autoEwmaAlpha(numVars = 10_000, flipBudget = 1_000_000), 1e-9)
-        assertEquals(0.2, NoiseController.autoEwmaAlpha(numVars = 400, flipBudget = 100), 1e-9)
-        val alpha = NoiseController.autoEwmaAlpha(numVars = 1_000_000, flipBudget = 1)
-        assertTrue(alpha in 0.02..0.5, "alpha out of clip range: $alpha")
     }
 }

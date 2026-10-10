@@ -107,34 +107,6 @@ class RevisedSimplexPrimalTest {
     }
 
     @Test
-    fun `a free structural column can enter phase one against a fixed slack`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))),
-            listOf(ExactLpNumber.of(2L)),
-            listOf(
-                ExactLpColumn(ExactLpBounds()),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(one, zero)),
-        )
-        val working = assertNotNull(LpExactState(model).toWorkingModel())
-
-        RevisedSimplex(working).use { solver ->
-            val result = assertNotNull(solver.solvePrimal())
-            val certified = certifyLpResult(working, solver, result)
-
-            assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
-            assertEquals(listOf(BigFraction.ofLong(2L)), certified.exactPrimal)
-            assertEquals(BigFraction.ofLong(2L), certified.lowerBound)
-            assertEquals(VarStatus.BASIC, result.basis.status[0])
-            assertEquals(VarStatus.FIXED, result.basis.status[1])
-        }
-    }
-
-    @Test
     fun `distinct exact endpoints sharing a double do not export a fixed status`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
@@ -159,39 +131,6 @@ class RevisedSimplexPrimalTest {
         assertEquals(VarStatus.AT_LOWER, assertNotNull(certified.float).basis.status[0])
         assertFalse(model.column(0).bounds.fixed)
         assertEquals(lower.value.toDouble(), upper.value.toDouble())
-    }
-
-    /** `≤`-rows with nonnegative rhs over a bounded box: feasible at the all-lower start the primal
-     *  pass begins from, and bounded since every variable has a finite upper bound. */
-    private fun randomFeasibleModel(m: Int, n: Int, rng: Random): LpModel {
-        val b = LpBuilder()
-        repeat(n) { b.addVar(0L, rng.nextLong(2, 8), cost = rng.nextLong(-6, 7)) }
-        val cols = IntArray(n) { it }
-        repeat(m) { b.addRow(cols, LongArray(n) { rng.nextLong(-3, 4) }, Relation.LE, rng.nextLong(3, 20)) }
-        return b.build(Sense.MINIMIZE)
-    }
-
-    @Test
-    fun `primal optimum matches the dual optimum and certifies`() {
-        val rng = Random(20260621)
-        var converged = 0
-        repeat(500) {
-            val model = randomFeasibleModel(rng.nextInt(3, 9), rng.nextInt(3, 9), rng)
-            val primal = RevisedSimplex(model).solvePrimal() ?: return@repeat
-            val dual = RevisedSimplex(model).solve() ?: return@repeat
-            converged++
-            assertTrue(
-                abs(primal.objective - dual.objective) <= 1e-6 * maxOf(1.0, abs(dual.objective)),
-                "primal obj ${primal.objective} vs dual ${dual.objective}",
-            )
-            // The primal basis must certify to a sound integer bound, exactly like the dual path.
-            val bound = integerDualLowerBoundCeil(model, primal.duals) ?: return@repeat
-            assertTrue(
-                bound.toDouble() <= ceil(primal.objective) + 1e-6,
-                "primal certified bound $bound > ceil(obj ${primal.objective})",
-            )
-        }
-        assertTrue(converged > 200, "primal converged on only $converged instances")
     }
 
     /** `≥`-rows with positive rhs (covering): the all-lower start is primal-infeasible (every slack
@@ -239,52 +178,6 @@ class RevisedSimplexPrimalTest {
         val result = RevisedSimplex(model).solvePrimal()
         assertTrue(result != null, "primal should solve the loose box")
         assertTrue(abs(result.objective - (-2.0)) <= 1e-9, "optimum ${result.objective} should be -2")
-    }
-
-    @Test
-    fun `primal solves a degenerate LP to the dual optimum`() {
-        // Overlapping/redundant constraints create degenerate vertices (several basics at zero), the
-        // setting where the Dantzig rule could cycle and Bland's rule keeps termination. maximize the
-        // sum (minimize its negation): optimum 3, e.g. (1,1,1,0).
-        val b = LpBuilder()
-        repeat(4) { b.addVar(0L, 3L, cost = -1L) }
-        val all = intArrayOf(0, 1, 2, 3)
-        b.addRow(all, longArrayOf(1L, 1L, 1L, 1L), Relation.LE, 3L)
-        b.addRow(all, longArrayOf(1L, 1L, 1L, 1L), Relation.LE, 3L) // redundant ⇒ degeneracy
-        b.addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 2L)
-        b.addRow(intArrayOf(2, 3), longArrayOf(1L, 1L), Relation.LE, 2L)
-        val model = b.build(Sense.MINIMIZE)
-        val primal = RevisedSimplex(model).solvePrimal()
-        val dual = RevisedSimplex(model).solve()
-        assertTrue(primal != null && dual != null, "both engines should solve the degenerate LP")
-        assertTrue(
-            abs(primal.objective - dual.objective) <= 1e-6 * maxOf(1.0, abs(dual.objective)),
-            "primal ${primal.objective} vs dual ${dual.objective}",
-        )
-        assertTrue(abs(primal.objective - (-3.0)) <= 1e-9, "optimum ${primal.objective} should be -3")
-    }
-
-    @Test
-    fun `routine refactors of an unchanged basis spend no primal restart`() {
-        // Sixty covering rows need sixty phase-one pivots; the metered solver fires a synthetic work trigger every
-        // eighth update, more often than the restart budget allows.
-        val builder = LpBuilder()
-        repeat(60) {
-            val variable = builder.addVar(0L, 3L, cost = 1L)
-            builder.addRow(intArrayOf(variable), longArrayOf(1L), Relation.GE, 1L)
-        }
-        val model = builder.build(Sense.MINIMIZE)
-
-        RevisedSimplex(
-            model,
-            basisSolverFactory = { matrix -> MeteredBtranSolver(KotlinBasisSolver(matrix)) },
-        ).use { solver ->
-            val result = solver.solvePrimal()
-
-            assertEquals(60.0, assertNotNull(result).objective, 1e-9)
-            val triggers = solver.lastRefactorPolicyMetrics.triggers[EngineRefactorTrigger.SYNTHETIC_WORK] ?: 0L
-            assertTrue(triggers > 4, "$triggers")
-        }
     }
 
     @Test

@@ -48,25 +48,6 @@ class LpContinuousColumnTest {
     }
 
     @Test
-    fun `certifies infeasibility with a fractional but dyadic coefficient`() {
-        // 0.5 x >= 1 (x >= 2) with x <= 1 is infeasible; 0.5 = 2⁻¹ rationalizes at k = 1.
-        val b = LpBuilder()
-        val x = b.addRealVar(0.0, 1.0, cost = 1.0)
-        b.addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.GE, 1.0)
-        assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
-    }
-
-    @Test
-    fun `certifies infeasibility with a decimal coefficient via the decimal scale`() {
-        // 0.1 is not dyadic, but the decimal ladder reconstructs it at scale 10 (1/10 is the intended
-        // coefficient); infeasible in reals (0.1x >= 1, x <= 5 => x >= 10) and certified as such.
-        val b = LpBuilder()
-        val x = b.addRealVar(0.0, 5.0, cost = 1.0)
-        b.addRealRow(intArrayOf(x), doubleArrayOf(0.1), Relation.GE, 1.0)
-        assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
-    }
-
-    @Test
     fun `certifies a coefficient outside every scaling ladder via the rational fallback`() {
         // 1/3 fits neither the dyadic nor the decimal ladder, so the scaled-integer certifiers
         // decline; the exact rational simplex reads the double as the rational it is and refutes
@@ -77,14 +58,4 @@ class LpContinuousColumnTest {
         assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
     }
 
-    @Test
-    fun `certifies a degenerate inequality-plus-equality feasible vertex via the exact point check`() {
-        // x <= 0.5 and x == 0.5 meet at the degenerate vertex x = 0.5; the basis reconstruction is
-        // finicky there, but the exact dyadic-point check certifies the reported point directly.
-        val b = LpBuilder()
-        val x = b.addRealVar(0.0, 1.0, cost = 0.0)
-        b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 0.5)
-        b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
-    }
 }

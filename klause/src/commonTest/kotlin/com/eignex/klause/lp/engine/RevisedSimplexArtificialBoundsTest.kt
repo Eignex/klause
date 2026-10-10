@@ -53,26 +53,6 @@ class RevisedSimplexArtificialBoundsTest {
     }
 
     @Test
-    fun `a column boxed only artificially is reported at its real seat`() {
-        // min −x₁ − 2x₂ over x₁ + x₂ ≤ 1: both columns start on an artificial upper, x₁ ends at its lower.
-        val model = working(
-            listOf(listOf(0 to 1L), listOf(0 to 1L)),
-            listOf(1L),
-            List(3) { nonnegative },
-            listOf(-1L, -2L, 0L),
-        )
-
-        RevisedSimplex(model).use { solver ->
-            val result = assertNotNull(solver.solve())
-
-            assertEquals(1, solver.lastNumericalMetrics.artificialStarts)
-            assertEquals(VarStatus.AT_LOWER, result.basis.status[0])
-            assertEquals(listOf(0.0, 1.0), result.primal.toList())
-            assertEquals(-2.0, result.objective)
-        }
-    }
-
-    @Test
     fun `an artificial bound active at the boxed optimum widens to the true optimum`() {
         // min −x₁ over x₁ − 10000x₂ ≤ 0, 2x₂ ≤ 1000: x₁ = 5e6 lies past the initial 1e6 box.
         val model = working(
@@ -90,26 +70,6 @@ class RevisedSimplexArtificialBoundsTest {
             assertEquals(0, solver.lastNumericalMetrics.artificialHandoffs)
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
             assertEquals(BigFraction.ofLong(-5_000_000L), certified.lowerBound)
-        }
-    }
-
-    @Test
-    fun `a dual degenerate artificial seat is released instead of widened`() {
-        // min x⁺ − x⁻ over x⁻ − x⁺ ≤ 5, the twin split of a free X ≥ −5: once x⁺ is basic, x⁻ sits on its
-        // artificial upper with a zero reduced cost.
-        val model = working(
-            listOf(listOf(0 to -1L), listOf(0 to 1L)),
-            listOf(5L),
-            List(3) { nonnegative },
-            listOf(1L, -1L, 0L),
-        )
-
-        RevisedSimplex(model).use { solver ->
-            val result = assertNotNull(solver.solve())
-
-            assertEquals(0, solver.lastNumericalMetrics.artificialWidenings)
-            assertEquals(0, solver.lastNumericalMetrics.artificialHandoffs)
-            assertEquals(-5.0, result.objective)
         }
     }
 

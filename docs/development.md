@@ -28,6 +28,15 @@ CI. Benchmarks, capture and timing tools are opt-in; see [benchmarking](benchmar
 
 ## Tests
 
+Unit tests define focused behavior and subsystem contracts: parsing and lowering,
+state ownership, rollback, explanations, exact arithmetic, result publication and
+resource limits. Keep a small set of representative examples for each contract.
+Klause-lab owns solver regression coverage, corpus validation and broad scenario
+sweeps. Avoid duplicating those runs in unit tests or adding a separate toy solve
+for every DSL operator, search policy or frontend feature. Add a unit test when
+it clarifies a distinct contract; extend an existing case for a variant of the
+same behavior.
+
 Use the surrounding framework, layout and assertions. Name classes after the
 file under test and name tests in backticks with plain ASCII describing behavior.
 Keep one observable behavior per test, using arrange, act, assert. Parameterize

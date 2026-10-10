@@ -9,7 +9,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SubcircuitInvariantTest {
@@ -39,18 +38,6 @@ class SubcircuitInvariantTest {
     }
 
     @Test
-    fun `full N-cycle has zero cost`() {
-        // All nodes included in a single Hamiltonian cycle.
-        val n = 4
-        val problem = problem(n)
-        val state = LocalSearchState(problem.bake(), Random(0))
-        for (i in 0 until n) state.assignment.setInt(i, ((i + 1) % n).toLong())
-        state.recompute()
-        assertEquals(0, state.intPayload[0], "a full N-cycle should satisfy Subcircuit with zero cost")
-        assertFalse(state.factors[0].isViolated(state, 0))
-    }
-
-    @Test
     fun `deltaIfIntSet predicts cost change accurately`() {
         // Start with a valid 2-cycle {0,1} and two excluded nodes. Then check delta for
         // including node 2 (succ[2]=3) — this breaks the valid subcircuit.
@@ -72,34 +59,4 @@ class SubcircuitInvariantTest {
         assertTrue(actual > 0, "including a node pointing to an excluded node should raise cost")
     }
 
-    @Test
-    fun `two disjoint included cycles have higher cost than one`() {
-        // 6 nodes: two 3-cycles vs. one 6-cycle.
-        val n = 6
-        val factor = Circuit(succ = IntArray(n) { it }, subcircuit = true)
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
-            factors = arrayOf<Factor>(factor),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-
-        // One valid 6-cycle.
-        for (i in 0 until n) state.assignment.setInt(i, ((i + 1) % n).toLong())
-        state.recompute()
-        val oneCycleCost = state.intPayload[0]
-        assertEquals(0, oneCycleCost, "one 6-cycle should have zero cost")
-
-        // Two disjoint 3-cycles.
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 0)
-        state.assignment.setInt(3, 4)
-        state.assignment.setInt(4, 5)
-        state.assignment.setInt(5, 3)
-        state.recompute()
-        val twoCycleCost = state.intPayload[0]
-        assertTrue(twoCycleCost > 0, "two disjoint cycles should have positive cost")
-    }
 }

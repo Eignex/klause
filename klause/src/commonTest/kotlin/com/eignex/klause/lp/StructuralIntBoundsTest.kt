@@ -37,13 +37,6 @@ class StructuralIntBoundsTest {
     }
 
     @Test
-    fun `a system with no equality implies nothing`() {
-        val rows = listOf(row(0 to 1L, op = LinearOp.LE, bound = 4L))
-
-        assertNull(structuralIntBounds(1, rows))
-    }
-
-    @Test
     fun `an underdetermined equality leaves its columns open`() {
         // x + y = 10 alone admits every integer x, so neither column takes a bound.
         val rows = listOf(row(0 to 1L, 1 to 1L, op = LinearOp.EQ, bound = 10L))

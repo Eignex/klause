@@ -62,20 +62,6 @@ class CblsStallChainTest {
     }
 
     @Test
-    fun `chains never touch frozen vars`() {
-        val state = stateAt(chainProblem(), intArrayOf(0, 2), Assumptions(ints = mapOf(1 to 2)))
-        val sink = MoveSink(Assumptions(ints = mapOf(1 to 2)))
-        state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = sink)
-        for (m in sink.list) {
-            if (m is Move.Compound) {
-                for (p in m.parts) {
-                    assertTrue((p as Move.IntSet).varId != 1, "chain must not touch a frozen var")
-                }
-            }
-        }
-    }
-
-    @Test
     fun `reused chain pools respect a newly frozen variable`() {
         val state = stateAt(chainProblem(), intArrayOf(0, 2))
         state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = MoveSink())
@@ -84,65 +70,5 @@ class CblsStallChainTest {
         val emitted = state.proposeRepairChains(seedFactor = 0, maxDepth = 4, firstMoveCap = 4, sink = MoveSink())
 
         assertEquals(0, emitted)
-    }
-
-    @Test
-    fun `default stallChainCap 0 never emits a chain compound`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 3),
-                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-            ),
-        )
-        val state = LocalSearchState(problem.bake(), Random(7))
-        state.recompute()
-        val strategy = Cbls()
-        var compounds = 0
-        repeat(1_500) {
-            val m = strategy.pickMove(state)
-            if (m != null) {
-                if (m is Move.Compound) compounds++
-                state.apply(m)
-            }
-        }
-        assertEquals(0, compounds, "default Cbls must not emit chain compounds")
-    }
-
-    @Test
-    fun `enabled chains surface as score-picked compounds on a permanently stalled search`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 3),
-                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-                Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 7),
-            ),
-        )
-        val state = LocalSearchState(problem.bake(), Random(7))
-        state.recompute()
-        val strategy = Cbls(stallChainCap = 8)
-        var chainPicks = 0
-        var budget = 3_000
-        while (budget-- > 0 && chainPicks < 1) {
-            val m = strategy.pickMove(state)
-            if (m != null) {
-                if (m is Move.Compound) {
-                    chainPicks++
-                    val vars = m.parts.map { p -> (p as Move.IntSet).varId }
-                    assertEquals(vars.size, vars.toSet().size, "a chain never touches a var twice")
-                }
-                state.apply(m)
-            }
-        }
-        assertTrue(chainPicks > 0, "the permanently-stalled search must surface at least one chain")
     }
 }

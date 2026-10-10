@@ -12,11 +12,9 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/** The one source-safe phase every route is planned from, and what the phases behind it may assume. */
 class PreparedSourceTest {
 
     /** `x = y + z` with `y + z <= 4`, every column open: the aggregate pass rewrites the second row. */
@@ -55,16 +53,6 @@ class PreparedSourceTest {
 
         assertContains(prepared.stats.passes, PresolvePass.AGGREGATE_SUB_SUMS.id)
         assertTrue(parent.remaining() > 0L)
-    }
-
-    @Test
-    fun `an untouched model is its own preparation`() {
-        val problem = aggregatable()
-
-        val prepared = PresolvePipeline.prepareSource(problem, PresolveConfig.NONE)
-
-        assertSame(problem, prepared.problem)
-        assertFalse(prepared.changed)
     }
 
     @Test

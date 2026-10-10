@@ -13,7 +13,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class RefinementTest {
@@ -27,18 +26,6 @@ class RefinementTest {
 
         assertEquals(LpRefinementDecline.WORK, stopped.reason)
         assertEquals(1L, cache.work)
-    }
-
-    @Test
-    fun `refinement direct poll observes cancellation between charges`() {
-        var cancelled = false
-        val meter = RefinementMeter(LpRefinementLimits(), LpRefinementCache(), Cancellation { cancelled })
-        meter.charge()
-        cancelled = true
-
-        val stopped = assertFailsWith<RefinementStop> { meter.poll() }
-
-        assertEquals(LpRefinementDecline.CANCELLED, stopped.reason)
     }
 
     @Test
@@ -133,78 +120,6 @@ class RefinementTest {
                 assertTrue(result.metrics.preparationWork > 0L)
                 assertEquals(0L, assertNotNull(owner.lastWorkingMetrics).owners.currentOwners)
                 owner.requireAvailable()
-            }
-        }
-    }
-
-    @Test
-    fun `real child work and pivot stops retain their refinement reason`() {
-        val builder = LpBuilder()
-        repeat(4) {
-            val column = builder.addVar(0L, 4L, cost = 1L)
-            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
-        }
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        for ((local, expected) in listOf(
-            LpFloatTermination.WORK to LpRefinementDecline.WORK,
-            LpFloatTermination.PIVOTS to LpRefinementDecline.PIVOTS,
-        )) {
-            var childResult: FloatLpResult? = null
-            var childReason: LpFloatTermination? = null
-            var childCalls = 0
-            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newPersistentSolver(
-                    model: LpModel,
-                    cancellation: Cancellation,
-                    refactorUpdateLimit: Int,
-                    iterationLimit: Int,
-                    workLimit: Long,
-                    trackDegeneracy: Boolean,
-                    pricing: LpPricingOptions,
-                ): PersistentLpSolver {
-                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                        model,
-                        cancellation,
-                        refactorUpdateLimit,
-                        iterationLimit,
-                        workLimit,
-                        trackDegeneracy,
-                        pricing,
-                    )
-                    return object : PersistentLpSolver by delegate {
-                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
-                            childCalls++
-                            childResult = delegate.resolveBounds(
-                                if (local == LpFloatTermination.WORK) {
-                                    LpFloatAllowance(1L, 100)
-                                } else {
-                                    LpFloatAllowance(assertNotNull(allowance).work, 1)
-                                },
-                            )
-                            childReason = delegate.lastTermination
-                            return childResult?.takeIf { it.optimal }
-                        }
-                    }
-                }
-            }
-            LpScopedSolver(state, context = LpSolveContext(engineFactory = factory)).use { owner ->
-                val result = refineLp(
-                    assertNotNull(state.toWorkingModel()),
-                    LpRefinementRequest(
-                        owner,
-                        owner.refinementCache,
-                        LpRefinementLimits(maxRounds = 1, maxAuxiliaries = 0, time = 30.seconds),
-                    ),
-                    DoubleArray(4) { 0.5 },
-                    DoubleArray(4),
-                )
-
-                assertEquals(1, childCalls)
-                assertTrue(childResult?.optimal != true)
-                assertEquals(local, childReason)
-                assertEquals(expected, result.metrics.decline)
-                assertNull(result.conflict)
-                assertEquals(0L, assertNotNull(owner.lastWorkingMetrics).owners.currentOwners)
             }
         }
     }
@@ -311,45 +226,6 @@ class RefinementTest {
             assertEquals(third, assertNotNull(result.bound).value)
             assertEquals(1, result.metrics.rounds)
             assertNull(result.conflict)
-        }
-    }
-
-    @Test
-    fun `an exact point without a float optimum seeds refinement to the certified optimum`() {
-        val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, 8.0, cost = 2.0)
-        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 3.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val five = BigFraction.ofLong(5L)
-        LpScopedSolver(state).use { owner ->
-            val result = refineLp(
-                assertNotNull(state.toWorkingModel()),
-                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                witness = ExactLpWitness(listOf(five), BigFraction.ofLong(2L) * five),
-                needPoint = false,
-            )
-
-            assertEquals(listOf(BigFraction.ofLong(3L)), assertNotNull(result.witness).primal)
-            assertEquals(BigFraction.ofLong(6L), assertNotNull(result.bound).value)
-        }
-    }
-
-    @Test
-    fun `a seeded attempt is not a repeat of an unseeded one on the same state`() {
-        val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, 8.0, cost = 2.0)
-        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 3.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val seed = ExactLpWitness(listOf(BigFraction.ofLong(5L)), BigFraction.ofLong(10L))
-        val other = ExactLpWitness(listOf(BigFraction.ofLong(4L)), BigFraction.ofLong(8L))
-        LpScopedSolver(state).use { owner ->
-            val request = LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits())
-            refineLp(assertNotNull(state.toWorkingModel()), request)
-            val seeded = refineLp(assertNotNull(state.toWorkingModel()), request, witness = seed, needPoint = false)
-            val repeated = refineLp(assertNotNull(state.toWorkingModel()), request, witness = other, needPoint = false)
-
-            assertEquals(BigFraction.ofLong(6L), assertNotNull(seeded.bound).value)
-            assertEquals(LpRefinementDecline.REPEATED, repeated.metrics.decline)
         }
     }
 
@@ -484,8 +360,4 @@ class RefinementTest {
         }
     }
 
-    @Test
-    fun `the default limits bound work and never the clock`() {
-        assertEquals(Duration.INFINITE, LpRefinementLimits().time)
-    }
 }

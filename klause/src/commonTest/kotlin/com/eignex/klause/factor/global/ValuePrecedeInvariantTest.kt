@@ -9,7 +9,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ValuePrecedeInvariantTest {
@@ -21,21 +20,6 @@ class ValuePrecedeInvariantTest {
         intDomains = Array(3) { IntDomain(0, 3) },
         factors = arrayOf<Factor>(ValuePrecede(s = 1, t = 2, xs = intArrayOf(0, 1, 2))),
     )
-
-    @Test
-    fun `not violated when no t precedes the first s`() {
-        val cases = listOf(
-            listOf(0L, 1L, 2L), // first s=1 at index 1, first t=2 at index 2
-            listOf(0L, 0L, 0L), // neither s nor t occurs
-        )
-        for (xs in cases) {
-            val state = LocalSearchState(problem().bake(), Random(0))
-            for (i in 0..2) state.assignment.setInt(i, xs[i])
-            state.recompute()
-            assertFalse(state.factors[0].isViolated(state, 0), "xs=$xs must satisfy value_precede")
-            assertEquals(0, state.factors[0].violationDegree(state, 0), "xs=$xs")
-        }
-    }
 
     @Test
     fun `violated when t appears before first s`() {

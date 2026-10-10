@@ -37,15 +37,6 @@ class OpenTheoryIncumbentsTest {
     }
 
     @Test
-    fun `an external integer bound is absent before an incumbent installs`() {
-        val exchange = IncumbentExchange<OpenTheoryAssignment, BigFraction>(
-            improves = { candidate, standing -> candidate < standing },
-        )
-
-        assertNull(exchange.integerBound())
-    }
-
-    @Test
     fun `a fractional incumbent supplies no integer cutoff`() {
         val exchange = IncumbentExchange<OpenTheoryAssignment, BigFraction>(
             improves = { candidate, standing -> candidate < standing },
@@ -53,24 +44,6 @@ class OpenTheoryIncumbentsTest {
         exchange.offer(witness(0), BigFraction.of(value("3"), value("2")))
 
         assertNull(exchange.integerBound())
-    }
-
-    @Test
-    fun `no incumbent stands before the first witness is offered`() {
-        assertNull(minimizingWitnessExchange().current())
-    }
-
-    @Test
-    fun `the first witness offered becomes the incumbent`() {
-        val exchange = minimizingWitnessExchange()
-        val first = witness(7)
-
-        val published = assertIs<Publication.Installed<OpenTheoryAssignment, BigInt>>(
-            exchange.offer(first, value("7")),
-        )
-
-        assertEquals(first, published.incumbent.assignment)
-        assertEquals(value("7"), exchange.current()?.objective)
     }
 
     @Test
@@ -101,27 +74,5 @@ class OpenTheoryIncumbentsTest {
         exchange.offer(witness(7), value("7"))
 
         assertEquals(Publication.NotImproving, exchange.offer(witness(7), value("7")))
-    }
-
-    @Test
-    fun `a witness above the standing value is not installed`() {
-        val exchange = minimizingWitnessExchange()
-        exchange.offer(witness(3), value("3"))
-
-        assertEquals(Publication.NotImproving, exchange.offer(witness(9), value("9")))
-        assertEquals(value("3"), exchange.current()?.objective)
-    }
-
-    @Test
-    fun `an improvement wider than a Long keeps its precision`() {
-        val exchange = minimizingWitnessExchange()
-        val huge = value("170141183460469231731687303715884105728")
-        exchange.offer(witness(0), huge)
-
-        assertIs<Publication.Installed<OpenTheoryAssignment, BigInt>>(
-            exchange.offer(witness(1), huge - BIG_ONE),
-        )
-
-        assertEquals(huge - BIG_ONE, exchange.current()?.objective)
     }
 }

@@ -6,7 +6,6 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -78,43 +77,6 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `dual reconstruction is useful without a feasible point`() {
-        val model = LpBuilder().apply {
-            addVar(0L, 1L, cost = 1L)
-            addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
-        }.build(Sense.MINIMIZE)
-        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
-
-        val result = reconstructCertificate(model, duals = doubleArrayOf(1.0 / 3.0))
-
-        assertNull(result.witness)
-        assertEquals(third, result.bound?.value)
-        assertFalse(result.complementary)
-    }
-
-    @Test
-    fun `exact source endpoints beyond the denominator floor are seated without guessing`() {
-        val endpoint = BigFraction.of(BIG_ONE, (BIG_ONE shl 60) + BIG_ONE)
-        val zero = ExactLpNumber.of(0L)
-        val side = ExactLpSide(ExactLpNumber.of(endpoint))
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(side, side))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
-        val basis = Basis(intArrayOf(), arrayOf(VarStatus.FIXED))
-
-        val result = reconstructCertificate(model, doubleArrayOf(endpoint.toDouble()), doubleArrayOf(), basis)
-
-        assertEquals(endpoint, result.witness?.primal?.single())
-        assertTrue(result.nonbasicStatusesMatch)
-        assertTrue(result.complementary)
-    }
-
-    @Test
     fun `wrong fixed status cannot seat unequal exact endpoints`() {
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
 
@@ -168,35 +130,6 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `mixed boxes use exact endpoint signs and all costs`() {
-        val zero = ExactLpNumber.of(0L)
-        val two = ExactLpNumber.of(2L)
-        val source = ExactLpModel(
-            List(4) { emptyList() },
-            emptyList(),
-            listOf(
-                ExactLpColumn(ExactLpBounds()),
-                ExactLpColumn(ExactLpBounds(upper = ExactLpSide(two))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(two), ExactLpSide(two))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(two))),
-            ),
-            emptyList(),
-            ExactLpObjective(listOf(zero, ExactLpNumber.of(-3L), ExactLpNumber.of(4L), ExactLpNumber.of(5L))),
-        )
-
-        val result = reconstructCertificate(
-            assertNotNull(LpExactState(source).toWorkingModel()),
-            doubleArrayOf(7.0, 2.0, 2.0, 0.0),
-            doubleArrayOf(),
-        )
-
-        assertEquals(BigFraction.ofLong(2L), result.witness?.objective)
-        assertEquals(BigFraction.ofLong(2L), result.bound?.value)
-        assertEquals(listOf(true, false, false), result.bound?.support?.sides?.map { it.upper })
-        assertTrue(result.complementary)
-    }
-
-    @Test
     fun `fixed arithmetic overflow restarts the full point from rational authority`() {
         val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val one = ExactLpNumber.of(1L)
@@ -217,43 +150,6 @@ class ReconstructedCertificateTest {
         assertEquals(BigFraction.ONE, result.witness?.objective)
         assertEquals(listOf(huge, huge), result.witness?.primal)
         assertTrue(result.metrics.verificationRestarts > 0)
-    }
-
-    @Test
-    fun `rational data beyond fixed arithmetic remains authoritative`() {
-        val huge = BigFraction.of((BIG_ONE shl 150) + BIG_ONE, bigIntOf(3))
-        val h = ExactLpNumber.of(huge)
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(h), ExactLpSide(h)))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-
-        val result = reconstructCertificate(
-            assertNotNull(LpExactState(source).toWorkingModel()),
-            doubleArrayOf(huge.toDouble()),
-            doubleArrayOf(),
-            Basis(intArrayOf(), arrayOf(VarStatus.FIXED)),
-        )
-
-        assertEquals(huge, result.witness?.primal?.single())
-        assertTrue(result.metrics.verificationRestarts > 0)
-        assertTrue(result.complementary)
-    }
-
-    @Test
-    fun `zero violation checks exact IEEE values above the denominator floor`() {
-        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
-        val tiny = 1.0 / (1L shl 50).toDouble()
-
-        val result = reconstructCertificate(model, doubleArrayOf(tiny), doubleArrayOf())
-
-        assertEquals(BigFraction.ofDouble(tiny), result.witness?.primal?.single())
-        assertEquals(0, result.metrics.attempts)
-        assertTrue(result.complementary)
     }
 
     @Test
@@ -279,17 +175,6 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `nonfinite candidates decline before reconstruction`() {
-        val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
-        for (value in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
-            val result = reconstructCertificate(model, doubleArrayOf(value))
-            assertNull(result.witness)
-            assertEquals(ReconstructionDecline.NONFINITE, result.metrics.decline)
-            assertEquals(0, result.metrics.attempts)
-        }
-    }
-
-    @Test
     fun `missing support and free residues cannot certify a ray`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
@@ -308,44 +193,6 @@ class ReconstructedCertificateTest {
 
         assertNull(result.conflict)
         assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
-    }
-
-    @Test
-    fun `rational ray cancels free columns and captures historical local antecedents`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val three = ExactLpNumber.of(3L)
-        val premises = ExactLpPremises(emptyList(), listOf(23))
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one), ExactLpEntry(1, three))),
-            listOf(zero, one),
-            listOf(
-                ExactLpColumn(ExactLpBounds()),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow(global = false, premises = premises), ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero, zero)),
-        )
-        val trail = LpBoundTrail(source)
-        assertTrue(trail.push())
-        assertTrue(trail.assertBound(2, true, ExactLpSide(zero), 7L))
-        val state = trail.state
-        val input = doubleArrayOf(-1.0, 1.0 / 3.0)
-
-        val result = reconstructCertificate(assertNotNull(state.toWorkingModel()), ray = input)
-        input.fill(0.0)
-        assertTrue(trail.pop(0))
-
-        val conflict = assertNotNull(result.conflict)
-        val y = conflict.multipliers
-        assertEquals(BigFraction.ZERO, y[0] + y[1] * BigFraction.ofLong(3L))
-        assertTrue(y[1] < BigFraction.ZERO)
-        assertEquals(listOf(0, 1), conflict.rows.toList())
-        val support = assertNotNull(result.conflictSupport)
-        assertEquals(state, support.state)
-        assertEquals(premises, support.rows.first().second.premises)
-        assertTrue(support.sides.any { it.column == 2 && it.upper })
     }
 
     @Test
@@ -408,97 +255,6 @@ class ReconstructedCertificateTest {
     }
 
     @Test
-    fun `exhaustion during violation evaluation preserves the completed bound`() {
-        val model = LpBuilder().apply { addVar(0L, 1L, cost = 1L) }.build(Sense.MINIMIZE)
-        val complete = reconstructCertificate(
-            model,
-            duals = doubleArrayOf(),
-            limits = ReconstructionLimits(maxAttempts = 0),
-        )
-
-        val result = reconstructCertificate(
-            model,
-            duals = doubleArrayOf(),
-            limits = ReconstructionLimits(maxWork = complete.metrics.work - 1L, maxAttempts = 0),
-        )
-
-        assertEquals(ReconstructionPhase.VIOLATION, result.metrics.phase)
-        assertEquals(ReconstructionDecline.WORK, result.metrics.decline)
-        assertEquals(BigFraction.ZERO, result.bound?.value)
-        assertNull(result.witness)
-    }
-
-    @Test
-    fun `resource exhaustion during support capture withholds the incomplete bound`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-            emptyList(),
-            ExactLpObjective(listOf(one)),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
-        val complete = reconstructCertificate(
-            model,
-            duals = doubleArrayOf(),
-            limits = ReconstructionLimits(maxAttempts = 0),
-        )
-        val result = reconstructCertificate(
-            model,
-            duals = doubleArrayOf(),
-            limits = ReconstructionLimits(maxWork = complete.metrics.work - 5L, maxAttempts = 0),
-        )
-
-        assertEquals(ReconstructionPhase.SUPPORT, result.metrics.phase)
-        assertEquals(ReconstructionDecline.WORK, result.metrics.decline)
-        assertNull(result.bound)
-        assertNull(result.conflictSupport)
-    }
-
-    @Test
-    fun `bounded representative slice records total reconstruction work`() {
-        val equality = LpBuilder().apply {
-            addVar(0L, 1L, cost = 1L)
-            addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
-        }.build(Sense.MINIMIZE)
-        val box = LpBuilder().apply { addVar(0L, 5L, cost = 1L) }.build(Sense.MINIMIZE)
-        val results = listOf(
-            "thirds-optimum" to reconstructCertificate(equality, doubleArrayOf(1.0 / 3.0), doubleArrayOf(1.0 / 3.0)),
-            "dual-only" to reconstructCertificate(equality, duals = doubleArrayOf(1.0 / 3.0)),
-            "nonoptimal-point" to reconstructCertificate(box, doubleArrayOf(3.0), doubleArrayOf()),
-            "bad-point" to reconstructCertificate(equality, doubleArrayOf(0.3)),
-            "nonfinite" to reconstructCertificate(box, doubleArrayOf(Double.NaN)),
-            "resource-decline" to reconstructCertificate(
-                box,
-                doubleArrayOf(0.0),
-                limits = ReconstructionLimits(maxWork = 0),
-            ),
-        )
-        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
-        assertEquals(third, results[0].second.witness?.primal?.single())
-        assertEquals(third, results[0].second.bound?.value)
-        assertTrue(results[0].second.complementary)
-        assertNull(results[1].second.witness)
-        assertEquals(third, results[1].second.bound?.value)
-        assertEquals(BigFraction.ofLong(3L), results[2].second.witness?.objective)
-        assertEquals(BigFraction.ZERO, results[2].second.bound?.value)
-        assertFalse(results[2].second.complementary)
-        for ((label, result) in results) {
-            if (label in listOf("bad-point", "nonfinite", "resource-decline")) {
-                assertNull(result.witness)
-                assertNull(result.bound)
-                assertNotNull(result.metrics.decline)
-            }
-            println(
-                "RECONSTRUCTION_COVERAGE|$label|${result.witness != null}|${result.bound != null}|" +
-                    "${result.conflict != null}|${result.complementary}|${result.metrics}",
-            )
-        }
-    }
-
-    @Test
     fun `cancellation before returning reconstruction discards completed proof`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
@@ -534,51 +290,4 @@ class ReconstructedCertificateTest {
         assertNull(result.bound)
     }
 
-    @Test
-    fun `reconstruction work cap stops between cancellation polls`() {
-        val meter = ReconstructionMeter(ReconstructionLimits(maxWork = 1L))
-        meter.step()
-
-        assertFailsWith<RuntimeException> { meter.step() }
-
-        assertEquals(1L, meter.snapshot(null).work)
-    }
-
-    @Test
-    fun `reconstruction observes cancellation within a polling stride`() {
-        var cancelled = false
-        val meter = ReconstructionMeter(cancellation = Cancellation { cancelled })
-        meter.step()
-        cancelled = true
-
-        assertFailsWith<RuntimeException> { repeat(64) { meter.step() } }
-    }
-
-    @Test
-    fun `rational factor handoff verifies source coordinates without a double roundtrip`() {
-        val exact = BigFraction.of(BIG_ONE, (BIG_ONE shl 70) + BIG_ONE)
-        val value = ExactLpNumber.of(exact)
-        val one = ExactLpNumber.of(1L)
-        val origin = ExactLpNumber.of(10L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(value), ExactLpSide(value)), origin = origin)),
-            emptyList(),
-            ExactLpObjective(listOf(one)),
-        )
-        val candidate = exact + BigFraction.ofLong(10L)
-
-        val result = verifyRationalCertificate(
-            assertNotNull(LpExactState(source).toWorkingModel()),
-            sourcePrimal = listOf(candidate),
-            duals = emptyList(),
-        )
-
-        assertEquals(candidate, result.witness?.primal?.single())
-        assertEquals(exact, result.witness?.objective)
-        assertEquals(exact, result.bound?.value)
-        assertTrue(result.complementary)
-        assertEquals(0, result.metrics.attempts)
-    }
 }

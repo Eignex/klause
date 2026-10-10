@@ -1,6 +1,5 @@
 package com.eignex.klause.util
 
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -87,37 +86,4 @@ class LongArrayListTest {
         assertEquals(listOf(2L, 4L, 6L), seen)
     }
 
-    @Test
-    fun `random add-remove ops match a swap-remove reference model`() {
-        val rng = Random(99)
-        repeat(15) {
-            val list = LongArrayList(initialCapacity = 1)
-            val ref = ArrayList<Long>()
-            repeat(300) {
-                when (rng.nextInt(3)) {
-                    0 -> {
-                        val v = rng.nextLong(-20, 20)
-                        list.add(v)
-                        ref.add(v)
-                    }
-
-                    1 -> if (ref.isNotEmpty()) {
-                        val i = rng.nextInt(ref.size)
-                        list.removeAt(i)
-                        ref[i] = ref[ref.size - 1]
-                        ref.removeAt(ref.size - 1)
-                    }
-
-                    2 -> if (ref.isNotEmpty()) {
-                        val i = rng.nextInt(ref.size)
-                        val v = rng.nextLong(-20, 20)
-                        list[i] = v
-                        ref[i] = v
-                    }
-                }
-                assertEquals(ref.size, list.size)
-            }
-            assertEquals(ref, list.toLongArray().toList())
-        }
-    }
 }

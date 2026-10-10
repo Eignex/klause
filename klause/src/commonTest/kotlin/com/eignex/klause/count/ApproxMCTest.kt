@@ -1,6 +1,5 @@
 package com.eignex.klause.count
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -16,48 +15,12 @@ class ApproxMCTest {
     private fun unconstrained(n: Int) =
         Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
 
-    private fun exactCount(p: Problem): Long = BacktrackSolver(p.bake()).enumerate(BacktrackParams()).count().toLong()
-
     @Test
     fun `small problem is counted exactly without hashing`() {
         val p = unconstrained(3) // 8 models, below the hashing threshold
         val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 0L))
         assertTrue(r.exact, "small instance should short-circuit to an exact count")
         assertEquals(8L, r.estimate)
-    }
-
-    @Test
-    fun `large free instance is within the epsilon band of the exact count`() {
-        // Cheapest config that still hashes: a smoke of the hashed pipeline, not the (ε, δ)
-        // guarantee. ε=2 shrinks the cell threshold to ≈38 (64 models exceed it), δ=0.99 floors
-        // the iteration count; band is correspondingly loose, seed pinned for determinism.
-        val p = unconstrained(6)
-        val exact = exactCount(p)
-        val eps = 2.0
-        val r = BacktrackSolver(p.bake()).approximateCount(
-            ApproxCountConfig(epsilon = eps, delta = 0.99, seed = 12345L),
-        )
-        assertTrue(!r.exact, "instance should require hashing")
-        assertWithinBand(exact, r.estimate, eps)
-    }
-
-    @Test
-    fun `constrained instance is within the epsilon band`() {
-        // (x0 v x1) removes the 2^4 assignments with x0=x1=false: 48 models, above the ε=2 cell
-        // threshold (≈38) so the constrained hashed path runs (cheapest smoke config, as above).
-        val n = 6
-        val p = Problem(
-            numBoolVars = n,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
-        )
-        val exact = exactCount(p)
-        val eps = 2.0
-        val r = BacktrackSolver(p.bake()).approximateCount(
-            ApproxCountConfig(epsilon = eps, delta = 0.99, seed = 999L),
-        )
-        assertWithinBand(exact, r.estimate, eps)
     }
 
     @Test

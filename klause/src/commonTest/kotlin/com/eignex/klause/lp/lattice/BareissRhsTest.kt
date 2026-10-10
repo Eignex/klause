@@ -5,7 +5,6 @@ import com.eignex.klause.lp.lattice.mixedEchelonHermite
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -23,15 +22,6 @@ class BareissRhsTest {
         val e = bareissEchelon(sparseRows(longArrayOf(0, 1), longArrayOf(1, 0)), 2, vec(3, 5))
         assertEquals(bigIntOf(5), e.rhs[0], "row now holding `x = 5` must carry 5, not 3")
         assertEquals(bigIntOf(3), e.rhs[1])
-    }
-
-    @Test
-    fun `an elimination combines right-hand sides the same way it combines rows`() {
-        // x + y = 4 and 2x + 2y = 8 are dependent; the second reduces to 0 = 0.
-        val e = bareissEchelon(sparseRows(longArrayOf(1, 1), longArrayOf(2, 2)), 2, vec(4, 8))
-        assertEquals(1, e.rows.size, "the dependent row drops out")
-        assertEquals(bigIntOf(4), e.rhs[0])
-        assertFalse(e.inconsistent, "8 = 2*4, so the pair is consistent")
     }
 
     @Test
@@ -56,14 +46,6 @@ class BareissRhsTest {
     fun `a row reduced to a nonzero constant is not reported dependent`() {
         val e = bareissEchelon(sparseRows(longArrayOf(1, 1), longArrayOf(2, 2)), 2, vec(4, 9))
         assertEquals(emptyList(), e.dependentRows.toList(), "0 = 1 refutes the system rather than repeating it")
-    }
-
-    @Test
-    fun `coefficients alone still reduce with no right-hand side claimed`() {
-        val e = bareissEchelon(sparseRows(longArrayOf(0, 1), longArrayOf(1, 0)), 2)
-        assertEquals(2, e.rows.size)
-        assertEquals(0, e.rhs.size, "nothing is claimed about bounds that were never supplied")
-        assertFalse(e.inconsistent, "inconsistency cannot be seen without the bounds")
     }
 
     @Test

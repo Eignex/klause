@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpColumn
@@ -17,8 +16,6 @@ import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
-import com.eignex.klause.lp.engine.LpBoundBatchResult
-import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
@@ -32,7 +29,6 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
-import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRetainedCuts
@@ -54,7 +50,6 @@ import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
-import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -96,65 +91,6 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `source publication declines a stale compaction without discarding the live owner`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 60)),
-            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 50)))
-        var live = problem.finiteIntDomain(0)
-        val domains = object : RelaxationDomains {
-            override fun intDomain(varId: Int): IntDomain = live
-            override fun boolValue(varId: Int): Boolean? = null
-        }
-        val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
-            LinearObjective(intCoefficients = longArrayOf(1))))
-        val cuts = LpRetainedCuts()
-        LpPropagator(object : LpSearchPolicy {}).use { lp ->
-            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
-            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
-            live = live.withMinAtLeast(3L)
-            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
-            while (sources.prepareCompaction(assertNotNull(lp.state)) == null && live.max > live.min + 1L) {
-                live = live.withMaxAtMost(live.max - 1L)
-                assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
-            }
-            val before = assertNotNull(lp.state)
-            val plan = assertNotNull(sources.prepareCompaction(before))
-            val cutPlan = assertNotNull(cuts.prepareCompaction(before, plan.remap))
-            assertTrue(lp.editSources(sources.prepare(before, domains)))
-            assertSame(before, lp.state)
-
-            assertFalse(lp.compact(before, plan.remap, cutPlan, plan))
-
-            assertSame(before, lp.state)
-            assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
-            val current = assertNotNull(sources.prepareCompaction(before))
-            assertTrue(lp.compact(before, current.remap,
-                assertNotNull(cuts.prepareCompaction(before, current.remap)), current))
-            assertEquals(1L, lp.metrics?.currentOwners)
-            assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
-        }
-    }
-
-    @Test
-    fun `a published cut refresh invalidates prior preparations without invalidating numerical state`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
-        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
-            .build(PropagationSession(problem))
-        val cuts = LpRetainedCuts()
-        LpPropagator(object : LpSearchPolicy {}).use { lp ->
-            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
-            val before = assertNotNull(lp.state)
-            val first = assertNotNull(cuts.prepare(before, base))
-            val stale = assertNotNull(cuts.prepare(before, base))
-            assertTrue(lp.editCuts(first))
-
-            assertFalse(lp.editCuts(stale))
-
-            assertSame(before, lp.state)
-            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
-        }
-    }
-
-    @Test
     fun `a published source refresh invalidates prior preparations without invalidating numerical state`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val domains = RootDomains(problem)
@@ -177,33 +113,6 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `a cut edit prepared before a trail transition declines without publication`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
-        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
-            .build(PropagationSession(problem))
-        val cuts = LpRetainedCuts()
-        var work = 0L
-        LpPropagator(object : LpSearchPolicy {}, onEdit = { work += it }).use { lp ->
-            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
-            val cut = Cut(base.intColOf, longArrayOf(1), Relation.GE, 0, global = true)
-            val stale = assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(cut)))
-            assertTrue(lp.atLevel(1))
-            val before = lp.state
-            val metrics = lp.metrics
-            val beforeWork = work
-
-            assertFalse(lp.editCuts(stale))
-
-            assertSame(before, lp.state)
-            assertEquals(metrics, lp.metrics)
-            assertEquals(beforeWork, work)
-            assertEquals(0, cuts.depth)
-            assertTrue(lp.editCuts(assertNotNull(cuts.prepare(assertNotNull(lp.state), base, listOf(cut)))))
-            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
-        }
-    }
-
-    @Test
     fun `a declined cut batch retains numerical state and source publication`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
@@ -221,30 +130,6 @@ class LpPropagatorTest {
 
             assertSame(before, lp.state)
             assertTrue(cuts.parentRows(assertNotNull(lp.state)).isEmpty())
-            assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
-        }
-    }
-
-    @Test
-    fun `a source edit prepared before a trail transition declines without publication`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
-        val domains = RootDomains(problem)
-        val sources = LpRetainedSources(
-            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
-        )
-        LpPropagator(object : LpSearchPolicy {}).use { lp ->
-            assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
-            val stale = sources.prepare(assertNotNull(lp.state), domains)
-            assertTrue(lp.atLevel(1))
-            val before = lp.state
-            val metrics = lp.metrics
-
-            assertFalse(lp.editSources(stale))
-
-            assertSame(before, lp.state)
-            assertEquals(metrics, lp.metrics)
-            assertEquals(0, sources.depth)
-            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
             assertEquals(BigFraction.ZERO, assertNotNull(lp.solve()).lowerBound)
         }
     }
@@ -293,38 +178,6 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `a redundant bound batch spends no edit work`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        var work = 0L
-        LpPropagator(object : LpSearchPolicy {}, onEdit = { work += it }).use { lp ->
-            assertTrue(lp.install(Any(), source))
-            val lower = listOf(ExactLpSide(zero))
-            val upper = listOf(ExactLpSide(ExactLpNumber.of(3L)))
-            assertEquals(LpBoundBatchResult.Applied(2), lp.assertBounds(lower, upper))
-            val spent = work
-            val edits = assertNotNull(lp.metrics).editAttempts
-
-            assertEquals(LpBoundBatchResult.Applied(0), lp.assertBounds(lower, upper))
-            assertEquals(
-                LpBoundBatchResult.Applied(0),
-                lp.assertBounds(listOf(ExactLpSide(ExactLpNumber.of(-1L))), listOf(ExactLpSide(ExactLpNumber.of(4L)))),
-            )
-
-            assertEquals(spent, work)
-            assertEquals(edits, assertNotNull(lp.metrics).editAttempts)
-            assertEquals(BigFraction.ZERO, lp.state?.activeSide(0, false)?.side?.number?.value)
-            assertEquals(BigFraction.ofLong(3), lp.state?.activeSide(0, true)?.side?.number?.value)
-        }
-    }
-
-    @Test
     fun `continuous CP rows decline the legacy bound adapter without changing domains`() {
         val problem = Problem(
             0,
@@ -346,54 +199,6 @@ class LpPropagatorTest {
             assertNull(engine.cpAdapter.relaxation(relaxation, session))
             assertEquals(domain, session.intDomain(0))
             assertTrue(relaxation.colRealId.any { it == 0 })
-        }
-    }
-
-    @Test
-    fun `ordinary owners use the current retained invocation allowance`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0, 4, cost = 1)
-        builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
-        val seen = ArrayList<LpFloatAllowance?>()
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-                return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
-                        seen.add(allowance)
-                        return delegate.resolveBounds(allowance)
-                    }
-                }
-            }
-        }
-        var effort = LpEffortProfile(work = 10_000L, iterations = 100)
-        LpPropagator(object : LpSearchPolicy {}, { effort }, LpSolveContext(factory)).use { lp ->
-            assertTrue(lp.install(Any(), source))
-            assertNotNull(lp.solveFloat())
-            effort = LpEffortProfile(work = 5000L, iterations = 30)
-            assertNotNull(lp.solveFloat())
-            effort = LpEffortProfile(work = 100L, iterations = 2)
-
-            assertNotNull(lp.solveFloat())
-
-            assertEquals(listOf(null, LpFloatAllowance(5000L, 30), LpFloatAllowance(100L, 2)), seen)
         }
     }
 
@@ -473,19 +278,6 @@ class LpPropagatorTest {
     }
 
     @Test
-    fun `a consumer can finish without installing optional LP state`() {
-        val policy = object : LpSearchPolicy {
-            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
-        }
-        LpPropagator(policy).use { lp ->
-            val session = SearchSession(listOf(lp))
-            session.initialize()
-
-            assertEquals(ComponentCheck.Feasible, lp.check(session))
-        }
-    }
-
-    @Test
     fun `failed bound invalidation overrides a cached feasible consumer check`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
@@ -505,94 +297,6 @@ class LpPropagatorTest {
             assertEquals(ComponentCheck.Feasible, lp.check(session))
             assertFalse(lp.assertBound(1, true, ExactLpSide(zero)))
             assertEquals(ComponentCheck.Indeterminate, lp.check(session))
-        }
-    }
-
-    @Test
-    fun `a cancelled source coefficient retains its local row assumption in the conflict`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val minus = ExactLpNumber.of(-1L)
-        val free = ExactLpColumn(ExactLpBounds(), integral = false)
-        val slack = ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero)), integral = false)
-        val source = ExactLpModel(
-            listOf(
-                listOf(
-                    ExactLpEntry(0, one),
-                    ExactLpEntry(1, minus),
-                ),
-                listOf(
-                    ExactLpEntry(0, minus),
-                    ExactLpEntry(1, one),
-                ),
-            ),
-            listOf(zero, minus),
-            listOf(free, free, slack, slack),
-            listOf(
-                ExactLpRow(
-                    global = false,
-                    premises = ExactLpPremises(emptyList(), listOf(0)),
-                ),
-                ExactLpRow(),
-            ),
-            ExactLpObjective(List(4) { zero }),
-        )
-        LpPropagator(object : LpSearchPolicy {}).use { lp ->
-            assertTrue(lp.install(Any(), source))
-            val session = SearchSession(listOf(lp), atoms = SearchAtomRegistry(2))
-            session.initialize()
-            session.push(SearchDecision.Bool(0))
-            val support = assertNotNull(lp.solve()).conflictSupport
-            val clause = assertNotNull(lp.explainConflict(support, session))
-            kotlin.test.assertContentEquals(intArrayOf(1), clause.literals)
-            session.popTo(0)
-            assertNull(lp.explainConflict(support, session))
-            val inactive = assertNotNull(lp.solve()).conflictSupport
-            assertNull(lp.explainConflict(inactive, session))
-        }
-    }
-
-    @Test
-    fun `scoped row pop restores exact feasibility while retaining the original output`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-            emptyList(),
-            ExactLpObjective(listOf(one)),
-        )
-        LpPropagator(object : LpSearchPolicy {}).use { lp ->
-            assertTrue(lp.install(Any(), source))
-            val initial = assertNotNull(lp.solve())
-            assertEquals(BigFraction.ZERO, initial.witness?.objective)
-            assertTrue(lp.atLevel(1))
-            assertTrue(
-                lp.append(
-                    LpScopedRow(
-                        0,
-                        listOf(0 to one),
-                        one,
-                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-                    ),
-                    scoped = true,
-                ),
-            )
-            val scoped = assertNotNull(assertNotNull(lp.solve()).witness)
-            assertEquals(BigFraction.ONE, scoped.objective)
-            assertEquals(listOf(BigFraction.ONE), scoped.primal)
-
-            lp.retract(0)
-
-            val restored = assertNotNull(assertNotNull(lp.solve()).witness)
-            assertEquals(BigFraction.ZERO, restored.objective)
-            assertEquals(listOf(BigFraction.ZERO), restored.primal)
-            assertEquals(listOf(BigFraction.ZERO), assertNotNull(initial.witness).primal)
-            assertEquals(BigFraction.ONE, scoped.primal[0])
-            assertEquals(BigFraction.ZERO, initial.witness?.objective)
-            assertEquals(0, assertNotNull(lp.state).rows.activeCount)
-            assertEquals(ComponentCheck.Indeterminate, lp.check(SearchSession(emptyList())))
         }
     }
 
@@ -834,128 +538,4 @@ class LpPropagatorTest {
         }
     }
 
-    @Test
-    fun `failed ordinary logical preparation remains charged and closes its numerical owner`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 3L)
-        repeat(4) { builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L) }
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val model = assertNotNull(source.toWorkingModel())
-        var closes = 0
-        var logicalWork = 0L
-        var numericalAllowance = 0L
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                numericalAllowance = workLimit
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-                return object : PersistentLpSolver by delegate {
-                    override fun close() {
-                        closes++
-                        delegate.close()
-                    }
-                    override fun prepareLogicals(token: Cancellation): Basis? {
-                        assertNotNull(delegate.prepareLogicals(token))
-                        logicalWork = delegate.lastMetrics.workOps
-                        return null
-                    }
-                }
-            }
-        }
-        LpPropagator(
-            object : LpSearchPolicy {},
-            { LpEffortProfile(work = 1000L) },
-            LpSolveContext(factory),
-        ).use { owner ->
-            assertTrue(owner.install(model, source.model))
-
-            assertNull(owner.solveFloat())
-
-            assertTrue(logicalWork > 0L)
-            assertTrue(numericalAllowance in 1L until 1000L)
-            assertEquals(1000L - numericalAllowance + logicalWork, owner.lastMetrics.workOps)
-            assertTrue(owner.lastMetrics.workOps <= 1000L)
-            assertNotNull(owner.state)
-            assertEquals(1, closes)
-            assertTrue(owner.install(model, source.model))
-        }
-    }
-
-    @Test
-    fun `a null first float result retains its owner and uses the next effort allowance`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0, 4, cost = 1)
-        builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-        val source = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val model = assertNotNull(source.toWorkingModel())
-        val seen = ArrayList<LpFloatAllowance?>()
-        var constructions = 0
-        var numericalAllowance = 0L
-        var logicalWork = 0L
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                constructions++
-                assertTrue(workLimit in 1L until 1000L)
-                numericalAllowance = workLimit
-                assertEquals(30, iterationLimit)
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-                return object : PersistentLpSolver by delegate {
-                    override fun prepareLogicals(token: Cancellation): Basis? =
-                        delegate.prepareLogicals(token).also { logicalWork = delegate.lastMetrics.workOps }
-                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
-                        seen.add(allowance)
-                        delegate.resolveBounds(allowance)
-                        return null
-                    }
-                }
-            }
-        }
-        var profile = LpEffortProfile(work = 1000L, iterations = 30)
-        LpPropagator(object : LpSearchPolicy {}, { profile }, LpSolveContext(factory)).use { owner ->
-            assertTrue(owner.install(model, source.model))
-            val installed = owner.state
-            assertNull(assertNotNull(owner.solveFloat()).second)
-            assertEquals(1000L - numericalAllowance + logicalWork, assertNotNull(owner.metrics).preparationWork)
-            assertTrue(owner.install(model, source.model))
-            assertSame(installed, owner.state)
-            profile = LpEffortProfile(work = 100L, iterations = 2)
-
-            assertNull(assertNotNull(owner.solveFloat()).second)
-
-            assertEquals(listOf(null, LpFloatAllowance(100L, 2)), seen)
-            assertEquals(1, constructions)
-            assertSame(installed, owner.state)
-        }
-    }
 }

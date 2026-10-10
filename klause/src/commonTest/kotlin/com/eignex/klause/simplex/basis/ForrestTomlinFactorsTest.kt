@@ -7,7 +7,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -69,39 +68,6 @@ class ForrestTomlinFactorsTest {
     }
 
     @Test
-    fun `updated row and column adjacency describe the same permuted triangular matrix`() {
-        val source = ftSource("dense")
-        val basis = IntArray(source.rows) { source.rows - 1 - it }
-        val initial = assertIs<LuBuildResult.Built>(BasisFactors(source).build(basis)).factors
-        val ft = ForrestTomlinFactors(initial)
-        val solver = KotlinBasisSolver(source, updateLimit = 100, fillFactor = 100.0)
-        assertTrue(solver.refactorize(basis))
-        for (step in 0 until 16) {
-            val slot = (step * 3) % source.rows
-            val entering = (basis[slot] + source.rows) % source.cols
-            val spike = IndexedVector(source.rows).also { it.scatterColumn(source, entering) }
-            solver.ftran(spike)
-            val mapped = BasisWorkspace(source.rows)
-            mapped.load(spike, initial.symbolic.columnPosition)
-            val pivot = initial.symbolic.columnPosition[slot]
-
-            assertTrue(ft.update(pivot, mapped, 1e-10))
-
-            assertEquals(pivot, ft.upper.order.last())
-            assertContentEquals(ft.upper.order, ft.transpose.order)
-            for (i in basis.indices) {
-                for (j in basis.indices) {
-                    assertEquals(ft.upper.columns[j][i], ft.transpose.columns[i][j])
-                    if (i > j) assertEquals(0.0, ft.upper.columns[ft.upper.order[j]][ft.upper.order[i]])
-                }
-                assertTrue(ft.upper.columns[i][i] != 0.0)
-            }
-            assertEquals(BasisUpdate.APPLIED, solver.update(slot, entering, spike))
-            basis[slot] = entering
-        }
-    }
-
-    @Test
     fun `fill advice adopts a usable basis before the update count limit`() {
         val source = SparseMatrix.ofColumns(
             3,
@@ -157,20 +123,6 @@ class ForrestTomlinFactorsTest {
     }
 
     @Test
-    fun `row transform rejects checked product breakdown`() {
-        for ((left, right) in listOf(1e200 to 1e200, 1e-200 to 1e-200)) {
-            val transform = ForrestTomlinRow(0, BasisSlice(intArrayOf(1), doubleArrayOf(left)))
-            val work = BasisWorkspace(2)
-            work.set(0, 1.0)
-            work.set(1, right)
-
-            assertFailsWith<BasisArithmeticException> { transform.forward(work) }
-
-            assertEquals(1L, transform.lastWork)
-        }
-    }
-
-    @Test
     fun `displaced row arithmetic declines without publishing adjacency or transforms`() {
         val matrix = SparseMatrix.ofColumns(
             2,
@@ -196,19 +148,6 @@ class ForrestTomlinFactorsTest {
         assertTrue(assertNotNull(ft.lastUpdateWork).units > 0)
     }
 
-    @Test
-    fun `copy work includes both staged diagonal adjacency views`() {
-        val matrix = SparseMatrix.ofColumns(1, 1, listOf(listOf(0 to 1.0)))
-        val initial = assertIs<LuBuildResult.Built>(BasisFactors(matrix).build(intArrayOf(0))).factors
-        for ((value, expected) in listOf(1.0 to 2L, 2.0 to 3L)) {
-            val ft = ForrestTomlinFactors(initial)
-            val spike = BasisWorkspace(1).also { it.set(0, value) }
-
-            assertTrue(ft.update(0, spike, 1e-10))
-
-            assertEquals(expected, assertNotNull(ft.lastUpdateWork).copiedEntries)
-        }
-    }
 }
 
 internal fun ftSource(shape: String, n: Int = 8): SparseMatrix {

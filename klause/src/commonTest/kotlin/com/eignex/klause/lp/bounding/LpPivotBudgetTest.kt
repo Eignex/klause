@@ -12,15 +12,6 @@ import kotlin.test.assertEquals
 class LpPivotBudgetTest {
 
     @Test
-    fun `an LP still inside its warmup keeps the size-derived budget`() {
-        val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
-
-        repeat(3) { budget.observe(pruned = false, couldPrune = true) }
-
-        assertEquals(0, budget.pivots(), "an LP that has not had its window yet must not be capped")
-    }
-
-    @Test
     fun `an LP that reaches its warmup without pruning is capped`() {
         val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
 
@@ -51,44 +42,12 @@ class LpPivotBudgetTest {
     }
 
     @Test
-    fun `a prune is not held against the solves that preceded it`() {
-        val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
-        repeat(3) { budget.observe(pruned = false, couldPrune = true) }
-        budget.observe(pruned = true, couldPrune = true)
-
-        repeat(3) { budget.observe(pruned = false, couldPrune = true) }
-
-        assertEquals(0, budget.pivots(), "three solves before the prune do not count toward the next window")
-    }
-
-    @Test
-    fun `a prune after the budget already bit still lifts it`() {
-        val budget = LpPivotBudget(cap = 500, warmupSolves = 2)
-        repeat(2) { budget.observe(pruned = false, couldPrune = true) }
-        assertEquals(500, budget.pivots())
-
-        budget.observe(pruned = true, couldPrune = true)
-
-        assertEquals(0, budget.pivots(), "a capped solve that prunes proves the LP worth its pivots")
-    }
-
-    @Test
     fun `solves with no incumbent to prune against do not spend the warmup`() {
         val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
 
         repeat(50) { budget.observe(pruned = false, couldPrune = false) }
 
         assertEquals(0, budget.pivots(), "a search that has not found its first solution is not a bad LP")
-    }
-
-    @Test
-    fun `the warmup resumes once an incumbent makes pruning possible`() {
-        val budget = LpPivotBudget(cap = 500, warmupSolves = 4)
-        repeat(50) { budget.observe(pruned = false, couldPrune = false) }
-
-        repeat(4) { budget.observe(pruned = false, couldPrune = true) }
-
-        assertEquals(500, budget.pivots(), "four real chances to prune, none taken")
     }
 
     @Test

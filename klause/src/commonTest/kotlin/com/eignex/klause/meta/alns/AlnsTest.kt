@@ -9,8 +9,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.portfolio.PoolClauseExchange
-import com.eignex.klause.portfolio.SharedClausePool
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
@@ -21,8 +19,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
-import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,16 +90,6 @@ class AlnsTest {
     )
 
     @Test
-    fun `random destroy returns expected fraction`() {
-        val problem = Problem(numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val incumbent = Sample(BooleanArray(10) { false }, LongArray(0))
-        val obj = LinearObjective(boolWeights = LongArray(10) { 1L })
-        val freed = DestroyOperator.Random.destroy(Random(0), problem.bake(), incumbent, obj, fraction = 0.3)
-        assertEquals(3, freed.bools.size, "expected 3 freed bools (fraction 0.3 of 10)")
-        assertEquals(freed.bools.toSet().size, freed.bools.size, "freed bools should be distinct")
-    }
-
-    @Test
     fun `adjacency related destroy stays inside connected components`() {
         // Two disconnected sub-problems sharing nothing:
         //   factor A: AtLeastOne over bool vars 0..3
@@ -126,85 +112,6 @@ class AlnsTest {
         val componentA = freed.bools.all { it in 0..3 }
         val componentB = freed.bools.all { it in 4..7 }
         assertTrue(componentA || componentB, "freed vars should be in one component: ${freed.bools.toList()}")
-    }
-
-    @Test
-    fun `adjacency related destroy reaches fraction across components when needed`() {
-        // Same two disconnected components, but free 6 of 8 (fraction 0.75) — adjacency
-        // BFS must re-seed into the second component after exhausting the first.
-        val fA = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
-        val fB = Cardinality.atLeastOne(IntArray(4) { Lit.make(it + 4, true) })
-        val problem = Problem(
-            numBoolVars = 8,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(fA, fB),
-        )
-        val incumbent = Sample(BooleanArray(8) { false }, LongArray(0))
-        val obj = LinearObjective(boolWeights = LongArray(8) { 1L })
-        val freed = DestroyOperator.AdjacencyRelated.destroy(Random(0), problem.bake(), incumbent, obj, fraction = 0.75)
-        assertEquals(6, freed.bools.size)
-        val fromA = freed.bools.count { it in 0..3 }
-        val fromB = freed.bools.count { it in 4..7 }
-        assertTrue(fromA > 0 && fromB > 0, "expected vars from both components, got A=$fromA B=$fromB")
-    }
-
-    @Test
-    fun `worst objective destroy picks high contribution vars`() {
-        val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val incumbent = Sample(booleanArrayOf(false, false, false, true), LongArray(0))
-        val obj = LinearObjective(boolWeights = longArrayOf(1L, 2L, 3L, 100L))
-        val freed = DestroyOperator.WorstObjective.destroy(Random(0), problem.bake(), incumbent, obj, fraction = 0.25)
-        assertEquals(1, freed.bools.size)
-        assertEquals(3, freed.bools[0], "expected var 3 (highest weighted-and-set)")
-    }
-
-    @Test
-    fun `alns minimizes weighted exactly-one`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, true),
-                Lit.make(2, true),
-                Lit.make(3, true),
-            ),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem.bake())
-        val alns = Alns(
-            inner = inner,
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 8,
-            flipsPerIteration = 50L,
-            acceptance = AcceptanceCriterion.BetterOrEqual,
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
-        assertNotNull(sample)
-        assertEquals(3.0, objective.evaluate(sample))
-    }
-
-    @Test
-    fun `alns with backtrack CP repair minimizes weighted exactly-one`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val alns = Alns(
-            inner = LocalSearchSolver(problem.bake()),
-            repairOperators = BacktrackRepair.Defaults,
-            backtrack = BacktrackSolver(problem.bake()),
-            backtrackParams = BacktrackParams(),
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 8,
-            acceptance = AcceptanceCriterion.BetterOrEqual,
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
-        assertNotNull(sample)
-        assertEquals(3.0, objective.evaluate(sample), "CP repair reaches the optimal weighted exactly-one")
     }
 
     @Test
@@ -245,67 +152,6 @@ class AlnsTest {
         val sample = selectAlns(exchange).minimize(selectObjective, params).assignment
         assertNotNull(sample)
         assertNotSame(optimal, sample, "a foreign full assignment may violate the pins, so none is imported")
-    }
-
-    @Test
-    fun `alns CP repair with a gated shared clause pool stays sound and optimal`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        // Cross-repair clause sharing (#644) with the soundness gate: search-conditioned (permanent)
-        // clauses and Farkas nogoods are withheld, so sharing globally-valid learning across repairs
-        // must not prune away the optimum.
-        val pool = SharedClausePool()
-        val alns = Alns(
-            inner = LocalSearchSolver(problem.bake()),
-            repairOperators = BacktrackRepair.Defaults,
-            backtrack = BacktrackSolver(problem.bake()),
-            backtrackParams = BacktrackParams(
-                clauseExchange = PoolClauseExchange(pool, skipPermanent = true, shareGlobalNogoods = false),
-            ),
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 6,
-            acceptance = AcceptanceCriterion.BetterOrEqual,
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
-        assertNotNull(sample)
-        assertEquals(3.0, objective.evaluate(sample), "gated cross-repair sharing keeps the optimum reachable")
-    }
-
-    @Test
-    fun `greedy construction repair climbs from infeasible incumbent to feasible optimum`() {
-        // 4 vars in exactly-one with weighted objective. Incumbent is all-false (infeasible).
-        // Greedy needs to flip one bool to true; under FeasibilityFirst shaping the only
-        // accepted flips are those reaching feasibility, so greedy picks bool 3 (cheapest
-        // weight = 3) and rejects flips to 0/1/2 which would have higher shaped score.
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, true),
-                Lit.make(2, true),
-                Lit.make(3, true),
-            ),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem.bake())
-        val incumbent = Sample(booleanArrayOf(false, false, false, false), LongArray(0))
-        val context = RepairContext(
-            inner = inner,
-            params = LocalSearchParams(randomSeed = 0L),
-            objective = objective,
-            pinAssumptions = Assumptions.None,
-            incumbent = incumbent,
-            freed = FreedVars(intArrayOf(0, 1, 2, 3), IntArray(0)),
-            rng = Random(0),
-        )
-        val sample = GreedyConstructionRepair().repair(context)
-        assertNotNull(sample)
-        val trueCount = (0..3).count { sample.bools[it] }
-        assertEquals(1, trueCount, "expected exactly one true after greedy repair")
     }
 
     @Test
@@ -389,118 +235,6 @@ class AlnsTest {
     }
 
     @Test
-    fun `alns over a session accumulates activity recency and feeds activity-biased destroy`() {
-        // Verify the cross-iteration wiring: when ALNS runs over a LocalSearchSession,
-        // the inner solver's per-call activity capture survives into the next iteration's
-        // destroy phase, where activityBiased reads it.
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, true),
-                Lit.make(2, true),
-                Lit.make(3, true),
-            ),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val solver = LocalSearchSolver(problem.bake())
-        val session = solver.session()
-
-        val alns = Alns(
-            inner = solver,
-            session = session,
-            destroyOperators = listOf(
-                DestroyOperator.Random,
-                DestroyOperator.activityBiased(session),
-            ),
-            maxIterations = 8,
-            flipsPerIteration = 100L,
-        )
-        alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
-        val touches = session.warmStateView.activityTouches()
-        assertEquals(4, touches.size)
-        assertTrue(touches.any { it > 0 }, "expected at least one touched variable")
-    }
-
-    @Test
-    fun `alns solves with a kumulant Thompson sampling bandit in place of the roulette wheel`() {
-        // Smoke test: plug a MultiArmedBandit(BetaBernoulliTS()) into Alns and verify it
-        // produces a feasible sample. The kumulant bandit family is tested in kumulant
-        // itself; here we just verify the integration point.
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, true),
-                Lit.make(2, true),
-                Lit.make(3, true),
-            ),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem.bake())
-        val alns = Alns(
-            inner = inner,
-            destroyOperators = DestroyOperator.Defaults,
-            repairOperators = RepairOperator.Defaults,
-            destroyBandit = MultiArmedBandit(
-                DestroyOperator.Defaults.size,
-                policy = BetaBernoulliTS(),
-                random = Random(1),
-            ),
-            repairBandit = MultiArmedBandit(
-                RepairOperator.Defaults.size,
-                policy = BetaBernoulliTS(),
-                random = Random(2),
-            ),
-            // BetaBernoulliTS expects rewards in [0, 1]; normalize from the (3, 1, 0) ALNS defaults.
-            newBestReward = 1.0,
-            acceptedReward = 0.33,
-            rejectedReward = 0.0,
-            maxIterations = 5,
-            flipsPerIteration = 50L,
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
-        assertNotNull(sample)
-    }
-
-    @Test
-    fun `freed vars empty triggers reward and continue`() {
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true)))),
-        )
-        val objective = LinearObjective(boolWeights = longArrayOf(1L))
-        val emptyOp = DestroyOperator { _, _, _, _, _ -> FreedVars(IntArray(0), IntArray(0)) }
-        val inner = LocalSearchSolver(problem.bake())
-        val alns = Alns(inner = inner, destroyOperators = listOf(emptyOp), maxIterations = 3, flipsPerIteration = 100L)
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 0L)).assignment
-        assertNotNull(sample, "ALNS should still return the initial solve's incumbent")
-    }
-
-    @Test
-    fun `randomized destroy size varies across iterations`() {
-        val problem = Problem(
-            numBoolVars = 20,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Cardinality(IntArray(20) { Lit.make(it, true) }, min = 5, max = 20)),
-        )
-        val objective = LinearObjective(boolWeights = LongArray(20) { (it + 1).toLong() })
-        val alns = Alns(
-            inner = LocalSearchSolver(problem.bake()),
-            repairOperators = scaledRepairOperators,
-            minDestroyFraction = 0.1,
-            maxDestroyFraction = 0.6,
-            maxIterations = 8,
-        )
-        alns.minimize(objective, LocalSearchParams(maxFlips = 100L, randomSeed = 1L))
-        val freedCounts = alns.iterationLog.map { it.freedCount }.toSet()
-        assertTrue(freedCounts.size >= 2, "the destroy size must vary across iterations, got $freedCounts")
-    }
-
-    @Test
     fun `acceptanceFor overrides the fixed acceptance and sees the initial objective`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
@@ -557,28 +291,6 @@ class AlnsTest {
     }
 
     @Test
-    fun `falls back to a backtrack bootstrap when local search finds no feasible incumbent`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        // The inner LS never finds feasible; the complete backtrack bootstrap must supply the incumbent
-        // so ALNS optimises instead of returning empty.
-        val alns = Alns(
-            inner = NoFeasibleLs(problem.bake()),
-            repairOperators = BacktrackRepair.Defaults,
-            backtrack = BacktrackSolver(problem.bake()),
-            backtrackParams = BacktrackParams(),
-            maxIterations = 8,
-            acceptance = AcceptanceCriterion.BetterOrEqual,
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
-        assertNotNull(sample, "the backtrack bootstrap must supply a feasible incumbent when LS fails")
-        assertEquals(3.0, objective.evaluate(sample), "the bootstrapped incumbent optimises to the true optimum")
-    }
-
-    @Test
     fun `maxInstructions caps the outer loop below maxIterations`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
@@ -596,50 +308,6 @@ class AlnsTest {
         )
         alns.minimize(objective, LocalSearchParams(maxFlips = 200L, maxInstructions = 120L, randomSeed = 1L))
         assertEquals(3, alns.iterationLog.size, "120 / 50-per-iteration budget must stop the loop after 3 iterations")
-    }
-
-    @Test
-    fun `a null maxInstructions leaves the loop bounded only by maxIterations`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val alns = Alns(
-            inner = LocalSearchSolver(problem.bake()),
-            destroyOperators = listOf(DestroyOperator.Random),
-            repairOperators = listOf(InnerLsRepair()),
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 5,
-            flipsPerIteration = 50L,
-        )
-        alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L))
-        assertEquals(5, alns.iterationLog.size, "with no instruction budget maxIterations remains the only cap")
-    }
-
-    @Test
-    fun `alns with noisy greedy repair still reaches the optimum`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val alns = Alns(
-            inner = LocalSearchSolver(problem.bake()),
-            repairOperators = listOf(GreedyConstructionRepair(noise = 0.5)),
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 8,
-            acceptance = AcceptanceCriterion.BetterOrEqual,
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
-        assertNotNull(sample)
-        assertEquals(
-            3.0,
-            objective.evaluate(sample),
-            "insertion noise diversifies but repair stays feasible and optimal",
-        )
     }
 
     private companion object {

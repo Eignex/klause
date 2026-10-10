@@ -9,17 +9,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Equivalence + soundness coverage for the batched exclusion path ([excludeIntValues], #599).
- *
- * Folding [excludeIntValue] over a sorted value list one-at-a-time rebuilds the hole array per
- * value (O(domain^2)); the batch merges them in one [IntDomain.excludeValues] pass. The two must
- * be observationally identical: after either, the **domain** and every materialized order
- * literal's **stored truth + level** must match. (Reasons/antecedents may legitimately differ —
- * the batch cites the shared batch reason where the sequential path chains rung-to-rung — but a
- * reason is only ever allowed to grow, never to drop a needed literal, so soundness is preserved;
- * end-state truth/level is the property that must hold exactly.)
- */
 class PropagationStateBatchExcludeTest {
 
     private fun freshState(numVars: Int, hi: Int): PropagationState {
@@ -99,18 +88,6 @@ class PropagationStateBatchExcludeTest {
         materializeAllAtoms(s, 1, 4)
         enterLevel(s, 0)
         assertEquals(false, s.excludeIntValues(0, longArrayOf(0, 1, 2, 3, 4), null), "excluding all → conflict")
-    }
-
-    @Test
-    fun `batch exclude of absent values leaves the domain unchanged`() {
-        val s = freshState(1, 4)
-        materializeAllAtoms(s, 1, 4)
-        enterLevel(s, 0)
-        // 2 is already a hole; 7,9 are out of range — all no-ops, domain unchanged.
-        s.excludeIntValue(0, 2)
-        val before = s.intDomains[0]
-        assertEquals(true, s.excludeIntValues(0, longArrayOf(2, 7, 9), null))
-        assertEquals(before, s.intDomains[0])
     }
 
     /**

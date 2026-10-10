@@ -27,12 +27,6 @@ class MixedEchelonHermiteTest {
         return acc
     }
 
-    private fun apply(transform: UnimodularTransform, point: Array<BigInt>): Array<BigInt> {
-        val result = Array(point.size) { BIG_ZERO }
-        transform.forEachEntry { row, column, value -> result[row] += value * point[column] }
-        return result
-    }
-
     @Test
     fun `the transform is unimodular so the lattice is preserved`() {
         val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
@@ -42,30 +36,12 @@ class MixedEchelonHermiteTest {
     }
 
     @Test
-    fun `the inverse transform recovers transformed integer coordinates`() {
-        val transform = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2).transform
-        val source = apply(transform, vec(5, -7))
-
-        assertEquals(
-            listOf(bigIntOf(5), bigIntOf(-7)),
-            apply(transform.inverse(), source).toList(),
-        )
-    }
-
-    @Test
     fun `an inequality keeps its value under the change of variables`() {
         // 2x0 + 3x1 = 0 drives the basis; the inequality row must evaluate identically at x = V*y.
         val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), sparseRows(longArrayOf(1, 1)), 2)
         val y = vec(3, -2)
         val x = r.recover(y)
         assertEquals(dot(sparseRows(longArrayOf(1, 1))[0], x), dot(r.inequalities[0], y), "row value is invariant")
-    }
-
-    @Test
-    fun `the equality block becomes lower triangular`() {
-        val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
-        assertEquals(1, r.equalities.size)
-        assertTrue(r.equalities[0][1].isZero(), "everything right of the pivot is cleared")
     }
 
     @Test
@@ -84,32 +60,12 @@ class MixedEchelonHermiteTest {
     }
 
     @Test
-    fun `the recovered point satisfies the original equality`() {
-        // Any y with the transformed equality satisfied must map back onto 2x0 + 3x1 = 0.
-        val original = sparseRows(longArrayOf(2, 3))
-        val r = mixedEchelonHermite(original, emptyList(), 2)
-        // The pivot is column 0, so y0 = 0 satisfies the transformed row for every y1.
-        for (t in -3L..3L) {
-            val x = r.recover(vec(0, t))
-            assertEquals(BIG_ZERO, dot(original[0], x), "x = V*y must satisfy the original row")
-        }
-    }
-
-    @Test
     fun `bounded rewritten variables bound the original ones`() {
         val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
         val b = r.originalBounds(arrayOf(BIG_ZERO, BIG_ZERO), arrayOf(BIG_ZERO, BIG_ZERO))
         // y pinned to the origin pins x to the origin, whatever V is.
         assertEquals(BIG_ZERO, b.lo[0])
         assertEquals(BIG_ZERO, b.hi[0])
-    }
-
-    @Test
-    fun `an open rewritten variable leaves the original open in that direction`() {
-        val r = mixedEchelonHermite(sparseRows(longArrayOf(2, 3)), emptyList(), 2)
-        val b = r.originalBounds(arrayOf(null, null), arrayOf(null, null))
-        assertTrue(b.lo.all { it == null }, "an unbounded y must not yield a bounded x")
-        assertTrue(b.hi.all { it == null })
     }
 
     @Test

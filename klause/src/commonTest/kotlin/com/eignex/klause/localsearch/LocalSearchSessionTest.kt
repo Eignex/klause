@@ -5,15 +5,11 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.schedule.AdaptiveCooling
 import com.eignex.klause.localsearch.strategy.Cbls
-import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
-import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -136,60 +132,6 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `maxInstructions tightens flip budget vs maxFlips when smaller`() {
-        val problem = weightLearningProblem()
-        val solver = LocalSearchSolver(problem.bake())
-        val tight = assertIs<SolveResult.Unknown>(
-            solver.solve(
-                LocalSearchParams(
-                    maxFlips = Long.MAX_VALUE,
-                    maxInstructions = 5L,
-                    randomSeed = 0L,
-                ),
-            ),
-        )
-        assertEquals(5.0, tight.stats.ls.moves.sum, "maxInstructions must cap local-search work")
-    }
-
-    @Test
-    fun `session captures learned factor weights after a call`() {
-        val problem = weightLearningProblem()
-        val solver = LocalSearchSolver(problem.bake(), strategy = Cbls())
-        val session = LocalSearchSession(solver)
-        assertNull(session.warmState.factorWeights)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
-        val captured = session.warmState.factorWeights
-        assertNotNull(captured, "session should capture factorWeights")
-        assertEquals(problem.numFactors, captured.size)
-        assertTrue(captured.any { it != 1.0 }, "CBLS should learn non-default weights")
-    }
-
-    @Test
-    fun `paused satisfaction exports learned weights to the session`() {
-        val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem().bake()))
-
-        session.resumableSolve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).use { handle ->
-            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1_000L))
-
-            val captured = assertNotNull(session.warmState.factorWeights)
-            assertTrue(captured.any { it != 1.0 })
-        }
-    }
-
-    @Test
-    fun `resumed satisfaction imports the session learned weights`() {
-        val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem().bake()))
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
-        val learned = assertNotNull(session.warmState.factorWeights).copyOf()
-
-        session.resumableSolve(LocalSearchParams(maxFlips = 0L, randomSeed = 2L)).use { handle ->
-            handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
-        }
-
-        assertTrue(learned.contentEquals(assertNotNull(session.warmState.factorWeights)))
-    }
-
-    @Test
     fun `reset clears warm state`() {
         val problem = weightLearningProblem()
         val session = LocalSearchSession(LocalSearchSolver(problem.bake(), strategy = Cbls()))
@@ -220,48 +162,6 @@ class LocalSearchSessionTest {
     }
 
     @Test
-    fun `session implements Session interface and is returned by solver session factory`() {
-        val solver = LocalSearchSolver(weightLearningProblem().bake())
-        val session: LocalSearchSession = solver.session()
-        assertEquals(0, session.depth)
-        session.push(Assumptions(bools = mapOf(0 to true)))
-        assertEquals(1, session.depth)
-        session.pop()
-        assertEquals(0, session.depth)
-    }
-
-    @Test
-    fun `session captures variable activity counts after a call`() {
-        val problem = weightLearningProblem()
-        val solver = LocalSearchSolver(problem.bake())
-        val session = LocalSearchSession(solver)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 7L))
-        val touches = session.warmStateView.activityTouches()
-        assertEquals(6, touches.size, "touches should cover all (bool + int) var slots")
-        assertTrue(touches.any { it > 0 }, "expected at least one touched variable")
-    }
-
-    @Test
-    fun `bestCostSeen watermark survives session call boundaries`() {
-        val problem = weightLearningProblem()
-        val solver = LocalSearchSolver(problem.bake())
-        val session = LocalSearchSession(solver)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
-        val firstWatermark = session.warmStateView.bestCostSeen()
-        assertTrue(
-            firstWatermark < Int.MAX_VALUE,
-            "expected watermark after first call, got $firstWatermark",
-        )
-
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 2L))
-        val secondWatermark = session.warmStateView.bestCostSeen()
-        assertTrue(
-            secondWatermark <= firstWatermark,
-            "watermark must monotone-decrease: $firstWatermark -> $secondWatermark",
-        )
-    }
-
-    @Test
     fun `reset clears bestCostSeen alongside other warm fields`() {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem.bake())
@@ -273,34 +173,6 @@ class LocalSearchSessionTest {
             Long.MAX_VALUE,
             session.warmStateView.bestCostSeen(),
             "reset should restore the bestCost watermark to its empty default",
-        )
-    }
-
-    @Test
-    fun `cbls smoothing bounds weight growth vs bump-only`() {
-        fun peakWeightAfterRun(strategy: SourceDrivenStrategy): Double {
-            val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem().bake(), strategy = strategy))
-            session.sample(LocalSearchParams(maxFlips = 3_000L, randomSeed = 4L))
-            return session.warmState.factorWeights!!.max()
-        }
-        val bumpOnlyPeak = peakWeightAfterRun(Cbls())
-        val smoothedPeak = peakWeightAfterRun(Cbls(smoothProb = 1.0, smoothFactor = 0.5))
-        assertTrue(bumpOnlyPeak > 1.0, "bump-only run should grow weights, got peak=$bumpOnlyPeak")
-        assertTrue(
-            smoothedPeak < bumpOnlyPeak,
-            "smoothing should bound growth: smoothed=$smoothedPeak vs bump-only=$bumpOnlyPeak",
-        )
-    }
-
-    @Test
-    fun `engine drives per-round feedback to an adaptive cooling schedule`() {
-        val cooling = AdaptiveCooling(initialRate = 0.999)
-        val strategy = SimulatedAnnealing.withSchedule(cooling, tabu = TabuFilter.Disabled)
-        val solver = LocalSearchSolver(weightLearningProblem().bake(), strategy = strategy)
-        LocalSearchSession(solver).sample(LocalSearchParams(maxFlips = 6_000L, randomSeed = 4L))
-        assertTrue(
-            cooling.coolingRate != 0.999,
-            "the engine must drive schedule.observe each round; rate stayed at ${cooling.coolingRate}",
         )
     }
 

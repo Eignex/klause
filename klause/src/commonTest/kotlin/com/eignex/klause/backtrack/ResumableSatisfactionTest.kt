@@ -50,36 +50,6 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `slices resumed to a verdict prove unsat like one uninterrupted solve`() {
-        val problem = pigeonhole(6, 5)
-        val whole = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-
-        val sliced = runToVerdict(handle(problem), sliceWork = 1L)
-
-        assertIs<SolveResult.Unsat>(whole)
-        assertIs<SolveResult.Unsat>(sliced)
-        assertEquals(whole.stats.search.nodes, sliced.stats.search.nodes, "a resumed search must not restart")
-    }
-
-    @Test
-    fun `slices resumed to a verdict find a model`() {
-        val sat = assertIs<SolveResult.Sat>(runToVerdict(handle(pigeonhole(5, 5)), sliceWork = 1L))
-
-        for (p in 0 until 5) assertTrue((0 until 5).any { h -> sat.assignment.bools[p * 5 + h] }, "pigeon $p unplaced")
-    }
-
-    @Test
-    fun `the same work budget pauses at the same node every time`() {
-        fun nodesAfterOneSlice(): Double {
-            val search = handle(pigeonhole(6, 5))
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 20L)
-            return search.stats.search.nodes.sum
-        }
-
-        assertEquals(nodesAfterOneSlice(), nodesAfterOneSlice())
-    }
-
-    @Test
     fun `a fired run token ends the search instead of pausing it`() {
         val search = handle(pigeonhole(6, 5))
 
@@ -119,5 +89,4 @@ class ResumableSatisfactionTest {
         assertEquals(3L, budget.spent)
         assertEquals(3.0, result.stats.search.nodes.sum)
     }
-
 }

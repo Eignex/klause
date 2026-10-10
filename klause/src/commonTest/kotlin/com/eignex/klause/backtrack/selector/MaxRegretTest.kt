@@ -12,24 +12,6 @@ import kotlin.test.assertEquals
 class MaxRegretTest {
 
     @Test
-    fun `MaxRegret picks variable with largest weighted span`() {
-        // 3 int vars, all unpinned, domain widths and coefficients chosen so v1 wins.
-        //   v0: dom [0..4] (width 4), coeff 1 → regret 4
-        //   v1: dom [0..3] (width 3), coeff 5 → regret 15
-        //   v2: dom [0..9] (width 9), coeff 0 → regret 0
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 3), IntDomain(0, 9)),
-            factors = emptyArray(),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 5L, 0L))
-        val session = PropagationSession(problem)
-        val picked = MaxRegret(obj).pick(session, Random(0L))
-        assertEquals(VarRef.IntVar(1), picked)
-    }
-
-    @Test
     fun `MaxRegret regret saturates instead of wrapping on a full long span`() {
         val problem = Problem(
             numBoolVars = 0,

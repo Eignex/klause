@@ -86,50 +86,6 @@ class GccSeparatorTest {
     }
 
     @Test
-    fun `all caps one reduces to the hall sum`() {
-        // cover {0,1,2}, each used at most once over 3 vars ⇒ AllDifferent over {0,1,2}: Σx in [3,3].
-        val gcc = GlobalCardinality(
-            xs = intArrayOf(0, 1, 2),
-            cover = longArrayOf(0, 1, 2),
-            countLow = intArrayOf(0, 0, 0),
-            countHigh = intArrayOf(1, 1, 1),
-            closed = true,
-        )
-        assertEquals(3L, lower(gcc, 2))
-        assertEquals(3L, upper(gcc, 2))
-    }
-
-    @Test
-    fun `cut excludes no feasible closed distribution`() {
-        val gcc = GlobalCardinality(
-            xs = intArrayOf(0, 1, 2, 3),
-            cover = longArrayOf(0, 1, 2),
-            countLow = intArrayOf(1, 0, 0),
-            countHigh = intArrayOf(2, 2, 2),
-            closed = true,
-        )
-        val lo = lower(gcc, 2)
-        val hi = upper(gcc, 2)
-        // Enumerate every closed assignment honouring the caps; Σ must lie within [lo, hi].
-        for (a in 0..2) {
-            for (b in 0..2) {
-                for (c in 0..2) {
-                    for (d in 0..2) {
-                        val cnt = IntArray(3)
-                        cnt[a]++
-                        cnt[b]++
-                        cnt[c]++
-                        cnt[d]++
-                        if (cnt[0] < 1 || cnt[0] > 2 || cnt[1] > 2 || cnt[2] > 2) continue
-                        val s = (a + b + c + d).toLong()
-                        assertTrue(s in lo..hi, "($a,$b,$c,$d): $s not in [$lo,$hi]")
-                    }
-                }
-            }
-        }
-    }
-
-    @Test
     fun `open gcc is not separated`() {
         val gcc = GlobalCardinality(
             xs = intArrayOf(0, 1, 2),

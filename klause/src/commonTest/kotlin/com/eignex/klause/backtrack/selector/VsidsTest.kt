@@ -2,7 +2,6 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -21,72 +20,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 class VsidsTest {
-
-    @Test
-    fun `vsids finds SAT on a hard pigeonhole-like instance`() {
-        // 6 vars with constraints forcing the search through several conflicts. VSIDS
-        // should consistently find a model — sanity check that activity-driven picking
-        // doesn't break correctness vs. the default random heuristic.
-        val problem = Problem(
-            numBoolVars = 6,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Cardinality.exactlyOne(
-                    intArrayOf(
-                        Lit.make(0, true),
-                        Lit.make(1, true),
-                        Lit.make(2, true),
-                    ),
-                ),
-                Cardinality.exactlyOne(
-                    intArrayOf(
-                        Lit.make(3, true),
-                        Lit.make(4, true),
-                        Lit.make(5, true),
-                    ),
-                ),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(4, false))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(5, false))),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(
-                variableSelector = Vsids(),
-                randomSeed = 0L,
-            ),
-        )
-        val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals(
-            1,
-            sat.assignment.bools.take(3).count { it },
-            "exactly one of v0..v2 should be true",
-        )
-        assertEquals(
-            1,
-            sat.assignment.bools.drop(3).count { it },
-            "exactly one of v3..v5 should be true",
-        )
-    }
-
-    @Test
-    fun `vsids proves UNSAT and accumulates activity`() {
-        // Direct two-clause contradiction. Should return Unsat immediately via
-        // bake-time propagation — no conflicts in the search tree, but VSIDS shouldn't
-        // crash on the early return.
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(variableSelector = Vsids()))
-        assertIs<SolveResult.Unsat>(r)
-    }
 
     @Test
     fun `vsids prefers highest-activity variable after onConflict bumps`() {

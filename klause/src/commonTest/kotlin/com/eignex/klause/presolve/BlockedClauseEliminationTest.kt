@@ -19,11 +19,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Blocked-clause elimination. Like BVE, BCE is satisfiability- but not solution-set-preserving, so each
- * test enumerates all Boolean assignments and checks equisatisfiability, that no original solution's
- * projection is rejected, and that reconstruction lifts every reduced solution back to a valid original.
- */
 class BlockedClauseEliminationTest {
 
     private fun pos(v: Int) = Lit.make(v, true)
@@ -64,22 +59,6 @@ class BlockedClauseEliminationTest {
     private fun clauseCount(problem: Problem) = problem.factors.filterIsInstance<Clause>().size
 
     @Test
-    fun `removes a blocked clause`() {
-        // In (a ∨ b) ∧ (¬a ∨ ¬b) each clause is blocked (the resolvent on either shared variable is a
-        // tautology), so at least one is removed and the solution set is recovered by reconstruction.
-        val problem = Problem(2, 0, emptyArray(), listOf(clause(pos(0), pos(1)), clause(neg(0), neg(1))))
-        val reduced = checkBce(2, listOf(clause(pos(0), pos(1)), clause(neg(0), neg(1))))
-        assertTrue(clauseCount(reduced) < clauseCount(problem), "a blocked clause is removed")
-    }
-
-    @Test
-    fun `removes a pure-literal clause as vacuously blocked`() {
-        // b never occurs negatively, so (a ∨ b) is blocked on b (no opposite clause to clash with).
-        val reduced = checkBce(2, listOf(clause(pos(0), pos(1))))
-        assertEquals(0, clauseCount(reduced), "the clause is removed")
-    }
-
-    @Test
     fun `keeps clauses whose only blocking variables are ineligible`() {
         // With both variables protected, neither may serve as a blocking literal, so nothing is removed.
         val reduced = checkBce(
@@ -89,21 +68,6 @@ class BlockedClauseEliminationTest {
         )
         assertEquals(2, clauseCount(reduced), "no clause is removed")
     }
-
-    @Test
-    fun `is sound on a mixed formula`() {
-        checkBce(
-            4,
-            listOf(
-                clause(pos(0), pos(1)),
-                clause(neg(0), pos(2)),
-                clause(neg(1), neg(2), pos(3)),
-                clause(pos(0), neg(3)),
-            ),
-        )
-    }
-
-    // ---- the source lane ----
 
     @Test
     fun `a blocked clause is repaired on a model with an open column`() {

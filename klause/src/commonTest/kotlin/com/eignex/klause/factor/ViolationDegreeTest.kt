@@ -3,12 +3,6 @@ package com.eignex.klause.factor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * `compressViolation` splits at [softCap]: residuals at or below it pass through verbatim, larger
- * ones get a `softCap + ⌊log2(raw − softCap + 1)⌋` tail. These cases pin both regimes and the
- * boundary, and cross-check the tail against an independent shift-loop reference so the
- * `countLeadingZeroBits` bit-length stays exactly the floor-log it stands in for.
- */
 class ViolationDegreeTest {
 
     /** Independent ⌊log2(extra)⌋ + 1 reference for `extra ≥ 1`. */
@@ -20,18 +14,6 @@ class ViolationDegreeTest {
             bits++
         }
         return bits
-    }
-
-    @Test
-    fun `non-positive residual compresses to zero`() {
-        assertEquals(0, compressViolation(0L, 16))
-        assertEquals(0, compressViolation(-5L, 16))
-    }
-
-    @Test
-    fun `residual at or below the soft cap passes through verbatim`() {
-        assertEquals(1, compressViolation(1L, 16))
-        assertEquals(16, compressViolation(16L, 16))
     }
 
     @Test

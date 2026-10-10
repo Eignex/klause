@@ -404,45 +404,6 @@ class LpDeclineDisciplineTest {
     }
 
     @Test
-    fun `standalone and engine leaf consumers preserve an unresolved real leaf`() {
-        val problem = continuousEqualityProblem()
-        val sample = Sample(booleanArrayOf(), longArrayOf())
-        val standaloneHarness = harness()
-        val standalone = leafRealFeasibility(
-            problem,
-            objective = null,
-            sample = sample,
-            context = standaloneHarness.context,
-        )
-        val engineHarness = harness()
-        val engine = engine(
-            problem,
-            LinearObjective(intCoefficients = LongArray(0)),
-            engineHarness,
-            LpPlan(bounding = true, realResidual = true),
-        )
-
-        val leaf = engine.use { it.leafCertify(PropagationSession(problem)) }
-
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, leafRealFeasibility(problem, null, sample).verdict)
-        assertEquals(LpVerdict.INDETERMINATE, standalone.verdict)
-        assertEquals(LpVerdict.INDETERMINATE, leaf.verdict)
-        assertTrue(standalone.reals.isEmpty())
-        assertTrue(leaf.reals.isEmpty())
-        assertTrue(standaloneHarness.factory.calls.contains(DeclineCall.GENERAL))
-        assertTrue(engineHarness.factory.calls.contains(DeclineCall.PERSISTENT))
-        assertEquals(0, engineHarness.factory.calls.count { it == DeclineCall.GENERAL })
-        assertEquals(
-            standaloneHarness.factory.calls.count { it == DeclineCall.GENERAL },
-            standaloneHarness.factory.calls.count { it == DeclineCall.CLOSE },
-        )
-        assertEquals(
-            engineHarness.factory.calls.count { it == DeclineCall.PERSISTENT },
-            engineHarness.factory.calls.count { it == DeclineCall.CLOSE },
-        )
-    }
-
-    @Test
     fun `MPS real leaf decline reaches the unknown solve terminal`() {
         val harness = harness()
         val component = object : SearchComponent {
@@ -548,25 +509,6 @@ class LpDeclineDisciplineTest {
         } finally {
             positive.close()
         }
-    }
-
-    @Test
-    fun `root Farkas consumer cannot report infeasibility after decline`() {
-        val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 1)),
-            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2)),
-        )
-        val objective = LinearObjective(intCoefficients = longArrayOf(0L))
-        val harness = harness()
-        val rejecting = engine(problem, objective, harness)
-
-        assertFalse(rejecting.rootLpInfeasibleNoBake(Cancellation.Never))
-        assertTrue(productionEngine(problem, objective).rootLpInfeasibleNoBake(Cancellation.Never))
-        assertTrue(harness.policy.observedSuccess(LpCertifier.EXACT_FARKAS))
-        assertTrue(harness.factory.calls.contains(DeclineCall.TABLEAU))
-        assertEquals(1, harness.factory.calls.count { it == DeclineCall.CLOSE })
     }
 
     @Test
@@ -677,36 +619,6 @@ class LpDeclineDisciplineTest {
         assertEquals(1, refutationHarness.factory.calls.count { it == DeclineCall.CLOSE })
     }
 
-    @Test
-    fun `pre cancelled common solving publishes no proof`() {
-        val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, 1.0)
-        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 2.0)
-        val token = Cancellation { true }
-        val harness = harness()
-
-        val result = solveAndCertify(
-            builder.build(Sense.MINIMIZE),
-            cancellation = token,
-            componentSplit = false,
-            context = harness.context,
-        )
-
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
-        assertTrue(harness.factory.cancellations.all { it === token })
-        assertNull(result.witness)
-        assertNull(result.bound)
-        assertNull(result.rationalConflict)
-        assertNull(result.farkasRay)
-        assertNull(result.boundConflict)
-        assertTrue(harness.policy.attempts.none { it.second })
-        assertFalse(harness.policy.observedSuccess(LpCertifier.RATIONAL))
-        assertEquals(
-            harness.factory.calls.count { it == DeclineCall.GENERAL },
-            harness.factory.calls.count { it == DeclineCall.CLOSE },
-        )
-    }
-
     private class Harness(val factory: ConsumerRecordingFactory, val policy: DecliningPolicy) {
         val context = LpSolveContext(factory, policy)
     }
@@ -731,19 +643,6 @@ class LpDeclineDisciplineTest {
         objective: LinearObjective,
         plan: LpPlan = LpPlan(bounding = true),
     ): LpEngine = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink("positive-control"))
-
-    private fun continuousEqualityProblem(): Problem {
-        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)
-        return Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(row),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
-        )
-    }
 
     private fun triangleCover(): Problem = Problem(
         0,

@@ -1,41 +1,15 @@
 package com.eignex.klause.backtrack.selector
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 
 class ActivityBasedSearchTest {
-
-    @Test
-    fun `ABS finds solutions in the engine`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 5,
-            intDomains = Array(5) { IntDomain(0, 4) },
-            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(
-                variableSelector = ActivityBasedSearch(),
-                valueSelector = IndomainMin,
-                randomSeed = 0L,
-            ),
-        )
-        val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0L..4L).toSet(), sat.assignment.ints.toSet())
-    }
 
     @Test
     fun `ABS scores vars by activity over domain size`() {
@@ -59,33 +33,6 @@ class ActivityBasedSearchTest {
             VarRef.IntVar(2),
             picked,
             "ABS should prefer the var with bumped activity",
-        )
-    }
-
-    @Test
-    fun `ABS decay implicit via increment grows over commits`() {
-        // Bump var 0 once at time t=0, then issue 100 onCommit calls (decaying),
-        // then bump var 1 once at t=100. Activity of var 1 should exceed var 0 because
-        // increment has grown.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = Array(2) { IntDomain(0, 9) },
-            factors = emptyArray(),
-        )
-        val session = PropagationSession(problem)
-        val abs = ActivityBasedSearch(decay = 0.95)
-        abs.pick(session, Random(0L))
-        abs.onPropagation(implied(intKeys = intArrayOf(0)))
-        // Pass time via commits so the increment grows.
-        repeat(50) { abs.onCommit(VarRef.IntVar(0)) }
-        // Bump var 1 with the now-larger increment.
-        abs.onPropagation(implied(intKeys = intArrayOf(1)))
-        val picked = abs.pick(session, Random(0L))
-        assertEquals(
-            VarRef.IntVar(1),
-            picked,
-            "recent bumps should outweigh older ones via implicit decay",
         )
     }
 

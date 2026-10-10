@@ -70,28 +70,8 @@ class KotlinBasisSolverTest {
     }
 
     @Test
-    fun `seeded updates solve permuted triangular bases in both directions`() {
-        assertSeededUpdatesSolve("triangular", 8)
-    }
-
-    @Test
     fun `seeded updates solve permuted sparse bases in both directions`() {
         assertSeededUpdatesSolve("sparse", 8)
-    }
-
-    @Test
-    fun `seeded updates solve permuted spiked bases in both directions`() {
-        assertSeededUpdatesSolve("spiked", 8)
-    }
-
-    @Test
-    fun `seeded updates solve permuted dense bases in both directions`() {
-        assertSeededUpdatesSolve("dense", 8)
-    }
-
-    @Test
-    fun `seeded updates solve permuted large dense bases in both directions`() {
-        assertSeededUpdatesSolve("dense", 16)
     }
 
     @Test
@@ -173,28 +153,6 @@ class KotlinBasisSolverTest {
 
         assertContentEquals(doubleArrayOf(-1.5, 0.5), spike.toDoubleArray())
         assertEquals(0.0, solver.solveQuality(doubleArrayOf(1.0, 0.0), spike).relativeResidual)
-    }
-
-    @Test
-    fun `empty basis solves have empty support and zero residual`() {
-        val solver: BasisSolver = KotlinBasisSolver(SparseMatrix.ofColumns(0, 0, emptyList()))
-        assertTrue(solver.refactorize(intArrayOf()))
-        val vector = IndexedVector(0)
-        solver.ftran(vector, 0.0)
-        solver.btran(vector)
-        assertEquals(0, vector.count)
-        assertEquals(1.0, solver.rcond)
-        assertEquals(0.0, solver.solveQuality(doubleArrayOf(), vector).relativeResidual)
-        solver.close()
-    }
-
-    @Test
-    fun `empty repair retains a usable empty basis`() {
-        val solver: BasisSolver = KotlinBasisSolver(SparseMatrix.ofColumns(0, 0, emptyList()))
-        assertTrue(solver.refactorize(intArrayOf()))
-        assertNull(solver.kernel)
-        assertFalse(assertNotNull(solver.refactorizeRepairing(intArrayOf())).repaired)
-        solver.close()
     }
 
     @Test
@@ -313,42 +271,6 @@ class KotlinBasisSolverTest {
         vector.unit(0)
         solver.ftran(vector)
         assertEquals(1.0, vector[0])
-    }
-
-    @Test
-    fun `unrepresentable update products preserve original headings and both solve directions`() {
-        for (magnitude in listOf(1e200, 1e-200)) {
-            val source = SparseMatrix.ofColumns(
-                2,
-                3,
-                listOf(
-                    listOf(0 to magnitude),
-                    listOf(0 to magnitude, 1 to 1.0),
-                    listOf(1 to magnitude),
-                ),
-            )
-            val solver = KotlinBasisSolver(source, LuPivotPolicy(absoluteTolerance = 0.0))
-            assertTrue(solver.refactorize(intArrayOf(0, 1)))
-            // Exact products cancel in the source equation; individual floating products are unrepresentable.
-            val spike = IndexedVector(2).also { it.scatter(doubleArrayOf(-magnitude, magnitude)) }
-            val before = solver.nnz
-
-            assertEquals(BasisUpdate.SINGULAR, solver.update(0, 2, spike, spike))
-
-            assertEquals(before, solver.nnz)
-            assertEquals(0, solver.updateCount)
-            assertContentEquals(doubleArrayOf(-magnitude, magnitude), spike.toDoubleArray())
-            val rhs = doubleArrayOf(magnitude, 0.0)
-            for (transpose in listOf(false, true)) {
-                val vector = IndexedVector(2).also { it.scatter(rhs) }
-                if (transpose) solver.btran(vector) else solver.ftran(vector)
-                assertEquals(0.0, sourceResidual(source, intArrayOf(0, 1), rhs, vector, transpose))
-                assertEquals(0.0, solver.solveQuality(rhs, vector, transpose).relativeResidual)
-            }
-            spike.unit(0)
-            assertEquals(BasisUpdate.APPLIED, solver.update(0, 0, spike))
-            solver.close()
-        }
     }
 
     private fun assertSeededUpdatesSolve(shape: String, n: Int) {

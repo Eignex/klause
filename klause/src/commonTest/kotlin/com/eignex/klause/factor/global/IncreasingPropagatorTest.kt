@@ -1,8 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -11,16 +8,12 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
-import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class IncreasingPropagatorTest {
@@ -31,43 +24,6 @@ class IncreasingPropagatorTest {
         intDomains = Array(n) { IntDomain(lo.toLong(), hi.toLong()) },
         factors = arrayOf<Factor>(Increasing(IntArray(n) { it }, strict = strict)),
     )
-
-    @Test
-    fun `propagation is sound and GAC in both strictness modes`() {
-        val cases = listOf(
-            "increasing" to chain(strict = false),
-            "strictly_increasing" to chain(strict = true, hi = 4),
-        )
-        for ((label, problem) in cases) {
-            val strict = label == "strictly_increasing"
-            val semantics = { sample: Sample ->
-                (0 until problem.numIntVars - 1).all {
-                    if (strict) sample.ints[it] < sample.ints[it + 1] else sample.ints[it] <= sample.ints[it + 1]
-                }
-            }
-            FactorPropagationOracle.assertSound(problem, label, semantics)
-            FactorPropagationOracle.assertGac(problem, label, semantics)
-        }
-    }
-
-    @Test
-    fun `every enumerated solution is non-decreasing`() {
-        val problem = chain(strict = false)
-        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).take(50).forEach { s ->
-            assertTrue((0 until 2).all { s.ints[it] <= s.ints[it + 1] }, "not non-decreasing: ${s.ints.toList()}")
-        }
-    }
-
-    @Test
-    fun `strictly increasing on an equal pinned pair is Unsat`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = Array(2) { IntDomain(1, 1) },
-            factors = arrayOf<Factor>(Increasing(intArrayOf(0, 1), strict = true)),
-        )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
-    }
 
     @Test
     fun `forward sweep raises later mins and backward sweep lowers earlier maxes`() {

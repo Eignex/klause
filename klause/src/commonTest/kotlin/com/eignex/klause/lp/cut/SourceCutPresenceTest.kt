@@ -2,7 +2,6 @@ package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -14,8 +13,6 @@ import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
-import com.eignex.klause.lp.engine.CutRoundingRule
-import com.eignex.klause.lp.engine.CutWeightedRow
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
@@ -110,79 +107,6 @@ class SourceCutPresenceTest {
     }
 
     @Test
-    fun `dormant auxiliary cuts revive with complete proofs under equivalent definitions`() {
-        val root = Any()
-        val oldA = CutSource(CutSourceKind.AUXILIARY, 0)
-        val oldB = CutSource(CutSourceKind.AUXILIARY, 1)
-        val newA = CutSource(CutSourceKind.AUXILIARY, 7)
-        val newB = CutSource(CutSourceKind.AUXILIARY, 8)
-        val integer = CutSource(CutSourceKind.INTEGER, 0)
-        val a = CutAuxiliaryDefinition(listOf(1L), emptyList(), 4L, true)
-        val b = CutAuxiliaryDefinition(listOf(2L), emptyList(), 4L, false)
-        val oldExpression = CutExpression(mapOf(oldA to BigFraction.ofLong(2L)))
-        val newExpression = CutExpression(mapOf(newA to BigFraction.ofLong(2L)))
-        val oldRow = CutPremise.Row(
-            CutExpression(mapOf(oldA to BigFraction.ONE, oldB to BigFraction.ONE)),
-            Relation.LE,
-            BigFraction.ofLong(2L),
-        )
-        val newRow = oldRow.copy(expression = CutExpression(mapOf(newA to BigFraction.ONE, newB to BigFraction.ONE)))
-        val oldFacts = listOf(
-            CutProofFact(CutPremise.Bound(oldExpression, true, BigFraction.ONE, strict = true), false),
-            CutProofFact(CutPremise.Integral(oldExpression), true),
-            CutProofFact(CutPremise.Fixed(oldB, BigFraction.ofLong(2L)), false),
-            CutProofFact(CutPremise.Excluded(integer, BigFraction.ofLong(3L)), false),
-            CutProofFact(CutPremise.Literal(0), false),
-            CutProofFact(oldRow, true),
-            CutProofFact(CutPremise.ObjectiveCutoff(oldExpression, BigFraction.ONE), false),
-        )
-        val newFacts = listOf(
-            CutProofFact(CutPremise.Bound(newExpression, true, BigFraction.ONE, strict = true), false),
-            CutProofFact(CutPremise.Integral(newExpression), true),
-            CutProofFact(CutPremise.Fixed(newB, BigFraction.ofLong(2L)), false),
-            CutProofFact(CutPremise.Excluded(integer, BigFraction.ofLong(3L)), false),
-            CutProofFact(CutPremise.Literal(0), false),
-            CutProofFact(newRow, true),
-            CutProofFact(CutPremise.ObjectiveCutoff(newExpression, BigFraction.ONE), false),
-        )
-        val proof = CutProvenance(root, 0L, oldFacts,
-            rules = listOf(CutRoundingRule(2L, true, 3L, listOf(CutWeightedRow(oldRow, -5L)))),
-            conclusion = CutPremise.Row(oldExpression, Relation.LE, BigFraction.ZERO),
-            auxiliaryDefinitions = mapOf(oldA to a, oldB to b))
-        val cut = SourceCut(oldExpression, Relation.LE, BigFraction.ZERO, proof)
-        val pool = CutPool()
-        val absent = CutSourceMap(root, 1L, emptyList())
-        assertTrue(pool.add(cut, absent))
-        assertTrue(pool.cuts().isEmpty())
-        val present = CutSourceMap(root, 2L, listOf(CutColumnSource(newA)),
-            activePremises = newFacts.filter { !it.global }.mapTo(HashSet()) { it.premise },
-            fixed = mapOf(newB to BigFraction.ofLong(2L)), auxiliaryDefinitions = mapOf(newA to a, newB to b))
-
-        assertTrue(pool.remap(present).isEmpty())
-
-        val mapped = pool.cuts().single()
-        assertEquals(listOf(0), mapped.cols.toList())
-        assertEquals(listOf(2L), mapped.coeffs.toList())
-        assertEquals(0L, mapped.rhs)
-        val remapped = assertNotNull(mapped.provenance)
-        assertEquals(newFacts, remapped.facts)
-        assertEquals(mapOf(newA to a, newB to b), remapped.auxiliaryDefinitions)
-        assertEquals(CutPremise.Row(newExpression, Relation.LE, BigFraction.ZERO), remapped.conclusion)
-        assertEquals(listOf(CutWeightedRow(newRow, -5L)), remapped.rules.single().rows)
-        assertEquals(listOf(2L, 3L), listOf(remapped.rules.single().divisor, remapped.rules.single().reduction))
-        assertTrue(remapped.rules.single().mir)
-        assertEquals(oldFacts, proof.facts)
-        val equivalent = SourceCut(newExpression, Relation.LE, BigFraction.ZERO, remapped)
-        assertEquals(cut.key, equivalent.key)
-        assertFalse(pool.add(equivalent, present))
-        assertEquals(1, pool.size)
-        assertEquals(mapOf(CutMappingDecline.MISSING_SOURCE to 1), pool.remap(absent))
-        assertTrue(pool.cuts().isEmpty())
-        assertTrue(pool.remap(present).isEmpty())
-        assertEquals(1, pool.cuts().size)
-    }
-
-    @Test
     fun `ambiguous auxiliary aliases decline instead of choosing a coordinate`() {
         val root = Any()
         val old = CutSource(CutSourceKind.AUXILIARY, 0)
@@ -220,14 +144,6 @@ class SourceCutPresenceTest {
     }
 
     @Test
-    fun `generic terms do not acquire an intrinsic source lattice`() {
-        val term = CutSource(CutSourceKind.TERM, 0)
-        val map = CutSourceMap(Any(), 0L, listOf(CutColumnSource(term)))
-
-        assertFalse(map.isGlobal(CutPremise.Integral(CutExpression(mapOf(term to BigFraction.ONE)))))
-    }
-
-    @Test
     fun `generic and auxiliary terms with equal ids retain distinct affine coordinates`() {
         val root = Any()
         val term = CutSource(CutSourceKind.TERM, 0)
@@ -259,28 +175,6 @@ class SourceCutPresenceTest {
         assertEquals(listOf(0, 1), mapped.cols.toList())
         assertEquals(listOf(-1L, 6L), mapped.coeffs.toList())
         assertEquals(1L, mapped.rhs)
-    }
-
-    @Test
-    fun `an auxiliary cannot use a generic term definition with the same id`() {
-        val root = Any()
-        val term = CutSource(CutSourceKind.TERM, 0)
-        val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
-        val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 4L, false)
-        val map = CutSourceMap(
-            root,
-            0L,
-            listOf(CutColumnSource(auxiliary)),
-            auxiliaryDefinitions = mapOf(term to definition),
-        )
-        val cut = SourceCut(
-            CutExpression(mapOf(auxiliary to BigFraction.ONE)),
-            Relation.LE,
-            BigFraction.ONE,
-            CutProvenance(root, 0L, emptyList(), auxiliaryDefinitions = mapOf(auxiliary to definition)),
-        )
-
-        assertNull(cut.toCut(map).orNull())
     }
 
     @Test
@@ -407,58 +301,4 @@ class SourceCutPresenceTest {
         }
     }
 
-    @Test
-    fun `Element selector index addition preserves values above Int range`() {
-        val offset = Int.MAX_VALUE
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(offset.toLong(), offset.toLong() + 1L), IntDomain(3, 7)),
-            arrayOf(Element(0, 1, longArrayOf(3, 7), false, offset)),
-        )
-        val relaxation = CpToLpRelaxation(problem, null, elementHull = true).build(RootDomains(problem))
-        val definitions = relaxation.colPresence.filterNotNull()
-        assertEquals(2, definitions.size)
-        assertTrue(definitions.any { it.required == listOf(0L, offset.toLong() + 1L) })
-        assertFalse(assertNotNull(relaxation.sourceMap).auxiliaryDefinitions.isEmpty())
-    }
-
-    @Test
-    fun `an integer cut does not depend on unrelated auxiliary definitions`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
-            arrayOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0))),
-        )
-        val relaxation = CpToLpRelaxation(problem, null, tableHull = true).build(RootDomains(problem))
-        val original = assertNotNull(relaxation.sourceMap)
-        val integer = CutSource(CutSourceKind.INTEGER, 0)
-        val expression = CutExpression(mapOf(integer to BigFraction.ONE))
-        val cut = SourceCut(
-            expression,
-            Relation.LE,
-            BigFraction.ONE,
-            CutProvenance(
-                problem,
-                original.epoch,
-                listOf(CutProofFact(CutPremise.Row(expression, Relation.LE, BigFraction.ONE), true)),
-                auxiliaryDefinitions = original.auxiliaryDefinitions,
-            ),
-        )
-        val target = CutSourceMap(problem, 10L, original.columns.filter { it?.source?.kind == CutSourceKind.INTEGER })
-
-        val mapped = assertNotNull(cut.toCut(target).orNull())
-
-        assertTrue(assertNotNull(mapped.provenance).auxiliaryDefinitions.isEmpty())
-        assertEquals(cut.provenance.facts, mapped.provenance.facts)
-        val term = original.auxiliaryDefinitions.keys.first()
-        val missing = SourceCut(
-            CutExpression(mapOf(term to BigFraction.ONE)),
-            Relation.LE,
-            BigFraction.ONE,
-            CutProvenance(problem, original.epoch, emptyList()),
-        )
-        assertNull(missing.toCut(original).orNull())
-    }
 }

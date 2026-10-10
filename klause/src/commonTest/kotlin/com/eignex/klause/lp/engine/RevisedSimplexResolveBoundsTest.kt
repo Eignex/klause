@@ -7,7 +7,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -49,23 +48,6 @@ class RevisedSimplexResolveBoundsTest {
     }
 
     @Test
-    fun `a re-solved bound revision agrees with solving it cold`() {
-        val lo = longArrayOf(2L, 1L)
-        val hi = longArrayOf(10L, 10L)
-        val model = base()
-        val initial = LpExactState(assertNotNull(model.authoritativeModel()))
-        val simplex = RevisedSimplex(assertNotNull(initial.toWorkingModel()))
-        assertNotNull(simplex.solve(null))
-
-        val next = LpExactState(assertNotNull(model.rebind(lo, hi).authoritativeModel()), boundRevision = 1L)
-        assertTrue(simplex.adopt(next, Cancellation.Never))
-        val reused = assertNotNull(simplex.resolveBounds())
-        val cold = assertNotNull(RevisedSimplex(base().rebind(lo, hi)).solve(null))
-
-        assertEquals(cold.objective, reused.objective, 1e-9, "reuse changes the pivot path, not the optimum")
-    }
-
-    @Test
     fun `a model with a different matrix is refused rather than reused`() {
         val initial = LpExactState(assertNotNull(base().authoritativeModel()))
         val simplex = RevisedSimplex(assertNotNull(initial.toWorkingModel()))
@@ -75,30 +57,6 @@ class RevisedSimplexResolveBoundsTest {
 
         assertFalse(simplex.adopt(LpExactState(assertNotNull(changed.authoritativeModel())), Cancellation.Never))
         assertEquals(3.0, assertNotNull(simplex.resolveBounds()).objective)
-    }
-
-    @Test
-    fun `closing an adopted engine releases its injected basis`() {
-        val model = base()
-        lateinit var factors: KotlinBasisSolver
-        val initial = LpExactState(assertNotNull(model.authoritativeModel()))
-        val simplex = RevisedSimplex(assertNotNull(initial.toWorkingModel()), basisSolverFactory = { matrix ->
-            KotlinBasisSolver(matrix).also { factors = it }
-        })
-        assertNotNull(simplex.solve())
-        val next = LpExactState(
-            assertNotNull(model.rebind(longArrayOf(2L, 1L), longArrayOf(10L, 10L)).authoritativeModel()),
-            boundRevision = 1L,
-        )
-        assertTrue(simplex.adopt(next, Cancellation.Never))
-        val result = assertNotNull(simplex.resolveBounds())
-        assertEquals(4.0, result.objective, 1e-9)
-        assertEquals(0, result.refactorizations)
-
-        simplex.close()
-        simplex.close()
-
-        assertFailsWith<IllegalStateException> { factors.refactorize(intArrayOf(0)) }
     }
 
     @Test
@@ -237,130 +195,4 @@ class RevisedSimplexResolveBoundsTest {
         }
     }
 
-    @Test
-    fun `bounded native trail and imported bound traces agree on exact source optima`() {
-        val measurements = ArrayList<List<Long>>()
-        repeat(3) { repetition ->
-            val capturedSource = base()
-            val zero = ExactLpNumber.of(0L)
-            val box = ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))
-            val source = ExactLpModel(
-                List(2) { listOf(ExactLpEntry(0, ExactLpNumber.of(-1L))) },
-                listOf(ExactLpNumber.of(-3L)),
-                listOf(ExactLpColumn(box), ExactLpColumn(box), ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-                listOf(ExactLpRow()),
-                ExactLpObjective(listOf(ExactLpNumber.of(1L), ExactLpNumber.of(2L), zero)),
-            )
-            val trail = LpBoundTrail(source)
-            RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { native ->
-                val imported = LpExactState(assertNotNull(capturedSource.authoritativeModel()))
-                RevisedSimplex(assertNotNull(imported.toWorkingModel())).use { adopted ->
-                    assertNotNull(native.solve())
-                    assertNotNull(adopted.solve())
-                    val nativeInitialWork = native.lastWorkOps
-                    val adoptedInitialWork = adopted.lastWorkOps
-                    var nativeFactors = native.lastRefactorizations.toLong()
-                    var adoptedFactors = adopted.lastRefactorizations.toLong()
-                    val nativeInitialFactors = nativeFactors
-                    val adoptedInitialFactors = adoptedFactors
-                    var nativeWork = 0L
-                    var adoptedWork = 0L
-                    var attempts = 0L
-                    var nativeSolved = 0L
-                    var adoptedSolved = 0L
-                    repeat(8) { cycle ->
-                        for (step in 0..4) {
-                            when (step) {
-                                0 -> {
-                                    assertTrue(trail.push())
-                                    assertTrue(
-                                        trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(1L)), cycle * 3L),
-                                    )
-                                }
-
-                                1 -> {
-                                    assertTrue(trail.push())
-                                    assertTrue(
-                                        trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(3L)), cycle * 3L + 1L),
-                                    )
-                                }
-
-                                2 -> {
-                                    assertTrue(trail.push())
-                                    assertTrue(
-                                        trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), cycle * 3L + 2L),
-                                    )
-                                }
-
-                                3 -> assertTrue(trail.pop(1))
-
-                                else -> assertTrue(trail.pop(0))
-                            }
-                            assertTrue(native.adopt(trail.state, Cancellation.Never))
-                            val nativeResult = native.resolveBounds()
-                            val lower = longArrayOf(if (step == 2) 1L else 0L, if (step in 1..2) 3L else 0L)
-                            val upper = longArrayOf(if (step == 4) 10L else 1L, 10L)
-                            val expectedX = maxOf(lower[0], minOf(upper[0], 3L - lower[1]))
-                            val expectedY = maxOf(lower[1], 3L - expectedX)
-                            val expectedPoint = listOf(expectedX, expectedY).map(BigFraction::ofLong)
-                            val expectedBound = BigFraction.ofLong(expectedX + 2L * expectedY)
-                            val capturedModel = capturedSource.rebind(lower, upper)
-                            val importedBounds = LpExactState(
-                                assertNotNull(capturedModel.authoritativeModel()),
-                                boundRevision = attempts + 1L,
-                            )
-                            assertTrue(adopted.adopt(importedBounds, Cancellation.Never))
-                            val adoptedResult = adopted.resolveBounds()
-                            attempts++
-                            if (nativeResult != null) nativeSolved++
-                            if (adoptedResult != null) adoptedSolved++
-                            nativeWork += native.lastWorkOps
-                            adoptedWork += adopted.lastWorkOps
-                            nativeFactors += native.lastRefactorizations
-                            adoptedFactors += adopted.lastRefactorizations
-                            if (repetition == 0) {
-                                val certified = certifyLpResult(
-                                    assertNotNull(trail.state.toWorkingModel()),
-                                    native,
-                                    nativeResult,
-                                )
-                                val baseline = certifyLpResult(
-                                    assertNotNull(importedBounds.toWorkingModel()),
-                                    adopted,
-                                    adoptedResult,
-                                )
-                                val checked = listOfNotNull(
-                                    certified,
-                                    baseline,
-                                    if (cycle == 0) solveAndCertify(trail.state.model) else null,
-                                )
-                                for (result in checked) {
-                                    assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict, "cycle=$cycle step=$step")
-                                    assertEquals(expectedPoint, result.exactPrimal)
-                                    assertEquals(expectedBound, result.lowerBound)
-                                }
-                                for (side in assertNotNull(assertNotNull(certified.bound).support).sides) {
-                                    val active = assertNotNull(trail.state.activeSide(side.column, side.upper))
-                                    assertEquals(active.side, side.side)
-                                    assertEquals(active.witness, side.witness)
-                                }
-                            }
-                        }
-                    }
-                    val measurement = listOf(
-                        nativeInitialWork, adoptedInitialWork, nativeWork, adoptedWork, nativeFactors, adoptedFactors,
-                        nativeFactors - nativeInitialFactors, adoptedFactors - adoptedInitialFactors,
-                        attempts, nativeSolved, adoptedSolved,
-                    )
-                    measurements += measurement
-                    assertEquals(40L, attempts)
-                    assertEquals(attempts, nativeSolved)
-                    assertEquals(attempts, adoptedSolved)
-                    assertTrue(nativeFactors - nativeInitialFactors <= attempts / 8L)
-                    assertTrue(adoptedFactors - adoptedInitialFactors <= attempts / 8L)
-                }
-            }
-        }
-        assertTrue(measurements.all { it == measurements.first() })
-    }
 }

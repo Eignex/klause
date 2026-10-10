@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -49,7 +48,6 @@ class LpEngineInjectionTest {
         }
     }
 
-
     private val decline = LpCertificationPolicy { _, _ -> false }
 
     private fun boundedProblem(): Problem = Problem(
@@ -91,15 +89,6 @@ class LpEngineInjectionTest {
     }
 
     @Test
-    fun `root work short of the LP allowance leaves it unspent`() {
-        val sink = SolveStatsSink(backend = "root-allowance-left")
-
-        budgetedEngine(sink).use { it.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 19_999L)) }
-
-        assertFalse(sink.lp.snapshot().workAllowanceSpent)
-    }
-
-    @Test
     fun `node solves are capped at the remaining LP allowance`() {
         val engine = budgetedEngine(SolveStatsSink(backend = "node-cap"))
 
@@ -110,44 +99,6 @@ class LpEngineInjectionTest {
 
         assertEquals(15_000L, budget)
     }
-
-    @Test
-    fun `the LP allowance caps node solves without an adaptive budget`() {
-        val engine = budgetedEngine(
-            SolveStatsSink(backend = "node-cap-fixed"),
-            LpPlan(bounding = true, boundAdaptiveWork = false),
-        )
-
-        assertEquals(20_000L, engine.use { it.nodeWorkBudget() })
-    }
-
-    @Test
-    fun `a spent LP allowance still bounds node solves`() {
-        val engine = budgetedEngine(SolveStatsSink(backend = "node-cap-spent"))
-
-        val budget = engine.use {
-            it.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 50_000L))
-            it.nodeWorkBudget()
-        }
-
-        assertEquals(1L, budget, "a solve limit of 0 would mean unbounded")
-    }
-
-    @Test
-    fun `node overhead spends the LP allowance`() {
-        val sink = SolveStatsSink(backend = "overhead-allowance")
-
-        budgetedEngine(sink).use { it.noteNodeOverhead(20_000L) }
-
-        assertTrue(sink.lp.snapshot().workAllowanceSpent)
-    }
-
-    private fun accountingEngine(backend: String): LpEngine = LpEngine(
-        Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray()),
-        LinearObjective(),
-        LpParams(),
-        SolveStatsSink(backend = backend),
-    )
 
     @Test
     fun `node construction and certification stay isolated per engine`() {
@@ -215,47 +166,6 @@ class LpEngineInjectionTest {
     }
 
     @Test
-    fun `root work is cumulative without entering the node charge`() {
-        val engine = accountingEngine("root-work")
-
-        engine.observeRootSolve(metricSolver(13L))
-
-        assertEquals(13L, engine.totalSolveWork())
-        assertEquals(0L, engine.pendingNodeSolveWork())
-        assertTrue(engine.workSpentExceeds(13L))
-    }
-
-    @Test
-    fun `node overhead counts as node work and is reported apart from the simplex`() {
-        val sink = SolveStatsSink(backend = "node-overhead")
-        val engine = LpEngine(Problem(0, 0, emptyArray(), emptyArray()), LinearObjective(), LpParams(), sink)
-
-        engine.use { it.noteNodeOverhead(11L) }
-
-        assertEquals(
-            listOf(11L, 11L, 11.0, 0.0),
-            listOf(
-                engine.pendingNodeSolveWork(),
-                engine.totalSolveWork(),
-                sink.snapshot().lp.overheadOps.sum,
-                sink.snapshot().lp.workOps.sum,
-            ),
-        )
-    }
-
-    @Test
-    fun `root work uses supplied metrics and saturates`() {
-        val engine = accountingEngine("root-work-override")
-        val solver = metricSolver(1L)
-
-        engine.observeRootSolve(solver, LpSolveMetrics(workOps = Long.MAX_VALUE - 3L))
-        engine.observeRootSolve(solver, LpSolveMetrics(workOps = 7L))
-
-        assertEquals(Long.MAX_VALUE, engine.totalSolveWork())
-        assertEquals(0L, engine.pendingNodeSolveWork())
-    }
-
-    @Test
     fun `root infeasibility cannot bypass the injected policy`() {
         val problem = Problem(
             numBoolVars = 0,
@@ -289,74 +199,6 @@ class LpEngineInjectionTest {
         val construction = factory.calls.single { it.kind == EngineConstruction.TABLEAU }
         assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
         assertEquals(41L, construction.tieSeed)
-    }
-
-    @Test
-    fun `gated residual uses the injected pricing policy`() {
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                ReifiedRealLinear(
-                    aux = 0,
-                    vars = IntArray(0),
-                    intCoeffs = DoubleArray(0),
-                    realVars = intArrayOf(0),
-                    realCoeffs = doubleArrayOf(1.0),
-                    op = LinearOp.GE,
-                    bound = 2.0,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
-        )
-        val factory = RecordingLpEngineFactory()
-        val engine = LpEngine(
-            problem,
-            LinearObjective(intCoefficients = LongArray(0)),
-            LpParams(
-                lpPlan = LpPlan(bounding = true, realResidual = true),
-                randomSeed = 43L,
-                zeroObjectivePricing = LpZeroObjectivePricing.LARGEST_PIVOT,
-            ),
-            SolveStatsSink(backend = "gated"),
-            LpSolveContext(factory, decline),
-        )
-
-        engine.use {
-            assertTrue(it.gatedResidual(PropagationSession(problem)) != null)
-        }
-
-        val construction = factory.calls.single { it.kind == EngineConstruction.PERSISTENT }
-        assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
-        assertEquals(43L, construction.tieSeed)
-    }
-
-    @Test
-    fun `leaf certification uses the injected pricing policy`() {
-        val problem = boundedProblem()
-        val factory = RecordingLpEngineFactory()
-        val engine = LpEngine(
-            problem,
-            LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
-            LpParams(
-                lpPlan = LpPlan(bounding = true, realResidual = true),
-                randomSeed = 47L,
-                zeroObjectivePricing = LpZeroObjectivePricing.LARGEST_PIVOT,
-            ),
-            SolveStatsSink(backend = "leaf"),
-            LpSolveContext(factory, decline),
-        )
-
-        engine.use {
-            it.leafCertify(PropagationSession(problem))
-        }
-
-        val construction = factory.calls.single { it.kind == EngineConstruction.PERSISTENT }
-        assertEquals(LpZeroObjectivePricing.LARGEST_PIVOT, construction.zeroObjectivePricing)
-        assertEquals(47L, construction.tieSeed)
     }
 
     @Test

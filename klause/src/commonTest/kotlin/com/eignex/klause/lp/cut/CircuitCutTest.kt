@@ -117,47 +117,6 @@ class CircuitCutTest {
     }
 
     @Test
-    fun `re-solving with the cut raises the bound above the subtour`() {
-        val (p, obj) = circuitProblem()
-        val session = PropagationSession(p)
-        val relaxer = relaxer(p, obj)
-        val r = relaxer.build(session)
-        val sol = requireNotNull(RevisedSimplex(r.model).solve())
-        val cuts = CircuitSeparator().separate(CutContext(p, r, sol.primal, session))
-
-        val r2 = relaxer.build(session, cuts)
-        val sol2 = requireNotNull(RevisedSimplex(r2.model).solve())
-        assertTrue(sol2.objective > 10.0 + eps, "subtour-eliminated bound ${sol2.objective} should exceed 10")
-    }
-
-    @Test
-    fun `subtour cut at n=6 excludes no Hamiltonian tour`() {
-        // Costs pair the largest c with the smallest successor value (rearrangement inequality), so
-        // c = [5,4,6,2,1,3] forces the min-cost assignment succ = [1,2,0,4,5,3] — two 3-cycles
-        // {0→1→2→0},{3→4→5→3}, a subtour that exercises the sparse max-flow separator beyond n=4.
-        val n = 6
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
-            factors = arrayOf<Factor>(Circuit(IntArray(n) { it })),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(5L, 4L, 6L, 2L, 1L, 3L))
-        val session = PropagationSession(p)
-        val r = relaxer(p, obj).build(session)
-        val model = r.circuitArcs.single()
-        val sol = requireNotNull(RevisedSimplex(r.model).solve())
-        val cut = CircuitSeparator().separate(CutContext(p, r, sol.primal, session)).first { it.rel == Relation.GE }
-        val arcOf = HashMap<Int, Pair<Int, Int>>()
-        for (k in model.cols.indices) arcOf[model.cols[k]] = model.tails[k] to model.heads[k]
-        val cutArcs = cut.cols.map { arcOf.getValue(it) }
-        for (succ in singleCyclePermutations(n)) {
-            val crossings = cutArcs.count { (i, j) -> succ[i] == j }
-            assertTrue(crossings >= cut.rhs, "tour ${succ.toList()} violates the subtour cut")
-        }
-    }
-
-    @Test
     fun `arc relaxation is gated on candidate-arc count not node count`() {
         // n=30 (30·29 = 870 arcs ≤ MAX_CIRCUIT_ARCS) builds; n=40 (1560 arcs) exceeds the cap and is
         // skipped, so the gate works both ways (#431).

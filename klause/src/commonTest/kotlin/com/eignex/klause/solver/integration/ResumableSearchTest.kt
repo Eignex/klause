@@ -90,7 +90,7 @@ class ResumableSearchTest {
 
     @Test
     fun `a paused-and-resumed branch-and-bound reaches the same optimum as a one-shot minimize`() {
-        // The knapsack from CdclOptimizationTest: 7 items, maximise value within a weight cap, posed as
+        // Seven items maximize value within a weight cap, posed as
         // minimise Σ(−value)·x. Resume must carry the incumbent + learned clauses to prove the optimum.
         val weights = intArrayOf(3, 4, 5, 2, 6, 1, 4)
         val values = intArrayOf(5, 6, 8, 3, 9, 2, 5)

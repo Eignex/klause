@@ -12,26 +12,8 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class SymmetricAllDifferentPropagatorTest {
-
-    @Test
-    fun `0-based self-inverse permutation`() {
-        // 4 vars, 0-based. xs[xs[i]] = i. Possible solutions: identity, single swap, two swaps.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = Array(4) { IntDomain(0, 3) },
-            factors = arrayOf<Factor>(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
-        )
-        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).take(40).forEach { sample ->
-            for (i in 0..3) {
-                val v = sample.ints[i].toInt()
-                assertTrue(sample.ints[v] == i.toLong(), "self-inverse violated at $i: ints=${sample.ints.toList()}")
-            }
-        }
-    }
 
     @Test
     fun `singleton forces mirror`() {

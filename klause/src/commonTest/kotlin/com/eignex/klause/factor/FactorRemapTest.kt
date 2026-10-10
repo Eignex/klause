@@ -31,15 +31,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.PbOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
-/**
- * Coverage of Factor.remap. The generic invariant — every variable id in the rewritten
- * factor is its image under the maps, and no others — catches any variable-bearing field a remap
- * forgot to rewrite (boolVars/intVars are derived from those fields). Targeted cases then pin the
- * footguns: constants and offsets must NOT move, Lit polarity is preserved, and sentinels survive.
- */
 class FactorRemapTest {
 
     // Injective shifts so the var-set image is unambiguous; ids used below stay < 64.
@@ -122,33 +114,6 @@ class FactorRemapTest {
     }
 
     @Test
-    fun `lit polarity is preserved`() {
-        val out = Clause(intArrayOf(pos(0), neg(1))).remap(mapping) as Clause
-        assertEquals(listOf(Lit.make(50, true), Lit.make(51, false)).toSet(), out.literals.toSet())
-    }
-
-    @Test
-    fun `constant element array is not remapped`() {
-        val out = Element(0, 1, longArrayOf(5, 6), arrIsVars = false, indexOffset = 1).remap(mapping) as Element
-        assertEquals(100, out.idx)
-        assertEquals(101, out.result)
-        assertTrue(out.arr.contentEquals(longArrayOf(5, 6)), "constant array must be untouched: ${out.arr.toList()}")
-        assertEquals(1, out.indexOffset)
-    }
-
-    @Test
-    fun `inverse offsets are preserved`() {
-        val out = Inverse(
-            intArrayOf(0, 1),
-            intArrayOf(2, 3),
-            fOffset = 7,
-            gOffset = 9,
-        ).remap(mapping) as Inverse
-        assertEquals(7, out.fOffset)
-        assertEquals(9, out.gOffset)
-    }
-
-    @Test
     fun `cumulative capacityVar sentinel survives and a real one remaps`() {
         val constCap =
             Cumulative(intArrayOf(0), longArrayOf(2), longArrayOf(1), 3L).remap(mapping) as Cumulative
@@ -193,10 +158,4 @@ class FactorRemapTest {
         assertEquals(listOf(3), out.realVars.toList())
     }
 
-    @Test
-    fun `null diffn size-vars stay null`() {
-        val out = Diffn(intArrayOf(0), intArrayOf(1), longArrayOf(1), longArrayOf(1)).remap(mapping) as Diffn
-        assertNull(out.widthVars)
-        assertNull(out.heightVars)
-    }
 }

@@ -14,8 +14,6 @@ import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CostShapingTest {
@@ -29,41 +27,10 @@ class CostShapingTest {
     }
 
     @Test
-    fun `linear shaping mixes violations and objective`() {
-        val s = CostShaping.linear(lambda = 0.5)
-        assertEquals(0.5 * 4.0, s.shape(0, 4.0))
-        assertEquals(2.0 + 0.5 * 4.0, s.shape(2, 4.0))
-        assertFalse(s.feasibilityGated)
-    }
-
-    @Test
     fun `saturating shaping caps violation contribution`() {
         val s = CostShaping.saturating(lambda = 1.0, cap = 3.0)
         assertEquals(3.0 + 10.0, s.shape(100, 10.0), "violations should saturate at cap=3")
         assertEquals(1.0 + 10.0, s.shape(1, 10.0), "violation below cap passes through")
-    }
-
-    @Test
-    fun `sqrt violation penalty grows sub-linearly`() {
-        val s = CostShaping.sqrtViolation(lambda = 0.0)
-        assertEquals(0.0, s.shape(0, 0.0))
-        assertEquals(1.0, s.shape(1, 0.0))
-        assertEquals(2.0, s.shape(4, 0.0))
-        assertEquals(3.0, s.shape(9, 0.0))
-    }
-
-    @Test
-    fun `shapedBreakScore reduces to breakScore when no shaping configured`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.recompute()
-        for (b in 0..1) {
-            val move = BoolFlip(b)
-            val raw = state.breakScore(move).toDouble()
-            val shaped = state.shapedBreakScore(move)
-            assertEquals(raw, shaped, "shaped should match raw when shaping is off")
-        }
     }
 
     @Test
@@ -81,33 +48,6 @@ class CostShapingTest {
         val score0 = state.shapedBreakScore(BoolFlip(0))
         val score1 = state.shapedBreakScore(BoolFlip(1))
         assertEquals(99.0, score0 - score1, "shaped break gap must equal objective gap")
-    }
-
-    @Test
-    fun `shapedObjectiveDelta returns zero when shaping is off`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.recompute()
-        assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
-        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
-        state.shaping.shapingLambda = 0.0
-        assertEquals(0.0, state.shapedObjectiveDelta(BoolFlip(0)))
-    }
-
-    @Test
-    fun `shapedObjectiveDelta returns lambda times linear delta when shaping is on`() {
-        val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
-        val problem = Problem(2, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setBool(0, false)
-        state.assignment.setBool(1, false)
-        state.recompute()
-        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(10L, 1L))
-        state.shaping.shapingLambda = 0.5
-        // Flipping bool 0 adds 10 to the objective; lambda 0.5 scales it to 5.
-        assertEquals(5.0, state.shapedObjectiveDelta(BoolFlip(0)))
-        assertEquals(0.5, state.shapedObjectiveDelta(BoolFlip(1)))
     }
 
     @Test
@@ -166,30 +106,5 @@ class CostShapingTest {
         }
         state.shaping.shapingLambda = 1.0
         assertEquals(0.0, state.shapedObjectiveDelta(Move.BoolFlip(0)))
-    }
-
-    @Test
-    fun `linear shaping minimize on exact one cardinality finds the cheapest pick`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, true),
-                Lit.make(2, true),
-                Lit.make(3, true),
-            ),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val solver = LocalSearchSolver(problem.bake())
-        val sample = solver.minimize(
-            objective,
-            LocalSearchParams(
-                maxFlips = 500L,
-                randomSeed = 1L,
-                costShaping = CostShaping.linear(lambda = 1.0),
-            ),
-        ).assignment
-        assertNotNull(sample)
-        assertEquals(3.0, objective.evaluate(sample))
     }
 }

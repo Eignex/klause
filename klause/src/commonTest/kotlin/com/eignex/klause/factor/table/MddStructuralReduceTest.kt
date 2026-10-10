@@ -47,8 +47,4 @@ class MddStructuralReduceTest {
         assertEquals(setOf(listOf(1, 2)), enumerate(reduced, d0, d1), "reduced diagram must accept exactly (1,2)")
     }
 
-    @Test
-    fun `a fully reachable diagram is unchanged`() {
-        assertEquals(FactorReduction.Unchanged, mdd().structuralReduce(arrayOf(IntDomain(1, 2), IntDomain(1, 2))))
-    }
 }

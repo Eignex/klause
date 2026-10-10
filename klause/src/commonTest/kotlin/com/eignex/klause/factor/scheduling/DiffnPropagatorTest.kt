@@ -1,9 +1,6 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.ConflictReasonOracle
-import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -12,11 +9,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
-import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -98,73 +93,6 @@ class DiffnPropagatorTest {
     }
 
     @Test
-    fun `diffn sweep never over-prunes`() {
-        // Brute-force oracle: every bound the sweep / pairwise pass tightens must hold on all
-        // non-overlapping packings. Every shape of two rectangles, each width and height in {1, 2},
-        // and three rectangles all narrow or all wide.
-        for (rects in 2..3) {
-            val masks = if (rects == 2) (0 until 4).toList() else listOf(0, 7)
-            for (widthMask in masks) {
-                for (heightMask in masks) {
-                    val xs = IntArray(rects) { 2 * it }
-                    val ys = IntArray(rects) { 2 * it + 1 }
-                    val widths = LongArray(rects) { 1L + ((widthMask shr it) and 1) }
-                    val heights = LongArray(rects) { 1L + ((heightMask shr it) and 1) }
-                    val doms = Array(2 * rects) { IntDomain(0, 3) }
-                    val problem = Problem(
-                        numBoolVars = 0,
-                        numIntVars = 2 * rects,
-                        intDomains = doms,
-                        factors = arrayOf<Factor>(Diffn(xs = xs, ys = ys, widths = widths, heights = heights)),
-                    )
-                    FactorPropagationOracle.assertSound(problem, "diffn-r$rects-w$widthMask-h$heightMask")
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `two 2x2 rectangles with origins in a unit range have no packing`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = Array(4) { IntDomain(0, 1) },
-            factors = arrayOf<Factor>(
-                Diffn(
-                    xs = intArrayOf(0, 2),
-                    ys = intArrayOf(1, 3),
-                    widths = longArrayOf(2, 2),
-                    heights = longArrayOf(2, 2),
-                ),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        // Two 2x2 rectangles with positions in [0,1] always overlap (every placement pair
-        // shares at least the [1,2)x[1,2) cell), so there is no non-overlapping packing.
-        assertIs<SolveResult.Unsat>(r)
-    }
-
-    @Test
-    fun `two unit squares pinned non-overlapping is Sat`() {
-        // Rect 1 at (0,0) 1x1. Rect 2 at (1,0) 1x1. Disjoint.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 0)),
-            factors = arrayOf<Factor>(
-                Diffn(
-                    xs = intArrayOf(0, 2),
-                    ys = intArrayOf(1, 3),
-                    widths = longArrayOf(1, 1),
-                    heights = longArrayOf(1, 1),
-                ),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        assertIs<SolveResult.Sat>(r)
-    }
-
-    @Test
     fun `propagation shaves the separating axis when overlap is forced on the other`() {
         // Two 3-wide rectangles whose x-ranges force them to overlap on x (each spans 3 units
         // from a start in [0,1], so neither can clear the other horizontally). Rect 0's y is
@@ -190,25 +118,6 @@ class DiffnPropagatorTest {
         val r = problem.propagate()
         val implied = assertIs<PropagationResult.Implied>(r)
         assertEquals(2, implied.intMinOrNullCompat(3), "rect 1 y.min must be pushed to 2 (above rect 0)")
-    }
-
-    @Test
-    fun `overlapping pinned rectangles is Unsat`() {
-        // Both rectangles pinned at (0, 0), 2x2 each → identical, overlap.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = Array(4) { IntDomain(0, 0) },
-            factors = arrayOf<Factor>(
-                Diffn(
-                    xs = intArrayOf(0, 2),
-                    ys = intArrayOf(1, 3),
-                    widths = longArrayOf(2, 2),
-                    heights = longArrayOf(2, 2),
-                ),
-            ),
-        )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test

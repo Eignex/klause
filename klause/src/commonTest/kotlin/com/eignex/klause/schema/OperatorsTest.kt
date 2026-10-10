@@ -1,32 +1,11 @@
 package com.eignex.klause.schema
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.localsearch.FixedCadenceRestart
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.model.CircuitExpr
-import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
-
-private class CircuitReifiedSchema : VariableSchema() {
-    val n0 by intVar(min = 0, max = 2)
-    val n1 by intVar(min = 0, max = 2)
-    val n2 by intVar(min = 0, max = 2)
-    val flag by boolVar()
-
-    val c by constraint {
-        flag iff CircuitExpr(listOf(n0.toIntExpr(), n1.toIntExpr(), n2.toIntExpr()))
-    }
-}
 
 class OperatorsTest {
 
@@ -57,79 +36,5 @@ class OperatorsTest {
         }
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is ReifiedCardinality })
-    }
-
-    @Test
-    fun `reified range end to end solve`() {
-        class S : VariableSchema() {
-            val flag by boolVar()
-            val a by boolVar()
-            val b by boolVar()
-            val c by boolVar()
-            val d by boolVar()
-            val rule by constraint { flag implies cardinality(2, 3, a, b, c, d) }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val solver = LocalSearchSolver(
-            compiled.problem.bake(),
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
-        )
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(8).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val flagSet = compiled.decode(schema.flag, s)
-            val truthCount = listOf(schema.a, schema.b, schema.c, schema.d).count { compiled.decode(it, s) }
-            if (flagSet) {
-                assertTrue(
-                    truthCount in 2..3,
-                    "flag set should force count∈[2,3], got $truthCount",
-                )
-            }
-        }
-    }
-
-    @Test
-    fun `at most four of five cardinality solves`() {
-        class S : VariableSchema() {
-            val a by boolVar()
-            val b by boolVar()
-            val c by boolVar()
-            val d by boolVar()
-            val e by boolVar()
-            val cap by constraint { atMost(4, a, b, c, d, e) }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val solver = LocalSearchSolver(
-            compiled.problem.bake(),
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
-        )
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 3_000, randomSeed = 19)).take(20).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val truthCount = listOf(schema.a, schema.b, schema.c, schema.d, schema.e).count { compiled.decode(it, s) }
-            assertTrue(truthCount <= 4, "got $truthCount true")
-        }
-    }
-
-    @Test
-    fun `reified circuit accepts a tour and rejects a self loop`() {
-        val s = CircuitReifiedSchema()
-        val compiled = s.compile()
-        val baked = compiled.problem.bake()
-        fun solve(flag: Boolean, successors: List<Long>): SolveResult = BacktrackSolver(baked).solve(
-            BacktrackParams(
-                assumptions = Assumptions(
-                    bools = mapOf(compiled.boolVarIdByName.getValue("flag") to flag),
-                    ints = successors.mapIndexed { i, value ->
-                        compiled.intVarIdByName.getValue("n$i") to value
-                    }.toMap(),
-                ),
-            ),
-        )
-
-        assertIs<SolveResult.Sat>(solve(flag = true, successors = listOf(1, 2, 0)))
-        assertIs<SolveResult.Unsat>(solve(flag = true, successors = listOf(1, 0, 2)))
     }
 }

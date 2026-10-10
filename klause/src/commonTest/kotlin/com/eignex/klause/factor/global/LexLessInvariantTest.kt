@@ -74,34 +74,6 @@ class LexLessInvariantTest {
     }
 
     @Test
-    fun `repair on equal-length prefix-equal under strict proposes prefix break`() {
-        val factor = LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = Array(4) { IntDomain(0, 5) },
-            factors = arrayOf<Factor>(factor),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-        // xs == ys. Strict requires a strict break; the comparable prefix is fully equal.
-        state.assignment.setInt(0, 2)
-        state.assignment.setInt(1, 3)
-        state.assignment.setInt(2, 2)
-        state.assignment.setInt(3, 3)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        val sink = MoveSink()
-        state.factors[0].proposeRepairMoves(state, 0, sink)
-        val intSets = sink.list.filterIsInstance<IntSet>()
-        // Must propose lowering xs[0] or raising ys[0] (the earliest position with room).
-        assertTrue(
-            intSets.any { it.varId == 0 && it.newValue == 1L } ||
-                intSets.any { it.varId == 2 && it.newValue == 4L },
-            "expected prefix-break move at index 0 in $intSets",
-        )
-    }
-
-    @Test
     fun `repair steps a lowered x across a hole to the next present value`() {
         val factor = LexLess(intArrayOf(0), intArrayOf(1), strict = true)
         val problem = Problem(

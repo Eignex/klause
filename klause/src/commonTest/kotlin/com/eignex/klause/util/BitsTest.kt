@@ -24,14 +24,6 @@ class BitsTest {
     }
 
     @Test
-    fun `full vs empty cardinality`() {
-        assertEquals(0, Bits.empty(100).cardinality())
-        assertEquals(100, Bits.full(100).cardinality())
-        // Word tail clears properly: full(65) has exactly 65 bits, not 128.
-        assertEquals(65, Bits.full(65).cardinality())
-    }
-
-    @Test
     fun `or and andNot ops`() {
         val a = Bits.of(10, intArrayOf(0, 2, 4, 6, 8))
         val b = Bits.of(10, intArrayOf(2, 3, 4))

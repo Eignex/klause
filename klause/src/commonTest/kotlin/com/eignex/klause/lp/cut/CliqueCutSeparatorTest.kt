@@ -12,7 +12,6 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -55,54 +54,4 @@ class CliqueCutSeparatorTest {
         assertEquals(setOf(0, 1, 2, 3), cliqueVars(r, cut))
     }
 
-    @Test
-    fun `clique cuts exclude no set-packing-feasible point`() {
-        val rng = Random(20260610)
-        var separated = 0
-        repeat(200) {
-            val n = rng.nextInt(3, 7)
-            // Random conflict graph + a base at-most-one over an edge so a clique can root.
-            val edges = HashSet<Long>()
-            val factors = ArrayList<Factor>()
-            for (a in 0 until n) {
-                for (b in a + 1 until n) {
-                    if (rng.nextInt(3) == 0) {
-                        edges.add(a.toLong() * n + b)
-                        factors.add(excl(a, b))
-                    }
-                }
-            }
-            if (edges.isEmpty()) return@repeat
-            // Promote one edge to an at-most-one Cardinality so the separator has a base clique.
-            val e = edges.first()
-            factors.add(Cardinality(intArrayOf(Lit.make((e / n).toInt(), true), Lit.make((e % n).toInt(), true)), 0, 1))
-            val p = Problem(n, 0, emptyArray(), factors.toTypedArray())
-            val obj = LinearObjective(boolWeights = LongArray(n) { -1L })
-            val r = CpToLpRelaxation(p, obj).build(PropagationSession(p))
-            val sol = RevisedSimplex(r.model).solve() ?: return@repeat
-            val cuts = CliqueCutSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
-            if (cuts.isEmpty()) return@repeat
-            separated++
-            for (cut in cuts) {
-                val clique = cliqueVars(r, cut).toList()
-                // Every 0/1 assignment respecting all exclusions must put at most one clique member true.
-                for (mask in 0 until (1 shl n)) {
-                    var feasible = true
-                    for (a in 0 until n) {
-                        for (b in a + 1 until n) {
-                            if ((a.toLong() * n + b) in edges &&
-                                mask and (1 shl a) != 0 && mask and (1 shl b) != 0
-                            ) {
-                                feasible = false
-                            }
-                        }
-                    }
-                    if (!feasible) continue
-                    val inClique = clique.count { v -> mask and (1 shl v) != 0 }
-                    assertTrue(inClique <= cut.rhs, "clique cut excludes feasible mask $mask")
-                }
-            }
-        }
-        assertTrue(separated > 6, "only $separated instances produced a clique cut")
-    }
 }

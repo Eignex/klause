@@ -1,19 +1,8 @@
 package com.eignex.klause.solver.integration
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.GlucoseRestart
-import com.eignex.klause.backtrack.selector.Vsids
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -51,63 +40,5 @@ class AdaptiveRestartTest {
         // The same hot-LBD conflict but with a trail spike well above the recent average: the
         // solver is driving deep toward a model, so blocking defers the restart.
         assertFalse(warmedPolicy().recordConflict(lbd = 50, trailSize = 100), "trail spike must block")
-    }
-
-    /** Pigeonhole P(n+1, n): the classic UNSAT clause family. */
-    private fun pigeonhole(pigeons: Int, holes: Int): Problem {
-        val factors = ArrayList<Factor>()
-        fun v(p: Int, h: Int) = p * holes + h
-        for (p in 0 until pigeons) factors.add(Clause(IntArray(holes) { h -> Lit.make(v(p, h), true) }))
-        for (h in 0 until holes) {
-            for (p1 in 0 until pigeons) {
-                for (p2 in p1 + 1 until pigeons) {
-                    factors.add(Clause(intArrayOf(Lit.make(v(p1, h), false), Lit.make(v(p2, h), false))))
-                }
-            }
-        }
-        return Problem(
-            numBoolVars = pigeons * holes,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = factors.toTypedArray(),
-        )
-    }
-
-    @Test
-    fun `adaptive restarts prove a clause-dense unsat instance`() {
-        val verdict = BacktrackSolver(pigeonhole(pigeons = 4, holes = 3).bake()).solve(
-            BacktrackParams(
-                randomSeed = 1L,
-                variableSelector = Vsids(),
-                adaptiveRestart = true,
-                maxLearnedClauses = 5_000,
-            ),
-        )
-        assertIs<SolveResult.Unsat>(verdict)
-    }
-
-    private fun clauseProblem(): Problem = Problem(
-        numBoolVars = 5,
-        numIntVars = 0,
-        intDomains = emptyArray(),
-        factors = arrayOf<Factor>(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(2, false), Lit.make(4, true))),
-            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false), Lit.make(4, false))),
-        ),
-    )
-
-    @Test
-    fun `adaptive restarts enumerate exactly the same models as no restarts`() {
-        fun models(params: BacktrackParams): Set<List<Boolean>> =
-            BacktrackSolver(clauseProblem().bake()).enumerate(params).map { it.bools.toList() }.toSet()
-
-        val plain = models(BacktrackParams(randomSeed = 5L, variableSelector = Vsids()))
-        val adaptive = models(
-            BacktrackParams(randomSeed = 5L, variableSelector = Vsids(), adaptiveRestart = true),
-        )
-        assertTrue(plain.isNotEmpty())
-        assertEquals(plain, adaptive, "adaptive restarts must not change the feasible set")
     }
 }

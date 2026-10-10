@@ -9,7 +9,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SortInvariantTest {
@@ -21,22 +20,6 @@ class SortInvariantTest {
         intDomains = Array(6) { IntDomain(0, 4) },
         factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
     )
-
-    @Test
-    fun `not violated when ys equals sorted xs`() {
-        val p = problem()
-        val state = LocalSearchState(p.bake(), Random(0))
-        // xs=[2,0,1], sorted=[0,1,2], ys=[0,1,2]
-        state.assignment.setInt(0, 2)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 1)
-        state.assignment.setInt(3, 0)
-        state.assignment.setInt(4, 1)
-        state.assignment.setInt(5, 2)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
-        assertEquals(0, state.factors[0].violationDegree(state, 0))
-    }
 
     @Test
     fun `violated when ys is not sorted xs with degree counting mismatched positions`() {

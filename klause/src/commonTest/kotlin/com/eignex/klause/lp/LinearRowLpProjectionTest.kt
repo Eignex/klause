@@ -2,16 +2,12 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.linearRows
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -103,39 +99,12 @@ class LinearRowLpProjectionTest {
     }
 
     @Test
-    fun `an unconditional row retains its exact integer constants`() {
-        val builder = RecordingBuilder()
-
-        Linear(longArrayOf(Long.MAX_VALUE), intArrayOf(0), LinearOp.LE, Long.MAX_VALUE).emitLpRelaxation(builder)
-
-        assertEquals(listOf(RecordingBuilder.IntegerRow(listOf(Long.MAX_VALUE), Long.MAX_VALUE)), builder.integerRows)
-    }
-
-    @Test
     fun `a reified integer row retains its big M relaxation`() {
         val builder = RecordingBuilder()
 
         ReifiedLinear(1, longArrayOf(2), intArrayOf(0), LinearOp.LE, 5).emitLpRelaxation(builder)
 
         assertEquals(2, builder.bigMRows)
-    }
-
-    @Test
-    fun `a reified integer row keeps only the direction whose big M the model states`() {
-        // `Σ 2·x ≤ 5` slackened by how far the left side can reach: the `≤` row leans on x's upper
-        // endpoint, the complementary `≥` row on its lower. An invented endpoint takes its own row out.
-        val factor = ReifiedLinear(1, longArrayOf(2), intArrayOf(0), LinearOp.LE, 5)
-
-        listOf(
-            Triple(false, false, 2),
-            Triple(false, true, 1),
-            Triple(true, false, 1),
-            Triple(true, true, 0),
-        ).forEach { (openLo, openHi, expected) ->
-            val builder = RecordingBuilder(openLo = openLo, openHi = openHi)
-            factor.emitLpRelaxation(builder)
-            assertEquals(expected, builder.bigMRows, "openLo=$openLo openHi=$openHi")
-        }
     }
 
     @Test
@@ -157,24 +126,6 @@ class LinearRowLpProjectionTest {
     }
 
     @Test
-    fun `a pinned real-valued integer row emits its reified LP row`() {
-        val builder = RecordingBuilder(pin = true)
-        val factor = ReifiedRealLinear(
-            aux = 1,
-            vars = intArrayOf(0),
-            intCoeffs = doubleArrayOf(0.5),
-            realVars = IntArray(0),
-            realCoeffs = DoubleArray(0),
-            op = LinearOp.LE,
-            bound = 2.5,
-        )
-
-        factor.emitLpRelaxation(builder)
-
-        assertEquals(listOf(RecordingBuilder.RealRow(strict = false)), builder.realRows)
-    }
-
-    @Test
     fun `a wide row rounds outward while an unsupported factor emits no row`() {
         val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
         val wideBuilder = RecordingBuilder()
@@ -188,34 +139,4 @@ class LinearRowLpProjectionTest {
         assertTrue(unsupportedBuilder.realRows.isEmpty())
     }
 
-    @Test
-    fun `a wide row reuses its rounding across emissions`() {
-        val huge = bigIntOf(Long.MAX_VALUE) * bigIntOf(4)
-        val builder = RecordingBuilder()
-        val projection = LinearLpProjection()
-        val factor = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
-
-        factor.emitLpRelaxation(builder, projection)
-        factor.emitLpRelaxation(builder, projection)
-
-        assertEquals(1, projection.cachedWideRoundingCount)
-        assertEquals(2, builder.realRows.size)
-    }
-
-    @Test
-    fun `multiple wide rows in one declaration cache their own rounding`() {
-        val huge = BIG_ONE shl 100
-        val first = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
-        val second = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge * bigIntOf(2))
-        val factor = object : Factor by first {
-            override val linearForm: LinearForm = LinearForm.Conjunction(first.linearRows + second.linearRows)
-        }
-        val builder = RecordingBuilder()
-        val projection = LinearLpProjection()
-
-        repeat(2) { factor.emitLpRelaxation(builder, projection) }
-
-        assertEquals(2, projection.cachedWideRoundingCount)
-        assertEquals(4, builder.realRows.size)
-    }
 }

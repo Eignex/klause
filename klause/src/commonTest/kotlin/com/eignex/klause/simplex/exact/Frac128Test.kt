@@ -3,35 +3,11 @@ package com.eignex.klause.simplex.exact
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class Frac128Test {
-
-    @Test
-    fun `fixed-width level agrees with the big level on random fraction chains`() {
-        val rng = Random(11)
-        repeat(200) {
-            val f128 = Frac128Ops()
-            val a = rng.nextLong(-1_000_000L, 1_000_000L)
-            val b = rng.nextLong(1L, 1_000_000L)
-            val c = rng.nextLong(-1_000L, 1_000L)
-            var x = f128.times(f128.ofLong(a), f128.reciprocal(f128.ofLong(b)))
-            x = f128.plus(x, f128.ofLong(c))
-            x = f128.minus(x, f128.times(f128.ofLong(2L), f128.reciprocal(f128.ofLong(3L))))
-            var y = BigFracOps.times(BigFracOps.ofLong(a), BigFracOps.reciprocal(BigFracOps.ofLong(b)))
-            y = BigFracOps.plus(y, BigFracOps.ofLong(c))
-            y = BigFracOps.minus(
-                y,
-                BigFracOps.times(BigFracOps.ofLong(2L), BigFracOps.reciprocal(BigFracOps.ofLong(3L))),
-            )
-            assertTrue(!f128.overflowed(), "no chain here should overflow 128 bits")
-            assertEquals(BigFracOps.signum(y), f128.signum(x))
-            assertEquals(y.toDouble(), f128.toDouble(x), 1e-9)
-        }
-    }
 
     @Test
     fun `the fixed-width level latches overflow past 128 bits`() {

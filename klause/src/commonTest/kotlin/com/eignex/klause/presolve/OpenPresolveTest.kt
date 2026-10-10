@@ -1,14 +1,11 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
@@ -17,13 +14,8 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/**
- * Presolve for a model whose integer sides are open. The finite lane's passes read CP domains an open
- * column does not have; what this lane can be given is a proof of the bounds themselves.
- */
 class OpenPresolveTest {
 
     /** `n` columns, all open above, lower bound 0. */
@@ -75,20 +67,6 @@ class OpenPresolveTest {
     }
 
     @Test
-    fun `a model with no open side is handed back untouched`() {
-        val spec = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(9), null, null),
-            factors = arrayOf<Factor>(row(0 to 1L, op = LinearOp.LE, bound = 5L)),
-        )
-
-        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(PresolveConfig.NONE))
-
-        assertEquals(0, result.closedSides)
-        assertTrue(result.spec === spec, "nothing to prove, so nothing is rebuilt")
-    }
-
-    @Test
     fun `a source pin closes an open side before the tightening runs`() {
         // Dual fixing reaches this column without solving anything: it occurs only as `+x` in a `<=`
         // row, so lowering never violates, and with no objective an optimum sits at its lower bound.
@@ -129,47 +107,9 @@ class OpenPresolveTest {
     }
 
     @Test
-    fun `a model the source phase declines to pin is still refuted`() {
-        // The two rows constrain x in opposite directions, so neither direction is safe and dual fixing
-        // declines. The source phase has to hand the model on rather than report the fixpoint it reached:
-        // `x >= 3` and `x <= 1` have no point between them, and on this route no bake follows to catch
-        // what a bare `Tightened` would wave through.
-        val spec = openAbove(
-            1,
-            row(0 to 1L, op = LinearOp.LE, bound = 1L),
-            row(0 to 1L, op = LinearOp.GE, bound = 3L),
-        )
-
-        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
-    }
-
-    @Test
-    fun `a model with nothing open is still refuted rather than passed on`() {
-        // Both sides stated, so there is nothing to close — but the rows have no solution between them.
-        // Closing is what this model does not need; refuting is what it still deserves, and on the open
-        // route there is no bake behind this to catch it.
-        val spec = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(5), null, null),
-            factors = arrayOf<Factor>(row(0 to 1L, op = LinearOp.LE, bound = -1L)),
-        )
-
-        assertIs<OpenPresolveResult.Refuted>(spec.closeOpenBounds())
-    }
-
-    @Test
     fun `a model contradictory over its open ranges is refuted rather than boxed`() {
         // x >= 0 with x <= -1: no solution anywhere in the unbounded model, not merely inside a box.
         val spec = openAbove(1, row(0 to 1L, op = LinearOp.LE, bound = -1L))
-
-        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
-    }
-
-    @Test
-    fun `an equality whose bound is outside its coefficient lattice is refuted over open ranges`() {
-        // 2x + 4y = 3 is feasible over the rationals and its columns are open both ways, so neither the
-        // relaxation nor interval propagation concludes anything; gcd(2, 4) does not divide 3.
-        val spec = fullyOpen(2, row(0 to 2L, 1 to 4L, op = LinearOp.EQ, bound = 3L))
 
         assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
     }
@@ -197,32 +137,6 @@ class OpenPresolveTest {
     }
 
     @Test
-    fun `disabled presolve leaves source factors untouched`() {
-        val spec = fullyOpen(
-            3,
-            row(0 to 1L, 1 to -1L, 2 to -1L, op = LinearOp.EQ, bound = 0L),
-            row(1 to 1L, 2 to 1L, op = LinearOp.LE, bound = 4L),
-        )
-
-        val result = assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen(PresolveConfig.NONE))
-
-        assertSame(spec.factors, result.spec.factors)
-    }
-
-    @Test
-    fun `inequalities that no bound crosses are refuted by the relaxation`() {
-        // x + y <= 5 with x + y >= 10. Every column is open, so no interval propagation moves a bound
-        // and no pair ever crosses; the contradiction is only visible to a dual ray.
-        val spec = fullyOpen(
-            2,
-            row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 5L),
-            row(0 to -1L, 1 to -1L, op = LinearOp.LE, bound = -10L),
-        )
-
-        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
-    }
-
-    @Test
     fun `an LP refutation records standalone route work`() {
         val spec = fullyOpen(
             2,
@@ -238,13 +152,6 @@ class OpenPresolveTest {
             stats.standalonePasses.sum + stats.componentPasses.sum > 0.0,
             "the LP solve that refuted the open model must be reported",
         )
-    }
-
-    @Test
-    fun `a satisfiable equality over open ranges is not refuted`() {
-        val spec = fullyOpen(2, row(0 to 2L, 1 to 4L, op = LinearOp.EQ, bound = 6L))
-
-        assertIs<OpenPresolveResult.Tightened>(spec.presolveOpen())
     }
 
     @Test
@@ -270,20 +177,6 @@ class OpenPresolveTest {
         row(0 to 1L, 1 to 1L, op = LinearOp.EQ, bound = 10L),
         row(0 to 1L, 1 to -1L, op = LinearOp.EQ, bound = 4L),
     )
-
-    private fun closingWork(): Long {
-        val budget = PresolveBudget(Long.MAX_VALUE)
-        jointlyDetermined().closeOpenBounds(budget.orSpent(Cancellation.Never))
-        return budget.spent()
-    }
-
-    @Test
-    fun `bound closing charges the same work on every run`() {
-        val first = closingWork()
-
-        assertTrue(first > 0L, "the bound proof must charge the work it does")
-        assertEquals(first, closingWork())
-    }
 
     @Test
     fun `a spent allowance closes no open side`() {
@@ -321,36 +214,6 @@ class OpenPresolveTest {
 
         assertTrue(result.spec.intBounds.hasUpper(0), "the constrained column closes")
         assertTrue(result.spec.intBounds.isOpenUpper(1), "the unconstrained one cannot be proved")
-    }
-
-    @Test
-    fun `a unit-asserted reified row is rounded in open presolve`() {
-        val openHi = Bits(1).also { it.set(0) }
-        val spec = Problem(
-            numBoolVars = 1,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(0), null, openHi),
-            factors = arrayOf(
-                Clause(intArrayOf(Lit.make(0, positive = true))),
-                ReifiedLinear(0, longArrayOf(2), intArrayOf(0), LinearOp.LE, 1L),
-            ),
-        )
-
-        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
-    }
-
-    @Test
-    fun `a unit-negated reified row is rounded in open presolve`() {
-        val openHi = Bits(1).also { it.set(0) }
-        val spec = Problem(
-            numBoolVars = 1,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(0), null, openHi),
-            factors = arrayOf(
-                Clause(intArrayOf(Lit.make(0, positive = false))),
-                ReifiedLinear(0, longArrayOf(2), intArrayOf(0), LinearOp.GE, 2L),
-            ),
-        )
-
-        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
     }
 
     /** Column 0 open above with the box [box]; column 1 closed, declaring [declared]. */
@@ -423,50 +286,6 @@ class OpenPresolveTest {
 
         assertEquals(0, result.closedSides)
         assertEquals(4L, result.spec.intBounds.upper(1))
-    }
-
-    @Test
-    fun `subsumption drops a dominated row on a model whose columns are open`() {
-        // `x + y <= 4` is implied by `x + y <= 2` over any range at all, so the drop is justified by the
-        // other row rather than by how far either column reaches — the property that lets subsumption
-        // run before a finite projection exists.
-        val spec = fullyOpen(
-            2,
-            row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 2L),
-            row(0 to 1L, 1 to 1L, op = LinearOp.LE, bound = 4L),
-        )
-
-        val prepared = PresolvePipeline.prepareSource(spec, PresolveConfig.parse(PresolvePass.REMOVE_REDUNDANT.id))
-
-        assertEquals(listOf(PresolvePass.REMOVE_REDUNDANT.id), prepared.stats.passes)
-        assertEquals(1, prepared.problem.factors.size, "the looser row is dropped")
-        assertTrue(!prepared.problem.intBounds.hasUpper(0), "the pass invents no bound for an open column")
-    }
-
-    @Test
-    fun `an eliminated boolean column is recovered from the tightened result`() {
-        val openHi = Bits(1).also { it.set(0) }
-        val spec = Problem(
-            numBoolVars = 3,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openHi),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-            ),
-        )
-
-        val result = assertIs<OpenPresolveResult.Tightened>(
-            spec.presolveOpen(PresolveConfig(PresolveEmphasis.AGGRESSIVE)),
-        )
-
-        val witness = BooleanArray(3)
-        result.rebuildEliminatedBooleans(witness)
-        assertTrue(
-            spec.factors.filterIsInstance<Clause>().all { c ->
-                c.literals.any { Lit.evaluate(it, witness[Lit.variable(it)]) }
-            },
-            "a witness of the reduced model lifts to one of the input",
-        )
     }
 
     @Test

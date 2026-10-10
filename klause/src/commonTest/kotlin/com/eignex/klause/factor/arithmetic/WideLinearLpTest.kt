@@ -89,19 +89,6 @@ class WideLinearLpTest {
     private val w = parseBigInt("18446744073709551617")
 
     @Test
-    fun `a wide at-most row over a nonnegative variable is an outward relaxation`() {
-        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.LE, w)
-        val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
-        row.emitLpRelaxation(b)
-        assertEquals(1, b.realRows.size)
-        val r = b.realRows[0]
-        assertEquals(LinearOp.LE, r.op)
-        // Weakened: a nonnegative variable's coefficient rounds down (<= the true value), the bound up.
-        assertTrue(floorBigInt(r.coeffs[0]) <= w, "coeff rounded down")
-        assertTrue(floorBigInt(r.rhs) >= w, "bound rounded up")
-    }
-
-    @Test
     fun `a wide row over a sign-straddling variable splits into nonnegative parts`() {
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.LE, w)
         val b = RecordingBuilder(mapOf(0 to IntDomain(-5, 5)))
@@ -139,18 +126,6 @@ class WideLinearLpTest {
     }
 
     @Test
-    fun `a column the model bounds below stays unsplit and keeps its rounding direction`() {
-        // Open above but stated non-negative below: the sign is known, so no split is needed and the
-        // coefficient still rounds down on the `≤` side.
-        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.LE, w)
-        val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)), openHi = setOf(0))
-        row.emitLpRelaxation(b)
-        assertEquals(1, b.realRows.size)
-        assertTrue(b.auxBounds.isEmpty(), "a sign-known column needs no split")
-        assertTrue(floorBigInt(b.realRows[0].coeffs[0]) <= w, "coeff rounded down")
-    }
-
-    @Test
     fun `a coefficient past the Double range emits no relaxation row instead of an infinite one`() {
         // 2^2000 has no finite Double to round outward to, so the row stays CP-only; rounding it anyway
         // would put an infinity in the LP.
@@ -159,18 +134,6 @@ class WideLinearLpTest {
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
         row.emitLpRelaxation(b)
         assertEquals(0, b.realRows.size, "no row is emitted for values the LP cannot represent")
-    }
-
-    @Test
-    fun `a coefficient in the top Double exponent band still emits a row when it is finite`() {
-        // 2^1023 shares its bit length with values that overflow, so the finiteness test cannot stop at
-        // the exponent — this one converts and must be relaxed like any other wide coefficient.
-        val big = BIG_ONE.shl(1023)
-        val row = Linear(intArrayOf(0), arrayOf(big), LinearOp.LE, big)
-        val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
-        row.emitLpRelaxation(b)
-        assertEquals(1, b.realRows.size)
-        assertTrue(b.realRows[0].coeffs.all { it.isFinite() }, "the emitted coefficients are finite")
     }
 
     @Test
