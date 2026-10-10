@@ -352,7 +352,8 @@ internal object PortfolioComposition {
             scenario.lsPool != null || scenario.btPool != null || !facts.profile.realColumns ||
             arms.any { it.label == "lp-default" }
         ) return null
-        val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-default" } ?: return null
+        val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-default" }
+            ?: return null
         return BacktrackWorkerConfig(
             recipe.editing(scenario.btEdit).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
             scenario.zeroObjectivePricing,
