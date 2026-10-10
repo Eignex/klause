@@ -73,8 +73,13 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
         // the top of each iteration, destroy from its verified global best — so ALNS both feeds and follows
         // the incumbents backtrack and LS arms find.
         val alns = Alns(
-            inner = LocalSearchSolver(problem).apply {
+            inner = LocalSearchSolver(
+                problem,
+                definitionalSweep = definitionalSweep,
+                perMoveInvariants = definitionalSweep != null,
+            ).apply {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
+                matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
             },
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),

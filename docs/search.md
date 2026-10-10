@@ -266,6 +266,8 @@ sample at most four alternatives from at most 32 present values, and literal cha
 stop at depth 16. The Cumulative duration neighborhood uses the same inverse route.
 Functional objective inference declines cones crossing literal-to-integer channels;
 ordinary objective scoring still grades the complete maintained assignment.
+The portfolio's ALNS inner local search shares the definition sweep and immutable
+network used by ordinary LS workers using invariants.
 Boolean break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Moves feeding definitions score the complete propagated assignment, including derived
