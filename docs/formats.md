@@ -83,8 +83,11 @@ When a branch compares a simple integer variable with a constant, these meanings
 can exclude conflicting selector tests and omit guard tests implied by that comparison.
 Conflicting branches and excluded defaults are skipped before traversing their definitions.
 Equality keys whose sign reversal exceeds a signed word retain their arithmetic encoding.
-A parse expands comparisons after lowering all assertions and objectives, visiting
-the newest comparisons first. Expansion shares a limit of 65,536 visits; comparisons
+A parse expands comparisons after lowering all assertions and objectives, starting
+from source Boolean declarations, Boolean costs and surviving constraint uses.
+The expansion follows Boolean dependencies as branch formulas are produced, with
+later constraint uses visited first. Unused numeric definitions do not consume
+comparison expansion work. Expansion shares a limit of 65,536 visits; comparisons
 that cannot finish retain their exact arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
 fresh definitions are omitted after following these dependencies to a fixpoint.

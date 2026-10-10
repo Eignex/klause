@@ -281,7 +281,7 @@ internal object Compiler {
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }
             lowerOpenIteChains() // an objective term can open chains of its own
-            conditionalEqualities.expandPending(this)
+            conditionalEqualities.expandPending(this, compiledObjective)
             val removed = conditionalEqualities.retainNeededDefinitions(
                 factors, intNames.values, boolNames.values, compiledObjective,
             )

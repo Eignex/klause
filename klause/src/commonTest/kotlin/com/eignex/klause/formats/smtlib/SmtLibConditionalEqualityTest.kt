@@ -23,6 +23,31 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `an unused later conditional does not exhaust an asserted comparison budget`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const s Int) (declare-const x Int)
+                (assert (>= s 0)) (assert (<= s 2))
+                (assert (= (ite (= s 0) s 2) 1))
+                (assert (let ((unused (ite (= (ite (<= x 0) x 2) 1) 4 5))) true))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        assertIs<ComponentResult.Conflict>(session.initialize())
+    }
+
+    @Test
     fun `a final comparison can refute the source after earlier comparisons exceed the expansion budget`() {
         val builder = Compiler.Builder(
             Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
