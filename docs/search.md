@@ -45,9 +45,13 @@ The reversible live prefix is committed once per completed sweep, including
 empty-prefix conflicts; sibling branches restore filtering from trailed state.
 
 LP explanations cite selected source bound witnesses and recursively expanded
-row, fixing and cutoff premises. Current CP propagation and source LP conflicts
-do not include an optional exact-theory row-propagation scanner or explanation
-weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
+row, fixing and cutoff premises. Open linear theories narrow source-column bounds
+from exact row intervals and imply reified comparisons with immutable row and
+bound premises. These bounds follow the LP trail and retract with their decisions.
+Strict real endpoints stay strict; integer endpoints round on the source lattice.
+Each propagation call limits interval passes before the complete LP check, so a
+partial interval pass cannot establish feasibility or exhaustion. There is no
+explanation weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
 
 ## Learned-clause retention
 

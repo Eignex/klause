@@ -150,6 +150,7 @@ class ExactLiraSearchComponent(
     }
     private val lp: LpPropagator by lpDelegate
     private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
+    private val propagation by lazy { ExactLraPropagation(model, lp, exactForms) }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -545,6 +546,13 @@ class ExactLiraSearchComponent(
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
+        val propagated = propagation.propagate(context, operationStop)
+        if (propagated is ComponentResult.Conflict) {
+            smtStats?.observeConflict(propagated.explanation)
+            outcome = ComponentCheck.Infeasible(propagated.explanation)
+        }
+        if (propagated !is ComponentResult.Consistent) return propagated
+        if (propagation.implied) return ComponentResult.Consistent
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve(token = operationStop, sparsePointRecovery = true)
             ?: return ComponentResult.Indeterminate
