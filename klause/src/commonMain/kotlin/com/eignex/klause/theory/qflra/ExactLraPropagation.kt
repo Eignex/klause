@@ -10,10 +10,13 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
+import com.eignex.klause.lp.bounding.LpDerivedBound
 import com.eignex.klause.lp.bounding.LpPropagator
+import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundAssertion
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -62,6 +65,36 @@ internal class ExactLraPropagation(
         private set
 
     fun propagate(context: SearchContext, stop: Cancellation): ComponentResult {
+        val pending = LinkedHashMap<Pair<Int, Boolean>, LpDerivedBound>()
+        var committed = false
+        return try {
+            val result = propagate(context, stop, pending)
+            if (result !is ComponentResult.Consistent) result else {
+                when (val batch = lp.assertDerivedBounds(pending.values.toList())) {
+                    is LpBoundBatchResult.Declined -> ComponentResult.Indeterminate
+                    is LpBoundBatchResult.Conflict -> ComponentResult.Conflict(
+                        context.explainAtoms(SearchAtomPremise.All(listOf(
+                            lp.activeBoundPremise(batch.reason.column, false) ?: SearchAtomPremise.Unavailable,
+                            lp.activeBoundPremise(batch.reason.column, true) ?: SearchAtomPremise.Unavailable,
+                        ))),
+                    )
+                    is LpBoundBatchResult.Applied -> {
+                        committed = true
+                        pending.values.forEach { refreshColumn(it.column) }
+                        result
+                    }
+                }
+            }
+        } finally {
+            if (!committed) rows.indices.forEach(::enqueue)
+        }
+    }
+
+    private fun propagate(
+        context: SearchContext,
+        stop: Cancellation,
+        pending: MutableMap<Pair<Int, Boolean>, LpDerivedBound>,
+    ): ComponentResult {
         implied = false
         // Interval narrowing may converge only asymptotically on real rows. The LP remains the complete check.
         for (column in columnReaders.indices) refreshColumn(column)
@@ -85,10 +118,10 @@ internal class ExactLraPropagation(
                 ) continue
                 val comparison = form.comparison(true) { context.boolValue(it) == true }
                 val minimum = stronger(
-                    activity(comparison.terms, upper = false), system.activityBound(comparison, false), false,
+                    activity(comparison.terms, upper = false, pending), system.activityBound(comparison, false), false,
                 )
                 val maximum = stronger(
-                    activity(comparison.terms, upper = true), system.activityBound(comparison, true), true,
+                    activity(comparison.terms, upper = true, pending), system.activityBound(comparison, true), true,
                 )
                 val truth = comparison.truth(minimum, maximum)
                 val activated = row.activator == LinearRow.ALWAYS || context.boolValue(row.activator) == true
@@ -135,7 +168,7 @@ internal class ExactLraPropagation(
                         val rest = activity(
                             inequality.columns.indices.filter { it != index }.associate {
                                 inequality.columns[it] to inequality.coefficients[it]
-                            }, upper = false,
+                            }, upper = false, pending,
                         ) ?: continue
                         var bound = (inequality.rhs - rest.value) * coefficient.reciprocal()
                         var strict = inequality.strict || rest.strict
@@ -144,20 +177,22 @@ internal class ExactLraPropagation(
                             bound = integerBound(bound, upper, strict)
                             strict = false
                         }
-                        val previous = lp.state?.activeSide(column, upper)?.side
+                        val previous = pending[column to upper]?.side ?: lp.state?.activeSide(column, upper)?.side
                         val side = ExactLpSide(ExactLpNumber.of(bound), strict)
                         if (previous != null && !side.strongerThan(previous, upper)) continue
                         val reason = SearchAtomPremise.All(listOf(premise, rest.premise))
-                        if (!lp.assertBound(column, upper, side, reason)) {
-                            return ComponentResult.Indeterminate
-                        }
-                        if (lp.state?.conflict != null) {
+                        pending[column to upper] = LpDerivedBound(column, upper, side, reason)
+                        val lowerSide = pending[column to false]?.side ?: lp.state?.activeSide(column, false)?.side
+                        val upperSide = pending[column to true]?.side ?: lp.state?.activeSide(column, true)?.side
+                        if (!ExactLpBounds(lowerSide, upperSide).consistent) {
                             return ComponentResult.Conflict(context.explainAtoms(SearchAtomPremise.All(listOf(
-                                lp.activeBoundPremise(column, false) ?: SearchAtomPremise.Unavailable,
-                                lp.activeBoundPremise(column, true) ?: SearchAtomPremise.Unavailable,
+                                pending[column to false]?.premise ?: lp.activeBoundPremise(column, false)
+                                    ?: SearchAtomPremise.Unavailable,
+                                pending[column to true]?.premise ?: lp.activeBoundPremise(column, true)
+                                    ?: SearchAtomPremise.Unavailable,
                             ))))
                         }
-                        refreshColumn(column)
+                        columnReaders[column].forEach(::enqueue)
                     }
                 }
         }
@@ -197,17 +232,22 @@ internal class ExactLraPropagation(
         ) second else first
     }
 
-    private fun activity(terms: Map<Int, BigFraction>, upper: Boolean): SmtActivityBound? {
+    private fun activity(
+        terms: Map<Int, BigFraction>,
+        upper: Boolean,
+        pending: Map<Pair<Int, Boolean>, LpDerivedBound>,
+    ): SmtActivityBound? {
         var value = BigFraction.ZERO
         var strict = false
         val premises = ArrayList<SearchAtomPremise>(terms.size)
         for ((column, coefficient) in terms) {
             if (coefficient.isZero) continue
             val sideUpper = if (coefficient.signum() > 0) upper else !upper
-            val side = lp.state?.activeSide(column, sideUpper)?.side ?: return null
+            val derived = pending[column to sideUpper]
+            val side = derived?.side ?: lp.state?.activeSide(column, sideUpper)?.side ?: return null
             value += coefficient * side.number.value
             strict = strict || side.strict
-            premises += lp.activeBoundPremise(column, sideUpper) ?: SearchAtomPremise.Unavailable
+            premises += derived?.premise ?: lp.activeBoundPremise(column, sideUpper) ?: SearchAtomPremise.Unavailable
         }
         return SmtActivityBound(value, strict, SearchAtomPremise.All(premises))
     }
