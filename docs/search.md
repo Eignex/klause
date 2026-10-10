@@ -92,6 +92,8 @@ The scheduler charges the observed instruction delta, while the solve-wide move
 allowance is charged once across slices. Closing or reseeding discards the retained
 state. Root refutations remain authoritative; an unsuccessful local-search walk is
 incomplete.
+An active local-search handle requires exclusive use of its solver and session;
+portfolio workers use separate solvers and close a handle before reseeding it.
 
 The immutable local-search projection is initialized lazily and reused across draws.
 Mixed-pool arms over the same model share it, including ALNS's inner local search.

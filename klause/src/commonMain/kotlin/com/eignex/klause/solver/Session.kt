@@ -60,7 +60,10 @@ interface Session<P : SolverParams> : AutoCloseable {
      */
     fun resumableSolve(params: P): ResumableSolve? = null
 
-    /** Open an optimisation handle under the current session state, or null when it cannot resume. */
+    /**
+     * Open an optimisation handle under the current session state, or null when it cannot resume.
+     * Retain exclusive use of the session until the handle is closed.
+     */
     fun resumable(objective: LinearObjective, params: P): ResumableSearch? = null
 
     /** Default implementation drains [samples] for one yield. Wraps it in
