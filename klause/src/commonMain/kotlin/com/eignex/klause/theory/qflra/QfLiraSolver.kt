@@ -489,6 +489,8 @@ class ExactLiraSearchComponent(
                 }
             }
         }
+        var directions: MutableMap<RowAddress, LinearOp>? = null
+        var directionPremises: MutableMap<RowAddress, SearchAtomPremise>? = null
         for ((address, comparison, premise) in disequalities) {
             val side = if (comparison.terms.isEmpty()) {
                 DerivedDisequalitySide(LinearOp.LE, SearchAtomPremise.All(emptyList()))
@@ -497,9 +499,16 @@ class ExactLiraSearchComponent(
                     DerivedDisequalitySide(it, node.directionPremises.getValue(address))
                 } ?: system.disequalitySide(comparison) ?: continue
             }
-            node = node.withDirection(address, side.direction).copy(
-                directionPremises = node.directionPremises + (address to side.premise),
-            )
+            if (address !in node.disequalityDirections) {
+                val nextDirections = directions ?: node.disequalityDirections.toMutableMap().also {
+                    directions = it
+                }
+                val nextPremises = directionPremises ?: node.directionPremises.toMutableMap().also {
+                    directionPremises = it
+                }
+                nextDirections[address] = side.direction
+                nextPremises[address] = side.premise
+            }
             if (!system.assertComparison(
                     comparison,
                     side.direction,
@@ -508,6 +517,9 @@ class ExactLiraSearchComponent(
             ) {
                 return false
             }
+        }
+        directions?.let { next ->
+            node = node.copy(disequalityDirections = next, directionPremises = checkNotNull(directionPremises))
         }
         nodesByLevel.put(context.decisionLevel, node)
         return true
@@ -1303,9 +1315,6 @@ private data class SearchNode(
                 }
             },
         )
-
-    fun withDirection(factor: RowAddress, direction: LinearOp): SearchNode =
-        copy(disequalityDirections = disequalityDirections + (factor to direction))
 
     fun rowTruth(address: RowAddress, row: LinearRow, bools: IntArray): Boolean? {
         val truth = row.truthUnder(bools) ?: return null
