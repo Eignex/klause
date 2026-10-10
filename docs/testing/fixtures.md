@@ -102,10 +102,12 @@ binary64. The MIT copyright/permission notice remains in the fixture
 
 [voltage_divider.fzn](../../klause-bench/src/test/resources/flatzinc/voltage_divider.fzn)
 is Hakan Kjellerstrand's `minizinc/voltage_divider/voltage_divider.mzn` from the
-Hakank corpus, compiled with MiniZinc 2.9.7 and Klause's globals library. Local-path
+Hakank corpus at revision `cfdfb67f9a22836ab6b9de0ee3940c6947742bec`,
+compiled with MiniZinc 2.9.7 and Klause's globals library. The MIT notice remains
+in the fixture. Local-path
 comments were removed. All 15 original flattened predicates and six scalar range
 bounds remain. The test checks exact witness coordinates without solver lowering.
 Source SHA-256 is
 `ab64d949341580bf5ea6c556e6d708b2285f40593f0de49b881f15869aa4d88e`;
 fixture SHA-256 is
-`854bae066abe5ad5c3e7b32e0ff92bc878e52963105dbe29704a9aabd313a1a7`.
+`e8353427783116d2980f3b0c05579d493fb072e92c18d38008fec458c3f840f7`.
