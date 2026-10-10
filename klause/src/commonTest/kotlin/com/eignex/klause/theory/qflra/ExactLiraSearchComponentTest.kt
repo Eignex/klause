@@ -96,6 +96,8 @@ class ExactLiraSearchComponentTest {
                 bigIntOf(7), assertNotNull(first.model.valueOf<ExactLiraAssignment>(component)).ints.single(),
             )
             session.popTo(1)
+            assertEquals(ComponentCheck.Indeterminate, component.check(session))
+            assertNull(component.nextBranch(session))
             for (variable in 1..3) {
                 assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, false))))
             }

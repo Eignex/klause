@@ -172,6 +172,7 @@ Boolean clauses stay outside this numeric interval queue; shared clause propagat
 handles their Boolean effects, and complete source checks still enforce them.
 The theory records its own Boolean implications through the assertion path;
 shared delivery excludes the component that produced them.
+Boolean completion is tracked incrementally across assertions and retraction.
 Source assertion accumulates derived disequality directions and their premises in
 private maps, then publishes one immutable node snapshot for the completed pass.
 Directions retain their source premises along a branch; retraction restores the
