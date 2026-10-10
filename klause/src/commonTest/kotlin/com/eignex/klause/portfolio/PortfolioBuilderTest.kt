@@ -52,17 +52,18 @@ class PortfolioBuilderTest {
     ).bake()
 
     @Test
-    fun `the default continuous optimization pool admits node LP beside its SAT guard`() {
+    fun `the default continuous optimization pool appends node LP after its incumbent workers`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
 
         val workers = PortfolioBuilder.build(continuous, scenario)
 
         try {
             assertEquals(
-                listOf("bt/satOptimized", "bt/lp-default"),
+                listOf("bt/satOptimized", "bt/conflictDriven", "bt/lp-default"),
                 workers.filter { it.label.startsWith("bt/") }.map { it.label },
             )
             assertEquals(4, workers.count { it.family == ArmFamily.LocalSearch })
+            assertEquals("bt/lp-default", workers.last().label)
         } finally {
             workers.forEach { it.close() }
         }

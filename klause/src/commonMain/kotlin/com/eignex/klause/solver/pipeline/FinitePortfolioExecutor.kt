@@ -65,7 +65,7 @@ internal fun continuousLpShares(
     labels: List<String>,
 ): DoubleArray {
     if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.engine != EngineMix.MIXED ||
-        !profile.realColumns || scenario.btPool != null
+        !profile.realColumns || scenario.btPool != null || scenario.lsPool != null
     ) return DoubleArray(0)
     val lp = labels.indexOf("bt/lp-default")
     if (lp < 0) return DoubleArray(0)
