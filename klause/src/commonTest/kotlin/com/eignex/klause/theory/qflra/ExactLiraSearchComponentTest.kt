@@ -53,6 +53,31 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `a source Boolean clause stays enforced without numeric interval deductions`() {
+        val clause = intArrayOf(Lit.make(0, false), Lit.make(1, true))
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Clause(clause),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertEquals(clause.toSet(), assertNotNull(conflict.explanation).literals.toSet())
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+        }
+    }
+
+    @Test
     fun `arithmetic assertions retract across decisions without arithmetic effects`() {
         val model = Problem(
             numBoolVars = 4,

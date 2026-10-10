@@ -80,6 +80,9 @@ Strict real endpoints stay strict; integer endpoints round on the source lattice
 Affected rows follow source Boolean and exact bound changes through a retained
 queue, including restored bounds after retraction. Equivalent normalized terms
 share their exact activity bounds even when individual source columns are open.
+Interval scans observe only columns and Boolean variables read by their rows.
+Boolean clauses stay outside this numeric interval queue; shared clause propagation
+handles their Boolean effects, and complete source checks still enforce them.
 The theory records its own Boolean implications through the assertion path;
 shared delivery excludes the component that produced them.
 Source assertion accumulates derived disequality directions and their premises in
