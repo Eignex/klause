@@ -1,10 +1,44 @@
 package com.eignex.klause.ir.intdomain
 
+import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.ir.DomainStorageSettings
+import com.eignex.klause.ir.IntDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class AbstractIntDomainTest {
+
+    @Test
+    fun `domain narrowing uses its captured bitset threshold`() {
+        val small = IntDomain(0, 100, DomainStorageSettings(8))
+        val large = IntDomain(0, 100, DomainStorageSettings(128))
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = KlauseConfig.DEFAULT.copy(bitsetThreshold = 1)
+
+            assertIs<RunsDomain>(small.excludeValue(50))
+            assertIs<BitsetDomain>(large.excludeValue(50))
+            assertEquals(small.excludeValue(50), large.excludeValue(50))
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
+    @Test
+    fun `domain restoration keeps the storage policy through representation changes`() {
+        val domain = IntDomain(0, 100, DomainStorageSettings(8)).excludeValue(50)
+
+        val restored = domain.includeInteriorValue(50)
+        val narrowed = restored.withMaxAtMost(90).excludeValues(longArrayOf(20, 30))
+
+        assertIs<RunsDomain>(narrowed)
+        assertEquals(0L, narrowed.min)
+        assertEquals(90L, narrowed.max)
+        assertTrue(50L in narrowed)
+    }
+
 
     @Test
     fun `excludeValues empty list is identity`() {

@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
@@ -36,11 +35,12 @@ internal object SmtLibMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val config = KlauseConfig.current
+            val config = common.config
             val parsed = SmtLib.parse(
                 openFileSource(path),
                 config.unboundedIntLo,
                 config.unboundedIntHi,
+                settings = config.problemSettings(),
             )
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.model.numBoolVars} int=${parsed.model.numIntVars} " +

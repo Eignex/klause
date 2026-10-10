@@ -1,5 +1,6 @@
 package com.eignex.klause.ir
 
+import com.eignex.klause.ir.intdomain.AbstractIntDomain
 import com.eignex.klause.ir.intdomain.ContiguousDomain
 import kotlin.random.Random
 
@@ -21,7 +22,7 @@ fun interface IntConsumer {
  *  - [com.eignex.klause.ir.intdomain.ContiguousDomain] — `(min..max)` with no holes; everything
  *    is O(1).
  *  - [com.eignex.klause.ir.intdomain.BitsetDomain] — one bit per value over a narrow span
- *    (`<=` [com.eignex.klause.config.KlauseConfig.bitsetThreshold]); membership is an O(1) bit test
+ *    (`<=` [DomainStorageSettings.bitsetThreshold]); membership is an O(1) bit test
  *    at any density.
  *  - [com.eignex.klause.ir.intdomain.RunsDomain] — a sorted list of disjoint present runs;
  *    membership O(log runs), storage O(runs). The wide-span rep for relatively few runs (few holes,
@@ -37,7 +38,7 @@ fun interface IntConsumer {
  *
  * **Representation choice** — construct via the factories (`IntDomain(min, max)` for the contiguous
  * case; the internal `intDomainFrom*` factories pick the wide rep): a single run ⇒ contiguous; span
- * `<=` [com.eignex.klause.config.KlauseConfig.bitsetThreshold] ⇒ bitset; otherwise the run list when
+ * `<=` [DomainStorageSettings.bitsetThreshold] ⇒ bitset; otherwise the run list when
  * it is at least as compact as the survivor list (`2·runs <= survivors`), else the survivor list.
  * Domains are immutable, so every mutation returns a fresh value and re-picks — no flip-flop cost.
  *
@@ -192,10 +193,14 @@ interface IntDomain {
     }
 
     /** Factory for `IntDomain`; the bitset/wide-rep cutoff is
-     *  [com.eignex.klause.config.KlauseConfig.bitsetThreshold]. */
+     *  [DomainStorageSettings.bitsetThreshold]. */
     companion object {
         /** Construct the contiguous domain `(min..max)`. */
-        operator fun invoke(min: Long, max: Long): IntDomain = ContiguousDomain(min, max)
+        operator fun invoke(
+            min: Long,
+            max: Long,
+            storage: DomainStorageSettings = defaultDomainStorageSettings,
+        ): IntDomain = ContiguousDomain(min, max, storage)
     }
 }
 
@@ -263,3 +268,6 @@ interface IntSpan {
     /** Invoke [action] for each value, ascending. */
     fun forEach(action: IntConsumer)
 }
+
+internal fun IntDomain.withStorage(settings: DomainStorageSettings): IntDomain =
+    (this as? AbstractIntDomain)?.withStorage(settings) ?: this

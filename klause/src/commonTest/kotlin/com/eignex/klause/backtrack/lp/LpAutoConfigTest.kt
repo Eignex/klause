@@ -42,21 +42,17 @@ class LpAutoConfigTest {
         // LP activation gates on the ceiling cap (#705): within it LP is on (even over the base cap,
         // where only the hull budget shrinks); past it LP is declined. Pure cost guard — sound either way.
         val p = problem(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2))
-        val saved = KlauseConfig.current
-        try {
-            KlauseConfig.current = saved.copy(lpCeilingTableauCells = Long.MAX_VALUE)
-            assertTrue(LpAutoConfig.recommend(p).bounding, "a large ceiling must enable auto LP")
-            // Over the base cap but within the ceiling: LP still on.
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpCeilingTableauCells = Long.MAX_VALUE)
-            assertTrue(
-                LpAutoConfig.recommend(p).bounding,
-                "over the base cap but within the ceiling, LP stays on",
-            )
-            KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
-            assertFalse(LpAutoConfig.recommend(p).bounding, "a 1-cell ceiling must disable auto LP")
-        } finally {
-            KlauseConfig.current = saved
-        }
+        var config = KlauseConfig.DEFAULT.copy(lpCeilingTableauCells = Long.MAX_VALUE)
+        assertTrue(LpAutoConfig.recommend(p.withSettings(config.problemSettings())).bounding)
+        // Over the base cap but within the ceiling: LP still on.
+        config = KlauseConfig.DEFAULT.copy(lpMaxTableauCells = 1L, lpCeilingTableauCells = Long.MAX_VALUE)
+        assertTrue(
+            LpAutoConfig.recommend(p.withSettings(config.problemSettings())).bounding,
+            "over the base cap but within the ceiling, LP stays on",
+        )
+        config = KlauseConfig.DEFAULT.copy(lpCeilingTableauCells = 1L)
+        assertFalse(LpAutoConfig.recommend(p.withSettings(config.problemSettings())).bounding)
+
     }
 
     @Test
@@ -72,15 +68,11 @@ class LpAutoConfigTest {
             realLower = DoubleArray(100),
             realUpper = DoubleArray(100) { 1.0 },
         )
-        val saved = KlauseConfig.current
-        try {
-            KlauseConfig.current = saved.copy(lpCeilingTableauCells = 50L)
+        val config = KlauseConfig.DEFAULT.copy(lpCeilingTableauCells = 50L)
 
-            assertTrue(LpAutoConfig.recommend(discrete).bounding)
-            assertFalse(LpAutoConfig.recommend(mixed).bounding, "100 continuous columns are past a 50-cell ceiling")
-        } finally {
-            KlauseConfig.current = saved
-        }
+        assertTrue(LpAutoConfig.recommend(discrete.withSettings(config.problemSettings())).bounding)
+        assertFalse(LpAutoConfig.recommend(mixed.withSettings(config.problemSettings())).bounding)
+
     }
 
     @Test
@@ -99,27 +91,23 @@ class LpAutoConfigTest {
         // NValue over 32 vars × domain 32 = 1024 cells: under its own MAX_NVALUE_CELLS cap (so the
         // builder would build it), but its ~2048 columns + ~1089 rows blow a 2^20 relaxation budget.
         // The size guard (#484) must shed the hull (lpNValue off) while the base LP still runs.
-        val saved = KlauseConfig.current
-        try {
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L shl 20)
-            val n = 32
-            val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n.toLong()) }
-            val big = Problem(0, n + 1, domains, arrayOf<Factor>(NValue(n, IntArray(n) { it })))
-            val rBig = LpAutoConfig.recommend(big)
-            assertFalse(rBig.nValue, "the over-budget NValue hull must be shed")
-            assertTrue(rBig.bounding, "the base LP still runs; only the hull is shed")
+        val config = KlauseConfig.DEFAULT.copy(lpMaxTableauCells = 1L shl 20)
+        val n = 32
+        val domains = Array(n + 1) { if (it < n) IntDomain(0, 31) else IntDomain(0, n.toLong()) }
+        val big = Problem(0, n + 1, domains, arrayOf<Factor>(NValue(n, IntArray(n) { it })))
+        val rBig = LpAutoConfig.recommend(big.withSettings(config.problemSettings()))
+        assertFalse(rBig.nValue, "the over-budget NValue hull must be shed")
+        assertTrue(rBig.bounding, "the base LP still runs; only the hull is shed")
 
-            // A small NValue (3×3 = 9 cells) fits comfortably and is enabled.
-            val small = Problem(
-                0,
-                4,
-                Array(4) { if (it < 3) IntDomain(0, 2) else IntDomain(0, 3) },
-                arrayOf<Factor>(NValue(3, intArrayOf(0, 1, 2))),
-            )
-            assertTrue(LpAutoConfig.recommend(small).nValue, "a small NValue hull fits and is enabled")
-        } finally {
-            KlauseConfig.current = saved
-        }
+        // A small NValue (3×3 = 9 cells) fits comfortably and is enabled.
+        val small = Problem(
+            0,
+            4,
+            Array(4) { if (it < 3) IntDomain(0, 2) else IntDomain(0, 3) },
+            arrayOf<Factor>(NValue(3, intArrayOf(0, 1, 2))),
+        )
+        assertTrue(LpAutoConfig.recommend(small.withSettings(config.problemSettings())).nValue)
+
     }
 
     @Test

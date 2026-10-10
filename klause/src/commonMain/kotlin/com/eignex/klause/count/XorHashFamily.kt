@@ -74,6 +74,7 @@ internal fun BakedProblem.withHashes(hashes: List<Xor>): Problem {
     merged.addAll(factors)
     merged.add(GaussianXor(hashes))
     return Problem(
+        settings = this.settings,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = rootIntDomains(),

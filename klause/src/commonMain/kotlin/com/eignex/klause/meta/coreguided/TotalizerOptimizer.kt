@@ -105,6 +105,7 @@ internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
             )
         }
         val problem = Problem(
+            settings = baseProblem.settings,
             numBoolVars = nextBoolId,
             numIntVars = baseProblem.numIntVars,
             intDomains = baseProblem.rootIntDomains(),
@@ -233,6 +234,7 @@ internal class TotalizerOptimizer(val baseProblem: BakedProblem) {
                 factors.addAll(thresholdFactors)
                 BacktrackSolver(
                     Problem(
+                        settings = baseProblem.settings,
                         numBoolVars = nextBoolId,
                         numIntVars = baseProblem.numIntVars,
                         intDomains = baseProblem.rootIntDomains(),

@@ -33,20 +33,17 @@ class LpLargeRelaxationTest {
     @Test
     fun `the relaxation-size ceiling gates lp activation`() {
         val p = linearProblem(4)
-        val saved = KlauseConfig.current
-        try {
-            // Over the base cap but within the ceiling ⇒ LP still on (the hull budget shrinks, not LP).
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = 1L, lpCeilingTableauCells = Long.MAX_VALUE)
-            val r = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
-            assertTrue(r.bounding, "lpBounding should be on within the ceiling")
+        var config = KlauseConfig.DEFAULT
+        // Over the base cap but within the ceiling ⇒ LP still on (the hull budget shrinks, not LP).
+        config = KlauseConfig.DEFAULT.copy(lpMaxTableauCells = 1L, lpCeilingTableauCells = Long.MAX_VALUE)
+        val r = LpAutoConfig.resolve(p.withSettings(config.problemSettings()), LpConfig.AGGRESSIVE)
+        assertTrue(r.bounding, "lpBounding should be on within the ceiling")
 
-            // Ceiling = 1 cell ⇒ nothing fits ⇒ LP off.
-            KlauseConfig.current = saved.copy(lpCeilingTableauCells = 1L)
-            val off = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
-            assertFalse(off.bounding)
-        } finally {
-            KlauseConfig.current = saved
-        }
+        // Ceiling = 1 cell ⇒ nothing fits ⇒ LP off.
+        config = KlauseConfig.DEFAULT.copy(lpCeilingTableauCells = 1L)
+        val off = LpAutoConfig.resolve(p.withSettings(config.problemSettings()), LpConfig.AGGRESSIVE)
+        assertFalse(off.bounding)
+
     }
 
     @Test
@@ -55,47 +52,43 @@ class LpLargeRelaxationTest {
         // root relaxation can't starve search. A zero budget cancels every root step immediately; the
         // solve must still reach the true optimum from search alone (graceful, sound degradation).
         val rng = Random(31_31_31)
-        val saved = KlauseConfig.current
-        try {
-            KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)
-            repeat(40) { _ ->
-                val n = rng.nextInt(3, 6)
-                val ub = IntArray(n) { rng.nextInt(2, 6) }
-                val cost = LongArray(n) { rng.nextLong(-6, 7) }
-                val cons = ArrayList<Pair<LongArray, Long>>()
-                repeat(rng.nextInt(1, 4)) { _ -> cons.add(LongArray(n) { rng.nextLong(-3, 4) } to rng.nextLong(0, 15)) }
-                val brute = bruteMin(n, ub, cost, cons)
+        val config = KlauseConfig.DEFAULT.copy(lpMaxTableauCells = Long.MAX_VALUE)
+        repeat(40) { _ ->
+            val n = rng.nextInt(3, 6)
+            val ub = IntArray(n) { rng.nextInt(2, 6) }
+            val cost = LongArray(n) { rng.nextLong(-6, 7) }
+            val cons = ArrayList<Pair<LongArray, Long>>()
+            repeat(rng.nextInt(1, 4)) { _ -> cons.add(LongArray(n) { rng.nextLong(-3, 4) } to rng.nextLong(0, 15)) }
+            val brute = bruteMin(n, ub, cost, cons)
 
-                val domains = Array(n) { IntDomain(0, ub[it].toLong()) }
-                val factors = cons.map { (c, r) ->
-                    Linear(c.map { it.toInt() }.toIntArray(), IntArray(n) { it }, LinearOp.LE, r.toInt())
-                }.toTypedArray<Factor>()
-                val problem = Problem(0, n, domains, factors)
-                val obj = LinearObjective(intCoefficients = cost)
-                val resolved = BacktrackParams(
-                    lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE),
-                    randomSeed = 7L,
-                )
-                assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
+            val domains = Array(n) { IntDomain(0, ub[it].toLong()) }
+            val factors = cons.map { (c, r) ->
+                Linear(c.map { it.toInt() }.toIntArray(), IntArray(n) { it }, LinearOp.LE, r.toInt())
+            }.toTypedArray<Factor>()
+            val problem = Problem(0, n, domains, factors)
+            val obj = LinearObjective(intCoefficients = cost)
+            val resolved = BacktrackParams(
+                lpPlan = LpAutoConfig.resolve(problem.withSettings(config.problemSettings()), LpConfig.AGGRESSIVE),
+                randomSeed = 7L,
+            )
+            assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
-                // rootBudgetMillis = 0 ⇒ Cancellation.after(0) is already passed ⇒ every root step bails.
-                val starved = resolved.copy(lpPlan = resolved.lpPlan.copy(rootBudgetMillis = 0L))
-                when (val res = BacktrackSolver(problem.bake()).minimize(obj, starved)) {
-                    is MinimizeResult.Optimal ->
-                        assertEquals(
-                            (brute ?: error("solver Optimal but brute infeasible")).toDouble(),
-                            res.objective,
-                            1e-9,
-                        )
+            // rootBudgetMillis = 0 ⇒ Cancellation.after(0) is already passed ⇒ every root step bails.
+            val starved = resolved.copy(lpPlan = resolved.lpPlan.copy(rootBudgetMillis = 0L))
+            when (val res = BacktrackSolver(problem.bake()).minimize(obj, starved)) {
+                is MinimizeResult.Optimal ->
+                    assertEquals(
+                        (brute ?: error("solver Optimal but brute infeasible")).toDouble(),
+                        res.objective,
+                        1e-9,
+                    )
 
-                    is MinimizeResult.Infeasible -> assertTrue(brute == null, "solver Infeasible but brute feasible")
+                is MinimizeResult.Infeasible -> assertTrue(brute == null, "solver Infeasible but brute feasible")
 
-                    else -> error("unexpected $res")
-                }
+                else -> error("unexpected $res")
             }
-        } finally {
-            KlauseConfig.current = saved
         }
+
     }
 
     private fun bruteMin(n: Int, ub: IntArray, cost: LongArray, cons: List<Pair<LongArray, Long>>): Long? {

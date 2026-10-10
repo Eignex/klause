@@ -2,9 +2,11 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -32,7 +34,8 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
-    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds)
+        settings: ProblemSettings = KlauseConfig.current.problemSettings(),
+    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds, settings)
 
     /** Decode and lower a streamed SMT-LIB [source], retaining only one top-level command at a time. */
     fun parse(
@@ -40,8 +43,9 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
+        settings: ProblemSettings = KlauseConfig.current.problemSettings(),
     ): SmtLibProblem {
-        val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds)
+        val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds, settings)
         val reader = SExprReader(source)
         while (true) builder.command(reader.readCommandOrNull() ?: break)
         return builder.build()

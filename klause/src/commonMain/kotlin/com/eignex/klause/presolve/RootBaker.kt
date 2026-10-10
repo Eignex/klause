@@ -41,6 +41,7 @@ object RootBaker {
         val extra = bake(problem, config)
         if (extra === problem.baked) return problem
         return BakedProblem(
+            settings = problem.settings,
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = problem.rootIntDomains(),
@@ -342,6 +343,7 @@ object RootBaker {
         }
         return reseed(
             BakedProblem(
+                settings = problem.settings,
                 numBoolVars = problem.numBoolVars,
                 numIntVars = problem.numIntVars,
                 intDomains = problem.rootIntDomains(),

@@ -123,6 +123,7 @@ internal object PresolveShared {
         // Inherit the pass-view mode: a pass fed a cheap already-folded input returns a cheap already-folded
         // output (the session re-folds via incremental propagation); a fresh-path rebuild stays eager.
         val base = BakedProblem(
+            settings = problem.settings,
             numBoolVars = numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = intDomains,

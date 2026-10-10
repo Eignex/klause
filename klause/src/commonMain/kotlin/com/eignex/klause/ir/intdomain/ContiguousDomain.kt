@@ -1,15 +1,23 @@
 package com.eignex.klause.ir.intdomain
 
-import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
+import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.klause.util.Bits
 
 /** Contiguous `(min..max)`, no interior holes. */
-internal class ContiguousDomain(override val min: Long, override val max: Long) :
-    AbstractIntDomain(),
+internal class ContiguousDomain(
+    override val min: Long,
+    override val max: Long,
+    storage: DomainStorageSettings = defaultDomainStorageSettings,
+) :
+    AbstractIntDomain(storage),
     IntSpan {
+    override fun withStorage(settings: DomainStorageSettings): IntDomain =
+        if (storage == settings) this else ContiguousDomain(min, max, settings)
+
     init {
         require(min <= max) { "Empty domain: $min..$max" }
     }
@@ -41,21 +49,21 @@ internal class ContiguousDomain(override val min: Long, override val max: Long) 
     override fun excludeValue(value: Long): IntDomain {
         if (value !in min..max) return this
         return when (value) {
-            min -> ContiguousDomain(min + 1, max)
+            min -> ContiguousDomain(min + 1, max, storage)
 
-            max -> ContiguousDomain(min, max - 1)
+            max -> ContiguousDomain(min, max - 1, storage)
 
             else -> {
                 // A full-Long span overflows the subtraction; a negative "span" means huge, never bitset.
                 val span = max - min + 1
-                if (span in 1..KlauseConfig.current.bitsetThreshold) {
+                if (span in 1..storage.bitsetThreshold) {
                     val spanI = span.toInt()
                     val bits = LongArray((spanI + 63) ushr 6)
                     Bits.fillRange(bits, 0, spanI)
                     Bits.clear(bits, (value - min).toInt())
-                    BitsetDomain(min, max, bits, min)
+                    BitsetDomain(min, max, bits, min, storage)
                 } else {
-                    RunsDomain(min, max, longArrayOf(min, value - 1, value + 1, max))
+                    RunsDomain(min, max, longArrayOf(min, value - 1, value + 1, max), storage)
                 }
             }
         }
@@ -64,13 +72,13 @@ internal class ContiguousDomain(override val min: Long, override val max: Long) 
     override fun withMinAtLeast(newMin: Long): IntDomain {
         if (newMin <= min) return this
         check(newMin <= max) { "withMinAtLeast($newMin) empties domain [$min..$max]" }
-        return ContiguousDomain(newMin, max)
+        return ContiguousDomain(newMin, max, storage)
     }
 
     override fun withMaxAtMost(newMax: Long): IntDomain {
         if (newMax >= max) return this
         check(newMax >= min) { "withMaxAtMost($newMax) empties domain [$min..$max]" }
-        return ContiguousDomain(min, newMax)
+        return ContiguousDomain(min, newMax, storage)
     }
 
     override fun includeInteriorValue(value: Long): IntDomain =

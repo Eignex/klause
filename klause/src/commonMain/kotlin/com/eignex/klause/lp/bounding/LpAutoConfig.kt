@@ -226,8 +226,8 @@ object LpAutoConfig {
         // pure cost guards on solve time, the bound is sound either way). `tableauCells` is a size proxy,
         // not a literal allocation. The base cap bounds the hull budget of a small base relaxation; the
         // ceiling is the absolute size past which LP is declined.
-        val baseCap = KlauseConfig.current.lpMaxTableauCells
-        val ceilingCap = KlauseConfig.current.lpCeilingTableauCells
+        val baseCap = problem.settings.lpMaxTableauCells
+        val ceilingCap = problem.settings.lpCeilingTableauCells
         val cells = tableauCells(rows, baseCols)
 
         val cutEligible = allDifferent || globalCardinality

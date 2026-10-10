@@ -140,6 +140,7 @@ internal fun ComponentPlan.booleanSkeleton(
     val touched = BooleanArray(source.numBoolVars)
     for (clause in clauses) for (v in clause.variables.boolVars) touched[v] = true
     val skeleton = Problem(
+        settings = source.settings,
         numBoolVars = source.numBoolVars,
         numIntVars = 0,
         intDomains = emptyArray(),

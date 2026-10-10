@@ -13,6 +13,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.values
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
@@ -94,7 +95,7 @@ internal fun splitCondition(text: String): Pair<String, String> {
 
 /** Compiler for the supported XCSP3 integer subset. */
 internal object Compiler {
-    internal class Builder : CnfLowering {
+    internal class Builder(private val settings: ProblemSettings = ProblemSettings()) : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
         internal val domains = ArrayList<IntDomain>()
@@ -219,7 +220,7 @@ internal object Compiler {
             domains.add(dom)
         }
         internal fun newAuxVar(lo: Long, hi: Long): Int {
-            domains.add(IntDomain(lo, hi))
+            domains.add(IntDomain(lo, hi, settings.storage))
             return domains.size - 1
         }
         override fun newBool(): Int = nextBool++
@@ -281,7 +282,7 @@ internal object Compiler {
                 if (b > prevEnd) prevEnd = b
                 if (b > hi) hi = b
             }
-            val dom = IntDomain(lo, hi)
+            val dom = IntDomain(lo, hi, settings.storage)
             return if (holes.isEmpty()) {
                 dom
             } else {
@@ -1263,6 +1264,7 @@ internal object Compiler {
 
         fun build(): Xcsp3Problem = Xcsp3Problem(
             Problem(
+                settings = settings,
                 numBoolVars = nextBool,
                 numIntVars = domains.size,
                 intDomains = domains.toTypedArray(),

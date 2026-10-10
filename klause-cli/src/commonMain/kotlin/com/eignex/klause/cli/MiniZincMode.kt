@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import com.eignex.klause.simplex.exact.BigFraction
@@ -67,7 +66,7 @@ internal object MiniZincMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             // The ambient config was installed once in `main`. Unbounded `var int` resolution:
             // CLI flag → KlauseConfig → built-in default.
-            val config = KlauseConfig.current
+            val config = common.config
             // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
             // whole source is never held as one String. Parsing only reads; the base bake runs as
             // presolve step 0, bounded by the presolve deadline.
@@ -75,6 +74,7 @@ internal object MiniZincMode : CliMode {
             val floatHi = unboundedFloatHi ?: config.unboundedFloatHi
             if (!common.exact && floatLo > floatHi) usageError("unbounded float lower bound exceeds upper bound")
             val executionProgram = parseFlatZincExecution(
+                settings = config.problemSettings(),
                 source = openFileSource(path),
                 floatBuckets = config.floatBuckets,
                 floatScale = config.floatScale,

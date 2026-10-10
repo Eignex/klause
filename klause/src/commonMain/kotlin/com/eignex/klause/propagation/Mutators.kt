@@ -607,7 +607,7 @@ internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: LongArra
     val oldMin = d.min
     val oldMax = d.max
     if (undoLogging) logIntChange(v) // one record restores the full prior domain + bound atoms
-    val newDomain = intDomainFromSurvivors(filtered)
+    val newDomain = intDomainFromSurvivors(filtered, problem.settings.storage)
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     var kindMask = IntEvent.VALUE_REMOVED_BIT

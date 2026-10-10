@@ -1,6 +1,5 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
@@ -159,7 +158,7 @@ object PresolvePipeline {
         // relaxation straight from the declared domains (no bake fixpoint) and certifies infeasibility via
         // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
         // bake would reach. Gated on span so small models never pay the LP.
-        val wideSpan = Presolve.maxIntSpan(sourceProblem) > KlauseConfig.current.largeSpanThreshold
+        val wideSpan = Presolve.maxIntSpan(sourceProblem) > sourceProblem.settings.largeSpanThreshold
         val rootInfeasible = if (!prepared.infeasible && wideSpan) {
             lpRootInfeasibleReporting(
                 sourceProblem,
