@@ -27,6 +27,7 @@ This tree is the internal implementation contract and developer workflow referen
 | [LP capture and replay](lp/replay.md) | Basis traces and retained/fresh consumer diagnostics |
 | [Fixture provenance](testing/fixtures.md) | Committed test and benchmark data, identities and licenses |
 | [Diagnostic tools](testing/tools.md) | Reusable opt-in probes and profiling |
+| [External campaign evidence](testing/campaign-evidence.md) | CI checking of externally staged measurements |
 
 Architecture contracts constrain implementation: preserve their dependency,
 authority, soundness and lifecycle rules when changing code. A deliberate contract
