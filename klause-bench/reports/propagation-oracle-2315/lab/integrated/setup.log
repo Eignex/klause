@@ -1,9 +1,0 @@
-$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
-From https://github.com/Eignex/klause
- + bf4bf5ca9...86d21c846 codex/arms-414-report -> codex/arms-414-report  (forced update)
- + 6ffbf294b...20112548b codex/rational-normalization-evidence -> codex/rational-normalization-evidence  (forced update)
-[i-01c55c8fab6386e87] 27d604ee5 is not cached: building
-WARNING: Using incubator modules: jdk.incubator.vector
-2bd62ece7 is not cached: building
-WARNING: Using incubator modules: jdk.incubator.vector
-

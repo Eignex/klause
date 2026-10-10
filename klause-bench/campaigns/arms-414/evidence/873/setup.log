@@ -1,6 +1,0 @@
-$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
-From https://github.com/Eignex/klause
-   5ad3707c0..8418dfd66  codex/presolve-554-controls -> codex/presolve-554-controls
-[i-0c7667217aa8a29b6] 52193ef90 is not cached: building
-WARNING: Using incubator modules: jdk.incubator.vector
-

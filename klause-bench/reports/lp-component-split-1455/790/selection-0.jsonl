@@ -1,3 +1,0 @@
-{"suite":"lp-component-split","problem":"mzn-dense-2x12","collection":"klause-bench/smoke-corpus/lp-component-split","family":"mzn-dense-2x12","format":"MINIZINC","category":"CSP"}
-{"suite":"lp-component-split","problem":"mzn-dense-8x24","collection":"klause-bench/smoke-corpus/lp-component-split","family":"mzn-dense-8x24","format":"MINIZINC","category":"CSP"}
-{"suite":"lp-component-split","problem":"mzn-linked-8x24","collection":"klause-bench/smoke-corpus/lp-component-split","family":"mzn-linked-8x24","format":"MINIZINC","category":"CSP"}
