@@ -96,7 +96,8 @@ class CompilerTest {
         val definition = SchemaDef<SchemaEntry>(
             mapOf(
                 "budget" to IntSpec(0, 4),
-                "floor" to NamedConstraint(IntCompare(IntRef("budget"), IntCmpOp.GE, IntLit(1))),
+                "peer" to IntSpec(0, 4),
+                "floor" to NamedConstraint(IntCompare(IntRef("budget"), IntCmpOp.GE, IntRef("peer"))),
             ),
         )
         val low = definition.compile(KlauseConfig.DEFAULT.copy(largeSpanThreshold = 0))
