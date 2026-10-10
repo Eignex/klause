@@ -47,8 +47,10 @@ class PortfolioPlanTest {
         )
 
         for (explicit in scenarios) assertTrue(continuousLpShares(explicit, profile, labels, objective).isEmpty())
-        assertTrue(continuousLpShares(scenario, profile.copy(problemClass = ProblemClass.FiniteCp), labels, objective).isEmpty())
-        assertTrue(continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/conflictDriven"), objective).isEmpty())
+        assertTrue(continuousLpShares(scenario,
+            profile.copy(problemClass = ProblemClass.FiniteCp), labels, objective).isEmpty())
+        assertTrue(continuousLpShares(scenario, profile,
+            listOf("bt/satOptimized", "bt/conflictDriven"), objective).isEmpty())
     }
 
     @Test
