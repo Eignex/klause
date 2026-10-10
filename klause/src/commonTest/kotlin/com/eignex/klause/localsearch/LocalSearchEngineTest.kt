@@ -2,10 +2,12 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -23,6 +25,80 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+
+    @Test
+    fun `satisfaction resumes initial scoring without repeating completed factors`() {
+        var expired = false
+        val initialized = IntArray(513)
+        val factors = Array<Factor>(initialized.size) { id ->
+            val clause = Clause(
+                if (id == initialized.lastIndex) intArrayOf(Lit.make(0, true)) else
+                    intArrayOf(Lit.make(0, true), Lit.make(0, false)),
+            )
+            val invariant = clause.invariantProjection()
+            object : Factor by clause, Invariant by invariant {
+                override fun initialize(state: LocalSearchState, factorId: Int) {
+                    invariant.initialize(state, factorId)
+                    initialized[factorId]++
+                    if (factorId == 255) expired = true
+                }
+            }
+        }
+        val problem = Problem(1, 0, emptyArray(), factors)
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+        val warm = WarmState()
+        val params = LocalSearchParams(maxFlips = 2L, initialAssignment = Sample(booleanArrayOf(false), LongArray(0)))
+
+        search.resumableSolve(params, warm).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L))
+            assertEquals(256, initialized.sum())
+            assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            expired = false
+
+            val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+
+            assertTrue(result.assignment.boolValue(0))
+            assertTrue(initialized.all { it == 1 })
+        }
+    }
+
+    @Test
+    fun `optimization does not publish a partially scored assignment`() {
+        var expired = false
+        val initialized = IntArray(513)
+        val factors = Array<Factor>(initialized.size) { id ->
+            val clause = Clause(
+                if (id == initialized.lastIndex) intArrayOf() else
+                    intArrayOf(Lit.make(0, true), Lit.make(0, false)),
+            )
+            val invariant = clause.invariantProjection()
+            object : Factor by clause, Invariant by invariant {
+                override fun initialize(state: LocalSearchState, factorId: Int) {
+                    invariant.initialize(state, factorId)
+                    initialized[factorId]++
+                    if (factorId == 255) expired = true
+                }
+            }
+        }
+        val problem = Problem(1, 0, emptyArray(), factors)
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+        val found = mutableListOf<Sample>()
+
+        search.resumable(LinearObjective(boolWeights = longArrayOf(1)), LocalSearchParams(maxFlips = 1L)).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) { found += it.sample })
+            assertEquals(256, initialized.sum())
+            assertTrue(found.isEmpty())
+            expired = false
+
+            val result = assertIs<MinimizeResult.Unknown>(
+                handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { found += it.sample },
+            )
+
+            assertTrue(found.isEmpty())
+            assertEquals(1.0, result.stats.ls.incumbentViolation)
+        }
+    }
 
     // x + k = 2.5 and x ≤ 1 over a continuous x in [0, 10] and an integer k in [0, 5]: k ≥ 2 and x = 2.5 - k.
     private fun mixedProblem(): Problem = Problem(

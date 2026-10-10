@@ -100,8 +100,13 @@ Sessions that decline resumable optimization retain their one-shot improvement s
 The immutable local-search projection is initialized lazily and reused across draws.
 Mixed-pool arms over the same model share it, including ALNS's inner local search.
 Objective-bound overlays keep their own projections. Assignments, RNGs, weights and
-invariant payloads belong to each live state. Projection construction, seeding,
-factor calls and repair searches remain atomic work that can overrun a segment.
+invariant payloads belong to each live state. Resumable handles initialize large
+factor sets in batches, retaining the next factor and completed payloads when a
+slice expires. Partial costs, samples and warm state remain private until every
+factor has been scored. Initial scoring preserves factor order and does not charge
+search moves. Projection construction, assignment seeding, individual factor calls,
+custom restart policies, subsequent restarts and repair searches remain atomic work
+that can overrun a segment.
 Greedy initialization polls cancellation between variables and retains only completed
 coordinate repairs. Its tabu/activity epoch resets on both completion and cancellation;
 one variable's bounded value probes remain atomic.

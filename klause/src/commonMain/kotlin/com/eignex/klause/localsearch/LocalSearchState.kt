@@ -303,6 +303,10 @@ class LocalSearchState(
     fun recompute() {
         clearViolationState()
         initializeFactors()
+        finishRecompute()
+    }
+
+    internal fun finishRecompute() {
         // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
         if (boolScoresInitialized) addAllBreakMake()
         if (cost < bestCostSeen) bestCostSeen = cost
@@ -310,7 +314,7 @@ class LocalSearchState(
 
     // The passes of [recompute] are separate methods: each loops over every factor or variable, and one body
     // holding them all is compiled again on-stack for each loop it enters.
-    private fun clearViolationState() {
+    internal fun clearViolationState() {
         for (i in 0 until problem.numFactors) violated.remove(i)
         cost = 0L
         for (v in cachedBoolBreakCount.indices) {
@@ -319,8 +323,9 @@ class LocalSearchState(
         }
     }
 
-    private fun initializeFactors() {
-        factors.forEachIndexed { id, factor ->
+    internal fun initializeFactors(from: Int = 0, end: Int = problem.numFactors) {
+        for (id in from until end) {
+            val factor = factors[id]
             factor.initialize(this, id)
             val deg = factor.violationDegree(this, id)
             factorDegree[id] = deg
