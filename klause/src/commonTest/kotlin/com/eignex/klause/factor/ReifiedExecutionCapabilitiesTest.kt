@@ -78,7 +78,11 @@ class ReifiedExecutionCapabilitiesTest {
                 val model = relaxation.model
                 assertTrue(model.m > 0, "$family/$index: reification rows must be exercised")
                 assertTrue(relaxation.colVarId.all { it >= 0 }, "$family/$index: source-backed columns")
-                for (sample in FactorPropagationOracle.sourceAssignments(problem).filter { degree(it) == 0 }) {
+                val witnesses = FactorPropagationOracle.sourceAssignments(problem).filter { degree(it) == 0 }.toList()
+                val aux = if (problem.numBoolVars == 1) 0 else 2
+                assertTrue(witnesses.any { it.bools[aux] }, "$family/$index: true witnesses")
+                assertTrue(witnesses.any { !it.bools[aux] }, "$family/$index: false witnesses")
+                for (sample in witnesses) {
                     val point = LongArray(model.n) { col ->
                         val v = relaxation.colVarId[col]
                         val value = if (relaxation.colIsBool[col]) {
@@ -123,13 +127,13 @@ class ReifiedExecutionCapabilitiesTest {
         }
 
     private fun pseudoBooleanCases(): List<Pair<Problem, (Sample) -> Int>> = PbOp.entries.map { op ->
-        val factor = ReifiedPseudoBoolean(2, longArrayOf(2, 3, 1), signedLiterals(), op, 2)
+        val factor = ReifiedPseudoBoolean(2, longArrayOf(2, 3, 1), signedLiterals(), op, 3)
         Problem(3, 0, emptyArray(), arrayOf<Factor>(factor)) to { s: Sample ->
             val sum = (if (s.bools[0]) 3 else 0) + if (!s.bools[1]) 3 else 0
             val residual = when (op) {
-                PbOp.LE -> maxOf(0, sum - 2)
-                PbOp.GE -> maxOf(0, 2 - sum)
-                PbOp.EQ -> abs(sum - 2)
+                PbOp.LE -> maxOf(0, sum - 3)
+                PbOp.GE -> maxOf(0, 3 - sum)
+                PbOp.EQ -> abs(sum - 3)
             }
             if (s.bools[2]) residual else if (residual == 0) 1 else 0
         }
