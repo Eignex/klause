@@ -418,6 +418,10 @@ private fun Compiler.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean
  * enters the reified equality. Past 64 bits the quantity is digit columns wide enough for either branch.
  */
 private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
+    if (trueLitCache >= 0) {
+        if (cond == trueLitCache) return Res.I(a)
+        if (cond == Lit.negate(trueLitCache)) return Res.I(b)
+    }
     if (a is IntComb.Narrow && b is IntComb.Narrow) {
         // A chain of equality tests on one selector defines the same quantity, and defers its lowering
         // until the chain's extent is known.
