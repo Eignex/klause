@@ -136,7 +136,7 @@ already selected by lab status sweep 845; only identities were used for selectio
 This is an existing regression corpus with reference coverage, not an unbiased
 sample of the complete challenge archive. Selection uses SHA-256 order with the
 `presolve-554/` prefix, and the holdout excludes every pilot base family.
-Remaining families are reserved. Holdout is therefore independent by base family
+Remaining families are reserved. Holdout is disjoint by catalog base family
 as well as by input; it cannot estimate within-family instance generalization.
 These campaign sets are separate from the curated thematic `sweep` set.
 
