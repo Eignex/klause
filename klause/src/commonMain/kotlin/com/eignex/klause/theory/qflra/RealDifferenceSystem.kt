@@ -13,7 +13,6 @@ import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
@@ -32,12 +31,7 @@ internal class RealDifferenceSystem private constructor(
         }
         return when (val result = graph.potentials(active, stop::invoke)) {
             Potentials.Abandoned -> Result.Interrupted
-            Potentials.Infeasible -> {
-                val cycle = graph.negativeCycle(active, stop::invoke) ?: return Result.Interrupted
-                if (stop()) return Result.Interrupted
-                Result.Conflict(SearchExplanation(cycle.map { guards[it] }.filter { it != ALWAYS }
-                    .distinct().map(Lit::negate).toIntArray()))
-            }
+            Potentials.Infeasible -> if (stop()) Result.Interrupted else Result.Infeasible
             is Potentials.Found -> {
                 if (stop()) return Result.Interrupted
                 val zero = result.values.last()
@@ -52,7 +46,7 @@ internal class RealDifferenceSystem private constructor(
         class Feasible(point: () -> List<BigFraction>) : Result {
             val point by lazy(point)
         }
-        class Conflict(val explanation: SearchExplanation) : Result
+        data object Infeasible : Result
         data object Interrupted : Result
     }
 

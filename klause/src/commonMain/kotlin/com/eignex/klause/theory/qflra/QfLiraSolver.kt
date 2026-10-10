@@ -549,17 +549,16 @@ class ExactLiraSearchComponent(
         ) {
             return ComponentResult.Consistent
         }
+        var checked = false
         // Graph evidence has no LP certifier identity to offer an overridden acceptance policy.
         if (node.sourceBranches.isEmpty() && solveContext.certificationPolicy === ProductionLpCertificationPolicy) {
             realDifference?.let { graph ->
                 if (!context.consumeCheck()) return ComponentResult.Indeterminate
+                checked = true
                 when (val result = graph.check(bools, operationStop)) {
                     RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
-                    is RealDifferenceSystem.Result.Conflict -> {
-                        smtStats?.observeConflict(result.explanation)
-                        outcome = ComponentCheck.Infeasible(result.explanation)
-                        return ComponentResult.Conflict(result.explanation)
-                    }
+                    // Shared LP explanations keep conflict learning on the same source proof surface.
+                    RealDifferenceSystem.Result.Infeasible -> Unit
                     is RealDifferenceSystem.Result.Feasible -> {
                         dirty = false
                         if (bools.none { it == UNASSIGNED }) {
@@ -578,7 +577,7 @@ class ExactLiraSearchComponent(
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
-        if (!context.consumeCheck()) return ComponentResult.Indeterminate
+        if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve(sparsePointRecovery = true)
             ?: return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate
