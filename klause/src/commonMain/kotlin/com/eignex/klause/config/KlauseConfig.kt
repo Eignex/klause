@@ -121,7 +121,8 @@ data class KlauseConfig(
 
     /** Integer-domain span above which the span-gated LP presolve steps engage (see
      *  [DEFAULT_LARGE_SPAN_THRESHOLD]). A pure cost gate — below it, presolve/solve behaviour is
-     *  unchanged; above it, the LP feasibility / bound-tightening runs ahead of the O(span) root bake. */
+     *  unchanged; coupled columns above it use LP feasibility / bound tightening ahead of the O(span)
+     *  root bake. Wide columns coupled to continuous columns also use that LP preparation. */
     val largeSpanThreshold: Long = DEFAULT_LARGE_SPAN_THRESHOLD,
 
     /** Number of uniformly-spaced buckets a `floatVar` is discretised into when no explicit
