@@ -25,6 +25,18 @@ class DenseBasisFactorsTest {
     }
 
     @Test
+    fun `singleton bases retain sparse construction below the dimension limit`() {
+        for (n in 1..6) {
+            val source = ftSource("unit", n)
+            KotlinBasisSolver(source).use { solver ->
+                assertTrue(solver.refactorize(IntArray(n) { n - 1 - it }))
+
+                assertEquals(0L, assertNotNull(solver.basisWork.build).denseAttempts)
+            }
+        }
+    }
+
+    @Test
     fun `density boundary ignores explicit zeros in selected columns`() {
         for (entries in listOf(17, 18, 19)) {
             val source = SparseMatrix.ofColumns(6, 6, List(6) { j ->
@@ -66,14 +78,7 @@ class DenseBasisFactorsTest {
                     val solution = IndexedVector(6).also { it.scatter(rhs) }
                     if (transpose) solver.btran(solution) else solver.ftran(solution)
 
-                    for (i in 0 until 6) {
-                        var product = 0.0
-                        for (j in 0 until 6) {
-                            product += if (transpose) source[j, headings[i]] * solution[j]
-                            else source[i, headings[j]] * solution[j]
-                        }
-                        assertEquals(rhs[i], product, 1e-10)
-                    }
+                    assertTrue(ftResidual(source, headings, rhs, solution, transpose) < 1e-12)
                     assertTrue(solver.solveQuality(rhs, solution, transpose).relativeResidual < 1e-12)
                 }
             }

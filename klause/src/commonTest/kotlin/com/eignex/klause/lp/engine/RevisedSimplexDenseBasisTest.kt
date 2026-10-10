@@ -66,7 +66,9 @@ class RevisedSimplexDenseBasisTest {
                 }
             }
         }).use { solver ->
-            val warm = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED))
+            val warm = Basis(
+                intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
+            )
             val result = solver.solve(warm)
             val certified = certifyLpResult(model, solver, result, cancellation = token)
 
