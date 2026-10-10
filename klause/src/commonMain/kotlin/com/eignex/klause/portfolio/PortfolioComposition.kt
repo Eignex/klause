@@ -349,7 +349,7 @@ internal object PortfolioComposition {
         facts: ProblemFacts,
         arms: List<WorkerConfig>,
     ): BacktrackWorkerConfig? {
-        if (!LpConfig.DEFAULT.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return null
+        if (!LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return null
         if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
             scenario.lsPool != null || scenario.btPool != null || !facts.profile.realColumns ||
             arms.any { it.label == "lp-default" }
