@@ -2,6 +2,8 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
@@ -64,6 +66,7 @@ internal fun continuousLpShares(
     profile: ProblemProfile,
     labels: List<String>,
 ): DoubleArray {
+    if (!LpConfig.DEFAULT.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return DoubleArray(0)
     if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.engine != EngineMix.MIXED ||
         !profile.realColumns || scenario.btPool != null || scenario.lsPool != null
     ) return DoubleArray(0)

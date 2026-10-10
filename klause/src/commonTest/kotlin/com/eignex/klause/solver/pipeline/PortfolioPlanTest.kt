@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
@@ -37,6 +38,8 @@ class PortfolioPlanTest {
             scenario.copy(cores = 2),
             scenario.copy(kind = Kind.CSP),
             scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(lpCeiling = LpConfig.OFF),
+            scenario.copy(lpCeiling = LpConfig.DEFAULT.copy(overrides = mapOf(LpTechnique.BOUNDING to false))),
             scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") }),
         )
 
