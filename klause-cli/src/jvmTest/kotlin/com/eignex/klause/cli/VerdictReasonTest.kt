@@ -56,7 +56,12 @@ class VerdictReasonTest {
 
     @Test
     fun `SMT interrupted incumbents retain their objective without an optimum claim`() {
-        for (reason in listOf(TerminationReason.Timeout, TerminationReason.BudgetExhausted, TerminationReason.Cancelled)) {
+        val reasons = listOf(
+            TerminationReason.Timeout,
+            TerminationReason.BudgetExhausted,
+            TerminationReason.Cancelled,
+        )
+        for (reason in reasons) {
             val out = capture {
                 SmtLibOutput().apply {
                     begin(optimize = true, maximize = false)
