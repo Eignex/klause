@@ -235,6 +235,9 @@ samples retained by custom restart policies remain independent of subsequent upd
 Optional local-search residual reporting observes committed assignments at loop and
 publication boundaries. Strict cost improvements retain a fresh per-kind sum of the
 maintained factor degrees, paired with their exact total. Probes are not observed.
+Reified linear categories partition their total by comparison operator and input
+shape: one input bounded to 0..1 (`binary`), another single input (`unary`), or
+multiple inputs (`multi`). Binary input bounds do not establish channel semantics.
 Worker aggregation selects one whole observation at the lowest total; it never adds
 breakdowns from different assignments. A zero residual does not establish domain,
 completion or source feasibility, and the observation does not replace an incumbent.

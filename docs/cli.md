@@ -138,8 +138,11 @@ Solver-control flags are common to **every** mode:
     default `false`). Residual reporting observes ordinary LS arms without changing
     their recipes; ALNS bootstrap is excluded. Under `-s`, `lsBestResidualViolation`
     and `lsBestResidual.<factor-kind>` describe one best committed assignment's graded
-    violations. These diagnostics do not claim a feasible witness; collecting them
-    adds scans at strict improvements and should be separated from acceptance timing.
+    violations. Reified rows use `ReifiedLinear.<op>.<shape>`, with `binary` for one
+    input bounded to 0..1, `unary` for another single input and `multi` for multiple
+    inputs. The categories partition the total. These diagnostics do not claim a
+    feasible witness; collecting them adds scans at strict improvements and should
+    be separated from acceptance timing.
   - presolve effort (any engine): `presolve-abort-fraction` (finite number in `[0,1]`, default `0.001`),
     `presolve-max-rounds` (nonnegative, default `1` for conservative, `16` for default/aggressive),
     `presolve-probe-per-var` and `presolve-probe-total` (nonnegative propagation-call caps;
