@@ -9,6 +9,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SampleResult
 
 /**
  * A scoped local-search session retaining learned factor weights across fresh searches.
@@ -36,6 +37,17 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : StatelessSess
 
     internal val warmState: WarmState get() = warm
     internal val warmStateView: WarmState get() = warm
+
+    override fun solve(params: LocalSearchParams): SolveResult = super.solve(params)
+    override fun sample(params: LocalSearchParams): SampleResult = super.sample(params)
+    override fun samples(params: LocalSearchParams): Sequence<Sample> = super.samples(params)
+    override fun samples(config: SamplingConfig, params: LocalSearchParams): Sequence<Sample> =
+        super.samples(config, params)
+    override fun enumerate(params: LocalSearchParams): Sequence<Sample> = super.enumerate(params)
+    override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
+        super.minimize(objective, params)
+    override fun improvements(objective: LinearObjective, params: LocalSearchParams): Sequence<MinimizeResult> =
+        super.improvements(objective, params)
 
     override fun resumableSolve(params: LocalSearchParams): ResumableSolve = checkNotNull(super.resumableSolve(params))
 
