@@ -400,6 +400,7 @@ class LocalSearchState(
         val affected = net.affectedNodes(ints.toIntArray(), bools.toIntArray())
         for (idx in affected) {
             val n = net.node(idx)
+            if (if (n.outIsBool) assumptions.isFrozenBool(n.out) else assumptions.isFrozenInt(n.out)) continue
             val v = n.eval(assignment, rootDomains)
             if (v == DefinitionalSweep.SweepNode.NO_WRITE) continue
             if (n.outIsBool) {

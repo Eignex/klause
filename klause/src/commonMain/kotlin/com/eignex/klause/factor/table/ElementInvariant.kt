@@ -86,14 +86,14 @@ internal class ElementInvariant(
             }
         } else {
             val target = idxDom.clamp(
-                if (idxVal < indexOffset) indexOffset.toLong() else (indexOffset + len - 1).toLong(),
+                if (idxVal < indexOffset) indexOffset.toLong() else indexOffset.toLong() + len - 1L,
             )
             if (target in idxDom && target != idxVal) sink.addElementIndexSet(state, idx, target)
         }
         for (p in 0 until len) {
             val evp = if (arrIsVars) state.assignment.intValue(arr[p].toInt()) else arr[p]
             if (evp == resultVal) {
-                val cand = (p + indexOffset).toLong()
+                val cand = indexOffset.toLong() + p
                 if (cand != idxVal && cand in idxDom) {
                     if (sink.addElementIndexSet(state, idx, cand)) break
                 }

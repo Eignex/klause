@@ -43,11 +43,8 @@ internal class InversePropagator(
 
     override val consumesIntEventDelta: Boolean = true
 
-    // The Hall violators of a failed matching on either side, read by [conflictReason] before the engine backtracks.
-    private var hallFailure: IntArray? = null
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        hallFailure?.let { hallReason(state, it, EmptyIntArray) }
+        state.propagatorFailures[this]?.let { hallReason(state, it, EmptyIntArray) }
             ?: collectHoleAndBoundAntecedents(
                 state,
                 (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars,
@@ -64,7 +61,7 @@ internal class InversePropagator(
             fresh
         }
         cache.conflictVars = null
-        hallFailure = null
+        state.propagatorFailures.remove(this)
         val full = !cache.initialized
         val fDirty = BooleanArray(f.size)
         val gDirty = BooleanArray(g.size)
@@ -176,12 +173,12 @@ internal class InversePropagator(
         }
         val fHall = reginFilter(state, f, NO_EXCEPT, cache.fRegin, tag = 0)
         if (fHall != null) {
-            hallFailure = fHall
+            state.propagatorFailures[this] = fHall
             return false
         }
         val gHall = reginFilter(state, g, NO_EXCEPT, cache.gRegin, tag = 1)
         if (gHall != null) {
-            hallFailure = gHall
+            state.propagatorFailures[this] = gHall
             return false
         }
         cache.initialized = true

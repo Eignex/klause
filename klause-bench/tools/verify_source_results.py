@@ -1,9 +1,10 @@
-"""Independently check reported source verdicts and finite optimum claims with exact arithmetic."""
+"""Check source verdicts, exact proofs and MPS tolerance witnesses with original source arithmetic."""
 
 import fractions
 import hashlib
 import io
 import json
+import math
 import pathlib
 import re
 import tarfile
@@ -94,7 +95,7 @@ def rational(value):
     return z3.RealVal(f"{value.numerator}/{value.denominator}")
 
 
-def mps(text):
+def mps(text, tolerance=False):
     section, objective_row, maximize, marker = None, None, False, False
     rows, coefficients, rhs, ranges, lower, upper, indicators = {}, {}, {}, {}, {}, {}, {}
     columns, integer = set(), set()
@@ -126,6 +127,7 @@ def mps(text):
                 marker = "'INTORG'" in parts
                 continue
             column = parts[0]
+            assert len(parts) >= 3 and len(parts) % 2 == 1, "invalid MPS column"
             columns.add(column)
             if marker:
                 integer.add(column)
@@ -152,7 +154,7 @@ def mps(text):
                 lower[column] = value
             elif kind in ("UP", "UI"):
                 upper[column] = value
-                if fractions.Fraction(value) < 0 and column not in lower:
+                if fractions.Fraction(value.replace('D', 'E')) < 0 and column not in lower:
                     lower[column] = None
             elif kind == "FX":
                 lower[column] = upper[column] = value
@@ -174,32 +176,51 @@ def mps(text):
             indicators[parts[1]] = (parts[2], parts[3])
         else:
             raise ValueError(f"unsupported MPS data section {section}")
+    assert all(row in rows for row in coefficients), "unknown MPS row"
     variables = {column: (z3.Int(column) if column in integer else z3.Real(column)) for column in columns}
+    def slack(bound, magnitude=0):
+        if not tolerance:
+            return 0
+        scale = rational(max(fractions.Fraction(1), abs(fractions.Fraction(str(bound).replace('D', 'E')))))
+        return rational('1e-7') * z3.If(magnitude > scale, magnitude, scale)
+
     constraints = []
     for column, variable in variables.items():
         lo, hi = lower.get(column, "0"), upper.get(column)
         if column in integer and column not in lower and column not in upper:
             hi = "1"
         if lo is not None:
-            constraints.append(variable >= rational(lo))
+            constraints.append(variable >= rational(lo) - slack(lo))
         if hi is not None:
-            constraints.append(variable <= rational(hi))
-    activities = {row: z3.Sum([rational(value) * variables[column] for column, value in terms])
-                  for row, terms in coefficients.items()}
+            constraints.append(variable <= rational(hi) + slack(hi))
+    terms_by_row = {}
+    for row, entries in coefficients.items():
+        summed = {}
+        for column, value in entries:
+            summed[column] = summed.get(column, 0) + fractions.Fraction(value.replace('D', 'E'))
+        terms_by_row[row] = [rational(value) * variables[column] for column, value in summed.items()]
+    activities = {row: z3.Sum(terms) for row, terms in terms_by_row.items()}
     for row, kind in rows.items():
         if kind == "N":
             continue
         activity, bound = activities.get(row, z3.RealVal(0)), rational(rhs.get(row, "0"))
-        span = fractions.Fraction(ranges[row]) if row in ranges else None
+        span = fractions.Fraction(ranges[row].replace('D', 'E')) if row in ranges else None
+        magnitude = z3.Sum([z3.Abs(term) for term in terms_by_row.get(row, [])])
         assertions = []
+        def above(side):
+            return activity >= side - slack(z3.simplify(side), magnitude)
+
+        def below(side):
+            return activity <= side + slack(z3.simplify(side), magnitude)
+
         if kind in ("E", "G"):
-            assertions.append(activity >= bound + (rational(span) if kind == "E" and span is not None and span < 0 else 0))
+            assertions.append(above(bound + (rational(span) if kind == "E" and span is not None and span < 0 else 0)))
         if kind in ("E", "L"):
-            assertions.append(activity <= bound + (rational(span) if kind == "E" and span is not None and span > 0 else 0))
+            assertions.append(below(bound + (rational(span) if kind == "E" and span is not None and span > 0 else 0)))
         if span is not None and kind == "L":
-            assertions.append(activity >= bound - rational(abs(span)))
+            assertions.append(above(bound - rational(abs(span))))
         if span is not None and kind == "G":
-            assertions.append(activity <= bound + rational(abs(span)))
+            assertions.append(below(bound + rational(abs(span))))
         for assertion in assertions:
             if row in indicators:
                 column, value = indicators[row]
@@ -207,6 +228,53 @@ def mps(text):
             constraints.append(assertion)
     objective = activities.get(objective_row, z3.RealVal(0)) - rational(rhs.get(objective_row, "0"))
     return constraints, -objective if maximize else objective, variables, maximize
+
+
+def mps_values(witness, variables):
+    tokens = witness.split()
+    assert tokens and tokens[0] == 'v', "invalid MPS witness"
+    values = {}
+    for token in tokens[1:]:
+        assert token.count('=') == 1, "invalid MPS coordinate"
+        name, value = token.split('=')
+        assert name in variables and name not in values, "unknown or duplicate MPS coordinate"
+        assert re.fullmatch(r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|[+-]?\d+/\d+', value), "invalid MPS value"
+        value = fractions.Fraction(value)
+        assert not z3.is_int(variables[name]) or value.denominator == 1, "fractional integer MPS coordinate"
+        values[name] = value
+    assert values.keys() == variables.keys(), "incomplete MPS witness"
+    return values
+
+
+def mps_point(expression, variables, values):
+    return z3.simplify(z3.substitute(expression, *[(variable, z3.IntVal(values[name].numerator) if z3.is_int(variable)
+                                                 else rational(values[name]))
+                                                for name, variable in variables.items()]))
+
+
+def mps_objective_matches(objective, variables, values, reported, exact_mode, exact_objective, witness):
+    candidates = [mps_point(objective, variables, values)]
+    if not exact_mode and '/' not in witness:
+        try:
+            # Float witnesses render shortest decimals; their objective uses the binary64 values they encode.
+            binary_values = {name: value if z3.is_int(variables[name]) else fractions.Fraction.from_float(float(value))
+                             for name, value in values.items()}
+            candidates.append(mps_point(objective, variables, binary_values))
+        except (OverflowError, ValueError):
+            pass
+    value = rational(reported)
+    for candidate in candidates:
+        if z3.is_true(z3.simplify(candidate == value)):
+            return True
+        if not exact_mode and not exact_objective:
+            try:
+                expected = float(fractions.Fraction(str(candidate)))
+                actual = float(reported)
+                if math.isfinite(expected) and math.isfinite(actual) and expected == actual:
+                    return True
+            except (OverflowError, ValueError):
+                pass
+    return False
 
 
 def source(case, archive):
@@ -289,21 +357,24 @@ def check(cases):
                         assert solver.check() == z3.unsat, "model objective differs from reported objective"
                     solver.pop()
                     result["witness"] = "exact source feasible"
-                if witness and not is_smt:
-                    assert witness.startswith("v ")
-                    values = dict(token.split("=", 1) for token in witness[2:].split())
-                    assert values.keys() == variables.keys()
-                    solver.push()
-                    solver.add(*(variable == rational(values[name]) for name, variable in variables.items()))
-                    status = solver.check()
-                    if status == z3.sat and reported_objective is not None:
-                        value = rational(reported_objective)
-                        solver.add(objective != (-value if maximize else value))
-                        assert solver.check() == z3.unsat, "point objective differs from reported objective"
-                    solver.pop()
-                    result["witness"] = "exact source feasible" if status == z3.sat else "not exact source feasible"
-                    if case["arm"].endswith("-exact"):
-                        assert status == z3.sat, record["problem"]
+                if witness is not None and not is_smt:
+                    values = mps_values(witness, variables)
+                    exact_mode = case["arm"].endswith("-exact")
+                    exact_feasible = all(z3.is_true(mps_point(row, variables, values)) for row in constraints)
+                    result["witness"] = "exact source feasible" if exact_feasible else "not exact source feasible"
+                    if reported_objective is not None:
+                        assert mps_objective_matches(-objective if maximize else objective, variables, values,
+                                                     reported_objective, exact_mode,
+                                                     record.get("exactObjective") is not None,
+                                                     witness), "point objective differs from reported objective"
+                        result["objectiveCheck"] = "source point objective matches"
+                    if exact_mode:
+                        assert exact_feasible, record["problem"]
+                    else:
+                        tolerance_rows, _, _, _ = mps(text, tolerance=True)
+                        accepted = all(z3.is_true(mps_point(row, variables, values)) for row in tolerance_rows)
+                        result["toleranceAccepted"] = accepted
+                        assert accepted, "MPS point exceeds source tolerance"
                 if record["proven"] and record["kind"] == "optimize":
                     assert reported_objective is not None and objective is not None
                     value = rational(reported_objective)

@@ -38,11 +38,8 @@ internal class ValuePrecedePropagator(
 
     override val consumesIntEventDelta: Boolean = true
 
-    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
-    private var failure: IntArray? = null
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        failure ?: collectHoleAndBoundAntecedents(state, xs)
+        state.propagatorFailures[this] ?: collectHoleAndBoundAntecedents(state, xs)
 
     // A t at position payload(0) would precede every s: s had left each earlier position.
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
@@ -73,7 +70,7 @@ internal class ValuePrecedePropagator(
             state.refPayload[factorId] = fresh
             fresh
         }
-        failure = null
+        state.propagatorFailures.remove(this)
         val dirty = state.drainIntEventDirtyVars(factorId)
         if (st.started && dirty.isEmpty()) return true
         fun noT(j: Int): IntArray? = when {
@@ -88,7 +85,7 @@ internal class ValuePrecedePropagator(
         for (j in st.prunedUpTo.value..upTo) {
             val v = xs[j]
             if (t in state.intDomains[v] && !state.excludeIntValue(v, t, noT(j))) {
-                failure = sBefore(state, j, -1, state.undo.size).toIntArray() +
+                state.propagatorFailures[this] = sBefore(state, j, -1, state.undo.size).toIntArray() +
                     (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
                 return false
             }
@@ -115,7 +112,8 @@ internal class ValuePrecedePropagator(
             // A t at position firstForcedT needs an s before it.
             val pinnedT = Lit.make(state.atomVarEq(xs[firstForcedT], t), false)
             if (count == 0) {
-                failure = sBefore(state, firstForcedT, -1, state.undo.size).also { it.add(pinnedT) }.toIntArray()
+                state.propagatorFailures[this] =
+                    sBefore(state, firstForcedT, -1, state.undo.size).also { it.add(pinnedT) }.toIntArray()
                 return false
             }
             if (count == 1) {
@@ -127,7 +125,7 @@ internal class ValuePrecedePropagator(
                 }
                 if (!state.tightenIntMin(v, s, ant) || !state.tightenIntMax(v, s, ant)) {
                     val own = collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0)
-                    failure = (ant ?: IntArray(0)) + own
+                    state.propagatorFailures[this] = (ant ?: IntArray(0)) + own
                     return false
                 }
             }

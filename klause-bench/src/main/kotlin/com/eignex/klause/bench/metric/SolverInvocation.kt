@@ -370,6 +370,9 @@ internal object SolverInvocation {
 
                         line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
 
+                        line.startsWith("% klause-exact: _objective = ") ->
+                            recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
+
                         line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) ->
                             recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
                     }
@@ -489,9 +492,7 @@ internal object SolverInvocation {
         )
     }
 
-    internal fun parsePbObjective(text: String): Double? {
-        return ExactObjective.parse(text)?.approximate()
-    }
+    internal fun parsePbObjective(text: String): Double? = ExactObjective.parse(text)?.approximate()
 
     /**
      * The reason a solver declined a model it had already parsed, or null when the failure is anything

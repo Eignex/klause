@@ -72,7 +72,7 @@ internal inline fun PropagationState.circuitReachesAll(
 }
 
 /** Gate used to skip propagation until the first real domain event. */
-internal class CpGate {
+internal open class CpGate {
     var started: Boolean = false
 }
 

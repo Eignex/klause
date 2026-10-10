@@ -511,9 +511,11 @@ internal object Compiler {
                 return
             }
             if (node is FExpr.Call && node.fn in REL && node.args.size == 2) {
-                val relation = relationParts(node)
-                postRel(relation)
-                if (node.fn == "eq") markAffineOutput(node, relation)
+                if (node.fn == "eq") {
+                    val output = node.args.firstOrNull { it is FExpr.Ref } as? FExpr.Ref
+                    if (output != null) definedVars.add(ref(output.name))
+                }
+                postRel(relationParts(node))
             } else {
                 // A Boolean combination that is a plain disjunction/implication of single-variable
                 // comparisons is the constraint itself (a [ComparisonClause]) — lowering it directly
@@ -522,27 +524,6 @@ internal object Compiler {
                 val cc = tryComparisonClause(node)
                 if (cc != null) factors.add(cc) else factors.add(Clause(intArrayOf(compileBool(node))))
             }
-        }
-
-        private fun markAffineOutput(node: FExpr.Call, relation: RelParts) {
-            val output = affineOutput(node.args[0], node.args[1])
-                ?: affineOutput(node.args[1], node.args[0]) ?: return
-            val row = relation.rel as? LinRelation.LongRel ?: return
-            val j = row.vars.indexOf(output)
-            if (j >= 0 && (row.coeffs[j] == 1L || row.coeffs[j] == -1L)) definedVars.add(output)
-        }
-
-        private fun affineOutput(output: FExpr, expression: FExpr): Int? =
-            if (output is FExpr.Ref && expression is FExpr.Call && isAffine(expression)) ref(output.name) else null
-
-        private fun isAffine(expression: FExpr): Boolean = when (expression) {
-            is FExpr.Num, is FExpr.Ref -> true
-            is FExpr.Call -> when (expression.fn) {
-                "add", "sub", "neg" -> expression.args.all { isAffine(it) }
-                "mul" -> expression.args.count { it !is FExpr.Num } <= 1 && expression.args.all { isAffine(it) }
-                else -> false
-            }
-            is FExpr.SetLit -> false
         }
 
         /** Post a lowered relation as a top-level factor: a [Linear] when it carries variable terms, else a
@@ -871,6 +852,7 @@ internal object Compiler {
             val vs = args.map { materializeVar(linear(it)) }.toIntArray()
             val m = newAuxVar(vs.minOf { domains[it].min }, vs.maxOf { domains[it].max })
             factors.add(ArrayMinMax(result = m, xs = vs, max = max))
+            definedVars.add(m)
             return IntComb.Narrow(LinComb(mapOf(m to 1L), 0L))
         }
 
@@ -981,6 +963,7 @@ internal object Compiler {
             val cs = LongArray(vars.size + 1) { if (it < vars.size) -narrow.coeffs.getValue(vars[it]) else 1L }
             val ids = IntArray(vars.size + 1) { if (it < vars.size) vars[it] else v }
             factors.add(Linear(cs, ids, LinearOp.EQ, narrow.constant)) // v − expr = 0
+            definedVars.add(v)
             return v
         }
 

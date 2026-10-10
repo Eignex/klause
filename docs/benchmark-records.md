@@ -13,7 +13,11 @@ archive consistency; it does not independently recompute the source objective.
 Source checking verifies witnesses, not optimality or refutation certificates.
 Objective comparisons and witness consistency checks prefer canonical
 `exactObjective` integer or rational text; legacy records use their numeric
-`objective`. Approximate numeric equality cannot tie distinct exact values.
+`objective`. Authoritative `% klause-exact: _objective` comments take precedence
+over rounded display assignments in retained FlatZinc witnesses. Summaries disclose
+`sourceValidationScope`, separating MiniZinc source pinning from independent
+original-FlatZinc checks with binary64 literal semantics. Approximate numeric
+equality cannot tie distinct exact values.
 
 Process incumbent clocks include subprocess launch, frontend loading, preparation,
 search and output delivery. Legacy attribution clocks start during search.

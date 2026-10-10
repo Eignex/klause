@@ -29,13 +29,10 @@ internal class IncreasingPropagator(private val xs: IntArray, private val gap: I
         out
     }
 
-    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
-    private var failure: IntArray? = null
-
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = failure
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = state.propagatorFailures[this]
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failure = null
+        state.propagatorFailures.remove(this)
         val d = state.intDomains
         val level = state.currentLevel
 
@@ -47,7 +44,8 @@ internal class IncreasingPropagator(private val xs: IntArray, private val gap: I
             return if (lit == Lit.NONE) IntArray(0) else intArrayOf(lit)
         }
         fun fail(ant: IntArray?, v: Int): Boolean {
-            failure = (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
+            state.propagatorFailures[this] =
+                (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
             return false
         }
         // Forward: xs(i).min ≥ xs(i−1).min + gap. Each tighten feeds the next iteration, so the

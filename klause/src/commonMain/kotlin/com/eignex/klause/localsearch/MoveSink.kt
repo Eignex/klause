@@ -185,12 +185,19 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      *  sibling indicators need updating, so the cost on non-channeling problems is just
      *  the occurrence-list walk.
      *
+     *  Retained extremum cones backsolve the target into an atomic repair of admissible searched inputs.
+     *
      *  Use this in any factor's `proposeRepairMoves` when proposing an int-set move on a
      *  variable that could be part of a value-to-indicator channeling cluster (the common
      *  decomposition of `x in S` / per-period choice / `course(i) = p` over int vars). Without
      *  channeling synthesis, the engine chases one indicator flip at a time after every int change.
      */
     fun addChannelingIntSet(state: LocalSearchState, varId: Int, newValue: Long) {
+        if (invariants?.isDefinedInt(varId) == true) {
+            val repair = extremumRepair(state, varId, newValue, ::allowsInt) ?: return
+            addCompound(repair.map { (input, target) -> Move.IntSet(input, target) })
+            return
+        }
         if (assumptions.isFrozenInt(varId)) return
         when (val m = state.synthesizeChannelingMove(varId, newValue)) {
             is Move.IntSet -> addIntSet(varId, newValue)

@@ -25,7 +25,19 @@ destination. See [presolve cancellation and accounting](presolve.md) for ownersh
 probe-count scope and cooperative deadline limits.
 
 [PropagationSession](../klause/src/commonMain/kotlin/com/eignex/klause/propagation/PropagationSession.kt)
-owns the finite-domain trail and fixpoint. Propagators supply sound source
+owns the finite-domain trail and fixpoint. Sessions over one immutable model can share
+its propagation projection and occurrence indexes. Incremental payloads, scratch arrays,
+watchers and failure contexts belong to each state. Failure clauses and premise-variable
+sets use separate state storage, leaving reversible payloads intact; each fire clears its
+previous failure, and undo discards pending failure context. The native SAT lane keeps
+its own state and leaves general CP failure storage unallocated.
+
+Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights
+and its heap belong to the solve, retain conflict bumps across restarts, and apply bumps
+received before the first selection once during initialization. Fresh selectors isolate
+solves that share a projection.
+
+Propagators supply sound source
 reasons for deductions and conflicts. An assignment's undo lifetime can be deeper
 than the effective level of its reason: Boolean pins use the deeper of that level
 and the current decision depth so an asserting backjump retains its consequence.
@@ -194,6 +206,18 @@ before initializing factor costs, avoiding an evaluation of the intermediate
 random assignment. Custom restart policies retain their ordinary restart protocol.
 ALNS skips its local-search fallback when the complete-engine bootstrap returns
 without an incumbent after cancellation, avoiding fresh seeding after the deadline.
+Hinted min/max expression outputs, their materialized affine operands and output aliases
+form a one-way definition cone. Unhinted min/max globals remain searched. Competing
+definitions and cyclic cones remain searched; independent constraints on a defined output
+still contribute violations. Evaluation clips values to root domains and preserves pinned
+outputs during seeding and moves. Repair proposals into these cones backsolve affine rows
+and extrema into admissible searched inputs, respecting domains, pins and implicit owners.
+Non-witness operands receive the required bound, allowing domain gaps and affine rounding.
+Shared-input repairs recompute every affected definition before checking the complete maintained cone.
+Element matching-cell indexes and range endpoints use Long arithmetic, including offsets
+whose valid array indexes cross the Int boundary. Matching-cell scans skip unreachable
+inverse targets until an admissible index repair is found.
+
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
 Element index repairs backsolve affine definitions with one or two distinct integer

@@ -7,15 +7,21 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.factorAt
+import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.undoTo
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SubcircuitPropagatorTest {
@@ -131,4 +137,29 @@ class SubcircuitPropagatorTest {
         assertEquals(0, result.ints[2], "succ[2] must be forced to 0 to close the cycle; got ${result.ints}")
     }
 
+
+    @Test
+    fun `shared subcircuit connectivity work preserves a peer cut reason across undo`() {
+        val projection = PropagationProblem(problem(4))
+        val first = PropagationState(projection, Assumptions.None)
+        val second = PropagationState(projection, Assumptions.None)
+        first.undoLogging = true
+        second.undoLogging = true
+        val root = first.mark()
+        first.currentLevel = 1
+        check(first.tightenIntMin(0, 1))
+        for (v in 0..3) check(first.tightenIntMax(v, 2))
+        assertNotNull(first.runToFixpoint(allFactors = true))
+        val reason = assertNotNull(first.factorAt(0).conflictReason(first, 0)).copyOf()
+        second.currentLevel = 1
+        for (v in 0..3) check(second.excludeIntValue(v, v.toLong()))
+
+        assertNull(second.runToFixpoint(allFactors = true))
+        assertContentEquals(reason, first.factorAt(0).conflictReason(first, 0))
+        ConflictReasonOracle.assertEntailed(projection.problem, first, 0)
+        first.undoTo(root)
+        first.currentLevel = 1
+        for (v in 0..3) check(first.excludeIntValue(v, v.toLong()))
+        assertNull(first.runToFixpoint(allFactors = true))
+    }
 }

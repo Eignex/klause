@@ -52,6 +52,13 @@ for continuous objectives. It declines unsupported float operations and expansio
 above the alternative limit. Arithmetic overflow during lowering also declines
 with a diagnostic.
 
+Authoritative rational witness coordinates are emitted as `% klause-exact:`
+comments while standard assignments retain MiniZinc-compatible decimal rendering.
+The benchmark's independent checker reads the original FlatZinc text, interpreting
+float literals as binary64 rationals and checking exact coordinates without rounding.
+Its `flatzinc-binary64` scope is distinct from pinning original MiniZinc source;
+it does not change the policy for compiler-rounded bounds or relax constraints.
+
 See [FlatZincFloatPolicy](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincFloatPolicy.kt)
 and [FlatZincIntegerFloatImages](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincIntegerFloatImages.kt).
 
@@ -135,3 +142,8 @@ cells and aliases retain their source variable identities. Unsupported construct
 decline through the common solve surface. Boolean-valued XCSP arithmetic terms
 use fresh 0/1 integers tied directly to their source literal by a reified equality,
 including negated literals; products and sum terms share this encoding.
+
+XCSP min/max arithmetic expressions mark deterministic auxiliaries and materialized affine
+operands as definition hints. Top-level equalities retain output aliases; hints alone do
+not orient unrelated sums or unhinted min/max globals. Domains and independently posted
+output constraints remain authoritative during local-search definition maintenance.

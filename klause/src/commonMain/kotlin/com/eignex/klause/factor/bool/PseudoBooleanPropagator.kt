@@ -44,31 +44,20 @@ internal class PseudoBooleanPropagator(
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
         if (watched) propagateWatched(state, factorId) else propagatePbBounds(state, weights, literals, op, bound)
 
-    /** Set by [selectWatched]: true iff the last selection reached [watchTarget] (constraint can't
-     *  propagate). Single-threaded per session, so a field is safe. */
-    private var lastSelectionCovered = false
+    /** Select non-false literals in descending weight order until they cover [watchTarget]. */
+    fun selectWatched(state: PropagationState): IntArray = selectCover(state).first
 
-    /**
-     * Select a covering set of currently-non-false literals whose weights sum to at least [watchTarget],
-     * preferring the heaviest (fewest watches). Returns all non-false literals when the target can't be
-     * met (the constraint is in the propagating regime and must wake on every remaining literal); sets
-     * [lastSelectionCovered] to whether the target was reached.
-     */
-    fun selectWatched(state: PropagationState): IntArray {
+    private fun selectCover(state: PropagationState): Pair<IntArray, Boolean> {
         val out = IntArrayList(byWeightDesc.size)
         var sum = 0L
-        lastSelectionCovered = false
         for (idx in byWeightDesc) {
             val lit = literals[idx]
             if (state.litFalse(lit)) continue
             out.add(lit)
             sum += weights[idx]
-            if (sum >= watchTarget) {
-                lastSelectionCovered = true
-                return out.toIntArray()
-            }
+            if (sum >= watchTarget) return out.toIntArray() to true
         }
-        return out.toIntArray() // target unreachable ⇒ watch every non-false literal
+        return out.toIntArray() to false
     }
 
     /**
@@ -79,7 +68,7 @@ internal class PseudoBooleanPropagator(
      */
     private fun propagateWatched(state: PropagationState, factorId: Int): Boolean {
         val old = state.refPayload[factorId] as? IntArray ?: EmptyIntArray
-        val next = selectWatched(state)
+        val (next, covered) = selectCover(state)
         // Reconcile watches against the new selection: drop the dropped, install the added. Safe to mutate the
         // watcher index here — propagate runs after the wakeup walk over the fired literal's list.
         for (lit in old) if (!next.contains(lit)) state.removeBoolWatch(factorId, lit)
@@ -87,7 +76,7 @@ internal class PseudoBooleanPropagator(
         state.refPayload[factorId] = next
         // Covered ⇒ slack ≥ every coefficient ⇒ nothing to do. Otherwise bounds-propagate (force / detect
         // conflict); [next] then watches every non-false literal so any further change re-fires.
-        if (lastSelectionCovered) return true
+        if (covered) return true
         return propagatePbBounds(state, weights, literals, op, bound)
     }
 
