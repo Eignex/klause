@@ -264,7 +264,7 @@ private fun appendRouteCertifierStats(
  */
 internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum
-    if (stats.run.backend != "ls" && moves == 0.0) return emptyList()
+    if (stats.run.backend != "ls" && moves == 0.0 && stats.ls.bestResidual == null) return emptyList()
 
     val out = ArrayList<Pair<String, String>>()
     out += "lsMoves" to "${moves.toLong()}"
@@ -274,6 +274,12 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
     if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)
     if (stats.ls.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.ls.incumbentViolation)
+    stats.ls.bestResidual?.let { residual ->
+        out += "lsBestResidualViolation" to residual.cost.toString()
+        for ((kind, degree) in residual.byKind.entries.sortedBy { it.key }) {
+            out += "lsBestResidual.$kind" to degree.toString()
+        }
+    }
     val completions = stats.ls.completions.sum.toLong()
     if (completions > 0L) {
         out += "lsCompletions" to "$completions"

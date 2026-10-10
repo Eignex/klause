@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
+import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpBasisVerificationStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
@@ -27,6 +28,21 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliStatsTest {
+
+    @Test
+    fun `a residual observation prints its cost and kind totals before any move`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "mixed"),
+            ls = LocalSearchStats(bestResidual = LocalSearchResidual(9, mapOf("Linear" to 7L, "Clause" to 2L))),
+        )
+
+        val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
+
+        assertEquals("9", pairs["lsBestResidualViolation"])
+        assertEquals("7", pairs["lsBestResidual.Linear"])
+        assertEquals("2", pairs["lsBestResidual.Clause"])
+        assertTrue("lsIncumbentObjective" !in pairs)
+    }
     @Test
     fun `refused float phase costs are emitted without a node solve`() {
         val stats = SolveStats(lp = LpStats(phases = mapOf("CLEANUP_STANDALONE" to

@@ -10,6 +10,18 @@ import kotlin.test.assertTrue
 class SolveStatsMergeTest {
 
     @Test
+    fun `local search residual aggregation keeps the breakdown paired with its cost`() {
+        val left = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(8, mapOf("Linear" to 8L))))
+        val right = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(3, mapOf("Clause" to 3L))))
+
+        val merged = left.mergedWith(right)
+
+        assertEquals(right.ls.bestResidual, merged.ls.bestResidual)
+        assertEquals(right.ls.bestResidual, right.mergedWith(left).ls.bestResidual)
+        assertEquals(right.ls.bestResidual, SolveStats.EMPTY.mergedWith(right).ls.bestResidual)
+    }
+
+    @Test
     fun `shared conflict counts add across solve rounds`() {
         val left = SolveStats(openTheoryClauses = OpenTheoryClauseStats(assertingConflicts = 7))
         val right = SolveStats(openTheoryClauses = OpenTheoryClauseStats(nonAssertingConflicts = 3))

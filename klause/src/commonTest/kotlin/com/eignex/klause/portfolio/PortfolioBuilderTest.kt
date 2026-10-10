@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,6 +16,22 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PortfolioBuilderTest {
+
+    @Test
+    fun `a portfolio local-search arm reports its committed residual when requested`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
+        val scenario = PortfolioScenario(
+            cores = 1, arms = 1, kind = Kind.COP, engine = EngineMix.LOCAL_SEARCH, reportLsResiduals = true,
+        )
+        val worker = PortfolioBuilder.build(problem, scenario, objective = LinearObjective()).single()
+
+        worker.use {
+            val result = it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = 0).last()
+
+            assertEquals(0L, result.stats.ls.bestResidual?.cost)
+            assertEquals(emptyMap(), result.stats.ls.bestResidual?.byKind)
+        }
+    }
 
     @Test
     fun `only added variants wait for an incumbent in an expanded curated pool`() {

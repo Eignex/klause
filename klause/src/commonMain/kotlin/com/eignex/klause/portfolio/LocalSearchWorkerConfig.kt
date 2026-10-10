@@ -22,10 +22,16 @@ import com.eignex.klause.solver.result.SearchEvent
  * schedule); this adapter owns only the run-time wiring (λ-shaping, warm-start, event sink, and the solve-wide
  * [nodeBudget] every segment spends).
  */
-internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBudget: NodeBudget? = null) :
+internal class LocalSearchWorkerConfig(
+    val recipe: LocalSearchRecipe,
+    val nodeBudget: NodeBudget? = null,
+    private val reportResiduals: Boolean = false,
+) :
     WorkerConfig {
 
     override val label: String get() = recipe.label
+
+    override fun withLsResiduals(): LocalSearchWorkerConfig = LocalSearchWorkerConfig(recipe, nodeBudget, true)
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the
@@ -82,6 +88,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
             // Keep a single over-populated constraint kind from steering the initial descent; a
             // no-op for the pool's weight-blind arms.
             normalizeWeightsByClass = true,
+            reportResiduals = reportResiduals,
             // Bidirectional cross-engine flow: publish incumbents this arm finds and, on restart, anchor
             // on the verified global best — so LS and backtrack incumbents circulate both ways.
             pooledIncumbents = matchedPools?.solutions,

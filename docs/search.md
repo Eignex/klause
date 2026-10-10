@@ -232,6 +232,13 @@ Optimization retains its best infeasible restart anchor as a private packed assi
 Strict cost improvements copy into that storage; a restart materializes an independent
 sample only when no feasible incumbent supersedes the anchor. Published samples and
 samples retained by custom restart policies remain independent of subsequent updates.
+Optional local-search residual reporting observes committed assignments at loop and
+publication boundaries. Strict cost improvements retain a fresh per-kind sum of the
+maintained factor degrees, paired with their exact total. Probes are not observed.
+Worker aggregation selects one whole observation at the lowest total; it never adds
+breakdowns from different assignments. A zero residual does not establish domain,
+completion or source feasibility, and the observation does not replace an incumbent.
+Disabled reporting allocates no recorder and performs no factor scans.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.

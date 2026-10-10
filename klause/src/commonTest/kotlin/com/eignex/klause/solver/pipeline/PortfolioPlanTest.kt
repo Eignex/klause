@@ -15,6 +15,16 @@ import kotlin.test.assertTrue
 class PortfolioPlanTest {
 
     @Test
+    fun `portfolio residual reporting accepts an explicit opt in`() {
+        val scenario = buildPortfolioScenario(
+            EngineParams(listOf("ls-residuals=true")), 1L, 1, Kind.COP, EngineMix.MIXED, 6,
+        )
+
+        assertTrue(scenario.reportLsResiduals)
+        assertTrue(scenario.copy(phaseRetention = 0.5).reportLsResiduals)
+    }
+
+    @Test
     fun `portfolio reseeding accepts an off control and nonnegative thresholds`() {
         for ((params, expected) in listOf(emptyList<String>() to 3, listOf("reseed-stale-threshold=0") to 0,
             listOf("reseed-stale-threshold=2") to 2, listOf("reseed-stale-threshold=4") to 4)) {
