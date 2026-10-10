@@ -235,11 +235,14 @@ def check(cases):
     for case in cases:
         assert case["status"] == "DONE" and case.get("record"), "incomplete case"
         record = case["record"]
+        reported_objective = record.get("exactObjective")
+        if reported_objective is None:
+            reported_objective = record.get("objective")
         source_key = (case["problem"]["suite"], record["problem"], record["gitSha"], record["sourceHashes"]["model"])
         if source_key not in sources:
             sources[source_key] = source(case, archive)
         text = sources[source_key]
-        key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(record["objective"]),
+        key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(reported_objective),
                record["proven"], record.get("maximize"), record.get("finalWitness"), case["arm"].endswith("-exact"))
         if key in cache:
             results.append({"index": case["index"], "check": cache[key]})
@@ -247,7 +250,7 @@ def check(cases):
         result = {"sourceHashVerified": True, "reportedFeasible": record["feasible"],
                   "reportedProven": record["proven"], "witness": "absent"}
         if record["feasible"] is None:
-            assert not record["proven"] and record["objective"] is None
+            assert not record["proven"] and reported_objective is None
             result["verdictCheck"] = "no claimed verdict"
         else:
             is_smt = case["problem"]["suite"] == "smtlib-core"
@@ -279,9 +282,9 @@ def check(cases):
                     solver.push()
                     solver.add(*smt_pins(witness, variables))
                     assert solver.check() == z3.sat, record["problem"]
-                    if record["objective"] is not None:
+                    if reported_objective is not None:
                         assert objective is not None
-                        value = rational(record["objective"])
+                        value = rational(reported_objective)
                         solver.add(objective != (-value if maximize else value))
                         assert solver.check() == z3.unsat, "model objective differs from reported objective"
                     solver.pop()
@@ -293,8 +296,8 @@ def check(cases):
                     solver.push()
                     solver.add(*(variable == rational(values[name]) for name, variable in variables.items()))
                     status = solver.check()
-                    if status == z3.sat and record["objective"] is not None:
-                        value = rational(record["objective"])
+                    if status == z3.sat and reported_objective is not None:
+                        value = rational(reported_objective)
                         solver.add(objective != (-value if maximize else value))
                         assert solver.check() == z3.unsat, "point objective differs from reported objective"
                     solver.pop()
@@ -302,8 +305,8 @@ def check(cases):
                     if case["arm"].endswith("-exact"):
                         assert status == z3.sat, record["problem"]
                 if record["proven"] and record["kind"] == "optimize":
-                    assert record["objective"] is not None and objective is not None
-                    value = rational(record["objective"])
+                    assert reported_objective is not None and objective is not None
+                    value = rational(reported_objective)
                     if maximize:
                         value = -value
                     solver.push()

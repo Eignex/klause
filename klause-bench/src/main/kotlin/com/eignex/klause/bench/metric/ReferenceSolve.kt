@@ -82,7 +82,7 @@ internal object ReferenceSolve {
                 val r = cached ?: cache(
                     if (id == "kissat") KissatReference.run(ref, budget) else ClaspReference.run(ref, budget),
                 )
-                Run(id, r, optimize = r.objective != null, maximize = false)
+                Run(id, r, optimize = r.exactObjective != null || r.objective != null, maximize = false)
             }
 
             // clasp minimises OPB (its only PB sense); the result carries the sense.
@@ -93,7 +93,7 @@ internal object ReferenceSolve {
 
             Format.XCSP3 -> {
                 val r = cached ?: cache(Xcsp3CpSatReference.run(ref, budget, checkNotNull(settings.processors)))
-                Run(id, r, optimize = r.objective != null, maximize = r.stats["maximize"].toBoolean())
+                Run(id, r, optimize = r.exactObjective != null || r.objective != null, maximize = r.stats["maximize"].toBoolean())
             }
 
             // SMT-LIB benchmarks are decision instances: no objective to orient.
