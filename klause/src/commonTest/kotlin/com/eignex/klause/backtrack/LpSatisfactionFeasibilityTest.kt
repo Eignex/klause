@@ -80,6 +80,7 @@ class LpSatisfactionFeasibilityTest {
             intDomains = Array(3) { IntDomain(0, 5) },
             factors = arrayOf<Factor>(
                 AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 1),
             ),
         )
 
