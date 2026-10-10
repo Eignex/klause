@@ -25,8 +25,8 @@ internal inline fun PropagationState.reifiedAuxTail(
     propagateTrue: (auxAntecedent: Int) -> Boolean,
     propagateFalse: (auxAntecedent: Int) -> Boolean,
 ): Boolean {
-    if (alwaysHolds) return pinBool(auxBoolVar, true, pinAntecedent())
-    if (neverHolds) return pinBool(auxBoolVar, false, pinAntecedent())
+    if (alwaysHolds) return boolValues[auxBoolVar] == true || pinBool(auxBoolVar, true, pinAntecedent())
+    if (neverHolds) return boolValues[auxBoolVar] == false || pinBool(auxBoolVar, false, pinAntecedent())
     extraPin()?.let { return it }
     val aux = boolValues[auxBoolVar] ?: return true
     val auxAntecedent = Lit.make(auxBoolVar, !aux)
