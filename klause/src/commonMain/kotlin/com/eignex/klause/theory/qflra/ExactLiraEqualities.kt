@@ -101,18 +101,27 @@ internal class ExactLiraEqualities(
         }
         val closed = closeEqualities(forest, context, stop, progressStop)
         if (closed !is ComponentResult.Consistent) return closed
+        val excluded = excludedOffsets(forest, context, progressStop) ?: return ComponentResult.Indeterminate
         for (row in rows) {
             if (progressStop()) return ComponentResult.Indeterminate
             val value = forest.difference(row.target, row.source)
             val nonintegral = (row.op == LinearOp.EQ || row.op == LinearOp.NE) && row.bound.den != BIG_ONE
+            val exclusion = if (value == null && excluded.isNotEmpty()) {
+                row.offsetKey(forest)?.let { excluded[it] }
+            } else null
             val truth = if (nonintegral) {
                 row.op == LinearOp.NE
             } else {
-                value?.let { row.truth(BigFraction.ofLong(it)) } ?: continue
+                value?.let { row.truth(BigFraction.ofLong(it)) }
+                    ?: exclusion?.let { row.op == LinearOp.NE } ?: continue
             }
             val assigned = if (row.activator == ALWAYS) true else context.boolValue(row.activator)
             if (assigned == truth) continue
-            val premises = if (nonintegral) emptyList() else {
+            val premises = if (exclusion != null) {
+                val paths = forest.offsetPremises(row.target, row.source, progressStop)
+                    ?: return ComponentResult.Indeterminate
+                paths + exclusion
+            } else if (nonintegral) emptyList() else {
                 forest.premises(row.target, row.source, progressStop) ?: return ComponentResult.Indeterminate
             }
             if (assigned != null) {
@@ -130,6 +139,36 @@ internal class ExactLiraEqualities(
         val result = propagateGeneral(forest, context, stop, progressStop)
         return if (stop()) ComponentResult.Indeterminate else result
     }
+
+    private fun excludedOffsets(
+        forest: EqualityForest,
+        context: SearchContext,
+        stop: Cancellation,
+    ): Map<OffsetKey, List<SearchAtomPremise>>? {
+        val result = HashMap<OffsetKey, List<SearchAtomPremise>>()
+        for (row in rows) {
+            if (stop()) return null
+            val truth = if (row.activator == ALWAYS) true else context.boolValue(row.activator)
+            if (!((row.op == LinearOp.NE && truth == true) || (row.op == LinearOp.EQ && truth == false))) continue
+            val key = row.offsetKey(forest) ?: continue
+            if (key in result) continue
+            val paths = forest.offsetPremises(row.target, row.source, stop) ?: return null
+            val literal = row.literal(checkNotNull(truth))
+            result[key] = if (literal == ALWAYS) paths else {
+                paths + SearchAtomPremise.Asserted(SearchDecision.Bool(literal))
+            }
+        }
+        return result
+    }
+
+    private fun Prepared.offsetKey(forest: EqualityForest): OffsetKey? {
+        if ((op != LinearOp.EQ && op != LinearOp.NE) || bound.den != BIG_ONE ||
+            bound.num < room.negate() || bound.num > room
+        ) return null
+        return forest.offsetKey(target, source, bound.num.toLong())
+    }
+
+    private data class OffsetKey(val first: Int, val second: Int, val value: Long)
 
     private fun closeEqualities(
         forest: EqualityForest,
@@ -296,6 +335,21 @@ internal class ExactLiraEqualities(
             val first = find(target)
             val second = find(source)
             return if (first.first == second.first) first.second - second.second else null
+        }
+
+        fun offsetKey(target: Int, source: Int, value: Long): OffsetKey? {
+            val first = find(target)
+            val second = find(source)
+            if (first.first == second.first) return null
+            val normalized = value - first.second + second.second
+            return if (first.first < second.first) OffsetKey(first.first, second.first, normalized)
+            else OffsetKey(second.first, first.first, -normalized)
+        }
+
+        fun offsetPremises(target: Int, source: Int, stop: Cancellation): List<SearchAtomPremise>? {
+            val first = premises(target, find(target).first, stop) ?: return null
+            val second = premises(source, find(source).first, stop) ?: return null
+            return first + second
         }
 
         fun constant(terms: Map<Int, BigFraction>, stop: Cancellation): BigFraction? {
