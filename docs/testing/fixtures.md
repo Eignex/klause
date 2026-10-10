@@ -59,7 +59,7 @@ Regenerate using
 [generate.py](../../klause-bench/scripts/lp-component-split/generate.py).
 These fixtures are explicit experiments rather than CI smoke selection.
 
-## Measurement storage
+## MPS source verifier
 
 The MPS source-verifier regressions in
 [`test_verify_source_results.py`](../../klause-bench/tools/test_verify_source_results.py)
@@ -69,6 +69,8 @@ the source tolerance contract; the fixture retains no generated solve records.
 The complete source is fetched by the catalog/verifier from the
 [MIPLIB 3 archive](https://miplib2010.zib.de/miplib3/miplib3.tar.gz), with model hash
 `351ed046eb56e07662b3c2dba35800f5d2cee3fac18c1bd7fbc8dea4a0dcd8db`.
+
+## Measurement storage
 
 Keep generated outputs and historical campaign bundles outside the repository.
 `klause-bench` contains the active harness, current corpus fixtures, named sets

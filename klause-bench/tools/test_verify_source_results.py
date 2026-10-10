@@ -324,6 +324,33 @@ class ProofCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'source tolerance'):
             self.check(case, source)
 
+    def test_mps_exact_integer_objective_retains_values_beyond_binary64(self):
+        for value in ('9007199254740993', '9223372036854775809'):
+            for maximize in (False, True):
+                with self.subTest(value=value, maximize=maximize):
+                    sense = 'OBJSENSE\n MAX\n' if maximize else ''
+                    source = f'NAME fixture\n{sense}ROWS\n N obj\nCOLUMNS\n x obj 1\nBOUNDS\n LI b x {value}\n UI b x {value}\nENDATA\n'
+                    case = self.case(suite='mps-core', arm='default', finalWitness=f'v x={value}',
+                                     exactObjective=value, objective=1, maximize=maximize)
+                    result = self.check(case, source)
+                    self.assertEqual(result['witness'], 'exact source feasible')
+                    self.assertIn('optimalityCheck', result)
+                    case['record']['exactObjective'] = str(int(value) + 1)
+                    with self.assertRaisesRegex(AssertionError, 'objective'):
+                        self.check(case, source)
+
+    def test_mps_column_tolerance_uses_absolute_large_bound(self):
+        for bound, accepted, rejected in (('10', '10.000001', '10.0000011'),
+                                         ('-10', '-10.000001', '-10.0000011')):
+            with self.subTest(bound=bound):
+                source = f'NAME fixture\nROWS\n N obj\nCOLUMNS\n x obj 0\nBOUNDS\n FX b x {bound}\nENDATA\n'
+                case = self.case(suite='mps-core', arm='default', proven=False, objective=None,
+                                 finalWitness=f'v x={accepted}')
+                self.assertTrue(self.check(case, source)['toleranceAccepted'])
+                case['record']['finalWitness'] = f'v x={rejected}'
+                with self.assertRaisesRegex(AssertionError, 'source tolerance'):
+                    self.check(case, source)
+
 
 if __name__ == '__main__':
     unittest.main()
