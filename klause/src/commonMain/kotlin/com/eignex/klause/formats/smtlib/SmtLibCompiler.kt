@@ -23,7 +23,12 @@ internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: Linea
 internal object Compiler {
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
      *  `internal fun Compiler.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
-    internal class Builder(val unboundedIntLo: Long, val unboundedIntHi: Long, val strictBounds: Boolean) :
+    internal class Builder(
+        val unboundedIntLo: Long,
+        val unboundedIntHi: Long,
+        val strictBounds: Boolean,
+        internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(),
+    ) :
         CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()
@@ -42,7 +47,6 @@ internal object Compiler {
 
         /** Open `ite`-on-equality chains and the equality atoms their conditions are read from. */
         internal val iteChains = IteChainTable()
-        internal val conditionalEqualities = SmtLibConditionalEquality()
 
         override val factors = ArrayList<Factor>()
         internal val asserts = ArrayList<SExpr>()
@@ -275,6 +279,7 @@ internal object Compiler {
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }
             lowerOpenIteChains() // an objective term can open chains of its own
+            conditionalEqualities.expandPending(this)
             val removed = conditionalEqualities.retainNeededDefinitions(
                 factors, intNames.values, boolNames.values, compiledObjective,
             )

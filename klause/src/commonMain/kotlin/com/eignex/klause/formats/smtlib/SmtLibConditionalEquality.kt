@@ -1,14 +1,17 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.ReifiedFactor
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 
-internal class SmtLibConditionalEquality {
+internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     class UnusedColumns(val ints: Set<Int>, val bools: Set<Int>)
 
     private class Definition(
@@ -30,6 +33,7 @@ internal class SmtLibConditionalEquality {
     }
 
     private data class Key(val variable: Int, val value: Long)
+    private class PendingEquality(val literal: Int, val factor: Factor)
     private data class Owner(val variable: Int, val integer: Boolean)
     private sealed interface Frame {
         class Eval(val term: LinComb) : Frame
@@ -40,6 +44,7 @@ internal class SmtLibConditionalEquality {
     private val definitions = HashMap<Int, Definition>()
     private val booleanDefinitions = HashMap<Int, List<Factor>>()
     private val equalities = HashMap<Key, Int>()
+    private val pendingEqualities = LinkedHashMap<Key, PendingEquality>()
     private var work = 0
 
     fun define(
@@ -140,18 +145,48 @@ internal class SmtLibConditionalEquality {
         if (definitions[variable]?.image?.contains(value) == false) {
             return Lit.negate(builder.trueLit()).also { equalities[key] = it }
         }
-        if (variable !in definitions || work >= WORK_LIMIT) return null
+        if (variable !in definitions) return null
+        return pendingEqualities.getOrPut(key) {
+            val literal = builder.reifyLinear(longArrayOf(1), intArrayOf(variable), LinearOp.EQ, value)
+            PendingEquality(literal, builder.factors.last())
+        }.literal
+    }
+
+    fun expandPending(builder: Compiler.Builder) {
+        val replaced = HashSet<Factor>()
+        for ((key, equality) in pendingEqualities.entries.toList().asReversed()) {
+            val expanded = expand(key.variable, key.value, builder) ?: continue
+            if (expanded == equality.literal) continue
+            val clauses = listOf(
+                Clause(intArrayOf(Lit.negate(equality.literal), expanded)),
+                Clause(intArrayOf(equality.literal, Lit.negate(expanded))),
+            )
+            builder.factors.addAll(clauses)
+            definePredicate(Lit.variable(equality.literal), clauses)
+            replaced.add(equality.factor)
+        }
+        builder.factors.removeAll { it in replaced }
+        pendingEqualities.clear()
+    }
+
+    private fun expand(variable: Int, value: Long, builder: Compiler.Builder): Int? {
+        val key = Key(variable, value)
+        equalities[key]?.let { return it }
+        if (definitions[variable]?.image?.contains(value) == false) {
+            return Lit.negate(builder.trueLit()).also { equalities[key] = it }
+        }
+        if (variable !in definitions || work >= workLimit) return null
         val pending = ArrayDeque<Frame>()
         val literals = ArrayDeque<Int>()
         pending.addLast(Frame.Eval(LinComb(mapOf(variable to 1L), 0)))
         while (pending.isNotEmpty()) {
             when (val frame = pending.removeLast()) {
                 is Frame.Known -> {
-                    if (++work > WORK_LIMIT) return null
+                    if (++work > workLimit) return null
                     literals.addLast(frame.literal)
                 }
                 is Frame.Eval -> {
-                    if (++work > WORK_LIMIT) return null
+                    if (++work > workLimit) return null
                     val term = frame.term
                     val source = term.asSimpleVar()
                     val cached = source?.let { equalities[Key(it, value)] }
@@ -250,7 +285,6 @@ internal class SmtLibConditionalEquality {
     }
 
     private companion object {
-        const val WORK_LIMIT = 65_536
         const val IMAGE_LIMIT = 1_024
     }
 }

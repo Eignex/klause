@@ -12,6 +12,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.times
@@ -21,6 +22,63 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
+    @Test
+    fun `a final comparison can refute the source after earlier comparisons exceed the expansion budget`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false, SmtLibConditionalEquality(workLimit = 3),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const x Int) (declare-const s Int) (declare-const early Bool)
+                (assert (>= s 0)) (assert (<= s 2))
+                (assert (= early (= (ite (<= x 0) x 2) 1)))
+                (assert (= (ite (= s 0) s 2) 1))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        assertIs<ComponentResult.Conflict>(session.initialize())
+    }
+
+    @Test
+    fun `an exhausted comparison expansion retains its exact arithmetic meaning`() {
+        for (value in listOf(0, 1)) {
+            val builder = Compiler.Builder(
+                Long.MIN_VALUE, Long.MAX_VALUE, false, SmtLibConditionalEquality(workLimit = 0),
+            )
+            val reader = SExprReader(
+                StringCharSource(
+                    """
+                    (declare-const x Int) (declare-const result Bool)
+                    (assert (= x $value))
+                    (assert (= result (= (ite (<= x 0) x 2) 0)))
+                    """.trimIndent(),
+                ),
+            )
+            while (true) builder.command(reader.readCommandOrNull() ?: break)
+            val parsed = builder.build()
+            ExactLiraSearchComponent(parsed.model).use { component ->
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                assertEquals(value == 0, assignment.bools[parsed.boolVarNames.getValue("result")])
+            }
+        }
+    }
+
     @Test
     fun `a constant conditional result completes without arithmetic predicate decisions`() {
         val guards = listOf(
