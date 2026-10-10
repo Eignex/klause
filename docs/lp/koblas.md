@@ -15,11 +15,11 @@ Koblas coordinates use group `com.eignex`:
 
 | Module | Version | Binary SHA-256 |
 |---|---|---|
-| koblas | `0.1.1-20261010.042342-251` | `97f5e9c15c444eb704f72fe57db0125ede8fcb2980a10ab4eaa6272590ef1395` |
-| koblas-jvm | `0.1.1-20261010.042342-254` | `b8817d1cbb4ee4bd7dc9a905c0ca211053c34634b101bbc9863e8db7c24d13b3` |
-| koblas-linuxx64 | `0.1.1-20261010.042342-250` | `7defce305e6ee64aa3e51f30ebc73acd11b1dc80e0cd0469ed352c600da208e8` |
-| koblas-linuxarm64 | `0.1.1-20261010.042342-251` | `cf316a2a0858e117577119db2e415463331d081f0d82f533cf3f6fe5b2306bf0` |
-| koblas-macosarm64 | `0.1.1-20261010.042148-274` | `18e951b0e52ee7e0680500514f16722e6c2cc55a67763b0e903c1a489c25b018` |
+| koblas | `0.1.1-20261010.075742-252` | `17b03f939e9ce00ba52ed00bb31168d2de117e41fcecc487d7ed00a9f39315d4` |
+| koblas-jvm | `0.1.1-20261010.075742-255` | `cf9486a34f4a1797ce477109594c3fb3858e8eebea7ecbc30ea263de53a8895d` |
+| koblas-linuxx64 | `0.1.1-20261010.075742-251` | `73c45c5864043692881abdab2f1d46ea33cc669c38c962673c6c7e0cad462163` |
+| koblas-linuxarm64 | `0.1.1-20261010.075742-252` | `3bf20b0e962a848dc4c5a0e9dccbdf371a21b3d241a3fc9e8b891d16a159c70d` |
+| koblas-macosarm64 | `0.1.1-20261010.075548-275` | `6a7081084c0bc8bdd0eb236ad3a4526d172f8c3581f2a9cd447cf51266af5a6d` |
 
 The build does not consult Maven Local. For source integration, use Gradle's supported composite
 substitution with an isolated checkout at the revision under test:

@@ -70,6 +70,17 @@ outside the repository alongside its primary checkout. All worktrees share this
 evidence directory. `klause-bench` retains the active harness, current fixtures/sets
 and reusable tools.
 
+Do not commit generated lab/campaign archives, raw records, payloads, manifests or
+campaign-only scripts anywhere in the repository, including compressed or encoded
+bundles. `docs/evidence/` may contain short Markdown summaries supporting current
+design decisions, never lab archives.
+
+Keep `.github` limited to the build/release workflows and issue/PR templates. Do
+not add campaign, lab or benchmark-evidence workflows, dispatch inputs, jobs or
+artifact uploads to existing workflows, or companion guides for campaign CI
+dispatch. Run measurement checking outside the repository's GitHub workflows.
+Reusable local analysis tools and regression fixtures belong in `klause-bench`.
+
 Consolidate conclusions that establish architecture or invariants into the relevant
 `docs/` page. Use `docs/evidence/` only for small, durable evidence supporting a
 current design decision; temporary campaigns and raw-result archives stay in

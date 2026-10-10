@@ -118,7 +118,7 @@ None of these campaigns run as part of `check`.
 ## Saved results
 
 See [paired lab record analysis](benchmark-records.md) for complete-block
-comparisons and analyzing external evidence through CI.
+comparisons of externally stored records.
 
 Each problem writes a raw `<problem>.out` stream and a self-describing
 `<problem>.json` record under `klause-bench/output/<config>/`. Configuration names

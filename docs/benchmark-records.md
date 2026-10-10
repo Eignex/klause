@@ -23,13 +23,7 @@ Family bootstrap intervals average seed/repetition observations within each cata
 base family, with the year removed. A single family has no estimated interval.
 Counters report their native scope; see [presolve accounting](presolve.md).
 
-The `build` workflow accepts `lab_cases`, `lab_control` and `lab_compression` on
-manual dispatch. `lab_cases` is a base64-encoded gzip or xz case array. The analysis
-job retains its decoded input and JSON report as the `lab-evidence` artifact and
-runs no solver. Empty `lab_cases` runs the full build gate; pushes and pull requests
-also run the full gate. Workflow input-size limits apply to the encoded payload.
-
 Temporary manifests, raw records and reports belong in the shared
 `klause-evidence/campaigns/<name>/` directory alongside the primary checkout.
-The analyzer and workflow are reusable tools; generated case bundles remain
+The analyzer is a reusable tool; generated case bundles remain
 outside the repository.
