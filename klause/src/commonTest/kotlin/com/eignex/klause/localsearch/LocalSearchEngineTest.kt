@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -330,6 +331,86 @@ class LocalSearchEngineTest {
             assertEquals(0.0, handle.stats.ls.moves.sum)
             val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
             assertEquals(initial, result.assignment)
+        }
+    }
+
+    @Test
+    fun `optimization restarts without an anchor before finding a feasible incumbent`() {
+        val problem = Problem(
+            2, 0, emptyArray(),
+            arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(1, true)))),
+        )
+        val anchors = mutableListOf<Sample?>()
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 1
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                anchors += bestSoFar
+                state.restart()
+            }
+        }
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), restartPolicy = policy)
+
+        search.resumable(
+            LinearObjective(boolWeights = longArrayOf(1, 1)),
+            LocalSearchParams(
+                maxFlips = 3L,
+                randomSeed = 3L,
+                assumptions = Assumptions(bools = mapOf(0 to false)),
+                initialAssignment = Sample(booleanArrayOf(false, false), LongArray(0)),
+            ),
+        ).use { handle ->
+            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+        }
+
+        assertTrue(anchors.isNotEmpty())
+        assertTrue(anchors.all { it == null })
+    }
+
+    @Test
+    fun `optimization restarts from its feasible incumbent`() {
+        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))))
+        val anchors = mutableListOf<Sample?>()
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 1
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                anchors += bestSoFar
+                state.restart()
+            }
+        }
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), restartPolicy = policy)
+
+        search.resumable(
+            LinearObjective(boolWeights = longArrayOf(1)),
+            LocalSearchParams(maxFlips = 3L, randomSeed = 3L),
+        ).use { handle ->
+            assertIs<MinimizeResult.BestFound>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+        }
+
+        assertTrue(anchors.size > 1)
+        assertTrue(anchors.drop(1).all { it?.bools?.single() == true })
+    }
+
+    @Test
+    fun `optimization completes initial greedy repair after a cancelled slice`() {
+        val problem = Problem(
+            32, 0, emptyArray(),
+            Array<Factor>(32) { Clause(intArrayOf(Lit.make(it, true))) },
+        )
+        val search = LocalSearchEngine(LocalSearchModel.open(problem))
+        val found = mutableListOf<Sample>()
+        var polls = 0
+
+        search.resumable(
+            LinearObjective(boolWeights = LongArray(32) { 1L }),
+            LocalSearchParams(maxFlips = 1L, randomSeed = 3L),
+        ).use { handle ->
+            assertNull(handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L) { found += it.sample })
+            assertTrue(found.isEmpty())
+
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { found += it.sample }
+
+            assertIs<MinimizeResult.BestFound>(result)
+            assertTrue(found.single().bools.all { it })
         }
     }
 

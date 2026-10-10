@@ -16,7 +16,6 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableSearch
@@ -764,9 +763,7 @@ internal class LocalSearchEngine(
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null
-        // The private anchor keeps Boolean coordinates packed until a restart consumes it.
         var bestCostInfeasible: Long = Long.MAX_VALUE
-        var bestCostAnchor: Assignment? = null
         var flipsSinceRestart = 0
         var totalFlips = 0L
         var restartCount = 0L
@@ -786,14 +783,13 @@ internal class LocalSearchEngine(
             evaluate = { objective.evaluate(it) },
         )
 
-        // The anchor for a restart: refresh from the pool first, then prefer the incumbent, falling back
-        // to [fallback] (the best-cost-infeasible assignment) when no feasible incumbent exists yet.
-        fun restartAnchor(fallback: Assignment?): Sample? {
+        // Restart policies require a feasible anchor; residual violation cannot certify one.
+        fun restartAnchor(): Sample? {
             pooled.poll(bestObj)?.let { (sample, obj) ->
                 bestObj = obj
                 bestSample = sample
             }
-            return bestSample ?: fallback?.snapshot()
+            return bestSample
         }
 
         // Each restart counts as one unit of work against maxFlips; otherwise a degenerate objective
@@ -914,7 +910,7 @@ internal class LocalSearchEngine(
                             cancelCountdown = 0
                             continue
                         }
-                        restartAndRepair(state, restartAnchor(null), params)
+                        restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                         restartCount++
                         flipsSinceRestart = 0
                         totalFlips++
@@ -952,7 +948,7 @@ internal class LocalSearchEngine(
                             continue
                         }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restartAndRepair(state, restartAnchor(null), params)
+                        restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -988,7 +984,7 @@ internal class LocalSearchEngine(
                         }
                         feasibleMisses = 0
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restartAndRepair(state, restartAnchor(null), params)
+                        restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -998,7 +994,7 @@ internal class LocalSearchEngine(
                 }
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
-                restartAndRepair(state, restartAnchor(bestCostAnchor), params)
+                restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -1010,7 +1006,7 @@ internal class LocalSearchEngine(
             val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restartAndRepair(state, restartAnchor(bestCostAnchor), params)
+                restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -1020,9 +1016,6 @@ internal class LocalSearchEngine(
             state.apply(move)
             if (state.cost in 1 until bestCostInfeasible) {
                 bestCostInfeasible = state.cost
-                val anchor = bestCostAnchor ?: Assignment(problem.numBoolVars, problem.numIntVars, problem.numRealVars)
-                    .also { bestCostAnchor = it }
-                state.assignment.copyInto(anchor)
             }
             flipsSinceRestart++
             totalFlips++
@@ -1104,7 +1097,7 @@ internal class LocalSearchEngine(
         // already feasible, and the repair sweep is objective-blind (it accepts any flip that doesn't
         // raise cost), so on a cost-0 seed it would wander across equal-cost feasibles and discard the
         // seed's objective — defeating the warm start.
-        if (greedyRepairOnRestart && isLargeEnoughForGreedy() && !seeded) greedyRepairPass(state, params)
+        if (greedyRepairOnRestart && isLargeEnoughForGreedy() && !seeded) greedyRepairPass(state, params, checkpoint)
         return state
     }
 
@@ -1173,9 +1166,15 @@ internal class LocalSearchEngine(
 
     /** Restart [state] from [anchor] and re-run the greedy repair sweep under the same size gate as
      *  the initial restart — the pairing every minimize restart site must preserve. */
-    private fun restartAndRepair(state: LocalSearchState, anchor: Sample?, params: LocalSearchParams) {
+    private suspend fun SequenceScope<MinimizeResult?>.restartAndRepair(
+        state: LocalSearchState,
+        anchor: Sample?,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+        onPause: () -> Unit,
+    ) {
         restarts.restart(state, anchor)
-        if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params)
+        if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params, checkpoint, onPause)
     }
 
     /** True when the problem is big enough that the post-restart greedy-repair sweep pays for
@@ -1209,8 +1208,22 @@ internal class LocalSearchEngine(
      * The point isn't to reach feasibility (LS strategies handle that) but to start from a
      * low-violation pose so the feasibility-fight phase has fewer hard constraints to chase.
      */
-    private fun greedyRepairPass(state: LocalSearchState, params: LocalSearchParams) =
-        greedyInit.run(state) { params.cancellation() }
+    private suspend fun <T> SequenceScope<T?>.greedyRepairPass(
+        state: LocalSearchState,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+        onPause: () -> Unit = {},
+    ) {
+        if (checkpoint == null) {
+            greedyInit.run(state) { params.cancellation() }
+            return
+        }
+        val pass = greedyInit.pass(state)
+        while (!pass.advance { params.cancellation() }) {
+            onPause()
+            yield(null)
+        }
+    }
 
     /** Undo [move] on [state] so it matches [baselineSnap] again. BoolFlip self-inverts;
      *  IntSet uses [baselineSnap] to recover the old value; Compound reverts each part. */

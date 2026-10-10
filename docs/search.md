@@ -195,8 +195,7 @@ search moves. Projection preparation also retains private invariant and occurren
 progress in batches. Matching arms can continue that shared preparation; a mutex protects
 each batch and publishes only the complete projection. A suspended arm holds no lock.
 Assignment seeding, individual factor calls,
-custom restart policies, subsequent restarts and repair searches remain atomic work
-that can overrun a segment.
+custom restart policies and repair searches remain atomic work that can overrun a segment.
 Before the first incumbent, an optimization arm that has not executed an instruction
 receives preparation revisits after all initial siblings have been admitted. Unfinished
 arms rotate in arm order until they enter search or terminate. Each revisit uses the
@@ -206,7 +205,9 @@ Greedy initialization polls cancellation between variables and retains only comp
 coordinate repairs. Payloads, costs, definition propagation and score caches update normally;
 neighbor configuration marking and tabu/activity tracking are suppressed during repair.
 Its activity epoch resets on completion, cancellation or failure, and ordinary tracking
-resumes afterwards. One variable's bounded value probes remain atomic.
+resumes afterwards. Resumable optimization retains the shuffled coordinate order and
+next coordinate across slice cancellation, completing initial and post-restart repair
+before entering the search walk. One variable's bounded value probes remain atomic.
 Its coordinate eligibility uses the generic move sink's pinned, defined and implicit-owner
 filters, preserving seeded globals and one-way definitions during repair.
 Implicit table moves select values from each support row intersected with root domains.
@@ -254,10 +255,10 @@ update payloads after the assignment changes; their return values are implementa
 and callers must read the post-move degree for scoring. Reified linear invariants offer
 an internal fused payload-update and exact-degree path. Other invariants update payloads
 and then read their degree, independently of the returned apply value.
-Optimization retains its best infeasible restart anchor as a private packed assignment.
-Strict cost improvements copy into that storage; a restart materializes an independent
-sample only when no feasible incumbent supersedes the anchor. Published samples and
-samples retained by custom restart policies remain independent of subsequent updates.
+Optimization restart policies receive only accepted feasible incumbents. Before an
+incumbent, their random-restart fallback can diversify the feasibility walk. Residual
+violation improvements contribute telemetry without becoming restart anchors. Published
+samples and samples retained by custom restart policies remain independent of subsequent updates.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
