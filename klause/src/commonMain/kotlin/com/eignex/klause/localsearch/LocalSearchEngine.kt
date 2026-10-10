@@ -14,6 +14,7 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableSearch
@@ -654,11 +655,9 @@ internal class LocalSearchEngine(
 
         var bestObj = Double.POSITIVE_INFINITY
         var bestSample: Sample? = null
-        // Best-cost (still-infeasible) snapshot for ILS perturbation before feasibility: when
-        // bestSample is null an IteratedLocalSearchRestart perturbs from this, so a long
-        // feasibility fight accumulates progress.
+        // The private anchor keeps Boolean coordinates packed until a restart consumes it.
         var bestCostInfeasible: Long = Long.MAX_VALUE
-        var bestCostSnap: Sample? = null
+        var bestCostAnchor: Assignment? = null
         var flipsSinceRestart = 0
         var totalFlips = 0L
         var restartCount = 0L
@@ -679,13 +678,13 @@ internal class LocalSearchEngine(
         )
 
         // The anchor for a restart: refresh from the pool first, then prefer the incumbent, falling back
-        // to [fallback] (a best-cost-infeasible snapshot) when no feasible incumbent exists yet.
-        fun restartAnchor(fallback: Sample?): Sample? {
+        // to [fallback] (the best-cost-infeasible assignment) when no feasible incumbent exists yet.
+        fun restartAnchor(fallback: Assignment?): Sample? {
             pooled.poll(bestObj)?.let { (sample, obj) ->
                 bestObj = obj
                 bestSample = sample
             }
-            return bestSample ?: fallback
+            return bestSample ?: fallback?.snapshot()
         }
 
         // Each restart counts as one unit of work against maxFlips; otherwise a degenerate objective
@@ -890,7 +889,7 @@ internal class LocalSearchEngine(
                 }
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
-                restartAndRepair(state, restartAnchor(bestCostSnap), params)
+                restartAndRepair(state, restartAnchor(bestCostAnchor), params)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -902,7 +901,7 @@ internal class LocalSearchEngine(
             val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restartAndRepair(state, restartAnchor(bestCostSnap), params)
+                restartAndRepair(state, restartAnchor(bestCostAnchor), params)
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -912,7 +911,9 @@ internal class LocalSearchEngine(
             state.apply(move)
             if (state.cost in 1 until bestCostInfeasible) {
                 bestCostInfeasible = state.cost
-                bestCostSnap = state.assignment.snapshot()
+                val anchor = bestCostAnchor ?: Assignment(problem.numBoolVars, problem.numIntVars, problem.numRealVars)
+                    .also { bestCostAnchor = it }
+                state.assignment.copyInto(anchor)
             }
             flipsSinceRestart++
             totalFlips++
