@@ -10,9 +10,12 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 /**
  * At-most-one clique extraction (the reusable builder behind clique-aware presolve and the planned
@@ -21,6 +24,51 @@ import kotlin.test.assertTrue
 class PresolveSharedTest {
 
     private fun pos(v: Int) = Lit.make(v, true)
+
+    @Test
+    fun `rebuilding with an expired deadline skips SAC tightening`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            ),
+        ).bake(Cancellation.after(Duration.ZERO))
+
+        val rebuilt = PresolveShared.rebuildProblem(
+            problem,
+            problem.factors.toList(),
+            bakeConfig = BakeConfig(probeIntBounds = true),
+        )
+
+        assertEquals(0L, rebuilt.rootIntDomain(0).min)
+        assertEquals(0L, rebuilt.rootIntDomain(1).min)
+    }
+
+    @Test
+    fun `successive rebakes charge probes and propagation to the same phase budget`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            ),
+        ).bake(budget.orSpent(Cancellation.Never))
+        val config = BakeConfig(probeIntBounds = true)
+        val rebuilt = PresolveShared.rebuildProblem(problem, problem.factors.toList(), bakeConfig = config)
+        val probes = budget.probeCalls
+        val work = budget.spent()
+
+        PresolveShared.rebuildProblem(rebuilt, rebuilt.factors.toList(), bakeConfig = config)
+
+        assertTrue(budget.probeCalls > probes)
+        assertTrue(budget.spent() > work)
+    }
 
     @Test
     fun `a unit-max cardinality yields one clique of its literals regardless of min`() {
