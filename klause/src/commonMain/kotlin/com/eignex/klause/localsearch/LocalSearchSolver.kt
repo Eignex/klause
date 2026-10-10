@@ -29,7 +29,7 @@ import com.eignex.klause.solver.result.SampleResult
  *
  * Three call kinds, each accepting a [LocalSearchParams]:
  *
- *  - [solve] — return a single [SolveResult]; LS never reports `Unsat`.
+ *  - [solve] — return a single [SolveResult]; root propagation is its only source of refutation.
  *  - [sample] / [enumerate] — both stream independent feasible draws with replacement.
  *    Local search has no notion of a "next" model, so enumerate is just a sample stream;
  *    duplicates may appear. Use [com.eignex.klause.backtrack.BacktrackSolver] when

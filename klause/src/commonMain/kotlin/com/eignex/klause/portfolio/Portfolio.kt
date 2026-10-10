@@ -192,7 +192,8 @@ class Portfolio(
             val openingFailure = opened.exceptionOrNull()
             if (opening && (handle != null || openingFailure != null)) {
                 run.log.initialized(
-                    arm, setup.elapsedNow().inWholeMilliseconds,
+                    arm,
+                    setup.elapsedNow().inWholeMilliseconds,
                     handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L,
                     openingFailure is SearchInitializationCancelled,
                 )
@@ -239,9 +240,17 @@ class Portfolio(
             claim.verified(verification)
             run.locked {
                 run.record(
-                    claim, handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
-                    cumulative = handle != null, work = work, failed = failed,
-                    failure = failure, phase = if (openingFailure != null) "opening" else if (handle != null) "slice" else "one-shot",
+                    claim,
+                    handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
+                    cumulative = handle != null,
+                    work = work,
+                    failed = failed,
+                    failure = failure,
+                    phase = when {
+                        openingFailure != null -> "opening"
+                        handle != null -> "slice"
+                        else -> "one-shot"
+                    },
                 )
                 if (claim.fault != null) {
                     run.quarantine(claim)
@@ -378,7 +387,8 @@ class Portfolio(
             val openingFailure = opened.exceptionOrNull()
             if (opening && (handle != null || openingFailure != null)) {
                 run.log.initialized(
-                    arm, setup.elapsedNow().inWholeMilliseconds,
+                    arm,
+                    setup.elapsedNow().inWholeMilliseconds,
                     handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L,
                     openingFailure is SearchInitializationCancelled,
                 )
@@ -445,8 +455,17 @@ class Portfolio(
             run.locked {
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
                 run.record(
-                    claim, stats, cumulative = handle != null, work = work, failed = failed,
-                    failure = failure, phase = if (openingFailure != null) "opening" else if (handle != null) "slice" else "one-shot",
+                    claim,
+                    stats,
+                    cumulative = handle != null,
+                    work = work,
+                    failed = failed,
+                    failure = failure,
+                    phase = when {
+                        openingFailure != null -> "opening"
+                        handle != null -> "slice"
+                        else -> "one-shot"
+                    },
                 )
                 if (claim.fault != null) {
                     run.quarantine(claim)
@@ -487,9 +506,13 @@ class Portfolio(
                 }
                 // An arm that threw is retired like one that finished: rescheduling it would only fail again.
                 if (failure != null || (handle != null && terminal != null) ||
-                    (claim.indeterminate &&
-                        (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded))
-                ) run.retire(arm)
+                    (
+                        claim.indeterminate &&
+                        (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded)
+                    )
+                ) {
+                    run.retire(arm)
+                }
             }
         }
         val stats = run.folded()
@@ -644,17 +667,23 @@ class Portfolio(
             val dedicated = lanes == workers.size
             val eligible = eligibleArms()
             val probe = if (dedicated) null else eligible.firstOrNull { !probed[it] && !busy[it] && !retired[it] }
-            val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) null else
+            val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) {
+                null
+            } else {
                 eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
                     .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
+            }
             val probing = probe != null
             val arm = when {
                 dedicated -> lane
+
                 probe != null -> probe.also { probed[it] = true }
+
                 revisit != null -> revisit.also {
                     preparationRevisits[it] = false
                     nextPreparationArm = (it + 1) % workers.size
                 }
+
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null

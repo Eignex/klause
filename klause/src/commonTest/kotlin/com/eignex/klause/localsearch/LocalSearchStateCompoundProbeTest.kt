@@ -37,8 +37,13 @@ class LocalSearchStateCompoundProbeTest {
     fun `real score probes preserve the committed row refresh cadence`() {
         val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0)
         val problem = Problem(
-            0, 0, emptyArray(), arrayOf<Factor>(row),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0),
+            0,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(row),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(10.0),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
         state.recompute()
@@ -125,7 +130,10 @@ class LocalSearchStateCompoundProbeTest {
     @Test
     fun `compound objective deltas reflect final coordinate values`() {
         val problem = Problem(
-            numBoolVars = 2, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 2)), factors = emptyArray(),
+            numBoolVars = 2,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 2)),
+            factors = emptyArray(),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
         val objective = LinearObjective(boolWeights = longArrayOf(2, 3), intCoefficients = longArrayOf(5))

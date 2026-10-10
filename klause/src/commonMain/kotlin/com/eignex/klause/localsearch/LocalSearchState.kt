@@ -898,8 +898,11 @@ class LocalSearchState(
         fun collect(part: Move) {
             when (part) {
                 is Move.BoolFlip -> bools.add(part.varId)
+
                 is Move.IntSet -> ints.add(part.varId)
+
                 is Move.RealSet -> {}
+
                 is Move.Compound -> {
                     for (p in part.parts) collect(p)
                     return

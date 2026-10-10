@@ -25,10 +25,10 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
-import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.StatelessSession
@@ -206,12 +206,14 @@ class PortfolioTest {
     fun `a caught reseed close failure retires the arm and retains its incumbent`() {
         val sample = Sample(BooleanArray(0), LongArray(0))
         val handle = TrackingResumableSearch(
-            null, MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
+            null,
+            MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
             closeFailure = "close failure",
         )
 
         val result = Portfolio.thompson(
-            listOf(trackingWorker("failed", 7, handle)), reseedStaleThreshold = 1,
+            listOf(trackingWorker("failed", 7, handle)),
+            reseedStaleThreshold = 1,
         ).use { it.minimize() }
 
         assertEquals(sample, assertIs<MinimizeResult.BestFound>(result).sample)
@@ -233,7 +235,8 @@ class PortfolioTest {
             var expectedNodes = 0.0
             var expectedMoves = 0.0
             val worker = PortfolioWorker.ofMinimize(
-                "plateau", 0,
+                "plateau",
+                0,
                 resumable = {
                     opened++
                     object : ResumableSearch {
@@ -257,9 +260,13 @@ class PortfolioTest {
                             runs++
                             spent += sliceNodes.coerceAtLeast(1L)
                             if (++slices == 1) {
-                                onIncumbent(MinimizeResult.BestFound(
-                                    Sample(BooleanArray(0), LongArray(0)), 0.0, TerminationReason.BudgetExhausted,
-                                ))
+                                onIncumbent(
+                                    MinimizeResult.BestFound(
+                                    Sample(BooleanArray(0), LongArray(0)),
+                                    0.0,
+                                    TerminationReason.BudgetExhausted,
+                                )
+                                )
                             }
                             return null
                         }
@@ -290,15 +297,16 @@ class PortfolioTest {
     @Test
     fun `ordinary arm diagnostics preserve the surviving optimization verdict`() {
         for (phase in listOf("opening", "slice", "one-shot")) {
-            val failedHandle = TrackingResumableSearch(null, onRun = { throw IllegalArgumentException("arm failure") })
+            val failedHandle = TrackingResumableSearch(null, onRun = { error("arm failure") })
             val worker = PortfolioWorker.ofMinimize(
-                "failed", 17,
+                "failed",
+                17,
                 resumable = when (phase) {
-                    "opening" -> { _ -> throw IllegalArgumentException("arm failure") }
+                    "opening" -> { _ -> error("arm failure") }
                     "slice" -> { _ -> failedHandle }
                     else -> null
                 },
-            ) { _, _, _, _ -> sequence { throw IllegalArgumentException("arm failure") } }
+            ) { _, _, _, _ -> sequence { error("arm failure") } }
             val sample = Sample(BooleanArray(0), LongArray(0))
             val sibling = TrackingResumableSearch(MinimizeResult.Optimal(sample, 0.0))
 
@@ -312,11 +320,11 @@ class PortfolioTest {
             assertEquals(1L, arm.failures)
             assertEquals(0L, arm.faults)
             assertEquals(17, diagnostic.armId)
-            assertEquals("IllegalArgumentException", diagnostic.type)
+            assertEquals("IllegalStateException", diagnostic.type)
             assertEquals("arm failure", diagnostic.message)
             assertEquals(phase, diagnostic.phase)
             assertEquals(1L, diagnostic.segment)
-            assertTrue("IllegalArgumentException: arm failure" in diagnostic.trace)
+            assertTrue("IllegalStateException: arm failure" in diagnostic.trace)
             assertNull(result.stats.portfolio.arms.last().failure)
         }
     }
@@ -339,7 +347,10 @@ class PortfolioTest {
         val order = mutableListOf<Int>()
         val prepared = TrackingResumableSearch(null, onRun = { order += 0 })
         val worker = PortfolioWorker.ofMinimize(
-            "prepared", 0, countsInstructions = true, resumable = { prepared },
+            "prepared",
+            0,
+            countsInstructions = true,
+            resumable = { prepared },
         ) { _, _, _, _ ->
             error("the retained handle must resume")
         }
@@ -360,7 +371,10 @@ class PortfolioTest {
         val workers = List(3) { arm ->
             val handle = TrackingResumableSearch(null, onRun = { order += arm })
             PortfolioWorker.ofMinimize(
-                "preparing$arm", arm, countsInstructions = true, resumable = { handle },
+                "preparing$arm",
+                arm,
+                countsInstructions = true,
+                resumable = { handle },
             ) { _, _, _, _ ->
                 error("the retained handle must resume")
             }
@@ -1552,6 +1566,7 @@ class PortfolioTest {
         assertEquals(handle.work, result.stats.portfolio.arms.single().work)
         assertEquals(10L, result.stats.portfolio.arms.single().initializationWork)
     }
+
     @Test
     fun `nonresumable session optimization retains stacked assumptions`() {
         val solver = BacktrackSolver(Problem(0, 1, arrayOf(IntDomain(0L, 1L)), emptyArray()).bake())
@@ -1654,7 +1669,9 @@ class PortfolioTest {
         val workers = listOf(
             PortfolioWorker.of("opening", 0, solver.session(), BacktrackParams(), LinearObjective()),
             trackingWorker(
-                "sibling", 1, TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.Unsupported)),
+                "sibling",
+                1,
+                TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.Unsupported)),
             ),
         )
 
@@ -1663,5 +1680,4 @@ class PortfolioTest {
         assertEquals(1, slices)
         assertTrue(checkNotNull(requestedMillis) <= checkNotNull(remainingMillis) + 1L)
     }
-
 }
