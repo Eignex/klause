@@ -122,6 +122,10 @@ The traversal clears visited ids between extractions and reads learned native cl
 variables directly, retaining the same factor-core membership across restarts and
 learned-clause compaction.
 
+Pseudo-Boolean accumulators cache coefficient reads by Boolean variable id. The
+coefficient map retains its iteration order; every coefficient mutation updates the
+cache, and reset clears only stored entries.
+
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump.
 Sound resolvents that cannot assert retain chronological fallback. Root

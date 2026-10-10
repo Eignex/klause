@@ -8,7 +8,34 @@ import kotlin.test.assertTrue
 
 class PbAccumulatorTest {
 
-    private fun acc(block: PbAccumulator.() -> Unit) = PbAccumulator().apply(block)
+    private fun acc(block: PbAccumulator.() -> Unit) = PbAccumulator(8).apply(block)
+
+    @Test
+    fun `loading another constraint clears previous coefficients`() {
+        val a = acc { loadClause(intArrayOf(Lit.make(0, true))) }
+
+        a.loadClause(intArrayOf(Lit.make(1, false)))
+
+        assertEquals(0L, a.coefOf(0))
+    }
+
+    @Test
+    fun `coefficients outside the reserved variable range remain accessible`() {
+        val a = acc { loadPb(longArrayOf(3), intArrayOf(Lit.make(8, true)), geBound = 1) }
+
+        val coefficient = a.coefOf(8)
+
+        assertEquals(3L, coefficient)
+    }
+
+    @Test
+    fun `weakening removes the coefficient of an eligible literal`() {
+        val a = acc { loadPb(longArrayOf(3, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), geBound = 3) }
+
+        a.weakenForDivision(keepVar = 0, divisor = 2, isFalse = { false })
+
+        assertEquals(0L, a.coefOf(1))
+    }
 
     @Test
     fun `generalized resolution cancels the pivot like clause resolution`() {

@@ -12,8 +12,8 @@ import com.eignex.klause.util.IntHashSet
 internal class PbConflictResolvent(private val state: PropagationState, private val graph: ReasonGraph) :
     ConflictResolvent {
 
-    private val acc = PbAccumulator()
-    private val reason = PbAccumulator()
+    private val acc = PbAccumulator(state.problem.numBoolVars)
+    private val reason = PbAccumulator(state.problem.numBoolVars)
     private val resolvedVars = IntHashSet()
     private val bumped = IntHashSet()
 
