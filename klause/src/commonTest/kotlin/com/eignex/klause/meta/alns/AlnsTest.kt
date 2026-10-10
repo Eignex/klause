@@ -540,6 +540,23 @@ class AlnsTest {
     }
 
     @Test
+    fun `a cancelled backtrack bootstrap does not start a local search fallback`() {
+        val problem = selectProblem()
+        var expired = false
+        val backtrack = object : Optimizer<BacktrackParams> by BacktrackSolver(problem) {
+            override fun minimize(objective: LinearObjective, params: BacktrackParams): MinimizeResult {
+                expired = true
+                return MinimizeResult.Unknown(TerminationReason.Cancelled)
+            }
+        }
+        val alns = Alns(inner = NoFeasibleLs(problem), backtrack = backtrack)
+
+        val result = alns.minimize(selectObjective, LocalSearchParams(cancellation = Cancellation { expired }))
+
+        assertEquals(TerminationReason.Cancelled, (result as MinimizeResult.Unknown).reason)
+    }
+
+    @Test
     fun `falls back to a backtrack bootstrap when local search finds no feasible incumbent`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
