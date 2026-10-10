@@ -23,7 +23,12 @@ import kotlin.test.assertNotNull
 class SmtLibConditionalEqualityTest {
     @Test
     fun `a constant conditional result completes without arithmetic predicate decisions`() {
-        for (guard in listOf("(<= x 0)", "(= x 0)")) {
+        val guards = listOf(
+            "(<= x 0)", "(= x 0)", "(and (<= x 0) (= x 0))", "(or (<= x 0) (= x 0))",
+            "(xor (<= x 0) (= x 0))", "(=> (<= x 0) (= x 0))", "(= (<= x 0) (= x 0))",
+            "(ite (<= x 0) (= x 0) (< x 0))",
+        )
+        for (guard in guards) {
             val parsed = SmtLib.parse(
                 "(declare-const x Int) (assert (= (ite $guard 1 1) 1))",
             )
@@ -37,6 +42,26 @@ class SmtLibConditionalEqualityTest {
                 session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
                 guard,
             )
+        }
+    }
+
+    @Test
+    fun `a Boolean gate retains its meaning when an arithmetic channel consumes it`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const c Bool)
+            (assert (not b)) (assert (not c))
+            (assert (= (ite b 1 1) 1))
+            (assert (distinct (and b c) false))
+            """.trimIndent(),
+        )
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            assertIs<ComponentResult.Conflict>(session.initialize())
         }
     }
 
