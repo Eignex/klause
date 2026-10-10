@@ -21,6 +21,42 @@ import kotlin.test.assertTrue
  */
 class LocalSearchStateTest {
 
+    @Test
+    fun `reified degree updates and scores agree with recompute across moves`() {
+        for (op in LinearOp.entries) {
+            val problem = Problem(
+                1, 1, arrayOf(IntDomain(0, 10)),
+                arrayOf<Factor>(ReifiedLinear(0, intArrayOf(2), intArrayOf(0), op, 6)),
+            )
+            val state = LocalSearchState(problem.bake(), Random(1))
+            state.violationSoftCap = 4
+            state.assignment.setBool(0, true)
+            state.recompute()
+            val moves = listOf(
+                Move.BoolFlip(0), Move.IntSet(0, 3), Move.BoolFlip(0), Move.IntSet(0, 10),
+                Move.Compound(listOf(Move.BoolFlip(0), Move.IntSet(0, 0))),
+            )
+
+            for (move in moves) {
+                val before = state.cost
+                val predicted = state.netDelta(move)
+                state.apply(move)
+                val cost = state.cost
+                val degree = state.factorDegree[0]
+                val breaks = state.breakScore(Move.BoolFlip(0))
+                val makes = state.makeScore(Move.BoolFlip(0))
+
+                state.recompute()
+
+                assertEquals(predicted, cost - before, "$op $move")
+                assertEquals(state.cost, cost, "$op $move")
+                assertEquals(state.factorDegree[0], degree, "$op $move")
+                assertEquals(state.breakScore(Move.BoolFlip(0)), breaks, "$op $move")
+                assertEquals(state.makeScore(Move.BoolFlip(0)), makes, "$op $move")
+            }
+        }
+    }
+
     private fun parts(move: Move): List<Move> = (move as Move.Compound).parts
 
     /** `c == p` reified as `b_p` for p in 0..2, encoded as N parallel single-var EQ reifieds. */
