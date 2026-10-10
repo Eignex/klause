@@ -60,7 +60,7 @@ class LocalSearchStateCompoundProbeTest {
         )
         val objective = LinearObjective(boolWeights = longArrayOf(0, 3), intCoefficients = longArrayOf(2, 0))
         for (move in listOf(Move.BoolFlip(0), Move.IntSet(1, 1))) {
-            val state = LocalSearchState(problem.bake(), Random(7))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
             state.invariants = network
             state.recompute()
             state.weights.factorWeights[0] = 2.5
@@ -78,11 +78,35 @@ class LocalSearchStateCompoundProbeTest {
 
             assertEquals(state.cost - cost, predicted)
             assertEquals(predicted * 2.5, weighted)
-            assertEquals(1, breakScore)
+            assertEquals(1, breakScore, "$move break")
             assertEquals(objective.evaluate(state.assignment) - value, objectiveDelta)
             assertEquals(checkNotNull(objectiveDelta) * 0.5, shapedDelta)
             val inverse = if (move is Move.BoolFlip) move else Move.IntSet(1, 0)
-            assertEquals(1, state.makeScore(inverse))
+            assertEquals(1, state.makeScore(inverse), "$move inverse make")
+        }
+    }
+
+    @Test
+    fun `compound objective deltas reflect final coordinate values`() {
+        val problem = Problem(
+            numBoolVars = 2, numIntVars = 1, intDomains = arrayOf(IntDomain(0, 2)), factors = emptyArray(),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
+        val objective = LinearObjective(boolWeights = longArrayOf(2, 3), intCoefficients = longArrayOf(5))
+        val cases = listOf(
+            Move.Compound(listOf(Move.BoolFlip(0), Move.BoolFlip(0))) to 0.0,
+            Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(0, 2))) to 10.0,
+            Move.Compound(listOf(Move.BoolFlip(0), Move.IntSet(0, 1))) to 7.0,
+        )
+        val before = state.assignment.snapshot()
+        state.shaping.objective = objective
+        state.shaping.shapingLambda = 0.5
+        state.recompute()
+
+        for ((move, expected) in cases) {
+            assertEquals(expected, state.objectiveDelta(objective, move))
+            assertEquals(expected * 0.5, state.shapedObjectiveDelta(move))
+            assertEquals(before, state.assignment.snapshot())
         }
     }
 

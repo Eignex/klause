@@ -178,7 +178,10 @@ arms share its lazy construction while each state applies definitions to its own
 Boolean break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Moves feeding definitions score the complete propagated assignment, including derived
-factor degrees and objective coordinates. Probes apply compound inputs together before
+factor degrees and objective coordinates. Compounds without definition readers retain
+additive linear objective scoring for distinct coordinates and the objective's own
+incremental delta; repeated-coordinate linear deltas use a probe of the final values.
+Probes apply compound inputs together before
 one definition pass, save affected input/output values, and restore those values directly;
 an inverse definition that cannot write does not strand a derived output. Probe activity
 is suppressed and its best-cost observation is discarded. Weighted probes snapshot and

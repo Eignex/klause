@@ -464,12 +464,13 @@ class LocalSearchState(
      * Break score fused with the per-move objective delta:
      *   `breakScore(move).toDouble() + shapingLambda * objectiveDelta(move)`
      * Reduces to `breakScore(move).toDouble()` when [ObjectiveShaping.shapingLambda] is zero,
-     * [ObjectiveShaping.objective] is null, or the objective isn't a [LinearObjective], so non-shaping
+     * [ObjectiveShaping.objective] is null, or the objective supports no incremental delta, so non-shaping
      * callers see identical behavior.
      *
-     * Direct primitives use coefficient lookup for [LinearObjective] or the caller-supplied
-     * [IncrementalObjective.deltaIfApplied]. Moves feeding definitions and compound moves use a
-     * reversible probe of their resulting assignment. Other objective types contribute `0.0`.
+     * Moves feeding definitions use a reversible probe. Other moves use coefficient lookup for
+     * [LinearObjective] or the caller-supplied [IncrementalObjective.deltaIfApplied]; repeated
+     * compound coordinates use a probe for their final linear delta. Other objective types
+     * contribute `0.0`.
      */
     fun shapedBreakScore(move: Move): Double = breakScore(move).toDouble() + shapedObjectiveDelta(move)
 
@@ -482,28 +483,21 @@ class LocalSearchState(
     fun shapedObjectiveDelta(move: Move): Double {
         val obj = shaping.objective ?: return 0.0
         val lambda = shaping.shapingLambda
-        if (lambda == 0.0) return 0.0
-        if (obj !is LinearObjective && obj !is IncrementalObjective) return 0.0
-        if (feedsDefinitions(move) || move is Move.Compound) return lambda * evaluateMove(move, obj).objectiveDelta
-        val delta = when (obj) {
-            is LinearObjective -> linearObjectiveDelta(move, obj)
-            is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
-            else -> return 0.0
-        }
-        return lambda * delta
+        if (lambda == 0.0 || (obj !is LinearObjective && obj !is IncrementalObjective)) return 0.0
+        return lambda * checkNotNull(objectiveDelta(obj, move))
     }
 
     /**
      * Raw per-move objective delta `evaluate(applyMove(current)) − evaluate(current)`, computed
-     * against the current assignment without committing the move. Definition inputs and compounds
-     * use a reversible probe; direct primitives return `null` for objectives with no incremental
-     * path, signalling the caller to fall back to `apply` + full [Objective.evaluate].
+     * against the current assignment without committing the move. Definition inputs use a
+     * reversible probe; other moves return `null` for objectives with no incremental path,
+     * signalling the caller to fall back to `apply` + full [Objective.evaluate].
      *
      * Unlike [shapedObjectiveDelta], this is unscaled — the delta the optimize-side descent scores
      * candidates by, paired with [netDelta] for the feasibility/cost side.
      */
     fun objectiveDelta(obj: Objective, move: Move): Double? {
-        if (feedsDefinitions(move) || move is Move.Compound) return evaluateMove(move, obj).objectiveDelta
+        if (feedsDefinitions(move)) return evaluateMove(move, obj).objectiveDelta
         return when (obj) {
             is LinearObjective -> linearObjectiveDelta(move, obj)
             is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
@@ -511,44 +505,50 @@ class LocalSearchState(
         }
     }
 
-    private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double = when (move) {
-        is Move.BoolFlip -> {
-            val v = move.varId
-            if (v < obj.boolWeights.size) {
-                val w = obj.boolWeights[v]
-                (if (assignment.boolValue(v)) -w else w).toDouble()
-            } else {
-                0.0
+    private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double {
+        return when (move) {
+            is Move.BoolFlip -> {
+                val v = move.varId
+                if (v < obj.boolWeights.size) {
+                    val w = obj.boolWeights[v]
+                    (if (assignment.boolValue(v)) -w else w).toDouble()
+                } else {
+                    0.0
+                }
             }
-        }
 
-        is Move.IntSet -> {
-            val v = move.varId
-            if (v < obj.intCoefficients.size) {
-                (obj.intCoefficients[v] * (move.newValue - assignment.intValue(v))).toDouble()
-            } else {
-                0.0
+            is Move.IntSet -> {
+                val v = move.varId
+                if (v < obj.intCoefficients.size) {
+                    (obj.intCoefficients[v] * (move.newValue - assignment.intValue(v))).toDouble()
+                } else {
+                    0.0
+                }
             }
-        }
 
-        is Move.RealSet -> {
-            val v = move.varId
-            if (v < obj.realCoefficients.size) {
-                obj.realCoefficients[v] * (
-                    move.newValue - assignment.realValue(
-                        v,
-                    )
-                    )
-            } else {
-                0.0
+            is Move.RealSet -> {
+                val v = move.varId
+                if (v < obj.realCoefficients.size) {
+                    obj.realCoefficients[v] * (
+                        move.newValue - assignment.realValue(
+                            v,
+                        )
+                        )
+                } else {
+                    0.0
+                }
             }
-        }
 
-        is Move.Compound -> {
-            // Linear deltas are additive over parts evaluated against the initial assignment.
-            var sum = 0.0
-            for (p in move.parts) sum += linearObjectiveDelta(p, obj)
-            sum
+            is Move.Compound -> {
+                // Distinct-coordinate deltas are additive; repeated writes need their final combined value.
+                probeSlotSet.clear()
+                var sum = 0.0
+                for (p in move.parts) {
+                    if (!probeSlotSet.add(slotOf(p))) return evaluateMove(move, obj).objectiveDelta
+                    sum += linearObjectiveDelta(p, obj)
+                }
+                sum
+            }
         }
     }
 
