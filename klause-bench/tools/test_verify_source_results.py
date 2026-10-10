@@ -95,6 +95,36 @@ class ProofCheckTest(unittest.TestCase):
         solver.add(*constraints, variables['x'] == 2)
         self.assertEqual(solver.check(), z3.unsat)
 
+    def test_mps_ranges_define_exact_feasible_intervals(self):
+        for kind, span, lo, hi in (('E', '2', 5, 7), ('E', '-2', 3, 5),
+                                  ('L', '2', 3, 5), ('G', '-2', 5, 7)):
+            with self.subTest(kind=kind, span=span):
+                text = f'NAME fixture\nROWS\n N obj\n {kind} row\nCOLUMNS\n x row 1\nRHS\n rhs row 5\nRANGES\n ranges row {span}\nENDATA\n'
+                constraints, _, variables, _ = proof_check.mps(text)
+                for value, expected in ((lo, z3.sat), (hi, z3.sat),
+                                        (lo - 1, z3.unsat), (hi + 1, z3.unsat)):
+                    solver = z3.Solver()
+                    solver.add(*constraints, variables['x'] == value)
+                    self.assertEqual(solver.check(), expected)
+
+    def test_mps_objective_offset_and_maximum_orientation(self):
+        text = 'NAME fixture\nOBJSENSE\n MAX\nROWS\n N obj\nCOLUMNS\n x obj 3\nRHS\n rhs obj 2\nENDATA\n'
+        _, objective, variables, maximize = proof_check.mps(text)
+        self.assertTrue(maximize)
+        self.assertEqual(str(z3.simplify(z3.substitute(objective, (variables['x'], z3.RealVal(4))))), '-10')
+
+    def test_unsupported_mps_sections_cannot_be_ignored(self):
+        with self.assertRaises(ValueError):
+            proof_check.mps('NAME fixture\nQCMATRIX row\nENDATA\n')
+
+    def test_inline_objective_orientation_cannot_be_ignored(self):
+        with self.assertRaises(ValueError):
+            proof_check.mps('NAME fixture\nOBJSENSE MAX\nENDATA\n')
+
+    def test_model_objective_must_match_reported_incumbent(self):
+        with self.assertRaises(AssertionError):
+            self.check(self.case(proven=False, objective=2))
+
 
 if __name__ == '__main__':
     unittest.main()
