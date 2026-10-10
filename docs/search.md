@@ -32,6 +32,34 @@ sets use separate state storage, leaving reversible payloads intact; each fire c
 previous failure, and undo discards pending failure context. The native SAT lane keeps
 its own state and leaves general CP failure storage unallocated.
 
+`FactorExecutionCapabilities` inventories each built-in family's execution routes.
+`SOUND_FILTERING`, `BOUNDS_FILTERING` and `DOMAIN_FILTERING` describe deduction
+mechanisms; they do not promise full consistency at every size or resource limit.
+Complete finite checks pin the full assignment and run a completed CP fixpoint.
+Local-search invariant satisfaction is a separate check from its graded score.
+Continuous arithmetic and floating objective scores require the existing source
+publication checks; a zero heuristic score is not an exact certificate.
+
+Gaussian XOR and difference-system helpers deliberately omit local-search scoring:
+their retained source rows enforce the assignment. Symmetry helpers also omit
+scoring because source witnesses need not satisfy a chosen CP representative.
+Objective-bound overlays deliberately omit CP propagation. Every inert built-in
+role carries a reason. A sound LP family can decline emission under feature,
+resource or domain gates, and omitted rows weaken the relaxation.
+
+Custom factors retain the `Propagator` and `Invariant` extension paths. A custom
+`Propagator` without an `Invariant` explicitly takes the propagation-only path;
+a custom `Invariant` supplies local checking and scoring through its interface
+contract. Structural-only custom factors refuse CP and local-search execution
+with route-specific errors. Custom implied linear rows remain available to LP
+relaxation independently of either execution interface.
+
+Shared table preparation transfers no-op verdicts only under matching contiguous
+column domains. MDD preparation sharing includes the initial and accepting states;
+value relabeling prepares an index over the relabeled transition array. Reversible
+live tuples, diagram reachability and all assignment-dependent payloads remain
+state-owned.
+
 Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights
 and its heap belong to the solve, retain conflict bumps across restarts, and apply bumps
 received before the first selection once during initialization. Fresh selectors isolate

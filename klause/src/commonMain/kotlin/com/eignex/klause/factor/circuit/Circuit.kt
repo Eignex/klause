@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.circuit
 
-import com.eignex.klause.factor.circuit.internals.cycleScan
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
@@ -10,8 +9,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.LocalSearchState
-import kotlin.math.abs
 
 /**
  * Successor-array single-cycle constraint over `n` nodes: `succ(i)` holds the index of node `i`'s
@@ -63,78 +60,4 @@ class Circuit(
         sink.intVars(succ)
     }
 
-    /** Graded cost, dispatched by mode; 0 iff the assignment forms the required single (sub)cycle. */
-    internal fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int =
-        if (subcircuit) subcircuitCost(state, replaceAt, replaceWith) else circuitCost(state, replaceAt, replaceWith)
-
-    /**
-     * Hamiltonian cost: `|numCycles − 1| + (n − nodesInCycles) + numSelfLoops + numOutOfBounds`.
-     * Returns 0 iff the assignment (with optional override `succ[replaceAt] = replaceWith`) is a single
-     * Hamiltonian cycle of length `n`. O(n).
-     */
-    private fun circuitCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int {
-        if (n == 1) {
-            val v = if (replaceAt == 0) replaceWith else state.assignment.intValue(succ[0])
-            return if (v == 0L) 0 else 1
-        }
-        val next = IntArray(n)
-        var numSelfLoops = 0
-        var numOob = 0
-        for (i in 0 until n) {
-            val s = if (i == replaceAt) replaceWith else state.assignment.intValue(succ[i])
-            if (s < 0 || s >= n) {
-                next[i] = -1
-                numOob++
-            } else if (s == i.toLong()) {
-                next[i] = -1
-                numSelfLoops++
-            } else {
-                next[i] = s.toInt()
-            }
-        }
-        val scan = cycleScan(next, n)
-        return abs(scan.numCycles - 1) + (n - scan.nodesInCycles) + numSelfLoops + numOob
-    }
-
-    /** Subcircuit cost: 0 iff the included set (non-self-loop nodes) forms a single cycle (or is empty). O(n). */
-    private fun subcircuitCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int {
-        val effective = LongArray(n) { i ->
-            if (i == replaceAt) replaceWith else state.assignment.intValue(succ[i])
-        }
-        var numOob = 0
-        var numIncluded = 0
-        var numPointToExcluded = 0
-        val included = BooleanArray(n)
-        for (i in 0 until n) {
-            val s = effective[i]
-            if (s < 0 || s >= n) {
-                numOob++
-                continue
-            }
-            if (s != i.toLong()) {
-                included[i] = true
-                numIncluded++
-            }
-        }
-        for (i in 0 until n) {
-            if (!included[i]) continue
-            val s = effective[i]
-            if (s in 0 until n && !included[s.toInt()] && effective[s.toInt()] in 0 until n &&
-                effective[s.toInt()] == s
-            ) {
-                numPointToExcluded++
-            }
-        }
-        if (numIncluded == 0) return numOob
-        val next = IntArray(n) { i ->
-            if (!included[i]) {
-                -1
-            } else {
-                val s = effective[i]
-                if (s in 0 until n && s != i.toLong() && included[s.toInt()]) s.toInt() else -1
-            }
-        }
-        val scan = cycleScan(next, n)
-        return abs(scan.numCycles - 1) + (numIncluded - scan.nodesInCycles) + numPointToExcluded + numOob
-    }
 }

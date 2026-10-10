@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.FactorReduction
@@ -16,9 +15,7 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.argsortBy
 
 /**
@@ -71,11 +68,6 @@ class Table private constructor(
     // symmetry refinement's per-round hot path. Cleared (recomputed) only when the tuples change.
     private var cachedTupleKey: LongArray? = cachedTupleKey
 
-    /** Shared across the rows of a `<group>` over one relation so a full-table GAC sweep that prunes
-     *  nothing is discovered once and skipped by the rest. Set by the front-end that shares [tuples];
-     *  carried across [remap] (same relation). Null ⇒ a lone table, no group reuse. */
-    internal var groupCache: TableGroupCache? = null
-
     private fun tupleKey(): LongArray = cachedTupleKey ?: run {
         // Rows are a set, so order-independence comes from sorting rows into a canonical order. Short
         // tables tie-break equal-lower-bound rows by their upper bound so the key stays canonical, and
@@ -120,7 +112,7 @@ class Table private constructor(
         tuples,
         hi,
         cachedTupleKey,
-    ).also { it.groupCache = groupCache }
+    )
 
     // Affine substitution `x = scale·replacement + offset` rewrites every column holding x: a row's
     // required value v for x means replacement = (v − offset) / scale, so rows where (v − offset) is
@@ -191,19 +183,6 @@ class Table private constructor(
     // The key embeds the full sorted tuple set, so its cost is dominated by the flat tuple count, not
     // the variable count — a wide table is far more expensive to key than its arity suggests.
     override val structuralKeyWeight: Int get() = xs.size + tuples.size
-
-    /** Var id → the single tuple column it occupies (the common case). Vars that appear in more than
-     *  one column are absent here and listed in [multiColumnsByVar] instead. */
-    internal val singleColumnByVar: IntIntMap
-
-    /** Var id → all tuple columns it occupies, for vars that appear more than once in [xs]. */
-    internal val multiColumnsByVar: MutableIntObjectMap<IntArray>
-
-    init {
-        val (single, multi) = tableColumnMaps(xs, arity)
-        singleColumnByVar = single
-        multiColumnsByVar = multi
-    }
 
     /**
      * Drop tuples no assignment can use — those with a cell outside its variable's current domain — a

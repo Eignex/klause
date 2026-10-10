@@ -70,6 +70,21 @@ builds a compact remapped CP projection and theory fragments. Variables owned by
 an open theory never become finite CP domains. Continuous variables are LP columns
 and are not integer branch candidates.
 
+Built-in factor execution capabilities are declared by
+`solver/FactorExecutionCapabilities.kt`, outside `ir`. The declarations distinguish
+unsupported routes, deliberate inertness, filtering strength, complete assignment
+checks, heuristic scores and sound relaxation families. Engines own their projection
+factories and check the declared CP and local-search roles when allocating them.
+Capability declarations do not certify a result or select a source theory.
+
+Optional-factor data stores presence literals without reading engine state.
+Propagation projections interpret pinned literals conservatively; local-search
+projections read complete assignments. Table group no-op caches and MDD transition
+indexes belong to a propagation projection, keyed by shared immutable relation
+arrays. Local-search projections prepare table column maps, AllDifferent occurrence counts
+and circuit scoring. Each engine interprets presence literals in its own state.
+Source lowering shares relation data without allocating engine preparation.
+
 Shared search exchanges Boolean literals, semantic integer bounds and typed opaque
 theory decisions. Components can maintain private residual state through
 `SearchBrancher`, but traversal and decision levels belong to the shared session.

@@ -19,7 +19,8 @@ class PropagationProblem(
 
     /** One propagator per model factor, materialized only by consumers of the general CP lane. */
     val propagators: Array<out Propagator> by lazy {
-        Array(problem.numFactors) { problem.factors[it].propagatorProjection() }
+        val preparation = FactorProjectionPreparation()
+        Array(problem.numFactors) { problem.factors[it].propagatorProjection(preparation) }
     }
 
     /** Propagator occurrences indexed by Boolean variable. */

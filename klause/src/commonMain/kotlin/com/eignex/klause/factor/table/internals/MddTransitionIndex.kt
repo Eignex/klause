@@ -23,9 +23,9 @@ internal class MddRootSnapshot(val fwd: LongArray, val bwd: LongArray, val survi
  * reachability bit, so the sweeps behave identically.
  *
  * The index depends only on the diagram's structure (`transitions`, `layerStarts`, `numStatesPerLayer`),
- * not on the sequence variables, the symbols, or the cost weights. A `<group>` of identical diagrams —
- * hundreds of factors over one shared structure — therefore builds it once and shares the instance, and
- * it survives both variable and value remapping unchanged.
+ * including their symbols, but not on the sequence variables or the cost weights. A propagation
+ * projection shares it across factors over the same immutable diagram and acceptance language.
+ * Variable remapping preserves that relation; value remapping prepares a new index.
  */
 internal class MddTransitionIndex(
     val fwdHead: Array<IntArray>,

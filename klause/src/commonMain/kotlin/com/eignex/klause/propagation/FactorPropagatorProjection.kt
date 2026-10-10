@@ -17,10 +17,25 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.propagation.difference.DifferenceSystemPropagator
+import com.eignex.klause.solver.PropagationCapability
+import com.eignex.klause.solver.executionCapabilities
+import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.PermutationGroup
 
 /** Builds the propagation-engine view of immutable factor data. */
-internal fun Factor.propagatorProjection(): Propagator = when (this) {
+internal fun Factor.propagatorProjection(preparation: FactorProjectionPreparation? = null): Propagator {
+    val capabilities = executionCapabilities()
+    check(capabilities.propagation != PropagationCapability.UNSUPPORTED) {
+        "unsupported propagation route for ${this::class.simpleName}; implement Propagator for a custom factor"
+    }
+    return buildPropagatorProjection(preparation).also {
+        check((it === NoPropagator) == (capabilities.propagation == PropagationCapability.INERT)) {
+            "propagation capability disagrees with projection for ${this::class.simpleName}"
+        }
+    }
+}
+
+private fun Factor.buildPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator = when (this) {
     is AllDifferent -> AllDifferentPropagator(
         boolVars,
         intVars,
@@ -28,8 +43,8 @@ internal fun Factor.propagatorProjection(): Propagator = when (this) {
         presents,
         exceptSet,
         boundsConsistent,
-        exceptValues,
-        { idx, state -> definitelyPresent(idx, state) },
+        LongHashSet(exceptSet.size).also { set -> for (value in exceptSet) set.add(value) },
+        { idx, state -> OptionalPresence.isDefinitelyPresent(presents, idx, state) },
     )
 
     is ArrayMinMax -> ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
@@ -63,8 +78,8 @@ internal fun Factor.propagatorProjection(): Propagator = when (this) {
         closed,
         presents,
         coverIndexByValue,
-        { idx, state -> definitelyPresent(idx, state) },
-        { idx, state -> definitelyAbsent(idx, state) },
+        { idx, state -> OptionalPresence.isDefinitelyPresent(presents, idx, state) },
+        { idx, state -> OptionalPresence.isDefinitelyAbsent(presents, idx, state) },
     )
 
     is Increasing -> IncreasingPropagator(xs, gap)
@@ -90,7 +105,7 @@ internal fun Factor.propagatorProjection(): Propagator = when (this) {
         accepting,
         recordStride,
         cost,
-        transitionIndex,
+        preparation?.mddIndex(this),
     )
 
     is NValue -> nValuePropagator()
@@ -139,7 +154,7 @@ internal fun Factor.propagatorProjection(): Propagator = when (this) {
 
     is SymmetryHandling -> symmetryPropagator()
 
-    is Table -> TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, hi, groupCache)
+    is Table -> TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, hi, preparation?.tableCache(this))
 
     is ValuePrecede -> ValuePrecedePropagator(boolVars, intVars, s, t, xs)
 
@@ -189,8 +204,8 @@ private fun NValue.nValuePropagator(): Propagator {
         presents,
         watches,
         presents.isEmpty(),
-        { idx, state -> definitelyAbsent(idx, state) },
-        { idx, state -> definitelyPresent(idx, state) },
+        { idx, state -> OptionalPresence.isDefinitelyAbsent(presents, idx, state) },
+        { idx, state -> OptionalPresence.isDefinitelyPresent(presents, idx, state) },
     )
 }
 

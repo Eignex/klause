@@ -7,6 +7,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -57,7 +58,7 @@ class LocalSearchPreparationTest {
                 clause,
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 2.5),
                 Clause(intArrayOf(Lit.make(0, false))),
-                object : Factor by clause {},
+                object : Factor by clause, Propagator {},
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
