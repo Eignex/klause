@@ -203,7 +203,7 @@ Run each configuration separately over the same frozen selection:
 ./gradlew :klause-bench:solveCampaign --args="solve suite=core kind=cop engine=cp param=var-selector=smallest-domain timeout=30000 label=domain"
 ```
 
-Use `klause-bench/output/compare.sh [--incomplete] <dirA> <dirB>` on the resulting
+Use `klause-bench/output/compare.sh [--incomplete] <dirA> <dirB>` (Python 3) on the resulting
 configuration directories. It compares shared problems by feasibility, proof and
 direction-aware objective quality, with time breaking ties. Complete mode prefers
 proved optimality; incomplete mode ignores it and splits ties equally. The report

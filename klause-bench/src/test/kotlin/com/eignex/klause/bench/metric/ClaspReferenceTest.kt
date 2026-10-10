@@ -11,6 +11,16 @@ class ClaspReferenceTest {
     private val cmd = listOf("docker", "run", "clasp")
 
     @Test
+    fun `reference objectives preserve arbitrary integer precision`() {
+        for (value in listOf("9007199254740993", "9223372036854775808")) {
+            val result = ClaspReference.parse("o $value\ns OPTIMUM FOUND\n", elapsedMs = 10, cmd = cmd)
+
+            assertEquals(value, result.exactObjective)
+            assertTrue(result.proven)
+        }
+    }
+
+    @Test
     fun `optimum found is a proven feasible optimum with the last o cost`() {
         val r = ClaspReference.parse("o 9\no 4\ns OPTIMUM FOUND\n", elapsedMs = 1_200, cmd = cmd)
         assertEquals(true, r.feasible)
