@@ -68,11 +68,11 @@ internal class ExactLiraEqualities(
     private var diagnosticUnavailableReasons = 0L
 
     fun printDiagnosticCounters() {
-        println("%%%mzn-stat: smtEqualityExclusionPasses=$diagnosticPasses")
-        println("%%%mzn-stat: smtEqualityExclusionPeakKeys=$diagnosticPeakExclusions")
-        println("%%%mzn-stat: smtEqualityExclusionMatches=$diagnosticMatches")
-        println("%%%mzn-stat: smtEqualityExclusionImplications=$diagnosticImplications")
-        println("%%%mzn-stat: smtEqualityExclusionUnavailableReasons=$diagnosticUnavailableReasons")
+        println("; smtEqualityExclusionPasses=$diagnosticPasses")
+        println("; smtEqualityExclusionPeakKeys=$diagnosticPeakExclusions")
+        println("; smtEqualityExclusionMatches=$diagnosticMatches")
+        println("; smtEqualityExclusionImplications=$diagnosticImplications")
+        println("; smtEqualityExclusionUnavailableReasons=$diagnosticUnavailableReasons")
     }
 
     fun propagate(context: SearchContext, stop: Cancellation): ComponentResult {
