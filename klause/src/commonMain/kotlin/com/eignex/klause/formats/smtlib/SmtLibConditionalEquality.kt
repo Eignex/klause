@@ -34,6 +34,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
 
     private data class Key(val variable: Int, val value: Long)
     private class PendingEquality(val literal: Int, val factor: Factor)
+    private class CompletedEquality(val variable: Int, val equality: PendingEquality)
     private data class Owner(val variable: Int, val integer: Boolean)
     private sealed interface Frame {
         class Eval(val term: LinComb) : Frame
@@ -45,6 +46,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private val booleanDefinitions = HashMap<Int, List<Factor>>()
     private val equalities = HashMap<Key, Int>()
     private val pendingEqualities = LinkedHashMap<Key, PendingEquality>()
+    private val completedEqualities = ArrayList<CompletedEquality>()
     private var work = 0
 
     fun define(
@@ -139,10 +141,20 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             ownedFactors.getValue(pending.removeFirst()).forEach(::read)
         }
         factors.removeAll { factor -> owners[factor]?.let { it !in retained } == true }
-        return UnusedColumns(
+        val unused = UnusedColumns(
             integerOwners.keys.filterTo(HashSet()) { integerOwners.getValue(it) !in retained },
             booleanOwners.keys.filterTo(HashSet()) { booleanOwners.getValue(it) !in retained },
         )
+        for (completed in completedEqualities) {
+            val variable = completed.variable
+            val equality = completed.equality
+            val predicate = Lit.variable(equality.literal)
+            if (variable in unused.ints || predicate in unused.bools) continue
+            factors.add(equality.factor)
+            booleanDefinitions[predicate] = booleanDefinitions.getValue(predicate) + equality.factor
+        }
+        completedEqualities.clear()
+        return unused
     }
 
     fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {
@@ -170,6 +182,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             builder.factors.addAll(clauses)
             definePredicate(Lit.variable(equality.literal), clauses)
             replaced.add(equality.factor)
+            completedEqualities.add(CompletedEquality(key.variable, equality))
         }
         builder.factors.removeAll { it in replaced }
         pendingEqualities.clear()

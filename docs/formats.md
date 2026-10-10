@@ -94,6 +94,9 @@ The same dependency closure retains Boolean connective gates and arithmetic
 predicate definitions only when a surviving use needs their value. Boolean-to-integer
 channels remain consumers of an existing Boolean definition, so arithmetic uses retain
 the gate and its inputs.
+Completed branch comparisons retain their arithmetic predicate when another surviving
+numeric consumer needs the conditional result. This exposes the selected source value
+to the theory without retaining otherwise unused numeric definitions.
 Source declarations and arithmetic leaves remain authoritative, including open
 defaults and sparse decision-list selectors. Shared search has no unconstrained
 predicate columns from these omitted definitions.

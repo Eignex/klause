@@ -1,7 +1,10 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
@@ -11,7 +14,9 @@ import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLiraEqualities
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
@@ -20,6 +25,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class SmtLibConditionalEqualityTest {
     @Test
@@ -356,6 +362,35 @@ class SmtLibConditionalEqualityTest {
         assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)))
 
         assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b")))
+    }
+
+    @Test
+    fun `a retained conditional comparison exposes its arithmetic value before branch propagation`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const alternative Bool) (declare-const x Int)
+            (assert (let ((t (ite b 7 9))) (and (= t 7) (= (+ t x) 4))))
+            (assert (or (= x -3) alternative))
+            """.trimIndent(),
+        )
+        val x = parsed.intVarNames.getValue("x")
+        val comparison = parsed.model.factors.filterIsInstance<ReifiedLinear>()
+            .single { it.vars.contentEquals(intArrayOf(x)) }
+        val equalities = ExactLiraEqualities(parsed.model, parsed.model.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(parsed.model.numBoolVars))
+        for (clause in parsed.model.factors.filterIsInstance<Clause>()) {
+            if (clause.literals.size == 1) session.push(SearchDecision.Bool(clause.literals.single()))
+        }
+
+        assertIs<ComponentResult.Consistent>(equalities.propagate(session, Cancellation.Never))
+
+        assertEquals(true, session.boolValue(comparison.auxBoolVar))
+        assertNull(session.boolValue(parsed.boolVarNames.getValue("b")))
+        session.popTo(0)
+        assertIs<ComponentResult.Consistent>(equalities.propagate(session, Cancellation.Never))
+        assertNull(session.boolValue(comparison.auxBoolVar))
     }
 
     @Test
