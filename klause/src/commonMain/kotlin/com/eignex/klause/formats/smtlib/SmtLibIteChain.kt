@@ -165,7 +165,7 @@ private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
     if (!collapseToElement(chain)) lowerAsDecisionList(chain)
     conditionalEqualities.define(
         chain.result, chain.conds, chain.arms, chain.default, factors.subList(start, factors.size),
-        chain.conds.map(iteChains::guardEquality),
+        chain.keys.map { GuardEquality(chain.selector, it, equal = true) },
     )
 }
 
