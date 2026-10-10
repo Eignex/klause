@@ -6,14 +6,15 @@ finite portfolios at p1 and p4 with 300-second budgets. It changes no defaults. 
 `52193ef906cfedac893b1df8390559ca0495b59e` ([plumbing PR](https://github.com/Eignex/klause/pull/2374)).
 The measurement SHA is retained by remote branch `codex/arms-414-measurement-frozen`.
 
-The eight original AWS stages complete 660/660 cases: 215 optimal and 445 feasible but unproved,
+The nine AWS stages complete 714/714 cases: 238 optimal and 476 feasible but unproved,
 with no failed commands, record errors, unsupported, unknown or invalid outcomes. CI finds no
-pairwise proof contradiction or disagreement in 874 applicable frozen-reference comparisons.
-All 67 distinct MiniZinc final candidates pass independent source checks. There are 396 legacy
-records without durable witnesses/source hashes; the other 264 retain both. OPB/XCSP3 witnesses
+pairwise proof contradiction or disagreement in 946 applicable frozen-reference comparisons.
+Independent MiniZinc source checks find 77 valid distinct candidates and one unknown, with no
+invalid or error result. There are 396 legacy
+records without durable witnesses/source hashes; the other 318 retain both. OPB/XCSP3 witnesses
 have internal solver checks and stored-reference checks, without an independent source gate.
-The arm-count sweeps support retaining the shipped counts. The preselected integrated-build
-confirmation completes 54/54 cases without failed commands; its CI analysis is pending.
+The arm-count sweeps and integrated confirmation support retaining the shipped arm counts and
+reseed threshold 3. Threshold 2 does not transfer consistently and loses one held-out proof.
 
 ## Frozen design
 
@@ -154,7 +155,7 @@ Baseline job 875 is complete with 156/156 records. Oversubscription p1 job 881 a
 job 879 are complete with 48/48 records each and no failed commands. Reseeding p4 job 880 is also
 complete with 48/48 records. Pool sizing p4 job 882 completes 72/72 records without failed commands.
 All eight original stages are complete, totaling 660 cases. Matched comparisons and source checks
-run in GitHub CI; the integrated confirmation is complete and awaits CI analysis.
+run in GitHub CI; the integrated confirmation also completes all 54 cases, totaling 714 overall.
 
 These measurements belong to the recorded SHAs. Exact-arithmetic normalization and Boolean
 undo-lifetime fixes reached main during collection; rebasing the plumbing does not retrospectively
@@ -292,7 +293,7 @@ Thresholds 3/0/2/4 record 134/0/204/93 actual reseeds. The off configuration per
 and the other values materially change execution. Per-arm initialization is retained separately;
 these frozen builds predate the construction-accounting repair and its integrated measurements.
 
-## P4 reseeding and preselected confirmation
+## P4 reseeding and integrated confirmation
 
 Job 880 completes 48/48 feasible records with source hashes and witnesses. Thresholds 3/2/4 prove
 the three knapsack cases; off proves those plus two linear-ordering cases. Per-record reference
@@ -312,15 +313,61 @@ OPB objectives. Off loses all three city seeds and one Fortress seed, despite it
 Threshold 4 varies only on city, winning one seed and losing two. These are width-dependent
 tradeoffs: threshold 2 loses two Fortress seeds at p1.
 
-Before inspecting held-out variant outcomes, threshold 2 at p4 is selected for a single confirmation
+Before inspecting held-out variant outcomes, threshold 2 at p4 was selected for a single confirmation
 stage, [AWS job 909](http://192.168.50.104:8420/jobs/909). It compares thresholds 3/2 on integrated
 main `54101a2cb001c825d0a920779004f4b140a0b956`, including #2328, at 300 seconds and seeds 3/7/11.
 The six frozen held-out families provide transfer evidence; city and Fortress repeat the discovery
 signal, and CoinsGrid guards proof retention. This adds 54 cases, at most 4.5 solve case-hours
 before setup. Both variants share the build, input bytes, default arm count, slice policy, presolve
-policy and AWS allocation settings. No p1 threshold change is proposed. Confirmation completes
-54/54 cases with no failed commands. The full raw records are archived; CI analysis and independent
-source checks are pending, so this selection does not authorize a default change by itself.
+policy and AWS allocation settings. No p1 threshold change is proposed.
+
+Confirmation completes 54/54 feasible cases: 23 optimal and 31 unproved, with retained witnesses
+and source hashes in every record. [CI analysis 38007048410](https://github.com/Eignex/klause/actions/runs/38007048410)
+finds 27 complete matched cells, no excluded cells, feasibility changes, arm exceptions,
+refuted-claim faults or proof contradictions, and no disagreement in 72 frozen-reference comparisons.
+Threshold 2 is the candidate in the comparisons below; objective quality and proofs remain separate.
+
+| Cohort | Objective wins / ties / losses | Proof gains / losses | Problem mean quality | Descriptive 95% interval |
+| --- | --- | --- | --- | --- |
+| Six held-out families | 2 / 14 / 2 | 0 / 1 | 0 | [-0.167, 0.167] |
+| Discovery repeats and CoinsGrid guard | 1 / 5 / 3 | 0 / 0 | -0.222 | [-0.333, 0] |
+| All nine inputs | 3 / 19 / 5 | 0 / 1 | -0.074 | [-0.222, 0.074] |
+
+| Input | Threshold 3 objective range | Threshold 2 objective range | Candidate wins / ties / losses | Proofs at 3 / 2 |
+| --- | --- | --- | --- | --- |
+| city-position | 4347–11807 | 5160–5897 | 1 / 0 / 2 | 0 / 0 |
+| Fortress | 459518 | 459518–469517 | 0 / 2 / 1 | 0 / 0 |
+| CoinsGrid | 80 | 80 | 0 / 3 / 0 | 3 / 3 |
+| depot-placement | 107 | 107 | 0 / 3 / 0 | 3 / 2 |
+| amaze | 1429 | 1429 | 0 / 3 / 0 | 3 / 3 |
+| CyclicBandwidth | 5–6 | 5 | 1 / 2 / 0 | 0 / 0 |
+| BinPacking2 | 25 | 25 | 0 / 3 / 0 | 3 / 3 |
+| lseu | 1120–1128 | 1128 | 0 / 2 / 1 | 0 / 0 |
+| exam.pi | 84–85 | 83–88 | 1 / 1 / 1 | 0 / 0 |
+
+The original three city wins do not repeat: threshold 2 wins seed 3 but loses seeds 7 and 11.
+It also loses Fortress seed 3 (469517 against 459518). The held-out wins are CyclicBandwidth seed 3
+and exam.pi seed 11; losses are lseu seed 11 and exam.pi seed 3. At depot seed 7, both reach 107,
+but threshold 3 proves it in a 65.443-second process while threshold 2 exhausts 300 seconds unproved.
+CoinsGrid retains every proof. The held-out objective balance and lost proof reject the candidate
+as a default replacement.
+
+Thresholds 3/2 record 1122/1731 actual reseeds. Both use the same installed fingerprint
+`d839dbb10df225393fc78595c524aa876cb14b57ee21618e1d7853ed58b6b692`, runtime-file hash
+`4f8040ee4b69b090ab741a4c31136ae71531132ad0304cd5de676a6d39508769` and p4 JVM options.
+Median solve-clock first times are 285/271 ms; process first times are 1159/1172 ms. Median best
+times are 26.639/53.719 seconds on the solve clock and 27.384/54.134 seconds on the process clock.
+These are descriptive medians across heterogeneous families, with different final qualities and
+proofs; they do not establish a speedup. Per-input checkpoints on both clocks, per-arm initialization,
+work, reward, contributions and final-holder counts remain in `evidence/909/summary.json`, with
+individual cases in `cases.csv` and the full attribution stream in the raw records.
+
+The final CI source gate checks 78 distinct MiniZinc candidates across all durable-witness stages:
+77 valid, one unknown, zero invalid and zero errors. The unknown is job 909 case 24, amaze seed 3
+at threshold 3. Its model/data hashes match, but the archived DZN uses compiler-introduced
+`X_INTRODUCED_16_`, which the pinned source compiler cannot resolve. This candidate remains
+internally checked and reference-consistent, without an independent source-valid claim. The
+compiler verdict, exact reason and source hashes are archived under `evidence/ci-38007048410/`.
 
 ## Completed p4 pool-size sweep
 
@@ -344,3 +391,13 @@ Four-arm configurations run whole arms at p4 and record no reseeds; they also om
 mixed ALNS worker. Default/expanded cp pools record 437/439 reseeds and mixed pools 509/554.
 Consequently the four-arm comparison includes composition, allocation and resumability together.
 Its extra proofs do not isolate a scheduler cause or outweigh the incumbent-quality losses.
+
+## Default decision
+
+Retain the production free and full portfolios, requested arm counts 6 at p1 and 8 at p4, and
+reseed threshold 3. Expanded pools have no consistent quality or proof advantage; four-arm pools
+trade incumbent quality for extra proofs. The preselected p4 threshold-2 candidate fails integrated
+confirmation, and p1 already has Fortress regressions. No arm removal follows from observational
+credit or caught exceptions. No slice, construction, presolve or scheduling policy change is shipped
+by this campaign. The telemetry seam and archived evidence make future bounded comparisons
+reproducible; the broad #414 epic remains open.

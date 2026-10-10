@@ -2706,9 +2706,12 @@
       "a": "mixed-p1-r3",
       "b": "mixed-p1-r0",
       "matched": 12,
-      "excluded": [],
       "qualityWins": 1,
+      "qualityTies": 8,
       "qualityLosses": 3,
+      "qualityUnscored": 0,
+      "feasibleGains": 0,
+      "feasibleLosses": 0,
       "proofGains": 1,
       "proofLosses": 0,
       "disagreementCases": [],
@@ -2716,15 +2719,38 @@
       "problemBootstrap95": [
         -0.3333333333333333,
         0
-      ]
+      ],
+      "excluded": [],
+      "cohorts": {
+        "discovery": {
+          "matched": 12,
+          "qualityWins": 1,
+          "qualityTies": 8,
+          "qualityLosses": 3,
+          "qualityUnscored": 0,
+          "feasibleGains": 0,
+          "feasibleLosses": 0,
+          "proofGains": 1,
+          "proofLosses": 0,
+          "disagreementCases": [],
+          "problemMeanQuality": -0.16666666666666666,
+          "problemBootstrap95": [
+            -0.3333333333333333,
+            0
+          ]
+        }
+      }
     },
     {
       "a": "mixed-p1-r3",
       "b": "mixed-p1-r2",
       "matched": 12,
-      "excluded": [],
       "qualityWins": 3,
+      "qualityTies": 7,
       "qualityLosses": 2,
+      "qualityUnscored": 0,
+      "feasibleGains": 0,
+      "feasibleLosses": 0,
       "proofGains": 0,
       "proofLosses": 0,
       "disagreementCases": [],
@@ -2732,15 +2758,38 @@
       "problemBootstrap95": [
         -0.5,
         0.75
-      ]
+      ],
+      "excluded": [],
+      "cohorts": {
+        "discovery": {
+          "matched": 12,
+          "qualityWins": 3,
+          "qualityTies": 7,
+          "qualityLosses": 2,
+          "qualityUnscored": 0,
+          "feasibleGains": 0,
+          "feasibleLosses": 0,
+          "proofGains": 0,
+          "proofLosses": 0,
+          "disagreementCases": [],
+          "problemMeanQuality": 0.08333333333333334,
+          "problemBootstrap95": [
+            -0.5,
+            0.75
+          ]
+        }
+      }
     },
     {
       "a": "mixed-p1-r3",
       "b": "mixed-p1-r4",
       "matched": 12,
-      "excluded": [],
       "qualityWins": 3,
+      "qualityTies": 7,
       "qualityLosses": 2,
+      "qualityUnscored": 0,
+      "feasibleGains": 0,
+      "feasibleLosses": 0,
       "proofGains": 0,
       "proofLosses": 0,
       "disagreementCases": [],
@@ -2748,15 +2797,38 @@
       "problemBootstrap95": [
         -0.5,
         0.75
-      ]
+      ],
+      "excluded": [],
+      "cohorts": {
+        "discovery": {
+          "matched": 12,
+          "qualityWins": 3,
+          "qualityTies": 7,
+          "qualityLosses": 2,
+          "qualityUnscored": 0,
+          "feasibleGains": 0,
+          "feasibleLosses": 0,
+          "proofGains": 0,
+          "proofLosses": 0,
+          "disagreementCases": [],
+          "problemMeanQuality": 0.08333333333333334,
+          "problemBootstrap95": [
+            -0.5,
+            0.75
+          ]
+        }
+      }
     },
     {
       "a": "mixed-p1-r0",
       "b": "mixed-p1-r2",
       "matched": 12,
-      "excluded": [],
       "qualityWins": 3,
+      "qualityTies": 7,
       "qualityLosses": 2,
+      "qualityUnscored": 0,
+      "feasibleGains": 0,
+      "feasibleLosses": 0,
       "proofGains": 0,
       "proofLosses": 1,
       "disagreementCases": [],
@@ -2764,15 +2836,38 @@
       "problemBootstrap95": [
         -0.5,
         0.75
-      ]
+      ],
+      "excluded": [],
+      "cohorts": {
+        "discovery": {
+          "matched": 12,
+          "qualityWins": 3,
+          "qualityTies": 7,
+          "qualityLosses": 2,
+          "qualityUnscored": 0,
+          "feasibleGains": 0,
+          "feasibleLosses": 0,
+          "proofGains": 0,
+          "proofLosses": 1,
+          "disagreementCases": [],
+          "problemMeanQuality": 0.08333333333333334,
+          "problemBootstrap95": [
+            -0.5,
+            0.75
+          ]
+        }
+      }
     },
     {
       "a": "mixed-p1-r0",
       "b": "mixed-p1-r4",
       "matched": 12,
-      "excluded": [],
       "qualityWins": 4,
+      "qualityTies": 7,
       "qualityLosses": 1,
+      "qualityUnscored": 0,
+      "feasibleGains": 0,
+      "feasibleLosses": 0,
       "proofGains": 0,
       "proofLosses": 1,
       "disagreementCases": [],
@@ -2780,15 +2875,38 @@
       "problemBootstrap95": [
         0,
         0.75
-      ]
+      ],
+      "excluded": [],
+      "cohorts": {
+        "discovery": {
+          "matched": 12,
+          "qualityWins": 4,
+          "qualityTies": 7,
+          "qualityLosses": 1,
+          "qualityUnscored": 0,
+          "feasibleGains": 0,
+          "feasibleLosses": 0,
+          "proofGains": 0,
+          "proofLosses": 1,
+          "disagreementCases": [],
+          "problemMeanQuality": 0.25,
+          "problemBootstrap95": [
+            0,
+            0.75
+          ]
+        }
+      }
     },
     {
       "a": "mixed-p1-r2",
       "b": "mixed-p1-r4",
       "matched": 12,
-      "excluded": [],
       "qualityWins": 5,
+      "qualityTies": 6,
       "qualityLosses": 1,
+      "qualityUnscored": 0,
+      "feasibleGains": 0,
+      "feasibleLosses": 0,
       "proofGains": 0,
       "proofLosses": 0,
       "disagreementCases": [],
@@ -2796,7 +2914,27 @@
       "problemBootstrap95": [
         0,
         0.75
-      ]
+      ],
+      "excluded": [],
+      "cohorts": {
+        "discovery": {
+          "matched": 12,
+          "qualityWins": 5,
+          "qualityTies": 6,
+          "qualityLosses": 1,
+          "qualityUnscored": 0,
+          "feasibleGains": 0,
+          "feasibleLosses": 0,
+          "proofGains": 0,
+          "proofLosses": 0,
+          "disagreementCases": [],
+          "problemMeanQuality": 0.3333333333333333,
+          "problemBootstrap95": [
+            0,
+            0.75
+          ]
+        }
+      }
     }
   ],
   "referenceChecks": {

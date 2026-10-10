@@ -39,16 +39,21 @@
       "job": 883,
       "status": "DONE",
       "cases": 24
+    },
+    {
+      "job": 909,
+      "status": "DONE",
+      "cases": 54
     }
   ],
-  "cases": 660,
+  "cases": 714,
   "outcomes": {
-    "feasible": 445,
-    "optimal": 215
+    "feasible": 476,
+    "optimal": 238
   },
   "missingSourceHashRecords": 396,
   "feasibleRecordsMissingWitnesses": 396,
-  "referenceComparisons": 874,
+  "referenceComparisons": 946,
   "missingReferences": 0,
   "referenceDisagreements": 0
 }
