@@ -111,6 +111,7 @@ internal class ReifiedLinearPropagator(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        propagateBinaryEquality(state)?.let { return it }
         val range = linearSumRange(state, coeffs, vars)
         val sumLo = range[0]
         val sumHi = range[1]
@@ -177,6 +178,27 @@ internal class ReifiedLinearPropagator(
                 }
             },
         )
+    }
+
+    private fun propagateBinaryEquality(state: PropagationState): Boolean? {
+        if (!singleEquality) return null
+        val target = equalityTarget?.takeIf { it in 0L..1L } ?: return null
+        val variable = vars[0]
+        val root = state.rootDomains[variable]
+        if (root.min < 0L || root.max > 1L) return null
+        state.work++
+        val domain = state.intDomains[variable]
+        if (domain.min == domain.max) {
+            val holds = (domain.min == target) == (op == LinearOp.EQ)
+            return state.boolValues[auxBoolVar] == holds ||
+                state.pinBool(auxBoolVar, holds, state.composeIntVarAtomAntecedents(vars))
+        }
+        val indicator = state.boolValues[auxBoolVar] ?: return true
+        val value = if (indicator == (op == LinearOp.EQ)) target else 1L - target
+        val reason = intArrayOf(Lit.make(auxBoolVar, !indicator))
+        return if (value == 1L) state.tightenIntMin(variable, value, reason) else {
+            state.tightenIntMax(variable, value, reason)
+        }
     }
 
     private fun eqTargetUnreachable(state: PropagationState): Boolean {
