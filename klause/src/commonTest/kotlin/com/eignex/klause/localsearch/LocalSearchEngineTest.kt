@@ -176,7 +176,7 @@ class LocalSearchEngineTest {
         var picks = 0
         val strategy = SourceDrivenStrategy(
             sources = emptyList(),
-            perturbation = { Move.IntSet(0, longArrayOf(1, 3, 2, 3)[picks++]) },
+            perturbation = { if (it.cost == 0L) null else Move.IntSet(0, longArrayOf(1, 2)[picks++]) },
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val search = LocalSearchEngine(
@@ -380,7 +380,10 @@ class LocalSearchEngineTest {
         }
         val search = LocalSearchEngine(
             LocalSearchModel.open(problem),
-            strategy = SourceDrivenStrategy(sources = emptyList(), feasibleDescent = FeasibleDescent.RatchetAsConstraint),
+            strategy = SourceDrivenStrategy(
+                sources = emptyList(),
+                feasibleDescent = FeasibleDescent.RatchetAsConstraint,
+            ),
             restartPolicy = policy,
         )
 
