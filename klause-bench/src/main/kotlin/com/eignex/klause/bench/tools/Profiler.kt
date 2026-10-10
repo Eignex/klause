@@ -80,7 +80,7 @@ internal object Profiler {
             methods.any { it.contains("LocalSearchState.apply") } -> "local-search move application"
             methods.any { it.contains("LocalSearchEngine") } -> "local-search loop"
             methods.any { it.contains(".presolve.") } -> "presolve"
-            methods.any { it.contains("BacktrackSolver") || it.contains(".backtrack.") } -> "backtrack"
+            methods.any { it.contains("BacktrackSolver") || it.contains(".backtrack.") } -> backtrackPhase(methods)
             else -> "other or unclassified"
         }
         val context = when {
@@ -89,6 +89,19 @@ internal object Profiler {
             else -> ""
         }
         return context + phase
+    }
+
+    private fun backtrackPhase(methods: List<String>): String = when {
+        methods.any { it.contains("PropagationProblem") } -> "backtrack projection preparation"
+        methods.any { it.contains("PropagationState.<init>") || it.contains("NativeSatState.<init>") } ->
+            "backtrack state allocation"
+        methods.any { it.contains("LpEngine.<init>") } -> "backtrack LP preparation"
+        methods.any { it.contains("PropagationSession.<init>") } -> "backtrack root propagation"
+        methods.any {
+            it.contains("ResumableMinimize.<init>") || it.contains("ResumableSatisfaction.<init>") ||
+                it.contains("CpSatisfactionTraversal.<init>")
+        } -> "backtrack initialization"
+        else -> "backtrack search"
     }
 
     fun <T> record(cfg: ProfileConfig, block: () -> T): T {
