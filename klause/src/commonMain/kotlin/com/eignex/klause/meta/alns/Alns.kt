@@ -240,7 +240,7 @@ internal class Alns(
 
         fun advance(
             params: LocalSearchParams,
-            onIncumbent: ((MinimizeResult.WithSample) -> Unit)? = null,
+            onIncumbent: ((MinimizeResult.BestFound) -> Unit)? = null,
         ): MinimizeResult.BestFound {
             check(!closed) { "the ALNS neighborhood search is closed" }
             currentCancellation = params.cancellation
@@ -453,7 +453,7 @@ internal class Alns(
         override val stats: SolveStats
             get() {
                 observeBootstrapWork()
-                val base = if (neighborhood == null) lsBootstrap?.stats ?: bootstrapStats else SolveStats.EMPTY
+                val base = lsBootstrap?.stats ?: bootstrapStats
                 return base.copy(alns = telemetry.snapshot())
             }
 
@@ -504,7 +504,7 @@ internal class Alns(
                 } ?: Long.MAX_VALUE
                 search.advance(
                     params.copy(cancellation = token, maxInstructions = minOf(sliceInstructions, remaining)),
-                    onIncumbent,
+                    { onIncumbent(it.copy(stats = stats)) },
                 )
                 return if (search.finished(params)) finish(search.result()) else null
             } catch (failure: Throwable) {
@@ -596,9 +596,9 @@ internal class Alns(
             val search = neighborhood
             if (search == null) {
                 neighborhood = NeighborhoodSearch(objective, params, sample, telemetry)
-                onIncumbent(checkNotNull(neighborhood).result())
+                onIncumbent(checkNotNull(neighborhood).result().copy(stats = stats))
             } else if (search.adopt(sample)) {
-                onIncumbent(search.result())
+                onIncumbent(search.result().copy(stats = stats))
             }
         }
 
@@ -612,9 +612,10 @@ internal class Alns(
         }
 
         private fun finish(result: MinimizeResult): MinimizeResult {
-            verdict = result
+            val completed = withStats(result, stats)
+            verdict = completed
             close()
-            return result
+            return completed
         }
 
         private fun closeBootstrap() {
@@ -657,13 +658,15 @@ internal class Alns(
 
     private fun withTelemetry(result: MinimizeResult, telemetry: AlnsStats): MinimizeResult {
         val stats = result.stats.copy(alns = result.stats.alns.mergedWith(telemetry))
-        return when (result) {
-            is MinimizeResult.Optimal -> result.copy(stats = stats)
-            is MinimizeResult.BestFound -> result.copy(stats = stats)
-            is MinimizeResult.Unbounded -> result.copy(stats = stats)
-            is MinimizeResult.Infeasible -> result.copy(stats = stats)
-            is MinimizeResult.Unknown -> result.copy(stats = stats)
-        }
+        return withStats(result, stats)
+    }
+
+    private fun withStats(result: MinimizeResult, stats: SolveStats): MinimizeResult = when (result) {
+        is MinimizeResult.Optimal -> result.copy(stats = stats)
+        is MinimizeResult.BestFound -> result.copy(stats = stats)
+        is MinimizeResult.Unbounded -> result.copy(stats = stats)
+        is MinimizeResult.Infeasible -> result.copy(stats = stats)
+        is MinimizeResult.Unknown -> result.copy(stats = stats)
     }
 
     private class AlnsStatsSink {

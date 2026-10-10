@@ -144,6 +144,7 @@ class AlnsTest {
         assertTrue(handle.preparationPending)
         assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
         assertFalse(handle.preparationPending)
+        assertEquals(7.0, handle.stats.ls.moves.sum)
         val result = assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
 
         assertSame(sample, result.assignment)
@@ -151,6 +152,8 @@ class AlnsTest {
         assertEquals(2, slices)
         assertEquals(1, closes)
         assertEquals(14L, handle.stats.alns.bootstrapLsMoves)
+        assertEquals(14.0, handle.stats.ls.moves.sum)
+        assertEquals(14.0, result.stats.ls.moves.sum)
         assertEquals(100L, handle.chargedInstructions)
         assertEquals(0L, result.stats.alns.outerAllowance)
     }
