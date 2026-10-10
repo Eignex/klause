@@ -398,4 +398,19 @@ class ProblemTest {
 
         assertFailsWith<IllegalArgumentException> { plan.forObjectiveRound(changed, appended = true) }
     }
+
+    @Test
+    fun `objective round rebinding cannot introduce holes into an open declaration`() {
+        val source = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                LongArray(1), LongArray(1), Bits(1).also { it.set(0) }, Bits(1).also { it.set(0) },
+            ),
+            factors = tighteningFactors().toTypedArray(),
+        )
+        val holed = Problem(0, 1, arrayOf(IntDomain(0, 3).excludeValue(1)), source.factors)
+        val plan = source.componentPlan()
+
+        assertFailsWith<IllegalArgumentException> { plan.forObjectiveRound(holed, appended = false) }
+    }
 }
