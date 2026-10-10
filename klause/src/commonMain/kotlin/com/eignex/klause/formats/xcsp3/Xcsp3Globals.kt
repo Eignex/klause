@@ -154,10 +154,14 @@ internal fun Compiler.Builder.elementVarMatrix(
     require(nCols > 0 && rows.all { it.size == nCols }) { "element: empty or ragged <matrix>" }
     val cells = rows.size.toLong() * nCols
     require(cells <= Int.MAX_VALUE) { "element: matrix is too large" }
-    factors.add(Linear(longArrayOf(1L), intArrayOf(i), LinearOp.GE, rowOff.toLong()))
-    factors.add(Linear(longArrayOf(1L), intArrayOf(i), LinearOp.LE, rowOff.toLong() + rows.size - 1L))
-    factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.GE, colOff.toLong()))
-    factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.LE, colOff.toLong() + nCols - 1L))
+    if (domains[i].min < rowOff) factors.add(Linear(longArrayOf(1L), intArrayOf(i), LinearOp.GE, rowOff.toLong()))
+    if (domains[i].max > rowOff.toLong() + rows.size - 1L) {
+        factors.add(Linear(longArrayOf(1L), intArrayOf(i), LinearOp.LE, rowOff.toLong() + rows.size - 1L))
+    }
+    if (domains[j].min < colOff) factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.GE, colOff.toLong()))
+    if (domains[j].max > colOff.toLong() + nCols - 1L) {
+        factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.LE, colOff.toLong() + nCols - 1L))
+    }
     val index = newAuxVar(0L, cells - 1L)
     definedVars.add(index)
     factors.add(

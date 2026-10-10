@@ -522,7 +522,9 @@ internal object Compiler {
                 return
             }
             if (node is FExpr.Call && node.fn in REL && node.args.size == 2) {
-                postRel(relationParts(node))
+                val relation = relationParts(node)
+                postRel(relation)
+                if (node.fn == "eq") markAffineOutput(node, relation)
             } else {
                 // A Boolean combination that is a plain disjunction/implication of single-variable
                 // comparisons is the constraint itself (a [ComparisonClause]) — lowering it directly
@@ -531,6 +533,27 @@ internal object Compiler {
                 val cc = tryComparisonClause(node)
                 if (cc != null) factors.add(cc) else factors.add(Clause(intArrayOf(compileBool(node))))
             }
+        }
+
+        private fun markAffineOutput(node: FExpr.Call, relation: RelParts) {
+            val output = affineOutput(node.args[0], node.args[1])
+                ?: affineOutput(node.args[1], node.args[0]) ?: return
+            val row = relation.rel as? LinRelation.LongRel ?: return
+            val j = row.vars.indexOf(output)
+            if (j >= 0 && (row.coeffs[j] == 1L || row.coeffs[j] == -1L)) definedVars.add(output)
+        }
+
+        private fun affineOutput(output: FExpr, expression: FExpr): Int? =
+            if (output is FExpr.Ref && expression is FExpr.Call && isAffine(expression)) ref(output.name) else null
+
+        private fun isAffine(expression: FExpr): Boolean = when (expression) {
+            is FExpr.Num, is FExpr.Ref -> true
+            is FExpr.Call -> when (expression.fn) {
+                "add", "sub", "neg" -> expression.args.all { isAffine(it) }
+                "mul" -> expression.args.count { it !is FExpr.Num } <= 1 && expression.args.all { isAffine(it) }
+                else -> false
+            }
+            is FExpr.SetLit -> false
         }
 
         /** Post a lowered relation as a top-level factor: a [Linear] when it carries variable terms, else a
@@ -958,6 +981,7 @@ internal object Compiler {
             }
             val (lo, hi) = linBounds(narrow)
             val v = newAuxVar(lo, hi)
+            definedVars.add(v)
             val vars = narrow.coeffs.keys.toList()
             val cs = LongArray(vars.size + 1) { if (it < vars.size) -narrow.coeffs.getValue(vars[it]) else 1L }
             val ids = IntArray(vars.size + 1) { if (it < vars.size) vars[it] else v }

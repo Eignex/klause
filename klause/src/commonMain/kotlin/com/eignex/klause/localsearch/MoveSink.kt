@@ -91,6 +91,9 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     internal fun allowsInt(varId: Int): Boolean =
         !assumptions.isFrozenInt(varId) && invariants?.isDefinedInt(varId) != true && !ownedByOther(varId)
 
+    internal fun allowsDefinedInt(varId: Int): Boolean =
+        !assumptions.isFrozenInt(varId) && !ownedByOther(varId)
+
     /** Queue a Boolean-flip move on `boolVar`. */
     fun addBoolFlip(varId: Int) {
         if (!allowsBool(varId)) return

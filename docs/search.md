@@ -197,8 +197,12 @@ without an incumbent after cancellation, avoiding fresh seeding after the deadli
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
 Element index repairs backsolve affine definitions with one or two distinct integer
-inputs and a unit output coefficient. Single-coordinate repairs precede joint moves;
-joint repair enumerates at most 64 present members of one input domain. Input domains,
+inputs and a unit output coefficient. Hinted one-input affine chains feeding only
+such index definitions are maintained from their searched leaves; other occurrences
+prevent their inference. Inverse repairs follow at most 16 such aliases, checking each
+intermediate domain and rejecting conflicting targets for a shared leaf.
+Single-coordinate repairs precede joint moves; joint repair enumerates at most 64
+present members of one input domain. Input domains,
 pins and implicit owners filter the complete move before publication. Equality indicators
 join coordinate moves, while arithmetic counter-shifts cannot overwrite the requested
 coordinates. Unsupported definitions, overflow and nonintegral inverses decline the

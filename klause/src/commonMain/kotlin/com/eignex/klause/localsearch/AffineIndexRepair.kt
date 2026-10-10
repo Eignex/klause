@@ -64,15 +64,12 @@ internal class AffineIndexRepair(
 
     private fun queue(first: Long, second: Long): Boolean {
         val values = longArrayOf(first, second)
-        val coordinates = ArrayList<Move.IntSet>(2)
+        val targets = LinkedHashMap<Int, Long>()
         for (i in definition.ins.indices) {
-            val varId = definition.ins[i].varId
-            val value = values[i]
-            if (value !in state.rootDomains[varId]) return false
-            if (value == current(i)) continue
-            if (!sink.allowsInt(varId)) return false
-            coordinates.add(Move.IntSet(varId, value))
+            if (!coordinateTarget(definition.ins[i].varId, values[i], targets, 0)) return false
         }
+        val coordinates = targets.filter { (v, value) -> value != state.assignment.intValue(v) }
+            .map { (v, value) -> Move.IntSet(v, value) }
         if (coordinates.isEmpty()) return false
         val parts = ArrayList<Move>(coordinates.size + 2)
         parts.addAll(coordinates)
@@ -87,7 +84,36 @@ internal class AffineIndexRepair(
         return sink.size > before
     }
 
+    private fun coordinateTarget(varId: Int, value: Long, targets: MutableMap<Int, Long>, depth: Int): Boolean {
+        if (value !in state.rootDomains[varId] || depth > MAX_ALIAS_DEPTH) return false
+        val alias = state.invariants?.linearDefinition(varId)
+        if (alias != null) {
+            if (value != state.assignment.intValue(varId) && !sink.allowsDefinedInt(varId)) return false
+            if (alias.ins.size != 1 || alias.ins[0].varId < 0 ||
+                (alias.outCoeff != 1L && alias.outCoeff != -1L)
+            ) return false
+            val target = aliasInput(alias, value) ?: return false
+            return coordinateTarget(alias.ins[0].varId, target, targets, depth + 1)
+        }
+        if (value != state.assignment.intValue(varId) && !sink.allowsInt(varId)) return false
+        if (targets.containsKey(varId) && targets[varId] != value) return false
+        targets[varId] = value
+        return true
+    }
+
+    @Suppress("SwallowedException")
+    private fun aliasInput(alias: FunctionalObjective.Lin, value: Long): Long? = try {
+        val numerator = subExact(alias.c, mulExact(alias.outCoeff, value))
+        val coefficient = alias.coeffs[0]
+        if (coefficient == 0L || numerator % coefficient != 0L ||
+            (numerator == Long.MIN_VALUE && coefficient == -1L)
+        ) null else numerator / coefficient
+    } catch (_: CheckedLongOverflowException) {
+        null
+    }
+
     private companion object {
         const val MAX_COORDINATE_VALUES = 64L
+        const val MAX_ALIAS_DEPTH = 16
     }
 }

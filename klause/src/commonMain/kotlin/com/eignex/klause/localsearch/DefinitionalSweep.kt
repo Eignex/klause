@@ -3,7 +3,6 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -96,22 +95,11 @@ class DefinitionalSweep internal constructor(
                 //    product terms), and
                 //  - every summand is itself a `Product` result (the sum caps a product cone, not a layer of
                 //    feasibility-critical decision variables whose exclusion from search stalls repair).
-                // A hinted index read only by Elements is also an evaluation channel: keeping it
-                // consistent lets coordinate moves reach the selected cells without repairing an aux.
                 val nonProductOcc = IntArray(numIntVars)
-                val nonIndexOcc = IntArray(numIntVars)
-                val indexUse = BooleanArray(numIntVars)
                 for (f in factors) {
                     for (v in f.intVars) {
                         if (v in 0 until numIntVars) {
                             if (f !is Product) nonProductOcc[v]++
-                            if (f is Element && f.idx == v && f.result != v &&
-                                (!f.arrIsVars || v.toLong() !in f.arr)
-                            ) {
-                                indexUse[v] = true
-                            } else {
-                                nonIndexOcc[v]++
-                            }
                         }
                     }
                 }
@@ -120,11 +108,13 @@ class DefinitionalSweep internal constructor(
                     val row = f.integerConstants ?: continue
                     val j = f.vars.indices.firstOrNull {
                         hinted[f.vars[it]] && (row.coeff(it) == 1L || row.coeff(it) == -1L) &&
-                            ((nonProductOcc[f.vars[it]] == 1 &&
-                                f.vars.indices.all { k -> k == it || isProductResult[f.vars[k]] }) ||
-                                (indexUse[f.vars[it]] && nonIndexOcc[f.vars[it]] == 1))
+                            nonProductOcc[f.vars[it]] == 1 &&
+                            f.vars.indices.all { k -> k == it || isProductResult[f.vars[k]] }
                     }
                     if (j != null) claim(f.vars[j], f, j)
+                }
+                for (definition in elementIndexDefinitions(factors, numIntVars, definedHints)) {
+                    claim(definition.variable, definition.factor, definition.outputIndex)
                 }
             }
             val nodes = ArrayList<SweepNode>()

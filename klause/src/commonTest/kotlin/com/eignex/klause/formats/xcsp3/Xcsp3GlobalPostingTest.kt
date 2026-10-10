@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
@@ -196,5 +197,88 @@ class Xcsp3GlobalPostingTest {
 
             assertTrue(solutions(parsed, 4).isEmpty())
         }
+    }
+
+    @Test
+    fun `affine matrix coordinates preserve source solutions`() {
+        for (equality in listOf("eq(add(day,1),row)", "eq(row,add(day,1))")) {
+            val parsed = parse(
+                """
+                <intension>$equality</intension>
+                <element startRowIndex="1"><matrix>(a,b)(b,a)</matrix><index>row col</index><value>v</value></element>
+                """.trimIndent(),
+                """
+                <var id="a">0</var><var id="b">9</var><var id="day">0..1</var>
+                <var id="row">1..2</var><var id="col">0..1</var><var id="v">9</var>
+                """.trimIndent(),
+            )
+
+            assertEquals(
+                setOf(listOf(0L, 9L, 0L, 1L, 1L, 9L), listOf(0L, 9L, 1L, 2L, 0L, 9L)),
+                solutions(parsed, 6),
+            )
+        }
+    }
+
+    @Test
+    fun `an element repair moves through declared affine coordinate chains`() {
+        val parsed = parse(
+            """
+            <intension>eq(add(day,1),shift)</intension><intension>eq(row,add(shift,1))</intension>
+            <element startRowIndex="2"><matrix>(a,b)(b,a)</matrix><index>row col</index><value>v</value></element>
+            """.trimIndent(),
+            """
+            <var id="a">0</var><var id="b">9</var><var id="day">0..1</var><var id="shift">1..2</var>
+            <var id="row">2..3</var><var id="col">0..1</var><var id="v">9</var>
+            """.trimIndent(),
+        )
+        val problem = parsed.problem
+        val names = parsed.intVarNames
+        val day = names.getValue("day")
+        val col = names.getValue("col")
+        val state = LocalSearchState(problem.bake(), Random(5), Assumptions(ints = mapOf(col to 0L)))
+        state.assignment.setInt(names.getValue("b"), 9)
+        state.assignment.setInt(day, 0)
+        state.assignment.setInt(names.getValue("shift"), 1)
+        state.assignment.setInt(names.getValue("row"), 2)
+        state.assignment.setInt(col, 0)
+        state.assignment.setInt(names.getValue("v"), 9)
+        state.invariants = assertNotNull(
+            DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars),
+        ).network(problem.numIntVars, problem.numBoolVars)
+        state.recompute()
+        val element = problem.factors.indexOfFirst { it is Element }
+
+        state.factors[element].proposeRepairMoves(state, element, state.moveSink)
+        state.apply(state.moveSink.list.single())
+
+        assertEquals(1L, state.assignment.intValue(day))
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `an element repair moves through a materialized affine index`() {
+        val parsed = parse(
+            "<element startIndex=\"1\"><list>0 9</list><index>add(day,1)</index><value>v</value></element>",
+            "<var id=\"day\">0..1</var><var id=\"v\">9</var>",
+        )
+        val problem = parsed.problem
+        val day = parsed.intVarNames.getValue("day")
+        val elementId = problem.factors.indexOfFirst { it is Element }
+        val element = problem.factors[elementId] as Element
+        val state = LocalSearchState(problem.bake(), Random(5))
+        state.assignment.setInt(day, 0)
+        state.assignment.setInt(element.idx, 1)
+        state.assignment.setInt(element.result, 9)
+        state.invariants = assertNotNull(
+            DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars),
+        ).network(problem.numIntVars, problem.numBoolVars)
+        state.recompute()
+
+        state.factors[elementId].proposeRepairMoves(state, elementId, state.moveSink)
+        state.apply(state.moveSink.list.single())
+
+        assertEquals(1L, state.assignment.intValue(day))
+        assertEquals(0L, state.cost)
     }
 }

@@ -96,4 +96,26 @@ class DefinitionalSweepInferTest {
             assertNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2)))
         }
     }
+
+    @Test
+    fun `an affine coordinate constrained outside the index chain stays searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, -1),
+            Linear(intArrayOf(2, 1, -1), intArrayOf(2, 1, 3), LinearOp.EQ, 2),
+            Element(3, 4, longArrayOf(0, 1, 2, 3), arrIsVars = false, indexOffset = 0),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 2),
+        )
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(1, 2), IntDomain(0, 3), IntDomain(0, 3))
+        val state = LocalSearchState(Problem(0, 5, domains, factors).bake(), Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 1)
+        state.assignment.setInt(3, 0)
+        state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 5, intArrayOf(2, 3))).network(5, 0)
+        state.recompute()
+
+        state.apply(Move.IntSet(0, 1))
+
+        assertEquals(1L, state.assignment.intValue(2))
+    }
 }
