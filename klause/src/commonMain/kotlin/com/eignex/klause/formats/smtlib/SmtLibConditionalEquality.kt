@@ -43,6 +43,8 @@ internal class SmtLibConditionalEquality {
     private val booleanDefinitions = HashMap<Int, List<Factor>>()
     private val equalities = HashMap<Key, Int>()
     private var work = 0
+    private var queries = 0
+    private var budgetDeclines = 0
 
     fun define(
         variable: Int,
@@ -130,6 +132,11 @@ internal class SmtLibConditionalEquality {
             ownedFactors.getValue(pending.removeFirst()).forEach(::read)
         }
         factors.removeAll { factor -> owners[factor]?.let { it !in retained } == true }
+        println(
+            ";;; conditional-lowering queries=$queries work=$work declines=$budgetDeclines " +
+                "definitions=${definitions.size} cached=${equalities.size} factors=${factors.size} " +
+                "retainedInts=${retained.count { it.integer }} retainedBools=${retained.count { !it.integer }}",
+        )
         return UnusedColumns(
             integerOwners.keys.filterTo(HashSet()) { integerOwners.getValue(it) !in retained },
             booleanOwners.keys.filterTo(HashSet()) { booleanOwners.getValue(it) !in retained },
@@ -137,23 +144,34 @@ internal class SmtLibConditionalEquality {
     }
 
     fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {
+        queries++
         val key = Key(variable, value)
         equalities[key]?.let { return it }
         if (definitions[variable]?.image?.contains(value) == false) {
             return Lit.negate(builder.trueLit()).also { equalities[key] = it }
         }
-        if (variable !in definitions || work >= WORK_LIMIT) return null
+        if (variable !in definitions) return null
+        if (work >= WORK_LIMIT) {
+            budgetDeclines++
+            return null
+        }
         val pending = ArrayDeque<Frame>()
         val literals = ArrayDeque<Int>()
         pending.addLast(Frame.Eval(LinComb(mapOf(variable to 1L), 0)))
         while (pending.isNotEmpty()) {
             when (val frame = pending.removeLast()) {
                 is Frame.Known -> {
-                    if (++work > WORK_LIMIT) return null
+                    if (++work > WORK_LIMIT) {
+                        budgetDeclines++
+                        return null
+                    }
                     literals.addLast(frame.literal)
                 }
                 is Frame.Eval -> {
-                    if (++work > WORK_LIMIT) return null
+                    if (++work > WORK_LIMIT) {
+                        budgetDeclines++
+                        return null
+                    }
                     val term = frame.term
                     val source = term.asSimpleVar()
                     val cached = source?.let { equalities[Key(it, value)] }
