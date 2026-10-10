@@ -157,8 +157,10 @@ arms rotate in arm order until they enter search or terminate. Each revisit uses
 base allowance and the regular family time share; it does not grow later slices. Dedicated lanes resume their own
 handles directly. No preparation revisit delays an unadmitted sibling.
 Greedy initialization polls cancellation between variables and retains only completed
-coordinate repairs. Its tabu/activity epoch resets on both completion and cancellation;
-one variable's bounded value probes remain atomic.
+coordinate repairs. Payloads, costs, definition propagation and score caches update normally;
+neighbor configuration marking and tabu/activity tracking are suppressed during repair.
+Its activity epoch resets on completion, cancellation or failure, and ordinary tracking
+resumes afterwards. One variable's bounded value probes remain atomic.
 Its coordinate eligibility uses the generic move sink's pinned, defined and implicit-owner
 filters, preserving seeded globals and one-way definitions during repair.
 Implicit table moves select values from each support row intersected with root domains.

@@ -15,6 +15,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -147,5 +148,26 @@ class GreedyInitTest {
         GreedyInit().run(state) { true }
 
         assertEquals(0L, state.step)
+    }
+
+    @Test
+    fun `a failed pass retains completed repair and restores search activity tracking`() {
+        val state = freshState(problem(), 7L)
+        var checks = 0
+
+        assertFailsWith<IllegalStateException> {
+            GreedyInit().run(state) {
+                if (++checks > 1) error("stop")
+                false
+            }
+        }
+
+        assertEquals(1L, state.cost)
+        assertEquals(0L, state.step)
+        assertTrue(state.tabu.touchCount.all { it == 0 })
+        val current = state.assignment.intValue(0)
+        state.apply(Move.IntSet(0, if (current == 0L) 1L else 0L))
+        assertEquals(1L, state.step)
+        assertEquals(1, state.tabu.touchCount[0])
     }
 }
