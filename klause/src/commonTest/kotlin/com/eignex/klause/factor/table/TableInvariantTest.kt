@@ -49,7 +49,7 @@ class TableInvariantTest {
                 state.assignment.setInt(5, 3L * (1L - bound))
                 state.assignment.setBool(0, false)
                 state.recompute()
-                state.weights[0] = 3.0
+                state.weights.factorWeights[0] = 3.0
                 val before = state.assignment.snapshot()
                 val cost = state.cost
                 state.moveSink.proposer = 0
