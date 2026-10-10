@@ -46,6 +46,11 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private val equalities = HashMap<Key, Int>()
     private val pendingEqualities = LinkedHashMap<Key, PendingEquality>()
     private var work = 0
+    private var queries = 0
+    private var pendingQueries = 0
+    private var completedQueries = 0
+    private var newestQueryVisits = 0
+    private var newestQueryCompleted = false
 
     fun define(
         variable: Int,
@@ -139,6 +144,17 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             ownedFactors.getValue(pending.removeFirst()).forEach(::read)
         }
         factors.removeAll { factor -> owners[factor]?.let { it !in retained } == true }
+        println("; smtConditionalQueries=$queries")
+        println("; smtConditionalPendingQueries=$pendingQueries")
+        println("; smtConditionalCompletedQueries=$completedQueries")
+        println("; smtConditionalVisits=$work")
+        println("; smtConditionalNewestQueryVisits=$newestQueryVisits")
+        println("; smtConditionalNewestQueryCompleted=$newestQueryCompleted")
+        println("; smtConditionalDefinitions=${definitions.size}")
+        println("; smtConditionalCached=${equalities.size}")
+        println("; smtConditionalFactors=${factors.size}")
+        println("; smtConditionalRetainedInts=${retained.count { it.integer }}")
+        println("; smtConditionalRetainedBools=${retained.count { !it.integer }}")
         return UnusedColumns(
             integerOwners.keys.filterTo(HashSet()) { integerOwners.getValue(it) !in retained },
             booleanOwners.keys.filterTo(HashSet()) { booleanOwners.getValue(it) !in retained },
@@ -146,6 +162,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
 
     fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {
+        queries++
         val key = Key(variable, value)
         equalities[key]?.let { return it }
         if (definitions[variable]?.image?.contains(value) == false) {
@@ -160,9 +177,18 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
 
     fun expandPending(builder: Compiler.Builder) {
         val replaced = HashSet<Factor>()
-        for ((key, equality) in pendingEqualities.entries.toList().asReversed()) {
-            val expanded = expand(key.variable, key.value, builder) ?: continue
+        pendingQueries = pendingEqualities.size
+        for ((index, entry) in pendingEqualities.entries.toList().asReversed().withIndex()) {
+            val (key, equality) = entry
+            val before = work
+            val expanded = expand(key.variable, key.value, builder)
+            if (index == 0) {
+                newestQueryVisits = work - before
+                newestQueryCompleted = expanded != null
+            }
+            if (expanded == null) continue
             if (expanded == equality.literal) continue
+            completedQueries++
             val clauses = listOf(
                 Clause(intArrayOf(Lit.negate(equality.literal), expanded)),
                 Clause(intArrayOf(equality.literal, Lit.negate(expanded))),
