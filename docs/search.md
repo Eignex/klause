@@ -20,6 +20,10 @@ peers. The shared store does not duplicate the CP pin.
 
 ## Finite propagation and explanations
 
+Fresh presolve rebuilds retain the originating cancellation token and accounting
+destination. See [presolve cancellation and accounting](presolve.md) for ownership,
+probe-count scope and cooperative deadline limits.
+
 [PropagationSession](../klause/src/commonMain/kotlin/com/eignex/klause/propagation/PropagationSession.kt)
 owns the finite-domain trail and fixpoint. Propagators supply sound source
 reasons for deductions and conflicts. An assignment's undo lifetime can be deeper
