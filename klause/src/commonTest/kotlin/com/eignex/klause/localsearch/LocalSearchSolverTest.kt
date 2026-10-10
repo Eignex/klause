@@ -236,6 +236,42 @@ class LocalSearchSolverTest {
     }
 
     @Test
+    fun `built in initial restarts preserve the custom restart seeded walk`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(0, 20)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 1)),
+        ).bake()
+        val sweep = assertNotNull(DefinitionalSweep.infer(arrayOf(Product(a = 0, b = 1, result = 2)), numIntVars = 3))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 1L))
+        val params = LocalSearchParams(maxFlips = 20L, randomSeed = 3L)
+        val policies: List<() -> RestartPolicy> = listOf(
+            { FixedCadenceRestart(maxFlipsBeforeRestart = 3) },
+            { AdaptivePerturbationRestart(maxFlipsBeforeRestart = 3) },
+            { IteratedLocalSearchRestart(maxFlipsBeforeRestart = 3) },
+            { StagnationRestart(maxFlipsBeforeRestart = 3) },
+        )
+        for (policy in policies) {
+            val custom = object : RestartPolicy by policy() {}
+            val expected = LocalSearchSolver(
+                problem, restartPolicy = custom, definitionalSweep = sweep,
+                perMoveInvariants = true, seedImplicitOnRestart = true,
+            ).improvements(objective, params).filterIsInstance<MinimizeResult.WithSample>()
+                .map { it.sample to it.objectiveValue }.toList()
+
+            val actual = LocalSearchSolver(
+                problem, restartPolicy = policy(), definitionalSweep = sweep,
+                perMoveInvariants = true, seedImplicitOnRestart = true,
+            ).improvements(objective, params).filterIsInstance<MinimizeResult.WithSample>()
+                .map { it.sample to it.objectiveValue }.toList()
+
+            assertTrue(actual.isNotEmpty())
+            assertEquals(expected, actual)
+        }
+    }
+
+    @Test
     fun `a gradient view that disagrees with the linear objective only guides moves`() {
         // The view reads p = x0·x1 alone; the linear objective p + x0 is the rewrite presolve left behind.
         val problem = Problem(
