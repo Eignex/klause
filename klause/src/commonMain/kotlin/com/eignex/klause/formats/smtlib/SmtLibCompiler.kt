@@ -300,37 +300,51 @@ internal object Compiler {
         }
 
         private fun compactConditionalColumns(
-            removed: Set<Int>,
+            removed: SmtLibConditionalEquality.UnusedColumns,
             objective: LinearObjectiveSpec?,
         ): LinearObjectiveSpec? {
-            if (removed.isEmpty()) return objective
+            if (removed.ints.isEmpty() && removed.bools.isEmpty()) return objective
             val mapping = IntArray(nextInt) { -1 }
             val retained = ArrayList<PresolveDomain>()
             for (variable in mapping.indices) {
-                if (variable !in removed) {
+                if (variable !in removed.ints) {
                     mapping[variable] = retained.size
                     retained.add(intDomains[variable])
                 }
             }
-            val remap = VarRemap(IntArray(nextBool) { it }, mapping)
+            var retainedBooleans = 0
+            val boolMapping = IntArray(nextBool) { variable ->
+                if (variable in removed.bools) -1 else retainedBooleans++
+            }
+            val remap = VarRemap(boolMapping, mapping)
             for (index in factors.indices) {
                 val factor = factors[index]
-                if (factor.variables.ints.isNotEmpty()) {
+                if (factor.variables.ints.isNotEmpty() || factor.variables.boolVars.isNotEmpty()) {
                     check(factor.variables.ints.all { mapping[it] >= 0 })
+                    check(factor.variables.boolVars.all { boolMapping[it] >= 0 })
                     factors[index] = factor.remap(remap)
                 }
             }
             for (entry in intNames.entries) entry.setValue(mapping[entry.value])
+            for (entry in boolNames.entries) entry.setValue(boolMapping[entry.value])
             intDomains.clear()
             intDomains.addAll(retained)
             nextInt = retained.size
-            if (objective == null || objective.intCoefficients.isEmpty()) return objective
-            val coefficients = LongArray(nextInt)
-            for (variable in mapping.indices) {
+            nextBool = retainedBooleans
+            return objective?.copy(
+                intCoefficients = compactCoefficients(objective.intCoefficients, mapping, nextInt),
+                boolWeights = compactCoefficients(objective.boolWeights, boolMapping, nextBool),
+            )
+        }
+
+        private fun compactCoefficients(coefficients: LongArray, mapping: IntArray, size: Int): LongArray {
+            if (coefficients.isEmpty()) return coefficients
+            val compacted = LongArray(size)
+            for (variable in coefficients.indices) {
                 val target = mapping[variable]
-                if (target >= 0) coefficients[target] = objective.intCoefficients.getOrElse(variable) { 0L }
+                if (target >= 0) compacted[target] = coefficients[variable]
             }
-            return objective.copy(intCoefficients = coefficients)
+            return compacted
         }
     }
 
