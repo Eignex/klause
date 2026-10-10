@@ -24,6 +24,102 @@ import kotlin.test.assertNull
 
 class ExactLiraEqualitiesTest {
     @Test
+    fun `guarded disequalities exclude comparisons through fixed values and retract`() {
+        for ((operator, truth) in listOf(LinearOp.EQ to false, LinearOp.NE to true)) {
+            val open = Bits(2).also { it.set(0); it.set(1) }
+            val source = Problem(
+                3,
+                intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7),
+                    ReifiedLinear(1, intArrayOf(-2), intArrayOf(1), operator, -14),
+                    ReifiedLinear(2, intArrayOf(-3, 3), intArrayOf(0, 1), LinearOp.EQ, 0),
+                ),
+            )
+            val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+                factor.linearRows.map { it.exactForm(0) }
+            }) { _, _ -> ComponentResult.Consistent }
+            val session = SearchSession(emptyList())
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            session.push(SearchDecision.Bool(Lit.make(1, truth)))
+
+            assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+            assertEquals(false, session.boolValue(2))
+            assertEquals(
+                setOf(Lit.make(0, false), Lit.make(1, !truth), Lit.make(2, false)),
+                session.reasonFor(2)?.literals?.toSet(),
+            )
+            session.popTo(0)
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+            assertNull(session.boolValue(2))
+            session.push(SearchDecision.Bool(Lit.make(1, !truth)))
+            assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+            assertEquals(true, session.boolValue(2))
+        }
+    }
+
+    @Test
+    fun `a disequality excludes a translated comparison across two open components`() {
+        val open = Bits(4).also { for (variable in 0..3) it.set(variable) }
+        val source = Problem(
+            4,
+            intBounds = IntBounds.fromModelBounds(LongArray(4), LongArray(4), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 3),
+                ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.EQ, 4),
+                ReifiedLinear(2, intArrayOf(2, -2), intArrayOf(2, 3), LinearOp.NE, 10),
+                ReifiedLinear(3, intArrayOf(-1, 1), intArrayOf(1, 0), LinearOp.EQ, 4),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        for (variable in 0..2) session.push(SearchDecision.Bool(Lit.make(variable, true)))
+
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+        assertEquals(false, session.boolValue(3))
+        assertEquals(
+            setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false), Lit.make(3, false)),
+            session.reasonFor(3)?.literals?.toSet(),
+        )
+    }
+
+    @Test
+    fun `cancellation during a disequality explanation withholds its implication`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(
+            3,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.NE, 7),
+                ReifiedLinear(2, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, true)))
+        var cancelled = false
+        val context = object : SearchContext by session {
+            override fun atomLiteral(decision: SearchDecision): Int? {
+                if (decision == SearchDecision.Bool(Lit.make(2, false))) cancelled = true
+                return session.atomLiteral(decision)
+            }
+        }
+
+        assertIs<ComponentResult.Indeterminate>(propagation.propagate(context, Cancellation { cancelled }))
+
+        assertNull(session.boolValue(2))
+    }
+
+    @Test
     fun `larger equalities derive fixed values with guarded reasons and retract`() {
         for ((operator, truth) in listOf(LinearOp.EQ to true, LinearOp.NE to false)) {
             val open = Bits(2).also { it.set(0); it.set(1) }
