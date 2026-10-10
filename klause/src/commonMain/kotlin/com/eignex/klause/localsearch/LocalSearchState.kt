@@ -218,6 +218,19 @@ class LocalSearchState(
     // applyIntSet skip configuration-change maintenance: a probe restores its start assignment, so
     // any conf-change marks would have to be reverted anyway.
     private var probeActive = false
+    private var activityTracking = true
+
+    // Repair keeps payloads and scores current, but its transient activity epoch is discarded.
+    internal fun repairInitialization(repair: () -> Unit) {
+        val wasTracking = activityTracking
+        activityTracking = false
+        try {
+            repair()
+        } finally {
+            activityTracking = wasTracking
+            resetStepCounters()
+        }
+    }
 
     /** Reset to a fresh random assignment and reinitialise all factors. */
     fun restart() {
@@ -656,13 +669,15 @@ class LocalSearchState(
         commit()
         refresh()
         settle()
-        if (!probeActive) {
-            markNeighborConfChange(touchedFactors)
-            markMovedVar()
+        if (activityTracking) {
+            if (!probeActive) {
+                markNeighborConfChange(touchedFactors)
+                markMovedVar()
+            }
+            tabu.step++
+            tabu.lastTouched[slot] = tabu.step
+            if (tabu.touchCount[slot] < Int.MAX_VALUE) tabu.touchCount[slot]++
         }
-        tabu.step++
-        tabu.lastTouched[slot] = tabu.step
-        if (tabu.touchCount[slot] < Int.MAX_VALUE) tabu.touchCount[slot]++
         if (cost < bestCostSeen) bestCostSeen = cost
     }
 

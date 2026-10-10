@@ -37,16 +37,21 @@ class GreedyInit {
             order[i] = order[j]
             order[j] = tmp
         }
+        state.repairInitialization { repairCoordinates(state, order, stop) }
+    }
+
+    private fun repairCoordinates(state: LocalSearchState, order: IntArray, stop: () -> Boolean) {
+        val numBoolVars = state.problem.numBoolVars
         for (v in order) {
             if (stop()) break
-            if (v < problem.numBoolVars) {
+            if (v < numBoolVars) {
                 val boolId = v
                 if (!eligibility.allowsBool(boolId)) continue
                 val baselineCost = state.cost
                 state.apply(Move.BoolFlip(boolId))
                 if (state.cost > baselineCost) state.apply(Move.BoolFlip(boolId))
             } else {
-                val intId = v - problem.numBoolVars
+                val intId = v - numBoolVars
                 if (!eligibility.allowsInt(intId)) continue
                 val d = state.rootDomains[intId]
                 val cur = state.assignment.intValue(intId)
@@ -82,8 +87,5 @@ class GreedyInit {
                 if (bestVal != cur) state.apply(Move.IntSet(intId, bestVal))
             }
         }
-        // Reset tabu / activity tracking so the repair pass's apply-then-revert churn doesn't leave
-        // the main loop with every var freshly blocked.
-        state.resetStepCounters()
     }
 }
