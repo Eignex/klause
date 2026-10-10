@@ -13,7 +13,7 @@ This tree is the internal implementation contract and developer workflow referen
 |---|---|
 | [Architecture](architecture.md) | Modules, package boundaries and model ownership |
 | [Search and propagation](search.md) | Shared search, explanations, learned clauses and portfolio slices |
-| [Presolve cancellation](presolve.md) | Fresh rebuild token ownership, phase allowances and probe telemetry |
+| [Presolve transformations](presolve.md) | Guarantees, source mappings, projected enumeration and phase accounting |
 | [LP architecture](lp/architecture.md) | Model authority, bound trails, sparse basis and consumers |
 | [LP certification](lp/certification.md) | Exact bounds, witnesses, conflicts, rays and resource limits |
 | [Input semantics](formats.md) | Finite and open routing, float lowering and MPS result contracts |

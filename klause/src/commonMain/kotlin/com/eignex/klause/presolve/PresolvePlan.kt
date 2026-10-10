@@ -119,11 +119,12 @@ class PresolveConfig(
     )
 
     /** Whether [pass] runs under [context]. */
-    fun resolved(pass: PresolvePass, context: PresolveContext): Boolean = overrides[pass] ?: auto(pass, context)
+    fun resolved(pass: PresolvePass, context: PresolveContext): Boolean =
+        (!context.solutionSetSensitive || pass.guarantees.bijection) && (overrides[pass] ?: auto(pass, context))
 
     private fun auto(pass: PresolvePass, context: PresolveContext): Boolean = pass.autoEligible &&
         pass.timing in emphasis.timings &&
-        (pass.preservesSolutionSet || !context.solutionSetSensitive) &&
+        (pass.guarantees.bijection || !context.solutionSetSensitive) &&
         !(pass == PresolvePass.BREAK_SYMMETRIES && context.modelBreaksSymmetry)
 
     /** Problem-transform passes enabled for [context], in priority order. */

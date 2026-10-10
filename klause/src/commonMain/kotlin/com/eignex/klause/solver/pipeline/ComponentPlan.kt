@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.BakedProblem
@@ -34,6 +36,7 @@ enum class FactorOwner {
 
 /** Immutable build-time decomposition of a [Problem]. */
 class ComponentPlan internal constructor(
+    private val source: Problem,
     private val intOwners: Array<IntVariableOwner>,
     private val factorOwners: Array<FactorOwner>,
     /** Theory route selected from the theory-owned source fragment. */
@@ -80,15 +83,16 @@ class ComponentPlan internal constructor(
      * others selects ownership once from the shape carrying it, then drops it from plan and model
      * together.
      *
-     * [spec] is what makes the drop checkable: only a model one factor shorter than this plan can be the
-     * one the appended row was added to, so a plan that never carried an appended factor is refused here
-     * rather than silently losing a row of the model.
+     * Retained factors must be the selected source factors by identity, and declarations may only
+     * narrow their bounds. The resulting plan is bound to [spec].
      */
     internal fun withoutAppendedFactor(spec: Problem): ComponentPlan {
-        require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size - 1) {
+        requireSamePrefix(spec, factorOwners.size - 1)
+        require(spec.factors.size == factorOwners.size - 1) {
             "dropping an appended factor needs the model the plan was selected from, minus that factor"
         }
         return ComponentPlan(
+            spec,
             intOwners,
             factorOwners.copyOfRange(0, factorOwners.size - 1),
             theoryPipeline,
@@ -164,8 +168,48 @@ class ComponentPlan internal constructor(
         )
     }
 
+    internal fun forObjectiveRound(spec: Problem, appended: Boolean): ComponentPlan {
+        val prefix = factorOwners.size - if (appended) 1 else 0
+        requireSamePrefix(spec, prefix)
+        require(spec.factors.size == factorOwners.size) { "objective round changed the factor count" }
+        if (appended) {
+            val selected = source.factors.last()
+            val replacement = spec.factors.last()
+            require(selected is Linear &&
+                replacement is Linear &&
+                selected.op == replacement.op && selected.vars.contentEquals(replacement.vars) &&
+                selected.constants is IntegralConstants &&
+                replacement.constants is IntegralConstants &&
+                selected.vars.indices.all { k ->
+                    selected.constants.exactCoeff(k) == replacement.constants.exactCoeff(k)
+                }
+            ) { "objective round must retain the planned row's columns and coefficients" }
+        }
+        return ComponentPlan(spec, intOwners, factorOwners, theoryPipeline, unplaceable)
+    }
+
+    private fun requireSamePrefix(spec: Problem, count: Int) {
+        require(spec.numBoolVars == source.numBoolVars && spec.numIntVars == source.numIntVars &&
+            spec.numRealVars == source.numRealVars && spec.realLower.contentEquals(source.realLower) &&
+            spec.realUpper.contentEquals(source.realUpper) && spec.factors.size >= count &&
+            (0 until count).all { spec.factors[it] === source.factors[it] }
+        ) { "component plan belongs to a different source model" }
+        for (v in 0 until source.numIntVars) {
+            val before = source.intBounds
+            val after = spec.intBounds
+            require(!before.hasLower(v) || after.hasLower(v) && after.lower(v) >= before.lower(v))
+            require(!before.hasUpper(v) || after.hasUpper(v) && after.upper(v) <= before.upper(v))
+            val declared = source.intDomainOrNull(v)
+            val narrowed = spec.intDomainOrNull(v)
+            require(declared == null || narrowed != null && narrowed.min >= declared.min && narrowed.max <= declared.max &&
+                narrowed == declared.withMinAtLeast(narrowed.min).withMaxAtMost(narrowed.max)) {
+                "objective round must only narrow declared values"
+            }
+        }
+    }
+
     private fun requireBelongsTo(spec: Problem) {
-        require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size) {
+        require(spec === source) {
             "component plan belongs to a different source model"
         }
     }
@@ -189,6 +233,7 @@ class CpProblemProjection internal constructor(
 fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
     if (preferFinite) {
         return ComponentPlan(
+            source = this,
             intOwners = Array(numIntVars) { IntVariableOwner.CP },
             factorOwners = Array(factors.size) { factor ->
                 if (factors[factor] is Clause) FactorOwner.SHARED else FactorOwner.CP
@@ -260,6 +305,7 @@ fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
         else -> ProblemPipeline.FINITE_CP
     }
     return ComponentPlan(
+        this,
         intOwners,
         factorOwners,
         route,

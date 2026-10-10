@@ -25,7 +25,7 @@ sealed interface OpenPresolveResult {
      *
      * @property spec the same model over tighter bounds; every other part of it is carried through.
      * @property closedSides how many open sides the phase proved a bound for.
-     * @property rebuild recovers the Boolean columns the phase eliminated, empty when it eliminated none.
+     * @property rebuild recovers the columns the phase eliminated, empty when it eliminated none.
      */
     class Tightened internal constructor(
         val spec: Problem,

@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
@@ -16,6 +17,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -84,4 +86,28 @@ class BinaryColumnSubstitutionTest {
         assertNull(substitute(model))
     }
 
+    @Test
+    fun `composed preparation preserves source objective after Boolean zero extension`() {
+        val model = problem(
+            5,
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            ),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 2), constant = 11)
+        val first = PresolvePipeline.run(model, objective, PresolveConfig.parse("binary-columns"), false)
+        val adjusted = checkNotNull(first.objective)
+        val second = PresolvePipeline.run(first.problem, adjusted, PresolveConfig.NONE, false)
+        val chain = first.mapping.then(second.mapping)
+
+        val values = BacktrackSolver(second.problem.bake()).enumerate().map { sample ->
+            chain.requireObjectivePreserved(objective, adjusted, sample)
+            objective.evaluateLong(chain.reconstructFrom(second.problem, sample))
+        }.toSet()
+
+        assertEquals(setOf(11L, 13L), values)
+        assertEquals(first.problem.numBoolVars, adjusted.boolWeights.size)
+        assertTrue(adjusted.boolWeights.all { it == 0L })
+    }
 }

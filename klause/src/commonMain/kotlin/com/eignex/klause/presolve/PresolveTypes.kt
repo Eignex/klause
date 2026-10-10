@@ -18,14 +18,16 @@ class Presolved(
     val passesFired: List<PresolvePass> = emptyList(),
     /** Whether presolve proved the input infeasible. */
     val infeasible: Boolean = false,
-)
+) {
+    internal var mapping: SourceMapping =
+        SourceMapping(problem, problem, TransformationGuarantees.IDENTITY, lift = reconstruct)
+}
 
 /**
  * What the source lane made of a canonical model: the rewritten declarations and factors, and whether a
  * pass refuted it.
  *
- * [rebuild] recovers the Boolean columns the passes eliminated. Integer columns are still never
- * eliminated here, so a witness needs nothing beyond it.
+ * [rebuild] recovers eliminated Boolean and integer columns in reverse transformation order.
  */
 internal class SourcePresolved(
     /** The transformed model, or the input itself when no pass fired. */
@@ -34,7 +36,7 @@ internal class SourcePresolved(
     val passesFired: List<PresolvePass> = emptyList(),
     /** Whether the lane proved the input infeasible. */
     val infeasible: Boolean = false,
-    /** Recovers the Boolean columns the passes eliminated, in the order they are recovered. */
+    /** Recovers the columns the passes eliminated, in the order they are recovered. */
     val rebuild: SourceRebuilds = SourceRebuilds.NONE,
 )
 
@@ -45,8 +47,7 @@ internal class SourcePresolved(
  * than as a closure over one lane's witness, so what a pass running before any finite projection exists
  * may produce is said by the type rather than checked on the way through. [bounds] is the one range it
  * may state, and a model-level range is not a finite domain — it says how far a column can reach, while
- * a domain says which values it may take. [rebuild] covers Boolean columns only; eliminating an integer
- * column needs a step shape that carries values at both lanes' widths, which does not exist yet.
+ * a domain says which values it may take. [rebuild] carries lane-neutral Boolean and integer steps.
  */
 internal class SourceDelta(
     /** Indices of input factors removed or replaced. */
@@ -57,7 +58,7 @@ internal class SourceDelta(
     val bounds: IntBounds? = null,
     /** Whether the pass proved infeasibility. */
     val infeasible: Boolean = false,
-    /** Recovers the Boolean columns this pass eliminated, or [SourceRebuilds.NONE] when it eliminated none. */
+    /** Recovers the columns this pass eliminated, or [SourceRebuilds.NONE] when it eliminated none. */
     val rebuild: SourceRebuilds = SourceRebuilds.NONE,
 ) {
     /**
@@ -82,6 +83,7 @@ internal class SourceDelta(
         val lift = rebuild.asSampleLift()
         val proved = bounds
             ?: return PassDelta(droppedIndices, addedFactors, reconstruct = lift, infeasible = infeasible)
+                .also { it.rebuild = rebuild }
         require(proved.size == rootDomains.size) {
             "proved ranges for ${proved.size} columns over a model of ${rootDomains.size}"
         }
@@ -89,10 +91,11 @@ internal class SourceDelta(
         for (v in rootDomains.indices) {
             val next = rootDomains[v].narrowedBy(proved, v)
                 ?: return PassDelta(droppedIndices, addedFactors, reconstruct = lift, infeasible = true)
+                    .also { it.rebuild = rebuild }
             if (next === rootDomains[v]) continue
             (narrowed ?: rootDomains.copyOf().also { narrowed = it })[v] = next
         }
-        return PassDelta(droppedIndices, addedFactors, narrowed, lift, infeasible = infeasible)
+        return PassDelta(droppedIndices, addedFactors, narrowed, lift, infeasible = infeasible).also { it.rebuild = rebuild }
     }
 }
 
@@ -123,8 +126,10 @@ class PassDelta(
     /** Whether the pass proved infeasibility. */
     val infeasible: Boolean = false,
 ) {
-    /** Whether the pass left factors and domains unchanged. */
-    val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && domains == null
+    internal var rebuild: SourceRebuilds = SourceRebuilds.NONE
+
+    /** Whether the pass left factors, domains and reconstruction unchanged. */
+    val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && domains == null && reconstruct == null && rebuild.isEmpty
 }
 
 /**

@@ -7579,6 +7579,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field VALUE_PRECEDENCE Lcom/eignex/klause/presolve/PresolvePass;
 	public final fun getAutoEligible ()Z
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getGuarantees ()Lcom/eignex/klause/presolve/TransformationGuarantees;
 	public final fun getId ()Ljava/lang/String;
 	public final fun getPreservesSolutionSet ()Z
 	public final fun getSkipAfterEmpty ()Z
@@ -7643,6 +7644,31 @@ public final class com/eignex/klause/presolve/SharedIntOccurrence {
 }
 
 public abstract interface class com/eignex/klause/presolve/SubsumeState {
+}
+
+public final class com/eignex/klause/presolve/TransformationGuarantees {
+	public static final field Companion Lcom/eignex/klause/presolve/TransformationGuarantees$Companion;
+	public fun <init> (ZZZZZ)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun component3 ()Z
+	public final fun component4 ()Z
+	public final fun component5 ()Z
+	public final fun copy (ZZZZZ)Lcom/eignex/klause/presolve/TransformationGuarantees;
+	public static synthetic fun copy$default (Lcom/eignex/klause/presolve/TransformationGuarantees;ZZZZZILjava/lang/Object;)Lcom/eignex/klause/presolve/TransformationGuarantees;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBijection ()Z
+	public final fun getObjective ()Z
+	public final fun getProjectedSolutions ()Z
+	public final fun getReconstructability ()Z
+	public final fun getSatisfiability ()Z
+	public fun hashCode ()I
+	public final fun then (Lcom/eignex/klause/presolve/TransformationGuarantees;)Lcom/eignex/klause/presolve/TransformationGuarantees;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/presolve/TransformationGuarantees$Companion {
+	public final fun getIDENTITY ()Lcom/eignex/klause/presolve/TransformationGuarantees;
 }
 
 public final class com/eignex/klause/propagation/Assumptions {

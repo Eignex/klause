@@ -1,13 +1,19 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.SearchOutcome
+import com.eignex.klause.backtrack.projectedOutcomes
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -88,4 +94,40 @@ class PresolvePipelineTest {
         assertTrue(boxPoints(unsat).none { isFeasible(unsat, it) }, "the fixture really has no solution")
     }
 
+    @Test
+    fun `affine reconstruction covers exactly the independently declared source solutions`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 2, 0), constant = 5)
+        val outcome = PresolvePipeline.run(model, objective, PresolveConfig.parse("affine"), false)
+        val expected = boxPoints(model).filter { values ->
+            values[0] + values[1] == 3L && values[1] - values[2] <= 1L && values[2] >= 1L
+        }.map { it.toList() }.toSet()
+
+        val actual = BacktrackSolver(outcome.problem.bake()).enumerate().map { reduced ->
+            outcome.mapping.requireObjectivePreserved(objective, outcome.objective ?: objective, reduced)
+            outcome.mapping.reconstructFrom(outcome.problem, reduced).ints.toList()
+        }.toSet()
+
+        assertTrue(outcome.mapping.rebuild.steps.any { it is RebuildStep.AffineValue })
+        assertEquals(expected, actual)
+    }
+
+    @Test
+    fun `projected enumeration after affine elimination emits each source solution once`() {
+        val outcome = PresolvePipeline.run(model, null, PresolveConfig.parse("affine"), false)
+        val expected = boxPoints(model).filter { values ->
+            values[0] + values[1] == 3L && values[1] - values[2] <= 1L && values[2] >= 1L
+        }.map { it.toList() }.toSet()
+
+        val outcomes = BacktrackSolver(outcome.problem.bake()).projectedOutcomes(
+            BacktrackParams(),
+            intArrayOf(),
+            intArrayOf(0, 1, 2),
+            outcome.mapping,
+        ).toList()
+        val actual = outcomes.filterIsInstance<SearchOutcome.Found>().map { it.sample.ints.toList() }
+
+        assertEquals(expected, actual.toSet())
+        assertEquals(expected.size, actual.size)
+        assertTrue(outcomes.last() is SearchOutcome.Exhausted)
+    }
 }

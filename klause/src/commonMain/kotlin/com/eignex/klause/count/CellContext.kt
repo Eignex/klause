@@ -2,6 +2,8 @@ package com.eignex.klause.count
 
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.SearchOutcome
+import com.eignex.klause.backtrack.projectedOutcomes
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
@@ -47,32 +49,24 @@ internal class CellContext private constructor(
         )
     }
 
-    /**
-     * Count distinct projections of the cell carved out by [hashes], up to `cap + 1`, with one
-     * decoded representative per distinct projection (see [CellResult]).
-     *
-     * The XOR hashes are propagated jointly by Gauss-Jordan elimination
-     * ([com.eignex.klause.factor.bool.GaussianXor], wired in by [withHashes]), so
-     * [BacktrackSolver.enumerate] finds every model in the hashed cell quickly — early parity
-     * conflict/forcing keeps the search off infeasible branches. A [CELL_DECISION_BUDGET] cap bounds
-     * the rare residual exhaustion-tail thrash; because Gaussian finds all models before that tail,
-     * cutting it leaves the count correct.
-     */
-    fun countCell(hashes: List<Xor>, cap: Int): CellResult {
-        val params = BacktrackPresets.satOptimized().copy(maxDecisions = CELL_DECISION_BUDGET)
-        val enumeration = BacktrackSolver(problem.withHashes(hashes).bake()).enumerate(params)
-        // For hashed cells, cap+1 models decide ">cap" while staying out of the exhaustion tail; the
-        // un-hashed base has no parity slices and must be enumerated fully for an exact projected count.
-        val models = if (hashes.isEmpty()) enumeration else enumeration.take(cap + 1)
-        val reps = LinkedHashMap<List<Long>, Sample>()
-        for (model in models) {
-            val key = projectionKey(model)
-            if (key !in reps) {
-                reps[key] = decode(model)
-                if (reps.size > cap) break
+    /** Count distinct projections, preserving whether the cell was completely checked. */
+    fun countCell(hashes: List<Xor>, cap: Int, maxDecisions: Long = CELL_DECISION_BUDGET): CellResult {
+        require(cap >= 0 && cap < Int.MAX_VALUE)
+        val params = BacktrackPresets.satOptimized().copy(maxDecisions = maxDecisions)
+        val outcomes = BacktrackSolver(problem.withHashes(hashes).bake()).projectedOutcomes(params, boolSet, intSet)
+        val representatives = ArrayList<Sample>()
+        var complete = false
+        for (outcome in outcomes) {
+            when (outcome) {
+                is SearchOutcome.Found -> {
+                    representatives.add(decode(outcome.sample))
+                    if (representatives.size > cap) break
+                }
+                is SearchOutcome.Exhausted -> complete = !outcome.indeterminate
+                SearchOutcome.BudgetCapped -> Unit
             }
         }
-        return CellResult(count = reps.size, capped = reps.size > cap, representatives = reps.values.toList())
+        return CellResult(representatives.size, representatives.size > cap, representatives, complete)
     }
 
     companion object {

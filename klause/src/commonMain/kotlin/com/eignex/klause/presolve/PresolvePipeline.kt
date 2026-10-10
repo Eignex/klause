@@ -41,7 +41,10 @@ class PresolveOutcome(
      * objective reads is never substituted — so this is the same objective, zero-extended.
      */
     val objective: LinearObjective? = null,
-)
+) {
+    internal var mapping: SourceMapping =
+        SourceMapping(problem, problem, TransformationGuarantees.IDENTITY, lift = reconstruct)
+}
 
 /**
  * The presolve driver: the full-model transform pipeline, independent of any front-end representation.
@@ -184,7 +187,7 @@ object PresolvePipeline {
                 ),
                 changed = true,
                 objective = refit(linearObjective, sourceProblem),
-            )
+            ).also { it.mapping = prepared.mapping }
         }
 
         // On a wide but feasible domain the LP still can't be skipped like the infeasible case, but its
@@ -214,10 +217,9 @@ object PresolvePipeline {
         cancellation.charge(BAKE_WORK_WEIGHT * passBaseUnits(prebaked.factors))
         val seeded = RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
-        val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
-        // The source phase ran before every round below, so its columns are recovered after theirs — first
-        // in application order is last through the fold.
-        prepared.rebuild.asSampleLift()?.let(reconstructs::add)
+        val mappings = ArrayList<SourceMapping>()
+        mappings.add(prepared.mapping)
+        mappings.add(SourceMapping(sourceProblem, seeded, TransformationGuarantees.IDENTITY))
         val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
         prepared.passesFired.forEach { firedPasses.add(it.id) }
         // Pseudo-Boolean lane substitution: a `{0, 1}` integer column becomes a Boolean literal and the rows
@@ -235,7 +237,7 @@ object PresolvePipeline {
         }
         var current = substitution?.problem ?: seeded
         substitution?.let {
-            reconstructs.add(it.reconstruct)
+            mappings.add(SourceMapping(seeded, it.problem, TransformationGuarantees.IDENTITY, lift = it.reconstruct))
             firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
         }
         var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
@@ -262,18 +264,18 @@ object PresolvePipeline {
                 harvestStats = harvestStats.mergedWith(it.stats)
             }
             val harvested = harvestResult?.problem ?: pre.problem
+            mappings.add(pre.mapping)
+            if (harvested !== pre.problem) {
+                mappings.add(SourceMapping(pre.problem, harvested, TransformationGuarantees.IDENTITY))
+            }
             // Neither presolve nor the harvest changed anything this round → fixpoint.
             if (pre.problem === current && harvested === pre.problem) break
             pre.passesFired.forEach { firedPasses.add(it.id) }
             harvestResult?.let { harvest += it.report }
-            // The harvest only narrows domains, so it contributes no reconstruct; add presolve's only when it
-            // actually transformed the problem (else it is the identity).
-            if (pre.problem !== current) reconstructs.add(pre.reconstruct)
             current = harvested
             // A no-op harvest means the next round's presolve would re-derive the same fixpoint, so stop.
             if (harvested === pre.problem) break
         }
-        val reconstruct: (Sample) -> Sample = { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
         // The base bake (declared → root-propagated domains) is not a presolve reduction: the solve boundary
         // re-runs it. So when no pass fired ([current] === [seeded]) and neither the OBBT pre-bake ([prebaked]
         // === [sourceProblem]) nor the probing reseed ([seeded] === [baked]) tightened anything beyond that base
@@ -297,10 +299,10 @@ object PresolvePipeline {
             // "presolve changed nothing" is what makes a run interesting in the first place.
             return PresolveOutcome(
                 problem,
-                reconstruct,
+                { it },
                 PresolveStats(bakeElapsed = bakeElapsed, lpStats = harvestStats),
                 changed = false,
-            )
+            ).also { it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY) }
         }
 
         // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when the LP tightened anything)
@@ -318,7 +320,10 @@ object PresolvePipeline {
             lpStats = harvestStats,
             bakeElapsed = bakeElapsed,
         )
-        return PresolveOutcome(posted, reconstruct, stats, changed = true, objective = refit(linearObjective, posted))
+        if (posted !== current) mappings.add(SourceMapping(current, posted, TransformationGuarantees.IDENTITY))
+        val mapping = mappings.reduce { acc, next -> acc.then(next) }
+        return PresolveOutcome(posted, { mapping.reconstructFrom(posted, it) }, stats,
+            changed = true, objective = refit(linearObjective, posted)).also { it.mapping = mapping }
     }
 }
 
