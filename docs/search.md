@@ -133,6 +133,11 @@ disequality indicators over root domains contained in `{0, 1}` propagate as dire
 channels: an indicator fixes its integer value, and a fixed integer pins the
 indicator. Wider domains retain the general linear propagator.
 
+Factor cores traverse the full reason graph with session-owned dense-id scratch.
+The traversal clears visited ids between extractions and reads learned native clause
+variables directly, retaining the same factor-core membership across restarts and
+learned-clause compaction.
+
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump.
 Sound resolvents that cannot assert retain chronological fallback. Root
