@@ -10,12 +10,11 @@ import kotlin.time.TestTimeSource
 
 class CancellationTest {
     @Test
-    fun `both polling surfaces observe live adapter cancellation and deadline`() {
+    fun `both polling surfaces observe rearmed adapter deadlines`() {
         for (direct in listOf(false, true)) {
             val clock = TestTimeSource()
             var deadline = clock.markNow() + 2.seconds
-            var external = false
-            val token = cancelledWhen({ deadline }) { external || deadline.hasPassedNow() }
+            val token = cancelledWhen({ deadline }) { deadline.hasPassedNow() }
             val read = if (direct) token::isCancelled else token::invoke
             assertFalse(read())
 
@@ -24,7 +23,21 @@ class CancellationTest {
 
             assertEquals(deadline, token.deadline())
             assertFalse(read())
+            clock += 1.seconds
+            assertTrue(read())
+        }
+    }
+
+    @Test
+    fun `both polling surfaces observe adapter external cancellation`() {
+        for (direct in listOf(false, true)) {
+            var external = false
+            val token = cancelledWhen({ null }) { external }
+            val read = if (direct) token::isCancelled else token::invoke
+            assertFalse(read())
+
             external = true
+
             assertTrue(read())
         }
     }
