@@ -18,8 +18,8 @@ internal object CliKnobs {
     /** Default LP relaxation ceiling spec (parsed by `LpConfig.parse`): `klause.lp` / `KLAUSE_LP`. */
     val lp by propertyKnob()
 
-    /** Presolve budget, in milliseconds' worth of work, for the presolve phase: `klause.presolve.budget.ms`
-     *  / `KLAUSE_PRESOLVE_BUDGET_MS`. Converted to work units at [PRESOLVE_WORK_PER_MS]; the presolve
+    /** Presolve phase budget, in milliseconds: `klause.presolve.budget.ms`
+     *  / `KLAUSE_PRESOLVE_BUDGET_MS`. Applied as an elapsed ceiling and converted to work units at [PRESOLVE_WORK_PER_MS]; the presolve
      *  round engine and its long-running passes charge their work against it and bail with the reductions
      *  made so far, so a pathologically large model can't spend unbounded effort in presolve. `0` or
      *  negative disables both the work and elapsed phase caps. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
@@ -51,7 +51,7 @@ internal object CliKnobs {
     const val MAX_PRESOLVE_BUDGET_SHARE = 0.25
 
     /** Presolve work units one millisecond of presolve budget buys, so the millisecond policy above keeps
-     *  its reach while the phase counts work instead of reading a clock. The median weighted work per
+     *  its reach through deterministic work accounting. The median weighted work per
      *  millisecond of an uncapped presolve, over the calibration sample's models whose presolve ran at least a
      *  second (33 of 60 MIPLIB 2017, 40 QF_LIA and 40 MiniZinc Challenge), was 274,665 (p25 177,850, p75
      *  390,977); shorter runs are dominated by warm-up no unit can charge, so they are left out. */
