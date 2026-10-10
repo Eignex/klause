@@ -10212,6 +10212,7 @@ final class com.eignex.klause.solver.objective/LinearObjective : com.eignex.klau
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.objective/LinearObjective.equals|equals(kotlin.Any?){}[0]
     final fun evaluate(com.eignex.klause.solver/Assignment): kotlin/Double // com.eignex.klause.solver.objective/LinearObjective.evaluate|evaluate(com.eignex.klause.solver.Assignment){}[0]
     final fun evaluate(com.eignex.klause.solver/Sample): kotlin/Double // com.eignex.klause.solver.objective/LinearObjective.evaluate|evaluate(com.eignex.klause.solver.Sample){}[0]
+    final fun evaluateExact(com.eignex.klause.solver/Sample): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.objective/LinearObjective.evaluateExact|evaluateExact(com.eignex.klause.solver.Sample){}[0]
     final fun evaluateLong(com.eignex.klause.solver/Assignment): kotlin/Long // com.eignex.klause.solver.objective/LinearObjective.evaluateLong|evaluateLong(com.eignex.klause.solver.Assignment){}[0]
     final fun evaluateLong(com.eignex.klause.solver/Sample): kotlin/Long // com.eignex.klause.solver.objective/LinearObjective.evaluateLong|evaluateLong(com.eignex.klause.solver.Sample){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.objective/LinearObjective.hashCode|hashCode(){}[0]

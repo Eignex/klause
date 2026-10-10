@@ -8784,6 +8784,7 @@ public final class com/eignex/klause/solver/objective/LinearObjective : com/eign
 	public fun equals (Ljava/lang/Object;)Z
 	public fun evaluate (Lcom/eignex/klause/solver/Assignment;)D
 	public fun evaluate (Lcom/eignex/klause/solver/Sample;)D
+	public final fun evaluateExact (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/simplex/exact/BigFraction;
 	public final fun evaluateLong (Lcom/eignex/klause/solver/Assignment;)J
 	public final fun evaluateLong (Lcom/eignex/klause/solver/Sample;)J
 	public final fun getBoolWeights ()[J
