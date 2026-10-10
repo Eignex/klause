@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.solver.ResumableSolve
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SearchInitializationCancelled
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
