@@ -522,6 +522,10 @@ internal object Compiler {
                 return
             }
             if (node is FExpr.Call && node.fn in REL && node.args.size == 2) {
+                if (node.fn == "eq") {
+                    val output = node.args.firstOrNull { it is FExpr.Ref } as? FExpr.Ref
+                    if (output != null) definedVars.add(ref(output.name))
+                }
                 postRel(relationParts(node))
             } else {
                 // A Boolean combination that is a plain disjunction/implication of single-variable
@@ -853,6 +857,7 @@ internal object Compiler {
             val vs = args.map { materializeVar(linear(it)) }.toIntArray()
             val m = newAuxVar(vs.minOf { domains[it].min }, vs.maxOf { domains[it].max })
             factors.add(ArrayMinMax(result = m, xs = vs, max = max))
+            definedVars.add(m)
             return IntComb.Narrow(LinComb(mapOf(m to 1L), 0L))
         }
 
@@ -962,6 +967,7 @@ internal object Compiler {
             val cs = LongArray(vars.size + 1) { if (it < vars.size) -narrow.coeffs.getValue(vars[it]) else 1L }
             val ids = IntArray(vars.size + 1) { if (it < vars.size) vars[it] else v }
             factors.add(Linear(cs, ids, LinearOp.EQ, narrow.constant)) // v − expr = 0
+            definedVars.add(v)
             return v
         }
 

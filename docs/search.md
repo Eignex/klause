@@ -191,6 +191,16 @@ before initializing factor costs, avoiding an evaluation of the intermediate
 random assignment. Custom restart policies retain their ordinary restart protocol.
 ALNS skips its local-search fallback when the complete-engine bootstrap returns
 without an incumbent after cancellation, avoiding fresh seeding after the deadline.
+Hinted min/max expression outputs, their materialized affine operands and output aliases
+form a one-way definition cone. Unhinted min/max globals remain searched. Competing
+definitions and cyclic cones remain searched; independent constraints on a defined output
+still contribute violations. Evaluation clips values to root domains and preserves pinned
+outputs during seeding and moves. Repair proposals into these cones backsolve affine rows
+and extrema into admissible searched inputs, respecting domains, pins and implicit owners.
+Shared-input repairs are checked against the complete maintained cone before publication.
+Element matching-cell indexes and range endpoints use Long arithmetic, including offsets
+whose valid array indexes cross the Int boundary.
+
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
 Boolean break/make vectors initialize on their first score query and are maintained

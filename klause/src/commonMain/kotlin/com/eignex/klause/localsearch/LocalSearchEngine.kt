@@ -149,9 +149,7 @@ internal class LocalSearchEngine(
 
     private fun prepareAssignment(state: LocalSearchState) {
         if (seedImplicitOnRestart) state.seedImplicitFeasible()
-        definitionalSweep?.sweep(state.assignment, state.rootDomains, problem.factors) {
-            state.assumptions.isFrozenBool(it)
-        }
+        definitionalSweep?.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
     }
 
     private suspend fun <T> SequenceScope<T?>.initialRestart(
@@ -1094,9 +1092,7 @@ internal class LocalSearchEngine(
             // from the seeded decision variables — otherwise a definitional constraint reads as violated
             // and the engine fights up from a spuriously-infeasible state, discarding the warm start.
             definitionalSweep?.let { sweep ->
-                sweep.sweep(state.assignment, state.rootDomains, problem.factors) {
-                    state.assumptions.isFrozenBool(it)
-                }
+                sweep.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
                 if (!sliced) state.recompute()
             }
             if (sliced) recomputeInitial(state, params, checkpoint)
