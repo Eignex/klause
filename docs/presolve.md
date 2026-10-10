@@ -116,3 +116,11 @@ Boolean equivalences; general reified rows and value-reading globals retain thei
 integer columns. Objective integer columns remain excluded. Substituted integers
 are pinned during search and reconstructed from the added literals, preserving
 source values and solution counts for either indicator polarity.
+
+## Joint difference propagation
+
+The finite CP projection appends a redundant difference system after the presolve
+fixpoint when its fragment has a guarded edge and an edge between integer columns.
+Fragments consisting only of unary bounds use their original arithmetic factors
+and domain propagation. All original factors remain present in either case.
+This posting policy does not change complete open difference theory selection.
