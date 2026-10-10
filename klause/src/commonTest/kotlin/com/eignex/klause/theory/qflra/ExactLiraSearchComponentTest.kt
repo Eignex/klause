@@ -167,7 +167,7 @@ class ExactLiraSearchComponentTest {
     fun `disequality directions retain inherited bounds and restore their sibling`() {
         val model = Problem(
             numBoolVars = 2,
-            intBounds = openBounds(),
+            intBounds = openBounds(0),
             numRealVars = 1,
             realLower = doubleArrayOf(-1.0),
             realUpper = doubleArrayOf(1.0),
