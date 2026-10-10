@@ -154,6 +154,15 @@ and [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/Claus
 
 ## Portfolio slices
 
+FlatZinc search hints select tiered variable and value heuristics without inheriting
+the free-search preset's phase saving or restart schedule. The source hint's
+solution-guided value wrapper remains available without saved phases taking
+precedence over it. Optimization updates guidance only after admitting a complete
+improving incumbent. Solution-guided selectors retain their first descent, then
+adopt better verified pooled incumbents when traversal resumes, without discarding
+their trail or learned state. Other
+pooled solution phasing retains its restart-boundary import policy.
+
 Open portfolios transport exact assignments in `Sample` rather than through a
 side registry. `exactInts` and `exactReals` carry immutable authoritative
 coordinates; finite samples retain their compact arrays. Copying an unchanged
@@ -311,6 +320,10 @@ samples retained by custom restart policies remain independent of subsequent upd
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
+Complete-search arms without a restart schedule retain traversal because closing
+a proof gap need not produce a better incumbent. Imported incumbent cutoffs still
+apply. Observable search families and complete workers configured with a restart
+schedule retain their plateau reseeding policy under the same incumbent.
 Each arm retains completed-handle totals separately from its current cumulative
 snapshot. Repeated snapshots replace the live entry; closing captures the final
 counters and merges the handle once, including when reseeding or stopping the pool.

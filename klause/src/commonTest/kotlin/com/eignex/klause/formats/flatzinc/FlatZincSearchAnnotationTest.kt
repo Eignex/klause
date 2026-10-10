@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.TierVarSelect
 import com.eignex.klause.backtrack.TieredValueSelector
 import com.eignex.klause.backtrack.TieredVariableSelector
@@ -10,6 +11,7 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.IndomainSplit
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -51,16 +53,22 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `annotated search enables phase saving so re-descents reuse the last working values`() {
+    fun `minimum value annotation retains its order after earlier models`() {
         val src = """
-            var 0..5: x;
-            constraint int_lin_le([1], [x], 3);
-            solve :: int_search([x], first_fail, indomain_min, complete) satisfy;
+            var 0..2: x;
+            var 0..2: y;
+            solve :: int_search([x, y], input_order, indomain_min, complete) satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        assertTrue(
-            toParams(program).phaseSaving,
-            "annotated track should phase-save (#543)",
+
+        val models = BacktrackSolver(program.problem.bake())
+            .enumerate(toParams(program).copy(minHammingDistance = 0))
+            .map { it.ints.toList() }
+            .toList()
+
+        assertEquals(
+            (0L..2L).flatMap { first -> (0L..2L).map { second -> listOf(first, second) } },
+            models,
         )
     }
 

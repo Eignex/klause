@@ -212,7 +212,7 @@ class PortfolioTest {
         )
 
         val result = Portfolio.thompson(
-            listOf(trackingWorker("failed", 7, handle)),
+            listOf(trackingWorker("failed", 7, handle).also { it.family = ArmFamily.LocalSearch }),
             reseedStaleThreshold = 1,
         ).use { it.minimize() }
 
@@ -281,6 +281,7 @@ class PortfolioTest {
                     }
                 },
             ) { _, _, _, _ -> error("the retained handle must resume") }
+                .also { it.family = ArmFamily.LocalSearch }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
                 it.minimize(Cancellation { slices >= 14 })
@@ -990,9 +991,6 @@ class PortfolioTest {
 
     @Test
     fun `aggressive re-seeding does not disrupt proving the optimum`() {
-        // The re-seed guard (#3): even with reseedStaleThreshold = 1 (drop a resumable arm's handle the
-        // first non-improving segment), a fast optimality proof must still come back as Optimal at the
-        // true value — the terminal-verdict and incumbent-exists guards keep re-seed from corrupting it.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -1007,18 +1005,59 @@ class PortfolioTest {
     }
 
     @Test
-    fun `plateau reseeding is counted and the off control retains its handle`() {
-        for (threshold in listOf(0, 2, 3, 4)) {
+    fun `plateau reseeding counts observable and restart-configured searches`() {
+        for (restarting in listOf(false, true)) {
+            for (threshold in listOf(0, 2, 3, 4)) {
+                var slices = 0
+                val handle = ScriptedSearch({ it == 0 }) { slices++ }
+                val worker = trackingWorker("plateau", 0, handle).also {
+                    it.family = if (restarting) ArmFamily.Backtrack else ArmFamily.LocalSearch
+                    it.restartingSearch = restarting
+                }
+
+                val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
+                    it.minimize(Cancellation { slices >= 13 })
+                }
+
+                assertEquals(threshold, result.stats.portfolio.reseedStaleThreshold)
+                assertEquals(if (threshold == 0) 0L else 12L / threshold, result.stats.portfolio.arms.single().reseeds)
+            }
+        }
+    }
+
+    @Test
+    fun `non-restarting complete search reaches improvements beyond non-improving segments`() {
+        for (threshold in listOf(1, 3)) {
             var slices = 0
-            val handle = ScriptedSearch({ it == 0 }) { slices++ }
-            val worker = trackingWorker("plateau", 0, handle)
+            val worker = PortfolioWorker.ofMinimize(
+                "complete",
+                0,
+                resumable = { ScriptedSearch({ it == 0 || it == 5 }) { slices++ } },
+            ) { _, _, _, _ -> error("the retained handle must resume") }
+
+            val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
+                it.minimize(Cancellation { slices >= 10 })
+            }
+
+            assertEquals(998.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
+        }
+    }
+
+    @Test
+    fun `non-restarting complete search retains its handle after an incumbent tightens`() {
+        for (threshold in listOf(1, 3)) {
+            var slices = 0
+            val worker = PortfolioWorker.ofMinimize(
+                "complete",
+                0,
+                resumable = { ScriptedSearch({ it == 0 || it == 5 }) { slices++ } },
+            ) { _, _, _, _ -> error("the retained handle must resume") }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
                 it.minimize(Cancellation { slices >= 13 })
             }
 
-            assertEquals(threshold, result.stats.portfolio.reseedStaleThreshold)
-            assertEquals(if (threshold == 0) 0L else 12L / threshold, result.stats.portfolio.arms.single().reseeds)
+            assertEquals(0L, result.stats.portfolio.arms.single().reseeds)
         }
     }
 

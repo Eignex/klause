@@ -24,7 +24,7 @@ import com.eignex.klause.formats.flatzinc.FlatZincSearchVarSelector
 
 /** Convert format-side search hints into backtrack-ready parameters. */
 fun FlatZincSearchHints.toBacktrackParams(numBoolVars: Int, numIntVars: Int): BacktrackParams =
-    BacktrackPresets.conflictDriven().copy(
+    BacktrackParams(
         variableSelector = fallbackVarSelector.toVariableSelector()
             .let { fallback -> TieredVariableSelector(this.tiers.map { it.toSearchTier() }, fallback = fallback) },
         valueSelector = toValueSelector(numBoolVars, numIntVars),

@@ -1,5 +1,8 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -38,6 +41,21 @@ class PooledSolutionPhasingTest {
 
     /** The shared exchange holding [pooledHint] as the standing incumbent. */
     private fun hintExchange() = IncumbentExchange.minimizing<Sample>().apply { offer(pooledHint, 15.0) }
+
+    @Test
+    fun `solution-guided optimization retains its first descent before adopting pooled guidance`() {
+        val objectives = ArrayList<Double>()
+        val params = BacktrackParams(
+            variableSelector = InputOrder,
+            valueSelector = SolutionGuided(IndomainMin),
+            pooledIncumbents = hintExchange(),
+            onEvent = { if (it is SearchEvent.Incumbent) objectives += it.objective },
+        )
+
+        BacktrackSolver(problem().bake()).minimize(LinearObjective(boolWeights = weights), params)
+
+        assertEquals(16.0, objectives.first())
+    }
 
     @Test
     fun `the pooled incumbent is read once per restart`() {
