@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
@@ -348,6 +349,7 @@ internal object PortfolioComposition {
         facts: ProblemFacts,
         arms: List<WorkerConfig>,
     ): BacktrackWorkerConfig? {
+        if (!LpConfig.DEFAULT.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return null
         if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
             scenario.lsPool != null || scenario.btPool != null || !facts.profile.realColumns ||
             arms.any { it.label == "lp-default" }

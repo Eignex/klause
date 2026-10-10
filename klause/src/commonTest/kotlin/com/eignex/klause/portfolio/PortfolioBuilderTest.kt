@@ -5,6 +5,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.Cancellation
@@ -66,6 +68,26 @@ class PortfolioBuilderTest {
             assertEquals("bt/lp-default", workers.last().label)
         } finally {
             workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `a disabled bounding ceiling keeps the continuous incumbent pool`() {
+        val ceilings = listOf(LpConfig.OFF, LpConfig.DEFAULT.copy(overrides = mapOf(LpTechnique.BOUNDING to false)))
+
+        for (ceiling in ceilings) {
+            val scenario = PortfolioScenario.sequential(Kind.COP).copy(lpCeiling = ceiling)
+            val workers = PortfolioBuilder.build(continuous, scenario)
+
+            try {
+                assertEquals(
+                    listOf("bt/satOptimized", "bt/conflictDriven"),
+                    workers.filter { it.label.startsWith("bt/") }.map { it.label },
+                )
+                assertEquals(4, workers.count { it.family == ArmFamily.LocalSearch })
+            } finally {
+                workers.forEach { it.close() }
+            }
         }
     }
 

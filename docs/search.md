@@ -344,7 +344,8 @@ SAT guard and conflict-driven core. A curated sequential mixed optimization pool
 with at least six configured slots appends an applicable default LP arm when its
 configured backtrack slots have not admitted it. The appended arm follows the
 configured workers and auxiliary ALNS arm, retaining their positions and seeds.
-LP ceilings and explicit arm pools control admission and techniques. Curated
+LP ceilings that disable bounding omit the auxiliary LP arm and its reservation.
+Explicit arm pools control admission and techniques. Curated
 single-core mixed optimization reserves half the scheduled time for this LP arm
 on continuous-column models. Individual segments retain work charging and time
 caps; the remaining time follows the bandit. Explicit backtrack pools and parallel
