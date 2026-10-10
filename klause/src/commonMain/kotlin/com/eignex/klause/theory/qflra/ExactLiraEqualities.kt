@@ -74,7 +74,7 @@ internal class ExactLiraEqualities(
             if (progressStop()) return ComponentResult.Indeterminate
             val lower = model.intBounds.lowerAsBigInteger(integer) ?: continue
             if (lower != model.intBounds.upperAsBigInteger(integer) || lower < room.negate() || lower > room) continue
-            forest.join(integer, zero, lower.toLong(), ALWAYS)
+            forest.join(integer, zero, lower.toLong(), null)
         }
         var inconsistent: Prepared? = null
         for (row in rows) {
@@ -86,7 +86,9 @@ internal class ExactLiraEqualities(
                 return conflict(context, emptyList(), row.literal(checkNotNull(truth)), stop)
             }
             if (row.bound.num < room.negate() || row.bound.num > room) continue
-            if (!forest.join(row.target, row.source, row.bound.num.toLong(), row.literal(checkNotNull(truth)))) {
+            val literal = row.literal(checkNotNull(truth))
+            val premise = if (literal == ALWAYS) null else SearchAtomPremise.Asserted(SearchDecision.Bool(literal))
+            if (!forest.join(row.target, row.source, row.bound.num.toLong(), premise)) {
                 inconsistent = row
                 break
             }
@@ -97,6 +99,8 @@ internal class ExactLiraEqualities(
             val truth = row.op == LinearOp.EQ
             return conflict(context, premises, row.literal(truth), stop)
         }
+        val closed = closeEqualities(forest, context, stop, progressStop)
+        if (closed !is ComponentResult.Consistent) return closed
         for (row in rows) {
             if (progressStop()) return ComponentResult.Indeterminate
             val value = forest.difference(row.target, row.source)
@@ -127,6 +131,80 @@ internal class ExactLiraEqualities(
         return if (stop()) ComponentResult.Indeterminate else result
     }
 
+    private fun closeEqualities(
+        forest: EqualityForest,
+        context: SearchContext,
+        stop: Cancellation,
+        progressStop: Cancellation,
+    ): ComponentResult {
+        val active = general.mapNotNull { (comparison, activator) ->
+            if (progressStop()) return ComponentResult.Indeterminate
+            val truth = if (activator == ALWAYS) true else context.boolValue(activator)
+            if ((comparison.op == LinearOp.EQ && truth == true) || (comparison.op == LinearOp.NE && truth == false)) {
+                Triple(comparison, activator, checkNotNull(truth))
+            } else {
+                null
+            }
+        }
+        if (active.isEmpty()) return ComponentResult.Consistent
+        repeat(GENERAL_PASSES) {
+            val batch = ArrayList<DerivedEquality>()
+            for ((comparison, activator, truth) in active) {
+                if (progressStop()) return ComponentResult.Indeterminate
+                val reduced = forest.reduce(comparison.terms, progressStop) ?: return ComponentResult.Indeterminate
+                val bound = comparison.bound - reduced.offset
+                val terms = reduced.coefficients.entries.toList()
+                if (terms.isEmpty() && bound.isZero) continue
+                if (terms.size > 2) continue
+                val first = terms.firstOrNull()
+                val second = terms.getOrNull(1)
+                if (second != null && first?.value != second.value.negated()) continue
+                val positive = first?.value?.signum() != -1
+                val magnitude = first?.value?.let { if (positive) it else it.negated() } ?: BigFraction.ONE
+                val normalized = bound * magnitude.reciprocal()
+                val impossible = terms.isEmpty() || normalized.den != BIG_ONE
+                if (!impossible && (normalized.num < room.negate() || normalized.num > room)) continue
+                val premises = forest.expressionPremises(comparison.terms, progressStop)
+                    ?: return ComponentResult.Indeterminate
+                val literal = if (activator == ALWAYS) ALWAYS else Lit.make(activator, truth)
+                if (impossible) return conflict(context, premises, literal, stop)
+                val premise = SearchAtomPremise.All(
+                    if (literal == ALWAYS) premises else {
+                        premises + SearchAtomPremise.Asserted(SearchDecision.Bool(literal))
+                    },
+                )
+                batch += DerivedEquality(
+                    if (positive) checkNotNull(first).key else second?.key ?: zero,
+                    if (positive) second?.key ?: zero else checkNotNull(first).key,
+                    normalized.num.toLong(), premise,
+                )
+            }
+            var changed = false
+            for (equality in batch) {
+                if (progressStop()) return ComponentResult.Indeterminate
+                val previous = forest.difference(equality.target, equality.source)
+                if (previous == equality.value) continue
+                if (!forest.join(equality.target, equality.source, equality.value, equality.premise)) {
+                    if (!forest.preparePaths(progressStop)) return ComponentResult.Indeterminate
+                    val premises = forest.premises(equality.target, equality.source, progressStop)
+                        ?: return ComponentResult.Indeterminate
+                    return conflict(context, premises + equality.premise, ALWAYS, stop)
+                }
+                changed = true
+            }
+            if (!changed) return ComponentResult.Consistent
+            if (!forest.preparePaths(progressStop)) return ComponentResult.Indeterminate
+        }
+        return ComponentResult.Consistent
+    }
+
+    private data class DerivedEquality(
+        val target: Int,
+        val source: Int,
+        val value: Long,
+        val premise: SearchAtomPremise,
+    )
+
     private fun propagateGeneral(
         forest: EqualityForest,
         context: SearchContext,
@@ -142,7 +220,8 @@ internal class ExactLiraEqualities(
             val premises = forest.expressionPremises(comparison.terms, progressStop)
                 ?: return ComponentResult.Indeterminate
             if (assigned != null) {
-                return conflict(context, premises, if (activator == ALWAYS) ALWAYS else Lit.make(activator, assigned), stop)
+                val literal = if (activator == ALWAYS) ALWAYS else Lit.make(activator, assigned)
+                return conflict(context, premises, literal, stop)
             }
             val decision = SearchDecision.Bool(Lit.make(activator, truth))
             val reason = context.explainAtoms(SearchAtomPremise.All(premises), decision) ?: continue
@@ -200,7 +279,7 @@ internal class ExactLiraEqualities(
         private val offset = LongArray(size)
         private val edges = ArrayList<Edge>()
         private val pathParent = IntArray(size) { -1 }
-        private val pathGuard = IntArray(size) { ALWAYS }
+        private val pathPremise = arrayOfNulls<SearchAtomPremise>(size)
         private val depth = IntArray(size)
 
         private fun find(vertex: Int): Pair<Int, Long> {
@@ -239,6 +318,23 @@ internal class ExactLiraEqualities(
             return value
         }
 
+        fun reduce(terms: Map<Int, BigFraction>, stop: Cancellation): Reduced? {
+            val zero = parent.lastIndex
+            val (zeroRoot, zeroOffset) = find(zero)
+            val coefficients = HashMap<Int, BigFraction>()
+            var value = BigFraction.ZERO
+            for ((column, coefficient) in terms) {
+                if (stop()) return null
+                val (root, offset) = find(column)
+                val relative = if (root == zeroRoot) offset - zeroOffset else offset
+                if (relative != 0L) value += coefficient * BigFraction.ofLong(relative)
+                if (root != zeroRoot) coefficients[root] = (coefficients[root] ?: BigFraction.ZERO) + coefficient
+            }
+            return Reduced(coefficients.filterValues { !it.isZero }, value)
+        }
+
+        data class Reduced(val coefficients: Map<Int, BigFraction>, val offset: BigFraction)
+
         fun expressionPremises(terms: Map<Int, BigFraction>, stop: Cancellation): List<SearchAtomPremise>? {
             val zero = parent.lastIndex
             val zeroRoot = find(zero).first
@@ -251,7 +347,7 @@ internal class ExactLiraEqualities(
             return result
         }
 
-        fun join(target: Int, source: Int, value: Long, guard: Int): Boolean {
+        fun join(target: Int, source: Int, value: Long, premise: SearchAtomPremise?): Boolean {
             val first = find(target)
             val second = find(source)
             if (first.first == second.first) return first.second - second.second == value
@@ -264,11 +360,14 @@ internal class ExactLiraEqualities(
                 offset[second.first] = -delta
                 if (rank[first.first] == rank[second.first]) rank[first.first]++
             }
-            edges += Edge(target, source, guard)
+            edges += Edge(target, source, premise)
             return true
         }
 
         fun preparePaths(stop: Cancellation): Boolean {
+            pathParent.fill(-1)
+            pathPremise.fill(null)
+            depth.fill(0)
             val starts = IntArray(parent.size + 1)
             for (edge in edges) {
                 if (stop()) return false
@@ -301,7 +400,7 @@ internal class ExactLiraEqualities(
                         val neighbor = if (edge.source == vertex) edge.target else edge.source
                         if (pathParent[neighbor] >= 0) continue
                         pathParent[neighbor] = vertex
-                        pathGuard[neighbor] = edge.guard
+                        pathPremise[neighbor] = edge.premise
                         depth[neighbor] = depth[vertex] + 1
                         pending.add(neighbor)
                     }
@@ -317,17 +416,17 @@ internal class ExactLiraEqualities(
             while (first != second) {
                 if (stop()) return null
                 val vertex = if (depth[first] >= depth[second]) first else second
-                val guard = pathGuard[vertex]
-                if (guard != ALWAYS) result += SearchAtomPremise.Asserted(SearchDecision.Bool(guard))
+                pathPremise[vertex]?.let { result += it }
                 if (vertex == first) first = pathParent[first] else second = pathParent[second]
             }
             return result
         }
 
-        private data class Edge(val target: Int, val source: Int, val guard: Int)
+        private data class Edge(val target: Int, val source: Int, val premise: SearchAtomPremise?)
     }
 
     private companion object {
         const val ALWAYS = -1
+        const val GENERAL_PASSES = 4
     }
 }
