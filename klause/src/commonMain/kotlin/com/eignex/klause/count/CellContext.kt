@@ -51,7 +51,7 @@ internal class CellContext private constructor(
 
     /** Count distinct projections, preserving whether the cell was completely checked. */
     fun countCell(hashes: List<Xor>, cap: Int, maxDecisions: Long = CELL_DECISION_BUDGET): CellResult {
-        require(cap >= 0 && cap < Int.MAX_VALUE)
+        require(cap >= 0)
         val params = BacktrackPresets.satOptimized().copy(maxDecisions = maxDecisions)
         val outcomes = BacktrackSolver(problem.withHashes(hashes).bake()).projectedOutcomes(params, boolSet, intSet)
         val representatives = ArrayList<Sample>()
