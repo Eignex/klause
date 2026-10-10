@@ -137,7 +137,9 @@ cycles within larger linear fragments. This
 redundant graph includes declared bounds and guarded rows without Boolean terms;
 cycle conflicts cite their active source guards. Wide rows and unsupported forms
 are omitted from this graph and remain enforced by the complete theory. It never
-publishes feasibility or materializes CP domains. They also narrow source-column
+publishes feasibility or materializes CP domains. A completed cycle scan is reused
+while its active edge mask remains identical; abandoned scans retain no new mask.
+They also narrow source-column
 bounds from exact row intervals and imply reified comparisons with immutable row and
 bound premises. These bounds follow the LP trail and retract with their decisions.
 Integer difference equalities form a weighted forest, including declared fixed
