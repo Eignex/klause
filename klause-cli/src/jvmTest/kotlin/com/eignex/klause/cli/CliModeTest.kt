@@ -580,6 +580,8 @@ class CliModeTest {
                 val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
 
                 val expected = if (direction == "minimize") "-$bound" else bound
+                assertTrue("sat" in out.lines(), "$sort $direction: $out")
+                assertTrue(out.lines().any { it.startsWith("; objective=") }, "$sort $direction: $out")
                 assertEquals("; objective=$expected", out.lines().last { it.startsWith("; objective=") }, out)
                 assertTrue("; optimizationStatus=optimal" in out.lines(), out)
             }
