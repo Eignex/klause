@@ -1,6 +1,16 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.EngineParams
+import com.eignex.klause.solver.pipeline.resolveLocalSearchRecipes
+import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -10,6 +20,53 @@ import kotlin.test.assertEquals
  * (so adding an arm to the enum without adding it to `ranked` fails here).
  */
 class LocalSearchWorkerConfigTest {
+
+    @Test
+    fun `upper bound initialization survives strategy edits`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1_000_003)), emptyList()).bake()
+        val recipe = resolveLocalSearchRecipes(
+            EngineParams(listOf("arm=cbls/fixed", "initial-values=max")),
+        ).pool!!.single()()
+        for (configured in listOf(recipe, recipe.withScoring(MoveScoring.Raw))) {
+            val incumbents = ArrayList<Double>()
+            val worker = LocalSearchWorkerConfig(configured).materialize(
+                problem, index = 0, armId = 0, seed = 1L, lsLambda = 1.0,
+                objective = LinearObjective(intCoefficients = longArrayOf(1L)),
+                lsObjective = null, definitionalSweep = null,
+                onEvent = { _, event -> if (event is SearchEvent.Incumbent) incumbents.add(event.objective) },
+                pools = null,
+            )
+
+            worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = 2L).last() }
+
+            assertEquals(1_000_003.0, incumbents.first())
+        }
+    }
+
+    @Test
+    fun `a warm start replaces the upper bound initialization`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1_000_003)), emptyList()).bake()
+        val recipe = resolveLocalSearchRecipes(
+            EngineParams(listOf("arm=cbls/fixed", "initial-values=max")),
+        ).pool!!.single()()
+        val incumbents = ArrayList<Double>()
+        val worker = LocalSearchWorkerConfig(recipe).materialize(
+            problem, index = 0, armId = 0, seed = 1L, lsLambda = 1.0,
+            objective = LinearObjective(intCoefficients = longArrayOf(1L)),
+            lsObjective = null, definitionalSweep = null,
+            onEvent = { _, event -> if (event is SearchEvent.Incumbent) incumbents.add(event.objective) },
+            pools = null,
+        )
+
+        worker.use {
+            it.improvements(
+                { Double.POSITIVE_INFINITY }, Cancellation.Never,
+                warmStart = Sample(booleanArrayOf(), longArrayOf(123L)), maxInstructions = 2L,
+            ).last()
+        }
+
+        assertEquals(123.0, incumbents.first())
+    }
 
     @Test
     fun `each arm family declares an explicit feasible-descent mode`() {

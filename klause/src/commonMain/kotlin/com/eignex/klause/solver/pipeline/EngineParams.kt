@@ -410,6 +410,11 @@ private fun applyEdits(
  */
 fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
     val dryRunSolver = p.bool("dry-run-solver") ?: false
+    val upperBoundStart = when (val initialValues = p.string("initial-values")?.lowercase()) {
+        null, "random" -> false
+        "max" -> true
+        else -> pipelineConfigError("ls: initial-values expects random|max, got `$initialValues`")
+    }
     val noiseRaw = p.double("noise")
     val cbRaw = p.double("cb")
     val skewRaw = p.double("skew-alpha")
@@ -433,7 +438,8 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
     val scoring = scalarTokens(p.string("scoring"), "scoring")
     val acceptance = scalarTokens(p.string("acceptance"), "acceptance")
     val restart = scalarTokens(p.string("restart"), "restart")
-    val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() || restart.isNotEmpty()
+    val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() ||
+        restart.isNotEmpty() || upperBoundStart
     val strategyRaw = p.string("strategy")?.lowercase()
     val armLabel = p.string("arm")
     if (armLabel != null && (strategyRaw != null || sourcesSpec != null)) {
@@ -471,7 +477,9 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
         noiseRaw,
         cb,
         skewAlpha,
-    ) { Geometric(initTemp, coolRate, minTemp) }
+    ) { Geometric(initTemp, coolRate, minTemp) }.let { edited ->
+        if (upperBoundStart) edited.withUpperBoundStart() else edited
+    }
 
     val pool: List<() -> LocalSearchRecipe>? = when {
         armLabel != null -> listOf({ edit(LocalSearchCatalog.byLabel(armLabel)) })
