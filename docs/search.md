@@ -369,6 +369,12 @@ when the objective has a continuous coefficient, until the first incumbent. Indi
 work charging and time caps; the remaining time follows the bandit. After the first
 incumbent, all scheduled time follows the bandit. Explicit backtrack pools and parallel
 lanes retain their requested scheduling.
+The auxiliary LP arm receives one base improving-phase probe if it has earned no
+progress credit. An unproductive probe retires the arm and closes its handle;
+retirement preserves the incumbent without claiming exhaustion. A witness,
+objective or bound improvement, root deductions, or used shared contributions
+retain the arm under normal bandit scheduling. Configured LP slots retain their
+requested scheduling.
 
 See [SliceBudget](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
 and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
