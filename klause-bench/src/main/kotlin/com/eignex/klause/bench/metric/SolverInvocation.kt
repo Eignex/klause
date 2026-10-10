@@ -8,6 +8,7 @@ import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.tools.Profiler
 import kotlinx.serialization.Serializable
 import java.io.File
 import java.math.BigDecimal
@@ -443,6 +444,13 @@ internal object SolverInvocation {
         }
         drain.join(STDERR_DRAIN_WAIT_MS)
         quarantines(stderr.toString())?.let { stats[QUARANTINED] = it }
+        if (cmd.first().substringAfterLast('/') == "klause-cli") {
+            System.getenv("KLAUSE_LAB_PROFILE_DIR")?.let { directory ->
+                val recording = File(directory, "cli.jfr")
+                runCatching { Profiler.summarizeCli(recording) }
+                    .onFailure { System.err.println("CLI profile summary failed: ${it.message}") }
+            }
+        }
         return Result(
             feasible = when {
                 anySolution -> true
