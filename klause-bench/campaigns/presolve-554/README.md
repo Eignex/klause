@@ -355,6 +355,26 @@ the number of integer probe calls per tier, not the cost of constructing and
 propagating each call. This is a mechanism consistent with the profile, not a
 measurement of which probe caused the overrun.
 
+[CI run 38008234656](https://github.com/Eignex/klause/actions/runs/38008234656)
+reads deeper caller stacks (up to 32 printed frames) from the same recording and
+verifies the record against its measurement manifest. Its
+`evidence/911/profile-windows.json.gz` separates samples before and after 300 seconds
+of CLI JVM uptime; that boundary is not the exact presolve deadline timestamp.
+All 1,809 later samples are on the main thread. Of these, 1,752 include
+`RootBaker.probeIntHoles`, and 1,802 include `PresolveShared.rebuildProblem` and
+`RootBaker.reseed`; inclusive counts overlap. Hole-SAC in a presolve rebuild therefore
+continues beyond nominal-budget JVM uptime in this recording. Before that boundary,
+14,553 samples include bound-SAC and 9,108 include Boolean probing.
+
+The frozen source has a concrete cancellation gap:
+[`PresolveShared.rebuildProblem`](https://github.com/Eignex/klause/blob/f6944877bb7a4846d56ce2031b0843da6105515c/klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveShared.kt#L125)
+constructs the rebuilt `BakedProblem` without forwarding `problem.cancellation`;
+the constructor defaults it to `Cancellation.Never`. RootBaker's cooperative polls
+then read that rebuilt token. This source finding is consistent with the observed
+continued hole-SAC and limits any claim that the integer caps enforce the solve
+deadline. No cancellation fix or post-fix performance estimate is included here;
+the scope/propagation of allowances remains relevant to [#2322](https://github.com/Eignex/klause/issues/2322).
+
 Partial snapshots under `evidence/906/partial-*.json.gz` and
 `evidence/907/partial-*.json.gz` validate the analyzer on process-clock records
 through CI while the jobs run. They are archived snapshots, not final comparisons

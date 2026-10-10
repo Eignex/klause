@@ -2,11 +2,13 @@
 """Analyze archived AWS records, retaining incomplete blocks and outcome categories."""
 import argparse
 from collections import Counter, defaultdict
+from decimal import Decimal, InvalidOperation
 import gzip
 import json
 import math
 from pathlib import Path
 import random
+import re
 import statistics
 
 
@@ -77,6 +79,21 @@ def numeric(r, key):
         return value if math.isfinite(value) else None
     except (ValueError, TypeError):
         return None
+
+
+def objective_support(r):
+    if r.get('feasible') is not True or r.get('objective') is None:
+        return 'not-applicable'
+    witness = r.get('finalWitness') or r.get('sourceWitness')
+    if witness is None:
+        return 'missing-witness'
+    reported = re.search(r'(?m)^\s*_objective\s*=\s*([^;]+);', witness)
+    if reported is None:
+        return 'missing-objective'
+    try:
+        return 'matched' if Decimal(reported.group(1).strip()) == Decimal(str(r['objective'])) else 'mismatch'
+    except InvalidOperation:
+        return 'unparsed-objective'
 
 
 def process_timing(r):
@@ -162,6 +179,7 @@ def analyze(cases, control):
                             'validationPolicies': dict(Counter(r.get('validationPolicy', 'missing') for r in recorded)),
                             'sourceValidation': dict(Counter(r.get('stats', {}).get('sourceValidation', 'absent')
                                                               for r in recorded)),
+                            'objectiveSupport': dict(Counter(objective_support(r) for r in recorded)),
                             'retainedWitnesses': sum(r.get('finalWitness') is not None or
                                 r.get('sourceWitness') is not None for r in recorded),
                             'retainedOutputHashes': sum(r.get('sourceOutputSha256') is not None for r in recorded)}
@@ -179,6 +197,9 @@ def analyze(cases, control):
             a, b = block[control]['record'], block[label]['record']
             if any(category(block[arm]) in ('error', 'unsupported') for arm in (control, label)):
                 skipped.append({'identity': key, 'reason': 'error or unsupported'})
+                continue
+            if any(objective_support(r) == 'mismatch' for r in (a, b)):
+                skipped.append({'identity': key, 'reason': 'retained witness disagrees with reported objective'})
                 continue
             ah, bh = a.get('sourceHashes'), b.get('sourceHashes')
             if ah and bh and ah != bh:
