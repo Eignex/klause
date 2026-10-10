@@ -29,6 +29,7 @@ internal object Compiler {
         val unboundedIntHi: Long,
         val strictBounds: Boolean,
         private val settings: ProblemSettings = ProblemSettings(),
+        internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(),
     ) :
         CnfLowering {
         internal val boolNames = HashMap<String, Int>()
@@ -48,7 +49,6 @@ internal object Compiler {
 
         /** Open `ite`-on-equality chains and the equality atoms their conditions are read from. */
         internal val iteChains = IteChainTable()
-        internal val conditionalEqualities = SmtLibConditionalEquality()
 
         override val factors = ArrayList<Factor>()
         internal val asserts = ArrayList<SExpr>()
@@ -281,6 +281,7 @@ internal object Compiler {
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }
             lowerOpenIteChains() // an objective term can open chains of its own
+            conditionalEqualities.expandPending(this)
             val removed = conditionalEqualities.retainNeededDefinitions(
                 factors, intNames.values, boolNames.values, compiledObjective,
             )
