@@ -27,6 +27,7 @@ internal class ExactLiraEqualities(
     private val accept: (SearchDecision, SearchContext) -> ComponentResult,
 ) {
     private val zero = model.numIntVars
+    // A simple forest path has at most zero links; leave room to subtract two path offsets.
     private val room = bigIntOf(Long.MAX_VALUE / (8L * (zero.toLong() + 2L)))
     private val rows = if (model.numRealVars != 0) emptyList() else {
         model.factors.flatMapIndexed { factorIndex, factor ->
@@ -72,7 +73,7 @@ internal class ExactLiraEqualities(
             val equality = row.op == LinearOp.EQ && truth == true || row.op == LinearOp.NE && truth == false
             if (!equality) continue
             if (row.bound.den != BIG_ONE) {
-                return conflict(context, emptyList(), row.literal(checkNotNull(truth)))
+                return conflict(context, emptyList(), row.literal(checkNotNull(truth)), stop)
             }
             if (row.bound.num < room.negate() || row.bound.num > room) continue
             if (!forest.join(row.target, row.source, row.bound.num.toLong(), row.literal(checkNotNull(truth)))) {
@@ -84,7 +85,7 @@ internal class ExactLiraEqualities(
         inconsistent?.let { row ->
             val premises = forest.premises(row.target, row.source, stop) ?: return ComponentResult.Indeterminate
             val truth = row.op == LinearOp.EQ
-            return conflict(context, premises, row.literal(truth))
+            return conflict(context, premises, row.literal(truth), stop)
         }
         for (row in rows) {
             if (stop()) return ComponentResult.Indeterminate
@@ -101,10 +102,11 @@ internal class ExactLiraEqualities(
                 forest.premises(row.target, row.source, stop) ?: return ComponentResult.Indeterminate
             }
             if (assigned != null) {
-                return conflict(context, premises, row.literal(assigned))
+                return conflict(context, premises, row.literal(assigned), stop)
             }
             val decision = SearchDecision.Bool(row.literal(truth))
             val reason = context.explainAtoms(SearchAtomPremise.All(premises), decision) ?: continue
+            if (stop()) return ComponentResult.Indeterminate
             val result = context.imply(decision.literal, reason)
             if (result !is ComponentResult.Consistent) return result
             val accepted = accept(decision, context)
@@ -114,10 +116,18 @@ internal class ExactLiraEqualities(
         return ComponentResult.Consistent
     }
 
-    private fun conflict(context: SearchContext, premises: List<SearchAtomPremise>, literal: Int): ComponentResult =
-        ComponentResult.Conflict(context.explainAtoms(SearchAtomPremise.All(
+    private fun conflict(
+        context: SearchContext,
+        premises: List<SearchAtomPremise>,
+        literal: Int,
+        stop: Cancellation,
+    ): ComponentResult {
+        if (stop()) return ComponentResult.Indeterminate
+        val reason = context.explainAtoms(SearchAtomPremise.All(
             if (literal == ALWAYS) premises else premises + SearchAtomPremise.Asserted(SearchDecision.Bool(literal)),
-        )))
+        ))
+        return if (stop()) ComponentResult.Indeterminate else ComponentResult.Conflict(reason)
+    }
 
     private data class Prepared(
         val target: Int,

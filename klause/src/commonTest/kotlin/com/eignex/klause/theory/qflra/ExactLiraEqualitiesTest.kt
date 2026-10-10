@@ -94,4 +94,26 @@ class ExactLiraEqualitiesTest {
         assertEquals(false, session.boolValue(0))
         assertContentEquals(intArrayOf(Lit.make(0, false)), assertNotNull(session.reasonFor(0)).literals)
     }
+
+    @Test
+    fun `wide equalities do not imply a comparison through wrapped offsets`() {
+        val open = Bits(3).also { for (variable in 0..2) it.set(variable) }
+        val source = Problem(
+            1,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+            factors = arrayOf(
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, Long.MAX_VALUE),
+                Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, Long.MAX_VALUE),
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, -2),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+        assertNull(session.boolValue(0))
+    }
 }
