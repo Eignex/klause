@@ -51,6 +51,91 @@ class ExactLiraEqualitiesTest {
     }
 
     @Test
+    fun `larger comparisons cancel within open equality components and retract`() {
+        for ((operator, bound, truth) in listOf(
+            Triple(LinearOp.EQ, 3, true), Triple(LinearOp.NE, 3, false),
+            Triple(LinearOp.LE, 2, false), Triple(LinearOp.GE, 3, true),
+        )) {
+            val open = Bits(4).also { for (variable in 0..3) it.set(variable) }
+            val source = Problem(
+                3,
+                intBounds = IntBounds.fromModelBounds(LongArray(4), LongArray(4), open, open),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                    ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.EQ, 2),
+                    ReifiedLinear(2, intArrayOf(1, -1, 1, -1), intArrayOf(0, 1, 2, 3), operator, bound),
+                ),
+            )
+            ExactLiraSearchComponent(source).use { component ->
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+                assertEquals(truth, session.boolValue(2))
+                assertEquals(
+                    setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, truth)),
+                    session.reasonFor(2)?.literals?.toSet(),
+                )
+                session.popTo(0)
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+                assertNull(session.boolValue(2))
+            }
+        }
+    }
+
+    @Test
+    fun `a conflicting larger comparison cites each component equality guard`() {
+        val open = Bits(4).also { for (variable in 0..3) it.set(variable) }
+        val source = Problem(
+            3,
+            intBounds = IntBounds.fromModelBounds(LongArray(4), LongArray(4), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.EQ, 2),
+                ReifiedLinear(2, intArrayOf(1, -1, 1, -1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 4),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        for (variable in 0..2) session.push(SearchDecision.Bool(Lit.make(variable, true)))
+
+        val conflict = assertIs<ComponentResult.Conflict>(propagation.propagate(session, Cancellation.Never))
+
+        assertEquals(
+            setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false)),
+            assertNotNull(conflict.explanation).literals.toSet(),
+        )
+    }
+
+    @Test
+    fun `larger comparisons preserve declared fixed values when the forest root is displaced`() {
+        val open = Bits(4).also { it.set(1); it.set(2) }
+        val source = Problem(
+            2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(7, 0, 0, 0), longArrayOf(7, 0, 0, 0), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, -5),
+                ReifiedLinear(1, intArrayOf(1, 1, -1, -1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 2),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+        assertEquals(true, session.boolValue(1))
+        assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)), session.reasonFor(1)?.literals?.toSet())
+    }
+
+    @Test
     fun `contradictory equality and disequality guards cite the active offset chain`() {
         for ((operator, bound) in listOf(LinearOp.EQ to 2, LinearOp.NE to 3)) {
             val open = Bits(3).also { for (variable in 0..2) it.set(variable) }
