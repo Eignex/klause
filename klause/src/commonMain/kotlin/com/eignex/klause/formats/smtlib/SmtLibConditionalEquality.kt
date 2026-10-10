@@ -26,12 +26,14 @@ internal class SmtLibConditionalEquality {
     }
 
     private data class Key(val variable: Int, val value: Long)
+    private data class Owner(val variable: Int, val integer: Boolean)
     private sealed interface Frame {
         class Eval(val term: LinComb) : Frame
         class Join(val variable: Int, val definition: Definition) : Frame
     }
 
     private val definitions = HashMap<Int, Definition>()
+    private val booleanDefinitions = HashMap<Int, List<Factor>>()
     private val equalities = HashMap<Key, Int>()
     private var work = 0
 
@@ -47,6 +49,10 @@ internal class SmtLibConditionalEquality {
             guards.toList(), arms.toList(), default, factors.toList(),
             constantImage(arms + default), guardTests.toList(),
         )
+    }
+
+    fun definePredicate(variable: Int, factors: List<Factor>) {
+        if (factors.isNotEmpty()) booleanDefinitions[variable] = factors.toList()
     }
 
     private fun constantImage(terms: List<LinComb>): Set<Long>? {
@@ -70,38 +76,56 @@ internal class SmtLibConditionalEquality {
         objective: LinearObjectiveSpec?,
     ): UnusedColumns {
         if (definitions.isEmpty()) return UnusedColumns(emptySet(), emptySet())
-        val owners = HashMap<Factor, Int>()
-        val predicateOwners = HashMap<Int, Int>()
-        for ((variable, definition) in definitions) {
-            for (factor in definition.factors) {
-                owners[factor] = variable
-                (factor as? ReifiedFactor)?.let { predicateOwners[it.auxBoolVar] = variable }
+        val owners = HashMap<Factor, Owner>()
+        val integerOwners = definitions.keys.associateWith { Owner(it, integer = true) }
+        val booleanOwners = HashMap<Int, Owner>()
+        val ownedFactors = HashMap<Owner, List<Factor>>()
+        fun own(owner: Owner, parts: List<Factor>) {
+            ownedFactors[owner] = parts
+            for (factor in parts) {
+                owners[factor] = owner
+                (factor as? ReifiedFactor)?.let { booleanOwners[it.auxBoolVar] = owner }
             }
         }
-        val retained = HashSet<Int>()
-        val pending = ArrayDeque<Int>()
-        fun need(variable: Int) {
-            if (variable in definitions && retained.add(variable)) pending.addLast(variable)
+        for ((variable, definition) in definitions) {
+            own(integerOwners.getValue(variable), definition.factors)
         }
-        fun needPredicate(variable: Int) {
-            predicateOwners[variable]?.let(::need)
+        for ((variable, parts) in booleanDefinitions) {
+            val owner = Owner(variable, integer = false)
+            booleanOwners[variable] = owner
+            own(owner, parts)
+        }
+        for (factor in factors) {
+            if (factor is ReifiedFactor && factor !in owners) {
+                val owner = Owner(factor.auxBoolVar, integer = false)
+                own(owner, listOf(factor))
+            }
+        }
+        val retained = HashSet<Owner>()
+        val pending = ArrayDeque<Owner>()
+        fun need(owner: Owner?) {
+            if (owner != null && retained.add(owner)) pending.addLast(owner)
         }
         fun read(factor: Factor) {
-            factor.variables.ints.forEach(::need)
-            factor.variables.boolVars.forEach(::needPredicate)
+            factor.variables.ints.forEach { need(integerOwners[it]) }
+            factor.variables.boolVars.forEach { need(booleanOwners[it]) }
         }
-        sourceIntegers.forEach(::need)
-        sourceBooleans.forEach(::needPredicate)
-        objective?.intCoefficients?.forEachIndexed { variable, coefficient -> if (coefficient != 0L) need(variable) }
-        objective?.boolWeights?.forEachIndexed { variable, weight -> if (weight != 0L) needPredicate(variable) }
+        sourceIntegers.forEach { need(integerOwners[it]) }
+        sourceBooleans.forEach { need(booleanOwners[it]) }
+        objective?.intCoefficients?.forEachIndexed { variable, coefficient ->
+            if (coefficient != 0L) need(integerOwners[variable])
+        }
+        objective?.boolWeights?.forEachIndexed { variable, weight ->
+            if (weight != 0L) need(booleanOwners[variable])
+        }
         for (factor in factors) if (factor !in owners) read(factor)
         while (pending.isNotEmpty()) {
-            definitions.getValue(pending.removeFirst()).factors.forEach(::read)
+            ownedFactors.getValue(pending.removeFirst()).forEach(::read)
         }
         factors.removeAll { factor -> owners[factor]?.let { it !in retained } == true }
         return UnusedColumns(
-            definitions.keys.filterTo(HashSet()) { it !in retained },
-            predicateOwners.keys.filterTo(HashSet()) { predicateOwners.getValue(it) !in retained },
+            integerOwners.keys.filterTo(HashSet()) { integerOwners.getValue(it) !in retained },
+            booleanOwners.keys.filterTo(HashSet()) { booleanOwners.getValue(it) !in retained },
         )
     }
 
@@ -216,7 +240,7 @@ private fun Compiler.Builder.foldConditionalAnd(literals: List<Int>): Int {
     return when (retained.size) {
         0 -> truth
         1 -> retained.first()
-        else -> tseitinAnd(retained.toList())
+        else -> retainConditionalGate { tseitinAnd(retained.toList()) }
     }
 }
 
@@ -230,6 +254,13 @@ private fun Compiler.Builder.foldConditionalOr(literals: List<Int>): Int {
     return when (retained.size) {
         0 -> Lit.negate(truth)
         1 -> retained.first()
-        else -> tseitinOr(retained.toList())
+        else -> retainConditionalGate { tseitinOr(retained.toList()) }
     }
+}
+
+private inline fun Compiler.Builder.retainConditionalGate(define: () -> Int): Int {
+    val start = factors.size
+    val literal = define()
+    conditionalEqualities.definePredicate(Lit.variable(literal), factors.subList(start, factors.size))
+    return literal
 }
