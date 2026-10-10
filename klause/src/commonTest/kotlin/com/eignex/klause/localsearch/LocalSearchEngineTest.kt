@@ -69,7 +69,7 @@ class LocalSearchEngineTest {
         val initialized = IntArray(513)
         val factors = Array<Factor>(initialized.size) { id ->
             val clause = Clause(
-                if (id == initialized.lastIndex) intArrayOf() else
+                if (id >= initialized.lastIndex - 1) intArrayOf(Lit.make(0, id == initialized.lastIndex)) else
                     intArrayOf(Lit.make(0, true), Lit.make(0, false)),
             )
             val invariant = clause.invariantProjection()
