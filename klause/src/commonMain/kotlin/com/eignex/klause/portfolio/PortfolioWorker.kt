@@ -61,6 +61,8 @@ class PortfolioWorker private constructor(
     /** The family the portfolio shares time with before it picks among the family's arms; see [FamilyPolicy]. */
     internal var family: ArmFamily = if (withInstructions) ArmFamily.LocalSearch else ArmFamily.Backtrack
 
+    internal var restartingSearch: Boolean = false
+
     internal var improvementOnly: Boolean = false
 
     internal var evidenceModel: ModelIdentity? = null
