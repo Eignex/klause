@@ -963,15 +963,15 @@ class LocalSearchState(
             breakProbeActive = false
             var breakCount = 0
             var makeCount = 0
+            var newlyViolated = 0
             for (i in 0 until probeTouchedList.size) {
                 val fid = probeTouchedList[i]
-                val delta = if (degBefore != null) factorDegree[fid] - degBefore[fid] else 0
-                if (move is Move.Compound) {
-                    if (factorDegree[fid] > 0 && !probeWasViolated[fid]) breakCount++
-                } else if (delta > 0) {
-                    breakCount++
-                } else if (delta < 0) {
-                    makeCount++
+                val degree = factorDegree[fid]
+                if (degree > 0 && !probeWasViolated[fid]) newlyViolated++
+                if (degBefore != null) {
+                    val before = degBefore[fid]
+                    if (degree > before) breakCount++
+                    if (degree < before) makeCount++
                 }
             }
             val delta = cost - oldCost
@@ -981,7 +981,8 @@ class LocalSearchState(
                 null -> 0.0
                 else -> objective.evaluate(assignment) - oldObjective
             }
-            return MoveEval(breakCount, makeCount, delta, weighted, objectiveDelta)
+            val breaks = if (move is Move.Compound) newlyViolated else breakCount
+            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta)
         } finally {
             breakProbeActive = false
             restoreProbeCoordinates()
@@ -1035,12 +1036,13 @@ class LocalSearchState(
 
     // Reconcile exact degrees independently of apply status deltas; fused updates avoid a second degree read.
     private fun updateViolation(factorId: Int, newDegree: Int = factors[factorId].violationDegree(this, factorId)) {
-        val delta = newDegree - factorDegree[factorId]
+        val oldDegree = factorDegree[factorId]
+        val delta = newDegree - oldDegree
         if (delta == 0) return
         if (breakProbeActive && !probeTouched[factorId]) {
             probeTouched[factorId] = true
-            probeWasViolated[factorId] = factorDegree[factorId] > 0
-            degScratch?.set(factorId, factorDegree[factorId])
+            probeWasViolated[factorId] = oldDegree > 0
+            degScratch?.set(factorId, oldDegree)
             probeTouchedList.add(factorId)
         }
         factorDegree[factorId] = newDegree

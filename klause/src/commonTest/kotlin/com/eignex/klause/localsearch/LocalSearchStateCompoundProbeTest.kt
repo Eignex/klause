@@ -84,6 +84,7 @@ class LocalSearchStateCompoundProbeTest {
             assertEquals(1L, state.cost, "$move committed cost")
             assertEquals(true, state.assignment.boolValue(1), "$move committed definition")
             val inverse = if (move is Move.BoolFlip) move else Move.IntSet(1, 0)
+            assertEquals(-2.5, state.weightedNetDelta(inverse), "$move inverse weighted delta")
             val inverseMake = state.makeScore(inverse)
             assertEquals(1L, state.cost, "$move inverse probe cost")
             assertEquals(true, state.assignment.boolValue(1), "$move inverse probe definition")
