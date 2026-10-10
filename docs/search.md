@@ -59,6 +59,9 @@ bound. Explanation paths cite the selected source equality guards, including
 complemented disequalities; an inconsistent offset path refutes its active guards.
 The forest is rebuilt from current assertions, so retraction drops their effects.
 Wide offsets are omitted from this redundant check and remain with the full theory.
+Equality-forest scans poll ordinary cancellation within 64 visits and check it
+before publishing each implication or conflict. Metered tokens retain immediate
+checks at every scan visit.
 Interval deductions read staged bounds within a propagation pass and publish the
 strongest side per column in one LP batch. Abandoned passes requeue their rows;
 crossed staged bounds cite both derivations without publishing a partial batch.
