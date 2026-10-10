@@ -1,13 +1,18 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.isClausal
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,6 +21,48 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PresolverTest {
+
+    @Test
+    fun `default clausal optimization retains native clause propagation`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            ),
+        )
+        val context = PresolveContext.of(LinearObjective(boolWeights = longArrayOf(1, 2, 3)), true)
+
+        val source = Presolver.runSource(problem, PresolveConfig.DEFAULT, context)
+        val finite = Presolver.run(source.problem.bake(), PresolveConfig.DEFAULT, context)
+
+        assertTrue(finite.problem.isClausal())
+        assertEquals(3, finite.problem.factors.size)
+    }
+
+    @Test
+    fun `stronger preparation permits clique conversion for clausal optimization`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            ),
+        )
+        val context = PresolveContext.of(LinearObjective(boolWeights = longArrayOf(1, 2, 3)), true)
+
+        for (spec in listOf("default,+amo-clique", "aggressive")) {
+            val source = Presolver.runSource(problem, PresolveConfig.parse(spec), context)
+
+            assertEquals(1, source.problem.factors.filterIsInstance<Cardinality>().size, spec)
+        }
+    }
 
     @Test
     fun `parse handles aliases and comma-lists`() {

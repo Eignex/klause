@@ -76,3 +76,9 @@ measurements must retain these scope differences.
 [PresolveSharedTest](../klause/src/commonTest/kotlin/com/eignex/klause/presolve/PresolveSharedTest.kt)
 covers expired-deadline SAC, probe telemetry across successive rebakes, and
 charges consuming the originating allowance.
+
+Default clausal optimization retains binary exclusion clauses rather than merging
+at-most-one cliques into cardinalities. This preserves native SAT propagation and
+learning and avoids repeated clique preparation. An explicit `+amo-clique` or
+aggressive emphasis permits conversion; nonclausal models and feasibility queries
+keep their configured clique policy.
