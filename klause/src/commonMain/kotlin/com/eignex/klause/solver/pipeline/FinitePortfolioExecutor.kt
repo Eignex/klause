@@ -51,6 +51,7 @@ fun FinitePipeline.portfolioExecutor(
         minShares = continuousLpShares(scenario, profile, workers.map { it.label }),
         onFault = onFault,
     ).also {
+        it.reserveBeforeIncumbentOnly = true
         it.evidenceVerification = PortfolioEvidence(
             ModelIdentity.of(problem, objective),
             finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck),

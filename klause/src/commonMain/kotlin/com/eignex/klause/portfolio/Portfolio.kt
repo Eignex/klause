@@ -142,6 +142,8 @@ class Portfolio(
      */
     private val minShares: DoubleArray = DoubleArray(0),
 ) : PortfolioExecutor {
+    internal var reserveBeforeIncumbentOnly: Boolean = false
+
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
         PortfolioEvidence(it, CandidateVerifier.trusting())
     }
@@ -737,7 +739,7 @@ class Portfolio(
         }
 
         private fun owedArm(eligibleArms: List<Int>): Int? {
-            if (minShares.isEmpty()) return null
+            if (minShares.isEmpty() || (improving && reserveBeforeIncumbentOnly)) return null
             var owed: Int? = null
             var deficit = 0.0
             for (arm in eligibleArms) {
