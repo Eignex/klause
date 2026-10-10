@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -21,6 +22,7 @@ class RealDifferenceSystemTest {
     fun `strict bounds retain a rational interior witness`() {
         val model = Problem(
             0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
             numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
@@ -43,6 +45,7 @@ class RealDifferenceSystemTest {
         for (strict in listOf(false, true)) {
             val model = Problem(
                 3,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
                 numRealVars = 2,
                 realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
                 realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
@@ -69,6 +72,7 @@ class RealDifferenceSystemTest {
     fun `released guards remove their cycle across sibling checks`() {
         val model = Problem(
             1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
@@ -91,9 +95,11 @@ class RealDifferenceSystemTest {
         for (bound in listOf(0.5, Double.MAX_VALUE)) {
             val model = Problem(
                 0,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
                 numRealVars = 1,
                 realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
                 realUpper = doubleArrayOf(bound),
+                factors = emptyArray(),
             )
 
             val system = RealDifferenceSystem.prepare(model, emptyList())
@@ -104,7 +110,9 @@ class RealDifferenceSystemTest {
 
     @Test
     fun `cancelled graph checks publish no result`() {
-        val model = Problem(0, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1, realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0), factors = emptyArray())
         val system = assertNotNull(RealDifferenceSystem.prepare(model, emptyList()))
 
         val result = system.check(intArrayOf(), Cancellation { true })
