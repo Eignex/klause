@@ -81,7 +81,7 @@ class BasisWorkTest {
                 listOf(0 to 1.0, 1 to 1.0),
             ),
         )
-        val solver = KotlinBasisSolver(source)
+        val solver = KotlinBasisSolver(source, denseDimensionLimit = 0)
         assertTrue(solver.refactorize(intArrayOf(0, 1)))
 
         assertTrue(solver.refactorize(intArrayOf(2, 3)))

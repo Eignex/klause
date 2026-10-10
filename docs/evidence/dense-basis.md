@@ -1,7 +1,7 @@
 # Dense basis selection
 
-The floating basis owner selects dense LU for dimensions 1–6 at a selected-basis
-nonzero density of at least 50%. This is a conservative measured envelope, not a
+The floating basis owner selects dense LU for dimensions 2–6 at a selected-basis
+nonzero density of at least 50%, with more nonzeros than rows. This is a conservative measured envelope, not a
 universal crossover. Sparse construction handles the other bases and logical
 repair. The internal `denseDimensionLimit = 0` control and `BasisSolver` factory
 support direct comparisons.
@@ -22,7 +22,8 @@ after warmup, compared 2000 six-row refactorizations per arm and 100 larger
 refactorizations per arm. The selected path's median paired elapsed ratio on the
 populated six-row basis was 0.64 for retained owners (including sparse ordering
 reuse), and 0.53 for fresh setup, factorization and disposal. Those measurements
-include owned sparse factor materialization. Larger bases and the six-row unit
+include owned sparse factor materialization. A separate repeat gave ratios 0.71
+and 0.53, respectively. Larger bases and the six-row unit
 basis made no dense attempt. Deterministic work units measure visits rather than
 elapsed time; dense work is charged even when wall time is lower.
 
@@ -33,3 +34,13 @@ Koblas's portable/SIMD BLAS composition; no installed vendor library was selecte
 A host-specific kernel win does not establish a complete-solver speedup or an
 improvement on every supported runtime. The rule must not be enlarged based on
 synthetic timing alone.
+
+Matched exact MPS source controls used pinned sparse main and the selected path,
+one processor, seed 1, a ten-second budget and five repeats. All 30 paired blocks
+on the six maintained MPS/component fixtures matched source hashes, acceptance
+policy, verdict, proof status and exact objective. An independent rational parser
+checked 50 final witnesses against original rows, bounds and integrality; direct
+enumeration checked the tiny objective optimum, and intersected singleton rows
+checked the tiny contradiction (20 repeated proof checks across both arms).
+Installed-build hashes remain in the external case records. These controls
+establish preserved outcomes on that selection, without a timing-gain claim.
