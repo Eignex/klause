@@ -270,6 +270,16 @@ path for `cp`/`fixed` or `ls`; it cannot profile the mixed pool. This path write
 no ordinary result JSON/cache and is a solver diagnostic rather than a CLI timing
 measurement.
 
+An AWS lab whole-CLI recording uses `KLAUSE_LAB_PROFILE_DIR` to identify the
+completed `cli.jfr`. The subprocess harness summarizes it on the runner after the
+captured CLI elapsed time ends. Tables attribute Java CPU samples and sampled
+allocation weights to projection preparation, state allocation, seeding, invariant
+setup, move selection/application, backtrack and presolve. ALNS bootstrap and
+repair stacks carry separate prefixes. Allocation weights estimate bytes; CPU
+sample shares are not wall-time attribution. Retain the raw recording and process
+resource report outside the repository, and compare performance with uninstrumented
+paired runs.
+
 ```sh
 ./gradlew :klause-bench:bench --args="solve suite=mzn-bench name=mario engine=cp profile=cpu timeout=30000"
 ./gradlew :klause-bench:intDomainMicrobench
