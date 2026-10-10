@@ -3668,7 +3668,7 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
-public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver {
+public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/ResumableSolver {
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
 	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZLcom/eignex/klause/localsearch/CandidateCompletion;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -12173,3 +12173,5 @@ public final class com/eignex/klause/util/StringCharSource : com/eignex/klause/u
 public abstract interface class com/eignex/klause/util/WorkMeter {
 	public abstract fun charge (J)V
 }
+
+

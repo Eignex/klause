@@ -36,6 +36,56 @@ internal data class ProfileConfig(
  * with a long-running selection (e.g. a fixed-budget search target) for a meaningful table.
  */
 internal object Profiler {
+    fun summarizeCli(file: File) {
+        val cpu = HashMap<String, Long>()
+        val phases = HashMap<String, Long>()
+        val allocation = HashMap<String, Long>()
+        RecordingFile(file.toPath()).use { recording ->
+            while (recording.hasMoreEvents()) {
+                val event = recording.readEvent()
+                when (event.eventType.name) {
+                    "jdk.ExecutionSample" -> {
+                        topMethod(event)?.let { cpu.merge(it, 1L, Long::plus) }
+                        phases.merge(cliPhase(event), 1L, Long::plus)
+                    }
+                    "jdk.ObjectAllocationSample" -> {
+                        val weight = event.getLong("weight")
+                        allocation.merge(cliPhase(event), weight, Long::plus)
+                    }
+                }
+            }
+        }
+        printTable("whole CLI: CPU samples by phase (stack attribution)", phases, 40)
+        printTable("whole CLI: CPU self-samples", cpu, 60)
+        printTable("whole CLI: sampled allocation weight by phase (estimated bytes)", allocation, 40)
+    }
+
+    private fun cliPhase(event: RecordedEvent): String {
+        val methods = event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" }
+        val localState = methods.any { it.contains("LocalSearchState.<init>") }
+        val initializing = methods.any {
+            it.contains("LocalSearchEngine.newMinimizeState") || it.contains("LocalSearchEngine.newSatisfyState")
+        }
+        val phase = when {
+            localState -> "local-search state allocation"
+            methods.any { it.contains("LocalSearchEngine.installInvariants") } -> "local-search invariant setup"
+            initializing -> "local-search seeding"
+            methods.any { it.contains("LocalSearchEngine.restartAndRepair") } -> "local-search restart seeding"
+            methods.any { it.contains("SourceDrivenStrategy.pickMove") } -> "local-search move selection"
+            methods.any { it.contains("LocalSearchState.apply") } -> "local-search move application"
+            methods.any { it.contains("LocalSearchEngine") } -> "local-search loop"
+            methods.any { it.contains(".presolve.") } -> "presolve"
+            methods.any { it.contains("BacktrackSolver") || it.contains(".backtrack.") } -> "backtrack"
+            else -> "other or unclassified"
+        }
+        val context = when {
+            methods.any { it.contains("Alns.bootstrapIncumbent") } -> "ALNS bootstrap: "
+            methods.any { it.contains("RepairOperator") || it.contains("Repair.repair") } -> "ALNS repair: "
+            else -> ""
+        }
+        return context + phase
+    }
+
     fun <T> record(cfg: ProfileConfig, block: () -> T): T {
         val recording = Recording()
         recording.enable("jdk.ExecutionSample").withPeriod(Duration.ofMillis(1))
@@ -94,7 +144,7 @@ internal object Profiler {
         val total = counts.values.sum()
         println("=== $title ===")
         if (total == 0L) {
-            println("  (no samples — solve too short for the 1ms sampling period)")
+            println("  (no samples)")
             return
         }
         counts.entries.sortedByDescending { it.value }.take(topN).forEach { (method, n) ->
