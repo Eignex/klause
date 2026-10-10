@@ -21,7 +21,7 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
 dependencies {
     implementation(project(":klause"))
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
-    implementation("com.eignex:kumulant:0.3.3")
+    implementation("com.eignex:kumulant:0.3.4-20260922.073440-66")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     // runBlocking + Flow.collect bridge for the suspend Portfolio API in the anytime metric.

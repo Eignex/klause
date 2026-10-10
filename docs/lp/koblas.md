@@ -11,15 +11,15 @@ The [build](../../klause/build.gradle.kts) pins immutable timestamps for both th
 alone is insufficient because its Gradle metadata redirects to mutable platform snapshots. Strict
 platform constraints propagate into klause publications.
 
-All coordinates use group `com.eignex` and version prefix `0.1.1-20260918.215912-`:
+Koblas coordinates use group `com.eignex`:
 
-| Module | Build | Binary SHA-256 |
-|---|---:|---|
-| koblas | 232 | `6bcd9279cc318d7c89a40ff4ce54015f8773bc6f199d5862fb80a4bd5a91df0f` |
-| koblas-jvm | 235 | `eefa41e82ca348c3b75bd34396321084a5f000bee27dd59c9d7448201a379721` |
-| koblas-linuxx64 | 231 | `90b181e95795875ecac5991db7f9c2337f2a30f59f64edc6e53ca6323a87677e` |
-| koblas-linuxarm64 | 232 | `d7f67015fe514d45a900f76ca9eeddd81fb36c887b63775412d5905a5fb91787` |
-| koblas-macosarm64 | 240 | `8ed9bc8b55325e0c918f4372beee2a4a1f49e07823398afb2871b4f283b03eb7` |
+| Module | Version | Binary SHA-256 |
+|---|---|---|
+| koblas | `0.1.1-20261010.042342-251` | `97f5e9c15c444eb704f72fe57db0125ede8fcb2980a10ab4eaa6272590ef1395` |
+| koblas-jvm | `0.1.1-20261010.042342-254` | `b8817d1cbb4ee4bd7dc9a905c0ca211053c34634b101bbc9863e8db7c24d13b3` |
+| koblas-linuxx64 | `0.1.1-20261010.042342-250` | `7defce305e6ee64aa3e51f30ebc73acd11b1dc80e0cd0469ed352c600da208e8` |
+| koblas-linuxarm64 | `0.1.1-20261010.042342-251` | `cf316a2a0858e117577119db2e415463331d081f0d82f533cf3f6fe5b2306bf0` |
+| koblas-macosarm64 | `0.1.1-20261010.042148-274` | `18e951b0e52ee7e0680500514f16722e6c2cc55a67763b0e903c1a489c25b018` |
 
 The build does not consult Maven Local. For source integration, use Gradle's supported composite
 substitution with an isolated checkout at the revision under test:
@@ -32,9 +32,27 @@ Record the checkout revision and the resulting artifact hashes separately from p
 checks. Do not publish over a shared `SNAPSHOT`, or commit machine-specific paths. Dependency updates
 must update every platform pin together and repeat provenance and published-metadata verification.
 
-Kumulant supplies online statistics and adaptive bandits. Its version is declared in the
-library, CLI and benchmark builds. Verify its numerical types and transitive koblas
-dependencies when upgrading; numerical ownership depends on the selected publication.
+### Kumulant
+
+Kumulant supplies online statistics and adaptive bandits. The library, CLI and benchmark
+builds use its timestamped `0.3.4-SNAPSHOT` publication. Contextual-bandit features use
+`com.eignex.koblas.DenseVector`; Kumulant exposes Koblas vector types and declares
+`koblas:0.1.1-SNAPSHOT` transitively. Klause strictly pins the Koblas root and platforms
+listed above so this transitive dependency cannot select different numerical binaries.
+
+Kumulant coordinates use group `com.eignex` and version prefix `0.3.4-20260922.073440-`:
+
+| Module | Build | Binary SHA-256 |
+|---|---:|---|
+| kumulant | 66 | `81bf47d09d6135b0857fc49510d17fbeac5dd958c5932753656d021bdfb78bae` |
+| kumulant-jvm | 66 | `41b110903da23f17f9c0c1b7c4e8722707bc369aadf21bfcd9fd05762a0eb3dc` |
+| kumulant-linuxx64 | 66 | `844f4b33057686b7ab47898757ae053f3aa377a508bc93cd0c7fbfc27ffa3a1a` |
+| kumulant-linuxarm64 | 66 | `a705527909d08e53a8b1a05f1051da970980a6183ed2aea315ba9cb8fa6f5416` |
+| kumulant-macosarm64 | 65 | `f0ce4c7f2f76c8aae200f8b443d4c4d2ad211733ebc540e7854916425ba1678c` |
+
+Kumulant's root metadata also redirects to mutable platform snapshots, so its platform
+constraints follow the same publication policy. Verify numerical ownership and transitive
+dependencies when updating either library.
 
 ## Consumer contracts
 
@@ -58,9 +76,10 @@ JVM launchers and Gradle execution tasks enable `jdk.incubator.vector` and
 `--enable-native-access=ALL-UNNAMED`. `-Pkoblas.noSimd=true` omits the module for portable-kernel
 verification. Embedded JVM callers supply these runtime options themselves.
 
-Koblas selects one immutable platform composition. Linux x64 prefers oneMKL or AOCL by CPU vendor;
-Linux arm64 prefers ArmPL; both fall back to installed OpenBLAS. macOS uses system Accelerate.
-Bindings use LP64 integers and one compute thread per call. Usual sonames and fixed installer
-prefixes are checked; `koblas.vendor` exposes the resolved path/version. No library means portable
-Level 1, containers and sparse primitives remain usable; dense Level 2/3 raises rather than falling
-back to portable arithmetic. Klause has no backend registry or bundled vendor payload.
+Koblas selects one immutable platform composition. Its default engines supply portable dense
+Level 2/3 arithmetic as well as Level 1 and sparse primitives. Eligible dense calls can use an
+installed host library; explicit vendor bindings require that library to be available.
+Linux x64 prefers oneMKL or AOCL by CPU vendor; Linux arm64 prefers ArmPL, with installed
+OpenBLAS as a fallback. macOS uses system Accelerate. Bindings use LP64 integers and one compute
+thread per call. Usual sonames and fixed installer prefixes are checked; `koblas.vendor` exposes
+the resolved path/version. Klause has no backend registry or bundled vendor payload.

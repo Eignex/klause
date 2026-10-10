@@ -1,13 +1,13 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.solver.Sample
+import com.eignex.koblas.DenseVector
 import com.eignex.kumulant.bandit.ContextualBandit
 import com.eignex.kumulant.bandit.contextual.LinearRegressionSpec
 import com.eignex.kumulant.bandit.contextual.RegressionContextualBandit
 import com.eignex.kumulant.bandit.contextual.RegressionContextualSpec
 import com.eignex.kumulant.bandit.materialize
 import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.math.DenseVector
 import com.eignex.kumulant.stat.regression.glm.MultivariateGaussian
 import kotlin.math.abs
 import kotlin.random.Random

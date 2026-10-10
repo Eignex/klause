@@ -42,8 +42,10 @@ kotlin {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")
-            implementation("com.eignex:koblas:0.1.1-20260918.215912-232")
-            implementation("com.eignex:kumulant:0.3.3")
+            implementation("com.eignex:koblas:0.1.1-20261010.042342-251") {
+                version { strictly("0.1.1-20261010.042342-251") }
+            }
+            implementation("com.eignex:kumulant:0.3.4-20260922.073440-66")
             implementation("com.eignex:kpermute:1.2.0")
         }
         // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
@@ -62,9 +64,19 @@ kotlin {
 // so downstream Gradle consumers resolve the same binaries as this build.
 dependencies {
     constraints {
-        for ((module, build) in mapOf("jvm" to 235, "linuxx64" to 231, "linuxarm64" to 232, "macosarm64" to 240)) {
-            val pinned = "0.1.1-20260918.215912-$build"
+        for ((module, pinned) in mapOf(
+            "jvm" to "0.1.1-20261010.042342-254",
+            "linuxx64" to "0.1.1-20261010.042342-250",
+            "linuxarm64" to "0.1.1-20261010.042342-251",
+            "macosarm64" to "0.1.1-20261010.042148-274",
+        )) {
             add("commonMainImplementation", "com.eignex:koblas-$module:$pinned") {
+                version { strictly(pinned) }
+            }
+        }
+        for ((module, build) in mapOf("jvm" to 66, "linuxx64" to 66, "linuxarm64" to 66, "macosarm64" to 65)) {
+            val pinned = "0.3.4-20260922.073440-$build"
+            add("commonMainImplementation", "com.eignex:kumulant-$module:$pinned") {
                 version { strictly(pinned) }
             }
         }

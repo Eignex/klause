@@ -67,7 +67,7 @@ kotlin {
             implementation("co.touchlab:kermit:2.1.0")
             // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to
             // render them as %%%mzn-stat lines.
-            implementation("com.eignex:kumulant:0.3.3")
+            implementation("com.eignex:kumulant:0.3.4-20260922.073440-66")
         }
     }
 }
