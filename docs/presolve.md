@@ -77,6 +77,8 @@ measurements must retain these scope differences.
 covers expired-deadline SAC, probe telemetry across successive rebakes, and
 charges consuming the originating allowance.
 
+## Clausal objectives
+
 Default clausal optimization retains binary exclusion clauses rather than merging
 at-most-one cliques into cardinalities. This preserves native SAT propagation and
 learning and avoids repeated clique preparation. An explicit `+amo-clique` or
@@ -105,3 +107,12 @@ columns retain their declared domains until the root bake and ordinary presolve;
 a wide column does not trigger bound queries over unrelated narrow columns.
 Every accepted tightening still requires the LP bound certificate, and skipping
 a query retains all source constraints and feasible values.
+
+## Binary integer channels
+
+Binary-column substitution accepts single-variable reified equalities `b ↔ (x = 0|1)`
+when every reader of `x` supports the Boolean replacement. These channels become
+Boolean equivalences; general reified rows and value-reading globals retain their
+integer columns. Objective integer columns remain excluded. Substituted integers
+are pinned during search and reconstructed from the added literals, preserving
+source values and solution counts for either indicator polarity.

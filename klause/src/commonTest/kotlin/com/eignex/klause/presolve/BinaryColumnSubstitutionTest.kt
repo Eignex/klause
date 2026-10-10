@@ -1,8 +1,10 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
@@ -36,6 +38,55 @@ class BinaryColumnSubstitutionTest {
         assertEquals(1, result.problem.factors.count { it is Clause })
         val sample = result.reconstruct(Sample(booleanArrayOf(true, false, false), longArrayOf(0, 0, 0)))
         assertTrue(satisfies(model, sample.bools, sample.ints))
+    }
+
+    @Test
+    fun `binary channel reconstruction preserves either indicator polarity`() {
+        for (bound in listOf(0, 1)) {
+            val model = Problem(
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = binary(1),
+                factors = listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, bound)),
+            )
+
+            val result = checkNotNull(substitute(model))
+            val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+                .map(result.reconstruct).map { it.bools.single() to it.ints.single() }.toSet()
+
+            assertEquals(setOf(true to bound.toLong(), false to (1L - bound)), assignments)
+        }
+    }
+
+    @Test
+    fun `multiple binary indicators retain their shared integer meaning`() {
+        val model = Problem(
+            numBoolVars = 2,
+            numIntVars = 1,
+            intDomains = binary(1),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+            ),
+        )
+
+        val result = checkNotNull(substitute(model))
+        val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+            .map(result.reconstruct).map { it.bools.toList() to it.ints.single() }.toSet()
+
+        assertEquals(setOf(listOf(true, false) to 1L, listOf(false, true) to 0L), assignments)
+    }
+
+    @Test
+    fun `a binary indicator cannot replace an objective integer column`() {
+        val model = Problem(
+            numBoolVars = 1,
+            numIntVars = 1,
+            intDomains = binary(1),
+            factors = listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+
+        assertNull(substitute(model, objectiveIntVars = setOf(0)))
     }
 
     private fun binary(n: Int) = Array<IntDomain>(n) { IntDomain(0, 1) }
