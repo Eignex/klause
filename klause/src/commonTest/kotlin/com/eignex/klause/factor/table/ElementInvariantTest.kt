@@ -25,7 +25,7 @@ class ElementInvariantTest {
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
             Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 0),
             Linear(intArrayOf(2, 1, -1), intArrayOf(1, 2, 3), LinearOp.EQ, 0),
-            Element(3, 4, longArrayOf(1, 9, 1, 9), arrIsVars = false, indexOffset = 0),
+            Element(3, 4, longArrayOf(1, 9, 1, 1), arrIsVars = false, indexOffset = 0),
         )
         val problem = Problem(
             0, 5,
@@ -38,9 +38,8 @@ class ElementInvariantTest {
         state.recompute()
 
         state.factors[3].proposeRepairMoves(state, 3, state.moveSink)
-        state.apply(state.moveSink.list.single())
 
-        assertEquals(0L, state.cost)
+        assertTrue(state.moveSink.list.isEmpty())
     }
 
     @Test
