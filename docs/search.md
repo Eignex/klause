@@ -93,8 +93,11 @@ parent snapshot before a sibling adds assertions.
 Completed source comparisons are installed once along a branch. Retraction clears
 their publication markers so restored assertions and sibling Boolean substitutions
 are installed against the current LP trail. Incomplete passes publish no markers.
-Each propagation call limits row visits before the complete LP check, so a
-partial interval pass cannot establish feasibility or exhaustion. There is no
+Each propagation call limits row visits. Non-root propagation defers LP solves
+while Boolean assignments are partial; equality, difference and interval checks
+still process current source assertions. Boolean completion and source integer
+branching retain full LP checks and independent witness validation. A partial
+interval pass cannot establish feasibility or exhaustion. There is no
 explanation weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
 
 ## Learned-clause retention

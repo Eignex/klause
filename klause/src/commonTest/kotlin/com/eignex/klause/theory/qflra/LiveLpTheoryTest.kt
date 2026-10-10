@@ -3,6 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
@@ -37,6 +38,7 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
@@ -65,6 +67,31 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LiveLpTheoryTest {
+    @Test
+    fun `a Boolean refutation completes within one full theory check`() {
+        val model = SmtLib.parse(
+            """
+            (declare-const x Int) (declare-const y Int) (declare-const z Int)
+            (assert (let ((b (<= x 0)) (c (<= y 0)) (d (<= z 0)))
+                (and
+                    (or b c d) (or b c (not d))
+                    (or b (not c) d) (or b (not c) (not d))
+                    (or (not b) c d) (or (not b) c (not d))
+                    (or (not b) (not c) d) (or (not b) (not c) (not d)))))
+            """.trimIndent(),
+        ).model
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(model.factors.filterIsInstance<Clause>()), component),
+                maxChecks = 1,
+                atoms = SearchAtomRegistry(model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Exhausted>(session.solve(model.numBoolVars))
+        }
+    }
+
     @Test
     fun `returned theory statistics include cleanup and remain immutable across rounds`() {
         for (cancelAfterWork in listOf(false, true)) {
