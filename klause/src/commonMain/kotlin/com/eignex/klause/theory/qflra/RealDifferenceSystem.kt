@@ -2,6 +2,8 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.arithmetic.difference.DifferenceGraph
 import com.eignex.klause.arithmetic.difference.Potentials
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -72,10 +74,10 @@ internal class RealDifferenceSystem private constructor(
                 ) return null
             }
             for ((factorIndex, factor) in model.factors.withIndex()) {
+                if (factor is Clause || factor is Cardinality) continue
                 if (factor.linearForm is LinearForm.Disjunction) return null
                 for ((rowIndex, row) in factor.linearRows.withIndex()) {
                     if (stop()) return null
-                    if (row.size > 0 && (0 until row.size).all { Term.isBool(row.ref(it)) }) continue
                     if ((0 until row.size).any { Term.isBool(row.ref(it)) }) return null
                     val truths = if (row.activator == LinearRow.ALWAYS) listOf(true) else listOf(true, false)
                     for (truth in truths) {

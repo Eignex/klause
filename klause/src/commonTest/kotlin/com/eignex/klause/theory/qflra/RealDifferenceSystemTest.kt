@@ -2,11 +2,16 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.exactForm
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -104,6 +109,33 @@ class RealDifferenceSystemTest {
             val system = RealDifferenceSystem.prepare(model, emptyList())
 
             assertNull(system)
+        }
+    }
+
+    @Test
+    fun `Boolean arithmetic retains the exact LP route`() {
+        val model = Problem(1, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(PseudoBoolean(longArrayOf(2), intArrayOf(Lit.make(0, true)), PbOp.GE, 1L)))
+
+        val system = RealDifferenceSystem.prepare(model,
+            model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } })
+
+        assertNull(system)
+    }
+
+    @Test
+    fun `shared Boolean factors leave difference arithmetic admissible`() {
+        for (factor in listOf(Clause(intArrayOf(Lit.make(0, true))),
+            Cardinality(intArrayOf(Lit.make(0, true)), 1, 1))) {
+            val model = Problem(1, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+                factors = arrayOf(factor))
+
+            val system = RealDifferenceSystem.prepare(model,
+                model.factors.map { source -> source.linearRows.map { it.exactForm(1) } })
+
+            assertNotNull(system)
         }
     }
 
