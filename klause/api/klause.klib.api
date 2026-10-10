@@ -517,6 +517,7 @@ final enum class com.eignex.klause.solver.pipeline/VarSelectorKind : kotlin/Enum
     enum entry CHB // com.eignex.klause.solver.pipeline/VarSelectorKind.CHB|null[0]
     enum entry DOMAIN_MAX_REGRET // com.eignex.klause.solver.pipeline/VarSelectorKind.DOMAIN_MAX_REGRET|null[0]
     enum entry INPUT_ORDER // com.eignex.klause.solver.pipeline/VarSelectorKind.INPUT_ORDER|null[0]
+    enum entry INT_INPUT_ORDER // com.eignex.klause.solver.pipeline/VarSelectorKind.INT_INPUT_ORDER|null[0]
     enum entry LARGEST_DOMAIN // com.eignex.klause.solver.pipeline/VarSelectorKind.LARGEST_DOMAIN|null[0]
     enum entry LARGEST_UPPER_BOUND // com.eignex.klause.solver.pipeline/VarSelectorKind.LARGEST_UPPER_BOUND|null[0]
     enum entry LINUCB // com.eignex.klause.solver.pipeline/VarSelectorKind.LINUCB|null[0]

@@ -19,6 +19,7 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.IndomainRandom
 import com.eignex.klause.backtrack.selector.IndomainSplit
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.IntInputOrder
 import com.eignex.klause.backtrack.selector.LargestDomain
 import com.eignex.klause.backtrack.selector.LargestUpperBound
 import com.eignex.klause.backtrack.selector.RandomVariable
@@ -678,9 +679,8 @@ fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, cores * AR
 private const val ARMS_PER_CORE = 2
 
 /** `var-selector` `--param` values for the `cp` engine's override pool (each maps to a [VariableSelector]).
- *  Covers the public no-argument selectors; the objective-/base-parameterised ones (MaxRegret,
- *  IndomainBest, LastConflict, …) and the `internal` ones (DomWdeg, ActivityBasedSearch) are not
- *  exposable as a bare value here. */
+ *  Each value supplies the selector's configuration; selectors requiring an objective or a separate
+ *  base selector are configured through the solver API. */
 enum class VarSelectorKind(val id: String) {
     VSIDS("vsids"),
     CHB("chb"),
@@ -692,6 +692,7 @@ enum class VarSelectorKind(val id: String) {
     SMALLEST_LOWER_BOUND("smallest-lower-bound"),
     LARGEST_UPPER_BOUND("largest-upper-bound"),
     DOMAIN_MAX_REGRET("domain-max-regret"),
+    INT_INPUT_ORDER("int-input-order"),
     ;
 
     /** A **fresh** selector instance (constructed per worker so parallel arms never share mutable
@@ -702,6 +703,7 @@ enum class VarSelectorKind(val id: String) {
         LINUCB -> RegressionVariableSelector.linUcb(seed = seed ?: 0L)
         RANDOM -> RandomVariable
         INPUT_ORDER -> InputOrder
+        INT_INPUT_ORDER -> IntInputOrder
         SMALLEST_DOMAIN -> SmallestDomain
         LARGEST_DOMAIN -> LargestDomain
         SMALLEST_LOWER_BOUND -> SmallestLowerBound
