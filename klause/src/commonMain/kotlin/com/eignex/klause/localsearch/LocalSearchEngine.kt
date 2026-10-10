@@ -95,7 +95,10 @@ internal class LocalSearchEngine(
         val cursor = exclusiveSearch { sequence.iterator() }
         object : Iterator<T> {
             override fun hasNext(): Boolean = exclusiveSearch { cursor.hasNext() }
-            override fun next(): T = exclusiveSearch { cursor.next() }
+            override fun next(): T = exclusiveSearch {
+                if (!cursor.hasNext()) throw NoSuchElementException()
+                cursor.next()
+            }
         }
     }
 
@@ -268,11 +271,9 @@ internal class LocalSearchEngine(
 
     fun resumableSolve(params: LocalSearchParams, warm: WarmState? = null): ResumableSolve {
         val ownership = acquireSearch()
-        try {
-            return openResumableSolve(params, warm, ownership)
-        } catch (failure: Throwable) {
+        return runCatching { openResumableSolve(params, warm, ownership) }.getOrElse {
             ownership.release()
-            throw failure
+            throw it
         }
     }
 
@@ -324,11 +325,11 @@ internal class LocalSearchEngine(
                 global: Cancellation,
                 sliceMillis: Long,
                 sliceInstructions: Long,
-            ): SolveResult? = try {
+            ): SolveResult? = runCatching {
                 advance(global, sliceMillis, sliceInstructions)
-            } catch (failure: Throwable) {
+            }.getOrElse {
                 close()
-                throw failure
+                throw it
             }
 
             private fun advance(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult? {
@@ -461,11 +462,9 @@ internal class LocalSearchEngine(
 
     fun resumable(objective: LinearObjective, params: LocalSearchParams, warm: WarmState? = null): ResumableSearch {
         val ownership = acquireSearch()
-        try {
-            return openResumable(objective, params, warm, ownership)
-        } catch (failure: Throwable) {
+        return runCatching { openResumable(objective, params, warm, ownership) }.getOrElse {
             ownership.release()
-            throw failure
+            throw it
         }
     }
 
@@ -517,11 +516,11 @@ internal class LocalSearchEngine(
                 sliceMillis: Long,
                 sliceInstructions: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
-            ): MinimizeResult? = try {
+            ): MinimizeResult? = runCatching {
                 advance(global, sliceMillis, sliceInstructions, onIncumbent)
-            } catch (failure: Throwable) {
+            }.getOrElse {
                 close()
-                throw failure
+                throw it
             }
 
             private fun advance(

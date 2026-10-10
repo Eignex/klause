@@ -212,6 +212,8 @@ Optimization portfolios can reseed stale resumable arms after an incumbent;
 Each arm retains completed-handle totals separately from its current cumulative
 snapshot. Repeated snapshots replace the live entry; closing captures the final
 counters and merges the handle once, including when reseeding or stopping the pool.
+Open-theory handles capture live-round progress before releasing their traversal;
+closing a completed round does not capture its counters again.
 Ordinary arm exceptions retire their producer and leave siblings running. The schedule
 retains one diagnostic per arm with its identity, operation, segment, charged work,
 exception type/message and cause trace. Type, message and trace are capped at 128,

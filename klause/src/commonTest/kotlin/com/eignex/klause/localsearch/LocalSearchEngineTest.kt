@@ -32,12 +32,19 @@ class LocalSearchEngineTest {
     @Test
     fun `early root and unsupported verdicts release handle ownership`() {
         val refuted = Problem(
-            1, 0, emptyArray(), arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, false))),
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
         val unsupported = Problem(
-            0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), emptyArray(),
+            0,
+            1,
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            emptyArray(),
         )
         for (problem in listOf(refuted, unsupported)) {
             val solver = LocalSearchSolver(problem.bake())
@@ -112,7 +119,8 @@ class LocalSearchEngineTest {
                 }
             }
             val solver = LocalSearchSolver(
-                Problem(0, 0, emptyArray(), emptyArray()).bake(), restartPolicy = policy,
+                Problem(0, 0, emptyArray(), emptyArray()).bake(),
+                restartPolicy = policy,
             )
             val params = LocalSearchParams(maxFlips = 1)
             val objective = LinearObjective()
@@ -138,7 +146,9 @@ class LocalSearchEngineTest {
         val owner = solver.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1))
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { throw IllegalArgumentException("callback failure") }
+            owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {
+                throw IllegalArgumentException("callback failure")
+            }
         }
 
         assertEquals("callback failure", failure.message)
@@ -148,7 +158,9 @@ class LocalSearchEngineTest {
     @Test
     fun `custom restarts retain independent best infeasible anchors`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 3)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 3)),
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
         )
         val anchors = mutableListOf<Sample>()
@@ -167,8 +179,10 @@ class LocalSearchEngineTest {
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val search = LocalSearchEngine(
-            LocalSearchModel.open(problem), strategy = strategy,
-            restartPolicy = restart, greedyRepairOnRestart = false,
+            LocalSearchModel.open(problem),
+            strategy = strategy,
+            restartPolicy = restart,
+            greedyRepairOnRestart = false,
         )
 
         search.resumable(
@@ -257,7 +271,9 @@ class LocalSearchEngineTest {
             }
         }
         val problem = Problem(
-            1, 0, emptyArray(),
+            1,
+            0,
+            emptyArray(),
             factors + arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, false)))),
         )
         val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)

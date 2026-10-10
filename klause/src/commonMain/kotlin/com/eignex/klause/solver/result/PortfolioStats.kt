@@ -16,7 +16,9 @@ data class PortfolioStats(
 ) {
     /** Combine two runs' schedules: the arms of both, in order, under the first one's classification. */
     fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(
-        arms + o.arms, profile ?: o.profile, reseedStaleThreshold ?: o.reseedStaleThreshold,
+        arms + o.arms,
+        profile ?: o.profile,
+        reseedStaleThreshold ?: o.reseedStaleThreshold,
     )
 }
 
