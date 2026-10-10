@@ -244,7 +244,10 @@ class DefinitionalSweep internal constructor(
             for (inId in d.intInputs) mark(inId)
         }
         for (t in terms) mark(t)
-        if (nodes.any { it is SweepNode.IntDef && it.out in reachable && it.intInputs.any { v -> v in literalOutputs } }) {
+        val readsLiteral = nodes.any {
+            it is SweepNode.IntDef && it.out in reachable && it.intInputs.any { v -> v in literalOutputs }
+        }
+        if (readsLiteral) {
             return null
         }
         // `nodes` is topological, so filtering preserves the inputs-before-outputs order the cone eval needs.

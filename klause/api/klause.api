@@ -3363,10 +3363,10 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep {
 }
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$Companion {
-	public final fun infer ([Lcom/eignex/klause/ir/Factor;I[ILjava/util/List;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun infer (Lcom/eignex/klause/ir/Problem;[ILjava/util/List;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
-	public static synthetic fun infer$default (Lcom/eignex/klause/localsearch/DefinitionalSweep$Companion;[Lcom/eignex/klause/ir/Factor;I[ILjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
+	public final fun infer ([Lcom/eignex/klause/ir/Factor;I[ILjava/util/List;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public static synthetic fun infer$default (Lcom/eignex/klause/localsearch/DefinitionalSweep$Companion;Lcom/eignex/klause/ir/Problem;[ILjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
+	public static synthetic fun infer$default (Lcom/eignex/klause/localsearch/DefinitionalSweep$Companion;[Lcom/eignex/klause/ir/Factor;I[ILjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
 }
 
 public abstract interface class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {

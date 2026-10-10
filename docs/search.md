@@ -255,6 +255,7 @@ searched. Pinned values survive evaluation, and clipped channels retain their fa
 violations without replacing a maintained predicate during seeding.
 Implicitly owned integer outputs remain unchanged during per-move propagation;
 the affected definition factors retain any resulting violations.
+Diversification kicks also exclude maintained Boolean outputs from direct flips.
 Repairs into retained literal channels change an admissible Boolean input or backsolve
 a retained unary equality into a searched integer or an existing extremum inverse.
 These repairs check output domains, pins and implicit owners; false equality targets

@@ -104,7 +104,8 @@ class LiteralDefinitionTest {
                 arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)),
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
-            state.invariants = DefinitionalSweep.infer(problem, if (hinted) intArrayOf(0) else intArrayOf())?.network(1, 1)
+            val hints = if (hinted) intArrayOf(0) else intArrayOf()
+            state.invariants = DefinitionalSweep.infer(problem, hints)?.network(1, 1)
 
             state.moveSink.addIntSet(0, 1)
 

@@ -38,7 +38,11 @@ class CumulativeInvariantTest {
                 ), factors,
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
-            val sweep = if (retained) DefinitionalSweep.infer(problem, intArrayOf(1)) else DefinitionalSweep.infer(factors, 7)
+            val sweep = if (retained) {
+                DefinitionalSweep.infer(problem, intArrayOf(1))
+            } else {
+                DefinitionalSweep.infer(factors, 7)
+            }
             state.invariants = assertNotNull(sweep).network(7, 1)
             state.assignment.setInt(0, if (bound == 1) 0L else 1L)
             state.assignment.setInt(1, 1)
