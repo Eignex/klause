@@ -229,11 +229,6 @@ class Portfolio(
                 }
             }
             run.locked {
-                if (opening && handle is InstructionSlicedSolve && !handle.isDone &&
-                    r == null && failure == null && work == 0L
-                ) {
-                    run.probePreparedState(claim)
-                }
                 run.record(
                     claim, handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
                     cumulative = handle != null, work = work, failed = failed,
@@ -427,11 +422,6 @@ class Portfolio(
             }
             run.locked {
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
-                if (opening && handle is InstructionSlicedSearch && !handle.isDone &&
-                    terminal == null && failure == null && work == 0L && !claim.improved
-                ) {
-                    run.probePreparedState(claim)
-                }
                 run.record(claim, stats, cumulative = handle != null, work = work, failed = failed)
                 if (claim.fault != null) {
                     run.quarantine(claim)
@@ -584,8 +574,7 @@ class Portfolio(
         /**
          * The next arm for lane [lane], or null when none is free. With a lane for every arm, each lane keeps its own
          * arm: there is nothing to share, so neither a probe nor the policy has a choice to make. Otherwise every arm
-         * first runs one base slice, in order, so the policy starts from evidence on each admitted arm. A local-search
-         * slice spent entirely on preparation gets one probe of the retained state. Then the
+         * first runs one base slice, in order, so the policy starts from evidence on each admitted arm; then the
          * policy picks among arms neither busy nor retired. Improvement variants are admitted at the first
          * incumbent, or when the initial pool retires.
          */
@@ -615,10 +604,6 @@ class Portfolio(
         private fun eligibleArms(): List<Int> {
             val first = workers.indices.filter { !workers[it].improvementOnly }
             return if (improving || first.all { retired[it] }) workers.indices.toList() else first
-        }
-
-        fun probePreparedState(claim: Claim) {
-            if (claim.probing) probed[claim.arm] = false
         }
 
         // The free arm furthest below its owed share, else the policy's pick among free arms: a family first, so a
