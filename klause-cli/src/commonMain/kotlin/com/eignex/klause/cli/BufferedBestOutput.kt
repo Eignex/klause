@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.SolveStats
 
 /**
@@ -29,6 +30,9 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     /** Render an incumbent objective that a continuous column contributes to. Only a format whose
      *  models can carry one needs this; the default never sees it. */
     protected open fun formatContinuousObjective(objective: Double): String = objective.toString()
+
+    protected open fun formatExactObjective(objective: BigFraction): String =
+        objective.toString()
 
     /** The single status line this format prints for [verdict] at completion. */
     protected abstract fun statusLine(verdict: Verdict): String
@@ -64,6 +68,11 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         } else if (objective != null) {
             println("$objectivePrefix${formatObjective(objective)}")
         }
+    }
+
+    final override fun onExactSolution(rendered: String, objective: BigFraction) {
+        best = rendered
+        if (streamObjective) println("$objectivePrefix${formatExactObjective(objective)}")
     }
 
     final override fun onComplete(verdict: Verdict) {

@@ -50,6 +50,7 @@ internal data class ReferenceEntry(
     /** How the row was produced where that decides whether it still holds: an MPS reference's solver build, options
      *  and validation rules ([MpsWitness.VERSION]). Blank for other solvers and for rows from before it was kept. */
     val version: String = "",
+    val exactObjective: String? = null,
 )
 
 /**
@@ -68,7 +69,7 @@ internal object ReferenceStore {
     // table, `<config>.csv` for a per-run result table), so `readCsv` reads it from the file name.
     private val COLUMNS = listOf(
         "suite", "problem", "maximize", "objective", "feasible", "proven", "elapsedMs", "budgetMs",
-        "format", "structure", "numGlobal", "numLinear", "boolHeavy", "logic", "version",
+        "format", "structure", "numGlobal", "numLinear", "boolHeavy", "logic", "version", "exactObjective",
     )
 
     /** The oracle-only prefix — a legacy row (pre-features) has exactly this many columns and decodes
@@ -203,8 +204,8 @@ internal object ReferenceStore {
      *  bounds the tighter objective wins; any feasible beats none. */
     private fun isBetter(a: ReferenceEntry, b: ReferenceEntry): Boolean {
         if (a.proven != b.proven) return a.proven
-        val ao = a.objective ?: return false
-        val bo = b.objective ?: return true
+        val ao = ExactObjective.value(a.exactObjective, a.objective) ?: return false
+        val bo = ExactObjective.value(b.exactObjective, b.objective) ?: return true
         return if (a.maximize) ao > bo else ao < bo
     }
 
@@ -227,6 +228,7 @@ internal object ReferenceStore {
         e.boolHeavy?.toString().orEmpty(),
         csv(e.logic),
         csv(e.version),
+        csv(e.exactObjective.orEmpty()),
     ).joinToString(",")
 
     /** Parse one CSV data row into a [ReferenceEntry] with the given [solver] (test seam over the
@@ -253,6 +255,7 @@ internal object ReferenceStore {
             boolHeavy = f.getOrNull(12)?.ifEmpty { null }?.toBoolean(),
             logic = f.getOrElse(13) { "" },
             version = f.getOrElse(14) { "" },
+            exactObjective = f.getOrNull(15)?.ifEmpty { null },
         )
     }
 

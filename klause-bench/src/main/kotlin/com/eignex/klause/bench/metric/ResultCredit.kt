@@ -15,7 +15,6 @@ import java.io.File
  * per-arm files — emit each arm's single-solver run as its own result CSV.
  */
 internal object ResultCredit {
-    private const val TIE_EPS = 1e-9
 
     /** Render the credit report over [files] (labelled by basename); when [by] names a feature column
      *  ("structure" / "format"), also break the credit down within each bucket. */
@@ -72,17 +71,16 @@ internal object ResultCredit {
      *  fastest run that decided it (SAT witness or proved UNSAT). Unsolved runs never win; an instance
      *  no run solved yields an empty set (it discriminates nothing and is dropped). */
     private fun winners(byLabel: Map<String, ReferenceEntry>): Set<String> {
-        val cop = byLabel.values.any { it.objective != null }
+        val cop = byLabel.values.any { it.objective != null || it.exactObjective != null }
         if (cop) {
             val maximize = byLabel.values.first().maximize
-            // Oriented objective (higher = better) for the runs that found one; unsolved runs drop out.
-            val oriented = byLabel.mapNotNull { (label, e) ->
-                val obj = e.objective
-                if (e.feasible == true && obj != null) label to (if (maximize) obj else -obj) else null
+            val objectives = byLabel.mapNotNull { (label, e) ->
+                val obj = ExactObjective.value(e.exactObjective, e.objective)
+                if (e.feasible == true && obj != null) label to obj else null
             }.toMap()
-            if (oriented.isEmpty()) return emptySet()
-            val best = oriented.values.max()
-            val atBest = oriented.filterValues { it >= best - TIE_EPS }.keys
+            if (objectives.isEmpty()) return emptySet()
+            val best = if (maximize) objectives.values.max() else objectives.values.min()
+            val atBest = objectives.filterValues { it.compareTo(best) == 0 }.keys
             // A proven optimum is strictly better than an equal-valued unproven bound.
             val proven = atBest.filter { byLabel.getValue(it).proven }.toSet()
             return proven.ifEmpty { atBest }

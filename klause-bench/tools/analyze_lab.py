@@ -2,7 +2,7 @@
 """Analyze archived AWS records, retaining incomplete blocks and outcome categories."""
 import argparse
 from collections import Counter, defaultdict
-from decimal import Decimal, InvalidOperation
+from fractions import Fraction
 import gzip
 import json
 import lzma
@@ -11,6 +11,8 @@ from pathlib import Path
 import random
 import re
 import statistics
+
+from compare_records import objective
 
 
 def read(path):
@@ -67,7 +69,7 @@ def quality(a, b):
     if aw and a.get('kind') == b.get('kind') == 'satisfy':
         return 0
     ap, bp = bool(a.get('proven')), bool(b.get('proven'))
-    av, bv = a.get('objective'), b.get('objective')
+    av, bv = objective(a), objective(b)
     if av is not None and bv is not None and av != bv:
         direction = (1 if bv > av else -1) * (1 if b.get('maximize') else -1)
         if (ap and direction > 0) or (bp and direction < 0):
@@ -85,7 +87,7 @@ def numeric(r, key):
 
 
 def objective_support(r):
-    if r.get('feasible') is not True or r.get('objective') is None:
+    if r.get('feasible') is not True or objective(r) is None:
         return 'not-applicable'
     witness = r.get('finalWitness') or r.get('sourceWitness')
     if witness is None:
@@ -94,8 +96,8 @@ def objective_support(r):
     if reported is None:
         return 'missing-objective'
     try:
-        return 'matched' if Decimal(reported.group(1).strip()) == Decimal(str(r['objective'])) else 'mismatch'
-    except InvalidOperation:
+        return 'matched' if Fraction(reported.group(1).strip()) == objective(r) else 'mismatch'
+    except (ValueError, ZeroDivisionError):
         return 'unparsed-objective'
 
 
@@ -227,7 +229,7 @@ def analyze(cases, control):
                     by_family[fam][metric].append(math.log(max(1, bv) / max(1, av)))
                     timing_pairs[metric] += 1
             equal_objective = (a.get('feasible') is not True or a.get('kind') == 'satisfy' or
-                               (a.get('objective') is not None and a.get('objective') == b.get('objective')))
+                               (objective(a) is not None and objective(a) == objective(b)))
             if q == 0 and a.get('kind') == b.get('kind') and equal_objective:
                 av, bv = process_timing(a), process_timing(b)
                 if av is not None and bv is not None:
@@ -251,6 +253,8 @@ def analyze(cases, control):
             if q != 0 or sa != sb:
                 differences.append({'identity': key, 'family': fam, 'quality': q,
                                     'controlObjective': a.get('objective'), 'candidateObjective': b.get('objective'),
+                                    'controlExactObjective': a.get('exactObjective'),
+                                    'candidateExactObjective': b.get('exactObjective'),
                                     'controlCategory': category(block[control]),
                                     'candidateCategory': category(block[label]),
                                     'controlBestMs': a.get('timeToBestMs'), 'candidateBestMs': b.get('timeToBestMs'),

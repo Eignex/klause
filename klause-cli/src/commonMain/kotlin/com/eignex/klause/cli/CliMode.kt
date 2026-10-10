@@ -10,6 +10,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -571,6 +572,8 @@ internal interface OutputProtocol {
     /** One solution. [objective] carries the discrete terms; [continuousObjective] the whole value
      *  when a continuous column carries cost, which no exact integer can express. */
     fun onSolution(rendered: String, objective: Long?, continuousObjective: Double? = null)
+
+    fun onExactSolution(rendered: String, objective: BigFraction)
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
 

@@ -67,6 +67,8 @@ Optimization emits `; objective=<value>` for each incumbent in the source object
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
 `best-found` and `unbounded`. These comments appear without `-s`; `sat` alone
 does not establish optimality.
+Exact theory objectives use arbitrary-precision integer or reduced `numerator/denominator`
+text, including values outside `Long` and non-terminating rational values.
 
 Open integers retain arbitrary-precision source bounds. A linear relaxation witness
 does not establish integrality: shared search splits fractional integers at exact

@@ -1,5 +1,8 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
@@ -14,6 +17,25 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class VerdictReasonTest {
+    @Test
+    fun `SMT output preserves arbitrary integers and rational objectives`() {
+        for ((numerator, denominator) in listOf(
+            "9223372036854775808" to 1,
+            "9007199254740993" to 1,
+            "-1" to 3,
+        )) {
+            val objective = BigFraction.of(parseBigInt(numerator), bigIntOf(denominator))
+            val out = capture {
+                SmtLibOutput().apply {
+                    begin(optimize = true, maximize = false)
+                    onExactSolution("(model)", objective)
+                    onComplete(Verdict.OPTIMAL)
+                }
+            }
+
+            assertEquals("; objective=$objective\nsat\n; optimizationStatus=optimal\n(model)\n", out)
+        }
+    }
 
     private fun capture(block: () -> Unit): String {
         val buf = ByteArrayOutputStream()

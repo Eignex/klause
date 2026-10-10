@@ -685,6 +685,12 @@ internal object Suites {
         license = "internal"
         vendored("lia-basic", Category.CSP, Expected.Sat)
         vendored("lia-opt", Category.OPTIMIZATION, Expected.Opt(7))
+        vendored("lia-big-min", Category.OPTIMIZATION, Expected.Sat)
+        vendored("lia-big-max", Category.OPTIMIZATION, Expected.Sat)
+        vendored("lia-adjacent-min", Category.OPTIMIZATION, Expected.Sat)
+        vendored("lia-adjacent-max", Category.OPTIMIZATION, Expected.Sat)
+        vendored("lira-rational-min", Category.OPTIMIZATION, Expected.Sat)
+        vendored("lira-rational-max", Category.OPTIMIZATION, Expected.Sat)
         vendored("lia-unsat", Category.UNSAT, Expected.Unsat)
         vendored("lia-disjunction", Category.CSP, Expected.Sat)
         vendored("lra-rational", Category.CSP, Expected.Sat)
