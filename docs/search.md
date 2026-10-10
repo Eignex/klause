@@ -138,14 +138,17 @@ portfolio workers use separate solvers and close a handle before reseeding it.
 Optimization handles open through their session so its assumptions and state apply.
 Sessions that decline resumable optimization retain their one-shot improvement stream.
 
-The immutable local-search projection is initialized lazily and reused across draws.
+The immutable local-search projection is prepared on demand and reused across draws.
 Mixed-pool arms over the same model share it, including ALNS's inner local search.
 Objective-bound overlays keep their own projections. Assignments, RNGs, weights and
 invariant payloads belong to each live state. Resumable handles initialize large
 factor sets in batches, retaining the next factor and completed payloads when a
 slice expires. Partial costs, samples and warm state remain private until every
 factor has been scored. Initial scoring preserves factor order and does not charge
-search moves. Projection construction, assignment seeding, individual factor calls,
+search moves. Projection preparation also retains private invariant and occurrence-index
+progress in batches. Matching arms can continue that shared preparation; a mutex protects
+each batch and publishes only the complete projection. A suspended arm holds no lock.
+Assignment seeding, individual factor calls,
 custom restart policies, subsequent restarts and repair searches remain atomic work
 that can overrun a segment.
 Before the first incumbent, an optimization arm whose initial local-search turn

@@ -27,6 +27,35 @@ import kotlin.test.assertTrue
 class LocalSearchEngineTest {
 
     @Test
+    fun `satisfaction resumes after projection preparation expires`() {
+        var expired = false
+        val factors = Array<Factor>(512) { fid ->
+            val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+            object : Factor by clause, Invariant {
+                override val boolVars: IntArray
+                    get() {
+                        if (fid == 255) expired = true
+                        return clause.boolVars
+                    }
+            }
+        }
+        val problem = Problem(1, 0, emptyArray(), factors + Clause(intArrayOf(Lit.make(0, true))))
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+        val warm = WarmState()
+        val params = LocalSearchParams(maxFlips = 2L, initialAssignment = Sample(booleanArrayOf(true), LongArray(0)))
+
+        search.resumableSolve(params, warm).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L))
+            assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+
+            val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+
+            assertTrue(result.assignment.bools[0])
+        }
+    }
+
+    @Test
     fun `satisfaction resumes initial scoring without repeating completed factors`() {
         var expired = false
         val initialized = IntArray(512)

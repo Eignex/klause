@@ -59,7 +59,7 @@ internal class LocalSearchEngine(
     completion: CandidateCompletion? = null,
 ) {
     private val problem: Problem = model.problem
-    internal var projection: Lazy<LocalSearchProblem> = lazy { LocalSearchProblem(problem, model.domains) }
+    internal var projection: LocalSearchPreparation = LocalSearchPreparation(problem, model.domains)
     internal var invariantNetwork: Lazy<InvariantNetwork?> = lazy {
         definitionalSweep?.network(problem.numIntVars, problem.numBoolVars)
     }
@@ -146,6 +146,17 @@ internal class LocalSearchEngine(
             state.initializeFactors(from, minOf(from + INITIAL_FACTOR_BATCH, problem.numFactors))
         }
         state.finishRecompute()
+    }
+
+    private suspend fun <T> SequenceScope<T?>.preparedProjection(
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+    ): LocalSearchProblem {
+        if (checkpoint == null) return checkNotNull(projection.get(Cancellation.Never))
+        while (true) {
+            projection.get(params.cancellation)?.let { return it }
+            yield(null)
+        }
     }
 
     private fun installInvariants(state: LocalSearchState) {
@@ -947,7 +958,7 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint?,
     ): LocalSearchState {
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val state = LocalSearchState(model, Random(seed), effectiveAssumptions, projection.value)
+        val state = LocalSearchState(model, Random(seed), effectiveAssumptions, preparedProjection(params, checkpoint))
         state.violationSoftCap = params.violationSoftCap
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
@@ -999,7 +1010,7 @@ internal class LocalSearchEngine(
         seed: Long,
         checkpoint: LocalSearchCheckpoint?,
     ): LocalSearchState {
-        val state = LocalSearchState(model, Random(seed), effectiveAssumptions, projection.value)
+        val state = LocalSearchState(model, Random(seed), effectiveAssumptions, preparedProjection(params, checkpoint))
         state.violationSoftCap = params.violationSoftCap
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
