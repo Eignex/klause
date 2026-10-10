@@ -82,7 +82,7 @@ class ResumableSatisfactionTest {
     }
 
     @Test
-    fun `an indeterminate root component ends satisfaction without pausing`() {
+    fun `an indeterminate node only root ends with no slice work`() {
         val component = object : SearchComponent {
             override fun initialize(context: SearchContext): ComponentResult = ComponentResult.Indeterminate
         }
@@ -90,7 +90,7 @@ class ResumableSatisfactionTest {
             BacktrackParams(componentFactory = { listOf(component) }),
         )
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1_000L) }
+        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) }
 
         assertIs<SolveResult.Unknown>(result)
         assertTrue(search.isDone)

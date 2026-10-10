@@ -177,10 +177,12 @@ Finite satisfaction and optimization searches share root hull pruning and global
 cut harvesting. Satisfaction uses a zero objective and admits variable shaving;
 objective shaving and incumbent-relative fixings remain optimization work. Root
 preparation runs once before shared initialization publishes the resulting bounds,
-under a common time/work allowance. A slice can retain pending initialization;
+under a common time/work allowance. Enabled preparation defers shared initialization
+into the first slice; node-only searches initialize eagerly. A slice can retain pending initialization;
 a cancelled optional root phase contributes only completed certified deductions.
 `lp-variable-shaving` and `lp-prune-hulls` are explicit backtrack overrides;
 `lp-root-cuts=false` disables root harvesting while retaining node separation.
+Curated satisfaction pools require `lp-root-cuts=true` to enable harvesting.
 
 Problem-level presolve/inprocessing and LP root harvesting are reused. There
 is no general problem presolve inside the tree or elimination of shared variable
