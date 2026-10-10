@@ -34,30 +34,6 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `portfolio diagnostics survive lab record serialization`() {
-        val diagnostic = """{"armId":7,"phase":"slice","segment":2,"work":30,"type":"IllegalStateException",""" +
-            """"message":"row \"R\"\u000aarm failure","trace":"cause\u000aframe"}"""
-        val result = SolverInvocation.Result(
-            feasible = true,
-            objective = null,
-            elapsedMs = 1,
-            timeToBestMs = null,
-            proven = false,
-            stats = mapOf("armFailure.failed" to diagnostic),
-            rawOutput = "",
-            command = "klause",
-        )
-
-        val encoded = Reports.json.encodeToString(SolverInvocation.Result.serializer(), result)
-        val decoded = Reports.json.decodeFromString(SolverInvocation.Result.serializer(), encoded)
-
-        assertEquals(true, decoded.feasible)
-        assertEquals(diagnostic, decoded.stats["armFailure.failed"])
-        val retained = Reports.json.parseToJsonElement(checkNotNull(decoded.stats["armFailure.failed"])).jsonObject
-        assertEquals("7", retained["armId"].toString())
-    }
-
-    @Test
     fun `objective precision survives parsing and cache round trips for each protocol`() {
         val objectives = listOf("9223372036854775808", "9007199254740993", "1/3", "-1/3", "1e400")
         for (dialect in SolverInvocation.Dialect.entries) {
@@ -181,21 +157,25 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `subprocess duration survives caching and legacy caches have unknown elapsed`() {
+    fun `subprocess records survive caching and legacy caches have unknown elapsed`() {
+        val diagnostic = """{"armId":7,"phase":"slice","segment":2,"work":30,"type":"IllegalStateException",""" +
+            """"message":"row \"R\"\u000aarm failure","trace":"cause\u000aframe"}"""
         val r = SolverInvocation.Result(
             false,
             null,
             null,
             proven = true,
-            stats = emptyMap(),
+            stats = mapOf("armFailure.failed" to diagnostic),
             rawOutput = "",
             command = "",
             elapsedMs = 140,
         )
         val encoded = Reports.json.encodeToString(r)
         val legacy = JsonObject(Reports.json.parseToJsonElement(encoded).jsonObject - "elapsedMs").toString()
+        val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(encoded)
 
-        assertEquals(140, Reports.json.decodeFromString<SolverInvocation.Result>(encoded).elapsedMs)
+        assertEquals(140, decoded.elapsedMs)
+        assertEquals(diagnostic, decoded.stats["armFailure.failed"])
         assertNull(Reports.json.decodeFromString<SolverInvocation.Result>(legacy).elapsedMs)
     }
 
