@@ -77,8 +77,12 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
         var lo = d.min
         var hi = d.max
         if (lo >= hi) continue
-        while (lo < hi && probes++ < SHAVE_MAX_ITERS && !token() && infeasibleUnder(v, lo, atMost = true, token = token)) lo += 1
-        while (hi > lo && probes++ < SHAVE_MAX_ITERS && !token() && infeasibleUnder(v, hi, atMost = false, token = token)) hi -= 1
+        while (lo < hi && probes++ < SHAVE_MAX_ITERS && !token() &&
+            infeasibleUnder(v, lo, atMost = true, token = token)
+        ) lo += 1
+        while (hi > lo && probes++ < SHAVE_MAX_ITERS && !token() &&
+            infeasibleUnder(v, hi, atMost = false, token = token)
+        ) hi -= 1
         if (lo != d.min || hi != d.max) out.add(ShavedBound(v, lo, hi))
     }
     return out

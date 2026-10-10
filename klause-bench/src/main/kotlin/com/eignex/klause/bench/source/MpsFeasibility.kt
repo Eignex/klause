@@ -4,19 +4,25 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.Locale
 
 internal object MpsFeasibility {
     fun resolve(source: File): File {
         val transformed = transform(CorpusFiles.readText(source))
         val hash = MessageDigest.getInstance("SHA-256").digest(transformed.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+            .joinToString("") { "%02x".format(Locale.ROOT, it) }
         val directory = File(CorpusFetcher.cacheRoot, ".mps-feasibility").also { it.mkdirs() }
         return File(directory, "$hash.mps").also { file ->
             if (!file.isFile) {
                 val pending = Files.createTempFile(directory.toPath(), "mps-", ".tmp")
                 try {
                     Files.writeString(pending, transformed)
-                    Files.move(pending, file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                    Files.move(
+                        pending,
+                        file.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING,
+                    )
                 } finally {
                     Files.deleteIfExists(pending)
                 }
@@ -65,7 +71,8 @@ internal object MpsFeasibility {
                         output.add(line)
                     } else {
                         val pairs = fields.drop(1).chunked(2).filter { it.first() !in freeRows }
-                        output.add(" ${fields.first()} " + pairs.flatten().ifEmpty { listOf(anchor, "0") }.joinToString(" "))
+                        val coefficients = pairs.flatten().ifEmpty { listOf(anchor, "0") }.joinToString(" ")
+                        output.add(" ${fields.first()} $coefficients")
                     }
                 }
                 "RHS", "RANGES" -> {
