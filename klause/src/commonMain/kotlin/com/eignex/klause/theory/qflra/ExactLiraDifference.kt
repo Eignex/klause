@@ -27,6 +27,7 @@ import com.eignex.klause.util.toLong
 internal class ExactLiraDifference(private val model: Problem, forms: List<List<ExactRowForm>>) {
     private val graph = DifferenceGraph(model.numIntVars + 1)
     private val guards = ArrayList<Int>()
+    private var checkedActive: BooleanArray? = null
     private val zero = model.numIntVars
     private val room = bigIntOf(Long.MAX_VALUE / (8L * (model.numIntVars.toLong() + 2L)))
 
@@ -56,9 +57,16 @@ internal class ExactLiraDifference(private val model: Problem, forms: List<List<
             val guard = guards[index]
             guard == ALWAYS || context.boolValue(Lit.variable(guard)) == Lit.isPositive(guard)
         }
-        val cycle = graph.negativeCycle(active) { stop() }
-        if (stop()) return ComponentResult.Indeterminate
-        if (cycle == null) return ComponentResult.Consistent
+        if (checkedActive?.contentEquals(active) == true) {
+            return if (stop()) ComponentResult.Indeterminate else ComponentResult.Consistent
+        }
+        var abandoned = false
+        val cycle = graph.negativeCycle(active) { stop().also { abandoned = abandoned || it } }
+        if (abandoned || stop()) return ComponentResult.Indeterminate
+        if (cycle == null) {
+            checkedActive = active
+            return ComponentResult.Consistent
+        }
         val premises = cycle.map { guards[it] }.filter { it != ALWAYS }.distinct().map {
             SearchAtomPremise.Asserted(SearchDecision.Bool(it))
         }
