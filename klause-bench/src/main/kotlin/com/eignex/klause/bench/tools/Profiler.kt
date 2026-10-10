@@ -64,7 +64,8 @@ internal object Profiler {
         val methods = event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" }
         val localState = methods.any { it.contains("LocalSearchState.<init>") }
         val initializing = methods.any {
-            it.contains("LocalSearchEngine.newMinimizeState") || it.contains("LocalSearchEngine.newSatisfyState")
+            it.contains("LocalSearchEngine.newMinimizeState") || it.contains("LocalSearchEngine.newSatisfyState") ||
+                it.contains("LocalSearchEngine.recomputeInitial")
         }
         val phase = when {
             methods.any { it.contains("LocalSearchProblem.<init>") } -> "local-search projection preparation"
