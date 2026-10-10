@@ -66,7 +66,10 @@ explicit settings. Root propagation, presolve and LP planning read the captured
 model settings. Search effort stays in the existing per-call backend parameters.
 
 `Problem.componentPlan()` selects an immutable ownership plan before search. It
-builds a compact remapped CP projection and theory fragments. Variables owned by
+builds a compact remapped CP projection and theory fragments. Plans belong to the
+actual source model object. Fresh rewrites need a new plan or the explicit
+objective-round adapter, which checks retained factor identity, bound narrowing
+and the appended row's unchanged columns and coefficients. Variables owned by
 an open theory never become finite CP domains. Continuous variables are LP columns
 and are not integer branch candidates.
 

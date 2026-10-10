@@ -616,6 +616,8 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
         final fun <get-autoEligible>(): kotlin/Boolean // com.eignex.klause.presolve/PresolvePass.autoEligible.<get-autoEligible>|<get-autoEligible>(){}[0]
     final val entries // com.eignex.klause.presolve/PresolvePass.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.presolve/PresolvePass> // com.eignex.klause.presolve/PresolvePass.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val guarantees // com.eignex.klause.presolve/PresolvePass.guarantees|{}guarantees[0]
+        final fun <get-guarantees>(): com.eignex.klause.presolve/TransformationGuarantees // com.eignex.klause.presolve/PresolvePass.guarantees.<get-guarantees>|<get-guarantees>(){}[0]
     final val id // com.eignex.klause.presolve/PresolvePass.id|{}id[0]
         final fun <get-id>(): kotlin/String // com.eignex.klause.presolve/PresolvePass.id.<get-id>|<get-id>(){}[0]
     final val preservesSolutionSet // com.eignex.klause.presolve/PresolvePass.preservesSolutionSet|{}preservesSolutionSet[0]
@@ -9695,6 +9697,37 @@ final class com.eignex.klause.presolve/Presolved { // com.eignex.klause.presolve
 }
 
 final class com.eignex.klause.presolve/SharedIntOccurrence // com.eignex.klause.presolve/SharedIntOccurrence|null[0]
+
+final class com.eignex.klause.presolve/TransformationGuarantees { // com.eignex.klause.presolve/TransformationGuarantees|null[0]
+    constructor <init>(kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean) // com.eignex.klause.presolve/TransformationGuarantees.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+
+    final val bijection // com.eignex.klause.presolve/TransformationGuarantees.bijection|{}bijection[0]
+        final fun <get-bijection>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.bijection.<get-bijection>|<get-bijection>(){}[0]
+    final val objective // com.eignex.klause.presolve/TransformationGuarantees.objective|{}objective[0]
+        final fun <get-objective>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.objective.<get-objective>|<get-objective>(){}[0]
+    final val projectedSolutions // com.eignex.klause.presolve/TransformationGuarantees.projectedSolutions|{}projectedSolutions[0]
+        final fun <get-projectedSolutions>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.projectedSolutions.<get-projectedSolutions>|<get-projectedSolutions>(){}[0]
+    final val reconstructability // com.eignex.klause.presolve/TransformationGuarantees.reconstructability|{}reconstructability[0]
+        final fun <get-reconstructability>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.reconstructability.<get-reconstructability>|<get-reconstructability>(){}[0]
+    final val satisfiability // com.eignex.klause.presolve/TransformationGuarantees.satisfiability|{}satisfiability[0]
+        final fun <get-satisfiability>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.satisfiability.<get-satisfiability>|<get-satisfiability>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component5|component5(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.presolve/TransformationGuarantees // com.eignex.klause.presolve/TransformationGuarantees.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.presolve/TransformationGuarantees.hashCode|hashCode(){}[0]
+    final fun then(com.eignex.klause.presolve/TransformationGuarantees): com.eignex.klause.presolve/TransformationGuarantees // com.eignex.klause.presolve/TransformationGuarantees.then|then(com.eignex.klause.presolve.TransformationGuarantees){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.presolve/TransformationGuarantees.toString|toString(){}[0]
+
+    final object Companion { // com.eignex.klause.presolve/TransformationGuarantees.Companion|null[0]
+        final val IDENTITY // com.eignex.klause.presolve/TransformationGuarantees.Companion.IDENTITY|{}IDENTITY[0]
+            final fun <get-IDENTITY>(): com.eignex.klause.presolve/TransformationGuarantees // com.eignex.klause.presolve/TransformationGuarantees.Companion.IDENTITY.<get-IDENTITY>|<get-IDENTITY>(){}[0]
+    }
+}
 
 final class com.eignex.klause.propagation/Assumptions { // com.eignex.klause.propagation/Assumptions|null[0]
     final val boolKeys // com.eignex.klause.propagation/Assumptions.boolKeys|{}boolKeys[0]

@@ -219,6 +219,7 @@ object Presolver {
         val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
             val reconstructs = ArrayList<(Sample) -> Sample>()
+            val rebuilds = ArrayList<SourceRebuilds>()
             var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
@@ -227,6 +228,7 @@ object Presolver {
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
                 delta.reconstruct?.let(reconstructs::add)
+                if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                 changed += changedUnitsOf(delta, current.rootIntDomainsInPlace)
                 current = current.withPassDelta(delta, ctx.bakeConfig)
                 return PassOutcome.CHANGED
@@ -241,12 +243,16 @@ object Presolver {
         val rounds = PresolveRoundEngine.run(
             passes, maxRounds, cancellation, ctx.presolveBudget, host, config.abortFraction,
         )
+        val mapping = SourceMapping(
+            problem, host.current, rounds.fired.transformationGuarantees(),
+            SourceRebuilds.compose(host.rebuilds), lift = composeReconstructs(host.reconstructs),
+        )
         return Presolved(
             host.current,
-            composeReconstructs(host.reconstructs),
+            { mapping.reconstructFrom(host.current, it) },
             rounds.fired,
             rounds.infeasible || host.current.baked is PropagationResult.Unsat,
-        )
+        ).also { it.mapping = mapping }
     }
 
     /**
@@ -284,6 +290,7 @@ object Presolver {
             var dupMark: PresolveSession.ChangeMark? = null
 
             val reconstructs = ArrayList<(Sample) -> Sample>()
+            val rebuilds = ArrayList<SourceRebuilds>()
             var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
@@ -295,6 +302,7 @@ object Presolver {
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
                 delta.reconstruct?.let(reconstructs::add)
+                if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                 changed += changedUnitsOf(delta, input.rootIntDomainsInPlace)
                 session.applyDelta(delta)
                 return PassOutcome.CHANGED
@@ -345,12 +353,17 @@ object Presolver {
         // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
         if (rounds.fired.isEmpty()) return Presolved(problem, { it }, emptyList())
 
+        val transformed = session.materialize()
+        val mapping = SourceMapping(
+            problem, transformed, rounds.fired.transformationGuarantees(),
+            SourceRebuilds.compose(host.rebuilds), lift = composeReconstructs(host.reconstructs),
+        )
         return Presolved(
-            session.materialize(),
-            composeReconstructs(host.reconstructs),
+            transformed,
+            { mapping.reconstructFrom(transformed, it) },
             rounds.fired,
             rounds.infeasible || session.infeasible,
-        )
+        ).also { it.mapping = mapping }
     }
 
     /** Compose per-pass reconstructs (application order) into the single solution-mapping function,

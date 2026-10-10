@@ -1,4 +1,41 @@
-# Presolve cancellation and accounting
+# Presolve transformations, cancellation and accounting
+
+## Guarantees and source mappings
+
+`PresolvePass.guarantees` separates equisatisfiability, objective preservation,
+witness reconstruction, bijection, and complete coverage by reconstructed source
+assignments. Objective preservation is conditional on the pass context protecting
+objective columns. A satisfiability reduction can retain an optimum while losing
+source multiplicity; its successful reconstruction does not establish a bijection.
+`preservesSolutionSet` retains the raw solution-set classification for compatibility.
+
+Affine elimination carries `AffineValue` records through both source and finite
+presolve. Records own their coefficient arrays and evaluate with exact integer
+arithmetic; residue division must be integral and finite results must fit `Long`.
+Reconstruction runs in reverse elimination order. `SourceMapping` binds a phase
+and its composed reconstruction to the actual source and reduced model objects.
+Composition requires the preceding target to be the following source. Equal
+variable counts and factor counts do not establish this association.
+
+Objective adjustments map reduced values into source units as `scale * value +
+offset`, with positive exact rational scale. Composition multiplies scales and
+transports the later offset through the earlier scale. Current reductions protect
+objective columns and use the identity adjustment; binary substitution only
+zero-extends Boolean weights. Independent source objective evaluation checks the
+composed adjustment against reconstructed witnesses. A mapping discards reduced-model
+witness certificates when its source differs
+from its target and never issues a proof certificate; source publication retains
+its complete checker.
+
+Sensitive queries require a bijection even when a pass is explicitly enabled.
+Affine elimination and other multiplicity-changing reductions remain disabled
+for enumeration, counting and sampling. Projected enumeration deduplicates the
+requested Boolean and integer coordinates while retaining terminal exhaustion,
+indeterminate checks and decision-budget interruption. Hash cells stop after
+`cap + 1` distinct projections, rather than full witnesses. An exhausted cell
+supports an exact count or uniform draw; an interrupted cell supplies only a
+lower bound and cannot support either. This implementation can still visit many
+full witnesses of one projection and retains the per-cell decision budget.
 
 ## Rebuild ownership
 

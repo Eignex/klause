@@ -84,12 +84,13 @@ internal object AffineSingletons {
             maxFactors,
             pivotOrder,
         ) ?: return PassDelta()
+        val rebuild = out.subs.asRebuilds()
         return PresolveShared.identityDelta(
             problem.factors,
             out.factors,
             domains,
-            out.subs.asRebuilds().asSampleLift(),
-        )
+            rebuild.asSampleLift(),
+        ).also { it.rebuild = rebuild }
     }
 
     /**

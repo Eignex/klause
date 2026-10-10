@@ -7,6 +7,7 @@ import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -166,5 +167,42 @@ class SourceRebuildTest {
         assertEquals(10L, ints[0])
         assertTrue(bools[0])
         assertTrue(rebuild.touchesInts)
+    }
+
+    @Test
+    fun `affine reconstruction retains exact cancellation beyond Long intermediates`() {
+        val rebuild = SourceRebuilds(
+            listOf(
+            RebuildStep.AffineValue(0, -Long.MAX_VALUE, intArrayOf(1), longArrayOf(2), 1),
+        )
+        )
+        val ints = longArrayOf(0, Long.MAX_VALUE)
+
+        rebuild.rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(Long.MAX_VALUE, ints[0])
+    }
+
+    @Test
+    fun `affine reconstruction rejects nonintegral reduced values`() {
+        val rebuild = SourceRebuilds(
+            listOf(
+            RebuildStep.AffineValue(0, 0, intArrayOf(1), longArrayOf(1), 2),
+        )
+        )
+
+        assertFailsWith<IllegalArgumentException> { rebuild.rebuildInto(BooleanArray(0), longArrayOf(0, 3)) }
+    }
+
+    @Test
+    fun `reconstruction records retain their own coefficient arrays`() {
+        val coefficients = longArrayOf(2)
+        val rebuild = SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), coefficients, 1)))
+        coefficients[0] = 9
+        val ints = longArrayOf(0, 3)
+
+        rebuild.rebuildInto(BooleanArray(0), ints)
+
+        assertEquals(7L, ints[0])
     }
 }
