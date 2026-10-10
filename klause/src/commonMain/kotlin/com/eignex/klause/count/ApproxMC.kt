@@ -50,9 +50,9 @@ internal object ApproxMC {
                 prevM = res.mStar
             }
         }
-        if (estimates.isEmpty()) {
-            // No usable cell in any run (e.g. every run hit the per-cell decision budget). Surface
-            // "unknown" rather than fabricate base.count (≈thresh) as a point estimate.
+        if (estimates.size < t) {
+            // Dropping interrupted iterations changes both the sample size and its distribution, so
+            // the requested confidence does not follow from the surviving cells.
             val lo = base.count.toLong()
             return Count(estimate = lo, lower = lo, upper = Long.MAX_VALUE, exact = false, confidence = 0.0)
         }
