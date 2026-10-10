@@ -71,6 +71,7 @@ interface ResumableSearch : AutoCloseable {
      * A paused slice still did the work it did, so a caller reporting a run its deadline cut short reads
      * them here — the terminal verdict it would otherwise take them from is exactly what such a run never
      * produces. Cumulative for this handle, so a caller folds each handle once rather than per slice.
+     * Remains readable after [close], including any counters finalized while closing.
      */
     val stats: SolveStats
 
@@ -115,7 +116,8 @@ interface ResumableSolve : AutoCloseable {
     /** True once [runSlice] has returned a verdict. */
     val isDone: Boolean
 
-    /** Counters accumulated so far, whether or not the search has finished; cumulative for this handle. */
+    /** Counters accumulated so far, whether or not the search has finished; cumulative for this handle.
+     *  Remains readable after [close], including any counters finalized while closing. */
     val stats: SolveStats
 
     /** Work spent so far, in the units [runSlice]'s `sliceNodes` budgets; cumulative for this handle. */
