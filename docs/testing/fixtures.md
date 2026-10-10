@@ -61,6 +61,15 @@ These fixtures are explicit experiments rather than CI smoke selection.
 
 ## Measurement storage
 
+The MPS source-verifier regressions in
+[`test_verify_source_results.py`](../../klause-bench/tools/test_verify_source_results.py)
+include a two-row projection of MIPLIB 3 `egout`: flow rows `031` and `033`, their
+original cost coefficients and fixed source decimals. Rounded coordinates exercise
+the source tolerance contract; the fixture retains no generated solve records.
+The complete source is fetched by the catalog/verifier from the
+[MIPLIB 3 archive](https://miplib2010.zib.de/miplib3/miplib3.tar.gz), with model hash
+`351ed046eb56e07662b3c2dba35800f5d2cee3fac18c1bd7fbc8dea4a0dcd8db`.
+
 Keep generated outputs and historical campaign bundles outside the repository.
 `klause-bench` contains the active harness, current corpus fixtures, named sets
 and reusable tools. Installed CLI solve records remain local under the ignored

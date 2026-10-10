@@ -172,6 +172,24 @@ metrics do not mean zero cost.
 
 ## Source validation
 
+[`verify_source_results.py`](../klause-bench/tools/verify_source_results.py) checks
+captured MPS and SMT-LIB lab records against hash-verified original sources using
+exact arithmetic. Default MPS witnesses report `toleranceAccepted` separately from
+exact source feasibility. Row activities, ranged sides and column bounds use the
+[source tolerance contract](formats.md#mps); integer coordinates remain integral.
+Missing, duplicate, unknown and nonfinite coordinates fail checking. Row arithmetic
+does not overflow binary64 because coefficients and printed values retain their
+original rational values.
+
+MPS objectives use source coefficients, sense and RHS offsets. Default float
+objectives can describe either the printed decimal point or the binary64 coordinates
+encoded by its shortest decimals. `exactObjective` must match one exactly; legacy
+numeric objectives allow only binary64 rounding. Exact-mode witnesses and objectives
+require exact equality. Tolerance acceptance supplies no optimum or infeasibility
+proof: those checks use the original unrelaxed constraints and exact objective.
+Run the verifier's regression tests with the pinned dependencies in
+[`requirements-source-checks.txt`](../klause-bench/tools/requirements-source-checks.txt).
+
 MiniZinc float runs pin the final DZN candidate into the original source and
 recompile with MiniZinc's standard library and the same data seed. `sourceValidation`
 is `valid`, `invalid` or `unknown`; `floatApproximation` records the lowering policy.
