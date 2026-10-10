@@ -1384,8 +1384,6 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 	public fun <init> ([IJI[I[JZ)V
 	public synthetic fun <init> ([IJI[I[JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun canSubstituteAffine (IIII)Z
-	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
-	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun getBoolVars ()[I
 	public final fun getBoundsConsistent ()Z
 	public final fun getDomainMin ()J
@@ -1398,7 +1396,6 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getVars ()[I
 	public fun isValueAnonymous ()Z
-	public fun present (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
 	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
 	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
@@ -1411,8 +1408,6 @@ public final class com/eignex/klause/factor/global/GlobalCardinality : com/eigne
 	public fun <init> ([I[J[I[I[IZ[I)V
 	public synthetic fun <init> ([I[J[I[I[IZ[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun canSubstituteAffine (IIII)Z
-	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
-	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun getBoolVars ()[I
 	public final fun getClosed ()Z
 	public final fun getCountHigh ()[I
@@ -1426,7 +1421,6 @@ public final class com/eignex/klause/factor/global/GlobalCardinality : com/eigne
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
 	public fun isValueAnonymous ()Z
-	public fun present (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
 	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
 	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
@@ -1500,8 +1494,6 @@ public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/fa
 	public fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[I)V
 	public synthetic fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun canSubstituteAffine (IIII)Z
-	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
-	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun getBoolVars ()[I
 	public fun getIntVars ()[I
 	public fun getLinearForm ()Lcom/eignex/klause/ir/LinearForm;
@@ -1512,7 +1504,6 @@ public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/fa
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
 	public fun isValueAnonymous ()Z
-	public fun present (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
 	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
 	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
@@ -1594,8 +1585,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public fun <init> ([I[J[JJ[I[I[II)V
 	public synthetic fun <init> ([I[J[JJ[I[I[IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun canSubstituteAffine (IIII)Z
-	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
-	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public final fun durPosOf (I)I
 	public fun getBoolVars ()[I
 	public final fun getCapacity ()J
@@ -1613,7 +1602,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public final fun getUnary ()Z
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public fun isValueAnonymous ()Z
-	public fun present (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
 	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
 	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;

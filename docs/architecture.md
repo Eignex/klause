@@ -77,7 +77,9 @@ checks, heuristic scores and sound relaxation families. Engines own their projec
 factories and check the declared CP and local-search roles when allocating them.
 Capability declarations do not certify a result or select a source theory.
 
-Optional-factor data stores presence literals without reading engine state.
+Optional-factor data stores presence literals without reading engine state. The
+built-in JVM facades expose those literals without the mixin's state-reading presence
+helpers; presence evaluation belongs to the engine projections.
 Propagation projections interpret pinned literals conservatively; local-search
 projections read complete assignments. Table group no-op caches and MDD transition
 indexes belong to a propagation projection, keyed by shared immutable relation
