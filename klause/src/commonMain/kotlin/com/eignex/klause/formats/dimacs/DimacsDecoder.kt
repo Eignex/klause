@@ -35,23 +35,43 @@ fun CnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.probl
 
 /** Lower this parsed WCNF document to hard clauses and a weighted soft-clause objective. */
 fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): WcnfProblem {
-    val totalVars = numOriginalBoolVars + softClauses.size + if (triviallyUnsat) 1 else 0
-    val factors = ArrayList<Factor>(hardClauses.size + softClauses.size + if (triviallyUnsat) 2 else 0)
-    factors.addAll(hardClauses.map(::Clause))
-    val weights = LongArray(totalVars)
+    val unitCosts = LongArray(numOriginalBoolVars)
+    val direct = BooleanArray(softClauses.size)
+    var constant = fixedCost
     for ((index, soft) in softClauses.withIndex()) {
-        val relax = numOriginalBoolVars + index
+        if (soft.literals.size != 1) continue
+        val literal = soft.literals[0]
+        val variable = Lit.variable(literal)
+        val weight = soft.weight
+        if (Lit.isPositive(literal)) {
+            if (constant > Long.MAX_VALUE - weight || unitCosts[variable] < Long.MIN_VALUE + weight) continue
+            constant += weight
+            unitCosts[variable] -= weight
+        } else {
+            if (unitCosts[variable] > Long.MAX_VALUE - weight) continue
+            unitCosts[variable] += weight
+        }
+        direct[index] = true
+    }
+    val relaxedClauses = direct.count { !it }
+    val totalVars = numOriginalBoolVars + relaxedClauses + if (triviallyUnsat) 1 else 0
+    val factors = ArrayList<Factor>(hardClauses.size + relaxedClauses + if (triviallyUnsat) 2 else 0)
+    factors.addAll(hardClauses.map(::Clause))
+    val weights = unitCosts.copyOf(totalVars)
+    var relax = numOriginalBoolVars
+    for ((index, soft) in softClauses.withIndex()) {
+        if (direct[index]) continue
         factors.add(Clause(intArrayOf(Lit.make(relax, positive = true)) + soft.literals))
-        weights[relax] = soft.weight
+        weights[relax++] = soft.weight
     }
     if (triviallyUnsat) {
-        val marker = numOriginalBoolVars + softClauses.size
+        val marker = numOriginalBoolVars + relaxedClauses
         factors.add(Clause(intArrayOf(Lit.make(marker, positive = true))))
         factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
     }
     return WcnfProblem(
         Problem(totalVars, 0, emptyArray(), factors.toTypedArray(), settings = settings),
-        LinearObjectiveSpec(boolWeights = weights, constant = fixedCost),
+        LinearObjectiveSpec(boolWeights = weights, constant = constant),
         numOriginalBoolVars,
     )
 }
