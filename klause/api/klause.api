@@ -3687,10 +3687,16 @@ public final class com/eignex/klause/localsearch/LocalSearchProblem {
 public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex/klause/solver/StatelessSession {
 	public fun <init> (Lcom/eignex/klause/localsearch/LocalSearchSolver;)V
 	public fun close ()V
+	public fun enumerate (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
+	public synthetic fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public synthetic fun enumerateScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun getSolver ()Lcom/eignex/klause/localsearch/LocalSearchSolver;
 	public synthetic fun getSolver ()Lcom/eignex/klause/solver/Solver;
+	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
+	public synthetic fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public synthetic fun improvementsScoped$com_eignex_klause (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
+	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public synthetic fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public synthetic fun minimizeScoped$com_eignex_klause (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public synthetic fun openEnumerateScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
 	public synthetic fun openImprovementsScoped$com_eignex_klause (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SearchStream;
@@ -3703,7 +3709,15 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 	public fun resumableSolve (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/ResumableSolve;
 	public synthetic fun resumableSolve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSolve;
 	public synthetic fun resumableSolveScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/ResumableSolve;
+	public fun sample (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/result/SampleResult;
+	public synthetic fun sample (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
+	public fun samples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
+	public synthetic fun samples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
+	public fun samples (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
+	public synthetic fun samples (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public synthetic fun samplesScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
+	public fun solve (Lcom/eignex/klause/localsearch/LocalSearchParams;)Lcom/eignex/klause/solver/SolveResult;
+	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 	public synthetic fun solveScoped$com_eignex_klause (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
