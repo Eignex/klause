@@ -78,7 +78,9 @@ their arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
 fresh definitions are omitted after following these dependencies to a fixpoint;
 source declarations and arithmetic leaves remain authoritative, including open
-defaults and sparse decision-list selectors.
+defaults and sparse decision-list selectors. Fresh reified predicates belonging
+only to omitted definitions are fixed false, so shared search does not branch
+on their unconstrained values.
 
 Optimization emits `; objective=<value>` for each incumbent in the source objective's
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
