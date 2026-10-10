@@ -18,6 +18,11 @@ private const val SPAN_PER_ARM = 8L
 /** A reified `variable = value` atom, recorded so a chain condition can be read back off its literal. */
 internal class EqAtom(val variable: Int, val value: Long, val allowsElement: Boolean)
 
+internal class GuardEquality(val variable: Int, val value: Long, val equal: Boolean) {
+    fun truthWhen(variable: Int?, value: Long): Boolean? =
+        if (this.variable == variable) (this.value == value) == equal else null
+}
+
 /**
  * One `ite`-on-equality chain being accumulated, defining `result` as
  * `if selector = keys(0) then arms(0) elif … else default`.
@@ -88,6 +93,12 @@ internal class IteChainTable {
 
     fun atomOf(lit: Int): EqAtom? = atoms[lit]
 
+    fun guardEquality(lit: Int): GuardEquality? {
+        atoms[lit]?.let { return GuardEquality(it.variable, it.value, equal = true) }
+        atoms[Lit.negate(lit)]?.let { return GuardEquality(it.variable, it.value, equal = false) }
+        return null
+    }
+
     fun open(chain: IteChain) {
         chains[chain.result] = chain
     }
@@ -154,6 +165,7 @@ private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
     if (!collapseToElement(chain)) lowerAsDecisionList(chain)
     conditionalEqualities.define(
         chain.result, chain.conds, chain.arms, chain.default, factors.subList(start, factors.size),
+        chain.conds.map(iteChains::guardEquality),
     )
 }
 

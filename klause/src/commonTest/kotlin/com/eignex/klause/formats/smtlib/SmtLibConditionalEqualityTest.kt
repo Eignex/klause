@@ -22,6 +22,115 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `a conditional cannot take a conflicting selector value without arithmetic checks`() {
+        for (comparison in listOf("(= (ite (= s 0) s 2) 1)", "(= (ite (= s 0) 2 s) 0)")) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const s Int)
+                (assert (>= s 0)) (assert (<= s 2))
+                (assert $comparison)
+                """.trimIndent(),
+            )
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            assertIs<ComponentResult.Conflict>(session.initialize(), comparison)
+        }
+    }
+
+    @Test
+    fun `a conditional retains its guard meaning after another selector shares the literal`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool)
+            (assert (let ((first (ite b 0 1)))
+                (let ((updated (ite (= first 0) first 2)))
+                    (let ((other (ite b 5 7)))
+                        (and (or (= other 5) (= other 7)) (= updated 1))))))
+            """.trimIndent(),
+        )
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        assertIs<ComponentResult.Conflict>(session.initialize())
+    }
+
+    @Test
+    fun `a conditional default remains available at a different selector value`() {
+        for (value in 0..2) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const s Int) (declare-const result Bool)
+                (assert (>= s 0)) (assert (<= s 2)) (assert (= s $value))
+                (assert (= result (= (ite (= s 0) 2 s) 1)))
+                """.trimIndent(),
+            )
+            ExactLiraSearchComponent(parsed.model).use { component ->
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                assertEquals(value == 1, assignment.bools[parsed.boolVarNames.getValue("result")])
+            }
+        }
+    }
+
+    @Test
+    fun `a conditional can compare a branch from a different selector`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const s Int) (declare-const t Int)
+            (assert (= s 0)) (assert (= t 1))
+            (assert (= (ite (= s 0) t 2) 1))
+            """.trimIndent(),
+        )
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(bigIntOf(1), assignment.ints[parsed.intVarNames.getValue("t")])
+        }
+    }
+
+    @Test
+    fun `an equality key beyond a signed word cannot exclude a feasible conditional branch`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Int)
+            (assert (= x -9223372036854775808))
+            (assert (= (ite (not (= (- x) -9223372036854775808)) x 0) -9223372036854775808))
+            """.trimIndent(),
+        )
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(bigIntOf(Long.MIN_VALUE), assignment.ints[parsed.intVarNames.getValue("x")])
+        }
+    }
+
+    @Test
     fun `a mixed real constraint retains its conditional value after unused definitions are omitted`() {
         val parsed = SmtLib.parse(
             """

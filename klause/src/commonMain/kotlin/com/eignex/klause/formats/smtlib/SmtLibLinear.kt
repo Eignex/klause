@@ -127,6 +127,7 @@ private fun Compiler.Builder.noteEqAtom(lit: Int, op: LinearOp, coeffs: LongArra
     if (op != LinearOp.EQ || vars.size != 1) return
     val c = coeffs[0]
     if (c != 1L && c != -1L) return
+    if (c == -1L && bound == Long.MIN_VALUE) return
     if (intDomains[vars[0]] !is PresolveDomain.Finite) return
     iteChains.noteAtom(lit, vars[0], bound * c)
 }

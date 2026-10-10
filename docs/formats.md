@@ -76,6 +76,10 @@ results are shared within one parse; nested definitions are traversed iterativel
 Constant branch images of at most 1,024 distinct values can reject a comparison
 before visiting its definition tree; unknown or larger images retain exact fallback.
 An integer conditional with a constant guard returns its selected branch directly.
+Conditional definitions retain immutable equality meanings for their guards.
+When a branch compares a simple integer variable with a constant, these meanings
+can exclude conflicting selector tests and omit guard tests implied by that comparison.
+Equality keys whose sign reversal exceeds a signed word retain their arithmetic encoding.
 A parse limits this expansion to 65,536 visits, after which comparisons retain
 their arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
