@@ -468,6 +468,7 @@ class InvariantNetwork internal constructor(
     private val nodeArr: Array<DefinitionalSweep.SweepNode> = nodes.toTypedArray()
     private val definedInt = BooleanArray(numIntVars)
     private val definedBool = BooleanArray(numBoolVars)
+    private val linearDefinitions = MutableIntObjectMap<FunctionalObjective.Lin>()
 
     /** Node indexes reading each int var. */
     private val intReaders: Array<IntArray>
@@ -479,6 +480,8 @@ class InvariantNetwork internal constructor(
         for (i in nodeArr.indices) {
             val n = nodeArr[i]
             if (n.outIsBool) definedBool[n.out] = true else definedInt[n.out] = true
+            val linear = (n as? DefinitionalSweep.SweepNode.IntDef)?.node as? FunctionalObjective.Lin
+            if (linear != null) linearDefinitions.put(n.out, linear)
         }
         intReaders = readers(numIntVars) { it.intInputs }
         boolReaders = readers(numBoolVars) { it.boolInputs }
@@ -505,6 +508,8 @@ class InvariantNetwork internal constructor(
     internal fun readsInt(v: Int): Boolean = intReaders[v].isNotEmpty()
 
     internal fun readsBool(v: Int): Boolean = boolReaders[v].isNotEmpty()
+
+    internal fun linearDefinition(v: Int): FunctionalObjective.Lin? = linearDefinitions[v]
 
     /** The node at [index] (indexes ascend in topological order). */
     fun node(index: Int): DefinitionalSweep.SweepNode = nodeArr[index]

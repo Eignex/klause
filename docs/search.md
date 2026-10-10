@@ -196,6 +196,13 @@ ALNS skips its local-search fallback when the complete-engine bootstrap returns
 without an incumbent after cancellation, avoiding fresh seeding after the deadline.
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
+Element index repairs backsolve affine definitions with one or two distinct integer
+inputs and a unit output coefficient. Single-coordinate repairs precede joint moves;
+joint repair enumerates at most 64 present members of one input domain. Input domains,
+pins and implicit owners filter the complete move before publication. Equality indicators
+join coordinate moves, while arithmetic counter-shifts cannot overwrite the requested
+coordinates. Unsupported definitions, overflow and nonintegral inverses decline the
+candidate; an unreachable matching cell does not stop the remaining element scan.
 Boolean break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Moves feeding definitions score the complete propagated assignment, including derived

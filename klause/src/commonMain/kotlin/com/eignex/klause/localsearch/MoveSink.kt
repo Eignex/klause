@@ -201,6 +201,15 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         }
     }
 
+    internal fun addElementIndexSet(state: LocalSearchState, varId: Int, newValue: Long): Boolean {
+        if (assumptions.isFrozenInt(varId)) return false
+        val linear = invariants?.linearDefinition(varId)
+        if (linear != null) return AffineIndexRepair(state, this, linear).propose(newValue)
+        val before = size
+        addChannelingIntSet(state, varId, newValue)
+        return size > before
+    }
+
     private fun materialize(): List<Move> {
         val compoundsRef = compounds
         val total = lane.size + (compoundsRef?.size ?: 0)
