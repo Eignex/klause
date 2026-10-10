@@ -15,6 +15,37 @@ import kotlin.test.assertTrue
 class MpsCompiledTest {
 
     @Test
+    fun `a free continuous integer definition preserves source values and objective`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -3\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1\nRHS\n RHS DEF 2\n" +
+                "BOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(longArrayOf(1L, 5L), null)
+
+        assertEquals(0, compiled.model.numRealVars)
+        assertEquals(2L, compiled.model.intBounds.lower(1))
+        assertEquals(5L, compiled.model.intBounds.upper(1))
+        assertTrue(compiled.sourceExact)
+        assertEquals("5", witness.objective.toString())
+        assertEquals(listOf("1", "5"), witness.values.map { it.toString() })
+    }
+
+    @Test
+    fun `a fractional continuous definition retains its continuous values`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -1\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 2\nBOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(2L).reciprocal()))
+
+        assertEquals(1, compiled.model.numRealVars)
+        assertEquals("1/2", witness.objective.toString())
+    }
+
+    @Test
     fun `source check rejects a marker integer above its implicit binary bound`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 1\n" +
