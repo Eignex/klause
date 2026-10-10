@@ -10,6 +10,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.model.PbOp
 
 internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
@@ -35,6 +36,7 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
  *  ([reifyLit] is a bool literal; its variable channels the relation's truth). The single lowering
  *  point every `*_lin_*` / linear-compare emitter funnels through, hard or `_reif`. */
 internal fun FlatZincCompiler.postLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long, reifyLit: Int?) {
+    if (postBooleanZeroSum(coeffs, vars, op, bound, reifyLit)) return
     factors.add(
         if (reifyLit != null) {
             ReifiedLinear(Lit.variable(reifyLit), coeffs, vars, op, bound)
@@ -42,6 +44,40 @@ internal fun FlatZincCompiler.postLinear(coeffs: LongArray, vars: IntArray, op: 
             Linear(coeffs, vars, op, bound)
         },
     )
+}
+
+private fun FlatZincCompiler.postBooleanZeroSum(
+    coeffs: LongArray,
+    vars: IntArray,
+    op: LinearOp,
+    bound: Long,
+    reifyLit: Int?,
+): Boolean {
+    if (coeffs.size != vars.size || bound != 0L || (op != LinearOp.LE && op != LinearOp.EQ) ||
+        coeffs.any { it < 0L }
+    ) return false
+    val zeroLiterals = ArrayList<Int>()
+    for (i in vars.indices) {
+        if (coeffs[i] == 0L) continue
+        val channel = booleanIntegerChannels[vars[i]] ?: return false
+        zeroLiterals.add(Lit.negate(channel))
+    }
+    if (reifyLit != null) {
+        tseitinAnd(zeroLiterals.distinct(), reifyLit)
+    } else {
+        for (literal in zeroLiterals.distinct()) factors.add(Clause(intArrayOf(literal)))
+    }
+    return true
+}
+
+internal fun FlatZincCompiler.collectBooleanIntegerChannels() {
+    // FlatZinc emits channels after the rows that use them; declaration order cannot select the lowering.
+    for (constraint in model.constraints) {
+        if (constraint.name != "bool2int") continue
+        locateConstraint(constraint)
+        expectArity(constraint, 2)
+        booleanIntegerChannels[resolveIntVar(constraint.args[1])] = resolveBoolLit(constraint.args[0])
+    }
 }
 
 internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) {

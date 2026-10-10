@@ -22,6 +22,15 @@ routing proof for MPS, SMT-LIB and exact FlatZinc, allowing a supported source t
 be measured through its open route. Unsupported syntax or a declined exact
 operation remains undecided.
 
+## FlatZinc Boolean channels
+
+FlatZinc retains `bool2int` channels and recognizes them independently of constraint
+order. Nonnegative weighted sums of channelled integers constrained to zero
+(`<= 0` or `= 0`) lower to Boolean conjunctions over the complemented input
+literals. Reified sums use the shared clause encoder; unreified sums pin those
+literals. Zero coefficients contribute no requirement. Other bounds and signed
+sums retain arithmetic propagation.
+
 ## FlatZinc floats
 
 FlatZinc first preserves finite float choices from constant-array selection and

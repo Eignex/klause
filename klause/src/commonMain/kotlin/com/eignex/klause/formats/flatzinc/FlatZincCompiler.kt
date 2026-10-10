@@ -56,6 +56,7 @@ internal class FlatZincCompiler(
     internal val params = HashMap<String, ParamValue>()
     internal val boolVars = HashMap<String, Int>()
     internal val intVars = HashMap<String, Int>()
+    internal val booleanIntegerChannels = HashMap<Int, Int>()
     internal val floatVars = HashMap<String, FloatBucketing>()
     internal val arrays = HashMap<String, FlatZincArray>()
     internal val intDomains = ArrayList<IntDomain>()
@@ -111,6 +112,7 @@ internal class FlatZincCompiler(
     }
 
     private fun compileConstraints(onLowered: ((FlatZincCompiler, SolveDirective) -> Unit)?): FlatZincProgram {
+        collectBooleanIntegerChannels()
         val impliedFactorIds = IntArrayList()
         var hasSymmetryBreaking = false
         for (c in model.constraints) {
