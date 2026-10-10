@@ -3,8 +3,9 @@
 ## Validation
 
 Opening or pushing a PR does not require a local `./gradlew check lintDocs` gate.
-GitHub CI supplies the full gate. Targeted local tests are optional; record skipped
-or interrupted validation accurately and check CI before describing a PR as green.
+Local gates and targeted tests are allowed. During long sessions, rely primarily on
+existing GitHub workflows for the full gate. Record skipped or interrupted local
+validation accurately and check CI before describing a PR as green.
 Fix failures through follow-up commits.
 
 When running the full gate locally:
@@ -78,8 +79,9 @@ design decisions, never lab archives.
 Keep `.github` limited to the build/release workflows and issue/PR templates. Do
 not add campaign, lab or benchmark-evidence workflows, dispatch inputs, jobs or
 artifact uploads to existing workflows, or companion guides for campaign CI
-dispatch. Run measurement checking outside the repository's GitHub workflows.
-Reusable local analysis tools and regression fixtures belong in `klause-bench`.
+dispatch. Existing GitHub workflows may run measurement checks; this restriction
+concerns adding campaign files or workflow configuration. Use `klause-lab` for AWS
+runs. Reusable analysis tools and regression fixtures belong in `klause-bench`.
 
 Consolidate conclusions that establish architecture or invariants into the relevant
 `docs/` page. Use `docs/evidence/` only for small, durable evidence supporting a

@@ -5,7 +5,8 @@ Kotlin Multiplatform constraint solver.
 ## PR validation
 
 Opening and pushing a PR does not require a local `./gradlew check lintDocs` gate.
-Use GitHub CI for the full gate; targeted local tests during development are optional.
+Local gates and targeted tests are allowed. During long sessions, rely primarily on
+existing GitHub workflows for the full gate.
 Record skipped or interrupted local validation accurately in the PR. Check CI before
 reporting the PR as green, and fix failures through follow-up commits.
 
@@ -84,8 +85,9 @@ Read `docs/benchmarking.md` before benchmarking. In short:
   contain short Markdown summaries supporting current design decisions, never lab archives.
 - Keep `.github` limited to the build/release workflows and issue/PR templates. Do not add campaign,
   lab or benchmark-evidence workflows, dispatch inputs, jobs or artifact uploads to existing workflows.
-  Run measurement checking outside the repository's GitHub workflows; do not add companion guides for
-  campaign CI dispatch. Reusable local analysis tools and regression fixtures belong in `klause-bench`.
+  Existing GitHub workflows may run measurement checks; this restriction concerns adding campaign
+  files or workflow configuration. Use `klause-lab` for AWS runs. Do not add companion guides for
+  campaign CI dispatch. Reusable analysis tools and regression fixtures belong in `klause-bench`.
 - Store temporary campaign notes, scripts, manifests, raw results and reports in
   `klause-evidence/campaigns/<name>/`, alongside the primary checkout and outside this repository.
   All worktrees share that evidence directory; do not create separate archives beside each worktree.
