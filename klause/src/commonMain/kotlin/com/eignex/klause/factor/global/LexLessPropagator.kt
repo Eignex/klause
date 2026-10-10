@@ -78,7 +78,9 @@ internal class LexLessPropagator(
                 if (dx.min == dx.max && dy.min == dy.max && dx.min == dy.min) a++ else break
             }
             if (a == len) {
-                if (!tailAllowsEquality) state.propagatorFailures[this] = reasonVars(len - 1, len - 1, strictHere = false)
+                if (!tailAllowsEquality) {
+                    state.propagatorFailures[this] = reasonVars(len - 1, len - 1, strictHere = false)
+                }
                 return tailAllowsEquality
             }
 

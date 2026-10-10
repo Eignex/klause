@@ -43,8 +43,6 @@ internal class InversePropagator(
 
     override val consumesIntEventDelta: Boolean = true
 
-    // The Hall violators of a failed matching on either side, read by [conflictReason] before the engine backtracks.
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         state.propagatorFailures[this]?.let { hallReason(state, it, EmptyIntArray) }
             ?: collectHoleAndBoundAntecedents(

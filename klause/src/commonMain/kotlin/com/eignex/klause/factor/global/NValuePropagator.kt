@@ -37,7 +37,11 @@ internal class NValuePropagator(
     override val consumesIntEventDelta: Boolean get() = consumesIntEventDeltaVal
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        state.propagatorFailures[this] ?: OptPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, intVars))
+        state.propagatorFailures[this] ?: OptPresence.withPresencePremises(
+            presents,
+            state,
+            collectHoleAndBoundAntecedents(state, intVars),
+        )
 
     private class Lits {
         private val seen = IntHashSet()

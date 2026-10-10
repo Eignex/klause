@@ -44,7 +44,8 @@ internal class IncreasingPropagator(private val xs: IntArray, private val gap: I
             return if (lit == Lit.NONE) IntArray(0) else intArrayOf(lit)
         }
         fun fail(ant: IntArray?, v: Int): Boolean {
-            state.propagatorFailures[this] = (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
+            state.propagatorFailures[this] =
+                (ant ?: IntArray(0)) + (collectHoleAndBoundAntecedents(state, intArrayOf(v)) ?: IntArray(0))
             return false
         }
         // Forward: xs(i).min ≥ xs(i−1).min + gap. Each tighten feeds the next iteration, so the

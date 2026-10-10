@@ -97,14 +97,27 @@ class PropagationProblemTest {
             Triple(Increasing(intArrayOf(0, 1, 2), strict = true), listOf(0 to 2L, 1 to 1L), listOf(1 to 2L, 2 to 1L)),
             Triple(SymmetricAllDifferent(intArrayOf(0, 1, 2)), listOf(0 to 1L, 1 to 1L), listOf(1 to 2L, 2 to 2L)),
             Triple(ValuePrecede(1, 2, intArrayOf(0, 1, 2)), listOf(0 to 2L), listOf(0 to 3L, 1 to 2L)),
-            Triple(NValue(3, intArrayOf(0, 1, 2)), listOf(0 to 0L, 1 to 1L, 3 to 1L), listOf(1 to 1L, 2 to 2L, 3 to 1L)),
             Triple(
-                GlobalCardinality(intArrayOf(0, 1, 2), longArrayOf(1), countLow = intArrayOf(0), countHigh = intArrayOf(1)),
+                NValue(3, intArrayOf(0, 1, 2)),
+                listOf(0 to 0L, 1 to 1L, 3 to 1L),
+                listOf(1 to 1L, 2 to 2L, 3 to 1L),
+            ),
+            Triple(
+                GlobalCardinality(
+                    intArrayOf(0, 1, 2),
+                    longArrayOf(1),
+                    countLow = intArrayOf(0),
+                    countHigh = intArrayOf(1),
+                ),
                 listOf(0 to 1L, 1 to 1L),
                 listOf(1 to 1L, 2 to 1L),
             ),
             Triple(Circuit(intArrayOf(0, 1, 2, 3)), listOf(0 to 2L, 1 to 2L), listOf(2 to 1L, 3 to 1L)),
-            Triple(Circuit(intArrayOf(0, 1, 2, 3), subcircuit = true), listOf(0 to 2L, 1 to 2L), listOf(2 to 1L, 3 to 1L)),
+            Triple(
+                Circuit(intArrayOf(0, 1, 2, 3), subcircuit = true),
+                listOf(0 to 2L, 1 to 2L),
+                listOf(2 to 1L, 3 to 1L),
+            ),
             Triple(ArrayMinMax(3, intArrayOf(0, 1, 2), max = true), listOf(0 to 3L, 3 to 2L), listOf(2 to 3L, 3 to 2L)),
             Triple(
                 Element(0, 1, longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
