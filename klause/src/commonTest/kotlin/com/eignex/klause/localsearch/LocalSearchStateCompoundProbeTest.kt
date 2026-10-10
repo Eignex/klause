@@ -94,7 +94,7 @@ class LocalSearchStateCompoundProbeTest {
             intDomains = Array(3) { IntDomain(0, 2) },
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0)),
         )
-        val state = LocalSearchState(problem.bake(), Random(7))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
         state.invariants = InvariantNetwork(
             listOf(DefinitionalSweep.SweepNode.ElementDef(1, 0, null, longArrayOf(2), 0)),
             3,
@@ -130,7 +130,7 @@ class LocalSearchStateCompoundProbeTest {
             intDomains = Array(3) { IntDomain(0, 2) },
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 0)),
         )
-        val state = LocalSearchState(problem.bake(), Random(7))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
         state.invariants = InvariantNetwork(
             listOf(DefinitionalSweep.SweepNode.ElementDef(2, 0, intArrayOf(1), null, 0)),
             3,
