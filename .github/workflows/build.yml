@@ -5,6 +5,15 @@ on:
     branches: [ main ]
   pull_request:
   workflow_dispatch:
+    inputs:
+      payload:
+        description: Externally staged evidence bundle
+        required: false
+        type: string
+      mode:
+        description: Evidence mode
+        default: controls
+        type: string
 
 # A newer push supersedes any in-flight run for the same ref.
 concurrency:
@@ -12,7 +21,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  external-evidence:
+    if: github.event_name == 'workflow_dispatch' && inputs.payload != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Unpack evidence
+        env:
+          PAYLOAD: ${{ inputs.payload }}
+        run: |
+          python3 - <<'PY'
+          import base64, io, os, pathlib, tarfile
+          root = pathlib.Path('campaign')
+          root.mkdir()
+          with tarfile.open(fileobj=io.BytesIO(base64.b64decode(os.environ['PAYLOAD'])), mode='r:xz') as source:
+              source.extractall(root, filter='data')
+          PY
+      - name: Check records and provenance
+        env:
+          MODE: ${{ inputs.mode }}
+        run: python3 campaign/analyze.py campaign campaign/experiment.json campaign/result "$MODE"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: external-campaign-evidence
+          path: campaign/
+          retention-days: 90
   test:
+    if: github.event_name != 'workflow_dispatch' || inputs.payload == ''
     name: Run JVM tests and collect coverage
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -71,6 +109,7 @@ jobs:
           fail_ci_if_error: false
 
   native-test:
+    if: github.event_name != 'workflow_dispatch' || inputs.payload == ''
     name: Run Linux native tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -118,6 +157,7 @@ jobs:
   # so it runs as its own job — still a required check, but in parallel with `test` rather
   # than serially in front of it.
   lint:
+    if: github.event_name != 'workflow_dispatch' || inputs.payload == ''
     name: Lint and validate docs
     runs-on: ubuntu-latest
     timeout-minutes: 45
