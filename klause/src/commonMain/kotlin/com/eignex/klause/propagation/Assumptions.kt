@@ -12,8 +12,8 @@ import com.eignex.klause.util.binarySearchInt
 /**
  * Per-call constraint on the solver: pin specific variables to specific values for the
  * duration of the call. Compatible with all the entry points on [Solver] and
- * [com.eignex.klause.solver.Optimizer]; backends that can't enforce assumptions (e.g. pure model-counting paths)
- * will document the limitation.
+ * [com.eignex.klause.solver.Optimizer]; operations that cannot enforce non-empty assumptions
+ * reject them explicitly. Session counting uses an isolated conditioned model.
  *
  * Implementations are expected to:
  *  - initialise (or re-initialise on restart) the assignment with the assumed values,

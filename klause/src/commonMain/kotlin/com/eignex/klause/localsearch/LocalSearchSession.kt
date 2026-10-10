@@ -1,88 +1,59 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.Session
+import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 
 /**
- * Stateful wrapper around a [LocalSearchSolver] that persists per-strategy learned state
- * (DDFW-style factor weights) across calls. The plain [LocalSearchSolver] stays stateless across
- * calls (per-draw isolation); a session is the opt-in path for callers wanting weights / heuristics
- * to survive a `sample` / `solve` / `minimize` boundary.
+ * A scoped local-search session retaining learned factor weights across fresh searches.
+ * Weights sync into each search at initialization and out at every published sample or incumbent,
+ * and at search completion. Closing an early stream preserves its latest published warm state.
  *
- * Implements [Session]; on top of the standard `solve` / `samples` / `enumerate` it offers a
- * `minimize` overload (not in the base interface because not every backend is an
- * [com.eignex.klause.solver.Optimizer]).
- *
- * **Not thread-safe**: one consumer per session. Sessions sharing a [solver] must run searches sequentially.
- * An active resumable handle excludes searches through every session of that solver until completion,
- * failure or close. Keep the session's assumption stack and warm state unchanged while its handle is active.
- *
- * Sync points:
- *  - Sync-in: at the start of each call, the warm state is copied into the new
- *    [FactorWeightBook.factorWeights] (only if size matches `problem.numFactors`).
- *  - Sync-out: at the end of the search loop, or when a streaming sequence completes / is
- *    cancelled. Sequences abandoned mid-iteration may not sync (accepted loss); the next call
- *    still starts from the previous capture.
+ * Single-threaded: an active stream or resumable handle excludes scope changes, [reset] and other
+ * searches. Local-search strategy and restart policy also require exclusive use across sessions
+ * sharing the same solver. Fresh calls retain weights; resumable slices additionally retain the
+ * assignment, RNG and restart progress.
  */
-class LocalSearchSession(override val solver: LocalSearchSolver) : Session<LocalSearchParams> {
+class LocalSearchSession(override val solver: LocalSearchSolver) : StatelessSession<LocalSearchParams>(solver) {
+    private val warm = WarmState()
 
-    private val warm: WarmState = WarmState()
-    private val stack: ArrayDeque<Assumptions> = ArrayDeque()
-
-    override val depth: Int get() = stack.size
-
-    override fun push(assumptions: Assumptions) {
-        stack.addLast(assumptions)
+    /** Discard learned state; requires an open, idle session. */
+    fun reset() {
+        ensureAvailable()
+        warm.reset()
     }
 
-    override fun pop() {
-        require(stack.isNotEmpty()) { "Session.pop on an empty assumption stack" }
-        stack.removeLast()
-    }
-
-    /** Discard all warm state. The next call starts from strategy defaults. */
-    fun reset() = warm.reset()
-
-    /** Test-only window into the warm state. */
     internal val warmState: WarmState get() = warm
-
-    /** Read-only handle for cooperating components (e.g. ALNS destroy operators that
-     *  read `WarmState.activityRecency`). External callers must not mutate the warm
-     *  state directly — use [reset] to clear it. */
     internal val warmStateView: WarmState get() = warm
 
-    override fun solve(params: LocalSearchParams): SolveResult = solver.engine.solve(applyStack(params), warm)
-
-    override fun resumableSolve(params: LocalSearchParams): ResumableSolve =
-        solver.engine.resumableSolve(applyStack(params), warm)
+    override fun resumableSolve(params: LocalSearchParams): ResumableSolve = checkNotNull(super.resumableSolve(params))
 
     override fun resumable(objective: LinearObjective, params: LocalSearchParams): ResumableSearch =
-        solver.engine.resumable(objective, applyStack(params), warm)
+        checkNotNull(super.resumable(objective, params))
 
-    override fun samples(params: LocalSearchParams): Sequence<Sample> = solver.engine.samples(applyStack(params), warm)
-
-    override fun enumerate(params: LocalSearchParams): Sequence<Sample> =
-        solver.engine.samples(applyStack(params), warm)
-
-    /** Optimisation entry point — overrides [Session.minimize] with warm-start support. */
-    override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
-        solver.engine.improvements(objective, applyStack(params), warm).last()
-
-    /** Streaming optimisation — yields each new incumbent then a terminal verdict.
-     *  Mirrors [com.eignex.klause.solver.Optimizer.improvements]. */
-    override fun improvements(objective: LinearObjective, params: LocalSearchParams): Sequence<MinimizeResult> =
-        solver.engine.improvements(objective, applyStack(params), warm)
-
-    private fun applyStack(params: LocalSearchParams): LocalSearchParams {
-        if (stack.isEmpty()) return params
-        var merged = params.assumptions
-        for (a in stack) merged = merged.mergedWith(a)
-        return params.copy(assumptions = merged)
-    }
+    internal override fun solveScoped(params: LocalSearchParams): SolveResult = solver.engine.solve(params, warm)
+    internal override fun resumableSolveScoped(params: LocalSearchParams): ResumableSolve =
+        solver.engine.resumableSolve(params, warm)
+    internal override fun resumableScoped(objective: LinearObjective, params: LocalSearchParams): ResumableSearch =
+        solver.engine.resumable(objective, params, warm)
+    internal override fun samplesScoped(params: LocalSearchParams): Sequence<Sample> = solver.engine.samples(params, warm)
+    internal override fun enumerateScoped(params: LocalSearchParams): Sequence<Sample> = solver.engine.samples(params, warm)
+    internal override fun minimizeScoped(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
+        solver.engine.improvements(objective, params, warm).last()
+    internal override fun improvementsScoped(objective: LinearObjective, params: LocalSearchParams): Sequence<MinimizeResult> =
+        solver.engine.improvements(objective, params, warm)
+    internal override fun openSamplesScoped(params: LocalSearchParams): SearchStream<Sample> =
+        solver.engine.openSamples(params, warm)
+    internal override fun openQualitySamplesScoped(config: SamplingConfig, params: LocalSearchParams): SearchStream<Sample> =
+        solver.engine.openSamples(config, params, warm)
+    internal override fun openEnumerateScoped(params: LocalSearchParams): SearchStream<Sample> =
+        solver.engine.openSamples(params, warm)
+    internal override fun openImprovementsScoped(objective: LinearObjective, params: LocalSearchParams): SearchStream<MinimizeResult> =
+        solver.engine.openImprovements(objective, params, warm)
 }

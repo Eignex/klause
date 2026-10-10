@@ -1,6 +1,8 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.count.SampleQuality
+import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -10,11 +12,14 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchStream
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -129,6 +134,46 @@ class LocalSearchSessionTest {
             assertEquals(3.0, handle.stats.ls.moves.sum)
             assertEquals(spent, budget.spent)
         }
+    }
+
+    @Test
+    fun `early stream close retains published warm state and releases the solver`() {
+        val factories = listOf<(LocalSearchSession, LocalSearchParams) -> SearchStream<*>>(
+            { session, params -> session.openSamples(params) },
+            { session, params -> session.openSamples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 1L), params) },
+            { session, params -> session.openImprovements(LinearObjective(boolWeights = longArrayOf(1, 2)), params) },
+        )
+        for ((index, open) in factories.withIndex()) {
+            val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))))
+            val solver = LocalSearchSolver(problem.bake())
+            val session = solver.session()
+            val params = LocalSearchParams(maxFlips = 2L, randomSeed = 1L)
+            val stream = open(session, params)
+            assertTrue(stream.hasNext())
+            stream.next()
+            assertFailsWith<IllegalStateException> { session.reset() }
+            assertFailsWith<IllegalStateException> { session.push(Assumptions.None) }
+            assertFailsWith<IllegalStateException> { solver.session().solve(params) }
+            val captured = if (index == 1) null else assertNotNull(session.warmState.factorWeights).copyOf()
+            stream.close()
+            stream.close()
+            assertFalse(stream.hasNext())
+            if (captured != null) assertTrue(captured.contentEquals(session.warmState.factorWeights))
+            assertIs<SolveResult.Sat>(solver.session().solve(params))
+            session.reset()
+        }
+    }
+
+    @Test
+    fun `closing a session closes its pending walk`() {
+        val solver = LocalSearchSolver(weightLearningProblem().bake())
+        val session = solver.session()
+        val handle = session.resumable(LinearObjective(boolWeights = LongArray(6) { 1L }), LocalSearchParams(maxFlips = 10L))
+        assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) {})
+        session.close()
+        assertFailsWith<IllegalStateException> { session.reset() }
+        assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        solver.session().resumable(LinearObjective(), LocalSearchParams(maxFlips = 1L)).close()
     }
 
     @Test

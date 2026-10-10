@@ -9,7 +9,9 @@ import com.eignex.klause.count.CountConfig
 import com.eignex.klause.count.ExactCountConfig
 import com.eignex.klause.count.SampleQuality
 import com.eignex.klause.count.SamplingConfig
-import com.eignex.klause.count.UniGen
+import com.eignex.klause.count.accurateSamples
+import com.eignex.klause.count.combineCounts
+import com.eignex.klause.count.countingScope
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
@@ -27,13 +29,20 @@ import com.eignex.klause.util.Cancellation
  *
  * [withAssumptions] is used by the [Session] abstraction to inject a stacked set of
  * pinned variables into a per-call params object without each backend needing to know
- * about Session. The default no-op returns `this` unchanged — appropriate for backends
- * whose params don't carry an `assumptions` field. Backends that do (LocalSearchParams,
- * BacktrackParams) override to return a copy with the merged pins applied.
+ * about Session. Parameters that support scopes expose [assumptions] and override
+ * [withAssumptions] to merge pins with later values winning. The default rejects non-empty scopes.
  */
 interface SolverParams {
-    /** Return a copy of these params with [assumptions] applied. */
-    fun withAssumptions(@Suppress("UNUSED_PARAMETER") assumptions: Assumptions): SolverParams = this
+    /** The per-call pins and deductions; empty for parameters without assumption support. */
+    val assumptions: Assumptions get() = Assumptions.None
+
+    /** Return a copy with [assumptions] merged, or reject a scope this backend cannot enforce. */
+    fun withAssumptions(assumptions: Assumptions): SolverParams {
+        if (!assumptions.isEmpty || !assumptions.deductions.isEmpty) {
+            throw UnsupportedOperationException("these solver parameters do not support assumptions")
+        }
+        return this
+    }
 
     /** Inject a cooperative cancellation token. Backends that support cancellation
      *  override to return a copy with the token wired in; others (Brute)
@@ -126,7 +135,7 @@ interface Solver<P : SolverParams> {
      * Infeasible (proven) from Unknown (budget) should override.
      */
     fun sample(params: P): SampleResult {
-        val s = samples(params).firstOrNull()
+        val s = openSamples(params).use { it.firstOrNull() }
         return if (s != null) {
             SampleResult.Found(s)
         } else {
@@ -139,6 +148,23 @@ interface Solver<P : SolverParams> {
 
     /** Lazily enumerate distinct models. */
     fun enumerate(params: P): Sequence<Sample>
+
+    /** Open samples with deterministic cleanup; close when stopping early. */
+    fun openSamples(params: P): SearchStream<Sample> = samples(params).asSearchStream()
+
+    /** Open enumeration with deterministic cleanup; close when stopping early. */
+    fun openEnumerate(params: P): SearchStream<Sample> = enumerate(params).asSearchStream()
+
+    /** Open a quality-tiered sample cursor; close when stopping early. */
+    fun openSamples(config: SamplingConfig, params: P): SearchStream<Sample> =
+        when (config.quality) {
+            SampleQuality.CHEAP -> openSamples(params)
+            SampleQuality.ACCURATE -> samples(config, params).asSearchStream()
+        }
+
+    /** Open an exact-count cursor; close when stopping early. */
+    fun openExactCount(config: ExactCountConfig = ExactCountConfig()): SearchStream<Count> =
+        exactCount(config).asSearchStream()
 
     /**
      * Approximate model count over [config]'s sampling set (all variables by default): a
@@ -162,20 +188,8 @@ interface Solver<P : SolverParams> {
      * the estimate clamped into the exact phase's proven `[lower, upper]` (the hard bounds can only
      * sharpen the probabilistic answer). Exact when cheap, approximate when not.
      */
-    fun count(config: CountConfig = CountConfig()): Count {
-        val proven = exactCount(config.toExactConfig()).last()
-        if (proven.exact) return proven
-        val approx = approximateCount(config.toApproxConfig())
-        val lower = maxOf(proven.lower, approx.lower)
-        val upper = maxOf(lower, minOf(proven.upper, approx.upper))
-        return Count(
-            estimate = approx.estimate.coerceIn(lower, upper),
-            lower = lower,
-            upper = upper,
-            exact = lower == upper,
-            confidence = approx.confidence,
-        )
-    }
+    fun count(config: CountConfig = CountConfig()): Count =
+        combineCounts(exactCount(config.toExactConfig()).last()) { approximateCount(config.toApproxConfig()) }
 
     /**
      * Quality-tiered sampling. [SampleQuality.CHEAP] (the default and the production path)
@@ -185,7 +199,7 @@ interface Solver<P : SolverParams> {
      */
     fun samples(config: SamplingConfig, params: P): Sequence<Sample> = when (config.quality) {
         SampleQuality.CHEAP -> samples(params)
-        SampleQuality.ACCURATE -> UniGen.samples(problem, config) { samples(params) }
+        SampleQuality.ACCURATE -> problem.countingScope(params.assumptions).accurateSamples(config) { samples(params) }
     }
 
     /**
@@ -250,4 +264,8 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      */
     fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> =
         sequenceOf(minimize(objective, params))
+
+    /** Open an incumbent cursor with deterministic cleanup; close when stopping early. */
+    fun openImprovements(objective: LinearObjective, params: P): SearchStream<MinimizeResult> =
+        improvements(objective, params).asSearchStream()
 }
