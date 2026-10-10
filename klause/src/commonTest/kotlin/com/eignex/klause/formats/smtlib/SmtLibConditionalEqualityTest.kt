@@ -31,6 +31,7 @@ class SmtLibConditionalEqualityTest {
             StringCharSource(
                 """
                 (declare-const s Int)
+                (assert (>= s 0)) (assert (<= s 2))
                 (assert (not (= s 2)))
                 (assert (= (ite (= s 0) 10 (ite (= s 1) 20 (ite (= s 2) 30 40))) 30))
                 """.trimIndent(),
