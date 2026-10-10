@@ -32,7 +32,9 @@ Record the checkout revision and the resulting artifact hashes separately from p
 checks. Do not publish over a shared `SNAPSHOT`, or commit machine-specific paths. Dependency updates
 must update every platform pin together and repeat provenance and published-metadata verification.
 
-`kumulant:0.3.3` owns its dense numerical types and has no koblas dependency.
+Kumulant supplies online statistics and adaptive bandits. Its version is declared in the
+library, CLI and benchmark builds. Verify its numerical types and transitive koblas
+dependencies when upgrading; numerical ownership depends on the selected publication.
 
 ## Consumer contracts
 
