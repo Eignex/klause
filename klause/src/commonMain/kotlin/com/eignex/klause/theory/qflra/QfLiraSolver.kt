@@ -96,6 +96,7 @@ class ExactLiraSearchComponent(
     AutoCloseable {
     private var smtStats: SmtStatsSink? = null
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
+    private var unassignedBooleans = model.numBoolVars
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
@@ -385,10 +386,11 @@ class ExactLiraSearchComponent(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
+                if (bools[variable] == UNASSIGNED) unassignedBooleans--
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
                 node = node.copy(retainedReduction = null)
-                if (variable !in arithmeticVariables && bools.any { it == UNASSIGNED }) {
+                if (variable !in arithmeticVariables && unassignedBooleans != 0) {
                     nodesByLevel.put(context.decisionLevel, node)
                     dirty = wasDirty
                     return ComponentResult.Consistent
@@ -576,7 +578,7 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Infeasible(differenceResult.explanation)
         }
         if (differenceResult !is ComponentResult.Consistent) return differenceResult
-        if (bools.any { it == UNASSIGNED } && arithmeticRows.none {
+        if (unassignedBooleans != 0 && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
         ) {
@@ -606,7 +608,7 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
-        val complete = bools.none { it == UNASSIGNED } && node.selectsEveryDisjunction(model, disjunctionAtoms) &&
+        val complete = unassignedBooleans == 0 && node.selectsEveryDisjunction(model, disjunctionAtoms) &&
             node.nextDisequality(model, disjunctionAtoms, bools) == null
         if (complete) {
             result.exactPrimal?.take(model.numRealVars + model.numIntVars)?.let { point ->
@@ -621,7 +623,7 @@ class ExactLiraSearchComponent(
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
-        if (bools.any { it == UNASSIGNED } || outcome != null) return null
+        if (unassignedBooleans != 0 || outcome != null) return null
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -770,6 +772,7 @@ class ExactLiraSearchComponent(
         assertedRows.forEach { it.fill(false) }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
+                unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
             }
