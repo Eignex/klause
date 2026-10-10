@@ -200,10 +200,14 @@ internal class ExactLiraEqualities(
                 starts[edge.target + 1]++
                 starts[edge.source + 1]++
             }
-            for (vertex in parent.indices) starts[vertex + 1] += starts[vertex]
+            for (vertex in parent.indices) {
+                if (stop()) return false
+                starts[vertex + 1] += starts[vertex]
+            }
             val adjacency = IntArray(edges.size * 2)
             val fill = starts.copyOf()
             edges.forEachIndexed { index, edge ->
+                if (stop()) return false
                 adjacency[fill[edge.target]++] = index
                 adjacency[fill[edge.source]++] = index
             }
@@ -217,6 +221,7 @@ internal class ExactLiraEqualities(
                     if (stop()) return false
                     val vertex = pending.removeLast()
                     for (index in starts[vertex] until starts[vertex + 1]) {
+                        if (stop()) return false
                         val edge = edges[adjacency[index]]
                         val neighbor = if (edge.source == vertex) edge.target else edge.source
                         if (pathParent[neighbor] >= 0) continue
