@@ -1,8 +1,10 @@
 package com.eignex.klause.solver.objective
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.bigIntOf
@@ -104,6 +106,26 @@ data class LinearObjective(
             total += intCoefficients[i] * sample.ints[i]
         }
         return total
+    }
+
+    /** Exact value of [sample], using certified real values when present and binary64 coefficients. */
+    fun evaluateExact(sample: Sample): BigFraction {
+        var total = bigIntOf(constant)
+        for (v in intCoefficients.indices) {
+            if (intCoefficients[v] == 0L) continue
+            total += bigIntOf(intCoefficients[v]) * bigIntOf(sample.ints[v])
+        }
+        for (b in boolWeights.indices) {
+            if (boolWeights[b] != 0L && sample.bools[b]) total += bigIntOf(boolWeights[b])
+        }
+        var value = BigFraction.of(total, BIG_ONE)
+        for (r in realCoefficients.indices) {
+            val c = realCoefficients[r]
+            if (c == 0.0) continue
+            val x = sample.exactReals?.get(r) ?: checkNotNull(BigFraction.ofDouble(sample.reals[r]))
+            value += checkNotNull(BigFraction.ofDouble(c)) * x
+        }
+        return value
     }
 
     override fun evaluate(sample: Sample): Double {
