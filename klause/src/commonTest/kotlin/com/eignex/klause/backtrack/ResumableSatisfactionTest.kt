@@ -8,6 +8,9 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,6 +79,21 @@ class ResumableSatisfactionTest {
         }
 
         assertIs<SolveResult.Unsat>(runToVerdict(solver.resumableSolve(BacktrackParams()), 1L))
+    }
+
+    @Test
+    fun `an indeterminate root component ends satisfaction without pausing`() {
+        val component = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult = ComponentResult.Indeterminate
+        }
+        val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
+            BacktrackParams(componentFactory = { listOf(component) }),
+        )
+
+        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1_000L) }
+
+        assertIs<SolveResult.Unknown>(result)
+        assertTrue(search.isDone)
     }
 
     @Test
