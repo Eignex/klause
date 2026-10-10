@@ -5,8 +5,6 @@ import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.schedule.Schedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
-import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.solver.Sample
 
 /**
  * A named local-search recipe: a four-axis [SourceDrivenStrategy] (its restart cadence carried in the
@@ -14,7 +12,7 @@ import com.eignex.klause.solver.Sample
  * solver-level knobs the strategy itself doesn't own. The portfolio wraps one of these per arm; a
  * single recipe is just a portfolio of one.
  */
-class LocalSearchRecipe private constructor(
+class LocalSearchRecipe(
     /** External name (CLI / campaign / telemetry). */
     val label: String,
     /** Drives the feasibility fight; its [SourceDrivenStrategy.feasibleDescent] also decides the optimize
@@ -22,37 +20,14 @@ class LocalSearchRecipe private constructor(
     val strategy: SourceDrivenStrategy,
     /** Minimize-phase strategy; `null` reuses [strategy] for the optimize phase. A CBLS/SA arm sets this
      *  to a second instance carrying its optimize [SourceDrivenStrategy.feasibleDescent]. */
-    val optimizeStrategy: SourceDrivenStrategy?,
+    val optimizeStrategy: SourceDrivenStrategy? = null,
     /** Per-arm switch for the per-move invariant network; off carves a diversity niche for cyclic
      *  definitional encodings whose reified indicators are otherwise search-excluded. */
-    val perMoveInvariants: Boolean,
+    val perMoveInvariants: Boolean = true,
     /** Per-arm switch for implicit-solving feasible init on every restart (paired with a CBLS whose
      *  `implicitStructuredCap > 0` on permutation/assignment-shaped models). */
-    val seedImplicitOnRestart: Boolean,
-    private val seedUpperBoundOnStart: Boolean,
+    val seedImplicitOnRestart: Boolean = false,
 ) {
-    /** Build a named recipe with random initial assignments. */
-    constructor(
-        label: String,
-        strategy: SourceDrivenStrategy,
-        optimizeStrategy: SourceDrivenStrategy? = null,
-        perMoveInvariants: Boolean = true,
-        seedImplicitOnRestart: Boolean = false,
-    ) : this(label, strategy, optimizeStrategy, perMoveInvariants, seedImplicitOnRestart, false)
-
-    internal fun withUpperBoundStart(): LocalSearchRecipe = LocalSearchRecipe(
-        label, strategy, optimizeStrategy, perMoveInvariants, seedImplicitOnRestart, true,
-    )
-
-    internal fun initialAssignment(problem: BakedProblem): Sample? = if (seedUpperBoundOnStart) {
-        Sample(
-            BooleanArray(problem.numBoolVars) { true },
-            LongArray(problem.numIntVars) { problem.rootIntDomain(it).max },
-        )
-    } else {
-        null
-    }
-
     /** How this recipe conducts the optimize phase — the optimize strategy's declared
      *  [SourceDrivenStrategy.feasibleDescent] (the [optimizeStrategy] when present, else [strategy]).
      *  [FeasibleDescent.RatchetAsConstraint] is violation-native (probSAT / WalkSAT / feasibility-jump):
@@ -71,7 +46,6 @@ class LocalSearchRecipe private constructor(
             optimizeStrategy?.let(transform),
             perMoveInvariants,
             seedImplicitOnRestart,
-            seedUpperBoundOnStart,
         )
 
     /** A copy whose sources axis is [transform]ed (the editable list of configured move sources). */

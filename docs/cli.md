@@ -129,16 +129,11 @@ Solver-control flags are common to **every** mode:
 - `--param <key>=<value>` — repeatable engine params (unknown/malformed keys are a usage
   error, exit 2):
   - `cp`: `seed`, `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`,
-    `var-selector` (`vsids|random|smallest-domain|input-order|int-input-order`), `val-selector`
+    `var-selector` (`vsids|random|smallest-domain|input-order`), `val-selector`
     (`random|min|max|middle`)
-    `input-order` selects Boolean variables before integers; `int-input-order` selects integers
-    before Booleans. Both use variable-id order within each kind and skip fixed variables.
   - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
-    `smooth-factor`, `initial-values` (`random|max`); recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
+    `smooth-factor`; recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
     (`greedy|walksat|probsat|skew|sa`), `cb`, `skew-alpha`, `cooling-rate`, `initial-temp`, `min-temp`
-    `initial-values=max` starts LS arms from upper integer bounds and true Booleans, reconciles
-    definitions and respects root pins. Subsequent restarts use the configured restart policy;
-    a shared-incumbent warm start replaces this initial pose.
   - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`
   - presolve effort (any engine): `presolve-abort-fraction` (finite number in `[0,1]`, default `0.001`),
     `presolve-max-rounds` (nonnegative, default `1` for conservative, `16` for default/aggressive),

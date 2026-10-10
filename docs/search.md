@@ -147,10 +147,6 @@ The scheduler charges the observed instruction delta, while the solve-wide move
 allowance is charged once across slices. Closing or reseeding discards the retained
 state. Root refutations remain authoritative; an unsuccessful local-search walk is
 incomplete.
-An LS recipe can choose an upper-bound starting pose: integer root-domain maxima
-and true Booleans. Initial assignment loading enforces pins and reconciles definitions;
-the pose carries no feasibility claim. Shared-incumbent warm starts take precedence,
-and later restarts retain the recipe's diversification policy.
 An active local-search handle acquires exclusive ownership of its solver when opened.
 Overlapping handle creation and other search execution throw `IllegalStateException`,
 including searches through another session of that solver. Completion, failure and

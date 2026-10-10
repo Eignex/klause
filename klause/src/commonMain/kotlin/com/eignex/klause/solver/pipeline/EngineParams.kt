@@ -19,7 +19,6 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.IndomainRandom
 import com.eignex.klause.backtrack.selector.IndomainSplit
 import com.eignex.klause.backtrack.selector.InputOrder
-import com.eignex.klause.backtrack.selector.IntInputOrder
 import com.eignex.klause.backtrack.selector.LargestDomain
 import com.eignex.klause.backtrack.selector.LargestUpperBound
 import com.eignex.klause.backtrack.selector.RandomVariable
@@ -410,11 +409,6 @@ private fun applyEdits(
  */
 fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
     val dryRunSolver = p.bool("dry-run-solver") ?: false
-    val upperBoundStart = when (val initialValues = p.string("initial-values")?.lowercase()) {
-        null, "random" -> false
-        "max" -> true
-        else -> pipelineConfigError("ls: initial-values expects random|max, got `$initialValues`")
-    }
     val noiseRaw = p.double("noise")
     val cbRaw = p.double("cb")
     val skewRaw = p.double("skew-alpha")
@@ -438,8 +432,7 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
     val scoring = scalarTokens(p.string("scoring"), "scoring")
     val acceptance = scalarTokens(p.string("acceptance"), "acceptance")
     val restart = scalarTokens(p.string("restart"), "restart")
-    val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() ||
-        restart.isNotEmpty() || upperBoundStart
+    val hasEdits = sources.isNotEmpty() || scoring.isNotEmpty() || acceptance.isNotEmpty() || restart.isNotEmpty()
     val strategyRaw = p.string("strategy")?.lowercase()
     val armLabel = p.string("arm")
     if (armLabel != null && (strategyRaw != null || sourcesSpec != null)) {
@@ -477,9 +470,7 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
         noiseRaw,
         cb,
         skewAlpha,
-    ) { Geometric(initTemp, coolRate, minTemp) }.let { edited ->
-        if (upperBoundStart) edited.withUpperBoundStart() else edited
-    }
+    ) { Geometric(initTemp, coolRate, minTemp) }
 
     val pool: List<() -> LocalSearchRecipe>? = when {
         armLabel != null -> listOf({ edit(LocalSearchCatalog.byLabel(armLabel)) })
@@ -687,8 +678,9 @@ fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, cores * AR
 private const val ARMS_PER_CORE = 2
 
 /** `var-selector` `--param` values for the `cp` engine's override pool (each maps to a [VariableSelector]).
- *  Each value supplies the selector's configuration; selectors requiring an objective or a separate
- *  base selector are configured through the solver API. */
+ *  Covers the public no-argument selectors; the objective-/base-parameterised ones (MaxRegret,
+ *  IndomainBest, LastConflict, …) and the `internal` ones (DomWdeg, ActivityBasedSearch) are not
+ *  exposable as a bare value here. */
 enum class VarSelectorKind(val id: String) {
     VSIDS("vsids"),
     CHB("chb"),
@@ -700,7 +692,6 @@ enum class VarSelectorKind(val id: String) {
     SMALLEST_LOWER_BOUND("smallest-lower-bound"),
     LARGEST_UPPER_BOUND("largest-upper-bound"),
     DOMAIN_MAX_REGRET("domain-max-regret"),
-    INT_INPUT_ORDER("int-input-order"),
     ;
 
     /** A **fresh** selector instance (constructed per worker so parallel arms never share mutable
@@ -711,7 +702,6 @@ enum class VarSelectorKind(val id: String) {
         LINUCB -> RegressionVariableSelector.linUcb(seed = seed ?: 0L)
         RANDOM -> RandomVariable
         INPUT_ORDER -> InputOrder
-        INT_INPUT_ORDER -> IntInputOrder
         SMALLEST_DOMAIN -> SmallestDomain
         LARGEST_DOMAIN -> LargestDomain
         SMALLEST_LOWER_BOUND -> SmallestLowerBound

@@ -78,7 +78,6 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
             costShaping = CostShaping.Linear(lambda = lsLambda),
             // The per-move gradient view of the objective, when the model provides one.
             lsObjective = lsObjective,
-            initialAssignment = recipe.initialAssignment(effectiveProblem),
             onEvent = onEvent?.let { sink -> { e -> sink(workerLabel, e) } },
             // Keep a single over-populated constraint kind from steering the initial descent; a
             // no-op for the pool's weight-blind arms.

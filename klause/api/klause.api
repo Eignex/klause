@@ -9582,7 +9582,6 @@ public final class com/eignex/klause/solver/pipeline/VarSelectorKind : java/lang
 	public static final field Companion Lcom/eignex/klause/solver/pipeline/VarSelectorKind$Companion;
 	public static final field DOMAIN_MAX_REGRET Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
 	public static final field INPUT_ORDER Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
-	public static final field INT_INPUT_ORDER Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
 	public static final field LARGEST_DOMAIN Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
 	public static final field LARGEST_UPPER_BOUND Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
 	public static final field LINUCB Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
