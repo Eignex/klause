@@ -42,9 +42,6 @@ internal class ElementPropagator(
             (state.refPayload[factorId] as ElementConstState).explain(state, payload, atTrail)
         }
 
-    // The reason of the failure the last [propagate] hit on a variable array, read by [conflictReason].
-    private var failure: IntArray? = null
-
     private class Lits {
         private val seen = IntHashSet()
         private val out = IntArrayList()
@@ -118,7 +115,7 @@ internal class ElementPropagator(
         collectHoleAndBoundAntecedents(state, intArrayOf(v))
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        (if (arrIsVars) failure else constantConflictReason(state)) ?: collectHoleAndBoundAntecedents(state, intVars)
+        (if (arrIsVars) state.propagatorFailures[this] else constantConflictReason(state)) ?: collectHoleAndBoundAntecedents(state, intVars)
 
     // Some position must be live in idx with its constant live in result, so the conflict cites, per position,
     // why it is not: idx's bound past it, its own hole, or its constant's absence from result. Null when a
@@ -201,7 +198,7 @@ internal class ElementPropagator(
 
     /** Full GAC for a variable array. */
     private fun elementPropagateVarArray(state: PropagationState): Boolean {
-        failure = null
+        state.propagatorFailures.remove(this)
         val len = arr.size
         val atRoot = state.currentLevel == 0
         val resultDom = state.intDomains[result]
@@ -220,7 +217,7 @@ internal class ElementPropagator(
                 val cell = arr[(ex[i] - indexOffset).toInt()].toInt()
                 val ant = if (atRoot) null else Lits().apply { disjoint(state, cell) }.toArray()
                 if (!state.excludeIntValue(idx, ex[i], ant)) {
-                    failure = Lits().apply {
+                    state.propagatorFailures[this] = Lits().apply {
                         addAll(ant)
                         addAll(ownDomain(state, idx))
                     }.toArray()
@@ -234,7 +231,7 @@ internal class ElementPropagator(
             if (indexOffset + pos.toLong() in idxDom) positions.add(pos)
         }
         if (positions.size == 0) {
-            failure = ownDomain(state, idx) ?: IntArray(0)
+            state.propagatorFailures[this] = ownDomain(state, idx) ?: IntArray(0)
             return false
         }
 
@@ -265,7 +262,7 @@ internal class ElementPropagator(
             }
             for (i in 0 until ex.size) {
                 if (!state.excludeIntValue(result, ex[i], ant)) {
-                    failure = Lits().apply {
+                    state.propagatorFailures[this] = Lits().apply {
                         resultUnsupported(state, payload, state.undo.size)
                         addAll(ownDomain(state, result))
                     }.toArray()
@@ -300,7 +297,7 @@ internal class ElementPropagator(
                     }
                     for (i in 0 until ex.size) {
                         if (!state.excludeIntValue(sel, ex[i], ant)) {
-                            failure = Lits().apply {
+                            state.propagatorFailures[this] = Lits().apply {
                                 addAll(ant)
                                 addAll(ownDomain(state, sel))
                             }.toArray()

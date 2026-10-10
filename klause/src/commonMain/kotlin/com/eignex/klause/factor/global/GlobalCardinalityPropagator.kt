@@ -60,11 +60,8 @@ internal class GlobalCardinalityPropagator(
         dup
     }
 
-    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
-    private var failure: IntArray? = null
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        failure ?: withPresencePremises(state, collectHoleAndBoundAntecedents(state, intVars))
+        state.propagatorFailures[this] ?: withPresencePremises(state, collectHoleAndBoundAntecedents(state, intVars))
 
     // Literals false now: the clause form of a reason over the conditions it is given.
     private inner class Reason(private val state: PropagationState) {
@@ -256,7 +253,7 @@ internal class GlobalCardinalityPropagator(
         if (presents.isEmpty() && intVars.isNotEmpty() && cache.cachedDoms[0] != null && dirty.isEmpty()) {
             return true
         }
-        failure = null
+        state.propagatorFailures.remove(this)
         val origIdx: IntArray = if (presents.isEmpty()) {
             IntArray(xs.size) { it }
         } else {
@@ -295,7 +292,7 @@ internal class GlobalCardinalityPropagator(
                     }.build()
                     for (k in 0 until toRemove.size) {
                         if (!state.excludeIntValue(x, toRemove[k], ant)) {
-                            failure = Reason(state).apply { lacksOthers(x) }.build()
+                            state.propagatorFailures[this] = Reason(state).apply { lacksOthers(x) }.build()
                             return false
                         }
                     }
@@ -348,22 +345,22 @@ internal class GlobalCardinalityPropagator(
                 if (definite[k] > state.intDomains[cv].min &&
                     !state.tightenIntMin(cv, definite[k].toLong(), pinnedReason(state, effectiveXs, k).build())
                 ) {
-                    failure = pinnedReason(state, effectiveXs, k).apply { countBounds(k) }.build()
+                    state.propagatorFailures[this] = pinnedReason(state, effectiveXs, k).apply { countBounds(k) }.build()
                     return false
                 }
                 if (possible[k] < state.intDomains[cv].max &&
                     !state.tightenIntMax(cv, possible[k].toLong(), possibleReason(state, counted, k).build())
                 ) {
-                    failure = possibleReason(state, counted, k).apply { countBounds(k) }.build()
+                    state.propagatorFailures[this] = possibleReason(state, counted, k).apply { countBounds(k) }.build()
                     return false
                 }
             } else {
                 if (requireNotNull(countLow)[k] > possible[k]) {
-                    failure = possibleReason(state, counted, k).build()
+                    state.propagatorFailures[this] = possibleReason(state, counted, k).build()
                     return false
                 }
                 if (requireNotNull(countHigh)[k] < definite[k]) {
-                    failure = pinnedReason(state, effectiveXs, k).build()
+                    state.propagatorFailures[this] = pinnedReason(state, effectiveXs, k).build()
                     return false
                 }
             }
@@ -552,7 +549,7 @@ internal class GlobalCardinalityPropagator(
             val obtained = flow.maxFlow(superSource, superSink)
             if (obtained < requiredSSFlow) {
                 val reach = flow.residualReachable(superSource)
-                failure = cutReason(state, effectiveXs, reach, otherNode, xToOtherEdgeIdx).build()
+                state.propagatorFailures[this] = cutReason(state, effectiveXs, reach, otherNode, xToOtherEdgeIdx).build()
                 return false
             }
             // Persist the just-established flow so later fires reuse it without a rebuild or replay.
@@ -593,7 +590,7 @@ internal class GlobalCardinalityPropagator(
                 if (sccId[2 + i] == sccId[2 + n + k]) continue
                 val ant = cutFrom(2 + n + k)
                 if (!state.excludeIntValue(effectiveXs[i], cover[k], ant)) {
-                    failure = Reason(state).apply {
+                    state.propagatorFailures[this] = Reason(state).apply {
                         ant?.forEach { add(it) }
                         lacksOthers(effectiveXs[i])
                     }.build()
@@ -609,7 +606,7 @@ internal class GlobalCardinalityPropagator(
                     val ant = cutFrom(otherNode)
                     for (k in 0 until toRemove.size) {
                         if (!state.excludeIntValue(effectiveXs[i], toRemove[k], ant)) {
-                            failure = Reason(state).apply {
+                            state.propagatorFailures[this] = Reason(state).apply {
                                 ant?.forEach { add(it) }
                                 lacksOthers(effectiveXs[i])
                             }.build()

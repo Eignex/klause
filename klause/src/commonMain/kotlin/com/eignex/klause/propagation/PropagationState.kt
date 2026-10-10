@@ -381,6 +381,14 @@ class PropagationState(
      *  backtrack on any conflict that doesn't come from a factor's `propagate`. */
     internal var lastDecisionConflictVar: Int = -1
 
+    // Failure clauses or premise variables are private to the state and independent of incremental payloads.
+    private val propagatorFailureStore = lazy(LazyThreadSafetyMode.NONE) { mutableMapOf<Propagator, IntArray?>() }
+    internal val propagatorFailures: MutableMap<Propagator, IntArray?> by propagatorFailureStore
+
+    internal fun clearPropagatorFailures() {
+        if (propagatorFailureStore.isInitialized()) propagatorFailures.clear()
+    }
+
     // Per-factor mutable scratch. Its drift across snapshot / restore is intentional: advisory
     // watch state self-corrects on each fire, avoiding snapshot copies of level-aware state.
 

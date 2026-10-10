@@ -39,9 +39,6 @@ internal class DisjunctivePropagator(
 
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
-    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
-    private var failure: IntArray? = null
-
     /** Snapshot effective per-task durations. Returns null if any duration var is not
      *  fixed at this fixpoint pass — propagation defers in that case (sound). */
     private fun effDurOrNull(state: PropagationState): LongArray? {
@@ -56,7 +53,7 @@ internal class DisjunctivePropagator(
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        failure ?: OptPresence.withPresencePremises(
+        state.propagatorFailures[this] ?: OptPresence.withPresencePremises(
             presents,
             state,
             collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0),
@@ -69,7 +66,7 @@ internal class DisjunctivePropagator(
         }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failure = null
+        state.propagatorFailures.remove(this)
         if (n == 0) return true
         val effDur = effDurOrNull(state) ?: return true
         if (!timeTable(state, effDur)) return false
@@ -101,7 +98,7 @@ internal class DisjunctivePropagator(
 
     // Tightening [v] failed against its other bound or a hole: the deduction's reason plus [v]'s own domain.
     private fun failWith(state: PropagationState, task: Int, build: View.() -> Unit): Boolean {
-        failure = now(state).run {
+        state.propagatorFailures[this] = now(state).run {
             build()
             ownDomain(task)
             literals()
@@ -115,7 +112,7 @@ internal class DisjunctivePropagator(
     private fun timeTable(state: PropagationState, effDur: LongArray): Boolean {
         val profile = mandatoryProfile(state, effDur)
         if (!profile.build(cap = 1L)) {
-            failure = now(state).run {
+            state.propagatorFailures[this] = now(state).run {
                 overloadAt(profile.overloadTime)
                 literals()
             }
@@ -200,7 +197,7 @@ internal class DisjunctivePropagator(
                 val dj = state.intDomains[starts[j]]
                 if (di.min + effDur[i] > dj.max) {
                     if (dj.min + effDur[j] > di.max) {
-                        failure = now(state).run {
+                        state.propagatorFailures[this] = now(state).run {
                             precedes(j, i)
                             precedes(i, j)
                             literals()
@@ -270,7 +267,7 @@ internal class DisjunctivePropagator(
             }
             val envTheta = tree.envOfTheta()
             if (envTheta > tau) {
-                failure = now(state).run {
+                state.propagatorFailures[this] = now(state).run {
                     overloadedBy(reversed, tau)
                     literals()
                 }

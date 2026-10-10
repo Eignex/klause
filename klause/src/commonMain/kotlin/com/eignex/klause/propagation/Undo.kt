@@ -123,6 +123,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     atoms.dirtyFactors.clear()
     dirtyBools.clear()
     dirtyInts.clear()
+    clearPropagatorFailures()
     conflictLevels = null
     conflictSeedFactors.clear()
     lastDecisionConflictVar = -1
