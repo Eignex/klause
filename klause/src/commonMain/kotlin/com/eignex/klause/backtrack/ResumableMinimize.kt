@@ -10,7 +10,7 @@ import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpEngine
-import com.eignex.klause.lp.bounding.harvestRootCuts
+import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
@@ -839,24 +839,7 @@ internal class ResumableMinimize(
      * `LpPlan.rootBudgetFraction`.
      */
     private fun initRootLp(token: Cancellation) {
-        // Drop hulls that add no root strength before the harvest + persistent base read the relaxer.
-        if (lpEngine.params.lpPlan.pruneHulls) lpEngine.pruneIneffectiveHulls(token)
-        val relaxer = lpEngine.lpRelaxer ?: return
-        val gomory = lpEngine.params.lpPlan.gomoryEnabled
-        val mir = lpEngine.params.lpPlan.mirEnabled
-        if (lpEngine.lpSeparators.isNotEmpty() || gomory || mir) {
-            lpEngine.cutPool.addAll(
-                lpEngine.harvestRootCuts(
-                    relaxer,
-                    PropagationSession(problem),
-                    lpEngine.lpSeparators,
-                    gomory,
-                    mir,
-                    token,
-                ),
-            )
-            sink.lp.observeCuts(lpEngine.lpGlobalCuts.size)
-        }
+        val relaxer = lpEngine.harvestRootRelaxation(token) ?: return
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token)
         sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower

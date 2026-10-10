@@ -909,7 +909,7 @@ internal class LpEngine(
         // HULL row in the full build.
         val suppressed = mutableSetOf<Int>()
         val hullIds = try {
-            relaxer.build(PropagationSession(problem), cancellation = cancellation).hullFactorIds
+            relaxer.build(PropagationSession(problem, cancellation), cancellation = cancellation).hullFactorIds
         } catch (_: LpAssemblyCancelled) {
             return
         }

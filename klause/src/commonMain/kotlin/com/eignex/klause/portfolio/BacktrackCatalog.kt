@@ -180,6 +180,7 @@ object BacktrackCatalog {
         // emphasis is the axis here exactly as it is for the optimize palette.
         BacktrackArm.LpDefault,
         BacktrackArm.LpAggressive,
+        BacktrackArm.LpConservative,
         BacktrackArm.Free,
         BacktrackArm.SelectorSwitch,
         BacktrackArm.DomWdeg,

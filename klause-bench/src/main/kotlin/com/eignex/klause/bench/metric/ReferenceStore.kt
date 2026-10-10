@@ -98,6 +98,7 @@ internal object ReferenceStore {
         is ProblemSource.External -> s.collection.id
         is ProblemSource.ExternalIndexed -> s.collection.id
         is ProblemSource.Vendored -> s.workspaceRelPath.substringBeforeLast('/', "vendored")
+        is ProblemSource.MpsFeasibility -> suiteOf(ref.copy(source = s.source)) + "-feasibility"
         is ProblemSource.InCode -> "in-code"
     }
 

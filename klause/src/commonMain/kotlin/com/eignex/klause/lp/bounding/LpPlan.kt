@@ -351,6 +351,8 @@ data class LpPlan(
      * clause and is withheld — the prune itself still happens. Off by default.
      */
     val learn: Boolean = false,
+    /** Harvest globally valid cuts before search. Node separation remains independent. */
+    val rootCutHarvest: Boolean = true,
     /**
      * Per-hull pruning: before search, drop each convex-hull technique that adds no strength to the root
      * relaxation bound (solve the root LP with the hull off; keep it only if its removal loosens the

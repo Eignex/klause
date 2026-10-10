@@ -389,6 +389,12 @@ bandit or family evidence, preserving their policy state when the probe is disca
 See [SliceBudget](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
 and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
 
+The satisfaction backtrack palette includes conservative LP after default and
+aggressive LP. Applicability and LP ceilings filter the palette; the four
+backtrack slots of the default mixed satisfaction pool retain their ordering.
+Root variable shaving and hull pruning remain explicit plan options. Root cuts
+follow the resolved plan and have an independent off control.
+
 ## Statistics
 
 | Field | Meaning |

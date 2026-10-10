@@ -133,6 +133,9 @@ internal sealed interface ProblemSource {
      *  for the common case of a file under `klause-bench/smoke-corpus/`. */
     data class Vendored(val workspaceRelPath: String) : ProblemSource
 
+    /** A source MPS with free rows and their coefficients removed, retaining its feasible set. */
+    data class MpsFeasibility(val source: ProblemSource) : ProblemSource
+
     /** Built directly in Kotlin — no file, no parsing. */
     data class InCode(val build: () -> Problem) : ProblemSource
 
