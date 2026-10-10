@@ -44,7 +44,8 @@ internal class SmtLibConditionalEquality {
         guardTests: List<GuardEquality?>,
     ) {
         definitions[variable] = Definition(
-            guards.toList(), arms.toList(), default, factors.toList(), constantImage(arms + default), guardTests.toList(),
+            guards.toList(), arms.toList(), default, factors.toList(),
+            constantImage(arms + default), guardTests.toList(),
         )
     }
 
