@@ -20,7 +20,7 @@ internal enum class ArmFamily(val observable: Boolean) {
     /** Local search: counted arms that restart from the incumbent. */
     LocalSearch(observable = true),
 
-    /** Large-neighbourhood search around the incumbent; it has nothing to work on before one exists. */
+    /** Large-neighbourhood search around the incumbent; its bootstrap competes within [LocalSearch]. */
     Lns(observable = true),
 }
 

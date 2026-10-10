@@ -3,6 +3,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ProblemProfile
@@ -712,16 +713,27 @@ class Portfolio(
         }
 
         // The free arm furthest below its owed share, else the policy's pick among free arms: a family first, so a
-        // family's share does not grow with its arm count, then an arm of that family. LNS works on an incumbent, so it
-        // waits for one unless it is all that is left.
+        // family's share does not grow with its arm count, then an arm of that family. An LNS bootstrap competes
+        // within local search's feasibility share; a neighborhood needs an incumbent unless it is all that is left.
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
             val free = eligibleArms.filter { !busy[it] && !retired[it] }
             if (free.isEmpty()) return -1
-            val present = free.mapTo(LinkedHashSet()) { workers[it].family }
+            val present = free.mapTo(LinkedHashSet()) { policyFamily(it) }
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
             val family = families.choose(eligible)
-            return armAmong(free.filter { workers[it].family == family })
+            return armAmong(free.filter { policyFamily(it) == family })
+        }
+
+        private fun policyFamily(arm: Int): ArmFamily {
+            val family = workers[arm].family
+            return if (!improving && family == ArmFamily.Lns &&
+                (handles[arm] as? IncumbentBootstrapSearch)?.bootstrapPending == true
+            ) {
+                ArmFamily.LocalSearch
+            } else {
+                family
+            }
         }
 
         // A policy that cannot be restricted to [candidates] is asked until it names one of them.
@@ -789,7 +801,7 @@ class Portfolio(
             val reward = if (failed) 0.0 else earned
             val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
             bandit.update(arm, reward, weight)
-            families.record(workers[arm].family, progressed = reward > 0.0, plateau = improving)
+            families.record(policyFamily(arm), progressed = reward > 0.0, plateau = improving)
             // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.
             for (other in workers.indices) {

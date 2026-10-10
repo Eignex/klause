@@ -12,6 +12,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
@@ -140,13 +141,17 @@ class AlnsTest {
         }
         val alns = Alns(inner = inner, maxIterations = 0)
         val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
+        val bootstrap = assertIs<IncumbentBootstrapSearch>(handle)
 
+        assertTrue(bootstrap.bootstrapPending)
         assertTrue(handle.preparationPending)
         assertNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
         assertFalse(handle.preparationPending)
+        assertTrue(bootstrap.bootstrapPending)
         assertEquals(7.0, handle.stats.ls.moves.sum)
         val result = assertNotNull(handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
 
+        assertFalse(bootstrap.bootstrapPending)
         assertSame(sample, result.assignment)
         assertEquals(1, opened)
         assertEquals(2, slices)

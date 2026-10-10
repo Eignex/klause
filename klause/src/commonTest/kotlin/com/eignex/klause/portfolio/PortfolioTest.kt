@@ -23,6 +23,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
@@ -370,6 +371,64 @@ class PortfolioTest {
             Portfolio.thompson(workers).use { it.minimize(Cancellation { order.size >= 4 }) }
 
             assertEquals(listOf(0, 1, 2, 0), order)
+        }
+    }
+
+    @Test
+    fun `only pending bootstrap resumes before the first incumbent after sibling admission`() {
+        for (bootstrapSlices in listOf(0, 1, 2)) {
+            val order = mutableListOf<Int>()
+            var opened = 0
+            var slices = 0
+            val tracked = TrackingResumableSearch(null)
+            val handle = object : IncumbentBootstrapSearch, ResumableSearch by tracked {
+                override val bootstrapPending: Boolean get() = slices < bootstrapSlices
+                override fun runSlice(
+                    global: Cancellation,
+                    sliceMillis: Long,
+                    sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? {
+                    order += 0
+                    if (++slices == 2) {
+                        onIncumbent(
+                            MinimizeResult.BestFound(
+                                Sample(BooleanArray(0), LongArray(0)), 0.0, TerminationReason.BudgetExhausted,
+                            ),
+                        )
+                    }
+                    return null
+                }
+            }
+            val workers = listOf(
+                PortfolioWorker.ofMinimize("bootstrap", 0, resumable = {
+                    opened++
+                    handle
+                }) { _, _, _, _ ->
+                    error("the retained handle must resume")
+                }.also { it.family = ArmFamily.Lns },
+            ) + List(2) { sibling ->
+                val arm = sibling + 1
+                val search = TrackingResumableSearch(null, onRun = { order += arm })
+                val siblingHandle = object : ResumableSearch by search {
+                    override val stats = SolveStats(ls = LocalSearchStats(moves = SumResult(1.0)))
+                }
+                trackingWorker("sibling$arm", arm, siblingHandle).also { it.family = ArmFamily.LocalSearch }
+            }
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = workers.size
+                override val random = Random(0)
+                override fun choose() = 0
+                override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+                override fun reset() = Unit
+            }
+
+            val result = Portfolio(workers, bandit).use { it.minimize(Cancellation { order.size >= 4 }) }
+
+            assertEquals(listOf(0, 1, 2, if (bootstrapSlices == 2) 0 else 1), order)
+            assertEquals(bootstrapSlices == 2, result is MinimizeResult.BestFound)
+            assertEquals(1, opened)
+            assertEquals(1, tracked.closes)
         }
     }
 

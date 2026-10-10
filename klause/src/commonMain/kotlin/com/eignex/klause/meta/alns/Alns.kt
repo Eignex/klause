@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.PooledIncumbents
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
@@ -425,7 +426,7 @@ internal class Alns(
     private inner class RetainedSearch(
         private val objective: LinearObjective,
         private val params: LocalSearchParams,
-    ) : InstructionSlicedSearch {
+    ) : InstructionSlicedSearch, IncumbentBootstrapSearch {
         private val telemetry = AlnsStatsSink()
         private var cpBootstrap: ResumableSearch? = null
         private var lsBootstrap: ResumableSearch? = null
@@ -444,6 +445,7 @@ internal class Alns(
             private set
 
         override val isDone: Boolean get() = verdict != null
+        override val bootstrapPending: Boolean get() = neighborhood == null && !closed
         override val work: Long get() = (chargedInstructions / LS_INSTRUCTIONS_PER_WORK).toLong()
         override val preparationPending: Boolean
             get() = neighborhood == null && !closed &&
