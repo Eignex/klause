@@ -66,7 +66,9 @@ internal class BacktrackWorkerConfig(
         val meter = SharingMeter()
         matchedPools?.clauses?.let {
             params = params.copy(
-                clauseExchange = PoolClauseExchange(it, origin = index, tally = matchedPools.contributions, meter = meter),
+                clauseExchange = PoolClauseExchange(
+                    it, origin = index, tally = matchedPools.contributions, meter = meter,
+                ),
             )
             sharing += Contribution.Clause
         }
@@ -98,7 +100,9 @@ internal class BacktrackWorkerConfig(
                         meter.exported(SharingChannel.Bounds, 1)
                         vb.publish(
                             v, lo, hi, origin = index, model = evidenceModel.forObjective(null),
-                            certificate = EvidenceCertificate.verified(evidenceModel.forObjective(null), EvidenceKind.Bound),
+                            certificate = EvidenceCertificate.verified(
+                                evidenceModel.forObjective(null), EvidenceKind.Bound,
+                            ),
                         )
                     },
                     globalVarLowerSupplier = vb::lowerOf,
@@ -119,7 +123,8 @@ internal class BacktrackWorkerConfig(
                         meter.exported(SharingChannel.Incumbents, 1)
                         meter.timed(SharingChannel.Incumbents) {
                             matchedPools.offerSolution(
-                                evidenceModel, sample, value, EvidenceCertificate.verified(evidenceModel, EvidenceKind.Witness),
+                                evidenceModel, sample, value,
+                                EvidenceCertificate.verified(evidenceModel, EvidenceKind.Witness),
                             )
                         }
                     },
@@ -134,7 +139,8 @@ internal class BacktrackWorkerConfig(
         return PortfolioWorker.of(
             workerLabel,
             armId,
-            (matchedPools?.nativeProjection?.let { BacktrackSolver(problem, it) } ?: BacktrackSolver(problem)).session(),
+            (matchedPools?.nativeProjection?.let { BacktrackSolver(problem, it) }
+                ?: BacktrackSolver(problem)).session(),
             params,
             objective = objective,
             withBound = withBound,

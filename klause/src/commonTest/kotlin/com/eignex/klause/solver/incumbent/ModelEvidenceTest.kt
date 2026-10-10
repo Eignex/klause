@@ -13,7 +13,9 @@ class ModelEvidenceTest {
             ModelEvidence.Witness(other, Candidate("point", 7)),
             ModelEvidence.Bound(other, 7, EvidenceCertificate.verified(other, EvidenceKind.Bound)),
             ModelEvidence.Infeasible(other, EvidenceCertificate.verified(other, EvidenceKind.Infeasible)),
-            ModelEvidence.Unbounded(other, Candidate("point", 7), EvidenceCertificate.verified(other, EvidenceKind.Unbounded)),
+            ModelEvidence.Unbounded(
+                other, Candidate("point", 7), EvidenceCertificate.verified(other, EvidenceKind.Unbounded),
+            ),
         )
 
         for (claim in claims) assertIs<Verification.Rejected>(verifier.verify(claim), claim.kind.name)

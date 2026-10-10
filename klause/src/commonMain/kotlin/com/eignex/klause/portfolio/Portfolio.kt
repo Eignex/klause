@@ -437,7 +437,9 @@ class Portfolio(
                 else -> null
             }
             if (proofKind != null) {
-                claim.verified(evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue))
+                claim.verified(
+                    evidenceVerification?.proof(worker, proofKind, terminal?.assignment, terminal?.objectiveValue),
+                )
             }
             run.locked {
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
@@ -478,7 +480,8 @@ class Portfolio(
                 }
                 // An arm that threw is retired like one that finished: rescheduling it would only fail again.
                 if (failure != null || (handle != null && terminal != null) ||
-                    (claim.indeterminate && (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded))
+                    (claim.indeterminate &&
+                        (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded))
                 ) run.retire(arm)
             }
         }

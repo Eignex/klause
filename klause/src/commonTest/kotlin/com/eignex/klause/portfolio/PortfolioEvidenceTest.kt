@@ -36,7 +36,9 @@ class PortfolioEvidenceTest {
             sequenceOf(MinimizeResult.Optimal(sample, 1.0))
         }.bindEvidence(model)
         val portfolio = Portfolio.thompson(listOf(worker))
-        portfolio.evidenceVerification = PortfolioEvidence(model) { Verification.Indeterminate("verification interrupted") }
+        portfolio.evidenceVerification = PortfolioEvidence(model) {
+            Verification.Indeterminate("verification interrupted")
+        }
         var publications = 0
 
         val result = portfolio.use { it.minimize(onImprovement = { publications++ }) }

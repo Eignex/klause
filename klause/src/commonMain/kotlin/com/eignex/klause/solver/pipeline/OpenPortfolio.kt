@@ -339,7 +339,9 @@ internal fun openWitnessVerifier(model: Problem, objective: LinearObjective?): C
         val certificate = sample.witnessCertificate
         if (certificate != null) {
             if (!certificate.model.sameModel(ModelIdentity.of(model)) || certificate.kind != EvidenceKind.Witness) {
-                return@CandidateVerifier Verification.Rejected("witness certificate belongs to a different model or claim")
+                return@CandidateVerifier Verification.Rejected(
+                    "witness certificate belongs to a different model or claim",
+                )
             }
         } else {
             when (val checked = verifyOpenWitness(model, sample)) {
