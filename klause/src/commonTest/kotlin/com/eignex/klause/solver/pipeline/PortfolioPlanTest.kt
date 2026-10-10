@@ -3,8 +3,12 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,6 +17,33 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PortfolioPlanTest {
+
+    @Test
+    fun `curated sequential continuous optimization reserves LP descent time`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
+
+        val shares = continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed"))
+
+        assertEquals(listOf(0.0, 0.5, 0.0), shares.toList())
+    }
+
+    @Test
+    fun `explicit and inapplicable scenarios keep their requested scheduling`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
+        val labels = listOf("bt/satOptimized", "bt/lp-default")
+        val scenarios = listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(kind = Kind.CSP),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") }),
+        )
+
+        for (explicit in scenarios) assertTrue(continuousLpShares(explicit, profile, labels).isEmpty())
+        assertTrue(continuousLpShares(scenario, profile.copy(problemClass = ProblemClass.FiniteCp), labels).isEmpty())
+        assertTrue(continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/conflictDriven")).isEmpty())
+    }
 
     @Test
     fun `portfolio reseeding accepts an off control and nonnegative thresholds`() {

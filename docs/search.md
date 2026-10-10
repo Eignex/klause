@@ -339,7 +339,7 @@ continuous-column capability determine which arms run; unsupported local-search
 arms are filtered from mixed pools while local-search-only requests retain their
 own behavior.
 
-Continuous-column models rank the default LP backtrack arm immediately after the
+Continuous-column optimization models rank the default LP backtrack arm immediately after the
 SAT guard. The default six-arm mixed optimization pool therefore admits node LP
 in its two backtrack slots while retaining four local-search slots. LP ceilings
 and explicit arm pools continue to control admission and techniques. Curated

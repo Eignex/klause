@@ -193,14 +193,14 @@ object BacktrackCatalog {
     }
 
     /**
-     * [rankedArms] with [BacktrackArm.LpDefault] second when the model has continuous columns. A row that
+     * [rankedArms] with [BacktrackArm.LpDefault] second on an optimization model with continuous columns. A row that
      * touches a real column never propagates in CP, so on such a model node LP is the only propagation those
      * rows get. Keeping the SAT guard first and admitting the LP workhorse in the second slot gives the
      * default mixed pool that propagation without changing its size or its local-search positions.
      */
     private fun rankedArms(kind: Kind, realColumns: Boolean): List<BacktrackArm> {
         val order = rankedArms(kind)
-        if (!realColumns) return order
+        if (!realColumns || kind != Kind.COP) return order
         val rest = order.filter { it != BacktrackArm.LpDefault }
         return rest.take(1) + BacktrackArm.LpDefault + rest.drop(1)
     }
