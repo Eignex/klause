@@ -96,10 +96,13 @@ internal object Profiler {
         methods.any { it.contains("PropagationState.<init>") || it.contains("NativeSatState.<init>") } ->
             "backtrack state allocation"
         methods.any { it.contains("LpEngine.<init>") } -> "backtrack LP preparation"
-        methods.any { it.contains("PropagationSession.<init>") } -> "backtrack root propagation"
+        methods.any {
+            it.contains("PropagationSession.<init>") || it.contains("PropagationState.advanceRootFixpoint") ||
+                it.contains("PropagationState.beginRootFixpoint")
+        } -> "backtrack root propagation"
         methods.any {
             it.contains("ResumableMinimize.<init>") || it.contains("ResumableSatisfaction.<init>") ||
-                it.contains("CpSatisfactionTraversal.<init>")
+                it.contains("CpSatisfactionTraversal.<init>") || it.contains("PropagationPreparation.advance")
         } -> "backtrack initialization"
         else -> "backtrack search"
     }

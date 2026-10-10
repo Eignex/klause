@@ -282,7 +282,7 @@ completed `cli.jfr`. The subprocess harness summarizes it on the runner after th
 captured CLI elapsed time ends. Tables attribute Java CPU samples and sampled
 allocation weights to projection preparation, state allocation, seeding, invariant
 setup, move selection/application, backtrack and presolve. Backtrack stacks distinguish
-projection preparation, state allocation, LP preparation, constructor root propagation,
+projection preparation, state allocation, LP preparation, root propagation,
 other initialization and search. Initial factor scoring
 resumed across slices remains part of seeding; retained projection construction
 remains projection preparation. ALNS bootstrap and

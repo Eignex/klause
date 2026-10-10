@@ -114,6 +114,17 @@ propagation visits and per 600 LP work units. Construction is charged once;
 fractional charges carry forward and overspending is repaid by later slices.
 Decision/move limits still count their original events.
 
+General CP optimization handles open with private preparation. Propagator projection
+and root propagation advance in batches of 256 factors, retaining the queue, watcher
+changes and deductions between turns. A paused root is not a search session and cannot
+publish a sample or refutation. Completion installs its fixpoint or derived conflict
+once, then enables the ordinary trail and branch-and-bound search. Propagator objects
+remain private to the handle. Preparation work, fractional charges and overspend debt
+carry into search without being charged again; the stats sink retains its timing window.
+The packed native-SAT optimization path and satisfaction/repair construction retain
+their constructor lifecycle. State allocation, occurrence indexes, individual factor
+calls, assumption seeding and LP construction remain atomic work.
+
 Slices yield before consuming an alternative or after a completed node. A
 pending sibling cannot be skipped when yielding, and reset discards a pending
 alternative. Constructor refutations return immediately. A rejected last root
@@ -151,7 +162,8 @@ each batch and publishes only the complete projection. A suspended arm holds no 
 Assignment seeding, individual factor calls,
 custom restart policies, subsequent restarts and repair searches remain atomic work
 that can overrun a segment.
-Before the first incumbent, an optimization arm that has not executed an instruction
+Before the first incumbent, an optimization arm with pending private preparation or
+a local-search arm that has not executed an instruction
 receives preparation revisits after all initial siblings have been admitted. Unfinished
 arms rotate in arm order until they enter search or terminate. Each revisit uses the
 base allowance and the regular family time share; it does not grow later slices. Dedicated lanes resume their own
@@ -224,3 +236,6 @@ component reasons. Zero does not establish complete factor reason coverage.
 Missing metrics remain missing, including root theory refutations that never
 enter shared search. Ratios of visit work to fixpoint time are coarse because
 their scopes differ.
+
+`initMs` measures opening the handle. Preparation deferred into slices contributes to
+segment time and live propagation counters; it is not included in opening time.

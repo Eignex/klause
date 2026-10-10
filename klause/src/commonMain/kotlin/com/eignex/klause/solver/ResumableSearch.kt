@@ -83,6 +83,9 @@ interface ResumableSearch : AutoCloseable {
     /** Work performed while opening this handle, included in [work]. */
     val initialWork: Long get() = 0L
 
+    /** When true, another slice can continue private initialization before searching. */
+    val preparationPending: Boolean get() = false
+
     override fun close() {}
 }
 

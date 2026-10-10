@@ -450,7 +450,8 @@ class Portfolio(
                 }
                 if (claim.foundFirst) run.startImprovementPhase()
                 if (handle != null && terminal == null && !failed &&
-                    worker.family == ArmFamily.LocalSearch && stats?.ls?.moves?.sum == 0.0
+                    (handle.preparationPending ||
+                        (worker.family == ArmFamily.LocalSearch && stats?.ls?.moves?.sum == 0.0))
                 ) {
                     run.revisitPreparation(arm)
                 }

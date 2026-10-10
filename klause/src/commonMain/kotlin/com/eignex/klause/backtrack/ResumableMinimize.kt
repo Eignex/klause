@@ -114,7 +114,11 @@ internal class ResumableMinimize(
     private val rebindable: Boolean = false,
     initialCandidate: Sample? = null,
     private val problem: BakedProblem = solver.problem,
+    preparedSession: PropagationSession? = null,
+    preparationBudget: SliceBudget? = null,
+    private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
 ) : ResumableSearch {
+    private val hasPreparation = preparationBudget != null
     private var initialCandidate = initialCandidate
     private var replaced = false
 
@@ -160,6 +164,7 @@ internal class ResumableMinimize(
         { sink.search.searchWork },
         { lpEngine.totalSolveWork() + sink.lp.standaloneWork },
         { session.work },
+        preparationBudget,
     )
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
@@ -201,7 +206,6 @@ internal class ResumableMinimize(
     private var objVarBest: Long? = null
     private val externalShared = params.objectiveBoundSupplier != null
     private var lastExternalCutoff = Double.POSITIVE_INFINITY
-    private val sink = SolveStatsSink(backend = "backtrack")
     private var lastObjBoundAsserted: Long? = null
     private var lastBoolCutoffRhs: Long? = null
     private var lastOpenCutoff: Long? = null
@@ -248,7 +252,7 @@ internal class ResumableMinimize(
     }
 
     private val cp = CpSearchComponent(
-        PropagationSession(
+        preparedSession ?: PropagationSession(
             solver.propagationProjection(params.nativeSat ?: true, problem),
             cancelledWhen(::runDeadline) { solveCancelled() },
             params.propagationCancelFloor,
@@ -725,7 +729,7 @@ internal class ResumableMinimize(
      * is time-boxed by [rootLpBudget].
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
-        sink.start()
+        if (!hasPreparation) sink.start()
         return firstRunWorkBody()
     }
 

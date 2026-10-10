@@ -44,6 +44,8 @@ class PropagationSession private constructor(
     pbLearning: Boolean,
     /** Engine projection shared by this session and its state. */
     val projection: PropagationProblem,
+    preparedState: PropagationState? = null,
+    rootConflict: IntArray? = null,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -63,7 +65,7 @@ class PropagationSession private constructor(
     ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection)
 
     private val state: PropagationState =
-        PropagationState(
+        preparedState ?: PropagationState(
             projection,
             Assumptions.None,
             nativeSat = nativeSat,
@@ -162,7 +164,15 @@ class PropagationSession private constructor(
     internal val propagationNanos: Long get() = state.propagationNanos
 
     init {
-        val conflict = state.runToFixpoint(allFactors = true, cancellation = cancellation)
+        val conflict = if (preparedState == null) {
+            state.runToFixpoint(allFactors = true, cancellation = cancellation)
+        } else {
+            check(
+                state.rootFixpointStarted && !state.runCancelled &&
+                    (rootConflict != null || !state.rootFixpointPending),
+            )
+            rootConflict
+        }
         if (conflict != null) {
             bakedUnsat = PropagationResult.Unsat(
                 state.extractConflictBools(conflict),
@@ -178,6 +188,14 @@ class PropagationSession private constructor(
         // and undoing to it rewinds every search mutation back to this post-bake baseline.
         state.undoLogging = true
         levelPush(state.mark())
+    }
+
+    internal companion object {
+        fun prepared(state: PropagationState, cancellation: Cancellation, conflict: IntArray?): PropagationSession =
+            PropagationSession(
+                state.problem, cancellation, state.cancelFloor, state.nativeSat, state.pbLearning,
+                state.projection, state, conflict,
+            )
     }
 
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
