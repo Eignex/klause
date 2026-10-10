@@ -401,6 +401,34 @@ class CliModeTest {
     }
 
     @Test
+    fun `SMT objectives preserve precision in either direction`() {
+        for ((lower, upper) in listOf(
+            "9007199254740992" to "9007199254740993",
+            "9223372036854775808" to "9223372036854775809",
+        )) {
+            for (direction in listOf("minimize", "maximize")) {
+                val smt = File.createTempFile("cliprecision", ".smt2").apply {
+                    writeText(
+                        """
+                        (declare-const x Int)
+                        (assert (>= x $lower)) (assert (<= x $upper))
+                        ($direction x)
+                        (check-sat)
+                        """.trimIndent(),
+                    )
+                    deleteOnExit()
+                }
+
+                val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
+                val expected = if (direction == "minimize") lower else upper
+
+                assertEquals("; objective=$expected", out.lines().last { it.startsWith("; objective=") }, out)
+                assertTrue("; optimizationStatus=optimal" in out.lines(), out)
+            }
+        }
+    }
+
+    @Test
     fun `SMT optimization reports an unbounded descent beside its witness`() {
         val smt = File.createTempFile("cliunbounded", ".smt2").apply {
             writeText(

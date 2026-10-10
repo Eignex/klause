@@ -27,7 +27,9 @@ class SolverInvocationTest {
                     SolverInvocation.Dialect.SMT_LIB -> "; objective=$objective\nsat\n; optimizationStatus=optimal"
                 }
                 val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"), dialect)
-                val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(Reports.json.encodeToString(result))
+                val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(
+                    Reports.json.encodeToString(result),
+                )
 
                 assertEquals(ExactObjective.parse(objective).toString(), decoded.exactObjective)
                 assertEquals(true, decoded.feasible)

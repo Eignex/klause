@@ -4,6 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
@@ -12,6 +13,11 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.unaryMinus
 import kotlin.time.TimeSource
 
 /**
@@ -25,6 +31,8 @@ internal object SmtLibMode : CliMode {
     override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
+        private var latestSourceObjective: BigFraction? = null
+
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
@@ -41,14 +49,21 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
-            val objective = parsed.objective?.toLinearObjective()
+            val minimizedObjective = parsed.objective?.toLinearObjective()
+            val maximize = parsed.sense == ObjectiveSense.MAXIMIZE
+            val objective = if (maximize) minimizedObjective?.negated() else minimizedObjective
+            latestSourceObjective = null
+            val render: (Sample) -> String = { sample ->
+                latestSourceObjective = objective?.evaluateExact(sample)
+                renderModel(ints, bools, reals, sample)
+            }
             var routingLpStats = LpStats()
             val routingStart = TimeSource.Monotonic.markNow()
             val route = parsed.model.pipelineRoute(
                 objective,
                 parsed.sense == ObjectiveSense.MAXIMIZE,
                 routePureRealToTheory = true,
+                routeLinearToTheory = objective?.requiresExactRoute(parsed.model) == true,
                 boundCancellation = common.routingCancellation(),
                 onLpStats = { routingLpStats = it },
             )
@@ -57,8 +72,8 @@ internal object SmtLibMode : CliMode {
             return when (route) {
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,
-                    objective,
-                    parsed.sense == ObjectiveSense.MAXIMIZE,
+                    minimizedObjective,
+                    maximize,
                     render,
                     routingLpStats = routingLpStats,
                     routingElapsedMs = routingElapsedMs,
@@ -102,9 +117,28 @@ internal object SmtLibMode : CliMode {
             }
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput()
+        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput { latestSourceObjective }
     }
 }
+
+private fun LinearObjective.requiresExactRoute(model: Problem): Boolean {
+    if (realCoefficients.any { it != 0.0 } || boolWeights.any { it != 0L }) return false
+    var lower = bigIntOf(constant)
+    var upper = lower
+    for (v in intCoefficients.indices) {
+        val coefficient = intCoefficients[v]
+        if (coefficient == 0L) continue
+        val lo = model.intBounds.lowerAsBigInteger(v) ?: return true
+        val hi = model.intBounds.upperAsBigInteger(v) ?: return true
+        val c = bigIntOf(coefficient)
+        lower += c * if (coefficient > 0) lo else hi
+        upper += c * if (coefficient > 0) hi else lo
+    }
+    val limit = bigIntOf(EXACT_INTEGER_MAGNITUDE)
+    return lower < -limit || upper > limit
+}
+
+private const val EXACT_INTEGER_MAGNITUDE = 1L shl 53
 
 // An open model searched by local search alone, minimizing [objective] when there is one.
 @Suppress("LongParameterList")
@@ -178,7 +212,13 @@ private fun smtReal(value: String): String {
 }
 
 /** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
-internal class SmtLibOutput : BufferedBestOutput() {
+internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { null }) : BufferedBestOutput() {
+    override fun formatObjective(objective: Long): String =
+        sourceObjective()?.toString() ?: super.formatObjective(objective)
+
+    override fun formatContinuousObjective(objective: Double): String =
+        sourceObjective()?.toString() ?: super.formatContinuousObjective(objective)
+
     private var optimize = false
 
     override val commentPrefix: String = ";"

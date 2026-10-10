@@ -93,7 +93,10 @@ internal object ReferenceSolve {
 
             Format.XCSP3 -> {
                 val r = cached ?: cache(Xcsp3CpSatReference.run(ref, budget, checkNotNull(settings.processors)))
-                Run(id, r, optimize = r.exactObjective != null || r.objective != null, maximize = r.stats["maximize"].toBoolean())
+                Run(
+                    id, r, optimize = r.exactObjective != null || r.objective != null,
+                    maximize = r.stats["maximize"].toBoolean(),
+                )
             }
 
             // SMT-LIB benchmarks are decision instances: no objective to orient.
