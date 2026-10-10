@@ -357,8 +357,8 @@ The auxiliary LP arm receives one base improving-phase probe if it has earned no
 progress credit. An unproductive probe retires the arm and closes its handle;
 retirement preserves the incumbent without claiming exhaustion. A witness,
 objective or bound improvement, root deductions, or used shared contributions
-retain the arm under normal bandit scheduling. Configured LP slots retain their
-requested scheduling.
+retain the arm under normal bandit scheduling. Configured LP slots do not retire
+under the auxiliary probe policy.
 
 See [SliceBudget](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
 and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
