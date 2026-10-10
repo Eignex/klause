@@ -143,8 +143,7 @@ internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: Short
  *  row-major cell lower bounds [tuples] and, for a short table, the per-cell upper bounds [hi] (null
  *  for a fully-ground table). [triviallySat] flags a table with a fully unbounded row, which matches
  *  every assignment — the constraint posts nothing. */
-internal class SupportTemplate(val triviallySat: Boolean, val tuples: LongArray, val hi: LongArray?) {
-}
+internal class SupportTemplate(val triviallySat: Boolean, val tuples: LongArray, val hi: LongArray?)
 
 /** Return the support template for [text], reusing the last one when [text] is the same object — the
  *  case for a `<group>`'s rows, which share one `<supports>` String object. */
