@@ -82,23 +82,25 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
             ),
         )
-        val session = PropagationSession(problem)
-        val r1 = session.pinBool(0, true)
-        assertIs<PropagationResult.Implied>(r1)
-        val r2 = session.pinBool(1, true)
-        val unsat = assertIs<PropagationResult.Unsat>(r2)
-        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertEquals(
-            setOf(Lit.make(0, false), Lit.make(1, false)),
-            learned.literals.toSet(),
-            "1UIP learned clause should be [¬a, ¬b], got ${learned.literals.toList()}",
-        )
-        assertEquals(
-            1,
-            learned.backjumpLevel,
-            "backjump should target level 1 (the only lower-level variable's level)",
-        )
-        assertEquals(2, learned.lbd, "two-decision-level clause should have LBD = 2")
+        for ((native, pb) in listOf(false to false, false to true, true to false, true to true)) {
+            val session = PropagationSession(problem, nativeSat = native, pbLearning = pb)
+            val r1 = session.pinBool(0, true)
+            assertIs<PropagationResult.Implied>(r1)
+            val r2 = session.pinBool(1, true)
+            val unsat = assertIs<PropagationResult.Unsat>(r2)
+            val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
+            assertEquals(
+                setOf(Lit.make(0, false), Lit.make(1, false)),
+                learned.literals.toSet(),
+                "1UIP learned clause should be [¬a, ¬b], got ${learned.literals.toList()}",
+            )
+            assertEquals(
+                1,
+                learned.backjumpLevel,
+                "backjump should target level 1 (the only lower-level variable's level)",
+            )
+            assertEquals(2, learned.lbd, "two-decision-level clause should have LBD = 2")
+        }
     }
 
     @Test

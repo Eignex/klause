@@ -125,6 +125,9 @@ learned-clause compaction.
 Pseudo-Boolean accumulators cache coefficient reads by Boolean variable id. The
 coefficient map retains its iteration order; every coefficient mutation updates the
 cache, and reset clears only stored entries.
+Native clause-only conflicts use clause resolution directly: unit-weight PB
+resolution saturates to the same clauses. General-lane cardinality and weighted
+pseudo-Boolean reasons retain cutting-planes analysis.
 
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump.

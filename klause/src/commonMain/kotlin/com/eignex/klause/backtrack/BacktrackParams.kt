@@ -369,6 +369,8 @@ data class BacktrackParams(
      * decisive win on counting structure (pigeonhole: polynomial vs the exponential a clause solver
      * needs) and net-neutral-to-positive elsewhere. `true`/`false` force it; ignored on problems with
      * integer variables (order-literal atoms carry no PB reason).
+     * Native clause-only reasons use clause resolution directly because PB resolution saturates to
+     * the same unit-weight clauses.
      */
     val pbLearning: Boolean? = null,
     /**

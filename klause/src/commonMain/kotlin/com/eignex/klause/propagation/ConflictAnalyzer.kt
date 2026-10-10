@@ -39,10 +39,15 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     /** The clause resolvent — the default, and the sound fallback when PB resolution can't proceed. */
     private val clauseResolvent: ConflictResolvent = ClauseResolvent(state, this)
 
-    /** The pseudo-Boolean cutting-planes resolvent, built only when PB learning is on and
-     *  the problem is pure-Boolean (order-literal atoms carry no PB reason). */
-    private val pbResolvent: PbConflictResolvent? =
-        if (state.pbLearning && state.problem.numIntVars == 0) PbConflictResolvent(state, this) else null
+    // Engine selection is available after this analyzer's owner finishes initialization. Native
+    // clause reasons saturate PB resolution to clauses, avoiding coefficient arithmetic entirely.
+    private val pbResolvent: PbConflictResolvent? by lazy(LazyThreadSafetyMode.NONE) {
+        if (state.pbLearning && state.problem.numIntVars == 0 && state.nativeEngine == null) {
+            PbConflictResolvent(state, this)
+        } else {
+            null
+        }
+    }
 
     /** The resolvent that produced the most recent result — its bump sets feed VSIDS. */
     private var lastResolvent: ConflictResolvent = clauseResolvent
