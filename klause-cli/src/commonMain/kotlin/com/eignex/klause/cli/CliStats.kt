@@ -351,11 +351,14 @@ private fun diagnosticString(value: String): String = buildString {
     for (char in value) {
         when (char) {
             '"' -> append("\\\"")
+
             '\\' -> append("\\\\")
+
             in '\u0000'..'\u001f', '\u007f', '\u2028', '\u2029' -> {
                 append("\\u")
                 append(char.code.toString(16).padStart(4, '0'))
             }
+
             else -> append(char)
         }
     }
