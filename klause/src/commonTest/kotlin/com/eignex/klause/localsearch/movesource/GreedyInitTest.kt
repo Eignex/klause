@@ -37,8 +37,9 @@ class GreedyInitTest {
             ),
         )
         val state = freshState(problem, 7L)
-        state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars))
-            .network(problem.numIntVars, problem.numBoolVars)
+        state.invariants = DefinitionalSweep(
+            listOf(DefinitionalSweep.SweepNode.CmpReif(0, longArrayOf(1), intArrayOf(0), 0L, LinearOp.EQ)),
+        ).network(problem.numIntVars, problem.numBoolVars)
         state.assumptions = Assumptions(bools = mapOf(1 to false, 2 to false), ints = mapOf(0 to 1L))
         state.assignment.setInt(0, 1L)
         state.recompute()
