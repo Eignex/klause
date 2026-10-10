@@ -312,7 +312,8 @@ class BacktrackSolver internal constructor(
         val window = ArrayDeque<Sample>()
         return PullSearchStream(
             pull = {
-                val cursor = traversal ?: CpSatisfactionTraversal(problem, params, null, lpSolveContext).also { traversal = it }
+                val cursor = traversal ?: CpSatisfactionTraversal(problem, params, null, lpSolveContext)
+                    .also { traversal = it }
                 var accepted: Sample? = null
                 var ended = false
                 while (accepted == null && !ended) {

@@ -183,6 +183,7 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
             }
             override fun next(): T {
                 ensureAvailable()
+                if (!cursor.hasNext()) throw NoSuchElementException()
                 return cursor.next()
             }
         }

@@ -29,6 +29,11 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : StatelessSess
         warm.reset()
     }
 
+    /** Release the active search and discard learned weights; idempotent. */
+    override fun close() {
+        try { super.close() } finally { warm.reset() }
+    }
+
     internal val warmState: WarmState get() = warm
     internal val warmStateView: WarmState get() = warm
 
@@ -42,18 +47,29 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : StatelessSess
         solver.engine.resumableSolve(params, warm)
     internal override fun resumableScoped(objective: LinearObjective, params: LocalSearchParams): ResumableSearch =
         solver.engine.resumable(objective, params, warm)
-    internal override fun samplesScoped(params: LocalSearchParams): Sequence<Sample> = solver.engine.samples(params, warm)
-    internal override fun enumerateScoped(params: LocalSearchParams): Sequence<Sample> = solver.engine.samples(params, warm)
+    internal override fun samplesScoped(params: LocalSearchParams): Sequence<Sample> =
+        solver.engine.samples(params, warm)
+    internal override fun enumerateScoped(params: LocalSearchParams): Sequence<Sample> =
+        solver.engine.samples(params, warm)
     internal override fun minimizeScoped(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
         solver.engine.improvements(objective, params, warm).last()
-    internal override fun improvementsScoped(objective: LinearObjective, params: LocalSearchParams): Sequence<MinimizeResult> =
+    internal override fun improvementsScoped(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+    ): Sequence<MinimizeResult> =
         solver.engine.improvements(objective, params, warm)
     internal override fun openSamplesScoped(params: LocalSearchParams): SearchStream<Sample> =
         solver.engine.openSamples(params, warm)
-    internal override fun openQualitySamplesScoped(config: SamplingConfig, params: LocalSearchParams): SearchStream<Sample> =
-        solver.engine.openSamples(config, params, warm)
+    internal override fun openQualitySamplesScoped(
+        config: SamplingConfig,
+        params: LocalSearchParams,
+    ): SearchStream<Sample> =
+        solver.openSamples(config, params, warm)
     internal override fun openEnumerateScoped(params: LocalSearchParams): SearchStream<Sample> =
         solver.engine.openSamples(params, warm)
-    internal override fun openImprovementsScoped(objective: LinearObjective, params: LocalSearchParams): SearchStream<MinimizeResult> =
+    internal override fun openImprovementsScoped(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+    ): SearchStream<MinimizeResult> =
         solver.engine.openImprovements(objective, params, warm)
 }
