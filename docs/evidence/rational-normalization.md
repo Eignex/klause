@@ -11,7 +11,7 @@ for routing these factory paths through general normalization. It measures
 one CP process on AWS, default LP, seeds 1, 7 and 31, fixed work 3000 and
 6000, and three alternating pairs per seed/work combination. Executed source
 hashes, build fingerprints and provenance are retained in the
-[CI evidence](https://github.com/Eignex/klause/actions/runs/38041964650).
+[CI evidence](https://github.com/Eignex/klause/actions/runs/38043606727).
 All 108 pairs attained the requested work and matched every non-timing counter
 and outcome. The figures below are medians of paired duration reductions;
 ranges contain the six seed/work block medians.
@@ -30,7 +30,7 @@ also retain unknown outcomes. Their observed median theory-check rates rise
 for each input. These deadline runs measure progress through different prefixes;
 they do not establish identical-work timing or completed-solve speedups.
 
-The [independent source checks](https://github.com/Eignex/klause/actions/runs/38041704646)
+The [independent source checks](https://github.com/Eignex/klause/actions/runs/38042314816)
 cover 104 matched MPS/SMT default/exact records: 24 finite optima, 76 feasible
 records in total, 16 infeasible records and 12 unknown records. Every claimed
 verdict agrees with original source constraints. Each claimed finite optimum

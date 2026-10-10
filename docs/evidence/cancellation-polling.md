@@ -13,7 +13,7 @@ reconstruction polling (189), LP delegate wrappers (69) and `SearchSession`
 (47). These groups overlap; they are attribution evidence rather than additive
 CPU costs. Frame removal or inlining does not establish saved execution time.
 
-The [fixed-work source/build check](https://github.com/Eignex/klause/actions/runs/38042530608)
+The [fixed-work source/build check](https://github.com/Eignex/klause/actions/runs/38043602143)
 compares `888a7dc594a5681327922c58de7b7ea147df59fc` with
 `ce80276bc741d9c366dc0e176bc0ee12dfb59eb0`, differing only in direct dispatch
 through owned adapter/composite polling methods and regression tests. One AWS
