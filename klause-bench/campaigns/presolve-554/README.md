@@ -1,7 +1,11 @@
 # Presolve effort campaign (#554)
 
-Status: AWS pilots, metadata integration and both 300-second campaigns complete;
-abort fraction 0.01 frozen for held-out validation (AWS job 914).
+Status: complete. The 612 production cases across discovery, the aggressive screen
+and frozen holdout support retaining the shipped default emphasis, abort fraction
+0.001, round cap 16 and default integer SAC caps (256 per variable, 20,000 per tier).
+No tested alternative establishes a consistent quality and process-time benefit.
+Aggressive remains opt-in. `decision.json` records this null result; the separate
+deadline diagnostic identifies a cancellation/work-meter gap that remains open.
 
 The solver baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`. The neutral
 controls build is `5ad3707c0c0bfb113f994828265b9f1bafef91c3` ([PR #2378](https://github.com/Eignex/klause/pull/2378)).
@@ -268,8 +272,8 @@ production case. Process timing includes FlatZinc frontend loading; MiniZinc sou
 compilation precedes subprocess launch and is outside this measurement. Setup,
 compilation and post-solve source checking do not consume measured search time.
 The abort fraction 0.0001 is pruned because it changed no observed pilot work.
-No round-cap expansion is justified by the pilot. A holdout candidate and its
-settings will be frozen only after discovery; holdout outcomes remain unopened.
+No round-cap expansion is justified by the pilot. The candidate was frozen after
+complete discovery analysis and before holdout submission or outcome inspection.
 
 Discovery screening ranks work-active candidates by the complete paired process
 PAR2 ratio, provided their mean reported quality is nonnegative. Ties prefer the
@@ -400,7 +404,71 @@ source. Default versus abort 0.01, 12 disjoint base families, three seeds and tw
 alternating repeats produce 144 cases (12 nominal solver core-hours). Host is
 explicitly AWS; parallel and machines are unset. Holdout cannot select another
 candidate. A shipped-setting change still requires consistent quality and timing
-evidence across discovery and holdout; a null result remains acceptable.
+evidence across discovery and holdout.
+
+## Complete holdout and decision
+
+Job 914 completed all 144 cases. Final cases, job, reference, file listing and
+worker/setup logs are archived under `evidence/914`.
+[CI run 38015666878](https://github.com/Eignex/klause/actions/runs/38015666878)
+produced `evidence/914/analysis.json.gz`: all 72 pairs across 12 catalog base
+families are complete, with no exclusions, source-hash mismatches, invalid source
+checks, contradictory reported outcomes or retained-objective mismatches.
+All 103 reported witnesses are retained with matching `_objective` values and
+available process clocks. Every record has one search arm and the same production
+fingerprint as discovery and the aggressive screen.
+
+| Configuration | Reported witnesses (proved) | Source-valid witnesses | Median preparation ms | Maximum preparation ms | Process PAR2 ratio (95% family interval) | Mean quality (95% family interval) |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| Default | 52 (6) | 18 | 437 | 29,149 | 1 | 0 |
+| Abort 0.01 | 51 (6) | 18 | 453 | 31,969 | 1.127 (0.976–1.458) | -0.014 (-0.042–0) |
+
+| Family | Abort 0.01 quality | Process ratio | Median preparation ms: default / abort 0.01 |
+| --- | ---: | ---: | --- |
+| tower | 0 | 1.002 | 27,608.5 / 28,209 |
+| hrc | 0 | 0.997 | 480 / 495.5 |
+| mario | 0 | 0.986 | 280.5 / 279 |
+| team-assignment | -0.167 | 1.111 | 373.5 / 425.5 |
+| mapping | 0 | 1 | 338 / 316 |
+| radiation | 0 | 1 | 516.5 / 622.5 |
+| vrplc | 0 | 0.979 | 170 / 188.5 |
+| zephyrus | 0 | 4.387 | 187.5 / 214.5 |
+| smelt | 0 | 0.884 | 550 / 541 |
+| multi-agent-graph-coverage | 0 | 1 | 249.5 / 261.5 |
+| aircraft-disassembly | 0 | 1.000 | 6,407 / 6,135.5 |
+| evm-super-compilation | 0 | 1.007 | 495.5 / 566.5 |
+
+Each family contributes six pairs. Abort 0.01 has no quality improvements, one
+regression and 71 ties: the second repetition of seed 11 on team-assignment loses
+a default witness of objective 10,580. Its recorded work matches default in that
+pair. Recorded work changes only on all six `vrplc` pairs, reducing charged work
+from 5,199,077 to 5,088,229 and round entries from seven to five, with the same 57
+removed constraints. The other 66 pairs match recorded work. The largest timing
+regression, `zephyrus`, also matches recorded work; this does not establish a
+presolve-work mechanism. Recorded RootBaker probe counts are zero, subject to the
+meter limitation below. The largest round-entry counts remain seven and six.
+
+The equal-outcome process ratio is 1.116 (0.968–1.444), covering 71 pairs in all
+12 families. Eighteen paired witnesses passed independent pinned-source checks;
+54 source checks per arm are unknown. Proof claims remain unverified. Maximum
+CLI durations are 300,700 ms for default and 300,645 ms for abort 0.01, retaining
+the observed overshoot rather than clipping it to the nominal budget.
+
+The frozen candidate supplies no consistent benefit: discovery quality ties with
+a process ratio of 1.059, and holdout has negative mean quality with a process
+ratio of 1.127. The holdout timing interval includes one; this is insufficient
+evidence for a replacement, not proof that default is universally optimal.
+Conservative failed the registered discovery quality gate, and both aggressive
+variants regress quality on the focused screen. Abort 0.0001 was inactive in the
+pilot, and the recorded schedules do not justify a larger round cap. Default
+emphasis, abort fraction 0.001 and existing round/SAC limits therefore remain
+unchanged. No alternative was selected using holdout outcomes.
+
+This decision applies to the frozen integrated build and disclosed regression
+corpus, with limited independent-check coverage and unmeasured within-instance
+contention. The cancellation/work-meter gap prevents a complete cost-bound claim;
+it does not erase the measured process/preparation costs. Follow-up allowance work
+under #2322 requires fresh evidence before any post-fix tuning conclusion.
 
 ## Separate deadline diagnostic
 
@@ -466,4 +534,4 @@ not complete probe totals or compliance with a solve-wide work allowance.
 Partial snapshots under `evidence/906/partial-*.json.gz` and
 `evidence/907/partial-*.json.gz` validate the analyzer on process-clock records
 through CI while the jobs run. They are archived snapshots, not final comparisons
-or a basis for candidate selection. Completed-job evidence will be archived separately.
+or a basis for candidate selection. Complete-job evidence is archived separately.
