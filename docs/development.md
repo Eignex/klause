@@ -62,9 +62,16 @@ in KDoc. Keep fixture identities/licenses in [provenance](testing/fixtures.md)
 and immutable capture manifests. Repository agent instructions and GitHub
 templates retain their functional locations.
 
-Keep benchmark result directories local and ignored. Historical campaign bundles,
-one-off reports and measurement archives belong outside the repository;
-`klause-bench` retains the active harness, current fixtures/sets and reusable tools.
+Keep benchmark result directories local and ignored. Store temporary campaign notes,
+scripts, manifests, raw results and reports in `klause-evidence/campaigns/<name>/`,
+outside the repository alongside its primary checkout. All worktrees share this
+evidence directory. `klause-bench` retains the active harness, current fixtures/sets
+and reusable tools.
+
+Consolidate conclusions that establish architecture or invariants into the relevant
+`docs/` page. Use `docs/evidence/` only for small, durable evidence supporting a
+current design decision; temporary campaigns and raw-result archives stay in
+`klause-evidence`.
 
 Read the relevant architecture and contract pages before changing a subsystem.
 Maintain them in the same change as code affecting ownership, dependencies,

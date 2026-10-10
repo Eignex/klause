@@ -79,6 +79,12 @@ Read `docs/benchmarking.md` before benchmarking. In short:
 - Keep `klause-bench` focused on the active harness, corpus inputs, named sets and reusable tools. Do not
   commit generated solve outputs, historical campaign bundles or one-off evidence reports there; keep
   measurement archives outside the repository.
+- Store temporary campaign notes, scripts, manifests, raw results and reports in
+  `klause-evidence/campaigns/<name>/`, alongside the primary checkout and outside this repository.
+  All worktrees share that evidence directory; do not create separate archives beside each worktree.
+  Promote reusable tooling and fixtures into `klause-bench`, and consolidate architectural conclusions
+  into the relevant `docs/` pages. Reserve `docs/evidence/` for small, durable evidence supporting a
+  current design decision; do not use it as campaign staging or an archive of raw results.
 - Keep `docs/README.md` and links current. Remove superseded files when consolidating documentation.
 
 ## Solver boundaries
