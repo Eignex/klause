@@ -22,10 +22,27 @@ internal object SolveEvidence {
     fun finalWitness(format: Format, raw: String): String? {
         val witness = when (format) {
             Format.MINIZINC -> MiniZincSourceValidation.candidate(raw)
+            Format.SMTLIB -> finalSmtModel(raw)
             Format.OPB, Format.XCSP3, Format.DIMACS, Format.WCNF, Format.MPS ->
                 raw.lineSequence().lastOrNull { it.startsWith("v ") }
             else -> null
         }
         return witness?.takeIf { it.length <= MAX_WITNESS_CHARS }
+    }
+
+    private fun finalSmtModel(raw: String): String? {
+        var model: StringBuilder? = null
+        var witness: String? = null
+        for (line in raw.lineSequence()) {
+            when (line) {
+                "(" -> model = StringBuilder(line)
+                ")" -> {
+                    model?.let { witness = it.append("\n)").toString() }
+                    model = null
+                }
+                else -> model?.append('\n')?.append(line)
+            }
+        }
+        return witness
     }
 }
