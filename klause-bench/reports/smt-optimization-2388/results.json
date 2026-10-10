@@ -1,0 +1,682 @@
+[
+  {
+    "index": 0,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-basic",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a7a7db8bf9bce85f41e1f5d8642a4113adcec0bc0b31715aed9dab9c29a9a7bc"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 1,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-basic",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a7a7db8bf9bce85f41e1f5d8642a4113adcec0bc0b31715aed9dab9c29a9a7bc"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 2,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-basic",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a7a7db8bf9bce85f41e1f5d8642a4113adcec0bc0b31715aed9dab9c29a9a7bc"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 3,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-basic",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a7a7db8bf9bce85f41e1f5d8642a4113adcec0bc0b31715aed9dab9c29a9a7bc"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 4,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-opt",
+    "seed": 0,
+    "feasible": true,
+    "objective": 7.0,
+    "proven": true,
+    "optimizationStatus": "optimal",
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "f67b9d6c6145e6d90a429fecf4ff34044ce023a3069237a1d731746d875d0ae9"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 5,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-opt",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "f67b9d6c6145e6d90a429fecf4ff34044ce023a3069237a1d731746d875d0ae9"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 6,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-opt",
+    "seed": 1,
+    "feasible": true,
+    "objective": 7.0,
+    "proven": true,
+    "optimizationStatus": "optimal",
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "f67b9d6c6145e6d90a429fecf4ff34044ce023a3069237a1d731746d875d0ae9"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 7,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-opt",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "f67b9d6c6145e6d90a429fecf4ff34044ce023a3069237a1d731746d875d0ae9"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 8,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-unsat",
+    "seed": 0,
+    "feasible": false,
+    "objective": null,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "3022001204e99df206e381a743ad5d42ac4884e6f54d95f4d987857fb592eabd"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 9,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-unsat",
+    "seed": 0,
+    "feasible": false,
+    "objective": null,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "3022001204e99df206e381a743ad5d42ac4884e6f54d95f4d987857fb592eabd"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 10,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-unsat",
+    "seed": 1,
+    "feasible": false,
+    "objective": null,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "3022001204e99df206e381a743ad5d42ac4884e6f54d95f4d987857fb592eabd"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 11,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-unsat",
+    "seed": 1,
+    "feasible": false,
+    "objective": null,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "3022001204e99df206e381a743ad5d42ac4884e6f54d95f4d987857fb592eabd"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 12,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-disjunction",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a6a721311030a976bce1fd886f64a5940e4c6f047c1a232ccf60a7117a47b53e"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 13,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-disjunction",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a6a721311030a976bce1fd886f64a5940e4c6f047c1a232ccf60a7117a47b53e"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 14,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-disjunction",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a6a721311030a976bce1fd886f64a5940e4c6f047c1a232ccf60a7117a47b53e"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 15,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-disjunction",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a6a721311030a976bce1fd886f64a5940e4c6f047c1a232ccf60a7117a47b53e"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 16,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lra-rational",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a43e54032934b240515315597a44ef85762bb4a5bcb4b7bc7d6743b43523d31e"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 17,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lra-rational",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a43e54032934b240515315597a44ef85762bb4a5bcb4b7bc7d6743b43523d31e"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 18,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lra-rational",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a43e54032934b240515315597a44ef85762bb4a5bcb4b7bc7d6743b43523d31e"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 19,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lra-rational",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "a43e54032934b240515315597a44ef85762bb4a5bcb4b7bc7d6743b43523d31e"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 20,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-wide-span",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "d90eb457f7b9d8333e19b3dcaf37321e6642f8400f93b67ff3e196f5c286677c"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 21,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-wide-span",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "d90eb457f7b9d8333e19b3dcaf37321e6642f8400f93b67ff3e196f5c286677c"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 22,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "lia-wide-span",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "d90eb457f7b9d8333e19b3dcaf37321e6642f8400f93b67ff3e196f5c286677c"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 23,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "lia-wide-span",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "d90eb457f7b9d8333e19b3dcaf37321e6642f8400f93b67ff3e196f5c286677c"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 24,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "blend-tiny",
+    "seed": 0,
+    "feasible": true,
+    "objective": 9.0,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "8404a1ddbd3809eab6054322880feb57fcc65bb567fcde0f6d2bb6eb299dd0a7"
+    },
+    "finalWitness": "v X1=3 X2=1"
+  },
+  {
+    "index": 25,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "blend-tiny",
+    "seed": 0,
+    "feasible": true,
+    "objective": 9.0,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "8404a1ddbd3809eab6054322880feb57fcc65bb567fcde0f6d2bb6eb299dd0a7"
+    },
+    "finalWitness": "v X1=3 X2=1"
+  },
+  {
+    "index": 26,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "blend-tiny",
+    "seed": 1,
+    "feasible": true,
+    "objective": 9.0,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "8404a1ddbd3809eab6054322880feb57fcc65bb567fcde0f6d2bb6eb299dd0a7"
+    },
+    "finalWitness": "v X1=3 X2=1"
+  },
+  {
+    "index": 27,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "blend-tiny",
+    "seed": 1,
+    "feasible": true,
+    "objective": 9.0,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "8404a1ddbd3809eab6054322880feb57fcc65bb567fcde0f6d2bb6eb299dd0a7"
+    },
+    "finalWitness": "v X1=3 X2=1"
+  },
+  {
+    "index": 28,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "feasible-tiny",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "b9162826039ba2243712daafe3e0433aec15ccef783e53ecb2230ae402043e74"
+    },
+    "finalWitness": "v A=2 B=0 C=3"
+  },
+  {
+    "index": 29,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "feasible-tiny",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "b9162826039ba2243712daafe3e0433aec15ccef783e53ecb2230ae402043e74"
+    },
+    "finalWitness": "v A=2 B=0 C=3"
+  },
+  {
+    "index": 30,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "feasible-tiny",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "b9162826039ba2243712daafe3e0433aec15ccef783e53ecb2230ae402043e74"
+    },
+    "finalWitness": "v A=0 B=2 C=3"
+  },
+  {
+    "index": 31,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "feasible-tiny",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "b9162826039ba2243712daafe3e0433aec15ccef783e53ecb2230ae402043e74"
+    },
+    "finalWitness": "v A=0 B=2 C=3"
+  },
+  {
+    "index": 32,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "float-tiny",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "7bb48ec9fd86f12ad51cbbb60b2c2933348ea010a3bdb09ed535a1006d7cb955"
+    },
+    "finalWitness": "v X1=0.0"
+  },
+  {
+    "index": 33,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "float-tiny",
+    "seed": 0,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "7bb48ec9fd86f12ad51cbbb60b2c2933348ea010a3bdb09ed535a1006d7cb955"
+    },
+    "finalWitness": "v X1=0.0"
+  },
+  {
+    "index": 34,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "float-tiny",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "7bb48ec9fd86f12ad51cbbb60b2c2933348ea010a3bdb09ed535a1006d7cb955"
+    },
+    "finalWitness": "v X1=0.0"
+  },
+  {
+    "index": 35,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "float-tiny",
+    "seed": 1,
+    "feasible": true,
+    "objective": null,
+    "proven": false,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "7bb48ec9fd86f12ad51cbbb60b2c2933348ea010a3bdb09ed535a1006d7cb955"
+    },
+    "finalWitness": "v X1=0.0"
+  },
+  {
+    "index": 36,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "infeasible-tiny",
+    "seed": 0,
+    "feasible": false,
+    "objective": null,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "3c0fa5629913496a268c4516522a68b8a6668314984cdca1b451f93df41d926b"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 37,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "infeasible-tiny",
+    "seed": 0,
+    "feasible": false,
+    "objective": null,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "3c0fa5629913496a268c4516522a68b8a6668314984cdca1b451f93df41d926b"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 38,
+    "status": "DONE",
+    "arm": "smt-metadata",
+    "problem": "infeasible-tiny",
+    "seed": 1,
+    "feasible": false,
+    "objective": null,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "d1e520040fc4eb959e1d00e93bd782131176b5655562ffc9bc9081c4f880db87",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "3c0fa5629913496a268c4516522a68b8a6668314984cdca1b451f93df41d926b"
+    },
+    "finalWitness": null
+  },
+  {
+    "index": 39,
+    "status": "DONE",
+    "arm": "main",
+    "problem": "infeasible-tiny",
+    "seed": 1,
+    "feasible": false,
+    "objective": null,
+    "proven": true,
+    "optimizationStatus": null,
+    "buildFingerprint": "0e383191f940212f4a001b113864c056322f361e3eee5780789142f7cb2ac814",
+    "validationPolicy": "reported-result-v1",
+    "sourceHashes": {
+      "model": "3c0fa5629913496a268c4516522a68b8a6668314984cdca1b451f93df41d926b"
+    },
+    "finalWitness": null
+  }
+]
