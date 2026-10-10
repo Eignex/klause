@@ -137,6 +137,9 @@ maps source decisions to bound assertions, retracts through the trail and suppli
 certified bounds, fixings and Farkas conflicts under an effort governor. Open
 adapters share normalized terms and justified root-fixed substitutions. They
 retain defining rows needed by any active bound, objective or reconstruction map.
+Derived bound batches retain a separate witness premise for each applied side and
+refresh the numerical owner once. A declined batch publishes no bound changes;
+a conflicting batch retains the applied prefix and its explanation premises.
 
 Farkas explanations cite selected bound witnesses and all contributing scoped
 row premises. Every learned literal is false at the conflict, and the cited
