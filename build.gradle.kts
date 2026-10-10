@@ -13,8 +13,8 @@ val koblasJvmArgs = buildList {
     }
 }
 
-// koblas ships its sparse kernels as a snapshot ahead of the next release; the snapshot endpoint is
-// not part of the conventions' default repository set, so declare it here.
+// Koblas and Kumulant use timestamped snapshots; this endpoint is outside the conventions'
+// default repository set.
 allprojects {
     repositories {
         maven("https://central.sonatype.com/repository/maven-snapshots/") {
