@@ -43,7 +43,7 @@ When running the full gate locally:
 
 ## Bench
 
-Read `klause-bench/README.md` before benchmarking. In short:
+Read `docs/benchmarking.md` before benchmarking. In short:
 
 - Rebuild the CLI binary first with `:klause-cli:installJvmDist`, since bench runs it as a subprocess. `installDist` is
   a no-op that serves a stale binary, so suspect it when a bench run contradicts a passing test.
@@ -61,6 +61,22 @@ Read `klause-bench/README.md` before benchmarking. In short:
 - PR body: follow `.github/pull_request_template.md`, with `Closes #NN` on its own line at the top.
 - Issues: follow `.github/issue_template.md`. Keep them short, a few plain sentences,
   and link code/PRs instead of pasting.
+
+## Documentation
+
+- `docs/` is the maintained internal developer documentation and architecture contract. Start with
+  `docs/README.md` and read the relevant architecture/contract pages before changing a subsystem.
+  User-facing documentation is hosted at `https://eignex.com/docs/klause/` and is maintained separately.
+- Update the affected docs in the same change whenever implementation changes architecture, ownership,
+  dependencies, invariants, result/proof semantics, resource policy or developer workflows. Reconcile
+  docs with the implemented system; do not leave competing descriptions or obsolete plans.
+- Keep all standalone documentation under root `docs/`. Do not create documentation elsewhere.
+  READMEs outside `docs/` are short entry points linking into it, with required license notices where
+  applicable. Agent instruction files and functional GitHub templates retain their required locations;
+  public API KDoc stays with source. Inputs, manifests, scripts and raw evidence are artifacts, not guides.
+- Document only the current Klause system. Exclude references/comparisons to other solvers, historical campaign
+  narratives and speculative implementation plans. Preserve fixture attribution and raw evidence.
+- Keep `docs/README.md` and links current. Remove superseded files when consolidating documentation.
 
 ## Solver boundaries
 
