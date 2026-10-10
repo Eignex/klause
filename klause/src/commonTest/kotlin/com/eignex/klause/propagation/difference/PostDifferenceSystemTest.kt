@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation.difference
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -49,6 +50,24 @@ class PostDifferenceSystemTest {
         assertNull(state.runToFixpoint(allFactors = true))
 
         assertEquals(3L, state.intDomains[0].max)
+        assertEquals(false, state.boolValues[1])
+    }
+
+    @Test
+    fun `unconditional difference rows convey unary bounds without a joint system`() {
+        val problem = problemOf(
+            ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.LE, 3L),
+            Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0L),
+            ReifiedLinear(1, longArrayOf(1), intArrayOf(1), LinearOp.GE, 5L),
+        )
+        val posted = problem.withDifferenceSystem()
+        assertSame(problem, posted)
+        val state = PropagationState(posted, Assumptions.None)
+        assertTrue(state.pinBool(0, true))
+
+        assertNull(state.runToFixpoint(allFactors = true))
+
+        assertEquals(3L, state.intDomains[1].max)
         assertEquals(false, state.boolValues[1])
     }
 
