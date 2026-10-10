@@ -1,7 +1,10 @@
 package com.eignex.klause.formats.xcsp3
 
+import com.eignex.klause.brute.BruteForceParams
+import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -9,6 +12,32 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class Xcsp3ConstructionTest {
+    @Test
+    fun `Boolean product terms preserve their source truth values`() {
+        for ((expression, trueInputs) in listOf(
+            "eq(x,1)" to setOf(1L),
+            "not(eq(x,1))" to setOf(0L, 2L),
+            "or(eq(x,1),eq(x,2))" to setOf(1L, 2L),
+            "eq(0,1)" to emptySet(),
+            "eq(1,1)" to setOf(0L, 1L, 2L),
+        )) {
+            val parsed = Xcsp3.parse(
+                """<instance><variables>
+                    <var id="x">0..2</var><var id="y">0..2</var><var id="z">0..2</var>
+                    </variables><constraints><intension>eq(mul($expression,y),z)</intension>
+                    </constraints></instance>""",
+            )
+
+            val actual = BruteForceSolver(parsed.problem.bake())
+                .enumerate(BruteForceParams(randomSeed = 0L))
+                .map { s -> (0 until 3).map { s.ints[it] } }.toSet()
+
+            val expected = (0L..2L).flatMap { x ->
+                (0L..2L).map { y -> listOf(x, y, if (x in trueInputs) y else 0L) }
+            }.toSet()
+            assertEquals(expected, actual, expression)
+        }
+    }
 
     @Test
     fun `a sum condition constructs its declared variables and normalized row`() {

@@ -382,18 +382,7 @@ internal object Compiler {
                         newAuxVar(v, v)
                     } else {
                         // Reify the relation (wide or narrow) onto a fresh bool, then channel it to a 0/1 int.
-                        val lit = reifyRelationFactor(r)
-                        val ch = newAuxVar(0L, 1L)
-                        factors.add(
-                            ReifiedLinear(
-                                Lit.variable(lit),
-                                intArrayOf(1),
-                                intArrayOf(ch),
-                                LinearOp.EQ,
-                                if (Lit.isPositive(lit)) 1 else 0,
-                            ),
-                        )
-                        ch
+                        litTo01(reifyRelationFactor(r))
                     }
                 }
 
@@ -865,9 +854,15 @@ internal object Compiler {
         /** Channel a literal to a fresh 0/1 int var equal to its truth value. */
         internal fun litTo01(lit: Int): Int {
             val ch = newAuxVar(0L, 1L)
-            val b = reifyLinear(intArrayOf(1), intArrayOf(ch), LinearOp.GE, 1) // b ⟺ ch = 1
-            factors.add(Clause(intArrayOf(Lit.negate(b), lit))) // b → lit
-            factors.add(Clause(intArrayOf(b, Lit.negate(lit)))) // lit → b
+            factors.add(
+                ReifiedLinear(
+                    Lit.variable(lit),
+                    intArrayOf(1),
+                    intArrayOf(ch),
+                    LinearOp.EQ,
+                    if (Lit.isPositive(lit)) 1 else 0,
+                ),
+            )
             return ch
         }
 
