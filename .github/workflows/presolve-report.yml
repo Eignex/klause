@@ -45,6 +45,7 @@ jobs:
           cp -R klause-bench/campaigns/presolve-554/evidence/911/cases "$PRESOLVE_PROFILE_DIR/"
           find "$PRESOLVE_PROFILE_DIR" -name '*.gz' -exec gzip -d {} +
           python3 klause-bench/exact-projection/profile.py "$PRESOLVE_PROFILE_DIR" > "$PRESOLVE_REPORT_DIR/911-profile.json"
+          python3 klause-bench/campaigns/presolve-554/profile_windows.py "$PRESOLVE_PROFILE_DIR" > "$PRESOLVE_REPORT_DIR/911-windows.json"
       - uses: actions/upload-artifact@v7
         with:
           name: presolve-reports
