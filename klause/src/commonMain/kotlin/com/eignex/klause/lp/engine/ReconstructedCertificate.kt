@@ -258,7 +258,13 @@ private class FixedReconstructionVerifier(
 
     private fun from(value: BigFraction): Frac128 {
         meter.fraction(value)
-        if (value.num.magnitudeBitLength() > 127 || value.den.magnitudeBitLength() > 127) throw ReconstructionOverflow()
+        val numeratorBits = value.num.magnitudeBitLength()
+        val denominatorBits = value.den.magnitudeBitLength()
+        if (numeratorBits > 127 || denominatorBits > 127) throw ReconstructionOverflow()
+        if (numeratorBits <= 63 && denominatorBits <= 63) {
+            val numerator = value.num.toLong()
+            return checked(Frac128(if (numerator < 0L) -1L else 0L, numerator, 0L, value.den.toLong()))
+        }
         val magnitude = value.num.abs()
         val low = magnitude.toLong()
         val high = (magnitude shr 64).toLong()
@@ -273,12 +279,18 @@ private class FixedReconstructionVerifier(
         )
     }
 
-    private fun big(value: Frac128): BigFraction = meter.fraction(
-        BigFraction.of(
-            (bigIntOf(value.nHi) shl 64) + bigIntOf(value.nLo.toULong()),
-            (bigIntOf(value.dHi) shl 64) + bigIntOf(value.dLo.toULong()),
-        ),
-    )
+    private fun big(value: Frac128): BigFraction {
+        val signedLong = (value.nHi == 0L && value.nLo >= 0L) || (value.nHi == -1L && value.nLo < 0L)
+        val fraction = if (signedLong && value.dHi == 0L && value.dLo > 0L) {
+            BigFraction.of(bigIntOf(value.nLo), bigIntOf(value.dLo))
+        } else {
+            BigFraction.of(
+                (bigIntOf(value.nHi) shl 64) + bigIntOf(value.nLo.toULong()),
+                (bigIntOf(value.dHi) shl 64) + bigIntOf(value.dLo.toULong()),
+            )
+        }
+        return meter.fraction(fraction)
+    }
 
     private fun plus(x: Frac128, y: Frac128): Frac128 = checked(ops.plus(x, y))
     private fun minus(x: Frac128, y: Frac128): Frac128 = checked(ops.minus(x, y))
