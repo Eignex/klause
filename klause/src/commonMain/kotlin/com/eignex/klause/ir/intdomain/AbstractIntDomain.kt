@@ -2,7 +2,6 @@ package com.eignex.klause.ir.intdomain
 
 import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.defaultDomainStorageSettings
 import com.eignex.klause.util.LongArrayList
 
 internal abstract class AbstractIntDomain(val storage: DomainStorageSettings) : IntDomain {
