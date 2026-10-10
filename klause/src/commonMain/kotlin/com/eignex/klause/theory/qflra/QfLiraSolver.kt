@@ -561,6 +561,7 @@ class ExactLiraSearchComponent(
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
         if (impliedDisjunct) return ComponentResult.Consistent
+        if (bools.any { it == UNASSIGNED }) return ComponentResult.Consistent
         val equalityResult = equalities.propagate(context, operationStop)
         if (equalityResult is ComponentResult.Conflict) {
             smtStats?.observeConflict(equalityResult.explanation)
