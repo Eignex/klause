@@ -1373,6 +1373,21 @@ class PortfolioTest {
         assertEquals(10L, result.stats.portfolio.arms.single().initializationWork)
     }
     @Test
+    fun `nonresumable session optimization retains stacked assumptions`() {
+        val solver = BacktrackSolver(Problem(0, 1, arrayOf(IntDomain(0L, 1L)), emptyArray()).bake())
+        val session = object : StatelessSession<BacktrackParams>(solver) {
+            override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch? = null
+        }
+        session.push(Assumptions.None.withInt(0, 1L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val worker = PortfolioWorker.of("pinned", 0, session, BacktrackParams(), objective)
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.minimize(Cancellation.Never) }
+
+        assertEquals(1.0, assertIs<MinimizeResult.Optimal>(result).objectiveValue)
+    }
+
+    @Test
     fun `cancelled optimization construction retires without stopping siblings`() {
         var openings = 0
         val sibling = TrackingResumableSearch(MinimizeResult.Optimal(Sample(BooleanArray(0), LongArray(0)), 0.0))
