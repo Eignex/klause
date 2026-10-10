@@ -403,14 +403,14 @@ internal object SolveCore {
      * The presolve phase's allowance, as a [Cancellation] for the phase and a [PresolveBudget] the round
      * engine slices per pass. Derived by [derivedPresolveBudgetMs] as a share of the run's own `-t`
      * budget rather than a flat figure, and counted in work. An explicit `klause.presolve.budget.ms` still
-     * wins. The run's deadline in [solveCancel] is the only clock left on the phase, as a safety net.
+     * wins. A shared elapsed ceiling also reserves time for search when work underprices preparation.
      */
     internal fun presolveAllowance(
         common: CommonOptions,
         solveCancel: Cancellation,
     ): Pair<Cancellation, PresolveBudget?> {
         val budget = common.sharedPresolveBudget() ?: return solveCancel to null
-        return budget.orSpent(solveCancel) to budget
+        return budget.orSpent(common.presolveTimeCancellation or solveCancel) to budget
     }
 
     /** Naked single backtrack solve for the `fixed`/FD engine. A model annotation selects its heuristic;

@@ -1429,6 +1429,21 @@ class CliModeTest {
     }
 
     @Test
+    fun `elapsed presolve exhaustion preserves the search cancellation`() {
+        val common = CommonOptions().apply { timeLimitMs = 10_000L }
+        val shared = requireNotNull(common.sharedPresolveBudget())
+        common.presolveTimeCancellation = Cancellation { true }
+
+        val solveCancellation = Cancellation { false }
+        val (cancel, budget) = SolveCore.presolveAllowance(common, solveCancellation)
+
+        assertTrue(cancel())
+        assertSame(shared, budget)
+        assertEquals(shared.allowance, shared.remaining())
+        assertFalse(solveCancellation())
+    }
+
+    @Test
     fun `routing exhaustion leaves source preparation runnable`() {
         val parent = PresolveBudget(6_000L)
         val route = routingSlice(parent, Cancellation.Never)
