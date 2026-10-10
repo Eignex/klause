@@ -62,6 +62,8 @@ in KDoc. Keep fixture identities/licenses in [provenance](testing/fixtures.md)
 and immutable capture manifests. Repository agent instructions and GitHub
 templates retain their functional locations.
 
+### Campaign evidence
+
 Keep benchmark result directories local and ignored. Store temporary campaign notes,
 scripts, manifests, raw results and reports in `klause-evidence/campaigns/<name>/`,
 outside the repository alongside its primary checkout. All worktrees share this
@@ -72,6 +74,12 @@ Consolidate conclusions that establish architecture or invariants into the relev
 `docs/` page. Use `docs/evidence/` only for small, durable evidence supporting a
 current design decision; temporary campaigns and raw-result archives stay in
 `klause-evidence`.
+
+Retain campaign bundles only while they support active work. After promoting useful
+conclusions, tooling or regression fixtures, delete obsolete evidence rather than
+copying historical archives into the shared directory.
+
+### Maintaining documentation
 
 Read the relevant architecture and contract pages before changing a subsystem.
 Maintain them in the same change as code affecting ownership, dependencies,

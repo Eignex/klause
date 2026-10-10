@@ -124,6 +124,11 @@ orientation, proof status, statistics and portfolio attribution. `solve-one` als
 writes a record on load failure: `stats.unsupported` means declined input and
 `stats.loadError` means compilation/parsing failed.
 
+The harness output directories are ignored staging locations. Keep campaign bundles
+needed for active work in the shared external `klause-evidence/campaigns/<name>/`
+directory and clear obsolete outputs. The [evidence policy](development.md#campaign-evidence)
+defines what belongs in the repository and when to retire campaign material.
+
 `elapsedMs` measures subprocess wall time, including launch and output consumption.
 It differs from `timeToBestMs` and `timeToFirstFeasibleMs`, which stay null without
 a witness. Legacy records and runs that never launched can have null elapsed time.
