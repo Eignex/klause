@@ -213,7 +213,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
 
     internal fun addElementIndexSet(state: LocalSearchState, varId: Int, newValue: Long): Boolean {
         if (assumptions.isFrozenInt(varId)) return false
-        val linear = invariants?.linearDefinition(varId)
+        val linear = if (invariants?.hasExtremumRepair(varId) == true) null else invariants?.linearDefinition(varId)
         if (linear != null) return AffineIndexRepair(state, this, linear).propose(newValue)
         val before = size
         addChannelingIntSet(state, varId, newValue)

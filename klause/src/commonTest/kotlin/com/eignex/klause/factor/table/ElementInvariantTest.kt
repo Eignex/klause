@@ -324,6 +324,41 @@ class ElementInvariantTest {
     }
 
     @Test
+    fun `index repairs backsolve affine aliases over retained extrema`() {
+        val problem = Problem(
+            0, 5,
+            arrayOf(IntDomain(0, 2), IntDomain(2, 2), IntDomain(0, 2), IntDomain(0, 4), IntDomain(9, 9)),
+            arrayOf<Factor>(
+                ArrayMinMax(2, intArrayOf(0, 1), false),
+                Linear(intArrayOf(2, -1), intArrayOf(2, 3), LinearOp.EQ, 0),
+                Element(3, 4, longArrayOf(1, 1, 9, 1, 1), false, 0),
+            ),
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, 5, intArrayOf(2, 3)))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.invariants = sweep.network(5, 0)
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 2)
+        state.assignment.setInt(4, 9)
+        sweep.sweep(state.assignment, state.rootDomains)
+        state.recompute()
+        val before = state.cost
+
+        state.factors[2].proposeRepairMoves(state, 2, state.moveSink)
+        val move = state.moveSink.list.single()
+        val predicted = state.netDelta(move)
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(1L, state.assignment.intValue(2))
+        assertEquals(2L, state.assignment.intValue(3))
+        assertEquals(-before, predicted)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
     fun `index repairs skip unreachable matching cells in a retained extremum cone`() {
         val problem = Problem(
             0,

@@ -226,7 +226,8 @@ such index definitions are maintained from their searched leaves; other occurren
 prevent their inference. Inverse repairs follow at most 16 such aliases, checking each
 intermediate domain and rejecting conflicting targets for a shared leaf.
 Single-coordinate repairs precede joint moves; joint repair enumerates at most 64
-present members of one input domain. Input domains,
+present members of one input domain. Affine aliases over retained extrema use the
+extremum inverse repair so their derived inputs remain reachable. Input domains,
 pins and implicit owners filter the complete move before publication. Equality indicators
 join coordinate moves and carry admissible binary channels after protecting all
 requested coordinates, while arithmetic counter-shifts cannot overwrite those
