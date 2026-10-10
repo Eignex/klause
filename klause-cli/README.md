@@ -12,6 +12,9 @@ driver, and differ only in how they parse input and print results:
   `s UNKNOWN`, a `v <instantiation>` line with named values, and `c` stat comments for `-s`.
 - **SMT-LIB QF_LIA** (`.smt2`, `.smt`) — `sat` / `unsat` / `unknown` plus a
   `(get-model)`-style `(define-fun …)` block on sat, `;` stat comments for `-s`.
+  Optimization emits `; objective=<value>` per incumbent in the source objective's direction
+  and `; optimizationStatus=<status>` at completion, including `optimal`, `best-found`
+  and `unbounded`. These comments are emitted without `-s`; `sat` alone proves no optimum.
 
 Each invocation solves exactly one instance. Whole-corpus solving across the external
 libraries lives in klause-bench (`bench solve suite=xcsp3-core|smtlib-core`), which is

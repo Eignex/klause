@@ -55,6 +55,35 @@ class VerdictReasonTest {
     }
 
     @Test
+    fun `SMT interrupted incumbents retain their objective without an optimum claim`() {
+        for (reason in listOf(TerminationReason.Timeout, TerminationReason.BudgetExhausted, TerminationReason.Cancelled)) {
+            val out = capture {
+                SmtLibOutput().apply {
+                    begin(optimize = true, maximize = false)
+                    onSolution("(model)", 7L)
+                    onVerdictContext(VerdictContext(terminationReason = reason))
+                    onComplete(Verdict.BEST_FOUND)
+                }
+            }
+
+            assertEquals("; objective=7\nsat\n; optimizationStatus=best-found\n(model)\n", out)
+        }
+    }
+
+    @Test
+    fun `SMT optimization without an incumbent retains the stop cause`() {
+        val out = capture {
+            SmtLibOutput().apply {
+                begin(optimize = true, maximize = false)
+                onVerdictContext(VerdictContext(terminationReason = TerminationReason.Timeout))
+                onComplete(Verdict.UNKNOWN)
+            }
+        }
+
+        assertEquals("unknown\n; optimizationStatus=unknown\n; wall timeout\n", out)
+    }
+
+    @Test
     fun `SMT-LIB statistics include every deterministic open theory counter`() {
         val out = capture {
             SmtLibOutput().onStatistics(

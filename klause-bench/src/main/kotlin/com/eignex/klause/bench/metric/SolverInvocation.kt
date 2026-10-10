@@ -318,6 +318,7 @@ internal object SolverInvocation {
         var proven = false
         var unsat = false
         var anySolution = false
+        var smtSat = false
 
         // An improving incumbent (a new solution / better objective): stamp time-to-best afresh.
         fun markIncumbent() {
@@ -400,7 +401,10 @@ internal object SolverInvocation {
                 }
 
                 Dialect.SMT_LIB -> when {
-                    line == SMT_SAT -> markFeasible()
+                    line == SMT_SAT -> {
+                        smtSat = true
+                        markFeasible()
+                    }
 
                     line == SMT_UNSAT -> {
                         unsat = true
@@ -410,7 +414,14 @@ internal object SolverInvocation {
                     line == SMT_UNKNOWN -> Unit
 
                     // `; <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
-                    line.startsWith(SMT_COMMENT_PREFIX) -> recordStat(line.removePrefix(SMT_COMMENT_PREFIX).trim())
+                    line.startsWith(SMT_COMMENT_PREFIX) -> {
+                        val kv = line.removePrefix(SMT_COMMENT_PREFIX).trim()
+                        recordStat(kv)
+                        if (kv.substringBefore('=').trim() == "objective") {
+                            objective = parsePbObjective(kv.substringAfter('=', "").trim())
+                            if (objective != null) markIncumbent()
+                        }
+                    }
                 }
             }
         }
@@ -453,7 +464,11 @@ internal object SolverInvocation {
             elapsedMs = elapsedMs,
             timeToBestMs = timeToBestMs,
             timeToFirstFeasibleMs = timeToFirstFeasibleMs,
-            proven = proven,
+            proven = if (dialect == Dialect.SMT_LIB) {
+                unsat || (smtSat && objective != null && stats["optimizationStatus"] == "optimal")
+            } else {
+                proven
+            },
             stats = stats,
             attribution = attribution,
             rawOutput = raw.toString(),

@@ -237,6 +237,7 @@ class CliModeTest {
 
         assertTrue("; smtTheoryChecks=" in output, output)
         assertTrue("; smtWitnessCandidates=1" in output, output)
+        assertFalse("optimizationStatus=" in output, output)
     }
 
     @Test
@@ -531,8 +532,74 @@ class CliModeTest {
         val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
 
         assertEquals(0, code, out)
-        assertEquals("sat", out.lines().firstOrNull(), out)
+        assertTrue("sat" in out.lines(), out)
+        assertTrue("; objective=3" in out.lines(), out)
+        assertTrue("; optimizationStatus=optimal" in out.lines(), out)
         assertTrue("(define-fun x () Int 3)" in out, out)
+    }
+
+    @Test
+    fun `SMT optimization reports the disjunctive integer optimum`() {
+        val smt = File.createTempFile("cliobjective", ".smt2").apply {
+            writeText(
+                """
+                (set-logic QF_LIA)
+                (declare-const x Int) (declare-const y Int)
+                (assert (>= x 0)) (assert (>= y 0))
+                (assert (<= (+ x y) 10))
+                (assert (or (>= x 7) (>= y 7)))
+                (minimize (+ x y))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
+
+        assertEquals("; objective=7", out.lines().last { it.startsWith("; objective=") }, out)
+        assertTrue("; optimizationStatus=optimal" in out.lines(), out)
+    }
+
+    @Test
+    fun `SMT optimization objectives use the source direction`() {
+        for ((sort, bound) in listOf("Int" to "2", "Real" to "1.5")) {
+            for (direction in listOf("minimize", "maximize")) {
+                val smt = File.createTempFile("clidirection", ".smt2").apply {
+                    writeText(
+                        """
+                        (declare-const x $sort)
+                        (assert (>= x (- $bound))) (assert (<= x $bound))
+                        ($direction x)
+                        (check-sat)
+                        """.trimIndent(),
+                    )
+                    deleteOnExit()
+                }
+
+                val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
+
+                val expected = if (direction == "minimize") "-$bound" else bound
+                assertEquals("; objective=$expected", out.lines().last { it.startsWith("; objective=") }, out)
+                assertTrue("; optimizationStatus=optimal" in out.lines(), out)
+            }
+        }
+    }
+
+    @Test
+    fun `SMT optimization reports an unbounded descent beside its witness`() {
+        val smt = File.createTempFile("cliunbounded", ".smt2").apply {
+            writeText(
+                "(declare-const x Int)\n(assert (<= x 9))\n(minimize x)\n(check-sat)\n",
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
+
+        assertTrue("sat" in out.lines(), out)
+        assertTrue("; optimizationStatus=unbounded" in out.lines(), out)
+        assertTrue("(define-fun x () Int" in out, out)
     }
 
     @Test
@@ -555,7 +622,7 @@ class CliModeTest {
         val out = capture { code = runCli(arrayOf("-e", "ls", "--param", "node-limit=100", smt.absolutePath)) }
 
         assertEquals(0, code, out)
-        assertEquals("sat", out.lines().firstOrNull(), out)
+        assertTrue("sat" in out.lines(), out)
     }
 
     @Test
@@ -718,7 +785,7 @@ class CliModeTest {
 
         val out = capture { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
 
-        assertEquals("sat", out.lines().firstOrNull(), out)
+        assertTrue("sat" in out.lines(), out)
         assertTrue("(define-fun y () Int 2)" in out, out)
         assertTrue("(define-fun x () Real (/ 2.0 3.0))" in out, out)
     }

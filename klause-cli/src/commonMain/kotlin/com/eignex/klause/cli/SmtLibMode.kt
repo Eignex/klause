@@ -179,7 +179,18 @@ private fun smtReal(value: String): String {
 
 /** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
 internal class SmtLibOutput : BufferedBestOutput() {
+    private var optimize = false
+
     override val commentPrefix: String = ";"
+    override val streamObjective: Boolean = true
+    override val objectivePrefix: String = "; objective="
+
+    override fun begin(optimize: Boolean, maximize: Boolean) {
+        this.optimize = optimize
+    }
+
+    override fun completionMetadata(verdict: Verdict): String? =
+        if (optimize) "optimizationStatus=${verdict.name.lowercase().replace('_', '-')}" else null
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND, Verdict.UNBOUNDED -> "sat"
