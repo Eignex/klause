@@ -23,6 +23,11 @@ class CompareRecordsTest {
                     b = dict(a, exactObjective=lower if maximize else higher)
                     assert scores.compare(a, b, True)[:3] == (1, 1, 0)
                     assert lab.quality(a, b) == -1
+            witness = dict(feasible=True, kind='optimize', exactObjective='1/3',
+                           finalWitness='_objective = 0.3333333333333333;\n% klause-exact: _objective = 1/3;')
+            assert lab.objective_support(witness) == 'matched'
+            witness['finalWitness'] = witness['finalWitness'].replace('= 1/3;', '= 1/2;')
+            assert lab.objective_support(witness) == 'mismatch'
             legacy = dict(feasible=True, proven=False, kind='optimize', objective=1.25, elapsedMs=10)
             exact = dict(legacy, exactObjective='5/4')
             assert scores.compare(legacy, exact, True)[:3] == (0, 0.5, 0.5)

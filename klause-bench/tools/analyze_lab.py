@@ -92,7 +92,8 @@ def objective_support(r):
     witness = r.get('finalWitness') or r.get('sourceWitness')
     if witness is None:
         return 'missing-witness'
-    reported = re.search(r'(?m)^\s*_objective\s*=\s*([^;]+);', witness)
+    exact = re.search(r'(?m)^% klause-exact: _objective\s*=\s*([^;]+);', witness)
+    reported = exact or re.search(r'(?m)^\s*_objective\s*=\s*([^;]+);', witness)
     if reported is None:
         return 'missing-objective'
     try:
@@ -184,6 +185,8 @@ def analyze(cases, control):
                             'validationPolicies': dict(Counter(r.get('validationPolicy', 'missing') for r in recorded)),
                             'sourceValidation': dict(Counter(r.get('stats', {}).get('sourceValidation', 'absent')
                                                               for r in recorded)),
+                            'sourceValidationScopes': dict(Counter(r.get('stats', {}).get('sourceValidationScope', 'unspecified')
+                                                                    for r in recorded)),
                             'objectiveSupport': dict(Counter(objective_support(r) for r in recorded)),
                             'retainedWitnesses': sum(r.get('finalWitness') is not None or
                                 r.get('sourceWitness') is not None for r in recorded),
