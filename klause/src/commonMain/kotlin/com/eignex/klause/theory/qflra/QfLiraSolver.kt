@@ -156,6 +156,11 @@ class ExactLiraSearchComponent(
         }
     }
     private val difference by lazy { ExactLiraDifference(model, exactForms) }
+    private val equalities by lazy {
+        ExactLiraEqualities(model, exactForms) { decision, context ->
+            lp.assertWithin(decision, context, operationStop)
+        }
+    }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -553,6 +558,13 @@ class ExactLiraSearchComponent(
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
         if (impliedDisjunct) return ComponentResult.Consistent
+        val equalityResult = equalities.propagate(context, operationStop)
+        if (equalityResult is ComponentResult.Conflict) {
+            smtStats?.observeConflict(equalityResult.explanation)
+            outcome = ComponentCheck.Infeasible(equalityResult.explanation)
+        }
+        if (equalityResult !is ComponentResult.Consistent) return equalityResult
+        if (equalities.implied) return ComponentResult.Consistent
         val differenceResult = difference.propagate(context, operationStop)
         if (differenceResult is ComponentResult.Conflict) {
             smtStats?.observeConflict(differenceResult.explanation)

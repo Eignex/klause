@@ -53,6 +53,12 @@ are omitted from this graph and remain enforced by the complete theory. It never
 publishes feasibility or materializes CP domains. They also narrow source-column
 bounds from exact row intervals and imply reified comparisons with immutable row and
 bound premises. These bounds follow the LP trail and retract with their decisions.
+Integer difference equalities form a weighted forest, including declared fixed
+columns. Exact offsets decide comparisons even when no individual column has a
+bound. Explanation paths cite the selected source equality guards, including
+complemented disequalities; an inconsistent offset path refutes its active guards.
+The forest is rebuilt from current assertions, so retraction drops their effects.
+Wide offsets are omitted from this redundant check and remain with the full theory.
 Interval deductions read staged bounds within a propagation pass and publish the
 strongest side per column in one LP batch. Abandoned passes requeue their rows;
 crossed staged bounds cite both derivations without publishing a partial batch.
