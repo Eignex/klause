@@ -436,6 +436,7 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
         factors.add(Clause(intArrayOf(cond, reifyEq(self, b.lin)))) // ¬cond ⇒ v = b
         conditionalEqualities.define(
             checkNotNull(self.asSimpleVar()), listOf(cond), listOf(a.lin), b.lin, factors.subList(start, factors.size),
+            listOf(iteChains.guardEquality(cond)),
         )
         return narrowRes(self)
     }
