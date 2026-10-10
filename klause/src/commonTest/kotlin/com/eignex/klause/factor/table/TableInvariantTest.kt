@@ -4,8 +4,8 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
