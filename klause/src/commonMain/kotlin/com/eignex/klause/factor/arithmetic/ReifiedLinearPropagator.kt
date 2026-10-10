@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectLinearLiftedAntecede
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.explainLinearBound
 import com.eignex.klause.factor.arithmetic.internals.integralQuotientOrNull
+import com.eignex.klause.factor.arithmetic.internals.linearLazyReason
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
@@ -140,7 +141,11 @@ internal class ReifiedLinearPropagator(
             // Pinning the indicator rests on the side of the sum that settles the body, lifted by its slack.
             pinAntecedent = {
                 settlingSide(sumLo, sumHi, holds = alwaysHolds)?.let {
-                    collectLinearLiftedAntecedents(state, coeffs, vars, useLo = it.useLo, slack = it.slack)
+                    if (state.undoLogging && factorId >= 0 && state.currentLevel > 0) {
+                        linearLazyReason(state, factorId, -1, it.useLo, it.slack, 0, false)
+                    } else {
+                        collectLinearLiftedAntecedents(state, coeffs, vars, useLo = it.useLo, slack = it.slack)
+                    }
                 } ?: state.composeIntVarAtomAntecedents(vars)
             },
             // Target absence decides EQ and NE even when the interval still straddles the target.
