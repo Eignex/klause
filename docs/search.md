@@ -159,6 +159,9 @@ Source assertion accumulates derived disequality directions and their premises i
 private maps, then publishes one immutable node snapshot for the completed pass.
 Directions retain their source premises along a branch; retraction restores the
 parent snapshot before a sibling adds assertions.
+Completed source comparisons are installed once along a branch. Retraction clears
+their publication markers so restored assertions and sibling Boolean substitutions
+are installed against the current LP trail. Incomplete passes publish no markers.
 Each propagation call limits row visits before the complete LP check, so a
 partial interval pass cannot establish feasibility or exhaustion. There is no
 explanation weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
