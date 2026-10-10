@@ -17,6 +17,7 @@ internal class SmtLibConditionalEquality {
         val arms: List<LinComb>,
         val default: LinComb,
         val factors: List<Factor>,
+        val image: Set<Long>?,
     ) {
         var noArm: Int? = null
     }
@@ -32,7 +33,23 @@ internal class SmtLibConditionalEquality {
     private var work = 0
 
     fun define(variable: Int, guards: List<Int>, arms: List<LinComb>, default: LinComb, factors: List<Factor>) {
-        definitions[variable] = Definition(guards.toList(), arms.toList(), default, factors.toList())
+        definitions[variable] = Definition(
+            guards.toList(), arms.toList(), default, factors.toList(), constantImage(arms + default),
+        )
+    }
+
+    private fun constantImage(terms: List<LinComb>): Set<Long>? {
+        val values = HashSet<Long>()
+        for (term in terms) {
+            if (term.coeffs.isEmpty()) {
+                values += term.constant
+            } else {
+                val source = term.asSimpleVar() ?: return null
+                values += definitions[source]?.image ?: return null
+            }
+            if (values.size > IMAGE_LIMIT) return null
+        }
+        return values
     }
 
     fun retainNeededDefinitions(
@@ -79,6 +96,9 @@ internal class SmtLibConditionalEquality {
     fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {
         val key = Key(variable, value)
         equalities[key]?.let { return it }
+        if (definitions[variable]?.image?.contains(value) == false) {
+            return Lit.negate(builder.trueLit()).also { equalities[key] = it }
+        }
         if (variable !in definitions || work >= WORK_LIMIT) return null
         val pending = ArrayDeque<Frame>()
         val literals = ArrayDeque<Int>()
@@ -96,6 +116,11 @@ internal class SmtLibConditionalEquality {
                         term.coeffs.isEmpty() -> literals.addLast(
                             if (term.constant == value) builder.trueLit() else Lit.negate(builder.trueLit()),
                         )
+                        source != null && definition?.image?.contains(value) == false -> {
+                            val literal = Lit.negate(builder.trueLit())
+                            equalities[Key(source, value)] = literal
+                            literals.addLast(literal)
+                        }
                         source != null && definition != null -> {
                             pending.addLast(Frame.Join(source, definition))
                             pending.addLast(Frame.Eval(definition.default))
@@ -136,6 +161,7 @@ internal class SmtLibConditionalEquality {
 
     private companion object {
         const val WORK_LIMIT = 65_536
+        const val IMAGE_LIMIT = 1_024
     }
 }
 
