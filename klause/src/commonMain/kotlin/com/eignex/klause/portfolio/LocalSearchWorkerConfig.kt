@@ -64,7 +64,10 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
             completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective) else null,
         ).apply {
             objectiveBound = boundHandle
-            if (effectiveProblem === problem) pools?.localSearchProjection?.let { engine.projection = it }
+            if (effectiveProblem === problem) {
+                pools?.localSearchProjection?.let { engine.projection = it }
+                pools?.localSearchInvariants?.let { engine.invariantNetwork = it }
+            }
         }.session()
         val workerLabel = "ls/$label"
         val params = LocalSearchParams(

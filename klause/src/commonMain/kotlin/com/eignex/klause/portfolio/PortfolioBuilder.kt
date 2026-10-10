@@ -72,7 +72,7 @@ object PortfolioBuilder {
             lsObjective,
             definitionalSweep,
             onEvent,
-            pools = poolsFor(scenario, problem),
+            pools = poolsFor(scenario, problem, definitionalSweep),
         ).onEach { it.improvementOnly = it.armId >= plan.firstSolutionCount }
     }
 
@@ -145,7 +145,11 @@ object PortfolioBuilder {
      * is just cross-segment memory there) and a platform mutex for several lanes' concurrent writers. The clause
      * pool is always present; the cut pool only when [PortfolioScenario.shareCuts] opts in.
      */
-    private fun poolsFor(scenario: PortfolioScenario, problem: BakedProblem): SharedPools? {
+    private fun poolsFor(
+        scenario: PortfolioScenario,
+        problem: BakedProblem,
+        definitionalSweep: DefinitionalSweep?,
+    ): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val concurrency = if (scenario.cores == 1) Concurrency.None else Concurrency.Strict
         val cuts = if (scenario.shareCuts) SharedCutPool(concurrency.lock()) else null
@@ -164,6 +168,7 @@ object PortfolioBuilder {
             ContributionTally(concurrency.lock()),
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
             localSearchProjection = lazy { LocalSearchProblem(problem, LocalSearchModel.of(problem).domains) },
+            localSearchInvariants = lazy { definitionalSweep?.network(problem.numIntVars, problem.numBoolVars) },
         )
     }
 }
