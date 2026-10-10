@@ -53,7 +53,7 @@ class MinimizeTerminationTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val solver = LocalSearchSolver(problem.bake())
+        val solver = LocalSearchSolver(problem.bake(), greedyRepairOnRestart = false)
         var polls = 0
         // Trip only after the descent has polled a while, so cancellation is observed inside the per-var loop.
         val cancellation = Cancellation { ++polls > 100 }
