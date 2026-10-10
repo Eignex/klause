@@ -31,7 +31,7 @@ class PortfolioWorker private constructor(
     private val solveFn: (Cancellation, Long?) -> SolveResult,
     private val improvementsFn: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
-    private val resumableFn: ((readBound: () -> Double, cancellation: Cancellation?, warmStart: Sample?) -> ResumableSearch)?,
+    private val resumableFn: ((() -> Double, Cancellation?, Sample?) -> ResumableSearch)?,
     private val resumableSolveFn: ((Cancellation?) -> ResumableSolve?)?,
     private val withInstructions: Boolean,
     private val closeFn: () -> Unit,
