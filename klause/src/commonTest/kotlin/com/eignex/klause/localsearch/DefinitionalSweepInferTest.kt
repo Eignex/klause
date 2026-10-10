@@ -81,4 +81,12 @@ class DefinitionalSweepInferTest {
         assertEquals(false, net.isDefinedInt(3))
     }
 
+    @Test
+    fun `duplicate extrema leave their output searched`() {
+        val extremum = ArrayMinMax(2, intArrayOf(0, 1), false)
+        for (duplicate in listOf(extremum, ArrayMinMax(2, intArrayOf(0, 1), false))) {
+            assertNull(DefinitionalSweep.infer(arrayOf<Factor>(extremum, duplicate), 3, intArrayOf(2)))
+        }
+    }
+
 }
