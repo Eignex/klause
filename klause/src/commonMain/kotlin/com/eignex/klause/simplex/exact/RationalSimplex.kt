@@ -277,9 +277,8 @@ class BigFraction private constructor(
             val negative = den.signum() < 0
             val n = if (negative) -num else num
             val d = if (negative) -den else den
-            if (d.isOne || n.isUnit) return BigFraction(n, d)
             val g = n.gcd(d)
-            return if (g.isOne) BigFraction(n, d) else BigFraction(n / g, d / g)
+            return BigFraction(n / g, d / g)
         }
 
         /** The exact rational value of a finite double: `v = ±m·2ᵉ` from its IEEE decomposition.
@@ -300,8 +299,7 @@ class BigFraction private constructor(
             m = m shr tz
             e += tz
             val mag = bigIntOf(if (bits < 0L) -m else m)
-            // The odd significand is coprime to the power-of-two denominator.
-            return if (e >= 0) BigFraction(mag shl e, BIG_ONE) else BigFraction(mag, BIG_ONE shl -e)
+            return if (e >= 0) of(mag shl e, BIG_ONE) else of(mag, BIG_ONE shl -e)
         }
     }
 }
