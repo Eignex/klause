@@ -53,6 +53,26 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `a false source clause conflicts despite feasible real bounds`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = session.push(SearchDecision.Bool(Lit.make(0, false)))
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
     fun `compound disjunct conflicts retain their Boolean names`() {
         for ((relation, values, fixed) in listOf(
             Triple(LinearOp.EQ, longArrayOf(0L, 1L), 2),
