@@ -943,7 +943,11 @@ class LocalSearchState(
         val oldCost = cost
         val oldBestCost = bestCostSeen
         val oldTracking = activityTracking
-        val oldObjective = if (objective != null && objective !is LinearObjective) objective.evaluate(assignment) else 0.0
+        val oldObjective = if (objective != null && objective !is LinearObjective) {
+            objective.evaluate(assignment)
+        } else {
+            0.0
+        }
         val degBefore = if (weights.allocated || move !is Move.Compound) {
             (degScratch ?: IntArray(factorDegree.size)).also { degScratch = it }
         } else {
