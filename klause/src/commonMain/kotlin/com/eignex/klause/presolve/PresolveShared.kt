@@ -128,6 +128,7 @@ internal object PresolveShared {
             intDomains = intDomains,
             factors = factors,
             seedDeductions = seedDeductions,
+            cancellation = problem.cancellation,
             alreadyFolded = problem.alreadyFolded,
             // The LP-only continuous columns are a separate namespace presolve never touches (real-bearing
             // rows are guarded out of every pass, and int renumbering leaves real ids alone), so carry it
