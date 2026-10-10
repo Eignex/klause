@@ -18,8 +18,10 @@ internal class SmtLibConditionalEquality {
         val default: LinComb,
         val factors: List<Factor>,
         val image: Set<Long>?,
+        val guardTests: List<GuardEquality?>,
     ) {
         var noArm: Int? = null
+        val guardColumns = guardTests.mapNotNull { it?.variable }.toSet()
     }
 
     private data class Key(val variable: Int, val value: Long)
@@ -32,9 +34,16 @@ internal class SmtLibConditionalEquality {
     private val equalities = HashMap<Key, Int>()
     private var work = 0
 
-    fun define(variable: Int, guards: List<Int>, arms: List<LinComb>, default: LinComb, factors: List<Factor>) {
+    fun define(
+        variable: Int,
+        guards: List<Int>,
+        arms: List<LinComb>,
+        default: LinComb,
+        factors: List<Factor>,
+        guardTests: List<GuardEquality?>,
+    ) {
         definitions[variable] = Definition(
-            guards.toList(), arms.toList(), default, factors.toList(), constantImage(arms + default),
+            guards.toList(), arms.toList(), default, factors.toList(), constantImage(arms + default), guardTests.toList(),
         )
     }
 
@@ -143,13 +152,17 @@ internal class SmtLibConditionalEquality {
                     for (index in arms.indices.reversed()) arms[index] = literals.removeLast()
                     val alternatives = ArrayList<Int>()
                     for (index in arms.indices) {
-                        alternatives += builder.foldConditionalAnd(listOf(definition.guards[index], arms[index]))
+                        val guard = definition.guardTests[index]?.truthWhen(
+                            definition.arms[index].asSimpleVar(), value,
+                        )
+                        alternatives += when (guard) {
+                            true -> arms[index]
+                            false -> Lit.negate(builder.trueLit())
+                            null -> builder.foldConditionalAnd(listOf(definition.guards[index], arms[index]))
+                        }
                     }
                     if (default != Lit.negate(builder.trueLit())) {
-                        val noArm = definition.noArm ?: builder.foldConditionalAnd(
-                            definition.guards.map { Lit.negate(it) },
-                        ).also { definition.noArm = it }
-                        alternatives += builder.foldConditionalAnd(listOf(noArm, default))
+                        alternatives += defaultAlternative(definition, default, value, builder)
                     }
                     val literal = builder.foldConditionalOr(alternatives)
                     equalities[Key(frame.variable, value)] = literal
@@ -158,6 +171,31 @@ internal class SmtLibConditionalEquality {
             }
         }
         return literals.single()
+    }
+
+    private fun defaultAlternative(
+        definition: Definition,
+        literal: Int,
+        value: Long,
+        builder: Compiler.Builder,
+    ): Int {
+        val source = definition.default.asSimpleVar()
+        if (source != null && source in definition.guardColumns) {
+            var simplified = false
+            val guards = ArrayList<Int>()
+            for (index in definition.guards.indices) {
+                when (definition.guardTests[index]?.truthWhen(source, value)) {
+                    true -> return Lit.negate(builder.trueLit())
+                    false -> simplified = true
+                    null -> guards.add(Lit.negate(definition.guards[index]))
+                }
+            }
+            if (simplified) return builder.foldConditionalAnd(guards + literal)
+        }
+        val noArm = definition.noArm ?: builder.foldConditionalAnd(
+            definition.guards.map { Lit.negate(it) },
+        ).also { definition.noArm = it }
+        return builder.foldConditionalAnd(listOf(noArm, literal))
     }
 
     private companion object {
