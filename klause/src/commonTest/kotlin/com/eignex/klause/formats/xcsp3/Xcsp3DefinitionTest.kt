@@ -15,6 +15,46 @@ import kotlin.test.assertTrue
 
 class Xcsp3DefinitionTest {
     @Test
+    fun `Boolean controlled product outputs follow source choices`() {
+        for (predicate in listOf("eq(room,0)", "not(eq(room,0))")) {
+            val relation = if (predicate.startsWith("not")) {
+                "eq(duration,mul(length,$predicate))"
+            } else {
+                "eq(mul($predicate,length),duration)"
+            }
+            val parsed = Xcsp3.parse(
+                """<instance><variables><var id="room">0..2</var><var id="length">3</var>
+                    <var id="duration">0..3</var></variables><constraints>
+                    <intension>$relation</intension>
+                    </constraints></instance>""",
+            )
+            val problem = parsed.problem
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
+            val sample = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
+                .first { it.ints[0] == 0L }
+            val state = LocalSearchState(problem.bake(), Random(3))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            assertTrue(state.invariants!!.isDefinedInt(2))
+            for (i in sample.ints.indices) state.assignment.setInt(i, sample.ints[i])
+            for (i in sample.bools.indices) state.assignment.setBool(i, sample.bools[i])
+            state.recompute()
+
+            for (room in listOf(1L, 2L, 0L)) {
+                val move = state.synthesizeChannelingMove(0, room)
+                val predicted = state.netDelta(move)
+                state.apply(move)
+                val active = if (predicate.startsWith("not")) room != 0L else room == 0L
+
+                assertEquals(if (active) 3L else 0L, state.assignment.intValue(2))
+                assertEquals(0L, predicted)
+                assertEquals(0L, state.cost)
+                state.recompute()
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
     fun `min and max chains retain aliases and exact source solutions`() {
         for (extreme in listOf("min", "max")) {
             val parsed = Xcsp3.parse(

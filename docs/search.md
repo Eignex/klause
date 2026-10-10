@@ -240,6 +240,13 @@ is never overwritten. Equality rows coalesce consistency flips for the same indi
 ordinary repeated Boolean flips are interpreted by their final parity.
 Product definitions then maintain their outputs from the coordinated channel changes.
 Wider inputs and other row shapes retain their independent repair neighborhoods.
+Cumulative overload repair can remove a maintained product duration through a unit
+binary equality channel and a unary equality choice predicate. It checks zero in the
+channel and duration domains, pins and implicit owners before proposing a complete
+choice-and-channel move. Per repair call, at most 16 such moves are drawn from choice
+domains with at most 32 present values, with at most four alternatives per predicate.
+The ordinary scorer grades every affected factor; removing a footprint does not
+establish that the complete assignment is feasible.
 Boolean break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Moves feeding definitions score the complete propagated assignment, including derived

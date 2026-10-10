@@ -494,8 +494,7 @@ internal object Compiler {
 
         internal fun intension(node: FExpr) {
             if (node is FExpr.Call && node.fn == "eq" && node.args.size == 2) {
-                // `eq(v, mul(a,b))` with v, a, b plain variables is one Product (v = a·b), skipping the aux
-                // var and equality the generic term path emits — the bulk of an O(n²) product model.
+                // A direct Product keeps its declared output in the maintained definition cone.
                 (directProduct(node.args[0], node.args[1]) ?: directProduct(node.args[1], node.args[0]))
                     ?.let {
                         factors.add(it)
@@ -638,14 +637,19 @@ internal object Compiler {
         /** The var id when [e] is a plain variable reference, else null. Emits no factors either way. */
         private fun plainVar(e: FExpr): Int? = if (e is FExpr.Ref) ref(e.name) else null
 
-        /** `Product(a, b, v)` (`v = a·b`) when [vSide] is a plain var and [mulSide] is `mul` of two plain
-         *  vars; null otherwise (the caller then takes the generic aux-var + equality path). */
         private fun directProduct(vSide: FExpr, mulSide: FExpr): Product? {
             if (mulSide !is FExpr.Call || mulSide.fn != "mul" || mulSide.args.size != 2) return null
             val v = plainVar(vSide) ?: return null
-            val a = plainVar(mulSide.args[0]) ?: return null
-            val b = plainVar(mulSide.args[1]) ?: return null
-            return Product(a, b, v)
+            val a = plainVar(mulSide.args[0])
+            val b = plainVar(mulSide.args[1])
+            if (a != null && b != null) return Product(a, b, v)
+            val boolean = mulSide.args.indexOfFirst {
+                it is FExpr.Call && (it.fn in REL || it.fn in BOOL_FNS || it.fn == "in" || it.fn == "notin")
+            }
+            if (boolean < 0) return null
+            val other = plainVar(mulSide.args[1 - boolean]) ?: return null
+            val channel = litTo01(compileBool(mulSide.args[boolean]))
+            return if (boolean == 0) Product(channel, other, v) else Product(other, channel, v)
         }
 
         internal fun compileBool(e: FExpr): Int = when (e) {

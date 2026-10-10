@@ -14,6 +14,7 @@ import com.eignex.klause.factor.scheduling.internals.simulateCumulativeResDelta
 import com.eignex.klause.factor.scheduling.internals.simulateCumulativeStartDelta
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.randomValue
+import com.eignex.klause.localsearch.ConditionalProductRepair
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
@@ -264,6 +265,7 @@ internal class CumulativeInvariant(
         val absT = if (peakT >= 0) peakT + tLow else 0L
         val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else EmptyIntArray
         val maxTargets = 4
+        var durationRepairs = 0
         for (i in 0 until n) {
             val v = starts[i]
             val cur = state.assignment.intValue(v)
@@ -272,6 +274,13 @@ internal class CumulativeInvariant(
             val dom = state.rootDomains[v]
             val runsAtPeak = (peakT >= 0 && r > 0 && d > 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
+                if (durationVars.isNotEmpty() && OptPresence.isPresentInAssignment(presents, i, state) &&
+                    durationRepairs < CUMULATIVE_MAX_DURATION_REPAIRS
+                ) {
+                    durationRepairs += ConditionalProductRepair(
+                        state, sink, durationVars[i], CUMULATIVE_MAX_DURATION_REPAIRS - durationRepairs,
+                    ).propose()
+                }
                 val afterPeak = absT + 1
                 if (afterPeak in dom && afterPeak != cur) sink.addChannelingIntSet(state, v, afterPeak)
                 val beforePeak = absT - d
@@ -420,5 +429,6 @@ internal class CumulativeInvariant(
 }
 
 private const val CUMULATIVE_MAX_SWAPS: Int = 4
+private const val CUMULATIVE_MAX_DURATION_REPAIRS: Int = 16
 private const val CUMULATIVE_STRUCTURED_SWAP_CAP: Int = 4
 private const val CUMULATIVE_SWAP_ATTEMPT_STRIDE: Int = 8
