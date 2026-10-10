@@ -110,8 +110,8 @@ a query retains all source constraints and feasible values.
 
 ## Binary integer channels
 
-Binary-column substitution accepts single-variable reified equalities `b ↔ (x = 0|1)`
-when every reader of `x` supports the Boolean replacement. These channels become
+Binary-column substitution accepts single-variable reified relations whose truth
+differs at 0 and 1 when every reader supports the Boolean replacement. These channels become
 Boolean equivalences; general reified rows and value-reading globals retain their
 integer columns. Objective integer columns remain excluded. Substituted integers
 reuse an existing channel literal when one is available, including its polarity;

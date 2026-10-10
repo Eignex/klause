@@ -34,6 +34,15 @@ estimates the total clause expansion of eligible rows. If it exceeds 32,768
 clauses, all these rows retain arithmetic propagation. This model-wide limit
 bounds expansion without making constraint order select a partial encoding.
 
+A FlatZinc integer objective defined by an unconditional unit-coefficient equality
+over Boolean-channelled binary columns can use the equivalent Boolean weighted
+objective. Projection requires supported integer linear rows and single-variable
+reified readers; general multi-variable reified arithmetic retains the integer
+objective. Channel polarity and fixed terms contribute exact weights and constants.
+Overflowing arithmetic retains the original objective. This changes the objective
+expression while preserving the source model and named integer outputs; normal
+presolve may eliminate and reconstruct those integer columns.
+
 ## FlatZinc floats
 
 FlatZinc first preserves finite float choices from constant-array selection and
