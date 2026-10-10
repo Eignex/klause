@@ -702,10 +702,10 @@ private fun tightenLinearTerms(
             val slack0 = bound - (sumLo - loTerm)
             if (c > 0) {
                 val t = floorDivLong(slack0, c)
-                if (!tightenMaxClamped(state, v, t, loReason(i, liftBudget(c, t, -slack0)))) return false
+                if (!tightenLinearMax(state, v, t) { loReason(i, liftBudget(c, t, -slack0)) }) return false
             } else {
                 val t = ceilDivLong(slack0, c)
-                if (!tightenMinClamped(state, v, t, loReason(i, liftBudget(c, t, -slack0)))) return false
+                if (!tightenLinearMin(state, v, t) { loReason(i, liftBudget(c, t, -slack0)) }) return false
             }
         }
         if ((op == LinearOp.GE || op == LinearOp.EQ) &&
@@ -714,10 +714,10 @@ private fun tightenLinearTerms(
             val needed = bound - (sumHi - hiTerm)
             if (c > 0) {
                 val t = ceilDivLong(needed, c)
-                if (!tightenMinClamped(state, v, t, hiReason(i, liftBudget(-c, t, needed)))) return false
+                if (!tightenLinearMin(state, v, t) { hiReason(i, liftBudget(-c, t, needed)) }) return false
             } else {
                 val t = floorDivLong(needed, c)
-                if (!tightenMaxClamped(state, v, t, hiReason(i, liftBudget(-c, t, needed)))) return false
+                if (!tightenLinearMax(state, v, t) { hiReason(i, liftBudget(-c, t, needed)) }) return false
             }
         }
     }
@@ -751,13 +751,11 @@ internal fun linearSumRange(state: PropagationState, coeffs: LongArray, vars: In
     return longArrayOf(lo, hi)
 }
 
-// Domains are 64-bit, so a bound beyond the 32-bit range is a valid tightening, not an infeasibility;
-// the mutator itself is a no-op when the bound doesn't constrain the current domain.
-private fun tightenMinClamped(state: PropagationState, v: Int, newMin: Long, ant: IntArray? = null): Boolean =
-    state.tightenIntMin(v, newMin, ant)
+private inline fun tightenLinearMin(state: PropagationState, v: Int, newMin: Long, reason: () -> IntArray?): Boolean =
+    newMin <= state.intDomains[v].min || state.tightenIntMin(v, newMin, reason())
 
-private fun tightenMaxClamped(state: PropagationState, v: Int, newMax: Long, ant: IntArray? = null): Boolean =
-    state.tightenIntMax(v, newMax, ant)
+private inline fun tightenLinearMax(state: PropagationState, v: Int, newMax: Long, reason: () -> IntArray?): Boolean =
+    newMax >= state.intDomains[v].max || state.tightenIntMax(v, newMax, reason())
 
 internal fun integralQuotientOrNull(value: Long, divisor: Long): Long? = when {
     divisor == 0L -> null
