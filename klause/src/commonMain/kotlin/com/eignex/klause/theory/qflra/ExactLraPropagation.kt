@@ -99,7 +99,7 @@ internal class ExactLraPropagation(
                                 inequality.columns[it] to inequality.coefficients[it]
                             }, upper = false,
                         ) ?: continue
-                        var bound = (inequality.rhs - rest.value) / coefficient
+                        var bound = (inequality.rhs - rest.value) * coefficient.reciprocal()
                         var strict = inequality.strict || rest.strict
                         val upper = coefficient.signum() > 0
                         if (column >= model.numRealVars) {
