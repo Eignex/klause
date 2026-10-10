@@ -24,6 +24,13 @@ The registry in [Main.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/
 and the flag declarations in [CliMode.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/CliMode.kt)
 are the implementation source for supported names, aliases and help text.
 
+SMT-LIB optimization streams `; objective=<value>` for each incumbent in the source
+objective's direction and emits `; optimizationStatus=<status>` at completion.
+These comments appear without `-s`; `sat` alone does not establish optimality.
+See [SMT-LIB result semantics](formats.md#smt-lib) for the status contract and
+[saved benchmark results](benchmarking.md#saved-results) for proof credit and
+the interpretation of interrupted incumbents and unbounded witness objectives.
+
 ## Build and run
 
 The module is Kotlin Multiplatform (via the `com.eignex.cli` kbuild plugin): shared CLI
