@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -72,25 +73,22 @@ class LpSatisfactionFeasibilityTest {
     }
 
     @Test
-    fun `root cut harvest refutes a fractional integer forced by continuous equations`() {
+    fun `root Hall cuts preserve an all different satisfaction witness`() {
         val problem = Problem(
             numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 1)),
+            numIntVars = 3,
+            intDomains = Array(3) { IntDomain(0, 5) },
             factors = arrayOf<Factor>(
-                Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.EQ, 1L),
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 1L),
+                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6),
             ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
         )
 
         val result = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(lpPlan = LpPlan(bounding = true, cuts = true)),
+            BacktrackParams(lpPlan = LpPlan(bounding = true, cuts = true, cutSearchMaxDepth = 0)),
         )
 
-        assertIs<SolveResult.Unsat>(result)
+        val sat = assertIs<SolveResult.Sat>(result)
+        assertEquals(3, sat.assignment.ints.toSet().size)
         assertTrue(result.stats.lp.rootPasses.sum > 0.0)
         assertTrue(result.stats.lp.cuts.sum > 0.0)
     }
