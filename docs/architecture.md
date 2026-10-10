@@ -52,6 +52,19 @@ checks this structural boundary.
 `BakedProblem` and the propagation session. A source declaration does not assign
 ownership to an engine.
 
+`ProblemSettings` carries immutable resource metadata through source rewrites,
+counting extensions and finite projections. Its domain-storage threshold, pre-bake
+span gate and automatic LP size limits do not alter the declared solution set.
+Domains retain their `DomainStorageSettings` through narrowing and restoration.
+The IR metadata has no dependency on compilation, propagation or solver engines.
+
+Schema compilation and format convenience entry points resolve `KlauseConfig.current`
+once, or accept explicit configuration/settings. Compilation uses semantic choices
+such as absent optional-value pinning; the model retains only narrow resource
+settings. Raw `Problem` and `IntDomain` constructors use built-in defaults and accept
+explicit settings. Root propagation, presolve and LP planning read the captured
+model settings. Search effort stays in the existing per-call backend parameters.
+
 `Problem.componentPlan()` selects an immutable ownership plan before search. It
 builds a compact remapped CP projection and theory fragments. Variables owned by
 an open theory never become finite CP domains. Continuous variables are LP columns

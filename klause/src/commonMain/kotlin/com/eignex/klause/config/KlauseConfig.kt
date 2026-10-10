@@ -1,5 +1,7 @@
 package com.eignex.klause.config
 
+import com.eignex.klause.ir.DomainStorageSettings
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
@@ -71,17 +73,18 @@ const val DEFAULT_BITSET_THRESHOLD: Int = 4096
 const val DEFAULT_DOMAIN_WALK_CAP: Long = DEFAULT_BITSET_THRESHOLD.toLong()
 
 /**
- * Central, process-wide configuration for klause's core (compiler + frontends).
+ * Immutable invocation configuration for klause's core (compiler + frontends).
  *
- * [KlauseConfig] consolidates the knobs that affect *compilation and solving semantics* into a
+ * [KlauseConfig] consolidates semantic choices, storage policy and preparation effort into a
  * single immutable value object, rather than ad-hoc `System.getenv` / `System.getProperty` reads
  * and loose constants resolved at each call site.
  *
  * Two usage modes:
  *  - **Ambient:** set [current] once at startup (e.g. a CLI entry point translating env vars
- *    via [fromProps]) and let APIs that don't take an explicit config read it.
+ *    via [fromProps]) and let APIs that don't take an explicit config capture it at entry.
  *  - **Explicit:** pass a [KlauseConfig] straight to [com.eignex.klause.compile.Compiler] or
  *    `VariableSchema.compile(config)` when you need per-call control (tests, embedding).
+ *    Source models retain [problemSettings] through preparation and solving.
  *
  * The core stays pure Kotlin with no platform dependencies — reading env vars / system
  * properties is the responsibility of platform entry points, which feed a property [fromProps]
@@ -173,6 +176,14 @@ data class KlauseConfig(
     /** Construction-time interior-hole SAC (implies bound SAC). `null` = auto (off — opt-in). */
     val presolveProbeIntHoles: Boolean? = null,
 ) {
+    /** Narrow immutable resource settings for source models and their projections. */
+    fun problemSettings(): ProblemSettings = ProblemSettings(
+        storage = DomainStorageSettings(bitsetThreshold),
+        largeSpanThreshold = largeSpanThreshold,
+        lpMaxTableauCells = lpMaxTableauCells,
+        lpCeilingTableauCells = lpCeilingTableauCells,
+    )
+
     /** Bundle the emphasis level and the per-pass override knobs into a [PresolveConfig]; `null`
      *  knobs are left out (deferred to the emphasis), explicit values become forced overrides. */
     fun presolveConfig(): PresolveConfig = PresolveConfig(
@@ -194,7 +205,7 @@ data class KlauseConfig(
 
         /**
          * Ambient configuration consulted by APIs that don't take an explicit [KlauseConfig]
-         * (notably `VariableSchema.compile()` and `Compiler()`). Assign once at application
+         * (notably `VariableSchema.compile()` and format entry points). Assign once at application
          * startup, before compiling. Defaults to [DEFAULT].
          */
         var current: KlauseConfig = DEFAULT

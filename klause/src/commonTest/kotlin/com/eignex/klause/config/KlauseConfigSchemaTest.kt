@@ -1,10 +1,17 @@
 package com.eignex.klause.config
 
+import com.eignex.klause.ir.ProblemSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class KlauseConfigSchemaTest {
+
+    @Test
+    fun `raw model resource defaults match the core defaults`() {
+        assertEquals(KlauseConfig.DEFAULT.problemSettings(), ProblemSettings())
+    }
+
 
     @Test
     fun `property key derives from the knob name as a dotted klause path`() {

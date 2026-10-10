@@ -116,6 +116,7 @@ internal object IntBitChannel {
         // which of its endpoints were invented. The channel re-encodes that box rather than replacing it,
         // so a side the source left open is still open here and no consumer reads the box as a declaration.
         val problem = Problem(
+            settings = base.settings,
             numBoolVars = nextBool,
             numIntVars = nextInt,
             intDomains = base.rootIntDomains() + extraDomains.toTypedArray(),

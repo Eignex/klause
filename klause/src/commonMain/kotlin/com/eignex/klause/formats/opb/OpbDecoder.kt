@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.opb
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -9,6 +10,7 @@ import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.channelBoolTo01
@@ -40,8 +42,8 @@ class OpbLoweringException(msg: String) : IllegalArgumentException("OPB: $msg")
 /** Decodes an OPB syntax document into solver data. */
 internal object OpbDecoder {
 
-    fun decode(document: OpbDocument): OpbProblem {
-        val builder = Builder(document.numDeclaredVars)
+    fun decode(document: OpbDocument, settings: ProblemSettings = ProblemSettings()): OpbProblem {
+        val builder = Builder(document.numDeclaredVars, settings)
         val objectiveWeights = MutableIntLongMap()
         var objectiveConstant = 0L
         var hasObjective = false
@@ -167,8 +169,8 @@ internal object OpbDecoder {
         fun longBound(): Long = bound.toLongExact()
     }
 
-    private class Builder(numDeclaredVars: Int) : CnfLowering {
-        private val problemBuilder = ProblemBuilder()
+    private class Builder(numDeclaredVars: Int, settings: ProblemSettings) : CnfLowering {
+        private val problemBuilder = ProblemBuilder(settings)
 
         override val factors get() = problemBuilder.factors
         override var trueLitCache: Int
@@ -237,4 +239,5 @@ internal object OpbDecoder {
 }
 
 /** Lower this parsed OPB document to a solver problem. */
-fun OpbDocument.toProblem(): OpbProblem = OpbDecoder.decode(this)
+fun OpbDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): OpbProblem =
+    OpbDecoder.decode(this, settings)

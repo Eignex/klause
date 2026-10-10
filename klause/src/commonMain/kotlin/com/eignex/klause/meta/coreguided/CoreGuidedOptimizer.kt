@@ -256,6 +256,7 @@ internal class CoreGuidedOptimizer(val baseProblem: BakedProblem) {
             }
         }
         return Problem(
+            settings = base.settings,
             numBoolVars = totalBoolVars,
             numIntVars = base.numIntVars,
             intDomains = base.rootIntDomains(),

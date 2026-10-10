@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.mps
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -11,6 +12,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.lowering.channelBoolTo01
@@ -394,7 +396,7 @@ private const val MPS_INFINITY = 1e20
  *  - an objective too wide for one power of ten is restated as an auxiliary continuous column `z` with
  *    the real row `z = Σ cᵢxᵢ + constant`, and `z` is optimized; [MpsCompiled.columns] omits `z`.
  */
-fun MpsModel.toProblem(): MpsCompiled {
+fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): MpsCompiled {
     val exactInput = exactAdapterSnapshot()
     val sourceNumbers = exactInput.sourceNumbers()
     val isFloat = BooleanArray(variables.size) { !variables[it].integer }
@@ -494,6 +496,7 @@ fun MpsModel.toProblem(): MpsCompiled {
     }
 
     val model = Problem(
+        settings = settings,
         numBoolVars = guards.numBool,
         intBounds = IntBounds.fromModelBounds(lower, upper, openLoBits, openHiBits),
         factors = factors.toTypedArray(),

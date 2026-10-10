@@ -113,6 +113,7 @@ internal object Oll {
         for (f in base.factors) factors.add(f)
         factors.add(PseudoBoolean(weights = weights, literals = negLits, op = PbOp.LE, bound = lb))
         val problem = Problem(
+            settings = base.settings,
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
             intDomains = base.rootIntDomains(),

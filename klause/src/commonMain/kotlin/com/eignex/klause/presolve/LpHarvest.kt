@@ -161,6 +161,7 @@ internal fun lpRootBoundsReporting(
     for (sb in shaved) domains[sb.varId] = domains[sb.varId].withMinAtLeast(sb.lo).withMaxAtMost(sb.hi)
     return LpRootBoundsResult(
         Problem(
+            settings = problem.settings,
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = domains,
@@ -277,6 +278,7 @@ fun lpHarvestReporting(
     }
     val transformed = RootBaker.reseed(
         BakedProblem(
+            settings = problem.settings,
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = domains,

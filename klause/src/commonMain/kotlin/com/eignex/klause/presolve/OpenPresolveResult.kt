@@ -265,6 +265,7 @@ private fun Problem.withBounds(bounds: Array<OpenIntBounds>): Problem? {
     val rebounded = declaredIntDomains.rebounded(IntBounds.fromModelBounds(lower, upper, openLo, openHi))
         ?: return null
     return Problem(
+        settings = settings,
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         declaredIntDomains = rebounded,

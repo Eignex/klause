@@ -42,7 +42,7 @@ internal object MpsMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val compiled = Mps.parse(openFileSource(path)).toProblem()
+            val compiled = Mps.parse(openFileSource(path)).toProblem(common.config.problemSettings())
             if (common.exact) requireExactMpsSource(compiled)
             objectiveScale = compiled.objectiveScale
             toleranceDifference = compiled.toleranceDifference

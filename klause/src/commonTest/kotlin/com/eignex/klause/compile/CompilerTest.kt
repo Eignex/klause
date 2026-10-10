@@ -2,6 +2,7 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
@@ -9,6 +10,17 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.lp.bounding.LpAutoConfig
+import com.eignex.klause.model.IntCmpOp
+import com.eignex.klause.model.IntCompare
+import com.eignex.klause.model.IntLit
+import com.eignex.klause.model.IntRef
+import com.eignex.klause.model.IntSpec
+import com.eignex.klause.model.NamedConstraint
+import com.eignex.klause.model.SchemaEntry
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.abs
@@ -21,6 +33,7 @@ import com.eignex.klause.schema.not
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
 import com.eignex.klause.solver.SolveResult
+import com.eignex.skema.SchemaDef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -42,6 +55,66 @@ private class IntCampaign : VariableSchema() {
 }
 
 class CompilerTest {
+
+    @Test
+    fun `interleaved compilation keeps resource settings through solving`() {
+        val definition = SchemaDef<SchemaEntry>(
+            mapOf(
+                "budget" to IntSpec(0, 4),
+                "floor" to NamedConstraint(IntCompare(IntRef("budget"), IntCmpOp.GE, IntLit(1))),
+            ),
+        )
+        val small = KlauseConfig.DEFAULT.copy(bitsetThreshold = 8, lpCeilingTableauCells = 1)
+        val large = KlauseConfig.DEFAULT.copy(bitsetThreshold = 4096)
+        val saved = KlauseConfig.current
+        try {
+            val first = definition.compile(small)
+            KlauseConfig.current = small
+            val second = definition.compile(large)
+            KlauseConfig.current = large.copy(bitsetThreshold = 1, lpCeilingTableauCells = 1)
+            val firstBaked = first.problem.bake()
+            val secondBaked = second.problem.bake()
+            val pins = Assumptions(ints = mapOf(first.intVarIdByName.getValue("budget") to 2L))
+
+            assertEquals(small.problemSettings(), firstBaked.settings)
+            assertEquals(large.problemSettings(), secondBaked.settings)
+            assertTrue(!LpAutoConfig.recommend(firstBaked).bounding)
+            assertTrue(LpAutoConfig.recommend(secondBaked).bounding)
+            for (compiled in listOf(first, second)) {
+                val result = assertIs<SolveResult.Sat>(
+                    BacktrackSolver(compiled).solve(BacktrackParams(assumptions = pins)),
+                )
+                assertEquals(2L, result.assignment.ints[0])
+            }
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
+    @Test
+    fun `presolve uses the span policy captured at compilation`() {
+        val definition = SchemaDef<SchemaEntry>(
+            mapOf(
+                "budget" to IntSpec(0, 4),
+                "floor" to NamedConstraint(IntCompare(IntRef("budget"), IntCmpOp.GE, IntLit(1))),
+            ),
+        )
+        val low = definition.compile(KlauseConfig.DEFAULT.copy(largeSpanThreshold = 0))
+        val high = definition.compile(KlauseConfig.DEFAULT.copy(largeSpanThreshold = Long.MAX_VALUE))
+        val saved = KlauseConfig.current
+        try {
+            KlauseConfig.current = KlauseConfig.DEFAULT.copy(largeSpanThreshold = Long.MAX_VALUE)
+            val lowOutcome = PresolvePipeline.run(low.problem, null, PresolveConfig.NONE, false)
+            KlauseConfig.current = KlauseConfig.DEFAULT.copy(largeSpanThreshold = 0)
+            val highOutcome = PresolvePipeline.run(high.problem, null, PresolveConfig.NONE, false)
+
+            assertTrue(lowOutcome.stats.lpStats.rootWorkOps.sum > 0L)
+            assertEquals(0.0, highOutcome.stats.lpStats.rootWorkOps.sum)
+        } finally {
+            KlauseConfig.current = saved
+        }
+    }
+
 
     @Test
     fun `nominal produces exactly one factor and indicators`() {

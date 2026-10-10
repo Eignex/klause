@@ -2,11 +2,13 @@
 
 package com.eignex.klause.formats.dimacs
 
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
 
 /** A WCNF document lowered to hard clauses and a weighted soft-clause objective. */
 data class WcnfProblem(
@@ -19,7 +21,7 @@ data class WcnfProblem(
 )
 
 /** Lower this parsed CNF document to a solver problem. */
-fun CnfDocument.toProblem(): Problem {
+fun CnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): Problem {
     val totalVars = numBoolVars + if (triviallyUnsat) 1 else 0
     val factors = ArrayList<Factor>(clauses.size + if (triviallyUnsat) 2 else 0)
     factors.addAll(clauses.map(::Clause))
@@ -28,11 +30,11 @@ fun CnfDocument.toProblem(): Problem {
         factors.add(Clause(intArrayOf(Lit.make(marker, positive = true))))
         factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
     }
-    return Problem(totalVars, 0, emptyArray(), factors.toTypedArray())
+    return Problem(totalVars, 0, emptyArray(), factors.toTypedArray(), settings = settings)
 }
 
 /** Lower this parsed WCNF document to hard clauses and a weighted soft-clause objective. */
-fun WcnfDocument.toProblem(): WcnfProblem {
+fun WcnfDocument.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): WcnfProblem {
     val totalVars = numOriginalBoolVars + softClauses.size + if (triviallyUnsat) 1 else 0
     val factors = ArrayList<Factor>(hardClauses.size + softClauses.size + if (triviallyUnsat) 2 else 0)
     factors.addAll(hardClauses.map(::Clause))
@@ -48,7 +50,7 @@ fun WcnfDocument.toProblem(): WcnfProblem {
         factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
     }
     return WcnfProblem(
-        Problem(totalVars, 0, emptyArray(), factors.toTypedArray()),
+        Problem(totalVars, 0, emptyArray(), factors.toTypedArray(), settings = settings),
         LinearObjectiveSpec(boolWeights = weights, constant = fixedCost),
         numOriginalBoolVars,
     )
