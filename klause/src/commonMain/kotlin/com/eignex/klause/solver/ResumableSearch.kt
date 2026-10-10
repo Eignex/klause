@@ -8,17 +8,10 @@ import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * A pause/resume handle over an optimisation. Unlike [Optimizer.improvements] — whose
- * `Sequence` rebuilds the engine on every call and so loses all learned state between calls — a
- * [ResumableSearch] holds the **entire search state explicitly** in object fields: the live
- * propagation state (learned-clause database, the DFS trail), the variable/value heuristics, the
- * incumbent, phase-saving, and LP warm-start caches. [runSlice] advances that state for one time
- * slice and returns; a later [runSlice] **continues the exact search mid-tree**, with everything
- * intact, instead of starting over.
- *
- * This is the engine seam a scheduled portfolio ([com.eignex.klause.portfolio.Portfolio])
- * needs to schedule an arm in segments without the cold-restart re-learning that dominated its
- * time-to-best: each scheduled segment resumes the arm where the previous one paused.
+ * A pause/resume handle over an optimisation. Each [runSlice] advances the retained search
+ * state and returns at a checkpoint. A later slice continues from that checkpoint, preserving
+ * the incumbent, heuristics and engine-specific state. A scheduled
+ * [com.eignex.klause.portfolio.Portfolio] uses this seam to retain work between segments.
  *
  * Backtrack retains its trail and local search retains its assignment, random state and restart policy.
  * The handle is **single-threaded and stateful**; drive it from one

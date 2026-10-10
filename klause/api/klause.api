@@ -12174,4 +12174,3 @@ public abstract interface class com/eignex/klause/util/WorkMeter {
 	public abstract fun charge (J)V
 }
 
-

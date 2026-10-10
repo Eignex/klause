@@ -62,7 +62,10 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe, val nodeBu
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
             // Continuous columns are scored in floating point; the exact residual LP decides each candidate.
             completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective) else null,
-        ).apply { objectiveBound = boundHandle }.session()
+        ).apply {
+            objectiveBound = boundHandle
+            if (effectiveProblem === problem) pools?.localSearchProjection?.let { engine.projection = it }
+        }.session()
         val workerLabel = "ls/$label"
         val params = LocalSearchParams(
             randomSeed = seed + index,

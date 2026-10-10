@@ -37,7 +37,7 @@ import kotlin.math.ln
  * count against the cap nor stop at it. The outer destroy/repair loop also charges each iteration's flip
  * allowance as local-search moves, so a run whose repairs never search still stops at the cap.
  *
- * Like a plain LS arm ([LocalSearchWorkerConfig]) and unlike a resumable backtrack arm, this worker has
+ * This worker has
  * no pause/resume handle — [PortfolioWorker.newResumableSearch] is null — and accepts a counted
  * [PortfolioWorker.acceptsInstructionBudget] segment instead: [Portfolio] maps its per-segment
  * flip allowance onto [com.eignex.klause.localsearch.LocalSearchParams.maxInstructions], which
@@ -70,7 +70,9 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, 
         // the top of each iteration, destroy from its verified global best — so ALNS both feeds and follows
         // the incumbents backtrack and LS arms find.
         val alns = Alns(
-            inner = LocalSearchSolver(problem),
+            inner = LocalSearchSolver(problem).apply {
+                pools?.localSearchProjection?.let { engine.projection = it }
+            },
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),
             backtrackParams = BacktrackParams(

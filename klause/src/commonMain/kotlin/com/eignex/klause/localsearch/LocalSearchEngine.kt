@@ -59,6 +59,7 @@ internal class LocalSearchEngine(
     completion: CandidateCompletion? = null,
 ) {
     private val problem: Problem = model.problem
+    internal var projection: Lazy<LocalSearchProblem> = lazy { LocalSearchProblem(problem, model.domains) }
 
     // Decides each candidate of a model with continuous columns, whose rows are only scored within a tolerance.
     // Null on a model without them, which scores every row exactly and needs no decision.
@@ -903,7 +904,7 @@ internal class LocalSearchEngine(
         warm: WarmState?,
     ): LocalSearchState {
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val state = LocalSearchState(model, Random(seed), effectiveAssumptions)
+        val state = LocalSearchState(model, Random(seed), effectiveAssumptions, projection.value)
         state.violationSoftCap = params.violationSoftCap
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
@@ -952,7 +953,7 @@ internal class LocalSearchEngine(
         warm: WarmState?,
         seed: Long,
     ): LocalSearchState {
-        val state = LocalSearchState(model, Random(seed), effectiveAssumptions)
+        val state = LocalSearchState(model, Random(seed), effectiveAssumptions, projection.value)
         state.violationSoftCap = params.violationSoftCap
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
         installInvariants(state)
