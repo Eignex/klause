@@ -73,6 +73,8 @@ this frontend's supported theory surface.
 Asserted and reified equalities between an integer conditional result and a constant
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
 results are shared within one parse; nested definitions are traversed iteratively.
+Constant branch images of at most 1,024 distinct values can reject a comparison
+before visiting its definition tree; unknown or larger images retain exact fallback.
 A parse limits this expansion to 65,536 visits, after which comparisons retain
 their arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
@@ -81,6 +83,10 @@ source declarations and arithmetic leaves remain authoritative, including open
 defaults and sparse decision-list selectors. Fresh reified predicates belonging
 only to omitted definitions are fixed false, so shared search does not branch
 on their unconstrained values.
+Decision lists whose selector tests have this Boolean expansion keep their shared
+guarded encoding. They do not become numeric tables that require the symbolic
+selector's auxiliary value; direct numeric selector tests remain eligible for
+finite-domain table lowering.
 
 Optimization emits `; objective=<value>` for each incumbent in the source objective's
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
