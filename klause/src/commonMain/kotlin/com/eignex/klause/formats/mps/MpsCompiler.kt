@@ -69,8 +69,8 @@ data class MpsColumn(
 /** An [MpsModel] lowered to a klause model. */
 @Suppress("UndocumentedPublicFunction")
 class MpsCompiled(
-    /** The compiled solver problem — an integer variable per integer MPS column, an LP-only continuous
-     *  variable per (bounded or unbounded) float column. */
+    /** The compiled solver problem — integer variables for integer columns and proven integral definitions,
+     *  with LP-only continuous variables for the remaining float columns. */
     val model: Problem,
     /** Objective, or `null` for a feasibility instance (no `N` row). */
     val objective: LinearObjectiveSpec?,
