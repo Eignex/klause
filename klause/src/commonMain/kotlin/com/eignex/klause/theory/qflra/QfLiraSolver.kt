@@ -564,15 +564,18 @@ class ExactLiraSearchComponent(
                     // Shared LP explanations keep conflict learning on the same source proof surface.
                     RealDifferenceSystem.Result.Infeasible -> Unit
                     is RealDifferenceSystem.Result.Feasible -> {
-                        dirty = false
-                        if (bools.none { it == UNASSIGNED }) {
-                            candidate = result.point
-                            acceptWitness(result.point)?.let {
-                                assignment = it
-                                outcome = ComponentCheck.Feasible
-                            }
+                        if (bools.any { it == UNASSIGNED }) {
+                            dirty = false
+                            return ComponentResult.Consistent
                         }
-                        return ComponentResult.Consistent
+                        candidate = result.point
+                        acceptWitness(result.point)?.let {
+                            assignment = it
+                            outcome = ComponentCheck.Feasible
+                            dirty = false
+                            return ComponentResult.Consistent
+                        }
+                        if (operationStop()) return ComponentResult.Indeterminate
                     }
                 }
             }
