@@ -4,14 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.exactForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -41,7 +39,7 @@ class RealDifferenceSystemTest {
     }
 
     @Test
-    fun `zero weight strict cycles cite only active guards`() {
+    fun `negative and strict cycles require active guards`() {
         for (strict in listOf(false, true)) {
             val model = Problem(
                 3,
@@ -61,10 +59,11 @@ class RealDifferenceSystemTest {
             val system = assertNotNull(RealDifferenceSystem.prepare(model,
                 model.factors.map { factor -> factor.linearRows.map { it.exactForm(2) } }))
 
-            val conflict = assertIs<RealDifferenceSystem.Result.Conflict>(
-                system.check(intArrayOf(1, 1, 1), Cancellation.Never))
+            val result = system.check(intArrayOf(1, 1, 1), Cancellation.Never)
 
-            assertEquals(setOf(Lit.make(0, false), Lit.make(1, false)), conflict.explanation.literals.toSet())
+            assertIs<RealDifferenceSystem.Result.Infeasible>(result)
+            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(1, -1, 1), Cancellation.Never))
+            assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1, 1, 1), Cancellation.Never))
         }
     }
 
@@ -81,7 +80,7 @@ class RealDifferenceSystemTest {
         )
         val system = assertNotNull(RealDifferenceSystem.prepare(model,
             model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }))
-        assertIs<RealDifferenceSystem.Result.Conflict>(system.check(intArrayOf(1), Cancellation.Never))
+        assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(1), Cancellation.Never))
 
         val released = system.check(intArrayOf(-1), Cancellation.Never)
         val sibling = system.check(intArrayOf(0), Cancellation.Never)
