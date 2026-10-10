@@ -1016,7 +1016,11 @@ internal class LocalSearchEngine(
         // random restart.
         val sliced = slicedInitialization(checkpoint)
         val seeded = params.initialAssignment?.let { seedFrom(state, it, recompute = !sliced) } ?: false
-        if (!seeded) initialRestart(state, params, checkpoint) else if (sliced) recomputeInitial(state, params, checkpoint)
+        if (!seeded) {
+            initialRestart(state, params, checkpoint)
+        } else if (sliced) {
+            recomputeInitial(state, params, checkpoint)
+        }
         return state
     }
 

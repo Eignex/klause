@@ -200,6 +200,26 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 class PortfolioTest {
 
     @Test
+    fun `preparation revisits follow every initial sibling admission`() {
+        val order = mutableListOf<Int>()
+        val prepared = TrackingResumableSearch(null, onRun = { order += 0 })
+        val worker = PortfolioWorker.ofMinimize(
+            "prepared", 0, countsInstructions = true, resumable = { prepared },
+        ) { _, _, _, _ ->
+            error("the retained handle must resume")
+        }
+        val workers = listOf(
+            worker,
+            trackingWorker("sibling1", 1, TrackingResumableSearch(null, onRun = { order += 1 })),
+            trackingWorker("sibling2", 2, TrackingResumableSearch(null, onRun = { order += 2 })),
+        )
+
+        Portfolio.thompson(workers).use { it.minimize(Cancellation { order.size >= 4 }) }
+
+        assertEquals(listOf(0, 1, 2, 0), order)
+    }
+
+    @Test
     fun `exact improvements install when their floating projections tie`() {
         val bases = listOf(
             "9007199254740992" to "1",

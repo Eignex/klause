@@ -85,7 +85,10 @@ class LocalSearchEngineTest {
         val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
         val found = mutableListOf<Sample>()
 
-        search.resumable(LinearObjective(boolWeights = longArrayOf(1)), LocalSearchParams(maxFlips = 1L)).use { handle ->
+        search.resumable(
+            LinearObjective(boolWeights = longArrayOf(1)),
+            LocalSearchParams(maxFlips = 1L),
+        ).use { handle ->
             assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) { found += it.sample })
             assertEquals(256, initialized.sum())
             assertTrue(found.isEmpty())
