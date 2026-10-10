@@ -29,7 +29,10 @@ order. Nonnegative weighted sums of channelled integers constrained to zero
 (`<= 0` or `= 0`) lower to Boolean conjunctions over the complemented input
 literals. Reified sums use the shared clause encoder; unreified sums pin those
 literals. Zero coefficients contribute no requirement. Other bounds and signed
-sums retain arithmetic propagation.
+sums retain arithmetic propagation. Before emitting integer linear rows, lowering
+estimates the total clause expansion of eligible rows. If it exceeds 32,768
+clauses, all these rows retain arithmetic propagation. This model-wide limit
+bounds expansion without making constraint order select a partial encoding.
 
 ## FlatZinc floats
 

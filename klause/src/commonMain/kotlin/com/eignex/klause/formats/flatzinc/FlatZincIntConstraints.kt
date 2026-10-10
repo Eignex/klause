@@ -36,7 +36,6 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
  *  ([reifyLit] is a bool literal; its variable channels the relation's truth). The single lowering
  *  point every `*_lin_*` / linear-compare emitter funnels through, hard or `_reif`. */
 internal fun FlatZincCompiler.postLinear(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long, reifyLit: Int?) {
-    if (postBooleanZeroSum(coeffs, vars, op, bound, reifyLit)) return
     factors.add(
         if (reifyLit != null) {
             ReifiedLinear(Lit.variable(reifyLit), coeffs, vars, op, bound)
@@ -53,21 +52,83 @@ private fun FlatZincCompiler.postBooleanZeroSum(
     bound: Long,
     reifyLit: Int?,
 ): Boolean {
-    if (coeffs.size != vars.size || bound != 0L || (op != LinearOp.LE && op != LinearOp.EQ) ||
-        coeffs.any { it < 0L }
-    ) return false
-    val zeroLiterals = ArrayList<Int>()
-    for (i in vars.indices) {
-        if (coeffs[i] == 0L) continue
-        val channel = booleanIntegerChannels[vars[i]] ?: return false
-        zeroLiterals.add(Lit.negate(channel))
-    }
+    val zeroLiterals = booleanZeroSumLiterals(coeffs, vars, op, bound) ?: return false
     if (reifyLit != null) {
-        tseitinAnd(zeroLiterals.distinct(), reifyLit)
+        tseitinAnd(zeroLiterals, reifyLit)
     } else {
-        for (literal in zeroLiterals.distinct()) factors.add(Clause(intArrayOf(literal)))
+        for (literal in zeroLiterals) factors.add(Clause(intArrayOf(literal)))
     }
     return true
+}
+
+private fun FlatZincCompiler.booleanZeroSumLiterals(
+    coeffs: LongArray,
+    vars: IntArray,
+    op: LinearOp,
+    bound: Long,
+): List<Int>? {
+    if (coeffs.size != vars.size || bound != 0L || (op != LinearOp.LE && op != LinearOp.EQ) ||
+        coeffs.any { it < 0L }
+    ) return null
+    val literals = LinkedHashSet<Int>()
+    for (i in vars.indices) {
+        if (coeffs[i] == 0L) continue
+        val channel = booleanIntegerChannels[vars[i]] ?: return null
+        literals.add(Lit.negate(channel))
+    }
+    return literals.toList()
+}
+
+private fun FlatZincCompiler.existingZeroSumColumns(expr: FznExpr, coeffs: LongArray): IntArray? {
+    return when (expr) {
+        is FznExpr.Ident -> (arrays[expr.name] as? FlatZincArray.Vars)?.varIds
+            ?: if (coeffs.all { it == 0L }) IntArray(coeffs.size) else null
+
+        is FznExpr.ArrayLit -> {
+            if (expr.elements.size != coeffs.size) null else {
+                val columns = IntArray(coeffs.size)
+                for (i in columns.indices) {
+                    if (coeffs[i] == 0L) continue
+                    columns[i] = when (val element = expr.elements[i]) {
+                        is FznExpr.Ident -> intVars[element.name]
+                        is FznExpr.ArrayAccess -> (arrays[element.name] as? FlatZincArray.Vars)
+                            ?.varIds?.getOrNull(element.index - 1)
+
+                        else -> null
+                    } ?: return null
+                }
+                columns
+            }
+        }
+
+        else -> null
+    }
+}
+
+internal fun FlatZincCompiler.selectBooleanZeroSumLowering() {
+    var clauses = 0L
+    for (constraint in model.constraints) {
+        val op = when (constraint.name) {
+            "int_lin_le", "int_lin_le_reif" -> LinearOp.LE
+            "int_lin_eq", "int_lin_eq_reif" -> LinearOp.EQ
+            else -> continue
+        }
+        locateConstraint(constraint)
+        val reified = constraint.name.endsWith("_reif")
+        expectArity(constraint, if (reified) 4 else 3)
+        val bound = evalIntConst(constraint.args[2])
+        if (bound != 0L) continue
+        val coeffs = evalIntConstArrayLong(constraint.args[0])
+        if (coeffs.any { it < 0L }) continue
+        val vars = existingZeroSumColumns(constraint.args[1], coeffs) ?: continue
+        val literals = booleanZeroSumLiterals(coeffs, vars, op, bound) ?: continue
+        clauses += literals.size + if (reified) 1L else 0L
+        if (clauses > booleanZeroSumClauseLimit) {
+            // Select once for the whole model so row order cannot choose which integers remain channelled.
+            lowerBooleanZeroSums = false
+            return
+        }
+    }
 }
 
 internal fun FlatZincCompiler.collectBooleanIntegerChannels() {
@@ -91,7 +152,9 @@ internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) 
         "int_lin_ne" -> LinearOp.NE
         else -> failHere("unhandled int linear ${c.name}")
     }
-    postLinear(coeffs, vars, op, bound, reifyLit = if (reified) resolveBoolLit(c.args[3]) else null)
+    val reifyLit = if (reified) resolveBoolLit(c.args[3]) else null
+    if (lowerBooleanZeroSums && postBooleanZeroSum(coeffs, vars, op, bound, reifyLit)) return
+    postLinear(coeffs, vars, op, bound, reifyLit)
 }
 
 internal fun FlatZincCompiler.emitBoolLinear(c: FznConstraint) {
