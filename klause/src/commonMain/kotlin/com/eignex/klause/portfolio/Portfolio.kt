@@ -778,7 +778,7 @@ class Portfolio(
             phase: String,
         ) {
             val arm = claim.arm
-            armWork[arm] += work
+            armWork[arm] += if (work > 0L) work else claim.sliceWork
             if (stats != null) {
                 if (cumulative) {
                     liveStats[arm] = stats

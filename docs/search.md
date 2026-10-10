@@ -231,7 +231,8 @@ available arm with the least charged work. Shared clauses, root fixings and
 objective floors remain credited, but cannot exclude a silent search from its
 family's coverage. Family selection retains its progress policy; after the first
 witness, arm selection also follows that policy. Initial admission, preparation
-revisits and explicit minimum time shares retain precedence.
+revisits and explicit minimum time shares retain precedence. A segment reporting
+no charged work uses its slice allowance for coverage accounting.
 
 Slices yield before consuming an alternative or after a completed node. A
 pending sibling cannot be skipped when yielding, and reset discards a pending
