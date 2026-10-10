@@ -34,9 +34,6 @@ internal class DiffnPropagator(
 
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
-    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
-    private var failure: IntArray? = null
-
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
         Region(state, atTrail, atLevel, payload[0] == 0).apply {
             val bound = (payload[3].toLong() shl 32) or (payload[4].toLong() and 0xFFFFFFFFL)
@@ -118,7 +115,7 @@ internal class DiffnPropagator(
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        failure?.let { return it }
+        state.propagatorFailures[this]?.let { return it }
         // Sharp reason for the dominant constant-size conflict: a pair forced to overlap on both
         // axes. Those four origin variables' bounds alone imply the contradiction, so citing only
         // them is sound and far tighter than the whole scope. Any other failure (sweep dead-end,
@@ -158,7 +155,7 @@ internal class DiffnPropagator(
      * sound (never removes a feasible value) while LS does the heavy lifting on var-size diffn.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failure = null
+        state.propagatorFailures.remove(this)
         if (varSize) return propagateVarSizeSoundOnly(state)
         // Sweep each axis: advance every rectangle's origin to the first column where some orthogonal
         // position escapes all other rectangles' compulsory parts. This subsumes pairwise reasoning
@@ -186,7 +183,7 @@ internal class DiffnPropagator(
     ): Boolean {
         fun now() = Region(state, state.undo.size, state.currentLevel, xAxis)
         fun failStuck(i: Int): Boolean {
-            failure = now().apply { stuck(i) }.literals()
+            state.propagatorFailures[this] = now().apply { stuck(i) }.literals()
             return false
         }
 
@@ -201,7 +198,7 @@ internal class DiffnPropagator(
             }
         }
         fun failMove(i: Int, lower: Boolean, bound: Long): Boolean {
-            failure = now().apply {
+            state.propagatorFailures[this] = now().apply {
                 moved(i, lower, bound)
                 ownDomain(pos[i])
             }.literals()
@@ -340,7 +337,7 @@ internal class DiffnPropagator(
                             if (lit != Lit.NONE) r.add(lit)
                         }
                     }
-                    failure = r.toIntArray()
+                    state.propagatorFailures[this] = r.toIntArray()
                     return false
                 }
             }

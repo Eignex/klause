@@ -36,11 +36,8 @@ internal class NValuePropagator(
 
     override val consumesIntEventDelta: Boolean get() = consumesIntEventDeltaVal
 
-    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
-    private var failure: IntArray? = null
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        failure ?: OptPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, intVars))
+        state.propagatorFailures[this] ?: OptPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, intVars))
 
     private class Lits {
         private val seen = IntHashSet()
@@ -65,7 +62,7 @@ internal class NValuePropagator(
 
     // Fail with [ant] plus [v]'s own domain, the bound a tightening of [v] ran into.
     private fun failOn(state: PropagationState, ant: IntArray?, v: Int): Boolean {
-        failure = Lits().apply {
+        state.propagatorFailures[this] = Lits().apply {
             addAll(ant)
             addAll(collectHoleAndBoundAntecedents(state, intArrayOf(v)))
         }.toArray()
@@ -78,7 +75,7 @@ internal class NValuePropagator(
         // (which assumes every counted variable is present) does not apply cleanly.
         if (presents.isNotEmpty()) return propagateGreedy(state)
 
-        failure = null
+        state.propagatorFailures.remove(this)
         if (state.cpGateShouldSkip(factorId)) return true
 
         // atLeast / eq: the distinct count cannot exceed the maximum number of variables that can be

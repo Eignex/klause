@@ -1,7 +1,6 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
@@ -47,14 +46,15 @@ internal class DomWdeg : VariableSelector {
      *  problem reference). Applied as part of the next [pick]'s heap init. */
     private val pendingBumps = IntArrayList(8)
 
-    private fun ensureInitialized(problem: Problem) {
+    private fun ensureInitialized(session: PropagationSession) {
+        val problem = session.problem
         if (heap != null && problemRef === problem) return
         val numFactors = problem.numFactors
         if (factorWeights.size != numFactors) factorWeights = DoubleArray(numFactors) { 1.0 }
         val numBool = problem.numBoolVars
         val numInt = problem.numIntVars
         val h = IndexedMaxHeap(numBool + numInt)
-        val projection = PropagationProblem(problem)
+        val projection = session.projection
         // Seed each var's key with Σ factorWeights[f] over its occurrence list.
         for (v in 0 until numBool) {
             var sum = 0.0
@@ -72,13 +72,18 @@ internal class DomWdeg : VariableSelector {
         numIntCached = numInt
         // Drain any conflict bumps that arrived before initialization.
         if (pendingBumps.size > 0) {
-            for (i in 0 until pendingBumps.size) applyFactorBump(problem, pendingBumps[i])
+            for (i in 0 until pendingBumps.size) {
+                val fid = pendingBumps[i]
+                if (fid !in factorWeights.indices) continue
+                factorWeights[fid] += 1.0
+                applyFactorBump(problem, fid)
+            }
             pendingBumps.clear()
         }
     }
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
-        ensureInitialized(session.problem)
+        ensureInitialized(session)
         return pickByActivityWithDomDivider(
             heap = requireNotNull(heap),
             session = session,
@@ -94,9 +99,12 @@ internal class DomWdeg : VariableSelector {
         // constraints, not just the single failing one.
         val problem = problemRef
         for (fid in unsat.conflictFactors) {
-            if (fid >= factorWeights.size) continue
-            factorWeights[fid] += 1.0
-            if (problem != null) applyFactorBump(problem, fid) else pendingBumps.add(fid)
+            if (problem == null) {
+                pendingBumps.add(fid)
+            } else if (fid in factorWeights.indices) {
+                factorWeights[fid] += 1.0
+                applyFactorBump(problem, fid)
+            }
         }
     }
 

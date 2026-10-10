@@ -25,7 +25,19 @@ destination. See [presolve cancellation and accounting](presolve.md) for ownersh
 probe-count scope and cooperative deadline limits.
 
 [PropagationSession](../klause/src/commonMain/kotlin/com/eignex/klause/propagation/PropagationSession.kt)
-owns the finite-domain trail and fixpoint. Propagators supply sound source
+owns the finite-domain trail and fixpoint. Sessions over one immutable model can share
+its propagation projection and occurrence indexes. Incremental payloads, scratch arrays,
+watchers and failure contexts belong to each state. Failure clauses and premise-variable
+sets use separate state storage, leaving reversible payloads intact; each fire clears its
+previous failure, and undo discards pending failure context. The native SAT lane keeps
+its own state and leaves general CP failure storage unallocated.
+
+Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights
+and its heap belong to the solve, retain conflict bumps across restarts, and apply bumps
+received before the first selection once during initialization. Fresh selectors isolate
+solves that share a projection.
+
+Propagators supply sound source
 reasons for deductions and conflicts. An assignment's undo lifetime can be deeper
 than the effective level of its reason: Boolean pins use the deeper of that level
 and the current decision depth so an asserting backjump retains its consequence.

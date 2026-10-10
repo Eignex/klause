@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.circuit
 
+import com.eignex.klause.factor.circuit.internals.CpGate
 import com.eignex.klause.factor.circuit.internals.buildSuccWatches
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
@@ -23,21 +24,20 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
     override val initialIntEventWatches: IntArray = buildSuccWatches(succ)
     override val consumesIntEventDelta: Boolean = true
 
-    // The reason the last failed [propagate] leaves for conflict analysis; null where it has no sharp one.
-    private var failure: IntArray? = null
+    private class Work(n: Int) : CpGate() {
+        val revHead = IntArray(n + 1)
+        val revCursor = IntArray(n)
+        var revArcs = IntArray(n)
+    }
 
-    // The candidate predecessors of each node, rebuilt in place by every connectivity check: node `u`'s are
-    // `revArcs(revHead(u) until revHead(u + 1))`.
-    private val revHead = IntArray(n + 1)
-    private val revCursor = IntArray(n)
-    private var revArcs = IntArray(n)
-
-    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = failure
+    override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = state.propagatorFailures[this]
 
     // Each pass is its own method: one method holding every loop is compiled again for each loop it enters
     // on-stack, and each such compile of the whole body costs C2 more than many solves' propagation.
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failure = null
+        state.propagatorFailures.remove(this)
+        val work = (state.refPayload[factorId] as? Work)
+            ?: Work(n).also { state.refPayload[factorId] = it }
         if (state.cpGateShouldSkip(factorId)) return true
         if (!tightenSuccToRange(state, succ, n)) return false
         if (n == 1) return true
@@ -49,7 +49,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         val includedCount = markMandatory(state, mandatory)
         if (!noShortFixedCycle(state, mandatory, includedCount)) return false
         if (!shaveChainClosures(state, pred, mandatory, includedCount)) return false
-        return stronglyConnectedSubcircuit(state)
+        return stronglyConnectedSubcircuit(state, work)
     }
 
     // Record which successor claims each fixed target, and each target's predecessor; two claims on one target fail.
@@ -185,12 +185,12 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
     }
 
     private fun fail(reason: Reason): Boolean {
-        failure = reason.build()
+        reason.state.propagatorFailures[this] = reason.build()
         return false
     }
 
     /** Clause-form literals, each false in the current state, that together justify a deduction over [succ]. */
-    private inner class Reason(private val state: PropagationState) {
+    private inner class Reason(val state: PropagationState) {
         private val literals = IntArrayList()
 
         fun add(ant: IntArray?): Reason {
@@ -282,7 +282,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
      * the cycle through the root stays inside it and misses `m`; the reason is the two nodes' opt-outs being gone
      * and every arc out of `R`. One that cannot reach the root mirrors it on the arcs into the root's ancestors.
      */
-    private fun stronglyConnectedSubcircuit(state: PropagationState): Boolean {
+    private fun stronglyConnectedSubcircuit(state: PropagationState, work: Work): Boolean {
         val mandatory = BooleanArray(n)
         var mandCount = 0
         var root = -1
@@ -294,9 +294,9 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
             }
         }
         if (mandCount < 2) return true
-        buildPredecessors(state)
+        buildPredecessors(state, work)
         for (forward in booleanArrayOf(true, false)) {
-            val reached = reachable(state, root, forward)
+            val reached = reachable(state, root, forward, work)
             val missed = (0 until n).firstOrNull { mandatory[it] && !reached[it] } ?: continue
             val reason = Reason(state).lacks(root, root).lacks(missed, missed)
             return fail(if (forward) reason.closed(reached) else reason.unentered(reached))
@@ -305,24 +305,24 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
     }
 
     // The nodes [root] reaches over non-self candidate arcs ([forward]), or that reach it.
-    private fun buildPredecessors(state: PropagationState) {
-        revHead.fill(0)
+    private fun buildPredecessors(state: PropagationState, work: Work) {
+        work.revHead.fill(0)
         for (i in 0 until n) {
             state.intDomains[succ[i]].values.forEach { j ->
-                if (j != i.toLong() && j in 0 until n) revHead[j.toInt() + 1]++
+                if (j != i.toLong() && j in 0 until n) work.revHead[j.toInt() + 1]++
             }
         }
-        for (u in 0 until n) revHead[u + 1] += revHead[u]
-        if (revArcs.size < revHead[n]) revArcs = IntArray(maxOf(revHead[n], revArcs.size * 2))
-        revHead.copyInto(revCursor, 0, 0, n)
+        for (u in 0 until n) work.revHead[u + 1] += work.revHead[u]
+        if (work.revArcs.size < work.revHead[n]) work.revArcs = IntArray(maxOf(work.revHead[n], work.revArcs.size * 2))
+        work.revHead.copyInto(work.revCursor, 0, 0, n)
         for (i in 0 until n) {
             state.intDomains[succ[i]].values.forEach { j ->
-                if (j != i.toLong() && j in 0 until n) revArcs[revCursor[j.toInt()]++] = i
+                if (j != i.toLong() && j in 0 until n) work.revArcs[work.revCursor[j.toInt()]++] = i
             }
         }
     }
 
-    private fun reachable(state: PropagationState, root: Int, forward: Boolean): BooleanArray {
+    private fun reachable(state: PropagationState, root: Int, forward: Boolean, work: Work): BooleanArray {
         val seen = BooleanArray(n)
         val stack = IntArrayList()
         seen[root] = true
@@ -339,8 +339,8 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
                     }
                 }
             } else {
-                for (k in revHead[u] until revHead[u + 1]) {
-                    val v = revArcs[k]
+                for (k in work.revHead[u] until work.revHead[u + 1]) {
+                    val v = work.revArcs[k]
                     if (!seen[v]) {
                         seen[v] = true
                         stack.add(v)

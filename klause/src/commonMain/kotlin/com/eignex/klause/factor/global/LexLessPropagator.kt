@@ -34,12 +34,8 @@ internal class LexLessPropagator(
         out
     }
 
-    // The premise variables of the last failed [propagate]: the fixed-equal prefix, and the scanned suffix
-    // when that suffix forced the failure.
-    private var failureVars: IntArray? = null
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
-        failureVars?.let { return state.composeIntVarAtomAntecedents(it) }
+        state.propagatorFailures[this]?.let { return state.composeIntVarAtomAntecedents(it) }
         val combined = IntArray(xs.size + ys.size).also {
             xs.copyInto(it, 0)
             ys.copyInto(it, xs.size)
@@ -64,7 +60,7 @@ internal class LexLessPropagator(
      * completion survives — a contradiction.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failureVars = null
+        state.propagatorFailures.remove(this)
         val nx = xs.size
         val ny = ys.size
         val len = minOf(nx, ny)
@@ -82,7 +78,7 @@ internal class LexLessPropagator(
                 if (dx.min == dx.max && dy.min == dy.max && dx.min == dy.min) a++ else break
             }
             if (a == len) {
-                if (!tailAllowsEquality) failureVars = reasonVars(len - 1, len - 1, strictHere = false)
+                if (!tailAllowsEquality) state.propagatorFailures[this] = reasonVars(len - 1, len - 1, strictHere = false)
                 return tailAllowsEquality
             }
 
@@ -112,7 +108,7 @@ internal class LexLessPropagator(
                 if (b == -1) b = i
             }
             if (b <= a) {
-                failureVars = reasonVars(a, i, strictHere = true)
+                state.propagatorFailures[this] = reasonVars(a, i, strictHere = true)
                 return false
             }
 
@@ -121,10 +117,10 @@ internal class LexLessPropagator(
             val newYMin = if (strictHere) dxa.min + 1 else dxa.min
             val premises = reasonVars(a, i, strictHere)
             val ant = state.composeIntVarAtomAntecedents(premises)
-            failureVars = premises
+            state.propagatorFailures[this] = premises
             if (!state.tightenIntMax(xs[a], newXMax, ant)) return false
             if (!state.tightenIntMin(ys[a], newYMin, ant)) return false
-            failureVars = null
+            state.propagatorFailures.remove(this)
 
             val dxa2 = state.intDomains[xs[a]]
             val dya2 = state.intDomains[ys[a]]

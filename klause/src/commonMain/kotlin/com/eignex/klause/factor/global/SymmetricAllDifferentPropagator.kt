@@ -33,14 +33,13 @@ internal class SymmetricAllDifferentPropagator(
 
     // The variables the last failed [propagate] rests on: two fixed to one value, or a fixed one and the mirror
     // it could not pin.
-    private var failureVars: IntArray? = null
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        failureVars?.let { state.composeIntVarAtomAntecedents(it) }
+        state.propagatorFailures[this]?.let { state.composeIntVarAtomAntecedents(it) }
             ?: collectLinearTightenAntecedents(state, xs, excludeIdx = -1, extraLit = 0)
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failureVars = null
+        state.propagatorFailures.remove(this)
         val lo = indexOffset
         val hi = indexOffset + xs.size - 1
         for (v in xs) {
@@ -54,7 +53,7 @@ internal class SymmetricAllDifferentPropagator(
             if (d.min != d.max) continue
             val slot = (d.min - indexOffset).toInt()
             if (claimedBy[slot] != -1) {
-                failureVars = intArrayOf(claimedBy[slot], v)
+                state.propagatorFailures[this] = intArrayOf(claimedBy[slot], v)
                 return false
             }
             claimedBy[slot] = v
@@ -66,10 +65,10 @@ internal class SymmetricAllDifferentPropagator(
             if (target < 0 || target >= xs.size) return false
             val mirror = i + indexOffset
             val ant = state.composeIntVarAtomAntecedents(intArrayOf(xs[i]))
-            failureVars = intArrayOf(xs[i], xs[target.toInt()])
+            state.propagatorFailures[this] = intArrayOf(xs[i], xs[target.toInt()])
             if (!state.tightenIntMin(xs[target.toInt()], mirror.toLong(), ant)) return false
             if (!state.tightenIntMax(xs[target.toInt()], mirror.toLong(), ant)) return false
-            failureVars = null
+            state.propagatorFailures.remove(this)
         }
         return true
     }

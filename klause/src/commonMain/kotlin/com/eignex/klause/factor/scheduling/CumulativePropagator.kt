@@ -46,11 +46,8 @@ internal class CumulativePropagator(
 
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
-    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
-    private var failure: IntArray? = null
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        failure ?: OptPresence.withPresencePremises(
+        state.propagatorFailures[this] ?: OptPresence.withPresencePremises(
             presents,
             state,
             collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0),
@@ -86,7 +83,7 @@ internal class CumulativePropagator(
     }
 
     private fun fail(state: PropagationState, build: View.() -> Unit): Boolean {
-        failure = now(state).run {
+        state.propagatorFailures[this] = now(state).run {
             build()
             literals()
         }
@@ -137,7 +134,7 @@ internal class CumulativePropagator(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failure = null
+        state.propagatorFailures.remove(this)
         if (n == 0) return true
         // Energetic-reasoning pass runs first and on variable durations/heights/capacity — unlike the
         // time-tabling / edge-finding below it does not need a fully fixed snapshot, so it is the only

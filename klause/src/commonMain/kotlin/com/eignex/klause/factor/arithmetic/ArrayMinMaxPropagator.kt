@@ -25,17 +25,14 @@ internal class ArrayMinMaxPropagator(
      */
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
-    // The reason the last failed [propagate] leaves for conflict analysis.
-    private var failure: IntArray? = null
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        failure ?: collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
+        state.propagatorFailures[this] ?: collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0)
 
     // Each step cites only the side it reads: the result's bound against every term's bound on the same side,
     // and one term's opposite bound for the result's other bound. A step that fails also cites the bound it
     // crossed.
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failure = null
+        state.propagatorFailures.remove(this)
         if (max) {
             var hiBound = Long.MIN_VALUE
             var loBound = Long.MIN_VALUE
@@ -84,7 +81,7 @@ internal class ArrayMinMaxPropagator(
 
     private fun fail(state: PropagationState, premises: IntArray?, crossed: Int, upper: Boolean): Boolean {
         val extra = bounds(state, intArrayOf(crossed), upper)
-        failure = when {
+        state.propagatorFailures[this] = when {
             premises == null -> extra
             extra == null -> premises
             else -> premises + extra

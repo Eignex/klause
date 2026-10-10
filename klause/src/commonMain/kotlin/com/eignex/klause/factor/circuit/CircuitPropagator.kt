@@ -20,20 +20,17 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     override val initialIntEventWatches: IntArray = buildSuccWatches(succ)
     override val consumesIntEventDelta: Boolean = true
 
-    // The reason of the failure the last [propagate] hit, read by [conflictReason] before the engine backtracks.
-    private var failure: IntArray? = null
-
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        failure ?: fixedSubtour(state)?.let { cycle -> Reason(state).apply { for (v in cycle) fixedVar(v) }.build() }
+        state.propagatorFailures[this] ?: fixedSubtour(state)?.let { cycle -> Reason(state).apply { for (v in cycle) fixedVar(v) }.build() }
             ?: collectHoleAndBoundAntecedents(state, succ)
 
     private fun fail(reason: Reason): Boolean {
-        failure = reason.build() ?: IntArray(0)
+        reason.state.propagatorFailures[this] = reason.build() ?: IntArray(0)
         return false
     }
 
     /** Clause-form literals, each false in the current state, that together justify a deduction over [succ]. */
-    private inner class Reason(private val state: PropagationState) {
+    private inner class Reason(val state: PropagationState) {
         private val seen = IntHashSet()
         private val literals = IntArrayList()
 
@@ -134,7 +131,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        failure = null
+        state.propagatorFailures.remove(this)
         if (state.cpGateShouldSkip(factorId)) return true
         if (!tightenSuccToRange(state, succ, n)) return false
         if (n == 1) {
