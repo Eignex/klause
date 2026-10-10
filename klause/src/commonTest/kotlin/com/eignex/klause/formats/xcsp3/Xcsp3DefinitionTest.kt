@@ -29,7 +29,7 @@ class Xcsp3DefinitionTest {
                     </constraints></instance>""",
             )
             val problem = parsed.problem
-            val sweep = assertNotNull(DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars))
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
             val sample = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
                 .first { it.ints[0] == 0L }
             val state = LocalSearchState(problem.bake(), Random(3))
@@ -40,7 +40,7 @@ class Xcsp3DefinitionTest {
             state.recompute()
 
             for (room in listOf(1L, 2L, 0L)) {
-                val move = state.synthesizeChannelingMove(0, room)
+                val move = Move.IntSet(0, room)
                 val predicted = state.netDelta(move)
                 state.apply(move)
                 val active = if (predicate.startsWith("not")) room != 0L else room == 0L

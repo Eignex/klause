@@ -247,6 +247,21 @@ choice-and-channel move. Per repair call, at most 16 such moves are drawn from c
 domains with at most 32 present values, with at most four alternatives per predicate.
 The ordinary scorer grades every affected factor; removing a footprint does not
 establish that the complete assignment is feasible.
+Domain-aware definition inference derives hinted unit equality channels only when
+their source bounds are within 0/1. A channel's predicate is derived only from a unique
+unit unary equality whose other Boolean occurrences are channels. Mixed integer and
+Boolean definitions are ordered together; competing outputs and cyclic cones stay
+searched. Pinned values survive evaluation, and clipped channels retain their factor
+violations without replacing a maintained predicate during seeding.
+Implicitly owned integer outputs remain unchanged during per-move propagation;
+the affected definition factors retain any resulting violations.
+Repairs into retained literal channels change an admissible Boolean input or backsolve
+a retained unary equality into a searched integer or an existing extremum inverse.
+These repairs check output domains, pins and implicit owners; false equality targets
+sample at most four alternatives from at most 32 present values, and literal chains
+stop at depth 16. The Cumulative duration neighborhood uses the same inverse route.
+Functional objective inference declines cones crossing literal-to-integer channels;
+ordinary objective scoring still grades the complete maintained assignment.
 Boolean break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Moves feeding definitions score the complete propagated assignment, including derived

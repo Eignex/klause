@@ -716,7 +716,7 @@ internal fun linearSolvable(
     // those literals are the ones the objective drives, but stalls repair when they are pure
     // feasibility-structure variables entangled in the hard constraints.
     val derivedFolds = if (objective == null) emptyList() else foldsOverObjectiveVars(boolFolds, objective)
-    val sweep = DefinitionalSweep.infer(problem.factors, problem.numIntVars, definedVars, derivedFolds)
+    val sweep = DefinitionalSweep.infer(problem, definedVars, derivedFolds)
     if (objective == null) {
         return Solvable(
             problem = problem, optimize = false, maximize = false,
@@ -732,7 +732,7 @@ internal fun linearSolvable(
     val objSweep = if (boolFolds.isEmpty()) {
         sweep
     } else {
-        DefinitionalSweep.infer(problem.factors, problem.numIntVars, definedVars, boolFolds)
+        DefinitionalSweep.infer(problem, definedVars, boolFolds)
     }
     return Solvable(
         problem = problem,

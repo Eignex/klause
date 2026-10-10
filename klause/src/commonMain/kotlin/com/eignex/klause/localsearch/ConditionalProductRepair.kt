@@ -26,8 +26,13 @@ internal class ConditionalProductRepair(
     private fun channel(variable: Int) {
         val domain = state.rootDomains[variable]
         if (domain.min < 0L || domain.max > 1L || 0L !in domain ||
-            state.assignment.intValue(variable) != 1L || !sink.allowsInt(variable)
+            state.assignment.intValue(variable) != 1L
         ) return
+        if (state.invariants?.literalChannel(variable) != null) {
+            added += LiteralChannelRepair(state, sink, variable, limit - added).propose(0L)
+            return
+        }
+        if (!sink.allowsInt(variable)) return
         for (fid in state.projection.intOccurrences[variable]) {
             val row = state.problem.factors[fid] as? ReifiedLinear ?: continue
             if (row.op != LinearOp.EQ || row.vars.size != 1) continue

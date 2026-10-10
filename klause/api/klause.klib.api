@@ -6499,6 +6499,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
 
     final object Companion { // com.eignex.klause.localsearch/DefinitionalSweep.Companion|null[0]
         final fun infer(kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/Int, kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ...): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/DefinitionalSweep.Companion.infer|infer(kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.Int;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>){}[0]
+        final fun infer(com.eignex.klause.ir/Problem, kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ...): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/DefinitionalSweep.Companion.infer|infer(com.eignex.klause.ir.Problem;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>){}[0]
     }
 }
 

@@ -144,6 +144,9 @@ use fresh 0/1 integers tied directly to their source literal by a reified equali
 including negated literals; products and sum terms share this encoding.
 Products of a Boolean expression and a declared integer use their declared equality
 output directly, so local search maintains the source product output during moves.
+The compiler marks the fresh binary channels as deterministic outputs. Domain-aware
+definition inference maintains those literal values and their unique unary equality
+predicates when the predicates have no other Boolean factor occurrences.
 
 XCSP min/max arithmetic expressions mark deterministic auxiliaries and materialized affine
 operands as definition hints. Top-level equalities retain output aliases; hints alone do

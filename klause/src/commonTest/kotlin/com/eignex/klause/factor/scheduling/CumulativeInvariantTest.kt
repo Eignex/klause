@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 class CumulativeInvariantTest {
     @Test
     fun `conditional durations repair overload through admissible choices`() {
-        for (bound in listOf(0, 1)) {
+        for ((bound, retained) in listOf(0 to false, 1 to false, 0 to true, 1 to true)) {
             val factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
@@ -38,7 +38,8 @@ class CumulativeInvariantTest {
                 ), factors,
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
-            state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 7)).network(7, 1)
+            val sweep = if (retained) DefinitionalSweep.infer(problem, intArrayOf(1)) else DefinitionalSweep.infer(factors, 7)
+            state.invariants = assertNotNull(sweep).network(7, 1)
             state.assignment.setInt(0, if (bound == 1) 0L else 1L)
             state.assignment.setInt(1, 1)
             state.assignment.setInt(2, 3)
@@ -93,7 +94,7 @@ class CumulativeInvariantTest {
             ), factors,
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
-        state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 10)).network(10, 2)
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1, 2))).network(10, 2)
         for ((variable, value) in longArrayOf(0, 1, 0, 3, 3, 0, 0, 3, 0, 0).withIndex()) {
             state.assignment.setInt(variable, value)
         }

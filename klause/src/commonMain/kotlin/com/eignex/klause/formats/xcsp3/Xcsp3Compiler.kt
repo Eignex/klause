@@ -839,6 +839,7 @@ internal object Compiler {
         /** Channel a literal to a fresh 0/1 int var equal to its truth value. */
         internal fun litTo01(lit: Int): Int {
             val ch = newAuxVar(0L, 1L)
+            definedVars.add(ch)
             factors.add(
                 ReifiedLinear(
                     Lit.variable(lit),

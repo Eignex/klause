@@ -1,5 +1,9 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.random.Random
@@ -15,6 +19,30 @@ import kotlin.test.assertTrue
  * move generation at the sink.
  */
 class InvariantNetworkTest {
+    @Test
+    fun `definition propagation preserves implicitly owned outputs`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+            arrayOf<Factor>(Product(0, 1, 2)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, 3)).network(3, 0)
+        state.moveSink.setOwners(intArrayOf(-1, -1, 7))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 3)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+
+        val predicted = state.netDelta(Move.IntSet(0, 1))
+        state.apply(Move.IntSet(0, 1))
+
+        assertEquals(0L, state.assignment.intValue(2))
+        assertTrue(state.cost > 0L)
+        assertEquals(state.cost, predicted)
+        val cost = state.cost
+        state.recompute()
+        assertEquals(cost, state.cost)
+    }
 
     private val src = """
         var 0..10: x;
