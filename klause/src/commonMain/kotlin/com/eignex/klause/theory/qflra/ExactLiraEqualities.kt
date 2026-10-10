@@ -61,8 +61,22 @@ internal class ExactLiraEqualities(
     }
     var implied = false
         private set
+    private var diagnosticPasses = 0L
+    private var diagnosticPeakExclusions = 0
+    private var diagnosticMatches = 0L
+    private var diagnosticImplications = 0L
+    private var diagnosticUnavailableReasons = 0L
+
+    fun printDiagnosticCounters() {
+        println("%%%mzn-stat: smtEqualityExclusionPasses=$diagnosticPasses")
+        println("%%%mzn-stat: smtEqualityExclusionPeakKeys=$diagnosticPeakExclusions")
+        println("%%%mzn-stat: smtEqualityExclusionMatches=$diagnosticMatches")
+        println("%%%mzn-stat: smtEqualityExclusionImplications=$diagnosticImplications")
+        println("%%%mzn-stat: smtEqualityExclusionUnavailableReasons=$diagnosticUnavailableReasons")
+    }
 
     fun propagate(context: SearchContext, stop: Cancellation): ComponentResult {
+        diagnosticPasses++
         implied = false
         if (stop()) return ComponentResult.Indeterminate
         if (rows.isEmpty() && general.isEmpty()) return ComponentResult.Consistent
@@ -102,6 +116,7 @@ internal class ExactLiraEqualities(
         val closed = closeEqualities(forest, context, stop, progressStop)
         if (closed !is ComponentResult.Consistent) return closed
         val excluded = excludedOffsets(forest, context, progressStop) ?: return ComponentResult.Indeterminate
+        diagnosticPeakExclusions = maxOf(diagnosticPeakExclusions, excluded.size)
         for (row in rows) {
             if (progressStop()) return ComponentResult.Indeterminate
             val value = forest.difference(row.target, row.source)
@@ -117,6 +132,7 @@ internal class ExactLiraEqualities(
             }
             val assigned = if (row.activator == ALWAYS) true else context.boolValue(row.activator)
             if (assigned == truth) continue
+            if (exclusion != null) diagnosticMatches++
             val premises = if (exclusion != null) {
                 val paths = forest.offsetPremises(row.target, row.source, progressStop)
                     ?: return ComponentResult.Indeterminate
@@ -128,10 +144,15 @@ internal class ExactLiraEqualities(
                 return conflict(context, premises, row.literal(assigned), stop)
             }
             val decision = SearchDecision.Bool(row.literal(truth))
-            val reason = context.explainAtoms(SearchAtomPremise.All(premises), decision) ?: continue
+            val reason = context.explainAtoms(SearchAtomPremise.All(premises), decision)
+            if (reason == null) {
+                if (exclusion != null) diagnosticUnavailableReasons++
+                continue
+            }
             if (stop()) return ComponentResult.Indeterminate
             val result = context.imply(decision.literal, reason)
             if (result !is ComponentResult.Consistent) return result
+            if (exclusion != null) diagnosticImplications++
             val accepted = accept(decision, context)
             if (accepted !is ComponentResult.Consistent) return accepted
             implied = true

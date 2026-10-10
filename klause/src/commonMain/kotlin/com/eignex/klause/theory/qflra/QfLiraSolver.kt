@@ -163,11 +163,12 @@ class ExactLiraSearchComponent(
         }
     }
     private val difference by lazy { ExactLiraDifference(model, exactForms) }
-    private val equalities by lazy {
+    private val equalitiesDelegate = lazy {
         ExactLiraEqualities(model, exactForms) { decision, context ->
             lp.assertWithin(decision, context, operationStop)
         }
     }
+    private val equalities by equalitiesDelegate
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -251,6 +252,7 @@ class ExactLiraSearchComponent(
     override fun retract(decisionLevel: Int) = lp.retract(decisionLevel)
     override fun onRestart(context: SearchContext) = lp.onRestart(context)
     override fun close() {
+        if (equalitiesDelegate.isInitialized()) equalities.printDiagnosticCounters()
         closeSourceLpOwners(listOfNotNull(if (lpDelegate.isInitialized()) lp else null, reduction))
     }
 
