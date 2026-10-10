@@ -11,10 +11,10 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.solver.RelaxationCapability
-import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.impliedLinearRows
+import com.eignex.klause.solver.RelaxationCapability
+import com.eignex.klause.solver.executionCapabilities
 
 /** Emit this factor's LP relaxation into [builder]. */
 internal fun Factor.emitLpRelaxation(builder: RelaxationBuilder, linearProjection: LinearLpProjection? = null) {
