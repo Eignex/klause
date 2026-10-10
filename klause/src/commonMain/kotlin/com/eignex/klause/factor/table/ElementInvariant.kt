@@ -95,8 +95,9 @@ internal class ElementInvariant(
             if (evp == resultVal) {
                 val cand = indexOffset.toLong() + p
                 if (cand != idxVal && cand in idxDom) {
+                    val before = sink.size
                     sink.addChannelingIntSet(state, idx, cand)
-                    break
+                    if (sink.size > before) break
                 }
             }
         }

@@ -199,7 +199,8 @@ outputs during seeding and moves. Repair proposals into these cones backsolve af
 and extrema into admissible searched inputs, respecting domains, pins and implicit owners.
 Shared-input repairs are checked against the complete maintained cone before publication.
 Element matching-cell indexes and range endpoints use Long arithmetic, including offsets
-whose valid array indexes cross the Int boundary.
+whose valid array indexes cross the Int boundary. Matching-cell scans skip unreachable
+inverse targets until an admissible index repair is found.
 
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
