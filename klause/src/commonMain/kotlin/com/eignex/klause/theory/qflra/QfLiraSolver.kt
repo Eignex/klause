@@ -96,12 +96,14 @@ class ExactLiraSearchComponent(
     AutoCloseable {
     private var smtStats: SmtStatsSink? = null
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
+    private var unassignedBooleans = model.numBoolVars
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val root = SearchNode()
     private val disjunctionAtoms = HashMap<Int, List<DisjunctAtom>>()
     private val disjunctOwner = Any()
     private var disjunctionRegistrationDeclined = false
     private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    private val assertedRows = exactForms.map { BooleanArray(it.size) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -127,6 +129,7 @@ class ExactLiraSearchComponent(
     private val lpDelegate: Lazy<LpPropagator> = lazy {
         LpPropagator(
             object : LpSearchPolicy {
+                override val eagerAssertionScopes: Boolean = false
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                     accept(decision, context)
                 override fun propagate(context: SearchContext): ComponentResult = relax(context)
@@ -150,6 +153,17 @@ class ExactLiraSearchComponent(
     }
     private val lp: LpPropagator by lpDelegate
     private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
+    private val propagation by lazy {
+        ExactLraPropagation(model, lp, system, exactForms) { decision, context ->
+            lp.assertWithin(decision, context, operationStop)
+        }
+    }
+    private val difference by lazy { ExactLiraDifference(model, exactForms) }
+    private val equalities by lazy {
+        ExactLiraEqualities(model, exactForms) { decision, context ->
+            lp.assertWithin(decision, context, operationStop)
+        }
+    }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -372,14 +386,11 @@ class ExactLiraSearchComponent(
         when (decision) {
             is SearchDecision.Bool -> {
                 val variable = decision.literal ushr 1
+                if (bools[variable] == UNASSIGNED) unassignedBooleans--
                 bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
                 boolLevels[variable] = context.decisionLevel
-                node = node.copy(
-                    retainedReduction = null,
-                    disequalityDirections = emptyMap(),
-                    directionPremises = emptyMap(),
-                )
-                if (variable !in arithmeticVariables && bools.any { it == UNASSIGNED }) {
+                node = node.copy(retainedReduction = null)
+                if (variable !in arithmeticVariables && unassignedBooleans != 0) {
                     nodesByLevel.put(context.decisionLevel, node)
                     dirty = wasDirty
                     return ComponentResult.Consistent
@@ -424,6 +435,7 @@ class ExactLiraSearchComponent(
                         } == true
                     }
                     node = node.copy(sourceBranches = node.sourceBranches + atom, retainedReduction = retained)
+                    if (!lp.atLevel(context.decisionLevel, operationStop)) return ComponentResult.Indeterminate
                     if (!system.assertAtom(atom, SearchAtomPremise.Asserted(decision))) {
                         return ComponentResult.Indeterminate
                     }
@@ -441,8 +453,10 @@ class ExactLiraSearchComponent(
 
     private fun assertSource(context: SearchContext): Boolean {
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
+        val published = ArrayList<RowAddress>()
         for ((factorIndex, factor) in model.factors.withIndex()) {
             for ((index, row) in factor.linearRows.withIndex()) {
+                if (assertedRows[factorIndex][index]) continue
                 val address = RowAddress(factorIndex, index)
                 val asserted = node.rowAssertions[address]
                 if (factor.linearForm is LinearForm.Disjunction && asserted == null) continue
@@ -457,6 +471,8 @@ class ExactLiraSearchComponent(
                     disequalities += Triple(address, comparison, premise)
                 } else if (!system.assertComparison(comparison, null, premise)) {
                     return false
+                } else {
+                    published += address
                 }
             }
         }
@@ -484,6 +500,8 @@ class ExactLiraSearchComponent(
                 }
             }
         }
+        var directions: MutableMap<RowAddress, LinearOp>? = null
+        var directionPremises: MutableMap<RowAddress, SearchAtomPremise>? = null
         for ((address, comparison, premise) in disequalities) {
             val side = if (comparison.terms.isEmpty()) {
                 DerivedDisequalitySide(LinearOp.LE, SearchAtomPremise.All(emptyList()))
@@ -492,9 +510,16 @@ class ExactLiraSearchComponent(
                     DerivedDisequalitySide(it, node.directionPremises.getValue(address))
                 } ?: system.disequalitySide(comparison) ?: continue
             }
-            node = node.withDirection(address, side.direction).copy(
-                directionPremises = node.directionPremises + (address to side.premise),
-            )
+            if (address !in node.disequalityDirections) {
+                val nextDirections = directions ?: node.disequalityDirections.toMutableMap().also {
+                    directions = it
+                }
+                val nextPremises = directionPremises ?: node.directionPremises.toMutableMap().also {
+                    directionPremises = it
+                }
+                nextDirections[address] = side.direction
+                nextPremises[address] = side.premise
+            }
             if (!system.assertComparison(
                     comparison,
                     side.direction,
@@ -503,8 +528,13 @@ class ExactLiraSearchComponent(
             ) {
                 return false
             }
+            published += address
+        }
+        directions?.let { next ->
+            node = node.copy(disequalityDirections = next, directionPremises = checkNotNull(directionPremises))
         }
         nodesByLevel.put(context.decisionLevel, node)
+        for (address in published) assertedRows[address.factor][address.row] = true
         return true
     }
 
@@ -535,16 +565,37 @@ class ExactLiraSearchComponent(
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
         if (impliedDisjunct) return ComponentResult.Consistent
-        if (bools.any { it == UNASSIGNED } && arithmeticRows.none {
+        val equalityResult = equalities.propagate(context, operationStop)
+        if (equalityResult is ComponentResult.Conflict) {
+            smtStats?.observeConflict(equalityResult.explanation)
+            outcome = ComponentCheck.Infeasible(equalityResult.explanation)
+        }
+        if (equalityResult !is ComponentResult.Consistent) return equalityResult
+        if (equalities.implied) return ComponentResult.Consistent
+        val differenceResult = difference.propagate(context, operationStop)
+        if (differenceResult is ComponentResult.Conflict) {
+            smtStats?.observeConflict(differenceResult.explanation)
+            outcome = ComponentCheck.Infeasible(differenceResult.explanation)
+        }
+        if (differenceResult !is ComponentResult.Consistent) return differenceResult
+        if (unassignedBooleans != 0 && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
         ) {
             return ComponentResult.Consistent
         }
+        if (!lp.atLevel(context.decisionLevel, operationStop)) return ComponentResult.Indeterminate
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
+        val propagated = propagation.propagate(context, operationStop)
+        if (propagated is ComponentResult.Conflict) {
+            smtStats?.observeConflict(propagated.explanation)
+            outcome = ComponentCheck.Infeasible(propagated.explanation)
+        }
+        if (propagated !is ComponentResult.Consistent) return propagated
+        if (propagation.implied) return ComponentResult.Consistent
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve(token = operationStop, sparsePointRecovery = true)
             ?: return ComponentResult.Indeterminate
@@ -557,7 +608,7 @@ class ExactLiraSearchComponent(
             outcome = ComponentCheck.Infeasible(explanation)
             return ComponentResult.Conflict(explanation)
         }
-        val complete = bools.none { it == UNASSIGNED } && node.selectsEveryDisjunction(model, disjunctionAtoms) &&
+        val complete = unassignedBooleans == 0 && node.selectsEveryDisjunction(model, disjunctionAtoms) &&
             node.nextDisequality(model, disjunctionAtoms, bools) == null
         if (complete) {
             result.exactPrimal?.take(model.numRealVars + model.numIntVars)?.let { point ->
@@ -572,7 +623,7 @@ class ExactLiraSearchComponent(
     }
 
     private fun branch(context: SearchContext): List<SearchDecision>? {
-        if (bools.any { it == UNASSIGNED } || outcome != null) return null
+        if (unassignedBooleans != 0 || outcome != null) return null
         if (operationStop() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -718,8 +769,10 @@ class ExactLiraSearchComponent(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        assertedRows.forEach { it.fill(false) }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
+                unassignedBooleans++
                 bools[variable] = UNASSIGNED
                 boolLevels[variable] = -1
             }
@@ -1291,9 +1344,6 @@ private data class SearchNode(
                 }
             },
         )
-
-    fun withDirection(factor: RowAddress, direction: LinearOp): SearchNode =
-        copy(disequalityDirections = disequalityDirections + (factor to direction))
 
     fun rowTruth(address: RowAddress, row: LinearRow, bools: IntArray): Boolean? {
         val truth = row.truthUnder(bools) ?: return null

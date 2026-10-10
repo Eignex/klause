@@ -58,6 +58,11 @@ intersects assertions exactly. It retains effective witnesses and weaker active
 assertions. Crossed bounds cite both sides; pop restores bounds and deactivates
 scoped rows.
 
+Open linear adapters align the LP trail with the search decision level before
+writing arithmetic assertions. Boolean decisions that only update source state
+can leave the LP trail shallower; retraction restores any deeper arithmetic scope
+before the adapter restores its source snapshot.
+
 A nonbasic bound change updates the basic contribution by `-B^-1 A(j) delta(x(j))`.
 A basic-bound edit changes feasibility rather than its value, except when source
 coordinates shift. Pop seats nonbasics at restored status bounds and recomputes
@@ -137,6 +142,9 @@ maps source decisions to bound assertions, retracts through the trail and suppli
 certified bounds, fixings and Farkas conflicts under an effort governor. Open
 adapters share normalized terms and justified root-fixed substitutions. They
 retain defining rows needed by any active bound, objective or reconstruction map.
+Derived bound batches retain a separate witness premise for each applied side and
+refresh the numerical owner once. A declined batch publishes no bound changes;
+a conflicting batch retains the applied prefix and its explanation premises.
 
 Farkas explanations cite selected bound witnesses and all contributing scoped
 row premises. Every learned literal is false at the conflict, and the cited
@@ -166,8 +174,9 @@ is no general problem presolve inside the tree or elimination of shared variable
 IDs after portfolio forks. Owner-local exact factors, bounded refinement reuse,
 counter-proofs and component OBBT remain scoped mechanisms. Triangular crash
 initialization belongs to the optional LP tree-search route. Production primal
-pricing recomputes scores; there is no optional exact-row propagation or
-conflict-weakening framework.
+pricing recomputes scores. Open theory adapters propagate exact source-row
+intervals with source premises; this stays outside the numerical engine. There
+is no conflict-weakening framework.
 
 [Certification](certification.md) defines accepted proof packages and budgets.
 [Capture and replay](replay.md) describes diagnostics without equating a kernel

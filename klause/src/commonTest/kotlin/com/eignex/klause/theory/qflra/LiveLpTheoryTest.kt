@@ -258,8 +258,15 @@ class LiveLpTheoryTest {
                 assertEquals(!Lit.isPositive(transformed.literal), session.boolValue(transformed.literal ushr 1))
                 assertEquals(!Lit.isPositive(excluded.literal), session.boolValue(excluded.literal ushr 1))
             }
+            assertEquals(2, session.learnedClauseCount)
+            // A learned backjump can retract a pushed decision; keep the witness premise at root.
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.publish(Lit.make(0, true)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
             val result = assertIs<SearchResult.Satisfied>(session.solve(source.numBoolVars))
-            val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertTrue(assignment.bools[0])
+            val values = assignment.ints
             assertEquals(BIG_ONE, values[0] - values[1])
             assertTrue(values[0] + values[1] >= BIG_ONE)
             for (excluded in listOf(transformed, free)) {
@@ -272,7 +279,6 @@ class LiveLpTheoryTest {
                 }
                 assertTrue(if (atom.upper) activity > atom.threshold else activity < atom.threshold)
             }
-            assertEquals(2, session.learnedClauseCount)
         }
     }
 
@@ -485,8 +491,11 @@ class LiveLpTheoryTest {
     fun `complementary registered integer conflicts refute the full source through shared learning`() {
         val source = Problem(
             0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
-            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+            intBounds = IntBounds.fromModelBounds(
+                LongArray(2), LongArray(2), Bits(2).also { it.set(0); it.set(1) },
+                Bits(2).also { it.set(0); it.set(1) },
+            ),
+            factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.EQ, 1)),
         )
         ExactLiraSearchComponent(source).use { component ->
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
@@ -494,7 +503,10 @@ class LiveLpTheoryTest {
             val split = assertNotNull(
                 SourceBoundAtom.integerSplit(
                     session,
-                    listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                    listOf(
+                        SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
+                        SourceBoundTerm(SearchIntValue(1), BigFraction.ONE),
+                    ),
                     BigFraction.ZERO,
                 ),
             )
@@ -552,19 +564,20 @@ class LiveLpTheoryTest {
             }
             val source = Problem(
                 0,
-                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
                 numRealVars = 1,
                 realLower = doubleArrayOf(0.0),
                 realUpper = doubleArrayOf(0.0),
                 factors = arrayOf(
                     Linear(
-                        intVars = intArrayOf(0),
-                        intCoeffs = doubleArrayOf(2.0),
+                        intVars = intArrayOf(0, 1),
+                        intCoeffs = doubleArrayOf(2.0, 2.0),
                         realVars = intArrayOf(0),
                         realCoeffs = doubleArrayOf(1.0),
                         op = LinearOp.GE,
-                        bound = if (scenario == "conflict") 3.0 else 1.0,
+                        bound = if (scenario == "conflict") 5.0 else 1.0,
                     ),
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
                 ),
             )
             source.componentPlan().search(source, emptyMap()).use { planned ->
@@ -587,7 +600,7 @@ class LiveLpTheoryTest {
                     }
                 }
             }
-            assertEquals(if (scenario == "decline") 3 else 1, created, scenario)
+            assertEquals(when (scenario) { "conflict" -> 0; "decline" -> 3; else -> 1 }, created, scenario)
             assertEquals(created, closed, scenario)
         }
     }

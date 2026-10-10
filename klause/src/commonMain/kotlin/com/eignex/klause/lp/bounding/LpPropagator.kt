@@ -71,6 +71,13 @@ internal data class LpFractionalBranch(
     val registered: Boolean = true,
 )
 
+internal data class LpDerivedBound(
+    val column: Int,
+    val upper: Boolean,
+    val side: ExactLpSide,
+    val premise: SearchAtomPremise,
+)
+
 internal class LpPropagator(
     private val policy: LpSearchPolicy,
     private val effort: () -> LpEffortProfile = { LpEffortProfile() },
@@ -261,6 +268,25 @@ internal class LpPropagator(
         }
         return result
     }
+
+    fun assertDerivedBounds(bounds: List<LpDerivedBound>): LpBoundBatchResult = withOwner { current ->
+        current.state.conflict?.let { return@withOwner LpBoundBatchResult.Conflict(0, it) }
+        if (cancellation() || nextWitness > Long.MAX_VALUE - bounds.size) {
+            return@withOwner LpBoundBatchResult.Declined(0)
+        }
+        val assertions = bounds.mapIndexed { index, bound ->
+            LpBoundAssertion(bound.column, bound.upper, bound.side, nextWitness + index, current.state.depth)
+        }
+        if (assertions.isEmpty()) return@withOwner LpBoundBatchResult.Applied(0)
+        onEdit(current.state.model.numVars.toLong())
+        val result = current.assertBounds(assertions)
+        if (result !is LpBoundBatchResult.Declined) {
+            for (index in 0 until result.count) witnesses[assertions[index].witness] = bounds[index].premise
+            nextWitness += result.count
+            if (result.count > 0) lastMetrics = LpSolveMetrics()
+        }
+        result
+    } ?: LpBoundBatchResult.Declined(0)
 
     fun append(row: LpScopedRow, scoped: Boolean): Boolean = owner?.append(row, scoped) == true
     fun deactivate(row: Long): Boolean = owner?.deactivate(row) == true

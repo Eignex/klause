@@ -57,9 +57,57 @@ The reversible live prefix is committed once per completed sweep, including
 empty-prefix conflicts; sibling branches restore filtering from trailed state.
 
 LP explanations cite selected source bound witnesses and recursively expanded
-row, fixing and cutoff premises. Current CP propagation and source LP conflicts
-do not include an optional exact-theory row-propagation scanner or explanation
-weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
+row, fixing and cutoff premises. Open linear theories check integer difference-row
+cycles within larger linear fragments. This
+redundant graph includes declared bounds and guarded rows without Boolean terms;
+cycle conflicts cite their active source guards. Wide rows and unsupported forms
+are omitted from this graph and remain enforced by the complete theory. It never
+publishes feasibility or materializes CP domains. A completed cycle scan is reused
+while its active edge mask remains identical; abandoned scans retain no new mask.
+They also narrow source-column
+bounds from exact row intervals and imply reified comparisons with immutable row and
+bound premises. These bounds follow the LP trail and retract with their decisions.
+Integer difference equalities form a weighted forest, including declared fixed
+columns. Exact offsets decide comparisons even when no individual column has a
+bound. Explanation paths cite the selected source equality guards, including
+complemented disequalities; an inconsistent offset path refutes its active guards.
+Larger source expressions are also constant when their coefficients cancel within
+each open forest component. Their comparison reasons cite the equality paths that
+justify the offsets; no individual column bound is required.
+Active larger equalities reduce against the forest for at most four passes.
+Supported residuals add integer offset facts; nonintegral or inconsistent residuals
+refute their active guards. Each batch captures immutable source and offset premises
+before adding its facts, so later deductions expand all contributing guards.
+Unsupported residuals stay with the complete theory; reaching the pass limit
+establishes no verdict.
+The forest is rebuilt from current assertions, so retraction drops their effects.
+Wide offsets are omitted from this redundant check and remain with the full theory.
+Equality-forest scans poll ordinary cancellation within 64 visits and check it
+before publishing each implication or conflict. Metered tokens retain immediate
+checks at every scan visit.
+Interval deductions read staged bounds within a propagation pass and publish the
+strongest side per column in one LP batch. Abandoned passes requeue their rows;
+crossed staged bounds cite both derivations without publishing a partial batch.
+Strict real endpoints stay strict; integer endpoints round on the source lattice.
+Affected rows follow source Boolean and exact bound changes through a retained
+queue, including restored bounds after retraction. Equivalent normalized terms
+share their exact activity bounds even when individual source columns are open.
+Interval scans observe only columns and Boolean variables read by their rows.
+Boolean clauses stay outside this numeric interval queue; shared clause propagation
+handles their Boolean effects, and complete source checks still enforce them.
+The theory records its own Boolean implications through the assertion path;
+shared delivery excludes the component that produced them.
+Boolean completion is tracked incrementally across assertions and retraction.
+Source assertion accumulates derived disequality directions and their premises in
+private maps, then publishes one immutable node snapshot for the completed pass.
+Directions retain their source premises along a branch; retraction restores the
+parent snapshot before a sibling adds assertions.
+Completed source comparisons are installed once along a branch. Retraction clears
+their publication markers so restored assertions and sibling Boolean substitutions
+are installed against the current LP trail. Incomplete passes publish no markers.
+Each propagation call limits row visits before the complete LP check, so a
+partial interval pass cannot establish feasibility or exhaustion. There is no
+explanation weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
 
 ## Learned-clause retention
 

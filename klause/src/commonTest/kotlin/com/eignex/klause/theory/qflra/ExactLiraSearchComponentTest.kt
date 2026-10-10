@@ -53,6 +53,66 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `a source Boolean clause stays enforced without numeric interval deductions`() {
+        val clause = intArrayOf(Lit.make(0, false), Lit.make(1, true))
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
+                Clause(clause),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertEquals(clause.toSet(), assertNotNull(conflict.explanation).literals.toSet())
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+        }
+    }
+
+    @Test
+    fun `arithmetic assertions retract across decisions without arithmetic effects`() {
+        val model = Problem(
+            numBoolVars = 4,
+            intBounds = openBounds(),
+            factors = arrayOf(ReifiedLinear(3, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            for (variable in 0..2) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, true))))
+            }
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(3, true))))
+            val first = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+            assertEquals(
+                bigIntOf(7), assertNotNull(first.model.valueOf<ExactLiraAssignment>(component)).ints.single(),
+            )
+            session.popTo(1)
+            assertEquals(ComponentCheck.Indeterminate, component.check(session))
+            assertNull(component.nextBranch(session))
+            for (variable in 1..3) {
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(variable, false))))
+            }
+            val direction = assertNotNull(component.nextBranch(session)).first()
+            assertIs<ComponentResult.Consistent>(session.push(direction))
+
+            val sibling = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+
+            assertTrue(
+                assertNotNull(sibling.model.valueOf<ExactLiraAssignment>(component)).ints.single() != bigIntOf(7),
+            )
+        }
+    }
+
+    @Test
     fun `compound disjunct conflicts retain their Boolean names`() {
         for ((relation, values, fixed) in listOf(
             Triple(LinearOp.EQ, longArrayOf(0L, 1L), 2),
@@ -153,11 +213,49 @@ class ExactLiraSearchComponentTest {
             )
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side.positive)))
 
-            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, false))))
 
-            assertEquals(setOf(0, side.positive.literal xor 1), assertNotNull(conflict.explanation).literals.toSet())
+            assertEquals(
+                setOf(0, side.positive.literal xor 1), assertNotNull(session.reasonFor(0)).literals.toSet(),
+            )
             session.popTo(1)
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+        }
+    }
+
+    @Test
+    fun `disequality directions retain inherited bounds and restore their sibling`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.NE, 0.0),
+                ReifiedRealLinear(
+                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 0.0,
+                ),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(model.numBoolVars))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val sides = assertNotNull(SourceBoundAtom.rationalSplit(
+                session, listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO,
+            ))
+            for (upper in listOf(true, false)) {
+                val side = if (upper) sides.positive else sides.negative
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(side)))
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, upper))))
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+                assertEquals(upper, assignment.bools[0])
+                assertEquals(!upper, assignment.reals.single() > BigFraction.ZERO)
+                session.popTo(0)
+            }
         }
     }
 
@@ -280,11 +378,14 @@ class ExactLiraSearchComponentTest {
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
                 LongArray(129),
-                LongArray(129) { if (it == 0) 1L else 0L },
+                LongArray(129) { if (it < 2) 1L else 0L },
                 null,
                 null,
             ),
-            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.GE, 1)),
+            factors = arrayOf(
+                Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
         )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(model).use { component ->
@@ -305,8 +406,11 @@ class ExactLiraSearchComponentTest {
     fun `source split leaves an unchecked branch indeterminate`() {
         val model = Problem(
             numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(LongArray(35), LongArray(35) { if (it == 0) 1L else 0L }, null, null),
-            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.GE, 1)),
+            intBounds = IntBounds.fromModelBounds(LongArray(35), LongArray(35) { if (it < 2) 1L else 0L }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
         )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(model).use { component ->
@@ -394,8 +498,8 @@ class ExactLiraSearchComponentTest {
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.0),
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 0.0),
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1, 2), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 0.0),
-                Linear(intArrayOf(5), intArrayOf(0), LinearOp.GE, 1),
-                Linear(intArrayOf(5), intArrayOf(0), LinearOp.LE, 4),
+                Linear(intArrayOf(5, 5, 5), intArrayOf(0, 1, 2), LinearOp.GE, 6),
+                Linear(intArrayOf(5, 5, 5), intArrayOf(0, 1, 2), LinearOp.LE, 9),
             ),
         )
         val stats = SmtStatsSink()
@@ -444,32 +548,31 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `a retracted published integer side cannot constrain its sibling reduction`() {
+    fun `a retracted published integer side cannot constrain its sibling witness`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
                 longArrayOf(0L, 0L),
-                longArrayOf(1L, 0L),
+                longArrayOf(3L, 0L),
                 null,
                 Bits(2).also { it.set(1) },
             ),
-            factors = arrayOf(Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.EQ, 1)),
+            factors = arrayOf(Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.EQ, 3)),
         )
         val stats = SmtStatsSink()
         ExactLiraSearchComponent(model).use { component ->
             component.observeWith(stats)
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
             assertIs<ComponentResult.Consistent>(session.initialize())
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtMost(0, 0L)))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.IntEqual(0, 2L)))
             assertIs<SearchResult.Exhausted>(session.solve(0))
-            assertTrue(stats.snapshot().sourceLp.operations > 0L)
             session.popTo(0)
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtLeast(0, 1L)))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.IntAtLeast(0, 3L)))
 
             val result = assertIs<SearchResult.Satisfied>(session.solve(0))
 
             val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertEquals(listOf(BIG_ONE, BIG_ZERO), assignment.ints.toList())
+            assertEquals(listOf(bigIntOf(3), BIG_ZERO), assignment.ints.toList())
         }
     }
 
@@ -527,7 +630,7 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `strict mixed candidates use shared integer branching`() {
+    fun `strict mixed source bounds recover exact integral witnesses`() {
         val model = Problem(
             0,
             intBounds = openBounds(),
@@ -567,7 +670,7 @@ class ExactLiraSearchComponentTest {
             val point = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
             assertEquals(BIG_ONE, point.ints.single())
             assertEquals(BigFraction.ONE, point.reals.single())
-            assertTrue(stats.snapshot().sourceLp.operations > 0L)
+            assertEquals(0L, stats.snapshot().sourceLp.operations)
         }
     }
 
@@ -757,7 +860,7 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `repeated partial conflicts omit an irrelevant assertion after retraction`() {
+    fun `root comparison implications omit irrelevant assertions after retraction`() {
         val source = partialModel()
         val model = Problem(3, intBounds = source.intBounds, factors = source.factors)
         val stats = SmtStatsSink()
@@ -767,23 +870,22 @@ class ExactLiraSearchComponentTest {
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
 
         repeat(3) {
-            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
-            assertContentEquals(intArrayOf(Lit.make(0, false)), conflict.explanation?.literals)
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertContentEquals(intArrayOf(Lit.make(0, false)), session.reasonFor(0)?.literals)
             session.popTo(1)
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
             session.popTo(1)
         }
 
-        assertEquals(3L, stats.snapshot().explainedConflicts)
-        assertEquals(3L, stats.snapshot().conflictLiterals)
+        assertEquals(0L, stats.snapshot().conflicts)
     }
 
     @Test
     fun `partial integer equality is relaxed before complete chronological refutation`() {
         val model = Problem(
             2,
-            intBounds = openBounds(),
-            factors = arrayOf(ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+            intBounds = openBounds(2),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.EQ, 1)),
         )
         val session = SearchSession(listOf(ExactLiraSearchComponent(model)))
         assertIs<ComponentResult.Consistent>(session.initialize())
@@ -845,21 +947,22 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `decided reified row conflicts with unconditional rows and explains assigned literals`() {
+    fun `unconditional rows imply a comparison with an immutable source reason`() {
         val component = ExactLiraSearchComponent(partialModel())
         val session = SearchSession(listOf(component))
 
         assertIs<ComponentResult.Consistent>(session.initialize())
-        val conflict = assertIs<ComponentResult.Conflict>(
+        assertIs<ComponentResult.Conflict>(
             session.push(SearchDecision.Bool(Lit.make(0, positive = true))),
         )
 
-        assertContentEquals(intArrayOf(Lit.make(0, positive = false)), conflict.explanation?.literals)
+        assertEquals(false, session.boolValue(0))
+        assertContentEquals(intArrayOf(Lit.make(0, positive = false)), session.reasonFor(0)?.literals)
         assertNull(session.model().valueOf<ExactLiraAssignment>(component))
     }
 
     @Test
-    fun `partial relaxation conflict records its explanation without a private exact search`() {
+    fun `partial relaxation implies a comparison without a private exact search`() {
         val stats = SmtStatsSink()
         val component = ExactLiraSearchComponent(partialModel()).also { it.observeWith(stats) }
         val session = SearchSession(listOf(component))
@@ -870,17 +973,16 @@ class ExactLiraSearchComponentTest {
         val snapshot = stats.snapshot()
         assertEquals(0L, snapshot.sourceLp.operations)
         assertTrue(requireNotNull(component.lpMetrics).preparationAttempts > 0L)
-        assertEquals(1L, snapshot.conflicts)
-        assertEquals(1L, snapshot.explainedConflicts)
-        assertEquals(1L, snapshot.conflictLiterals)
+        assertEquals(0L, snapshot.conflicts)
+        assertContentEquals(intArrayOf(Lit.make(0, false)), session.reasonFor(0)?.literals)
     }
 
     @Test
     fun `shared exact LIRA component reports reduction conflicts`() {
         val model = Problem(
             numBoolVars = 0,
-            intBounds = openBounds(),
-            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+            intBounds = openBounds(2),
+            factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.EQ, 1)),
         )
         val stats = SmtStatsSink()
         val component = ExactLiraSearchComponent(model).also { it.observeWith(stats) }

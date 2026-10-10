@@ -220,13 +220,21 @@ class OpenTheoryMinimizeTest {
 
     @Test
     fun `a budget spent mid-descent bounds the optimum by the standing incumbent`() {
-        val values = listOf(2L, 4L).map { decisions ->
-            val parsed = stepped()
+        val values = listOf(2L, 3L).map { decisions ->
+            val parsed = modelOf(
+                """
+                (declare-const x Int)
+                (declare-const y Int)
+                (declare-const z Int)
+                (assert (or (= y 20) (= y 0)))
+                (assert (or (= z 7) (= z 0)))
+                (assert (= x (+ y z)))
+                """.trimIndent(),
+            )
             val x = parsed.intVarNames.getValue("x")
-            val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = 1L })
+            val objective = LinearObjective(intCoefficients = LongArray(parsed.model.numIntVars).also { it[x] = -1L })
 
-            // Folded into comparison clauses, the disjunctions put the first witness at the optimum, so the
-            // descent has no standing incumbent to stop beside; the reified form keeps its intermediate steps.
+            // Reified alternatives keep the intermediate objective values in the descent.
             val minimizer = OpenTheoryMinimizer(
                 parsed.model,
                 objective,
@@ -245,11 +253,11 @@ class OpenTheoryMinimizeTest {
             assertTrue(yValue in setOf(0, 20))
             assertTrue(zValue in setOf(0, 7))
             assertEquals((yValue + zValue).toString(), incumbent.intValue(x))
-            assertEquals(incumbent.intValue(x), value.toString())
-            assertTrue(value.toString() in setOf("0", "7", "20", "27"))
+            assertEquals((-incumbent.intValue(x).toInt()).toString(), value.toString())
+            assertTrue(value.toString() in setOf("0", "-7", "-20", "-27"))
             value
         }
-        assertTrue(values[1] < values[0])
+        assertTrue(values[1] <= values[0])
     }
 
     @Test

@@ -16,7 +16,12 @@ private const val MAX_CHAIN_SPAN = 4096L
 private const val SPAN_PER_ARM = 8L
 
 /** A reified `variable = value` atom, recorded so a chain condition can be read back off its literal. */
-internal class EqAtom(val variable: Int, val value: Long)
+internal class EqAtom(val variable: Int, val value: Long, val allowsElement: Boolean)
+
+internal class GuardEquality(val variable: Int, val value: Long, val equal: Boolean) {
+    fun truthWhen(variable: Int?, value: Long): Boolean? =
+        if (this.variable == variable) (this.value == value) == equal else null
+}
 
 /**
  * One `ite`-on-equality chain being accumulated, defining `result` as
@@ -59,13 +64,16 @@ internal class IteChain(val result: Int, val selector: Int, val default: LinComb
     /** Positive-form condition literals, parallel to [keys]; `conds(i)` holds iff `selector = keys(i)`. */
     val conds = ArrayList<Int>()
     private val distinct = HashSet<Long>()
+    var allowsElement = true
+        private set
 
     /** Append an arm, or decline when [key] repeats — a repeat would make the arms non-exclusive. */
-    fun addArm(key: Long, arm: LinComb, cond: Int): Boolean {
+    fun addArm(key: Long, arm: LinComb, cond: Int, allowsElement: Boolean): Boolean {
         if (!distinct.add(key)) return false
         keys.add(key)
         arms.add(arm)
         conds.add(cond)
+        this.allowsElement = this.allowsElement && allowsElement
         return true
     }
 }
@@ -79,11 +87,17 @@ internal class IteChainTable {
     private val chains = LinkedHashMap<Int, IteChain>()
     private val fixedVars = HashMap<Long, Int>()
 
-    fun noteAtom(lit: Int, variable: Int, value: Long) {
-        atoms[lit] = EqAtom(variable, value)
+    fun noteAtom(lit: Int, variable: Int, value: Long, allowsElement: Boolean = true) {
+        atoms[lit] = EqAtom(variable, value, allowsElement)
     }
 
     fun atomOf(lit: Int): EqAtom? = atoms[lit]
+
+    fun guardEquality(lit: Int): GuardEquality? {
+        atoms[lit]?.let { return GuardEquality(it.variable, it.value, equal = true) }
+        atoms[Lit.negate(lit)]?.let { return GuardEquality(it.variable, it.value, equal = false) }
+        return null
+    }
 
     fun open(chain: IteChain) {
         chains[chain.result] = chain
@@ -117,7 +131,9 @@ internal fun Compiler.Builder.chainIte(cond: Int, thenTerm: LinComb, elseTerm: L
     val restTerm = if (negated) thenTerm else elseTerm
     val atom = iteChains.atomOf(atomLit) ?: return null
     val extended = restTerm.asSimpleVar()?.let { iteChains.openAt(it) }
-    if (extended != null && extended.selector == atom.variable && extended.addArm(atom.value, armTerm, atomLit)) {
+    if (extended != null && extended.selector == atom.variable &&
+        extended.addArm(atom.value, armTerm, atomLit, atom.allowsElement)
+    ) {
         widenToInclude(extended.result, armTerm)
         return LinComb(mapOf(extended.result to 1), 0)
     }
@@ -128,7 +144,7 @@ internal fun Compiler.Builder.chainIte(cond: Int, thenTerm: LinComb, elseTerm: L
         atom.variable,
         restTerm,
     )
-    chain.addArm(atom.value, armTerm, atomLit)
+    chain.addArm(atom.value, armTerm, atomLit, atom.allowsElement)
     iteChains.open(chain)
     return LinComb(mapOf(chain.result to 1), 0)
 }
@@ -145,7 +161,12 @@ internal fun Compiler.Builder.lowerOpenIteChains() {
 }
 
 private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
+    val start = factors.size
     if (!collapseToElement(chain)) lowerAsDecisionList(chain)
+    conditionalEqualities.define(
+        chain.result, chain.conds, chain.arms, chain.default, factors.subList(start, factors.size),
+        chain.keys.map { GuardEquality(chain.selector, it, equal = true) },
+    )
 }
 
 /**
@@ -164,6 +185,7 @@ private fun Compiler.Builder.lowerAsDecisionList(chain: IteChain) {
 
 /** Post the chain as one [Element] over the selector's whole domain, or decline. */
 private fun Compiler.Builder.collapseToElement(chain: IteChain): Boolean {
+    if (!chain.allowsElement) return false
     if (chain.keys.size < MIN_CHAIN_DEPTH) return false
     val domain = (intDomains[chain.selector] as? PresolveDomain.Finite)?.domain ?: return false
     val lo = domain.min
