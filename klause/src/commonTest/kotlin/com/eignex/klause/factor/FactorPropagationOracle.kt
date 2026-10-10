@@ -5,8 +5,10 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
 import kotlin.random.Random
@@ -154,7 +156,8 @@ object FactorPropagationOracle {
         return !hole
     }
 
-    private fun enumerateSat(problem: Problem, label: String, satisfies: ((Sample) -> Boolean)?): List<Sample> {
+    /** Enumerate declared finite assignments without consulting an engine projection. */
+    fun sourceAssignments(problem: Problem): Sequence<Sample> {
         require(problem !is BakedProblem) { "Pass the original source Problem, before root domains are folded." }
         require(problem.numRealVars == 0) { "The oracle requires a finite Boolean/integer assignment space." }
         require((0 until problem.numIntVars).all { problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) }) {
@@ -171,28 +174,110 @@ object FactorPropagationOracle {
         }
         repeat(problem.numBoolVars) { include(2L) }
         domains.forEach { include(it.valueCount) }
-        // This projection evaluates factors over the declarations without running root deductions.
-        val state = LocalSearchState(
+        return (0 until space.toInt()).asSequence().map { ordinal ->
+            var remaining = ordinal.toLong()
+            val bools = BooleanArray(problem.numBoolVars) {
+                val value = remaining % 2L == 1L
+                remaining /= 2L
+                value
+            }
+            val ints = LongArray(problem.numIntVars) { v ->
+                val domain = domains[v]
+                val value = domain.values.valueAt((remaining % domain.valueCount).toInt())
+                remaining /= domain.valueCount
+                value
+            }
+            Sample(bools, ints)
+        }
+    }
+
+    /** Compare complete CP acceptance with independent source semantics, including rejected assignments. */
+    fun assertCompleteChecks(problem: Problem, label: String, satisfies: (Sample) -> Boolean) {
+        val session = PropagationSession(problem)
+        for (sample in sourceAssignments(problem)) {
+            session.popToLevel(0)
+            val accepted = sample.bools.indices.all {
+                session.pinBool(it, sample.bools[it]) !is PropagationResult.Unsat
+            } && sample.ints.indices.all { session.pinInt(it, sample.ints[it]) !is PropagationResult.Unsat }
+            assertEquals(satisfies(sample), accepted, "$label: complete CP check")
+        }
+    }
+
+    /** Compare invariant satisfaction and its uncompressed small score with an independent degree. */
+    fun assertScoring(problem: Problem, label: String, degree: (Sample) -> Int) {
+        require(problem.numFactors == 1) { "Scoring oracle requires one source factor." }
+        val assignments = sourceAssignments(problem)
+        val state = declaredState(problem)
+        for (sample in assignments) {
+            load(state, sample)
+            val expected = degree(sample)
+            assertEquals(expected == 0, !state.factors[0].isViolated(state, 0), "$label: assignment check")
+            assertEquals(expected, state.factorDegree[0], "$label: recomputed degree")
+        }
+    }
+
+    /** Compare predicted and committed single-variable move scores with independent source degrees. */
+    fun assertMoveScoring(problem: Problem, label: String, degree: (Sample) -> Int) {
+        require(problem.numFactors == 1) { "Move scoring oracle requires one source factor." }
+        val assignments = sourceAssignments(problem)
+        val state = declaredState(problem)
+        val domains = problem.finiteIntDomains()
+        for (sample in assignments) {
+            for (v in sample.bools.indices) {
+                load(state, sample)
+                val after = Sample(sample.bools.copyOf(), sample.ints.copyOf())
+                after.bools[v] = !after.bools[v]
+                val expected = degree(after)
+                val delta = state.factors[0].deltaIfBoolFlipped(state, 0, v)
+                assertEquals(expected - degree(sample), delta, "$label: predicted bool $v flip")
+
+                state.apply(Move.BoolFlip(v))
+
+                assertEquals(expected, state.factorDegree[0], "$label: committed bool $v flip")
+                assertEquals(expected == 0, !state.factors[0].isViolated(state, 0), "$label: bool move check")
+            }
+            for (v in sample.ints.indices) {
+                domains[v].values.forEach { value ->
+                    load(state, sample)
+                    val after = Sample(sample.bools.copyOf(), sample.ints.copyOf())
+                    after.ints[v] = value
+                    val expected = degree(after)
+                    val delta = state.factors[0].deltaIfIntSet(state, 0, v, value)
+                    assertEquals(expected - degree(sample), delta, "$label: predicted int $v=$value")
+
+                    state.apply(Move.IntSet(v, value))
+
+                    assertEquals(expected, state.factorDegree[0], "$label: committed int $v=$value")
+                    assertEquals(expected == 0, !state.factors[0].isViolated(state, 0), "$label: int move check")
+                }
+            }
+        }
+    }
+
+    private fun declaredState(problem: Problem): LocalSearchState {
+        val domains = problem.finiteIntDomains()
+        // Projection checks use declarations so deductions cannot hide rejected assignments.
+        return LocalSearchState(
             LocalSearchModel.open(problem, domains), Random(0L),
-            // Exact invariant selection must see declarations even when local search would use a window.
             projection = LocalSearchProblem(problem, domains),
         )
+    }
+
+    private fun load(state: LocalSearchState, sample: Sample) {
+        sample.bools.forEachIndexed { v, value -> state.assignment.setBool(v, value) }
+        sample.ints.forEachIndexed { v, value -> state.assignment.setInt(v, value) }
+        state.recompute()
+    }
+
+    private fun enumerateSat(problem: Problem, label: String, satisfies: ((Sample) -> Boolean)?): List<Sample> {
         val samples = ArrayList<Sample>()
-        repeat(space.toInt()) { ordinal ->
-            var remaining = ordinal.toLong()
-            repeat(problem.numBoolVars) { v ->
-                state.assignment.setBool(v, remaining % 2L == 1L)
-                remaining /= 2L
-            }
-            domains.forEachIndexed { v, domain ->
-                state.assignment.setInt(v, domain.values.valueAt((remaining % domain.valueCount).toInt()))
-                remaining /= domain.valueCount
-            }
-            state.recompute()
+        val assignments = sourceAssignments(problem)
+        val state = declaredState(problem)
+        for (sample in assignments) {
+            load(state, sample)
             if (satisfies == null) {
-                if (state.cost == 0L) samples.add(state.assignment.snapshot())
+                if (state.cost == 0L) samples.add(sample)
             } else {
-                val sample = state.assignment.snapshot()
                 val accepted = satisfies(sample)
                 assertEquals(
                     accepted,
