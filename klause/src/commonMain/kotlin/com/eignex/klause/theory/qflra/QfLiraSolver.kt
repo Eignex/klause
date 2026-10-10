@@ -101,6 +101,7 @@ class ExactLiraSearchComponent(
     private val disjunctOwner = Any()
     private var disjunctionRegistrationDeclined = false
     private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -546,6 +547,30 @@ class ExactLiraSearchComponent(
             }
         ) {
             return ComponentResult.Consistent
+        }
+        if (node.sourceBranches.isEmpty()) {
+            realDifference?.let { graph ->
+                if (!context.consumeCheck()) return ComponentResult.Indeterminate
+                when (val result = graph.check(bools, operationStop)) {
+                    RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
+                    is RealDifferenceSystem.Result.Conflict -> {
+                        smtStats?.observeConflict(result.explanation)
+                        outcome = ComponentCheck.Infeasible(result.explanation)
+                        return ComponentResult.Conflict(result.explanation)
+                    }
+                    is RealDifferenceSystem.Result.Feasible -> {
+                        dirty = false
+                        if (bools.none { it == UNASSIGNED }) {
+                            candidate = result.point
+                            acceptWitness(result.point)?.let {
+                                assignment = it
+                                outcome = ComponentCheck.Feasible
+                            }
+                        }
+                        return ComponentResult.Consistent
+                    }
+                }
+            }
         }
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {

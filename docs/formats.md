@@ -84,6 +84,16 @@ The theory packages cover difference arithmetic, LIA and LRA/LIRA. Bitvectors,
 arrays, strings, quantifiers and unrestricted non-linear arithmetic are outside
 this frontend's supported theory surface.
 
+The exact real component uses a difference graph when every arithmetic row is a
+one-column bound or a two-column difference with an integral normalized bound.
+Boolean guards select active edges. With `n` graph vertices, scaling bounds by
+`n+1` and subtracting one from strict edges preserves every simple cycle's sign,
+including zero-weight strict cycles. The graph supplies rational potentials and
+source-guard cycle explanations; witnesses still pass the complete source-row
+check. Fractional normalized bounds, unsafe Long magnitudes, disequalities,
+private disjunctions and mixed integer/real models retain the exact LP route.
+No finite CP domains are created by this graph.
+
 Optimization emits `; objective=<value>` for each incumbent in the source objective's
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
 `best-found` and `unbounded`. These comments appear without `-s`; `sat` alone
