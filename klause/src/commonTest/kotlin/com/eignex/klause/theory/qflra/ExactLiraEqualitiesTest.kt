@@ -1,0 +1,97 @@
+package com.eignex.klause.theory.qflra
+
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.exactForm
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
+import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+
+class ExactLiraEqualitiesTest {
+    @Test
+    fun `guarded equality offsets imply a comparison over unbounded columns and retract`() {
+        val open = Bits(3).also { for (variable in 0..2) it.set(variable) }
+        val source = Problem(
+            2,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(-2, 2), intArrayOf(0, 1), LinearOp.EQ, -2),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 2),
+                ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 3),
+            ),
+        )
+        ExactLiraSearchComponent(source).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            assertEquals(true, session.boolValue(1))
+            assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)), session.reasonFor(1)?.literals?.toSet())
+            session.popTo(0)
+            assertNull(session.boolValue(1))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertNull(session.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `contradictory equality and disequality guards cite the active offset chain`() {
+        for ((operator, bound) in listOf(LinearOp.EQ to 2, LinearOp.NE to 3)) {
+            val open = Bits(3).also { for (variable in 0..2) it.set(variable) }
+            val source = Problem(
+                2,
+                intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
+                    Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 2),
+                    ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(0, 2), operator, bound),
+                ),
+            )
+            val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+                factor.linearRows.map { it.exactForm(0) }
+            }) { _, _ -> ComponentResult.Consistent }
+            val session = SearchSession(emptyList())
+            session.push(SearchDecision.Bool(Lit.make(0, true)))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            val conflict = assertIs<ComponentResult.Conflict>(propagation.propagate(session, Cancellation.Never))
+
+            assertEquals(
+                setOf(Lit.make(0, false), Lit.make(1, false)), assertNotNull(conflict.explanation).literals.toSet(),
+            )
+        }
+    }
+
+    @Test
+    fun `a nonintegral equality threshold implies its guard is false`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(
+            1,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(2, -2), intArrayOf(0, 1), LinearOp.EQ, 1)),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+        assertEquals(false, session.boolValue(0))
+        assertContentEquals(intArrayOf(Lit.make(0, false)), assertNotNull(session.reasonFor(0)).literals)
+    }
+}
