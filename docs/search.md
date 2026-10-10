@@ -186,8 +186,11 @@ Sessions that decline resumable optimization retain their one-shot improvement s
 
 The immutable local-search projection is prepared on demand and reused across draws.
 Mixed-pool arms over the same model share it, including ALNS's inner local search.
-Objective-bound overlays keep their own projections. Assignments, RNGs, weights and
-invariant payloads belong to each live state. Resumable handles initialize large
+Objective-bound overlays keep their own projections. Each Boolean, integer and real
+variable's occurrence index contains each active factor once, in factor order. A move
+updates that invariant once; the invariant accounts for all positions reading the
+coordinate, including positions with different presence literals. Assignments, RNGs,
+weights and invariant payloads belong to each live state. Resumable handles initialize large
 factor sets in batches, retaining the next factor and completed payloads when a
 slice expires. Partial costs, samples and warm state remain private until every
 factor has been scored. Initial scoring preserves factor order and does not charge
