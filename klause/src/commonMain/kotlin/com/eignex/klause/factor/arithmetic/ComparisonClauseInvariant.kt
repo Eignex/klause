@@ -19,14 +19,20 @@ internal class ComparisonClauseInvariant(
 ) : Invariant {
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
-        for (i in vars.indices) if (literalShortfall(state, i) == 0L) return false
+        for (i in vars.indices) if (literalShortfall(i, state.assignment.intValue(vars[i])) == 0L) return false
         return true
     }
 
-    override fun violationDegree(state: LocalSearchState, factorId: Int): Int {
+    override fun violationDegree(state: LocalSearchState, factorId: Int): Int = degreeAt(state, -1, 0L)
+
+    override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int =
+        degreeAt(state, intVar, newValue) - state.factorDegree[factorId]
+
+    private fun degreeAt(state: LocalSearchState, intVar: Int, newValue: Long): Int {
         var best = Long.MAX_VALUE
         for (i in vars.indices) {
-            val s = literalShortfall(state, i)
+            val value = if (vars[i] == intVar) newValue else state.assignment.intValue(vars[i])
+            val s = literalShortfall(i, value)
             if (s == 0L) return 0
             if (s < best) best = s
         }
@@ -34,8 +40,7 @@ internal class ComparisonClauseInvariant(
     }
 
     /** Units the variable of literal [i] must move for that literal to hold; `0` when it already does. */
-    private fun literalShortfall(state: LocalSearchState, i: Int): Long {
-        val x = state.assignment.intValue(vars[i])
+    private fun literalShortfall(i: Int, x: Long): Long {
         val c = consts[i]
         return when (ops[i]) {
             LinearOp.LE -> if (x <= c) 0L else saturatedSub(x, c)

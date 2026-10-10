@@ -284,6 +284,8 @@ floating-point accumulation order.
 Committed moves reconcile cost and violated membership from exact post-move degrees.
 Factor data and engine projections are separate: the local-search projection supplies
 an `Invariant`, while mutable payloads belong to each `LocalSearchState`.
+Comparison-clause integer scores substitute the target in every matching literal,
+including repeated variables, and retain the minimum saturated comparison shortfall.
 Candidate `deltaIf*` methods return the exact degree change. Ordinary `apply*` methods
 update payloads after the assignment changes; their return values are implementation-specific
 and callers must read the post-move degree for scoring. Reified linear invariants offer

@@ -7,13 +7,52 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class ComparisonClauseTest {
+
+    @Test
+    fun `integer move scores match committed comparison clause cost`() {
+        for (op in LinearOp.entries) {
+            for ((initial, target) in listOf(-5L to 4L, 4L to 10L, 10L to -10L, -10L to 0L)) {
+                val problem = Problem(
+                    0, 2, Array(2) { IntDomain(-20, 20) },
+                    arrayOf<Factor>(
+                        ComparisonClause(
+                            intArrayOf(0, 0, 1), arrayOf(op, LinearOp.LE, LinearOp.EQ), longArrayOf(4, -8, 0),
+                        ),
+                    ),
+                )
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+                state.assignment.setInt(0, initial)
+                state.assignment.setInt(1, 20)
+                state.recompute()
+                state.weights.factorWeights[0] = 3.0
+                val before = state.cost
+                val move = Move.IntSet(0, target)
+
+                val predicted = state.netDelta(move)
+                val weighted = state.weightedNetDelta(move)
+                assertEquals(initial, state.assignment.intValue(0))
+                assertEquals(before, state.cost)
+                state.apply(move)
+
+                assertEquals(state.cost - before, predicted, "$op: $initial to $target")
+                assertEquals(3.0 * (state.cost - before), weighted, "$op: $initial to $target")
+                val committed = state.cost
+                state.recompute()
+                assertEquals(committed, state.cost)
+            }
+        }
+    }
 
     private fun le(v: Int, c: Long) = Triple(v, LinearOp.LE, c)
     private fun ge(v: Int, c: Long) = Triple(v, LinearOp.GE, c)
