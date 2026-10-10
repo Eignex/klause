@@ -84,6 +84,21 @@ overrun a slice. Solve-wide cancellation remains available within propagation;
 some factor internals are not covered by visit metering. Local-search segments
 have separate atomic work.
 
+Local-search optimization handles retain the live assignment, RNG, factor payloads,
+restart progress and incumbent between segments. A slice pauses at an instruction
+checkpoint or cancellation poll; an interrupted continuous-candidate check retains
+its candidate for the next slice. Moves and restart transitions count as instructions.
+The scheduler charges the observed instruction delta, while the solve-wide move
+allowance is charged once across slices. Closing or reseeding discards the retained
+state. Root refutations remain authoritative; an unsuccessful local-search walk is
+incomplete.
+
+The immutable local-search projection is initialized lazily and reused across draws.
+Mixed-pool arms over the same model share it, including ALNS's inner local search.
+Objective-bound overlays keep their own projections. Assignments, RNGs, weights and
+invariant payloads belong to each live state. Projection construction, seeding,
+factor calls and repair searches remain atomic work that can overrun a segment.
+
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
 Reseeding preserves terminal verdicts. Arm policy, scheduling and available

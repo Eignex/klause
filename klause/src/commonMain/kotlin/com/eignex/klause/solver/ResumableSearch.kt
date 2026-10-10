@@ -53,7 +53,7 @@ interface ResumableSearch : AutoCloseable {
      * So with a node budget armed, [sliceMillis] is only an outer bound: pass [Long.MAX_VALUE] for a slice that is
      * reproducible whatever it costs, or a finite time for one that must not run long when its nodes turn out to
      * be expensive. Either way the pause lands where a node budget would land it. [global] still carries the
-     * whole-solve deadline, so nothing can overrun it.
+     * whole-solve deadline. Cancellation is cooperative; atomic engine work can overrun a slice.
      */
     fun runSlice(
         global: Cancellation,
