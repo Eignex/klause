@@ -163,16 +163,18 @@ internal class LiveQfLraSystem(
             )
         }
         val logical = List(terms.size) { ExactLpColumn(ExactLpBounds(), integral = false) }
+        val entries = List(columns) { ArrayList<ExactLpEntry>() }
+        terms.forEachIndexed { row, term ->
+            for ((column, coefficient) in term) {
+                if (column in entries.indices && !coefficient.isZero) {
+                    entries[column] += ExactLpEntry(row, ExactLpNumber.of(coefficient.negated()))
+                }
+            }
+        }
         return lp.install(
             source,
             ExactLpModel(
-                List(columns) { column ->
-                    terms.mapIndexedNotNull { index, term ->
-                        term[column]?.takeUnless { it.isZero }?.let {
-                            ExactLpEntry(index, ExactLpNumber.of(it.negated()))
-                        }
-                    }
-                },
+                entries,
                 List(terms.size) { ExactLpNumber.of(0L) },
                 structural + logical,
                 List(terms.size) { ExactLpRow() },
