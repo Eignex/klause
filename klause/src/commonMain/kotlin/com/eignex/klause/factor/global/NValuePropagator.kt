@@ -159,7 +159,9 @@ internal class NValuePropagator(
         // (sound, just weaker) — the AtMost mode, which only tightens the minimum, is a no-op.
         val nonAbsent = xs.indices.filter { !definitelyAbsentNvFn(it, state) }
         if (nonAbsent.any { state.intDomains[xs[it]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
-            val boundsAnt = OptionalPresence.withPresencePremises(presents, state, collectHoleAndBoundAntecedents(state, xs))
+            val boundsAnt = OptionalPresence.withPresencePremises(
+                presents, state, collectHoleAndBoundAntecedents(state, xs),
+            )
             return when (mode) {
                 NValue.Mode.Eq, NValue.Mode.AtLeast -> state.tightenIntMax(n, nonAbsent.size.toLong(), boundsAnt)
                 NValue.Mode.AtMost -> true

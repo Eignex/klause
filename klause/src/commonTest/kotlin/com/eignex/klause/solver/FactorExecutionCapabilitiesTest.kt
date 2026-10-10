@@ -46,7 +46,9 @@ class FactorExecutionCapabilitiesTest {
             Regular(intArrayOf(0), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2)),
             AllDifferent(intArrayOf(0, 1), 0, 2),
             AllDifferent(intArrayOf(0, 1), 0, 2, presents = literals, boundsConsistent = true),
-            GlobalCardinality(intArrayOf(0, 1), longArrayOf(0, 1), countLow = intArrayOf(0, 0), countHigh = intArrayOf(2, 2)),
+            GlobalCardinality(
+                intArrayOf(0, 1), longArrayOf(0, 1), countLow = intArrayOf(0, 0), countHigh = intArrayOf(2, 2),
+            ),
             NValue(0, intArrayOf(1, 2)),
             Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
             SymmetricAllDifferent(intArrayOf(0, 1)),
@@ -73,8 +75,12 @@ class FactorExecutionCapabilitiesTest {
             LexLess(intArrayOf(0), intArrayOf(1), true),
             Sort(intArrayOf(0, 1), intArrayOf(2, 3)),
             RealProduct(0, 0, 1, 0.0, 1.0),
-            ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
-            ObjectiveBoundFactor(intArrayOf(0), longArrayOf(1), intArrayOf(0), longArrayOf(1), MutableObjectiveBound(0)),
+            ReifiedRealLinear(
+                0, intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0,
+            ),
+            ObjectiveBoundFactor(
+                intArrayOf(0), longArrayOf(1), intArrayOf(0), longArrayOf(1), MutableObjectiveBound(0),
+            ),
             GaussianXor(listOf(Xor(literals, 1))),
             DifferenceSystem(listOf(DifferenceEdge(0, 1, 0))),
             SymmetryHandling(listOf(intArrayOf(1, 0) to intArrayOf(1, 0))),
@@ -92,7 +98,9 @@ class FactorExecutionCapabilitiesTest {
                 factor.invariantProjection() === NoInvariant,
                 factor::class.simpleName,
             )
-            if (capabilities.propagation == PropagationCapability.INERT || capabilities.scoring == ScoringCapability.INERT) {
+            if (capabilities.propagation == PropagationCapability.INERT ||
+                capabilities.scoring == ScoringCapability.INERT
+            ) {
                 assertNotNull(capabilities.inertReason, factor::class.simpleName)
             }
         }

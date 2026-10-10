@@ -114,9 +114,17 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
 
 internal fun Factor.executionCapabilities(): FactorExecutionCapabilities = builtInExecutionCapabilities()
     ?: FactorExecutionCapabilities(
-        propagation = if (this is Propagator) PropagationCapability.SOUND_FILTERING else PropagationCapability.UNSUPPORTED,
+        propagation = if (this is Propagator) {
+            PropagationCapability.SOUND_FILTERING
+        } else {
+            PropagationCapability.UNSUPPORTED
+        },
         propagationCheck = AssignmentCheckCapability.UNSUPPORTED,
-        assignmentCheck = if (this is Invariant) AssignmentCheckCapability.EXACT else AssignmentCheckCapability.UNSUPPORTED,
+        assignmentCheck = if (this is Invariant) {
+            AssignmentCheckCapability.EXACT
+        } else {
+            AssignmentCheckCapability.UNSUPPORTED
+        },
         scoring = when (this) {
             is Invariant -> ScoringCapability.GRADED
             is Propagator -> ScoringCapability.INERT
