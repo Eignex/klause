@@ -28,8 +28,7 @@ import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.toDouble
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.klause.util.toLongExact
 import kotlin.math.abs
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -57,11 +56,6 @@ internal class OpenPortfolio(
     private val lanes: Int = 1,
     private val searchesContinuousOnly: Boolean = false,
 ) {
-    // The theory arm's witnesses as the pool saw them: each may hold integers past the 64-bit range a Sample cannot
-    // carry, so the pool's copy is only a stand-in for it. The witness check reads them from every lane while the
-    // theory arm adds to them, so both go through [lock].
-    private val theoryWitnesses = ArrayList<TheoryWitness>()
-    private val lock = (if (lanes > 1) Concurrency.Strict else Concurrency.None).lock()
     private var descentVerdict: OpenTheoryOptimum? = null
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
@@ -117,7 +111,7 @@ internal class OpenPortfolio(
         }
         val incumbents = PortfolioIncumbents<BigFraction>(
             valueOf = { candidate ->
-                witnessOf(candidate.sample)?.value?.asFraction() ?: objective.evaluateExact(candidate.sample)
+                objective.evaluateExact(candidate.sample)
             },
             improves = { candidate, standing -> candidate < standing },
             approximateValue = { it.toDouble() },
@@ -170,14 +164,7 @@ internal class OpenPortfolio(
             is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
         }
 
-    private fun assignmentOf(sample: Sample): OpenTheoryAssignment =
-        witnessOf(sample)?.assignment ?: OpenTheoryAssignment.Sampled(sample)
-
-    private fun witnessOf(sample: Sample): TheoryWitness? =
-        lock.withLock { theoryWitnesses.firstOrNull { it.sample === sample } }
-
-    private fun installedWitnessOf(assignment: OpenTheoryAssignment): TheoryWitness? =
-        lock.withLock { theoryWitnesses.firstOrNull { it.assignment === assignment } }
+    private fun assignmentOf(sample: Sample): OpenTheoryAssignment = OpenTheoryAssignment.Sampled(sample)
 
     // The theory exactly as the default open route decides it.
     private fun decide(request: OpenTheoryRequest, params: TheoryParams): OpenTheoryResult =
@@ -207,15 +194,10 @@ internal class OpenPortfolio(
     }
 
     private fun toSolveResult(result: OpenTheoryResult): SolveResult = when (result) {
-        is OpenTheoryResult.Sat -> SolveResult.Sat(pooled(result.assignment, value = null).sample, result.stats)
+        is OpenTheoryResult.Sat -> SolveResult.Sat(result.assignment.toSample(model), result.stats)
         is OpenTheoryResult.Unsat -> SolveResult.Unsat(stats = result.stats)
         is OpenTheoryResult.Unknown -> SolveResult.Unknown(result.reason, result.stats)
     }
-
-    // The pool's stand-in for a theory witness, remembered so the exact witness can be read back.
-    private fun pooled(assignment: OpenTheoryAssignment, value: BigInt?): TheoryWitness =
-        TheoryWitness(assignment.toSampleOrPlaceholder(model), assignment, value)
-            .also { lock.withLock { theoryWitnesses += it } }
 
     private fun descentWorker(minimizer: OpenTheoryMinimizer, armId: Int, readBound: () -> BigInt?): PortfolioWorker =
         PortfolioWorker.ofMinimize(
@@ -239,14 +221,14 @@ internal class OpenPortfolio(
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
             ): MinimizeResult? {
                 val verdict = descent.runSlice(global, sliceMillis, sliceNodes) { assignment, value ->
-                    val witness = pooled(assignment, value)
+                    val sample = assignment.toSample(model)
                     val objective = value.toDouble()
-                    onIncumbent(MinimizeResult.BestFound(witness.sample, objective, TerminationReason.BudgetExhausted))
+                    onIncumbent(MinimizeResult.BestFound(sample, objective, TerminationReason.BudgetExhausted))
                 } ?: return null
                 descentVerdict = verdict
                 return when (verdict) {
                     is OpenTheoryOptimum.Optimal -> MinimizeResult.Optimal(
-                        standIn(verdict.assignment, verdict.value.num),
+                        verdict.assignment.toSample(model),
                         verdict.value.toDouble(),
                         verdict.stats,
                     )
@@ -254,7 +236,7 @@ internal class OpenPortfolio(
                     is OpenTheoryOptimum.Infeasible -> MinimizeResult.Infeasible(stats = verdict.stats)
 
                     is OpenTheoryOptimum.Unbounded -> MinimizeResult.Unbounded(
-                        standIn(verdict.witness, verdict.value.num),
+                        verdict.witness.toSample(model),
                         verdict.value.toDouble(),
                         direction = emptyList(),
                         stats = verdict.stats,
@@ -265,11 +247,6 @@ internal class OpenPortfolio(
                     is OpenTheoryOptimum.Bounded -> MinimizeResult.Unknown(verdict.reason, verdict.stats)
                 }
             }
-
-            // The descent reports a verdict on a witness it installed, so the pool already holds its stand-in. Its
-            // objective is integral, so the value's numerator is the value.
-            private fun standIn(assignment: OpenTheoryAssignment, value: BigInt): Sample =
-                (installedWitnessOf(assignment) ?: pooled(assignment, value)).sample
 
             override fun close() = descent.close()
         }
@@ -335,7 +312,7 @@ internal class OpenPortfolio(
     // wherever a Double states an integral value exactly, and within a relative tolerance where continuous terms make
     // the claim a floating-point sum. The theory arm's witnesses are exact by construction.
     private fun witnessCheck(objective: LinearObjective?): WitnessCheck = WitnessCheck { sample, claimed ->
-        if (witnessOf(sample) != null) return@WitnessCheck null
+        if (sample.isTheoryWitness) return@WitnessCheck null
         refuteOpenWitness(model, sample)?.let { return@WitnessCheck it }
         if (objective == null || claimed == null) return@WitnessCheck null
         val exact = objective.evaluateExact(sample)
@@ -347,8 +324,6 @@ internal class OpenPortfolio(
         }
         if (agrees) null else "objective $claimed, but the assignment scores $exact"
     }
-
-    private class TheoryWitness(val sample: Sample, val assignment: OpenTheoryAssignment, val value: BigInt?)
 
     private companion object {
         const val DEFAULT_LS_ARMS: Int = 3
@@ -372,9 +347,22 @@ private const val OBJECTIVE_TOLERANCE = 1e-6
 private const val EXACT_DOUBLE_INTEGER: Long = 1L shl 53
 
 // [sample] moved into [searchModel]'s windows, so it seeds a search whose invariants were sized for them.
-private fun inWindows(sample: Sample, searchModel: LocalSearchModel): Sample {
+internal fun inWindows(sample: Sample, searchModel: LocalSearchModel): Sample {
     val domains = searchModel.domains
-    if (sample.ints.size != domains.size) return sample
+    if (sample.numIntVars != domains.size) return sample
+    val exact = sample.exactInts
+    if (exact != null) {
+        val projected = LongArray(domains.size) { id ->
+            val value = exact[id]
+            val domain = domains[id]
+            when {
+                value < bigIntOf(domain.min) -> domain.min
+                value > bigIntOf(domain.max) -> domain.max
+                else -> domain.clamp(value.toLongExact())
+            }
+        }
+        return Sample(sample.bools, projected, sample.reals, sample.exactReals)
+    }
     if (sample.ints.indices.all { domains[it].contains(sample.ints[it]) }) return sample
     return sample.copy(ints = LongArray(domains.size) { domains[it].clamp(sample.ints[it]) })
 }

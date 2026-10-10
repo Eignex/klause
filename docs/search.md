@@ -67,6 +67,17 @@ and [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/Claus
 
 ## Portfolio slices
 
+Open portfolios transport exact assignments in `Sample` rather than through a
+side registry. `exactInts` and `exactReals` carry immutable authoritative
+coordinates; finite samples retain their compact arrays. Copying an unchanged
+assignment preserves its coordinates and theory acceptance. Changing coordinates
+requires a fresh witness check. The exact objective is evaluated from the carried
+assignment, including integers outside `Long`.
+
+A wide exact sample exposes no finite integer array. Local-search warm starts
+explicitly project the integers into their search windows and discard theory
+acceptance. This search seed cannot replace the exact incumbent or justify a bound.
+
 Resumable backtrack arms charge decisions, propagation visits and completed LP
 work to their scheduler. The current conversion is one slice node per 4000
 propagation visits and per 600 LP work units. Construction is charged once;

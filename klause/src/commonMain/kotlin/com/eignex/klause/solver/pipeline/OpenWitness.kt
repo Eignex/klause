@@ -8,6 +8,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.util.toLongExact
 
 /**
  * Why [sample] is not a solution of the open source model [model], or null when it is.
@@ -18,6 +21,9 @@ import com.eignex.klause.util.Cancellation
  * rows by an exact LP; a floating-point real value alone decides nothing.
  */
 internal fun refuteOpenWitness(model: Problem, sample: Sample): String? {
+    if (sample.exactInts?.any { !it.fitsLong() } == true) {
+        return "wide integer coordinates require an exact theory witness check"
+    }
     if (sample.bools.size != model.numBoolVars || sample.ints.size != model.numIntVars) {
         return "assignment covers ${sample.bools.size}/${sample.ints.size} of the " +
             "${model.numBoolVars}/${model.numIntVars} discrete variables"
@@ -36,8 +42,14 @@ internal fun refuteOpenWitness(model: Problem, sample: Sample): String? {
     return (verdict as? Verification.Rejected)?.reason
 }
 
-/** A [Sample] of this witness for the portfolio to carry, its integers clipped where they pass the 64-bit range. */
-internal fun OpenTheoryAssignment.toSampleOrPlaceholder(model: Problem): Sample = Sample(
-    bools = BooleanArray(model.numBoolVars) { boolValue(it) },
-    ints = LongArray(model.numIntVars) { intValue(it).toLongOrNull() ?: 0L },
-)
+internal fun OpenTheoryAssignment.toSample(model: Problem): Sample {
+    val ints = List(model.numIntVars) { parseBigInt(intValue(it)) }
+    val reals = List(model.numRealVars) { TheoryCompletion.parseRational(realValue(it)) }
+    return Sample(
+        bools = BooleanArray(model.numBoolVars) { boolValue(it) },
+        ints = if (ints.all { it.fitsLong() }) LongArray(ints.size) { ints[it].toLongExact() } else LongArray(0),
+        reals = DoubleArray(reals.size) { reals[it].toDouble() },
+        exactReals = reals,
+        exactInts = ints,
+    ).also { it.isTheoryWitness = true }
+}
