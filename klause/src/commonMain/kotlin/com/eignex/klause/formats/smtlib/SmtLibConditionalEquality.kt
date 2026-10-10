@@ -132,11 +132,14 @@ internal class SmtLibConditionalEquality {
             ownedFactors.getValue(pending.removeFirst()).forEach(::read)
         }
         factors.removeAll { factor -> owners[factor]?.let { it !in retained } == true }
-        println(
-            ";;; conditional-lowering queries=$queries work=$work declines=$budgetDeclines " +
-                "definitions=${definitions.size} cached=${equalities.size} factors=${factors.size} " +
-                "retainedInts=${retained.count { it.integer }} retainedBools=${retained.count { !it.integer }}",
-        )
+        println("; smtConditionalQueries=$queries")
+        println("; smtConditionalVisits=$work")
+        println("; smtConditionalDeclines=$budgetDeclines")
+        println("; smtConditionalDefinitions=${definitions.size}")
+        println("; smtConditionalCached=${equalities.size}")
+        println("; smtConditionalFactors=${factors.size}")
+        println("; smtConditionalRetainedInts=${retained.count { it.integer }}")
+        println("; smtConditionalRetainedBools=${retained.count { !it.integer }}")
         return UnusedColumns(
             integerOwners.keys.filterTo(HashSet()) { integerOwners.getValue(it) !in retained },
             booleanOwners.keys.filterTo(HashSet()) { booleanOwners.getValue(it) !in retained },
