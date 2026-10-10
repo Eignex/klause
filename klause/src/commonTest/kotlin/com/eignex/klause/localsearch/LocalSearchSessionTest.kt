@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -10,9 +11,9 @@ import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -113,6 +114,25 @@ class LocalSearchSessionTest {
                 assertTrue(result.sample.bools[0])
                 assertEquals(1.0, result.objective)
             }
+    }
+
+    @Test
+    fun `optimization stops when a sibling spends the shared allowance`() {
+        val budget = NodeBudget(10L)
+        val session = LocalSearchSolver(weightLearningProblem().bake()).session()
+        val params = LocalSearchParams(maxFlips = 100L, nodeBudget = budget, randomSeed = 7L)
+
+        session.resumable(LinearObjective(boolWeights = LongArray(6) { 1L }), params).use { handle ->
+            val counted = assertIs<InstructionSlicedSearch>(handle)
+            assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 3L) {})
+            budget.spendMoves(5L)
+            val spent = budget.spent
+            val result = counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 3L) {}
+
+            assertIs<MinimizeResult.Unknown>(result)
+            assertEquals(3.0, handle.stats.ls.moves.sum)
+            assertEquals(spent, budget.spent)
+        }
     }
 
     @Test

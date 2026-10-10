@@ -14,8 +14,8 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -34,7 +34,7 @@ import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-private fun interface SatisfyCheckpoint {
+private fun interface LocalSearchCheckpoint {
     fun shouldPause(moves: Long): Boolean
 }
 
@@ -182,7 +182,7 @@ internal class LocalSearchEngine(
                 it,
                 warm = warm,
                 sink = sink,
-                checkpoint = SatisfyCheckpoint { spent ->
+                checkpoint = LocalSearchCheckpoint { spent ->
                     instructions = spent
                     spent >= limit
                 },
@@ -288,7 +288,7 @@ internal class LocalSearchEngine(
         params: LocalSearchParams,
         warm: WarmState?,
         sink: SolveStatsSink,
-        checkpoint: SatisfyCheckpoint? = null,
+        checkpoint: LocalSearchCheckpoint? = null,
         onFinished: () -> Unit = {},
     ): Sequence<MinimizeResult?> = sequence {
         sink.start()
@@ -336,7 +336,7 @@ internal class LocalSearchEngine(
             params.copy(cancellation = Cancellation { token() }),
             warm,
             sink,
-            SatisfyCheckpoint { spent ->
+            LocalSearchCheckpoint { spent ->
                 instructions = spent
                 spent >= limit
             },
@@ -344,8 +344,8 @@ internal class LocalSearchEngine(
         ).iterator()
         return object : InstructionSlicedSearch {
             private var verdict: MinimizeResult? = null
-            private var best: MinimizeResult.WithSample? = null
             private var closed = false
+            private var started = false
 
             override val isDone: Boolean get() = verdict != null
             override val stats: SolveStats get() = sink.snapshot()
@@ -380,12 +380,15 @@ internal class LocalSearchEngine(
                 limit = instructions + minOf(sliceInstructions, available, Long.MAX_VALUE - instructions)
                 if (token() || sliceInstructions == 0L) return null
                 if (available == 0L) {
-                    sink.timedOut = true
-                    sink.stop()
-                    return (best?.let {
-                        MinimizeResult.BestFound(it.assignment, it.objectiveValue, TerminationReason.BudgetExhausted, stats)
-                    } ?: MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)).also { verdict = it }
+                    if (!started) {
+                        sink.timedOut = true
+                        sink.stop()
+                        return MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats).also { verdict = it }
+                    }
+                    // Resume the pending checkpoint only to finish; the loop checks the shared allowance first.
+                    limit = Long.MAX_VALUE
                 }
+                started = true
                 while (cursor.hasNext()) {
                     val result = cursor.next() ?: return null
                     if (finished) {
@@ -393,7 +396,6 @@ internal class LocalSearchEngine(
                         return result
                     }
                     if (result is MinimizeResult.WithSample) {
-                        best = result
                         onIncumbent(result)
                     }
                 }
@@ -423,7 +425,7 @@ internal class LocalSearchEngine(
         effectiveAssumptions: Assumptions,
         warm: WarmState? = null,
         sink: SolveStatsSink? = null,
-        checkpoint: SatisfyCheckpoint? = null,
+        checkpoint: LocalSearchCheckpoint? = null,
     ): Sequence<Sample?> {
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val maxFlips = moveCap(params)
@@ -588,7 +590,7 @@ internal class LocalSearchEngine(
         effectiveAssumptions: Assumptions,
         warm: WarmState?,
         sink: SolveStatsSink,
-        checkpoint: SatisfyCheckpoint? = null,
+        checkpoint: LocalSearchCheckpoint? = null,
         onFinished: () -> Unit = {},
     ) {
         val state = newMinimizeState(guide, params, effectiveAssumptions, warm)
@@ -677,6 +679,7 @@ internal class LocalSearchEngine(
                 yield(null)
                 cancelCountdown = 0
             }
+            if (params.nodeBudget?.movesLeft() == 0L) break
             if (cancelCountdown-- <= 0) {
                 while (params.cancellation()) {
                     if (checkpoint != null) {

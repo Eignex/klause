@@ -3,8 +3,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
-import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
