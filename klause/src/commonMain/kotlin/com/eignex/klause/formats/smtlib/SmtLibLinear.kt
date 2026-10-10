@@ -73,6 +73,10 @@ internal fun Compiler.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray,
 /** Assert `a ⟨op⟩ b` (an SMT relation operator) as a hard linear row, lowering to a wide [Linear]
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb) {
+    if (op == "=") conditionalEquality(a, b)?.let {
+        forceTrue(it)
+        return
+    }
     val linOp = relLinearOp(op)
     when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
         is LinRelation.LongRel -> assertLinearRow(rel.coeffs, rel.vars, linOp, rel.bound)
@@ -88,18 +92,7 @@ internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb)
 /** Reify `a ⟨op⟩ b` onto a fresh literal, using a wide [com.eignex.klause.factor.arithmetic.ReifiedLinear]
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): Int {
-    if (op == "=" && a is IntComb.Narrow && b is IntComb.Narrow) {
-        val variable = if (b.lin.coeffs.isEmpty()) a.lin.asSimpleVar() else {
-            if (a.lin.coeffs.isEmpty()) b.lin.asSimpleVar() else null
-        }
-        if (variable != null) {
-            val value = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
-            conditionalEqualities.reify(variable, value, this)?.let { literal ->
-                if (intDomains[variable] is PresolveDomain.Finite) iteChains.noteAtom(literal, variable, value)
-                return literal
-            }
-        }
-    }
+    if (op == "=") conditionalEquality(a, b)?.let { return it }
     val linOp = relLinearOp(op)
     return when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
         is LinRelation.LongRel -> reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound).also {
@@ -111,6 +104,17 @@ internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb):
         } else {
             reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound)
         }
+    }
+}
+
+private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
+    if (a !is IntComb.Narrow || b !is IntComb.Narrow) return null
+    val variable = if (b.lin.coeffs.isEmpty()) a.lin.asSimpleVar() else {
+        if (a.lin.coeffs.isEmpty()) b.lin.asSimpleVar() else null
+    } ?: return null
+    val value = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
+    return conditionalEqualities.reify(variable, value, this)?.also { literal ->
+        if (intDomains[variable] is PresolveDomain.Finite) iteChains.noteAtom(literal, variable, value)
     }
 }
 
