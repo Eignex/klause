@@ -90,3 +90,8 @@ remain sound, but elapsed cancellation can change the deductions and selected ro
 with host speed. The solve-wide deadline still applies, and mandatory construction
 and work between cancellation polls can overrun the preparation ceiling. An explicit
 nonpositive presolve budget disables both phase limits.
+
+At-most-one clique replacement is published only after clique analysis and factor
+matching finish within their cancellation scope. A cancelled replacement leaves
+the input factors intact, preserving their propagation representation for search.
+Earlier completed passes keep their sound reductions.
