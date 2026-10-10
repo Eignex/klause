@@ -10,6 +10,7 @@ import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
@@ -49,24 +50,34 @@ internal class MiniZincRunner(
     /** Compile [ref]'s `.mzn`(+`.dzn`) to FlatZinc and return the `.fzn` file (used by the
      *  resolve path and by the coverage / compile-audit metrics that inspect the FZN).
      *
-     *  Cached + concurrency-safe: a `.fzn` newer than its `.mzn`(+`.dzn`) sources is reused
-     *  (skip recompile); a fresh compile goes to a unique temp file and is then **atomically
-     *  renamed** into place, so several bench JVMs compiling the same instance in parallel can
-     *  never observe a half-written `.fzn`. (Source mtimes only — bump/clean `build/mzn-fzn-seed*` if the
-     *  klause redefinition library itself changes.) */
+     *  The cache binds model/data and solver-library contents to paired FlatZinc and DZN output
+     *  mappings. Each compile publishes the output mapping before the FlatZinc commit marker;
+     *  concurrent compiles use unique temporary files and atomic replacement. */
     fun compileFzn(ref: ProblemRef): File {
         require(supports(ref)) { "${ref.name}: MiniZincRunner only resolves MINIZINC problems" }
         val root = CorpusFetcher.workspaceRoot()
         val mzn = CorpusFetcher.resolve(ref.source)
         val dzn = ref.data?.let { CorpusFetcher.resolve(it) }
-        val workDir = File(root, "klause-bench/build/mzn-fzn-seed$MZN_RANDOM_SEED").apply { mkdirs() }
-        val fzn = File(workDir, "${ref.name.replace('/', '_')}.fzn")
-        val upToDate = fzn.exists() &&
+        val workDir = File(root, "klause-bench/build/mzn-fzn-output-v2-seed$MZN_RANDOM_SEED").apply { mkdirs() }
+        val digest = MessageDigest.getInstance("SHA-256")
+        for (source in listOfNotNull(mzn, dzn) +
+            File(root, "klause-mzn-lib/share/minizinc").walkTopDown().filter { it.isFile }.sortedBy { it.path }.toList()
+        ) {
+            digest.update(source.readBytes())
+            digest.update(0.toByte())
+        }
+        val hash = digest.digest().joinToString("") { "%02x".format(it) }
+        val fzn = File(workDir, "${ref.name.replace('/', '_')}-$hash.fzn")
+        val upToDate = fzn.exists() && outputFile(fzn).exists() &&
             fzn.lastModified() >= mzn.lastModified() &&
             (dzn == null || fzn.lastModified() >= dzn.lastModified())
         if (!upToDate) compile(root, mzn, dzn, fzn)
         return fzn
     }
+
+    fun compileOutput(ref: ProblemRef): File = outputFile(compileFzn(ref))
+
+    private fun outputFile(fzn: File): File = File(fzn.parentFile, "${fzn.nameWithoutExtension}.ozn")
 
     private fun compile(root: File, mzn: File, dzn: File?, out: File) {
         val msc = File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc")
@@ -74,11 +85,17 @@ internal class MiniZincRunner(
         // Compile to a unique temp, then atomically publish — concurrent compiles of the same
         // instance each write their own temp and the rename is all-or-nothing (no truncated reads).
         val tmp = File.createTempFile("${out.nameWithoutExtension}-", ".fzn.tmp", out.parentFile)
+        val tmpOzn = File.createTempFile("${out.nameWithoutExtension}-", ".ozn.tmp", out.parentFile)
         val cmd = buildList {
             add("minizinc")
             add("--solver")
             add(msc.absolutePath)
             add("-c")
+            add("--output-mode")
+            add("dzn")
+            add("--output-objective")
+            add("--output-ozn-to-file")
+            add(tmpOzn.absolutePath)
             add("--random-seed")
             add(MZN_RANDOM_SEED.toString())
             add("-G")
@@ -103,8 +120,13 @@ internal class MiniZincRunner(
                 "minizinc compile failed (exit ${proc.exitValue()}) for ${mzn.name}: ${output.take(500)}"
             }
             require(tmp.exists()) { "minizinc compile produced no .fzn for ${mzn.name}" }
+            require(tmpOzn.length() > 0) { "minizinc compile produced no output mapping" }
+            Files.move(tmpOzn.toPath(), outputFile(out).toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
             Files.move(tmp.toPath(), out.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
         } finally {
+            if (proc.isAlive) proc.destroyForcibly().waitFor()
+            tmp.delete()
+            tmpOzn.delete()
             log.delete()
         }
     }

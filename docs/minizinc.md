@@ -49,9 +49,13 @@ strength or performance.
 
 ## Source validation
 
-For float models the bench pins the final candidate into the original model and
-recompiles with MiniZinc's standard library. Integer campaigns can opt into the
-same check with `param=source-validation=true`. The checker reports valid,
-invalid or unknown; a compilation timeout or residual constraints leaves the
-check unknown. Checking feasibility does not certify source optimality.
+The bench retains DZN `.ozn` mappings to reconstruct source variables from
+compiler-introduced FlatZinc outputs. Source pinning recompiles with MiniZinc's
+standard library and independently checks the objective. Certified rational
+witnesses travel in FlatZinc comments alongside standard decimal output and are
+checked independently against the original flattened predicates and bounds.
+Records distinguish MiniZinc source checks from exact checks with FlatZinc's
+binary64 literal semantics. Integer campaigns opt in with
+`param=source-validation=true`. Unsupported or incomplete checks remain unknown.
+Checking feasibility does not certify source optimality.
 See [benchmark result validation](benchmarking.md#source-validation).

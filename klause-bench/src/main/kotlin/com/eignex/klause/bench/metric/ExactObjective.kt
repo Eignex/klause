@@ -14,6 +14,20 @@ internal class ExactObjective private constructor(
     override fun toString(): String =
         if (denominator == BigInteger.ONE) numerator.toString() else "$numerator/$denominator"
 
+    operator fun plus(other: ExactObjective): ExactObjective = normalized(
+        numerator * other.denominator + other.numerator * denominator, denominator * other.denominator,
+    )
+
+    operator fun times(other: ExactObjective): ExactObjective =
+        normalized(numerator * other.numerator, denominator * other.denominator)
+
+    operator fun div(other: ExactObjective): ExactObjective =
+        normalized(numerator * other.denominator, denominator * other.numerator)
+
+    val integral: Boolean get() = denominator == BigInteger.ONE
+
+    private fun normalized(n: BigInteger, d: BigInteger): ExactObjective = requireNotNull(parse("$n/$d"))
+
     fun approximate(): Double? = BigDecimal(numerator).divide(BigDecimal(denominator), MathContext.DECIMAL128)
         .toDouble().takeIf(Double::isFinite)
 
