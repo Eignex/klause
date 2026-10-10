@@ -1,8 +1,0 @@
-$ git fetch --prune origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
-From https://github.com/Eignex/klause
- * [new branch]          codex/smt-2388-optimization-reporting -> codex/smt-2388-optimization-reporting
-[i-0500726edd240d00f] reused the cached build of c82d8f3f7
-WARNING: Using incubator modules: jdk.incubator.vector
-5beb76bcc is not cached: building
-WARNING: Using incubator modules: jdk.incubator.vector
-

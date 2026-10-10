@@ -85,6 +85,8 @@ Read `docs/benchmarking.md` before benchmarking. In short:
   Promote reusable tooling and fixtures into `klause-bench`, and consolidate architectural conclusions
   into the relevant `docs/` pages. Reserve `docs/evidence/` for small, durable evidence supporting a
   current design decision; do not use it as campaign staging or an archive of raw results.
+  Retain only evidence needed for active work. Delete obsolete campaign bundles after promoting
+  their useful conclusions, tooling or regression fixtures; do not relocate historical archives.
 - Keep `docs/README.md` and links current. Remove superseded files when consolidating documentation.
 
 ## Solver boundaries
