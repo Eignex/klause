@@ -34,6 +34,7 @@ internal class ExactLraPropagation(
     private val lp: LpPropagator,
     private val system: LiveQfLraSystem,
     forms: List<List<ExactRowForm>>,
+    private val accept: (SearchDecision, SearchContext) -> ComponentResult = { _, _ -> ComponentResult.Consistent },
 ) {
     private val rows = model.factors.flatMapIndexed { factorIndex, factor ->
         if (factor.linearForm is LinearForm.Disjunction) emptyList() else {
@@ -102,6 +103,8 @@ internal class ExactLraPropagation(
                     ) ?: continue
                     val result = context.imply(literal, reason)
                     if (result !is ComponentResult.Consistent) return result
+                    val accepted = accept(SearchDecision.Bool(literal), context)
+                    if (accepted !is ComponentResult.Consistent) return accepted
                     implied = true
                     booleanReaders[row.activator].forEach(::enqueue)
                     continue

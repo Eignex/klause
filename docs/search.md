@@ -139,6 +139,8 @@ Strict real endpoints stay strict; integer endpoints round on the source lattice
 Affected rows follow source Boolean and exact bound changes through a retained
 queue, including restored bounds after retraction. Equivalent normalized terms
 share their exact activity bounds even when individual source columns are open.
+The theory records its own Boolean implications through the assertion path;
+shared delivery excludes the component that produced them.
 Each propagation call limits row visits before the complete LP check, so a
 partial interval pass cannot establish feasibility or exhaustion. There is no
 explanation weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
