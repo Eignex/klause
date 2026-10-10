@@ -84,11 +84,11 @@ A parse limits this expansion to 65,536 visits, after which comparisons retain
 their arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
 fresh definitions are omitted after following these dependencies to a fixpoint.
-Their unused integer columns are removed with surviving constraints and objectives remapped.
+Their unused integer columns and private reified predicates are removed with
+surviving constraints and objectives remapped in both variable namespaces.
 Source declarations and arithmetic leaves remain authoritative, including open
-defaults and sparse decision-list selectors. Fresh reified predicates belonging
-only to omitted definitions are fixed false, so shared search does not branch
-on their unconstrained values.
+defaults and sparse decision-list selectors. Shared search has no unconstrained
+predicate columns from these omitted definitions.
 Decision lists whose selector tests have this Boolean expansion keep their shared
 guarded encoding. They do not become numeric tables that require the symbolic
 selector's auxiliary value; direct numeric selector tests remain eligible for
