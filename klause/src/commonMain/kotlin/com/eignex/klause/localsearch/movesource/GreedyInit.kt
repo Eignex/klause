@@ -32,9 +32,8 @@ class GreedyInit {
             order[i] = order[j]
             order[j] = tmp
         }
-        for ((visited, v) in order.withIndex()) {
-            // The pass runs inside one segment of a scheduled arm, so it answers that segment's deadline too.
-            if (visited and STOP_POLL_MASK == 0 && stop()) return
+        for (v in order) {
+            if (stop()) break
             if (v < problem.numBoolVars) {
                 val boolId = v
                 if (state.assumptions.isFrozenBool(boolId)) continue
@@ -81,10 +80,5 @@ class GreedyInit {
         // Reset tabu / activity tracking so the repair pass's apply-then-revert churn doesn't leave
         // the main loop with every var freshly blocked.
         state.resetStepCounters()
-    }
-
-    private companion object {
-        // Variables visited between two polls of the stop check.
-        const val STOP_POLL_MASK = 255
     }
 }
