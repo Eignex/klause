@@ -46,6 +46,10 @@ Oversized authority starts wide, and fixed-width overflow restarts the whole
 operation from authority. Failed attempts and precision restarts are charged.
 An off-status feasible point cannot furnish the claimed warm basis.
 
+Reconstruction converts signed single-word fractions directly between
+`BigFraction` and `Frac128`; wider values use both words. Both paths retain the
+same bit checks, work charges, allocation allowance and cancellation checks.
+
 `BigFraction` factories preserve reduced numerators and positive denominators.
 Zero has denominator one. A unit numerator or denominator is already coprime;
 an already-coprime general fraction needs no division after the GCD check.
