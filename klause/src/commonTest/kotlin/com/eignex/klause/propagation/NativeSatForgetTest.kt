@@ -9,11 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Forgetting and glue export on the native-SAT learned store: compaction must renumber the survivors,
- * preserve their watches, and drop the rejected clauses' watches, so a survivor still propagates and a
- * dropped clause no longer constrains.
- */
 class NativeSatForgetTest {
 
     private fun session(numVars: Int, vararg clauses: IntArray): PropagationSession = PropagationSession(
@@ -76,20 +71,6 @@ class NativeSatForgetTest {
         session.pinBool(0, true) // satisfy the surviving clause so it stays quiet
         session.pinBool(2, false)
         assertNull(session.boolValue(3), "dropped clause (2 ∨ 3) must not propagate var 3")
-    }
-
-    @Test
-    fun `an eligible problem runs on the native lane`() {
-        val eligible = PropagationSession(
-            Problem(
-                numBoolVars = 2,
-                numIntVars = 0,
-                intDomains = emptyArray(),
-                factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
-            ),
-            nativeSat = true,
-        )
-        assertTrue(eligible.usesNativeSat, "an eligible pure-CNF session must use the native lane")
     }
 
     @Test

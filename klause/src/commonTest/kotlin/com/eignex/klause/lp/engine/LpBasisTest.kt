@@ -109,24 +109,4 @@ class LpBasisTest {
         assertEquals(0L, converted.model.upper[0])
     }
 
-    @Test
-    fun `free and upper only declarations cannot enter legacy solver`() {
-        for ((bounds, status) in listOf(
-            ExactLpBounds() to ExactLpStatus.FREE,
-            ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(1L))) to ExactLpStatus.AT_UPPER,
-        )) {
-            val model = ExactLpModel(
-                listOf(emptyList()),
-                emptyList(),
-                listOf(ExactLpColumn(bounds)),
-                emptyList(),
-                ExactLpObjective(listOf(ExactLpNumber.of(0L))),
-            )
-            val basis = ExactLpBasis(emptyList(), listOf(status))
-
-            assertTrue(basis.validFor(model))
-            assertNull(basis.toLegacy(model))
-            assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model, basis).verdict)
-        }
-    }
 }

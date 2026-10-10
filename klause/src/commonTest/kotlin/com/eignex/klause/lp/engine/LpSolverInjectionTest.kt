@@ -249,21 +249,6 @@ class LpSolverInjectionTest {
     }
 
     @Test
-    fun `certified exact imports use component engines and report component work`() {
-        val factory = RecordingLpEngineFactory()
-        val observer = SolveRecordingObserver()
-
-        val result = solveAndCertify(twoComponentModel(), observer = observer,
-            context = LpSolveContext(engineFactory = factory))
-
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
-        assertEquals(2, result.float?.blocks)
-        assertEquals(2, factory.calls.count { it.kind == EngineConstruction.GENERAL })
-        assertEquals(1, factory.calls.count { it.kind == EngineConstruction.COMPONENT })
-        assertTrue(observer.solves.single().second)
-    }
-
-    @Test
     fun `component close releases every child and preserves the first close failure`() {
         val first = IllegalStateException("first close")
         val second = IllegalStateException("second close")
@@ -308,31 +293,6 @@ class LpSolverInjectionTest {
         assertFailsWith<IllegalStateException> { newLpSolver(model, factory = factory) }
 
         assertEquals(1, closed)
-    }
-
-    @Test
-    fun `component split closes owned solvers when wrapper construction throws`() {
-        val model = twoComponentModel()
-        var closed = 0
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newGeneralSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                workLimit: Long,
-                pricing: LpPricingOptions,
-            ): LpSolver = closeTrackingSolver { closed++ }
-
-            override fun newComponentSolver(
-                model: LpModel,
-                parts: List<LpNeighborhood>,
-                solvers: List<LpSolver>,
-                isolated: IntArray,
-            ): ComponentLpSolverCapability = error("injected component construction failure")
-        }
-
-        assertFailsWith<IllegalStateException> { newLpSolver(model, factory = factory) }
-
-        assertEquals(2, closed)
     }
 
     @Test

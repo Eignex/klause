@@ -67,6 +67,11 @@ Optimization emits `; objective=<value>` for each incumbent in the source object
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
 `best-found` and `unbounded`. These comments appear without `-s`; `sat` alone
 does not establish optimality.
+Exact theory objectives use arbitrary-precision integer or reduced `numerator/denominator`
+text, including values outside `Long` and non-terminating rational values.
+Finite witnesses report objectives from certified real values and exact integer
+sums. Supported linear integer optimization uses the complete theory route when
+its objective range can exceed the consecutive-integer range of binary64.
 
 Open integers retain arbitrary-precision source bounds. A linear relaxation witness
 does not establish integrality: shared search splits fractional integers at exact

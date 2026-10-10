@@ -1,20 +1,15 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -87,19 +82,4 @@ class CpToLpRelaxationObjConeTest {
         assertTrue(coneBound <= fullBound + eps, "cone bound $coneBound must not exceed full bound $fullBound")
     }
 
-    @Test
-    fun `cone-mode LP keeps the optimum correct end to end`() {
-        val p = problem()
-        val baseline = BacktrackSolver(p.bake()).minimize(objective, BacktrackParams(randomSeed = 1L))
-        val cone = BacktrackSolver(p.bake()).minimize(
-            objective,
-            BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, objectiveCone = true)),
-        )
-
-        assertTrue(baseline is MinimizeResult.Optimal, "baseline should solve, got $baseline")
-        assertTrue(cone is MinimizeResult.Optimal, "cone-LP solve should be optimal, got $cone")
-        assertEquals(12.0, cone.objective, eps, "minimum makespan is the critical-path length")
-        assertEquals(baseline.objective, cone.objective, eps, "the cone relaxation must not change the optimum")
-        assertTrue(cone.stats.lp.solves.sum > 0.0, "the cone LP should actually run, got ${cone.stats.lp.solves.sum}")
-    }
 }

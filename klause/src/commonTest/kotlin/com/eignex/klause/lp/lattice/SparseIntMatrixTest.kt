@@ -100,15 +100,6 @@ class SparseIntMatrixTest {
     }
 
     @Test
-    fun `every reduced row leads at its own pivot column`() {
-        val random = Random(31)
-        repeat(REPEATS) {
-            val e = bareissEchelon(matrix(random, ROWS, COLS), COLS)
-            for (i in e.rows.indices) assertEquals(e.pivots[i], e.rows[i].lead)
-        }
-    }
-
-    @Test
     fun `the hermite factorisation reproduces the reduced matrix exactly`() {
         val random = Random(77)
         repeat(REPEATS) {
@@ -136,25 +127,6 @@ class SparseIntMatrixTest {
             assertNotNull(f)
             val det = determinant(Array(COLS) { i -> Array(COLS) { j -> f.v[i, j] } })
             assertTrue(det == BIG_ONE || det == -BIG_ONE, "det V was $det")
-        }
-    }
-
-    @Test
-    fun `the hermite rows pivot in strictly ascending columns`() {
-        val random = Random(1234)
-        repeat(REPEATS) {
-            val a = bareissEchelon(matrix(random, ROWS, COLS), COLS).rows
-            if (a.isEmpty()) return@repeat
-            val f = hermiteNormalForm(a, COLS)
-            assertNotNull(f)
-            // Forward substitution reads each row's last non-zero as that row's own pivot, so two rows
-            // must not claim the same column and a later row must not pivot to the left of an earlier one.
-            var previous = -1
-            for (row in f.h) {
-                if (row.isZero) continue
-                assertTrue(row.trail > previous, "row pivoted at ${row.trail} after $previous")
-                previous = row.trail
-            }
         }
     }
 

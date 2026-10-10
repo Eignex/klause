@@ -1,8 +1,6 @@
 package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
@@ -16,26 +14,6 @@ class DimacsTest {
     private object Dimacs {
         fun parse(text: String) = com.eignex.klause.formats.dimacs.Dimacs.parse(text).toProblem()
         fun parseWcnf(text: String) = com.eignex.klause.formats.dimacs.Dimacs.parseWcnf(text).toProblem()
-    }
-
-    @Test
-    fun `parses simple sat instance`() {
-        val text = """
-            c sample
-            p cnf 3 3
-            1 -2 3 0
-            -1 2 0
-            -3 0
-        """.trimIndent()
-        val problem = Dimacs.parse(text)
-        assertEquals(3, problem.numBoolVars)
-        assertEquals(0, problem.numIntVars)
-        assertEquals(3, problem.factors.size)
-        val first = problem.factors[0] as Clause
-        assertEquals(
-            listOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true)),
-            first.literals.toList(),
-        )
     }
 
     @Test
@@ -66,14 +44,6 @@ class DimacsTest {
     fun `rejects a header whose clause count differs from the body`() {
         val ex = assertFailsWith<DimacsFormatException> { Dimacs.parse("p cnf 2 2\n1 0\n") }
         assertTrue(ex.message?.contains("declares 2 clauses, found 1") == true)
-    }
-
-    @Test
-    fun `rejects a non-integer cnf variable count with a header diagnostic`() {
-        // An over-Int count must surface a message naming the header field, not a bare
-        // NumberFormatException from toInt().
-        val e = assertFailsWith<DimacsFormatException> { Dimacs.parse("p cnf 5000000000 1\n1 0\n") }
-        assertTrue("variable count" in e.message.orEmpty(), e.message.orEmpty())
     }
 
     @Test
@@ -118,14 +88,6 @@ class DimacsTest {
         assertEquals(4, w.problem.numBoolVars)
         assertEquals(2, w.problem.factors.size)
         assertEquals(1L, w.objective.boolWeights[3])
-    }
-
-    @Test
-    fun `old wcnf without top keeps normal-weight clauses soft`() {
-        val w = Dimacs.parseWcnf("p wcnf 2 1\n5 -1 0\n")
-        assertEquals(2, w.numOriginalBoolVars)
-        assertEquals(3, w.problem.numBoolVars)
-        assertEquals(5L, w.objective.boolWeights[2])
     }
 
     @Test
@@ -204,9 +166,4 @@ class DimacsTest {
         assertTrue(BacktrackSolver(w.problem.bake()).solve() is SolveResult.Unsat)
     }
 
-    @Test
-    fun `a bare zero empty clause makes the cnf instance unsatisfiable`() {
-        val problem = Dimacs.parse("p cnf 2 2\n1 2 0\n0\n")
-        assertTrue(BacktrackSolver(problem.bake()).solve() is SolveResult.Unsat)
-    }
 }

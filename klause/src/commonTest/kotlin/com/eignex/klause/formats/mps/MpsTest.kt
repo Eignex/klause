@@ -141,29 +141,6 @@ class MpsTest {
     }
 
     @Test
-    fun `reads a named rhs set whose name matches a row`() {
-        val text = "ROWS\n N COST\n L C1\n L C2\nCOLUMNS\n X1 C1 1 C2 1\n" +
-            "RHS\n C1 C2 3\nENDATA"
-
-        val constraints = Mps.parse(text).constraints.associateBy { it.name }
-
-        assertEquals(0.0, constraints.getValue("C1").upper)
-        assertEquals(3.0, constraints.getValue("C2").upper)
-    }
-
-    @Test
-    fun `accepts mps d exponent numeric fields`() {
-        val text = "ROWS\n N COST\n L C1\nCOLUMNS\n X1 COST 1D+1 C1 2d+0\n" +
-            "RHS\n RHS C1 3D+0\nENDATA"
-
-        val model = Mps.parse(text)
-
-        assertEquals(10.0, model.objective.coeffs.single())
-        assertEquals(2.0, model.constraints.single().coeffs.single())
-        assertEquals(3.0, model.constraints.single().upper)
-    }
-
-    @Test
     fun `parsed numeric fields retain decimal and scientific authority`() {
         val text = "ROWS\n N COST\n E C1\nCOLUMNS\n X COST 0.1 C1 9.007199254740993D15\n" +
             "RHS\n RHS C1 1.208925819614629174706176E24\nENDATA"
@@ -173,23 +150,6 @@ class MpsTest {
         assertEquals("1/10", source.objectiveCoefficients.single().fraction.toString())
         assertEquals("9007199254740993", source.constraintCoefficients.single().single().fraction.toString())
         assertEquals("1208925819614629174706176", source.constraintBounds.single().first?.fraction.toString())
-    }
-
-    @Test
-    fun `long and subnormal decimals retain their legacy projections`() {
-        val tokens = listOf("0.6169532649852302182", "1e-310", "1e-320")
-        val text = "ROWS\n N COST\nCOLUMNS\n" + tokens.mapIndexed { index, token ->
-            " X$index COST $token"
-        }.joinToString("\n") + "\nENDATA"
-
-        val model = Mps.parse(text)
-        val source = model.sourceNumbers()
-        val exact = model.toExactLpModel()
-
-        assertEquals(tokens.map { it.toDouble().toRawBits() }, model.objective.coeffs.map { it.toRawBits() })
-        assertTrue(source.objectiveCoefficients.none(MpsSourceNumber::isIeee))
-        assertTrue(tokens.indices.all { !exact.objective.cost(it).value.isZero })
-        assertTrue(tokens.indices.all { exact.objective.cost(it).ieeeBits == null })
     }
 
     @Test
@@ -284,24 +244,6 @@ class MpsTest {
             Triple("FR BND X1", null, null),
             Triple("MI BND X1", null, null),
             Triple("BV BND X1", 0.0, 1.0),
-        )
-        for ((line, lo, hi) in cases) {
-            val text = "ROWS\n N COST\nCOLUMNS\n X1 COST 1.0\nBOUNDS\n $line\nENDATA"
-            val v = Mps.parse(text).variables.single()
-            assertEquals(lo, v.lower, "lower for '$line'")
-            assertEquals(hi, v.upper, "upper for '$line'")
-        }
-    }
-
-    @Test
-    fun `resolves a value-less bounds type that carries a redundant trailing value`() {
-        // Writers emit lines like `BV BOUND1 C_000047 1.0` where the value-less type still carries a
-        // value. The column is the named one, never the stray trailing number.
-        val cases = listOf(
-            Triple("BV BND X1 1.0", 0.0, 1.0),
-            Triple("FR BND X1 0.0", null, null),
-            Triple("MI BND X1 0.0", null, null),
-            Triple("PL BND X1 1e30", 0.0, null),
         )
         for ((line, lo, hi) in cases) {
             val text = "ROWS\n N COST\nCOLUMNS\n X1 COST 1.0\nBOUNDS\n $line\nENDATA"

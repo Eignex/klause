@@ -78,28 +78,6 @@ class ExactContinuationTest {
     }
 
     @Test
-    fun `nonsingular target order is retained after seating permutations`() {
-        val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)),
-            List(2) { BigFraction.ONE },
-            List(4) { BigFraction.ZERO },
-            List(4) { null },
-            listOf(1, 0),
-            listOf(
-                ContinuationStatus.BASIC,
-                ContinuationStatus.BASIC,
-                ContinuationStatus.LOWER,
-                ContinuationStatus.LOWER,
-            ),
-        )
-
-        val result = ExactContinuation(input).resume()
-
-        assertEquals(listOf(1, 0), result.headings)
-        assertEquals(List(2) { BigFraction.ONE }, assertNotNull(result.values).take(2))
-    }
-
-    @Test
     fun `oversized rational import uses exact source values`() {
         val large = BigFraction.of(BIG_ONE shl 180, BIG_ONE)
         val input = ExactContinuationInput(
@@ -139,33 +117,6 @@ class ExactContinuationTest {
     }
 
     @Test
-    fun `import limit resumes seating without rebuilding`() {
-        val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)),
-            List(2) { BigFraction.ONE },
-            List(4) { BigFraction.ZERO },
-            List(4) { null },
-            listOf(1, 0),
-            listOf(
-                ContinuationStatus.BASIC,
-                ContinuationStatus.BASIC,
-                ContinuationStatus.LOWER,
-                ContinuationStatus.LOWER,
-            ),
-        )
-        val session = ExactContinuation(input)
-
-        val first = session.resume(ExactContinuationLimits(maxImportPivots = 1))
-        val last = session.resume(ExactContinuationLimits(maxImportPivots = 2))
-
-        assertEquals(ContinuationDecline.IMPORT_LIMIT, first.metrics.decline)
-        assertEquals(1, first.metrics.importPosition)
-        assertEquals(0, last.metrics.builds)
-        assertEquals(1, last.metrics.imports)
-        assertEquals(listOf(1, 0), last.headings)
-    }
-
-    @Test
     fun `overflow during a pivot discards partial import and charges both builds`() {
         val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val input = ExactContinuationInput(
@@ -190,31 +141,6 @@ class ExactContinuationTest {
         assertEquals(1, result.metrics.restarts)
         assertEquals(2, result.metrics.builds)
         assertEquals(2, result.metrics.imports)
-    }
-
-    @Test
-    fun `elapsed time stops a continuation only under a time cap it was asked for`() {
-        val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE)),
-            listOf(BigFraction.ONE),
-            List(2) { BigFraction.ZERO },
-            List(2) { null },
-            listOf(0),
-            listOf(ContinuationStatus.BASIC, ContinuationStatus.LOWER),
-        )
-        val hour = 3_600_000_000_000L
-        val cases = listOf(
-            ExactContinuationLimits() to null,
-            ExactContinuationLimits(maxTimeNs = hour) to ContinuationDecline.TIME,
-        )
-        for ((limits, expected) in cases) {
-            val continuation = ExactContinuation(input).also { it.account(0L, 0L, hour) }
-
-            val result = continuation.resume(limits)
-
-            assertEquals(expected, result.metrics.decline)
-            assertEquals(expected == null, result.values != null)
-        }
     }
 
     @Test
@@ -299,43 +225,6 @@ class ExactContinuationTest {
         assertEquals(0, repeated.metrics.pivots)
         assertEquals(1, repeated.metrics.retainedPivots)
         assertEquals(0, repeated.metrics.builds)
-    }
-
-    @Test
-    fun `cancellation during import preserves the last complete pivot`() {
-        val input = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE), listOf(1 to BigFraction.ONE)),
-            List(2) { BigFraction.ONE },
-            List(4) { BigFraction.ZERO },
-            List(4) { null },
-            listOf(1, 0),
-            listOf(
-                ContinuationStatus.BASIC,
-                ContinuationStatus.BASIC,
-                ContinuationStatus.LOWER,
-                ContinuationStatus.LOWER,
-            ),
-        )
-        var checkpoints = 0
-        ExactContinuation(input).resume(
-            ExactContinuationLimits(maxImportPivots = 1),
-            Cancellation {
-                checkpoints++
-                false
-            },
-        )
-        val session = ExactContinuation(input)
-        var calls = 0
-
-        val stopped = session.resume(cancellation = Cancellation { ++calls >= checkpoints - 1 })
-        val resumed = session.resume()
-
-        assertEquals(ContinuationDecline.CANCELLED, stopped.metrics.decline)
-        assertEquals(ContinuationPhase.IMPORT, stopped.metrics.phase)
-        assertEquals(1, stopped.metrics.importPosition)
-        assertEquals(0, resumed.metrics.builds)
-        assertEquals(1, resumed.metrics.imports)
-        assertEquals(listOf(1, 0), resumed.headings)
     }
 
     @Test

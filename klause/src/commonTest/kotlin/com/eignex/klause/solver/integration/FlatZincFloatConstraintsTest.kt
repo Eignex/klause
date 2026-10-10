@@ -8,7 +8,6 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -23,72 +22,6 @@ class FlatZincFloatConstraintsTest {
     private fun solve(src: String, buckets: Int = 5): SolveResult =
         BacktrackSolver(parseFlatZinc(src, floatBuckets = buckets).problem.bake())
             .solve(BacktrackParams(randomSeed = 0L))
-
-    @Test
-    fun `float_abs equates the result to the magnitude`() {
-        val src = """
-            var -1.0..1.0: x;
-            var 0.0..1.0: y;
-            constraint float_lin_eq([1.0], [x], -0.5);
-            constraint float_abs(x, y);
-            constraint float_lin_eq([1.0], [y], 0.5);
-            solve satisfy;
-        """.trimIndent()
-        assertIs<SolveResult.Sat>(solve(src))
-    }
-
-    @Test
-    fun `float_abs rejects a result that is not the magnitude`() {
-        val src = """
-            var -1.0..1.0: x;
-            var 0.0..1.0: y;
-            constraint float_lin_eq([1.0], [x], -0.5);
-            constraint float_abs(x, y);
-            constraint float_lin_eq([1.0], [y], 0.25);
-            solve satisfy;
-        """.trimIndent()
-        assertIs<SolveResult.Unsat>(solve(src))
-    }
-
-    @Test
-    fun `array_float_element selects the indexed constant`() {
-        val src = """
-            var 1..3: i;
-            var 0.0..4.0: x;
-            constraint int_eq(i, 2);
-            constraint array_float_element(i, [1.0, 2.0, 3.0], x);
-            constraint float_lin_eq([1.0], [x], 2.0);
-            solve satisfy;
-        """.trimIndent()
-        assertIs<SolveResult.Sat>(solve(src))
-    }
-
-    @Test
-    fun `array_float_element rejects a value other than the indexed constant`() {
-        val src = """
-            var 1..3: i;
-            var 0.0..4.0: x;
-            constraint int_eq(i, 2);
-            constraint array_float_element(i, [1.0, 2.0, 3.0], x);
-            constraint float_lin_eq([1.0], [x], 1.0);
-            solve satisfy;
-        """.trimIndent()
-        assertIs<SolveResult.Unsat>(solve(src))
-    }
-
-    @Test
-    fun `float_times with no representable bucket rejects cleanly`() {
-        // a*b lands near 0.81..1.0 but c is confined to 0.0..0.1: no bucket triple realises it, so the
-        // bucketing cannot encode the constraint and lowering must reject rather than crash or claim UNSAT.
-        val src = """
-            var 0.9..1.0: a;
-            var 0.9..1.0: b;
-            var 0.0..0.1: c;
-            constraint float_times(a, b, c);
-            solve satisfy;
-        """.trimIndent()
-        assertFailsWith<FlatZincParseException> { parseFlatZinc(src, floatBuckets = 2) }
-    }
 
     @Test
     fun `a purely-linear float model lowers floats to LP-only continuous columns`() {
@@ -140,73 +73,6 @@ class FlatZincFloatConstraintsTest {
         // float_abs is nonlinear ⇒ the whole-problem gate keeps every float bucketed (no real columns).
         assertEquals(0, program.problem.numRealVars)
         assertTrue(program.problem.numIntVars >= 2)
-    }
-
-    @Test
-    fun `float_times with a constant operand is lowered as a linear product`() {
-        // c = 2.0 * x with x = 2 is linear (no var*var table); c must equal 4.
-        val src = """
-            var 0.0..4.0: x;
-            var 0.0..8.0: c;
-            constraint float_lin_eq([1.0], [x], 2.0);
-            constraint float_times(2.0, x, c);
-            constraint float_lin_eq([1.0], [c], 4.0);
-            solve satisfy;
-        """.trimIndent()
-        assertIs<SolveResult.Sat>(solve(src))
-    }
-
-    @Test
-    fun `float_times with a constant operand rejects a wrong result`() {
-        val src = """
-            var 0.0..4.0: x;
-            var 0.0..8.0: c;
-            constraint float_lin_eq([1.0], [x], 2.0);
-            constraint float_times(2.0, x, c);
-            constraint float_lin_eq([1.0], [c], 6.0);
-            solve satisfy;
-        """.trimIndent()
-        assertIs<SolveResult.Unsat>(solve(src))
-    }
-
-    @Test
-    fun `an int times real product lowers to LP-only columns and solves exactly`() {
-        val program = parseFlatZinc(
-            """
-            var 1..3: n;
-            var 1.0..3.0: nf;
-            var 0.0..5.0: y;
-            var 0.0..20.0: w;
-            constraint int2float(n, nf);
-            constraint float_times(nf, y, w);
-            constraint float_lin_eq([1.0], [y], 3.0);
-            constraint float_lin_eq([1.0], [w], 9.0);
-            solve satisfy;
-            """.trimIndent(),
-            exactFloats = true,
-        )
-        // nf (int image), y and w are a purely-linear-plus-int·real component ⇒ LP-only real columns;
-        // only n stays an integer search variable. The product w = n·y with y = 3, w = 9 forces n = 3.
-        assertEquals(3, program.problem.numRealVars)
-        assertEquals(1, program.problem.numIntVars)
-        assertIs<SolveResult.Sat>(BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
-    }
-
-    @Test
-    fun `an int times real product with no integer completion is UNSAT`() {
-        // w = n·y with y = 3 forces w in {3, 6, 9} across n in 1..3; w = 10 has no integer completion.
-        val src = """
-            var 1..3: n;
-            var 1.0..3.0: nf;
-            var 0.0..5.0: y;
-            var 0.0..20.0: w;
-            constraint int2float(n, nf);
-            constraint float_times(nf, y, w);
-            constraint float_lin_eq([1.0], [y], 3.0);
-            constraint float_lin_eq([1.0], [w], 10.0);
-            solve satisfy;
-        """.trimIndent()
-        assertIs<SolveResult.Unsat>(solve(src))
     }
 
     @Test

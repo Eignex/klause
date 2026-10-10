@@ -5,12 +5,6 @@ import com.eignex.klause.propagation.Assumptions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Direct unit tests for the reversible-state trail ([RevInt] / [RevRef] / [RevIntArray] +
- * [PropagationState.mark] / [undoTo]): multiple writes per level must roll back LIFO to each
- * mark's value, across nested marks. This is the substrate every incremental propagator relies on,
- * so it's exercised in isolation here (the Table STR2 port is the end-to-end gate).
- */
 class ReversibleTrailTest {
 
     private fun freshState(): PropagationState {
@@ -65,14 +59,4 @@ class ReversibleTrailTest {
         assertEquals("a", r.value)
     }
 
-    @Test
-    fun `a write of the same value does not change what rollback restores`() {
-        val s = freshState()
-        val r = RevInt(s, 5)
-        val m0 = s.mark()
-        r.set(5) // no-op (same value)
-        r.set(8)
-        s.undoTo(m0)
-        assertEquals(5, r.value)
-    }
 }

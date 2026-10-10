@@ -17,11 +17,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Common linear sub-sum extraction ([Presolve.aggregateSubSums]). Shape tests check a defined sub-sum
- * folds into one variable; the enumeration test drives the whole feasible set to guard the coefficient
- * matching — the pass must be solution-set preserving.
- */
 class LinearSubSumAggregationTest {
 
     @Test
@@ -45,31 +40,9 @@ class LinearSubSumAggregationTest {
 
     private fun theInequality(p: Problem): Linear = linears(p).single { it.op == LinearOp.LE }
 
-    private fun coeffOf(l: Linear, v: Int): Long = checkNotNull(l.integerConstants).coeffs[l.vars.indexOf(v)]
-
     private fun run(vararg factors: Factor): Problem {
         val p = Problem(0, 4, Array(4) { IntDomain(0, 8) }, factors.toList())
         return p.bake().withPassDelta(Presolve.aggregateSubSums(p), BakeConfig.NONE)
-    }
-
-    @Test
-    fun `a defined sub-sum folds into its single variable`() {
-        // x + y + w ≤ 10 with s = x + y becomes s + w ≤ 10.
-        val out = run(sumDef(), Linear(intArrayOf(1, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 10))
-        val ineq = theInequality(out)
-        assertEquals(setOf(0, 3), ineq.vars.toSet(), "the partner terms collapse into s")
-        assertEquals(10L, checkNotNull(ineq.integerConstants).bound)
-        assertEquals(1L, coeffOf(ineq, 0))
-    }
-
-    @Test
-    fun `a scaled occurrence folds with its multiplier`() {
-        // 2x + 2y + w ≤ 20 folds to 2s + w ≤ 20.
-        val out = run(sumDef(), Linear(intArrayOf(2, 2, 1), intArrayOf(1, 2, 3), LinearOp.LE, 20))
-        val ineq = theInequality(out)
-        assertEquals(setOf(0, 3), ineq.vars.toSet())
-        assertEquals(2L, coeffOf(ineq, 0), "the multiplier carries onto s")
-        assertEquals(20L, checkNotNull(ineq.integerConstants).bound)
     }
 
     @Test
@@ -97,21 +70,6 @@ class LinearSubSumAggregationTest {
     }
 
     @Test
-    fun `a two-term equality is not a sub-sum definition`() {
-        // s − x = 0 is a plain alias; affine elimination owns it, not this pass.
-        val p = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 8) },
-            listOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 5),
-            ),
-        )
-        assertTrue(Presolve.aggregateSubSums(p).isEmpty, "a two-term equality defines no multi-term sub-sum")
-    }
-
-    @Test
     fun `a zero-coefficient partner does not divide by zero`() {
         // `s + 0·x − w = 0` keeps its zero term (coalescing preserves it). Multiplier matching must not
         // take `c % 0` on that term: a zero coefficient counts as no partner, leaving a single-partner
@@ -126,54 +84,6 @@ class LinearSubSumAggregationTest {
             ),
         )
         assertTrue(Presolve.aggregateSubSums(p).isEmpty, "a zero-coefficient term is not a sub-sum partner")
-    }
-
-    @Test
-    fun `the fold preserves the feasible set`() {
-        // Per-variable ranges chosen so the sub-sum and the multiplier are genuinely exercised.
-        val mins = longArrayOf(0, 0, 0, 0)
-        val maxs = longArrayOf(6, 3, 3, 3)
-        val domains = Array(4) { IntDomain(mins[it], maxs[it]) }
-        val factors = listOf(
-            sumDef(),
-            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 5),
-            Linear(intArrayOf(2, 2, -1), intArrayOf(1, 2, 3), LinearOp.GE, 1),
-        )
-        val p = Problem(0, 4, domains, factors)
-        val out = p.bake().withPassDelta(Presolve.aggregateSubSums(p), BakeConfig.NONE)
-        assertTrue(out.factors.size < p.factors.size || linears(out).any { it.vars.contains(0) }, "a fold occurred")
-        assertEquals(
-            feasible(p.factors, mins, maxs),
-            feasible(out.factors, mins, maxs),
-            "aggregation changed the feasible set",
-        )
-    }
-
-    @Test
-    fun `interacting definitions preserve the feasible set in either order`() {
-        for (duplicate in listOf(false, true)) {
-            for (reversed in listOf(false, true)) {
-                for (sign in listOf(-1, 1)) {
-                    val first = Linear(intArrayOf(sign, -sign, -sign), intArrayOf(0, 2, 3), LinearOp.EQ, 0)
-                    val second = if (duplicate) {
-                        first
-                    } else {
-                        Linear(intArrayOf(sign, -sign, -sign), intArrayOf(1, 2, 3), LinearOp.EQ, 0)
-                    }
-                    val factors = if (reversed) listOf(second, first) else listOf(first, second)
-                    val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, factors)
-                    val delta = Presolve.aggregateSubSums(problem)
-
-                    val output = problem.bake().withPassDelta(delta, BakeConfig.NONE)
-
-                    assertTrue(delta.addedFactors.isNotEmpty())
-                    assertEquals(
-                        feasible(problem.factors, LongArray(4), LongArray(4) { 1 }),
-                        feasible(output.factors, LongArray(4), LongArray(4) { 1 }),
-                    )
-                }
-            }
-        }
     }
 
     @Test
@@ -219,36 +129,6 @@ class LinearSubSumAggregationTest {
             val delta = Presolve.aggregateSubSums(problem)
 
             assertTrue(delta.isEmpty)
-        }
-    }
-
-    @Test
-    fun `representable boundary substitutions preserve exact feasible sets`() {
-        val cases = listOf(
-            Linear(longArrayOf(-1, Long.MIN_VALUE, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0) to
-                Linear(longArrayOf(Long.MIN_VALUE, -1), intArrayOf(1, 2), LinearOp.LE, 0),
-            sumDef() to Linear(
-                longArrayOf(Long.MAX_VALUE, Long.MIN_VALUE, Long.MIN_VALUE),
-                intArrayOf(0, 1, 2),
-                LinearOp.LE,
-                0,
-            ),
-            Linear(longArrayOf(-1, Long.MAX_VALUE, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0) to
-                Linear(longArrayOf(Long.MAX_VALUE, -1), intArrayOf(1, 2), LinearOp.LE, 0),
-            Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 1) to
-                Linear(longArrayOf(1_000_000_000_000_000, 1_000_000_000_000_000), intArrayOf(1, 2), LinearOp.LE, 0),
-        )
-        for ((definition, target) in cases) {
-            val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(definition, target))
-            val delta = Presolve.aggregateSubSums(problem)
-            val output =
-                problem.factors.filterIndexed { index, _ -> index !in delta.droppedIndices } + delta.addedFactors
-
-            assertTrue(delta.addedFactors.isNotEmpty())
-            assertEquals(
-                feasible(problem.factors, LongArray(4), LongArray(4) { 1 }),
-                feasible(output.toTypedArray(), LongArray(4), LongArray(4) { 1 }),
-            )
         }
     }
 

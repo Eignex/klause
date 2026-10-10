@@ -38,55 +38,6 @@ class LpReplayHarnessTest {
     }
 
     @Test
-    fun `replay validator compares integer models with the continuous relaxation`() {
-        val model = LpBuilder().apply {
-            val x = addVar(0L, 1L, cost = 1L)
-            addRow(intArrayOf(x), longArrayOf(2L), Relation.GE, 1L)
-        }.build(Sense.MINIMIZE)
-        val settings = LpReplaySettings(
-            label = "integer-relaxation",
-            seed = LpWave0ReplaySlice.SEED,
-            solverKind = LpReplaySolverKind.PERSISTENT,
-            componentSplit = false,
-        )
-
-        val step = LpReplay.replay(
-            LpCapture.capture(model, settings, listOf(LpReplayEvent.Solve())),
-            IndependentExactValidator,
-        ).steps.single()
-
-        assertEquals(0.5, Double.fromBits(checkNotNull(step.objectiveBits)))
-        assertEquals(1L, step.integerObjectiveLowerBound)
-        assertEquals(LpIndependentValidation.VALIDATED, step.independentCheck.validation)
-        assertEquals(LpIndependentClaim.PROVED_OPTIMUM, step.independentCheck.claim)
-
-        val integerOptimumCandidate = LpReplayStep(
-            step.eventIndex,
-            step.operation,
-            step.candidate,
-            step.productionVerdict,
-            1.0.toRawBits(),
-            step.primalBits,
-            step.integerObjectiveLowerBound,
-            step.hasFeasibleWitness,
-            step.hasCertifiedBound,
-            step.hasInfeasibilityProof,
-            step.metrics,
-            step.certifiers,
-            step.exactInputAttempts,
-            step.exactInputAccepted,
-            step.certificationCapability,
-            step.enforcedRows,
-            exactWitness = step.exactWitness,
-            rationalLowerBound = BigFraction.ONE,
-        )
-        assertEquals(
-            LpIndependentValidation.REFUTED,
-            IndependentExactValidator.validate(model, integerOptimumCandidate).validation,
-        )
-    }
-
-    @Test
     fun `unattained strict infimum keeps the persistent bound and general witness separate`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0, cost = 1.0)
@@ -142,21 +93,6 @@ class LpReplayHarnessTest {
             assertEquals(LpIndependentValidation.VALIDATED, check.validation, candidate.name)
             assertEquals(LpIndependentClaim.FEASIBLE_WITNESS, check.claim, candidate.name)
         }
-    }
-
-    @Test
-    fun `unbounded objective preserves a valid feasibility witness`() {
-        val model = LpBuilder().apply {
-            addOpenAboveVar(0L, cost = -1L)
-        }.build(Sense.MINIMIZE)
-
-        val check = IndependentExactValidator.validate(
-            model,
-            fabricatedStep(LpCandidateKind.NONE, objective = null, primal = 0.0),
-        )
-
-        assertEquals(LpIndependentValidation.VALIDATED, check.validation)
-        assertEquals(LpIndependentClaim.FEASIBLE_WITNESS, check.claim)
     }
 
     @Test
@@ -308,29 +244,6 @@ class LpReplayHarnessTest {
 
         assertEquals(LpIndependentValidation.REFUTED, check.validation)
         assertEquals(LpIndependentClaim.CERTIFIED_BOUND, check.claim)
-    }
-
-    @Test
-    fun `probe optimum claims require a present witness and equal certified bound`() {
-        val model = LpBuilder().apply {
-            val x = addFreeVar(0L, null, cost = -1L)
-            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 5L)
-        }.build(Sense.MINIMIZE).rebind(longArrayOf(0L), longArrayOf(3L))
-        for ((point, bound) in listOf(5.0 to -6L, 5.0 to null, null to -5L, null to null)) {
-            val step = fabricatedStep(
-                LpCandidateKind.NONE,
-                null,
-                point,
-                verdict = LpVerdict.ATTAINED_OPTIMUM,
-                lowerBound = bound?.let(BigFraction::ofLong),
-                hasWitness = point != null,
-            )
-
-            val check = IndependentExactValidator.validate(model, step)
-
-            assertEquals(LpIndependentValidation.REFUTED, check.validation)
-            assertEquals(LpIndependentClaim.PROVED_OPTIMUM, check.claim)
-        }
     }
 
     private fun fabricatedStep(

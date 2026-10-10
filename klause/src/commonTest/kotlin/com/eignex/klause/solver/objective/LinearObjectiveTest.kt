@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.objective
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,6 +12,22 @@ import kotlin.test.assertNull
  * so the recognition has to fail whenever any other term carries cost.
  */
 class LinearObjectiveTest {
+    @Test
+    fun `exact evaluation preserves integer sums outside Long`() {
+        val objective = LinearObjective(intCoefficients = longArrayOf(8L))
+        val sample = Sample(BooleanArray(0), longArrayOf(1L shl 61))
+
+        assertEquals("18446744073709551616", objective.evaluateExact(sample).toString())
+    }
+
+    @Test
+    fun `exact evaluation uses certified real values`() {
+        val third = BigFraction.ofLong(3L).reciprocal()
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(1.0 / 3.0), listOf(third))
+
+        assertEquals(third, objective.evaluateExact(sample))
+    }
 
     @Test
     fun `one weighted integer column is the single objective variable`() {

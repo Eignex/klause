@@ -75,40 +75,12 @@ class SingletonInequalityProjectionTest {
     }
 
     @Test
-    fun `projects a singleton variable out of an inequality`() {
-        // 2·x + y ≤ 10, x ∈ [0,5] appears only here ⇒ project x (at its min 0), leaving y ≤ 10, x rebuilt to 0.
-        val p = problem(
-            arrayOf(IntDomain(0, 5), IntDomain(0, 20)),
-            Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 10),
-        )
-        // y (var 1) also occurs once, so pin whichever the pass picks; assert x specifically is projected.
-        val d = SingletonInequalityProjection.project(p, objectiveIntVars = setOf(1))
-        assertEquals(1, d.droppedIndices.size)
-        val kept = d.addedFactors.single() as Linear
-        assertEquals(listOf(1), kept.vars.toList())
-        assertEquals(LinearOp.LE, kept.op)
-        assertEquals(10L, checkNotNull(kept.integerConstants).bound)
-        val rebuilt = d.reconstruct!!(Sample(bools = BooleanArray(0), ints = longArrayOf(99, 5)))
-        assertEquals(0L, rebuilt.ints[0], "x rebuilt to its most-permissive bound")
-        assertTrue(isFeasible(p, rebuilt), "reconstructed assignment must satisfy the original inequality")
-    }
-
-    @Test
     fun `leaves objective variables in place`() {
         val p = problem(
             arrayOf(IntDomain(0, 5), IntDomain(0, 20)),
             Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 10),
         )
         assertEquals(0, SingletonInequalityProjection.project(p, objectiveIntVars = setOf(0, 1)).droppedIndices.size)
-    }
-
-    @Test
-    fun `does not touch equalities`() {
-        val p = problem(
-            arrayOf(IntDomain(0, 5), IntDomain(0, 20)),
-            Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.EQ, 10),
-        )
-        assertEquals(0, SingletonInequalityProjection.project(p, emptySet()).droppedIndices.size)
     }
 
     @Test

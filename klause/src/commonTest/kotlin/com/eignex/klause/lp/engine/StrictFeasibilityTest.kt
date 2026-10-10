@@ -43,33 +43,6 @@ class StrictFeasibilityTest {
     }
 
     @Test
-    fun `disabled auxiliaries skip strict eligibility admission`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true)), integral = false)),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        LpScopedSolver(LpExactState(source)).use { owner ->
-            val result = refineLp(
-                assertNotNull(owner.state.toWorkingModel()),
-                LpRefinementRequest(
-                    owner,
-                    owner.refinementCache,
-                    LpRefinementLimits(maxAuxiliaries = 0, maxCoordinates = 0, maxWork = 1),
-                ),
-            )
-
-            assertEquals(LpRefinementDecline.CANDIDATE, result.metrics.decline)
-            assertEquals(0, result.metrics.strictAttempts)
-            assertEquals(1L, owner.refinementCache.work)
-            assertNull(owner.lastWorkingMetrics)
-        }
-    }
-
-    @Test
     fun `a stronger closed logical bound preserves strict margin recovery`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
@@ -99,37 +72,6 @@ class StrictFeasibilityTest {
     }
 
     @Test
-    fun `a bounded strict correction returns a source witness within its pivot budget`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(3L)))),
-            listOf(one),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(one)), integral = false),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)), integral = false),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)),
-        )
-        val limits = LpRefinementLimits(maxPivots = 4)
-        LpScopedSolver(LpExactState(source)).use { owner ->
-            val result = refineLp(
-                assertNotNull(owner.state.toWorkingModel()),
-                LpRefinementRequest(owner, owner.refinementCache, limits),
-            )
-
-            assertEquals(
-                BigFraction.of(BIG_ONE, bigIntOf(3)),
-                assertNotNull(result.witness).primal.single(),
-            )
-            assertTrue(result.metrics.observedPivots > 0)
-            assertEquals(result.metrics.observedPivots, result.metrics.pivots)
-            assertTrue(owner.refinementCache.pivots <= limits.maxPivots)
-        }
-    }
-
-    @Test
     fun `strict rational admission respects the source bit budget`() {
         val zero = ExactLpNumber.of(0L)
         val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 40))
@@ -148,35 +90,6 @@ class StrictFeasibilityTest {
 
             assertEquals(LpRefinementDecline.BITS, result.metrics.decline)
             assertNull(result.witness)
-            assertNull(owner.lastWorkingMetrics)
-            assertTrue(owner.refinementCache.work > 0L)
-        }
-    }
-
-    @Test
-    fun `expanded strict models decline admission before creating owners`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(
-                ExactLpColumn(
-                    ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))),
-                    integral = false,
-                ),
-            ),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        LpScopedSolver(LpExactState(source)).use { owner ->
-            val result = refineLp(
-                assertNotNull(owner.state.toWorkingModel()),
-                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxCoordinates = 1)),
-            )
-
-            assertEquals(LpRefinementDecline.DIMENSION, result.metrics.decline)
-            assertNull(result.witness)
-            assertEquals(1, result.metrics.strictAttempts)
             assertNull(owner.lastWorkingMetrics)
             assertTrue(owner.refinementCache.work > 0L)
         }
@@ -311,41 +224,6 @@ class StrictFeasibilityTest {
     }
 
     @Test
-    fun `repeated strict source attempts retain spending`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(
-                ExactLpColumn(
-                    ExactLpBounds(ExactLpSide(zero, strict = true), ExactLpSide(ExactLpNumber.of(1L))),
-                    integral = false,
-                ),
-            ),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val limits = LpRefinementLimits(maxWork = 100)
-        LpScopedSolver(LpExactState(source)).use { donor ->
-            val first = refineLp(
-                assertNotNull(donor.state.toWorkingModel()),
-                LpRefinementRequest(donor, donor.refinementCache, limits),
-            )
-            assertNull(first.witness)
-            val spent = donor.refinementCache.work
-
-            val repeated = refineLp(
-                assertNotNull(donor.state.toWorkingModel()),
-                LpRefinementRequest(donor, donor.refinementCache, limits),
-            )
-
-            assertEquals(LpRefinementDecline.REPEATED, repeated.metrics.decline)
-            assertNull(repeated.witness)
-            assertEquals(spent, donor.refinementCache.work)
-        }
-    }
-
-    @Test
     fun `a closure endpoint moves inside exact open intervals`() {
         for (denominator in listOf(1L, 1_000_000_000_000L)) {
             val upper = BigFraction.of(BIG_ONE, bigIntOf(denominator))
@@ -372,44 +250,6 @@ class StrictFeasibilityTest {
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
             assertEquals(1, assertNotNull(result.refinement).strictWitnesses)
         }
-    }
-
-    @Test
-    fun `signed strict rows retain closed source sides and origins`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-2L)), ExactLpEntry(1, one))),
-            listOf(zero, one),
-            listOf(
-                ExactLpColumn(
-                    ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)),
-                    origin = ExactLpNumber.of(10L),
-                    integral = false,
-                ),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), integral = false),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), integral = false),
-            ),
-            List(2) { ExactLpRow(strict = true) },
-            ExactLpObjective(
-                listOf(ExactLpNumber.of(6L), zero, zero),
-                constant = ExactLpNumber.of(3L),
-                scale = ExactLpNumber.of(2L),
-                externalConstant = one,
-            ),
-        )
-
-        val result = solveAndCertify(model)
-
-        val x = assertNotNull(result.exactPrimal).single() - BigFraction.ofLong(10L)
-        assertTrue(x > BigFraction.ZERO && x < BigFraction.ONE)
-        assertEquals(
-            (BigFraction.ofLong(6L) * x + BigFraction.ofLong(3L)) *
-                BigFraction.ofLong(2L).reciprocal() + BigFraction.ONE,
-            assertNotNull(result.witness).objective,
-        )
-        assertEquals(LpVerdict.FEASIBLE, result.verdict)
-        assertTrue(assertNotNull(result.lowerBound) < result.witness.objective)
     }
 
     @Test

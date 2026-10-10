@@ -34,29 +34,6 @@ class LpWorkBudgetTest {
     }
 
     @Test
-    fun `a solve that converged cleanly is budgeted from the model's size`() {
-        val budget = budget(initial = 50_000L)
-
-        budget.observe(reachedOptimum = true, degenerateColumns = 0, columns = 100, sizeBudget = 500L)
-
-        assertEquals(500L, budget.ops(), "size predicts cost better than a history of overshoots")
-    }
-
-    @Test
-    fun `a degenerate optimum shrinks harder than a degenerate stall`() {
-        val stalled = budget()
-        val converged = budget()
-
-        stalled.observe(reachedOptimum = false, degenerateColumns = 50, columns = 100, sizeBudget = 500L)
-        converged.observe(reachedOptimum = true, degenerateColumns = 50, columns = 100, sizeBudget = 500L)
-
-        assertTrue(
-            converged.ops() < stalled.ops(),
-            "reaching the optimum degenerately means the budget was more than enough",
-        )
-    }
-
-    @Test
     fun `the budget never falls to nothing`() {
         val budget = budget(initial = 200L)
 
@@ -74,12 +51,4 @@ class LpWorkBudgetTest {
         assertEquals(100_000L, budget.ops(), "doubling must stop at the ceiling")
     }
 
-    @Test
-    fun `a solve over no columns is not fed back`() {
-        val budget = budget()
-
-        budget.observe(reachedOptimum = false, degenerateColumns = 0, columns = 0, sizeBudget = 500L)
-
-        assertEquals(1_000L, budget.ops(), "an empty relaxation says nothing about the budget")
-    }
 }

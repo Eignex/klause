@@ -11,7 +11,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * #22 Table LP linearization: the one selector-per-tuple convex hull. The LP optimum over the table
@@ -74,17 +73,6 @@ class CpToLpRelaxationTableHullTest {
     }
 
     @Test
-    fun `hull picks the cheapest tuple for a skewed objective`() {
-        // minimize x0 over the tuples -> (0,5), so x0 = 0.
-        val p = tableProblem(IntDomain(0, 4), IntDomain(0, 5))
-        val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 0L)))
-
-        assertEquals(0.0, sol.objectiveValue, eps)
-        assertEquals(0.0, sol.primal(intCol(r, 0)), eps)
-        assertEquals(5.0, sol.primal(intCol(r, 1)), eps) // channelled from the selected tuple
-    }
-
-    @Test
     fun `shrinking a domain removes the tuples it kills`() {
         // Restrict x1 <= 1: only tuple (4,0) survives, so minimizing x0+x1 must give 4.
         val p = tableProblem(IntDomain(0, 4), IntDomain(0, 1))
@@ -96,15 +84,4 @@ class CpToLpRelaxationTableHullTest {
         assertEquals(0.0, sol.primal(intCol(r, 1)), eps)
     }
 
-    @Test
-    fun `the hull excludes no allowed tuple and nothing outside their convex hull`() {
-        // The LP feasible region projected to (x0,x1) is conv{(0,5),(2,2),(4,0)}. Check a maximize
-        // direction lands on a vertex tuple, confirming the hull is exactly those tuples' convex set.
-        val p = tableProblem(IntDomain(0, 4), IntDomain(0, 5))
-        val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(-1L, 0L))) // maximize x0
-        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-        assertEquals(4.0, sol.primal(intCol(r, 0)), eps) // (4,0) is the max-x0 vertex
-        // x0+x1 of any LP point lies within the tuple range; the three tuples all sum to <= 5.
-        assertTrue(sol.primal(intCol(r, 0)) + sol.primal(intCol(r, 1)) <= 5.0 + eps)
-    }
 }

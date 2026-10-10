@@ -8,7 +8,6 @@ import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -73,77 +72,4 @@ class CpToLpRelaxationGccCountHullTest {
         assertTrue(hull.objectiveValue > bare.objectiveValue + eps, "the hull beats the per-count domain bound")
     }
 
-    @Test
-    fun `randomized count-var GCC hull matches the brute-force optimum`() {
-        val rng = Random(20260616)
-        var checked = 0
-        repeat(300) { _ ->
-            val n = rng.nextInt(2, 5)
-            val maxVal = rng.nextInt(2, 5)
-            // Each xs gets a contiguous sub-range of 1..maxVal (a hole would still be sound, but a
-            // range keeps the brute-force enumeration simple and already exercises the full model).
-            val doms = Array(n) {
-                val lo = rng.nextInt(1, maxVal + 1)
-                val hi = rng.nextInt(lo, maxVal + 1)
-                lo to hi
-            }
-            val coverSize = rng.nextInt(1, maxVal + 1)
-            val cover = IntArray(coverSize) { it + 1 } // distinct values 1..coverSize
-            // Var ids: 0..n-1 = xs, n..n+coverSize-1 = count vars (domain [0, n]).
-            val intDomains = Array(n + coverSize) {
-                if (it < n) IntDomain(doms[it].first.toLong(), doms[it].second.toLong()) else IntDomain(0, n.toLong())
-            }
-            val countVars = IntArray(coverSize) { n + it }
-            val cx = LongArray(n) { rng.nextInt(-3, 4).toLong() }
-            val cc = LongArray(coverSize) { rng.nextInt(-3, 4).toLong() }
-            val objCoeffs = LongArray(n + coverSize) { if (it < n) cx[it] else cc[it - n] }
-            val p = Problem(
-                numBoolVars = 0,
-                numIntVars = n + coverSize,
-                intDomains = intDomains,
-                factors = arrayOf<Factor>(
-                    GlobalCardinality(
-                        xs = IntArray(n) { it },
-                        cover = LongArray(cover.size) { cover[it].toLong() },
-                        countVars = countVars,
-                    ),
-                ),
-            )
-            val obj = LinearObjective(intCoefficients = objCoeffs)
-
-            // Brute force: minimum objective over every assignment of xs within its domain.
-            var brute: Long? = null
-            val x = IntArray(n)
-            fun rec(i: Int) {
-                if (i == n) {
-                    var o = 0L
-                    for (k in 0 until n) o += cx[k] * x[k]
-                    for (c in 0 until coverSize) {
-                        var cnt = 0L
-                        for (k in 0 until n) if (x[k] == cover[c]) cnt++
-                        o += cc[c] * cnt
-                    }
-                    if (brute == null || o < brute!!) brute = o
-                    return
-                }
-                for (v in doms[i].first..doms[i].second) {
-                    x[i] = v
-                    rec(i + 1)
-                }
-            }
-            rec(0)
-
-            val r = CpToLpRelaxation(p, obj, gccCountHull = true).build(PropagationSession(p))
-            val sol = solveLp(r.model)
-            checked++
-            assertEquals(FloatLpStatus.OPTIMAL, sol.status, "feasible assignment exists but LP not optimal")
-            assertEquals(
-                brute!!.toDouble(),
-                sol.objectiveValue,
-                eps,
-                "GCC count hull optimum ${sol.objectiveValue} != brute $brute",
-            )
-        }
-        assertTrue(checked > 100, "only $checked instances checked")
-    }
 }

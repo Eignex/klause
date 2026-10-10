@@ -24,6 +24,17 @@ class ProofCheckTest(unittest.TestCase):
         self.assertEqual(result['witness'], 'exact source feasible')
         self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
 
+    def test_exact_objective_overrides_rounded_numeric_objective(self):
+        for value in ('9007199254740993', '9223372036854775809', '1/3'):
+            for maximize in (False, True):
+                direction = 'maximize' if maximize else 'minimize'
+                bound = '<=' if maximize else '>='
+                source = f'(declare-const x Real) (assert ({bound} x {value if "/" not in value else "(/ 1 3)"})) ({direction} x)'
+                witness = value if '/' not in value else '(/ 1.0 3.0)'
+                case = self.case(objective=1.0, exactObjective=value, maximize=maximize,
+                                 finalWitness=f'((define-fun x () Real {witness}))')
+                self.assertIn('optimalityCheck', self.check(case, source))
+
     def test_feasible_suboptimal_point_does_not_certify_optimum(self):
         with self.assertRaises(AssertionError):
             self.check(self.case(objective=1, finalWitness='((define-fun x () Real 1.0))'))

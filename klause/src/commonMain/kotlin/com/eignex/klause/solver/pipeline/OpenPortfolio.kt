@@ -27,8 +27,6 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.abs
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
 import com.eignex.klause.util.toDouble
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
@@ -119,7 +117,7 @@ internal class OpenPortfolio(
         }
         val incumbents = PortfolioIncumbents<BigFraction>(
             valueOf = { candidate ->
-                witnessOf(candidate.sample)?.value?.asFraction() ?: objective.exactValue(candidate.sample)
+                witnessOf(candidate.sample)?.value?.asFraction() ?: objective.evaluateExact(candidate.sample)
             },
             improves = { candidate, standing -> candidate < standing },
             approximateValue = { it.toDouble() },
@@ -340,7 +338,7 @@ internal class OpenPortfolio(
         if (witnessOf(sample) != null) return@WitnessCheck null
         refuteOpenWitness(model, sample)?.let { return@WitnessCheck it }
         if (objective == null || claimed == null) return@WitnessCheck null
-        val exact = objective.exactValue(sample)
+        val exact = objective.evaluateExact(sample)
         val value = exact.toDouble()
         val agrees = if (objective.realCoefficients.any { it != 0.0 }) {
             abs(value - claimed) <= OBJECTIVE_TOLERANCE * maxOf(1.0, abs(value))
@@ -379,25 +377,4 @@ private fun inWindows(sample: Sample, searchModel: LocalSearchModel): Sample {
     if (sample.ints.size != domains.size) return sample
     if (sample.ints.indices.all { domains[it].contains(sample.ints[it]) }) return sample
     return sample.copy(ints = LongArray(domains.size) { domains[it].clamp(sample.ints[it]) })
-}
-
-// The exact value of this objective at [sample]. A continuous term reads the certified rational value an open witness
-// carries, and its coefficient as the binary rational the Double states.
-private fun LinearObjective.exactValue(sample: Sample): BigFraction {
-    var total = bigIntOf(constant)
-    for (v in intCoefficients.indices) {
-        if (intCoefficients[v] == 0L) continue
-        total += bigIntOf(intCoefficients[v]) * bigIntOf(sample.ints[v])
-    }
-    for (b in boolWeights.indices) {
-        if (boolWeights[b] != 0L && sample.bools[b]) total += bigIntOf(boolWeights[b])
-    }
-    var value = total.asFraction()
-    for (r in realCoefficients.indices) {
-        val c = realCoefficients[r]
-        if (c == 0.0) continue
-        val x = sample.exactReals?.get(r) ?: checkNotNull(BigFraction.ofDouble(sample.reals[r]))
-        value += checkNotNull(BigFraction.ofDouble(c)) * x
-    }
-    return value
 }

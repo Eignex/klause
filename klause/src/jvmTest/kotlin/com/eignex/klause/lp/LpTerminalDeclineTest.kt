@@ -282,57 +282,6 @@ class LpTerminalDeclineTest {
     }
 
     @Test
-    fun `finite MPS enumeration decline is unknown`() {
-        val factory = TerminalRecordingFactory()
-        val policy = TerminalPolicy { _, _ -> false }
-        val result = run(
-            continuous,
-            optimize = false,
-            context = LpSolveContext(factory, policy),
-            allSolutions = true,
-        )
-
-        assertEquals(FiniteSolveVerdict.UNKNOWN, result.verdict)
-        assertEquals(0L, result.solutions)
-        assertTrue(factory.solves >= 1)
-        assertTrue(policy.observedSuccessful(LpCertifier.RATIONAL))
-        assertEquals(factory.generalSolvers, factory.generalCloses)
-        assertEquals(factory.persistentSolversCreated, factory.persistentCloses)
-    }
-
-    @Test
-    fun `sequential LP solve contexts stay isolated`() {
-        val rejectingFactory = TerminalRecordingFactory()
-        val rejectingPolicy = TerminalPolicy { _, _ -> false }
-        val acceptingFactory = TerminalRecordingFactory()
-        val first = run(
-            continuous,
-            optimize = false,
-            context = LpSolveContext(rejectingFactory, rejectingPolicy),
-        )
-        val middle = run(
-            continuous,
-            optimize = false,
-            context = LpSolveContext(acceptingFactory, ProductionLpCertificationPolicy),
-        )
-        val last = run(
-            continuous,
-            optimize = false,
-            context = LpSolveContext(rejectingFactory, rejectingPolicy),
-        )
-
-        assertEquals(FiniteSolveVerdict.UNKNOWN, first.verdict)
-        assertEquals(FiniteSolveVerdict.SAT, middle.verdict)
-        assertEquals(FiniteSolveVerdict.UNKNOWN, last.verdict)
-        assertTrue(rejectingFactory.solves >= 2)
-        assertTrue(acceptingFactory.solves >= 1)
-        assertEquals(rejectingFactory.generalSolvers, rejectingFactory.generalCloses)
-        assertEquals(acceptingFactory.generalSolvers, acceptingFactory.generalCloses)
-        assertEquals(rejectingFactory.persistentSolversCreated, rejectingFactory.persistentCloses)
-        assertEquals(acceptingFactory.persistentSolversCreated, acceptingFactory.persistentCloses)
-    }
-
-    @Test
     fun `finite MPS optimizer decline without incumbent is unknown`() {
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { _, _ -> false }

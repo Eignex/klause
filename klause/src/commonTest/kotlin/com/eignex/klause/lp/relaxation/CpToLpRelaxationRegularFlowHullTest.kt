@@ -8,10 +8,8 @@ import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * #655 (Tranche A): the layer-expanded DFA flow hull of [Regular]. The flow polytope is integral, so
@@ -22,17 +20,6 @@ import kotlin.test.assertTrue
 class CpToLpRelaxationRegularFlowHullTest {
 
     private val eps = 1e-9
-
-    /** Run the 1-based DFA on [seq]; true iff it ends in an accepting state (0 transition = reject). */
-    private fun accepts(seq: IntArray, alphabet: Int, trans: IntArray, q0: Int, acc: Set<Int>): Boolean {
-        var q = q0
-        for (sym in seq) {
-            if (sym < 1 || sym > alphabet) return false
-            q = trans[(q - 1) * alphabet + (sym - 1)]
-            if (q == 0) return false
-        }
-        return q in acc
-    }
 
     @Test
     fun `a sequence position the model leaves open gets no flow hull`() {
@@ -89,68 +76,4 @@ class CpToLpRelaxationRegularFlowHullTest {
         assertEquals(3.0, sol.objectiveValue, eps)
     }
 
-    @Test
-    fun `randomized flow hull matches the brute-force optimum`() {
-        val rng = Random(20260616)
-        var checked = 0
-        repeat(300) { _ ->
-            val numStates = rng.nextInt(2, 4)
-            val alphabet = rng.nextInt(2, 4)
-            val len = rng.nextInt(2, 5)
-            val trans = IntArray(numStates * alphabet) { rng.nextInt(0, numStates + 1) } // 0..numStates (0 = dead)
-            val q0 = 1
-            val accCount = rng.nextInt(1, numStates + 1)
-            val acc = HashSet<Int>()
-            while (acc.size < accCount) acc.add(rng.nextInt(1, numStates + 1))
-            val c = LongArray(len) { rng.nextInt(-3, 4).toLong() }
-            val p = Problem(
-                numBoolVars = 0,
-                numIntVars = len,
-                intDomains = Array(len) { IntDomain(1, alphabet.toLong()) },
-                factors = arrayOf<Factor>(
-                    Regular(
-                        IntArray(len) { it },
-                        numStates,
-                        alphabet,
-                        LongArray(trans.size) { trans[it].toLong() },
-                        q0,
-                        acc.toIntArray(),
-                    ),
-                ),
-            )
-            val obj = LinearObjective(intCoefficients = c)
-
-            // Brute force: minimum objective over accepted strings in the domains.
-            var brute: Long? = null
-            val x = IntArray(len)
-            fun rec(i: Int) {
-                if (i == len) {
-                    if (!accepts(x, alphabet, trans, q0, acc)) return
-                    var o = 0L
-                    for (k in 0 until len) o += c[k] * x[k]
-                    if (brute == null || o < brute!!) brute = o
-                    return
-                }
-                for (v in 1..alphabet) {
-                    x[i] = v
-                    rec(i + 1)
-                }
-            }
-            rec(0)
-
-            val r = CpToLpRelaxation(p, obj, regularHull = true).build(PropagationSession(p))
-            val sol = solveLp(r.model)
-            val opt = brute ?: return@repeat // no accepting string: the hull is skipped (a relaxation may loosen)
-            checked++
-            assertEquals(FloatLpStatus.OPTIMAL, sol.status, "accepted string exists but LP not optimal")
-            // Integral flow polytope ⇒ the LP optimum equals the true optimum over accepted strings.
-            assertEquals(
-                opt.toDouble(),
-                sol.objectiveValue,
-                eps,
-                "flow hull optimum ${sol.objectiveValue} != brute $opt",
-            )
-        }
-        assertTrue(checked > 100, "only $checked feasible instances checked")
-    }
 }

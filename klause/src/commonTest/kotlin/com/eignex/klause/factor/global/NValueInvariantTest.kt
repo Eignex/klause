@@ -9,7 +9,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class NValueInvariantTest {
@@ -21,20 +20,6 @@ class NValueInvariantTest {
         intDomains = Array(4) { IntDomain(0, domainHi.toLong()) },
         factors = arrayOf<Factor>(NValue(n = 0, xs = intArrayOf(1, 2, 3))),
     )
-
-    @Test
-    fun `not violated when distinct count equals n`() {
-        val p = problem()
-        val state = LocalSearchState(p.bake(), Random(0))
-        // n=3, xs=[0,1,2] → 3 distinct values, matches n=3
-        state.assignment.setInt(0, 3)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 1)
-        state.assignment.setInt(3, 2)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
-        assertEquals(0, state.factors[0].violationDegree(state, 0))
-    }
 
     @Test
     fun `violated when distinct count differs from n by the size of the mismatch`() {

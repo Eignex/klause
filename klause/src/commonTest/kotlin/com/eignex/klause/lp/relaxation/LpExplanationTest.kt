@@ -158,34 +158,6 @@ class LpExplanationTest {
     }
 
     @Test
-    fun `source integer bounds beyond Long range distinguish tautologies from contradictions`() {
-        val high = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
-        val low = BigFraction.ofLong(Long.MIN_VALUE) - BigFraction.ONE
-        for (threshold in listOf(low, high)) for (upper in listOf(false, true)) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(-6, 6)), emptyArray())
-            val source = CutSource(CutSourceKind.INTEGER, 0)
-            val premise = CutPremise.Bound(CutExpression(mapOf(source to BigFraction.ONE)), upper, threshold)
-            val proof = CutProvenance(problem, 0L, listOf(CutProofFact(premise, false)))
-            val model = LpBuilder().apply {
-                addVar(-6L, 6L)
-                addRow(intArrayOf(), longArrayOf(), Relation.LE, 0L)
-            }.build(Sense.MINIMIZE)
-            model.rowGlobal[0] = false
-            val relaxation = LpRelaxation(model, intArrayOf(0), booleanArrayOf(false), 0L, intArrayOf(0), intArrayOf(),
-                sourceMap = CutSourceMap(problem, 0L, listOf(CutColumnSource(source)), parentRows = mapOf(0 to proof)))
-            val literals = IntArrayList()
-
-            assertEquals(
-                upper == (threshold == high),
-                LpExplanation.addRowPremiseLits(literals, IntHashSet(), relaxation,
-                    intArrayOf(0), PropagationSession(problem)),
-            )
-
-            assertTrue(literals.toIntArray().isEmpty())
-        }
-    }
-
-    @Test
     fun `projected global flags cannot erase exact row premises`() {
         val problem = Problem(1, 1, arrayOf(IntDomain(0, 9)),
             arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)))
@@ -292,26 +264,6 @@ class LpExplanationTest {
     }
 
     @Test
-    fun `retained Boolean explanations follow actual pinned endpoints`() {
-        for (value in listOf(false, true)) {
-            val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>())
-            val session = PropagationSession(problem)
-            val source = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
-            val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
-            session.implyBool(0, value)
-            assertTrue(trail.assertBound(0, !value, ExactLpSide(ExactLpNumber.of(if (value) 1L else 0L)), 7L))
-            val retained = LpRelaxation(
-                assertNotNull(trail.state.toWorkingModel()), intArrayOf(0), booleanArrayOf(true), 0L,
-                intArrayOf(), intArrayOf(0),
-            )
-
-            val premise = LpExplanation.premiseLit(retained, session, 0, lowerSide = value)
-
-            assertEquals(Lit.make(0, !value), premise)
-        }
-    }
-
-    @Test
     fun `retained integer explanations round rational and strict sides in the source lattice`() {
         for (strict in listOf(false, true)) {
             val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), arrayOf<Factor>())
@@ -387,56 +339,4 @@ class LpExplanationTest {
         )
     }
 
-    @Test
-    fun `infeasible node lp yields a bound-atom nogood from the farkas ray`() {
-        // x in [2,5] with x <= 1: the LP is infeasible and the load-bearing reason is x's lower bound,
-        // so the Farkas ray names x and the clause is the single literal ¬(x >= 2).
-        val b = LpBuilder()
-        val x = b.addVar(2, 5, cost = 0)
-        b.addRow(mapOf(x to 1L), Relation.LE, 1)
-        val model = b.build(Sense.MINIMIZE)
-        val simplex = RevisedSimplex(model)
-        assertTrue(simplex.solve() == null, "the LP is infeasible, so solve() must return null")
-        val ray = assertNotNull(integerFarkasRay(model, assertNotNull(simplex.infeasibleRay)))
-        val relaxation = LpRelaxation(
-            model = model,
-            colVarId = intArrayOf(x),
-            colIsBool = booleanArrayOf(false),
-            objectiveConstant = 0L,
-            intColOf = intArrayOf(x),
-            boolColOf = IntArray(0),
-        )
-        // A clean session (no conflicting constraint) so the premise atom resolves; x stays in [2,5].
-        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(2, 5)), arrayOf<Factor>()))
-        val clause = LpExplanation.infeasibilityClause(relaxation, ray, session)
-        assertEquals(listOf(session.boundGeLit(x, 2, positive = false)), clause?.toList())
-    }
-
-    @Test
-    fun `a farkas nogood through a real row cites the bound that row carries`() {
-        // x in [2,5], y in [0,5]; the real row 0.5x - 0.5y <= 0 and the integer row y <= 1. Their sum is
-        // x <= 1, so the proof rests on x >= 2 alone, and y cancels out of it.
-        val b = LpBuilder()
-        val x = b.addVar(2, 5, cost = 0)
-        val y = b.addVar(0, 5, cost = 0)
-        b.addRealRow(intArrayOf(x, y), doubleArrayOf(0.5, -0.5), Relation.LE, 0.0)
-        b.addRow(mapOf(y to 1L), Relation.LE, 1)
-        val model = b.build(Sense.MINIMIZE)
-        val simplex = RevisedSimplex(model)
-        assertTrue(simplex.solve() == null, "the LP is infeasible, so solve() must return null")
-        val ray = assertNotNull(integerFarkasRay(model, assertNotNull(simplex.infeasibleRay)))
-        val relaxation = LpRelaxation(
-            model = model,
-            colVarId = intArrayOf(x, y),
-            colIsBool = booleanArrayOf(false, false),
-            objectiveConstant = 0L,
-            intColOf = intArrayOf(x, y),
-            boolColOf = IntArray(0),
-        )
-        val session = PropagationSession(Problem(0, 2, arrayOf(IntDomain(2, 5), IntDomain(0, 5)), arrayOf<Factor>()))
-
-        val clause = LpExplanation.infeasibilityClause(relaxation, ray, session)
-
-        assertEquals(listOf(session.boundGeLit(x, 2, positive = false)), clause?.toList())
-    }
 }

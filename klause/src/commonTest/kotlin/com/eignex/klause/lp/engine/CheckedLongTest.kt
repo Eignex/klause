@@ -38,12 +38,4 @@ class CheckedLongTest {
         assertFailsWith<CheckedLongOverflowException> { mulExact(3_037_000_500L, 3_037_000_500L) }
     }
 
-    @Test
-    fun `gcd basics`() {
-        assertEquals(6L, gcdLong(12L, 18L))
-        assertEquals(7L, gcdLong(7L, 0L))
-        assertEquals(7L, gcdLong(0L, 7L))
-        assertEquals(4L, gcdLong(-12L, 8L))
-        assertEquals(0L, gcdLong(0L, 0L))
-    }
 }

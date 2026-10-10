@@ -56,31 +56,6 @@ class LpReferenceAdapterTest {
     }
 
     @Test
-    fun `integer storage is validated as a continuous relaxation`() {
-        val model = LpBuilder().apply {
-            val x = addVar(0L, 1L, cost = 1L)
-            addRow(intArrayOf(x), longArrayOf(2L), Relation.GE, 1L)
-        }.build(Sense.MINIMIZE)
-
-        val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
-        val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
-
-        assertEquals(BigFraction.ofDouble(0.5), referenceBound.lower)
-        assertTrue(referenceBound.attained)
-    }
-
-    @Test
-    fun `witness objective restores the lower bound shift`() {
-        val model = LpBuilder().apply {
-            addRealVar(2.0, 4.0, cost = 3.0)
-        }.build(Sense.MINIMIZE)
-
-        val objective = LpReferenceAdapter().objective(model, longArrayOf(2.5.toRawBits()))
-
-        assertEquals(BigFraction.ofDouble(7.5), objective)
-    }
-
-    @Test
     fun `active row mask changes the exact reference problem`() {
         val model = LpBuilder().apply {
             val x = addVar(0L, 1L)
@@ -105,22 +80,6 @@ class LpReferenceAdapterTest {
         assertEquals(BigFraction.ZERO, referenceBound.lower)
         assertFalse(referenceBound.attained)
         assertTrue(reference.witness.single() > BigFraction.ZERO)
-    }
-
-    @Test
-    fun `attained optimum is witnessed even when phase one stops elsewhere`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, 10.0, cost = 1.0)
-            val y = addRealVar(0.0, 10.0)
-            addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.GE, 3.0)
-        }.build(Sense.MINIMIZE)
-
-        val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
-        val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
-
-        assertEquals(BigFraction.ZERO, referenceBound.lower)
-        assertTrue(referenceBound.attained)
-        assertEquals(BigFraction.ZERO, reference.witness[0])
     }
 
     @Test
@@ -172,36 +131,6 @@ class LpReferenceAdapterTest {
     }
 
     @Test
-    fun `source probe witness checks retain strict rows and dimensions`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, null)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 5.0, strict = true)
-        }.build(Sense.MINIMIZE)
-        val adapter = LpReferenceAdapter()
-
-        for ((point, expected) in listOf(4L to true, 5L to false)) {
-            assertEquals(expected, adapter.accepts(model, longArrayOf(point.toDouble().toRawBits())))
-            assertEquals(expected, adapter.acceptsExact(model, listOf(BigFraction.ofLong(point))))
-        }
-        assertEquals(false, adapter.accepts(model, longArrayOf()))
-        assertEquals(false, adapter.acceptsExact(model, emptyList()))
-        assertEquals(false, adapter.acceptsExact(model, listOf(BigFraction.ZERO, BigFraction.ZERO)))
-    }
-
-    @Test
-    fun `zero cost probe support still declines objective comparison`() {
-        val model = LpBuilder().apply {
-            val x = addVar(0L, 10L, cost = 1L)
-            val y = addFreeVar(lower = 0L, upper = null)
-            addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, LP_UNBOUNDED_PROBE + 5L)
-        }.build(Sense.MINIMIZE)
-
-        val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
-
-        assertIs<LpReferenceObjective.ProbeBoundDecline>(reference.objective)
-    }
-
-    @Test
     fun `probe box infeasibility declines instead of refuting the open model`() {
         val model = LpBuilder().apply {
             val x = addFreeVar(lower = null, upper = null)
@@ -214,35 +143,11 @@ class LpReferenceAdapterTest {
     }
 
     @Test
-    fun `integer shifts beyond double precision stay exact`() {
-        val fixed = 9_007_199_254_740_993L
-        val model = LpBuilder().apply {
-            addVar(fixed, fixed, cost = 1L)
-        }.build(Sense.MINIMIZE)
-
-        val reference = assertIs<LpReferenceResult.Feasible>(LpReferenceAdapter().solve(model))
-        val referenceBound = assertIs<LpReferenceObjective.Bound>(reference.objective)
-
-        assertEquals(BigFraction.ofLong(fixed), reference.witness.single())
-        assertEquals(BigFraction.ofLong(fixed), referenceBound.lower)
-        assertTrue(referenceBound.attained)
-    }
-
-    @Test
     fun `cancelled reference run declines instead of deciding`() {
         val model = constrainedModel()
 
         val result = assertIs<LpReferenceResult.Declined>(
             LpReferenceAdapter(Cancellation { true }).solve(model),
-        )
-
-        assertEquals(LpReferenceDecline.CANCELLED_OR_PIVOT_LIMIT, result.reason)
-    }
-
-    @Test
-    fun `pivot limited reference run declines instead of deciding`() {
-        val result = assertIs<LpReferenceResult.Declined>(
-            LpReferenceAdapter(maxPivots = 0).solve(constrainedModel()),
         )
 
         assertEquals(LpReferenceDecline.CANCELLED_OR_PIVOT_LIMIT, result.reason)

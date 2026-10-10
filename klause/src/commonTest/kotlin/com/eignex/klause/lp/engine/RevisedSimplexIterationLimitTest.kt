@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.engine
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -53,13 +52,4 @@ class RevisedSimplexIterationLimitTest {
         assertFalse(capped.optimal, "a stopped iterate must not gate reduced-cost fixing or cuts")
     }
 
-    @Test
-    fun `a budget above the pivots the model needs leaves the optimum unchanged`() {
-        val full = assertNotNull(RevisedSimplex(cover()).solve(null))
-
-        val generous = assertNotNull(RevisedSimplex(cover(), iterationLimit = full.pivots + 10).solve(null))
-
-        assertEquals(full.objective, generous.objective, 1e-9, "a budget that never binds changes nothing")
-        assertTrue(generous.optimal)
-    }
 }

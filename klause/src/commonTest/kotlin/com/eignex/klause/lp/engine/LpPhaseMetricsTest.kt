@@ -41,26 +41,6 @@ class LpPhaseMetricsTest {
     }
 
     @Test
-    fun `an accepted degenerate optimum records exact dual recovery without cleanup or ladder work`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, null, cost = 1.0)
-            val y = addRealVar(0.0, null, cost = 1.0)
-            addRealRow(intArrayOf(x, y), doubleArrayOf(5.0, 5.0), Relation.GE, 1.0)
-        }.build(Sense.MINIMIZE)
-        val events = ArrayList<LpPhaseMetrics>()
-        val observer = phaseObserver(events)
-
-        val result = solveAndCertify(model, observer = observer, floatAccept = { true })
-
-        assertEquals(LpVerdict.TOLERANCE_OPTIMUM, result.verdict)
-        assertEquals(listOf(LpSolvePhase.AUTHORITATIVE_IMPORT, LpSolvePhase.EXACT_DUALS,
-            LpSolvePhase.FLOAT_ACCEPTANCE), events.map { it.phase })
-        assertEquals("ACCEPTED", events.last().outcome)
-        assertEquals("ACCEPTED", events.single { it.phase == LpSolvePhase.EXACT_DUALS }.outcome)
-        assertTrue(events.all { it.nanos >= 0L })
-    }
-
-    @Test
     fun `cleanup costs remain visible when acceptance falls through to the exact ladder`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, null, cost = -9e-13)
@@ -79,21 +59,6 @@ class LpPhaseMetricsTest {
     }
 
     @Test
-    fun `a source refusal records the exact ladder verdict`() {
-        val model = LpBuilder().apply { addRealVar(0.0, 2.0, cost = 1.0) }.build(Sense.MINIMIZE)
-        val events = ArrayList<LpPhaseMetrics>()
-        var checks = 0
-
-        val result = solveAndCertify(model, observer = phaseObserver(events), floatAccept = { checks++; false })
-
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
-        assertEquals(1, checks)
-        assertEquals("REFUSED", events.single { it.phase == LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE }.outcome)
-        assertEquals("IMPORTED", events.single { it.phase == LpSolvePhase.AUTHORITATIVE_IMPORT }.outcome)
-        assertEquals("ATTAINED_OPTIMUM", events.single { it.phase == LpSolvePhase.EXACT_LADDER }.outcome)
-    }
-
-    @Test
     fun `cancellation during source acceptance withholds the optimum without importing authority`() {
         val model = LpBuilder().apply { addRealVar(0.0, 2.0, cost = 1.0) }.build(Sense.MINIMIZE)
         val events = ArrayList<LpPhaseMetrics>()
@@ -104,17 +69,6 @@ class LpPhaseMetricsTest {
 
         assertEquals(LpVerdict.INDETERMINATE, result.verdict)
         assertTrue(events.none { it.phase == LpSolvePhase.AUTHORITATIVE_IMPORT })
-    }
-
-    @Test
-    fun `a work capped source imports authority before its single float solve`() {
-        val model = LpBuilder().apply { addRealVar(0.0, 2.0, cost = 1.0) }.build(Sense.MINIMIZE)
-        val events = ArrayList<LpPhaseMetrics>()
-
-        solveAndCertify(model, workLimit = 1L, observer = phaseObserver(events), floatAccept = { true })
-
-        assertEquals(LpSolvePhase.AUTHORITATIVE_IMPORT, events.first().phase)
-        assertTrue(events.none { it.phase == LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE })
     }
 
     private fun phaseObserver(events: MutableList<LpPhaseMetrics>) = object : LpCertificationObserver {

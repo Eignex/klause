@@ -144,7 +144,7 @@ internal object ClaspReference {
         val lines = stdout.lineSequence().map { it.trim() }.toList()
         val status = lines.lastOrNull { it.startsWith("s ") }?.removePrefix("s ")?.trim()
         val bestObjective = lines.filter { it.startsWith("o ") }
-            .mapNotNull { it.removePrefix("o ").trim().toDoubleOrNull() }
+            .mapNotNull { ExactObjective.parse(it.removePrefix("o ").trim()) }
             .lastOrNull()
         val feasible = when (status) {
             "OPTIMUM FOUND", "SATISFIABLE" -> true
@@ -163,7 +163,8 @@ internal object ClaspReference {
         val timeMs = elapsedMs.takeIf { feasible == true }
         return SolverInvocation.Result(
             feasible = feasible,
-            objective = bestObjective.takeIf { feasible == true },
+            objective = bestObjective?.approximate().takeIf { feasible == true },
+            exactObjective = bestObjective?.toString().takeIf { feasible == true },
             elapsedMs = elapsedMs,
             timeToBestMs = timeMs,
             timeToFirstFeasibleMs = timeMs,

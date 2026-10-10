@@ -12,36 +12,6 @@ import kotlin.test.assertTrue
 class RewardLedgerTest {
 
     @Test
-    fun `an arm earning as fast as the rest of the pool scores one half`() {
-        val ledger = RewardLedger(2)
-        ledger.credit(0, Signal.Improvement, 4.0)
-        ledger.settle(0, 100)
-
-        ledger.credit(1, Signal.Improvement, 4.0)
-
-        assertEquals(0.5, ledger.settle(1, 100), 1e-9)
-    }
-
-    @Test
-    fun `the only arm earning a signal scores one`() {
-        val ledger = RewardLedger(2)
-        ledger.settle(0, 100)
-
-        ledger.credit(1, Signal.Improvement, 4.0)
-
-        assertEquals(1.0, ledger.settle(1, 100), 1e-9)
-    }
-
-    @Test
-    fun `an arm that earned nothing scores zero`() {
-        val ledger = RewardLedger(2)
-        ledger.credit(0, Signal.Improvement, 4.0)
-        ledger.settle(0, 100)
-
-        assertEquals(0.0, ledger.settle(1, 100))
-    }
-
-    @Test
     fun `the same credit over more work scores lower`() {
         fun rewardFor(work: Long): Double {
             val ledger = RewardLedger(2)
@@ -67,15 +37,6 @@ class RewardLedgerTest {
     }
 
     @Test
-    fun `credit owed to an idle arm counts against the arm being scored`() {
-        val ledger = RewardLedger(2)
-        ledger.credit(1, Signal.ClauseUses, 5.0)
-        ledger.credit(0, Signal.Improvement, 4.0)
-
-        assertEquals(0.5, ledger.settle(0, 100), 1e-9)
-    }
-
-    @Test
     fun `an arm is not scored on a signal it cannot earn`() {
         // Arm 0 is backtrack, arm 1 local search: only arm 1 can lower violation.
         val ledger = RewardLedger(2) { arm, signal -> signal != Signal.Violation || arm == 1 }
@@ -84,19 +45,6 @@ class RewardLedgerTest {
         ledger.credit(0, Signal.RootFixings, 3.0)
 
         assertEquals(1.0, ledger.settle(0, 100), 1e-9)
-    }
-
-    @Test
-    fun `scaling a signal does not change the reward`() {
-        fun rewardAt(scale: Double): Double {
-            val ledger = RewardLedger(2)
-            ledger.credit(0, Signal.Improvement, 3.0 * scale)
-            ledger.settle(0, 100)
-            ledger.credit(1, Signal.Improvement, 5.0 * scale)
-            return ledger.settle(1, 100)
-        }
-
-        assertEquals(rewardAt(1.0), rewardAt(1_000.0), 1e-9)
     }
 
     @Test

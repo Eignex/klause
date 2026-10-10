@@ -11,9 +11,6 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.tools.Profiler
 import kotlinx.serialization.Serializable
 import java.io.File
-import java.math.BigDecimal
-import java.math.BigInteger
-import java.math.MathContext
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -82,6 +79,7 @@ internal object SolverInvocation {
         val assignment: String? = null,
         /** Subprocess wall-clock duration, including launch and output consumption; null in legacy caches. */
         val elapsedMs: Long? = null,
+        val exactObjective: String? = null,
     ) {
         fun referenceElapsedMs(budgetMs: Long): Long = when {
             proven -> solveTimeMs(stats) ?: elapsedMs ?: budgetMs
@@ -314,12 +312,20 @@ internal object SolverInvocation {
         val stats = LinkedHashMap<String, String>()
         val attribution = ArrayList<Attribution>()
         var objective: Double? = null
+        var exactObjective: String? = null
         var timeToBestMs: Long? = null
         var timeToFirstFeasibleMs: Long? = null
         var proven = false
         var unsat = false
         var anySolution = false
         var smtSat = false
+
+        fun recordObjective(text: String): Boolean {
+            val value = ExactObjective.parse(text) ?: return false
+            exactObjective = value.toString()
+            objective = value.approximate()
+            return true
+        }
 
         // An improving incumbent (a new solution / better objective): stamp time-to-best afresh.
         fun markIncumbent() {
@@ -365,8 +371,7 @@ internal object SolverInvocation {
                         line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
 
                         line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) ->
-                            line.substringAfter('=').trim().removeSuffix(";").trim().toDoubleOrNull()
-                                ?.let { objective = it }
+                            recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
                     }
                 }
 
@@ -386,11 +391,9 @@ internal object SolverInvocation {
                     line == XCSP_UNKNOWN -> Unit
 
                     // `o <cost>`: one line per improving incumbent (model-oriented objective).
-                    line.startsWith(XCSP_OBJECTIVE_PREFIX) ->
-                        parsePbObjective(line.removePrefix(XCSP_OBJECTIVE_PREFIX).trim())?.let {
-                            objective = it
-                            markIncumbent()
-                        }
+                    line.startsWith(XCSP_OBJECTIVE_PREFIX) -> {
+                        if (recordObjective(line.removePrefix(XCSP_OBJECTIVE_PREFIX).trim())) markIncumbent()
+                    }
 
                     line.startsWith(ARM_PREFIX) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
                         val arrivedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
@@ -419,8 +422,9 @@ internal object SolverInvocation {
                         val kv = line.removePrefix(SMT_COMMENT_PREFIX).trim()
                         recordStat(kv)
                         if (kv.substringBefore('=').trim() == "objective") {
-                            objective = parsePbObjective(kv.substringAfter('=', "").trim())
-                            if (objective != null) markIncumbent()
+                            exactObjective = null
+                            objective = null
+                            if (recordObjective(kv.substringAfter('=', "").trim())) markIncumbent()
                         }
                     }
                 }
@@ -469,11 +473,12 @@ internal object SolverInvocation {
                 else -> null
             },
             objective = objective.takeIf { anySolution },
+            exactObjective = exactObjective.takeIf { anySolution },
             elapsedMs = elapsedMs,
             timeToBestMs = timeToBestMs,
             timeToFirstFeasibleMs = timeToFirstFeasibleMs,
             proven = if (dialect == Dialect.SMT_LIB) {
-                unsat || (smtSat && objective != null && stats["optimizationStatus"] == "optimal")
+                unsat || (smtSat && exactObjective != null && stats["optimizationStatus"] == "optimal")
             } else {
                 proven
             },
@@ -485,13 +490,7 @@ internal object SolverInvocation {
     }
 
     internal fun parsePbObjective(text: String): Double? {
-        text.toDoubleOrNull()?.let { return it.takeIf(Double::isFinite) }
-        val parts = text.split('/', limit = 3)
-        if (parts.size != 2 || parts.any { !SIGNED_INTEGER.matches(it) }) return null
-        val denominator = BigInteger(parts[1])
-        if (denominator == BigInteger.ZERO) return null
-        return BigDecimal(BigInteger(parts[0])).divide(BigDecimal(denominator), MathContext.DECIMAL128)
-            .toDouble().takeIf(Double::isFinite)
+        return ExactObjective.parse(text)?.approximate()
     }
 
     /**
@@ -553,7 +552,6 @@ internal object SolverInvocation {
     private const val MODEL_OBJECTIVE_KEY = "_objective"
     private const val STAT_PREFIX = "%%%mzn-stat:"
     private const val ARM_PREFIX = "%%%klause-arm:"
-    private val SIGNED_INTEGER = Regex("[+-]?[0-9]+")
 
     // XCSP3 competition output stream (klause-cli's `.xml` front-end).
     private const val XCSP_SATISFIABLE = "s SATISFIABLE"

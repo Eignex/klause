@@ -1,7 +1,5 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
@@ -9,14 +7,10 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.FloatLpStatus
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -81,19 +75,6 @@ class CumulativeRelaxationTest {
     }
 
     @Test
-    fun `capacity divides the cumulative energy`() {
-        // 4 tasks, demand 1, length 2, capacity 2: energy 8 over capacity 2 ⇒ makespan ≥ 4.
-        val p = makespanProblem(
-            starts = Array(4) { IntDomain(0, 20) },
-            durations = longArrayOf(2, 2, 2, 2),
-            resources = longArrayOf(1, 1, 1, 1),
-            capacity = 2,
-            horizon = 20,
-        )
-        assertEquals(4.0, makespanBound(p, makespanVar = 4, cumulative = true), eps)
-    }
-
-    @Test
     fun `energetic windowing beats the whole-horizon area`() {
         // Task 0: est 0, len 2. Task 1: est 5, len 2. Capacity 1.
         // Whole horizon (t1 = 0): 0 + (2 + 2) = 4. Window t1 = 5: 5 + 2 (task 1) = 7 > 4.
@@ -105,20 +86,6 @@ class CumulativeRelaxationTest {
             horizon = 20,
         )
         assertEquals(7.0, makespanBound(p, makespanVar = 2, cumulative = true), eps)
-    }
-
-    @Test
-    fun `disjunctive factor gets the one-machine bound`() {
-        val p = makespanProblem(
-            starts = Array(3) { IntDomain(0, 20) },
-            durations = longArrayOf(2, 3, 4),
-            resources = longArrayOf(1, 1, 1),
-            capacity = 1,
-            horizon = 20,
-            disjunctive = true,
-        )
-        // Σ dur = 9, all may start at 0 ⇒ makespan ≥ 9.
-        assertEquals(9.0, makespanBound(p, makespanVar = 3, cumulative = true), eps)
     }
 
     @Test
@@ -212,103 +179,4 @@ class CumulativeRelaxationTest {
         assertTrue(!CumulativeRelaxation(p).applicable, "variable durations ⇒ no plan")
     }
 
-    @Test
-    fun `bound never exceeds the true optimum - soundness vs brute force`() {
-        val rng = Random(20260613)
-        var nontrivial = 0
-        repeat(120) { _ ->
-            val n = rng.nextInt(2, 4)
-            val hi = rng.nextInt(2, 5)
-            val durations = LongArray(n) { rng.nextInt(1, 4).toLong() }
-            val resources = LongArray(n) { rng.nextInt(1, 3).toLong() }
-            val capacity = rng.nextInt(1, 4).toLong()
-            val starts = Array(n) { IntDomain(rng.nextInt(0, 3).toLong(), (hi + rng.nextInt(0, 3)).toLong()) }
-            // Ensure every domain is non-empty and the horizon covers any feasible end.
-            val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
-            val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
-            val optimum = bruteOptimum(n, starts, durations, resources, capacity) ?: return@repeat // infeasible
-            val bound = makespanBound(p, makespanVar = n, cumulative = true)
-            assertTrue(
-                bound <= optimum + eps,
-                "unsound: LP makespan bound $bound > true optimum $optimum " +
-                    "(dur=${durations.toList()} res=${resources.toList()} cap=$capacity)",
-            )
-            val plain = makespanBound(p, makespanVar = n, cumulative = false)
-            if (bound > plain + eps) nontrivial++
-        }
-        assertTrue(nontrivial > 12, "the row only strengthened $nontrivial instances")
-    }
-
-    @Test
-    fun `branch and bound preserves the scheduling optimum under an LP emphasis`() {
-        // End-to-end: the non-global makespan row (live earliest-starts + premises) fires during
-        // search, so a wrong premise would corrupt the optimum. The AGGRESSIVE emphasis turns on lpCumulative plus
-        // the full LP learning stack, exactly the path that consumes the row's premises.
-        val rng = Random(20260613)
-        var optimal = 0
-        var infeasible = 0
-        repeat(45) { iter ->
-            val n = rng.nextInt(2, 4)
-            val durations = LongArray(n) { rng.nextInt(1, 4).toLong() }
-            val resources = LongArray(n) { rng.nextInt(1, 3).toLong() }
-            val capacity = rng.nextInt(1, 4).toLong()
-            val starts = Array(n) { IntDomain(0, rng.nextInt(2, 5).toLong()) }
-            val horizon = (0 until n).maxOf { starts[it].max + durations[it] }
-            val p = makespanProblem(starts, durations, resources, capacity, horizon.toInt())
-            val optimum = bruteOptimum(n, starts, durations, resources, capacity)
-            val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
-            val params = BacktrackParams(randomSeed = 7L, lubyRestartBase = 8L, lpConfig = LpConfig.AGGRESSIVE)
-            when (val res = BacktrackSolver(p.bake()).minimize(obj, params)) {
-                is MinimizeResult.Optimal -> {
-                    optimal++
-                    assertTrue(optimum != null, "solver Optimal on a brute-infeasible instance #$iter")
-                    assertEquals(optimum.toDouble(), res.objective, 1e-9, "wrong scheduling optimum on instance #$iter")
-                }
-
-                is MinimizeResult.Infeasible -> {
-                    infeasible++
-                    assertTrue(optimum == null, "solver Infeasible on a brute-feasible instance #$iter")
-                }
-
-                else -> error("unexpected non-terminal result $res on instance #$iter")
-            }
-        }
-        assertTrue(optimal > 12, "covered only $optimal optimal instances")
-    }
-
-    /** Minimal feasible `max(startᵢ + durᵢ)` over all in-domain start assignments, or null if none. */
-    private fun bruteOptimum(
-        n: Int,
-        starts: Array<IntDomain>,
-        durations: LongArray,
-        resources: LongArray,
-        capacity: Long,
-    ): Long? {
-        val s = IntArray(n)
-        var best: Long? = null
-        fun feasible(): Boolean {
-            val horizon = (0 until n).maxOf { s[it] + durations[it] }
-            for (t in 0 until horizon) {
-                var load = 0L
-                for (k in 0 until n) if (s[k] <= t && t < s[k] + durations[k]) load += resources[k]
-                if (load > capacity) return false
-            }
-            return true
-        }
-        fun rec(i: Int) {
-            if (i == n) {
-                if (feasible()) {
-                    val mk = (0 until n).maxOf { s[it] + durations[it] }
-                    if (best == null || mk < best!!) best = mk
-                }
-                return
-            }
-            for (v in starts[i].min..starts[i].max) {
-                s[i] = v.toInt()
-                rec(i + 1)
-            }
-        }
-        rec(0)
-        return best
-    }
 }

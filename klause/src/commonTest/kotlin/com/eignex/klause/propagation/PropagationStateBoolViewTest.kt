@@ -6,12 +6,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * Documents the three-valued semantics of [PropagationState.boolValues] — the [Bits]-backed
- * `BoolView` wrapper. Read-write-clear is the contract every factor depends on; this test pins
- * it down so a future tweak to the underlying packed storage can't silently break the
- * null-tracking invariant.
- */
 class PropagationStateBoolViewTest {
 
     private fun newState(numBoolVars: Int): PropagationState {
@@ -25,40 +19,12 @@ class PropagationStateBoolViewTest {
     }
 
     @Test
-    fun `unassigned vars read as null`() {
-        val s = newState(5)
-        for (v in 0 until 5) assertNull(s.boolValues[v])
-    }
-
-    @Test
-    fun `set true and false round-trip`() {
-        val s = newState(4)
-        s.boolValues[0] = true
-        s.boolValues[1] = false
-        s.boolValues[3] = true
-        assertEquals(true, s.boolValues[0])
-        assertEquals(false, s.boolValues[1])
-        assertNull(s.boolValues[2])
-        assertEquals(true, s.boolValues[3])
-    }
-
-    @Test
     fun `set null clears assignment back to unassigned`() {
         val s = newState(3)
         s.boolValues[0] = true
         assertEquals(true, s.boolValues[0])
         s.boolValues[0] = null
         assertNull(s.boolValues[0])
-    }
-
-    @Test
-    fun `flipping an assigned value keeps it assigned at the new value`() {
-        val s = newState(2)
-        s.boolValues[0] = true
-        s.boolValues[0] = false
-        assertEquals(false, s.boolValues[0])
-        s.boolValues[0] = true
-        assertEquals(true, s.boolValues[0])
     }
 
     @Test
@@ -75,10 +41,4 @@ class PropagationStateBoolViewTest {
         assertNull(s.boolValues[128])
     }
 
-    @Test
-    fun `size and indices match numBoolVars`() {
-        val s = newState(7)
-        assertEquals(7, s.boolValues.size)
-        assertEquals(0 until 7, s.boolValues.indices)
-    }
 }

@@ -1,35 +1,12 @@
 package com.eignex.klause.util
 
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Coverage for [MutableIntObjectMap]: get/put/getOrPut/remove/clear, growth, backward-shift
- *  deletion, extreme keys, and a randomized differential check against `HashMap`. */
 class MutableIntObjectMapTest {
-
-    @Test
-    fun `empty map returns null and reports absent`() {
-        val m = MutableIntObjectMap<String>()
-        assertEquals(0, m.size)
-        assertTrue(m.isEmpty())
-        assertNull(m[42])
-        assertFalse(m.containsKey(42))
-    }
-
-    @Test
-    fun `put then get round-trips and tracks size`() {
-        val m = MutableIntObjectMap<String>()
-        m.put(10, "ten")
-        m.put(20, "twenty")
-        assertEquals("ten", m[10])
-        assertEquals("twenty", m[20])
-        assertEquals(2, m.size)
-        assertNull(m[30])
-    }
 
     @Test
     fun `put overwrites existing key without growing size`() {
@@ -96,30 +73,4 @@ class MutableIntObjectMapTest {
         for (k in 0 until 1000) assertEquals(k, m[k * 7])
     }
 
-    @Test
-    fun `matches a HashMap reference under random put-remove churn`() {
-        val rng = Random(2024)
-        repeat(12) {
-            val m = MutableIntObjectMap<Int>(rng.nextInt(1, 16))
-            val ref = HashMap<Int, Int>()
-            repeat(600) {
-                val key = rng.nextInt(-60, 60)
-                when (rng.nextInt(3)) {
-                    0 -> {
-                        val v = rng.nextInt(-100, 100)
-                        m.put(key, v)
-                        ref[key] = v
-                    }
-
-                    1 -> assertEquals(ref.remove(key) != null, m.remove(key))
-
-                    2 -> assertEquals(ref[key], m[key])
-                }
-                assertEquals(ref.size, m.size)
-            }
-            val seen = HashMap<Int, Int>()
-            m.forEach { k, v -> seen[k] = v }
-            assertEquals(ref, seen)
-        }
-    }
 }

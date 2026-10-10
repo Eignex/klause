@@ -111,6 +111,7 @@ internal data class SolveRecord(
     val sourceOutputSha256: String? = null,
     val processTimeToFirstFeasibleMs: Long? = null,
     val processTimeToBestMs: Long? = null,
+    val exactObjective: String? = null,
 )
 
 internal object SolveMetric {
@@ -242,6 +243,7 @@ internal object SolveMetric {
             maximize = run.maximize,
             feasible = r.feasible,
             objective = r.objective,
+            exactObjective = r.exactObjective,
             timeToBestMs = r.timeToBestMs,
             timeToFirstFeasibleMs = r.timeToFirstFeasibleMs,
             elapsedMs = r.elapsedMs,
@@ -389,6 +391,7 @@ internal object SolveMetric {
             problem = rec.problem,
             maximize = rec.maximize,
             objective = rec.objective,
+            exactObjective = rec.exactObjective,
             feasible = rec.feasible,
             proven = rec.proven,
             elapsedMs = elapsed,
@@ -462,6 +465,7 @@ internal object SolveMetric {
             maximize = entry.maximize,
             feasible = r.feasible,
             objective = r.objective,
+            exactObjective = r.exactObjective,
             timeToBestMs = bestMs,
             timeToFirstFeasibleMs = firstFeasibleMs,
             processTimeToFirstFeasibleMs = processFirstMs,
@@ -556,9 +560,9 @@ internal object SolveMetric {
                 null -> "?"
             }
 
-            rec.objective == null -> "?"
+            rec.exactObjective == null && rec.objective == null -> "?"
 
-            else -> "${if (rec.proven) "opt" else "best"}=${rec.objective}$at"
+            else -> "${if (rec.proven) "opt" else "best"}=${rec.exactObjective ?: rec.objective}$at"
         }
     }
 

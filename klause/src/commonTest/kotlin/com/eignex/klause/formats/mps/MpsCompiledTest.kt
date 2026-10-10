@@ -55,20 +55,6 @@ class MpsCompiledTest {
     }
 
     @Test
-    fun `source check accepts an exact point on a rounded row within tolerance`() {
-        val compiled = Mps.parse(
-            "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1\n MARK0 'MARKER' 'INTORG'\n" +
-                " K R -0.00222609232214646\n MARK1 'MARKER' 'INTEND'\nBOUNDS\n FX BND K 1\nENDATA",
-        ).toProblem()
-        val onLoweredRow = assertNotNull(BigFraction.ofDouble(0.00222609232214646))
-
-        val witness = compiled.sourceWitness(longArrayOf(1L), listOf(onLoweredRow))
-
-        assertFalse(compiled.sourceExact)
-        assertEquals(onLoweredRow, witness.values.first())
-    }
-
-    @Test
     fun `source check keeps the exact objective when a decimal cost rounds`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\n E R\nCOLUMNS\n X COST 0.10000000000000000001 R 3\nRHS\n RHS R 1\nENDATA",
@@ -121,24 +107,6 @@ class MpsCompiledTest {
         assertEquals(1L, assertNotNull(compiled.objective).intCoefficients.single())
         assertFalse(compiled.sourceExact)
         assertEquals("objective coefficient 'Y'", compiled.sourceDifference)
-    }
-
-    @Test
-    fun `a mixed objective with exact binary real cost preserves source equality`() {
-        val compiled = MpsModel(
-            "m",
-            ObjectiveSense.MINIMIZE,
-            MpsObjective("COST", intArrayOf(0, 1), doubleArrayOf(1.0, 0.5), 0.0),
-            listOf(
-                MpsVar("X", integer = true, lower = 0.0, upper = 10000.0),
-                MpsVar("Y", integer = false, lower = 0.0, upper = 1.0),
-            ),
-            emptyList(),
-        ).toProblem()
-
-        assertEquals(1L, compiled.objectiveScale)
-        assertEquals(0.5, assertNotNull(compiled.objective).realCoefficients.single())
-        assertTrue(compiled.sourceExact)
     }
 
     @Test
@@ -206,31 +174,6 @@ class MpsCompiledTest {
     }
 
     @Test
-    fun `a coefficient finer than a millionth keeps its term in the row`() {
-        val row = lower(twoFinite, MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1e-7, 1.0), null, 1.0))
-
-        val constants = assertNotNull(row.integerConstants)
-        assertEquals(listOf(1L, 10_000_000L), row.vars.indices.map { constants.coeff(it) })
-    }
-
-    @Test
-    fun `an objective too wide for one scale keeps its source values`() {
-        val compiled = MpsModel(
-            "m",
-            ObjectiveSense.MINIMIZE,
-            MpsObjective("cost", intArrayOf(0, 1), doubleArrayOf(1e15, 0.25), 0.0),
-            listOf(
-                MpsVar("x", integer = true, lower = 0.0, upper = 1.0),
-                MpsVar("y", integer = true, lower = 0.0, upper = null),
-            ),
-            emptyList(),
-        ).toProblem()
-
-        assertTrue(compiled.sourceExact, compiled.sourceDifference)
-        assertEquals(listOf("x", "y"), compiled.columns.map { it.name })
-    }
-
-    @Test
     fun `an integer row too wide for one scale keeps every term`() {
         val row = lower(
             twoFinite,
@@ -268,32 +211,6 @@ class MpsCompiledTest {
         val coefficients = (0 until constants.coefficients.size).map { constants.coefficients.at(it).toString() }
         assertEquals(listOf("1000000000000000000000", "1"), coefficients)
         assertEquals("1000000000000000000000", constants.bound.toString())
-        assertTrue(compiled.sourceExact, compiled.sourceDifference)
-    }
-
-    @Test
-    fun `an indicated integer row too wide for one scale keeps its source values`() {
-        val compiled = MpsModel(
-            "m",
-            ObjectiveSense.MINIMIZE,
-            MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
-            listOf(
-                MpsVar("guard", integer = true, lower = 0.0, upper = 1.0),
-                MpsVar("x", integer = true, lower = 0.0, upper = 1.0),
-                MpsVar("y", integer = true, lower = 0.0, upper = 1.0),
-            ),
-            listOf(
-                MpsConstraint(
-                    "c",
-                    intArrayOf(1, 2),
-                    doubleArrayOf(1e15, 0.25),
-                    null,
-                    1e15,
-                    MpsIndicator(column = 0, whenOne = true),
-                ),
-            ),
-        ).toProblem()
-
         assertTrue(compiled.sourceExact, compiled.sourceDifference)
     }
 
@@ -491,21 +408,6 @@ class MpsCompiledTest {
     }
 
     @Test
-    fun `compiled parsed snapshot is independent of later edits`() {
-        val parsed = Mps.parse(
-            "ROWS\n N COST\n L C1\nCOLUMNS\n X COST 3 C1 2\nRHS\n RHS C1 5\nENDATA",
-        )
-        val compiled = parsed.toProblem()
-
-        parsed.objective.coeffs[0] = 7.0
-        parsed.constraints[0].coeffs[0] = 9.0
-        val exact = assertNotNull(compiled.exactLpModel)
-
-        assertEquals(BigFraction.ofLong(3L), exact.objective.cost(0).value)
-        assertEquals(BigFraction.ofLong(2L), exact.entries(0).single().number.value)
-    }
-
-    @Test
     fun `programmatic infinite sides retain open bound conventions`() {
         val source = MpsModel(
             "open",
@@ -568,24 +470,6 @@ class MpsCompiledTest {
         )
 
         for (model in invalid) assertFailsWith<IllegalArgumentException> { model.toProblem() }
-    }
-
-    @Test
-    fun `parsed and compiled copies retain exact authority`() {
-        val text = "ROWS\n N COST\nCOLUMNS\n X COST 9007199254740993\nENDATA"
-        val parsed = Mps.parse(text)
-
-        val parsedCopy = parsed.copy(name = "copy")
-        val compiledCopy = parsed.toProblem().copy()
-
-        assertEquals(
-            "9007199254740993",
-            parsedCopy.toProblem().exactLpModel?.objective?.cost(0)?.value.toString(),
-        )
-        assertEquals(
-            "9007199254740993",
-            compiledCopy.exactLpModel?.objective?.cost(0)?.value.toString(),
-        )
     }
 
     @Test

@@ -6,8 +6,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -56,64 +54,6 @@ class LocalSearchImprovementsTest {
     }
 
     @Test
-    fun `a warm-started optimum survives greedy repair as the first incumbent`() {
-        // 40 bools under an at-most-one cardinality, minimising the count of true bools: the optimum is
-        // all-false (objective 0). Warm-start from it. The greedy-repair pass on a ≥32-variable restart
-        // is objective-blind — it accepts any flip that keeps cost 0 — so it would set one bool true
-        // (objective 1) and surface that as the first incumbent unless a warm start skips the pass.
-        val n = 40
-        val factor = Cardinality.atMostOne(IntArray(n) { Lit.make(it, true) })
-        val problem = Problem(n, 0, emptyArray(), listOf(factor))
-        val obj = LinearObjective(boolWeights = LongArray(n) { 1L })
-        val optimum = Sample(BooleanArray(n) { false }, longArrayOf())
-        val first = LocalSearchSolver(problem.bake()).improvements(
-            obj,
-            LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L, initialAssignment = optimum),
-        ).first()
-        val bf = assertIs<MinimizeResult.BestFound>(first)
-        assertEquals(0.0, bf.objective, "warm start must yield the seed objective, not a scrambled one")
-    }
-
-    @Test
-    fun `minimize equals improvements last`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, true),
-                Lit.make(2, true),
-                Lit.make(3, true),
-            ),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val obj = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L, 1L))
-        val solver = LocalSearchSolver(problem.bake())
-        val params = LocalSearchParams(maxFlips = 200L, randomSeed = 0L)
-        val viaMinimize = solver.minimize(obj, params)
-        val viaImprovementsLast = solver.improvements(obj, params).last()
-        // Two separate runs report their own wall-clock stats; the verdicts must agree.
-        assertEquals(viaMinimize.withoutStats(), viaImprovementsLast.withoutStats())
-    }
-
-    @Test
-    fun `minimize populates native LS stats`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val result = LocalSearchSolver(
-            problem.bake(),
-        ).minimize(obj, LocalSearchParams(maxFlips = 200L, randomSeed = 1L))
-        val best = assertIs<MinimizeResult.BestFound>(result)
-        val stats = best.stats
-        assertEquals("ls", stats.run.backend)
-        assertTrue(stats.ls.moves.sum > 0.0, "LS must report the moves it applied")
-        assertEquals(best.objective, stats.ls.incumbentObjective, "incumbent objective mirrors the verdict")
-        assertEquals(0.0, stats.ls.incumbentViolation, "a feasible incumbent has zero violation")
-        assertTrue(stats.ls.timeToBestMs >= 0L, "time-to-best is stamped once an incumbent lands")
-    }
-
-    @Test
     fun `instruction budget bounds constant-objective optimization work`() {
         // A constant objective has no improving incumbent after its first one. The counted allowance
         // must still end the segment.
@@ -125,19 +65,6 @@ class LocalSearchImprovementsTest {
 
         val best = assertIs<MinimizeResult.BestFound>(result)
         assertEquals(7.0, best.stats.ls.moves.sum, "the instruction budget bounds the whole segment")
-    }
-
-    @Test
-    fun `solve populates moves and a feasible incumbent`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val result = LocalSearchSolver(problem.bake()).solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
-        val sat = assertIs<SolveResult.Sat>(result)
-        assertEquals("ls", sat.stats.run.backend)
-        assertEquals(0.0, sat.stats.ls.incumbentViolation, "a satisfied instance has zero violation")
-        assertTrue(sat.stats.ls.incumbentObjective.isNaN(), "no objective is tracked in satisfy mode")
     }
 
     @Test

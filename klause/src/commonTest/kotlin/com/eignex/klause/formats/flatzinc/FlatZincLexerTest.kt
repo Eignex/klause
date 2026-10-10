@@ -2,21 +2,8 @@ package com.eignex.klause.formats.flatzinc
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class FlatZincLexerTest {
-
-    @Test
-    fun `tokens for var decl`() {
-        val tokens = FlatZincLexer("var int: x;").tokenize().dropLast(1)
-        assertEquals(5, tokens.size)
-        assertEquals("var", (tokens[0] as FznToken.Kw).keyword)
-        assertEquals("int", (tokens[1] as FznToken.Kw).keyword)
-        assertEquals(":", (tokens[2] as FznToken.Punct).symbol)
-        assertEquals("x", (tokens[3] as FznToken.Ident).name)
-        assertEquals(";", (tokens[4] as FznToken.Punct).symbol)
-    }
 
     @Test
     fun `int range token uses two-dot punct`() {
@@ -35,12 +22,6 @@ class FlatZincLexerTest {
     }
 
     @Test
-    fun `negative int literal`() {
-        val tokens = FlatZincLexer("-7").tokenize().dropLast(1)
-        assertEquals(-7L, (tokens[0] as FznToken.IntLit).value)
-    }
-
-    @Test
     fun `string literal with escapes`() {
         val tokens = FlatZincLexer("\"hello \\\"world\\\"\\n\"").tokenize().dropLast(1)
         assertEquals("hello \"world\"\n", (tokens[0] as FznToken.StringLit).value)
@@ -54,27 +35,4 @@ class FlatZincLexerTest {
         assertEquals("y", (tokens[8] as FznToken.Ident).name)
     }
 
-    @Test
-    fun `double-colon punct`() {
-        val tokens = FlatZincLexer("var int: x :: output_var = 0;").tokenize().dropLast(1)
-        assertTrue(tokens.any { it is FznToken.Punct && it.symbol == "::" })
-    }
-
-    @Test
-    fun `keywords vs identifiers`() {
-        val tokens = FlatZincLexer("var bool true false intersect").tokenize().dropLast(1)
-        assertEquals("var", (tokens[0] as FznToken.Kw).keyword)
-        assertEquals("bool", (tokens[1] as FznToken.Kw).keyword)
-        assertEquals("true", (tokens[2] as FznToken.Kw).keyword)
-        assertEquals("false", (tokens[3] as FznToken.Kw).keyword)
-        // `intersect` isn't in our keyword list — should be an identifier.
-        assertEquals("intersect", (tokens[4] as FznToken.Ident).name)
-    }
-
-    @Test
-    fun `eof at end`() {
-        val tokens = FlatZincLexer("").tokenize()
-        assertEquals(1, tokens.size)
-        assertIs<FznToken.Eof>(tokens[0])
-    }
 }

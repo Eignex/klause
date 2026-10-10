@@ -141,11 +141,13 @@ internal fun SolveRecord.sourceChecked(validation: SourceValidation, approximati
         "floatApproximation" to approximation.toString(),
         "reportedFeasible" to feasible.toString(),
         "reportedObjective" to objective.toString(),
+        "reportedExactObjective" to exactObjective.toString(),
         "reportedProven" to proven.toString(),
     )
     return copy(
         feasible = if (reject) null else feasible,
         objective = if (reject) null else objective,
+        exactObjective = if (reject) null else exactObjective,
         proven = proven && !reject && !approximation,
         timeToBestMs = if (reject) null else timeToBestMs,
         processTimeToFirstFeasibleMs = if (reject) null else processTimeToFirstFeasibleMs,
@@ -155,8 +157,12 @@ internal fun SolveRecord.sourceChecked(validation: SourceValidation, approximati
             emptyList()
         } else {
             attribution.filter { incumbent ->
-                objective == null ||
-                    (incumbent.continuousObjective ?: incumbent.exactObjective?.toDoubleOrNull()) == objective
+                val retained = ExactObjective.value(exactObjective, objective)
+                val attributed = ExactObjective.value(
+                    incumbent.exactObjective.takeIf { incumbent.continuousObjective == null },
+                    incumbent.continuousObjective ?: incumbent.objective,
+                )
+                retained == null || attributed?.compareTo(retained) == 0
             }
         },
         stats = verifiedStats,

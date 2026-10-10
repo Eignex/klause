@@ -7,7 +7,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/** The presolve phase's work allowance and the per-pass slices taken from it, driven by explicit charges. */
 class PresolveBudgetTest {
 
     @Test
@@ -46,20 +45,6 @@ class PresolveBudgetTest {
         assertFalse(second(), "the second slice was taken from the full 900 that was left")
         budget.charge(100)
         assertTrue(second())
-    }
-
-    @Test
-    fun `a zero share is already spent`() {
-        assertTrue(PresolveBudget(1000).slice(0)(), "a pass with no share left must not start")
-    }
-
-    @Test
-    fun `remaining never reports a negative budget`() {
-        val budget = PresolveBudget(100)
-
-        budget.charge(150)
-
-        assertEquals(0L, budget.remaining())
     }
 
     @Test

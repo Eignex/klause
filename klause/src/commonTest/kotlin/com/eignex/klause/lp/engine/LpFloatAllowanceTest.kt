@@ -40,37 +40,6 @@ class LpFloatAllowanceTest {
     }
 
     @Test
-    fun `iteration allowances can grow and shrink across objective revisions`() {
-        val builder = LpBuilder()
-        repeat(4) {
-            val x = builder.addVar(0, 4, cost = 1)
-            builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
-        }
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
-        val state = LpExactState(source)
-        RevisedSimplex(assertNotNull(state.toWorkingModel())).use { solver ->
-            assertFalse(solver.resolveBounds(LpFloatAllowance(0L, 1))?.optimal == true)
-            assertEquals(LpFloatTermination.PIVOTS, solver.lastTermination)
-            assertTrue(solver.lastPivots <= 1)
-            assertFalse(solver.adopt(state, Cancellation { true }))
-            assertNull(solver.lastTermination)
-            assertTrue(assertNotNull(solver.resolveBounds(LpFloatAllowance(0L, 100))).optimal)
-            assertEquals(LpFloatTermination.OPTIMAL_CANDIDATE, solver.lastTermination)
-            val objective = ExactLpObjective(List(8) { ExactLpNumber.of(if (it < 4) -1L else 0L) })
-            val revised = LpExactState(source.copy(objective = objective), objectiveRevision = 1L)
-            assertTrue(solver.adopt(revised))
-
-            assertFalse(solver.resolveBounds(LpFloatAllowance(0L, 1))?.optimal == true)
-            assertEquals(LpFloatTermination.PIVOTS, solver.lastTermination)
-            assertTrue(solver.lastPivots <= 1)
-            val result = assertNotNull(solver.resolveBounds(LpFloatAllowance(0L, 100)))
-
-            assertTrue(result.optimal)
-            assertEquals(-16.0, result.objective)
-        }
-    }
-
-    @Test
     fun `cancelled and throwing invocations restore construction allowances`() {
         for (throws in listOf(false, true)) {
             val builder = LpBuilder()

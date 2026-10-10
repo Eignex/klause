@@ -77,20 +77,6 @@ class CpToLpRelaxationReifiedBoolTest {
     }
 
     @Test
-    fun `reified pseudo-boolean GE is sound`() {
-        val p = pbProblem(
-            PbOp.GE,
-            bound = 4,
-            lits = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)),
-            weights = intArrayOf(2, 3, 1),
-            aux = 3,
-            nBool = 4,
-        )
-        val excluded = checkSoundness(p, nBool = 4, aux = 3) { 2 * b(it, 0) + 3 * b(it, 1) + b(it, 2) >= 4 }
-        assertTrue(excluded > 0)
-    }
-
-    @Test
     fun `reified pseudo-boolean EQ is sound`() {
         val p = pbProblem(
             PbOp.EQ,

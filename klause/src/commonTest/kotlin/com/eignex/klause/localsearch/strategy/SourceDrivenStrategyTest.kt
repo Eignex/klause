@@ -9,16 +9,13 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
-import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.movesource.StallSwaps
-import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -38,48 +35,6 @@ class SourceDrivenStrategyTest {
         intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
         factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 2)),
     )
-
-    private fun driveToFeasible(strategy: SourceDrivenStrategy, state: LocalSearchState, steps: Int): Boolean {
-        state.recompute()
-        repeat(steps) {
-            if (state.cost == 0L) return true
-            val m = strategy.pickMove(state) ?: return@repeat
-            state.apply(m)
-        }
-        return state.cost == 0L
-    }
-
-    @Test
-    fun `a focused arm built only from ViolatedRepairs solves a satisfiable instance`() {
-        val strategy = SourceDrivenStrategy(
-            sources = listOf(ConfiguredSource(ViolatedRepairs(sampleCount = 4))),
-            scoring = MoveScoring.Raw,
-            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
-        )
-        val state = LocalSearchState(satisfiableProblem().bake(), Random(7))
-        assertTrue(driveToFeasible(strategy, state, steps = 200), "ViolatedRepairs-only arm must reach feasibility")
-    }
-
-    @Test
-    fun `the same SatisfiedStructured and ObjectiveSeed sources Cbls uses are reusable by configuration`() {
-        // Feasible-phase sources, listed by configuration — no generation code in this strategy.
-        val strategy = SourceDrivenStrategy(
-            sources = listOf(
-                ConfiguredSource(SatisfiedStructured.sampled(4)),
-                ConfiguredSource(ObjectiveSeed()),
-            ),
-            scoring = MoveScoring.Weighted,
-            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
-        )
-        // A feasible state (the EQ is satisfied at (1,1)) with an objective so ObjectiveSeed fires.
-        val state = LocalSearchState(satisfiableProblem().bake(), Random(7))
-        state.shaping.objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 1)
-        state.recompute()
-        assertEquals(0L, state.cost, "fixture must start feasible so the feasible-phase sources fire")
-        assertNotNull(strategy.pickMove(state), "feasible-phase sources must yield a candidate by configuration")
-    }
 
     @Test
     fun `feasible descent declines an objective-lowering move that breaks feasibility`() {

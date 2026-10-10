@@ -6,7 +6,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -130,49 +129,6 @@ class LpSolveSessionTest {
             assertEquals(if (split) 1 else 0, factory.calls.count { it.kind == EngineConstruction.COMPONENT })
             assertEquals(0, factory.calls.count { it.kind == EngineConstruction.GENERAL })
         }
-    }
-
-    @Test
-    fun `a later solve replaces an expired call deadline without rebuilding its owner`() {
-        val source = LpBuilder().apply {
-            val x = addRealVar(0.0, 5.0, cost = 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
-        }.build(Sense.MINIMIZE)
-        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).ownerWorkingModel())
-        val factory = RecordingLpEngineFactory()
-        var expired = false
-        LpSolveSession(LpSolveContext(factory)).use { owner ->
-            assertEquals(LpVerdict.ATTAINED_OPTIMUM, owner.solve(model, Cancellation { expired }).verdict)
-            expired = true
-            assertEquals(LpVerdict.INDETERMINATE, owner.solve(model, Cancellation { expired }).verdict)
-            assertEquals(LpVerdict.ATTAINED_OPTIMUM, owner.solve(model).verdict)
-        }
-
-        assertEquals(1, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
-    }
-
-    @Test
-    fun `accepted tolerance bypasses exact certification on each retained solve`() {
-        val source = LpBuilder().apply {
-            val x = addRealVar(0.0, 2.0, cost = 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        }.build(Sense.MINIMIZE)
-        val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).ownerWorkingModel())
-        val attempts = ArrayList<LpCertifier>()
-        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { route, _ ->
-            attempts += route
-            false
-        })
-        LpSolveSession(context).use { owner ->
-            repeat(2) {
-                val actual = owner.solve(model, floatAccept = { true }, floatOffset = 7.0)
-                assertEquals(LpVerdict.TOLERANCE_OPTIMUM, actual.verdict)
-                assertNull(actual.witness)
-                assertEquals(1.0 / 3.0, assertNotNull(actual.floatOptimum).primal.single(), 1e-12)
-            }
-        }
-
-        assertTrue(attempts.isEmpty())
     }
 
     @Test

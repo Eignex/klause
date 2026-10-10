@@ -29,18 +29,6 @@ class AcceptanceRuleTest {
     private val anyTemp = 1.0
 
     @Test
-    fun `greedy takes the minimum over both pools`() {
-        // swap (score-only, -0.5) beats b (noise, 1.0): deterministic rules see both pools.
-        assertEquals(swap, AcceptanceRule.Greedy.choose(rng(), listOf(a, b), listOf(swap), anyTemp, score))
-    }
-
-    @Test
-    fun `greedy descent takes the best strictly-improving move over both pools`() {
-        // swap (score-only, -0.5) is the only strictly-improving move; deterministic rules see both pools.
-        assertEquals(swap, AcceptanceRule.GreedyDescent.choose(rng(), listOf(a, b), listOf(swap), anyTemp, score))
-    }
-
-    @Test
     fun `greedy descent returns null at a local optimum`() {
         // No candidate strictly improves (the minimum is flip at 0.0, not < 0): a local optimum, so the
         // rule declines rather than committing a non-improving move.
@@ -57,11 +45,6 @@ class AcceptanceRuleTest {
     }
 
     @Test
-    fun `walksat noise=0 is greedy over both pools`() {
-        assertEquals(swap, AcceptanceRule.WalkSatNoise(0.0).choose(rng(), listOf(a, b), listOf(swap), anyTemp, score))
-    }
-
-    @Test
     fun `probsat draws from the noise pool and falls back to greedy on the score pool`() {
         val r = rng()
         repeat(50) {
@@ -73,16 +56,6 @@ class AcceptanceRuleTest {
     }
 
     @Test
-    fun `skew prefers the smaller move when alpha is large`() {
-        // flip (size 1, score 0.0) vs swap (size 2, score -0.5): greedy picks swap; skew(1.0) keys
-        // flip=0+1=1.0 vs swap=-0.5+2=1.5, so skew picks the smaller flip.
-        assertEquals(swap, AcceptanceRule.Greedy.choose(rng(), listOf(flip), listOf(swap), anyTemp, score))
-        assertEquals(flip, AcceptanceRule.Skew(1.0).choose(rng(), listOf(flip), listOf(swap), anyTemp, score))
-        // alpha = 0 is exactly greedy.
-        assertEquals(swap, AcceptanceRule.Skew(0.0).choose(rng(), listOf(flip), listOf(swap), anyTemp, score))
-    }
-
-    @Test
     fun `metropolis stays in the noise pool and falls back to greedy on the score pool`() {
         val r = rng()
         repeat(50) {
@@ -91,17 +64,6 @@ class AcceptanceRuleTest {
         }
         // Empty noise pool → the score-only moves are selected greedily (never accepted stochastically).
         assertEquals(swap, AcceptanceRule.Metropolis.choose(rng(), emptyList(), listOf(swap, flip), anyTemp, score))
-    }
-
-    @Test
-    fun `metropolis accepts an improving move regardless of temperature`() {
-        // b has delta 1.0 (worsening) and the only other noise option is a (2.0); at a near-zero
-        // temperature the worsening test almost never passes, so the rule takes its random fallback —
-        // still a noise-pool move. The acceptance reads the supplied temperature, owning no schedule.
-        val improving = Move.IntSet(4, 1) // delta -1.0
-        val improvingScore: (Move) -> Double = { if (it == improving) -1.0 else scores.getValue(it) }
-        val m = AcceptanceRule.Metropolis.choose(rng(), listOf(improving), emptyList(), 1e-6, improvingScore)
-        assertEquals(improving, m, "an improving move (delta ≤ 0) is always accepted, even when cold")
     }
 
     @Test

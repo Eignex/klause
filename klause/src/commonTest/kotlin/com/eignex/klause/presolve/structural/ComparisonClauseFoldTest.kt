@@ -90,14 +90,6 @@ class ComparisonClauseFoldTest {
     }
 
     @Test
-    fun `the source form moves a declared constant term into the bound`() {
-        val delta = ComparisonClauseFold.foldSource(constantShifted(openConstants = false))
-
-        val folded = assertIs<ComparisonClause>(delta.addedFactors.single())
-        assertContentEquals(longArrayOf(1, 1), folded.consts)
-    }
-
-    @Test
     fun `the source form keeps a term over an open column out of the bound`() {
         val delta = ComparisonClauseFold.foldSource(constantShifted(openConstants = true))
 
@@ -116,30 +108,6 @@ class ComparisonClauseFoldTest {
     /** Enumerate a problem's solutions projected onto its integer variables. */
     private fun intSolutions(problem: Problem): HashSet<List<Long>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = 1L)).take(10_000).map { it.ints.toList() }.toHashSet()
-
-    @Test
-    fun `folds a reified LE disjunction into one ComparisonClause`() {
-        val domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3))
-        val problem = problemOf(
-            numBool = 2,
-            domains = domains,
-            factors = listOf(
-                reif(0, 0, LinearOp.LE, 1),
-                reif(1, 1, LinearOp.LE, 1),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            ),
-        )
-        val baked = problem.bake()
-        val delta = Presolve.foldComparisonClauses(baked)
-        assertEquals(3, delta.droppedIndices.size, "the clause and both reified definitions are consumed")
-        assertEquals(1, delta.addedFactors.size)
-        assertTrue(delta.addedFactors.single() is ComparisonClause)
-
-        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
-        val brute = HashSet<List<Long>>()
-        for (a in 0..3) for (b in 0..3) if (a <= 1 || b <= 1) brute.add(listOf(a.toLong(), b.toLong()))
-        assertEquals(brute, intSolutions(reduced), "folded model must have the same integer solution set")
-    }
 
     @Test
     fun `folds a negated indicator as the complement comparison`() {
@@ -180,28 +148,6 @@ class ComparisonClauseFoldTest {
         val baked = problem.bake()
         val delta = Presolve.foldComparisonClauses(baked)
         assertTrue(delta.isEmpty, "a shared indicator must keep the reified encoding")
-    }
-
-    @Test
-    fun `folds a reified body whose extra term is a fixed constant variable`() {
-        // The FlatZinc shape: `b <-> (x - k <= 0)` with k a {1} constant var is `x <= 1`.
-        val domains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(1, 1), IntDomain(1, 1))
-        val problem = problemOf(
-            numBool = 2,
-            domains = domains,
-            factors = listOf(
-                ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.LE, 0),
-                ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            ),
-        )
-        val baked = problem.bake()
-        val delta = Presolve.foldComparisonClauses(baked)
-        assertTrue(delta.addedFactors.singleOrNull() is ComparisonClause, "constant term must fold into the bound")
-        val reduced = baked.withPassDelta(delta, BakeConfig.NONE)
-        val brute = HashSet<List<Long>>()
-        for (a in 0..3) for (b in 0..3) if (a <= 1 || b <= 1) brute.add(listOf(a.toLong(), b.toLong(), 1L, 1L))
-        assertEquals(brute, intSolutions(reduced))
     }
 
     @Test

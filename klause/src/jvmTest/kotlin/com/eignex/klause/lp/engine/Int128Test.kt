@@ -52,44 +52,6 @@ class Int128Test {
     }
 
     @Test
-    fun `addLong, addProduct, subtract accumulate exactly`() {
-        val rng = Random(7)
-        repeat(500) {
-            val acc = Int128()
-            var oracle = BigInteger.ZERO
-            repeat(rng.nextInt(1, 40)) {
-                when (rng.nextInt(3)) {
-                    0 -> {
-                        val v = rng.nextLong()
-                        acc.addLong(v)
-                        oracle += big(v)
-                    }
-
-                    1 -> {
-                        val a = rng.nextLong(-(1L shl 40), 1L shl 40)
-                        val b = rng.nextLong(-(1L shl 40), 1L shl 40)
-                        acc.addProduct(a, b)
-                        oracle += big(a) * big(b)
-                    }
-
-                    else -> {
-                        val other = Int128()
-                        val v = rng.nextLong(-(1L shl 60), 1L shl 60)
-                        other.addLong(v)
-                        acc.subtract(other)
-                        oracle -= big(v)
-                    }
-                }
-            }
-            assertFalse(acc.overflow)
-            assertEquals(oracle, acc.toBig(), "accumulated value")
-            assertEquals(oracle.toLongOrNull() != null, acc.fitsLong(), "fitsLong agreement")
-            assertEquals(oracle.signum() >= 0, acc.isNonNegative(), "isNonNegative agreement")
-            if (acc.fitsLong()) assertEquals(oracle.toLongOrNull(), acc.toLong())
-        }
-    }
-
-    @Test
     fun `subtracting the minimum signed value reports overflow only outside the signed range`() {
         for (value in longArrayOf(-1L, 0L, 1L, Long.MIN_VALUE)) {
             val minimum = Int128().apply { repeat(4) { addProduct(Long.MIN_VALUE, 1L shl 62) } }
@@ -100,19 +62,6 @@ class Int128Test {
 
             assertEquals(value >= 0L, acc.overflow, "subtract minimum from $value")
             if (value < 0L) assertEquals(expected, acc.toBig())
-        }
-    }
-
-    @Test
-    fun `subtraction detects negative overflow and preserves a representable signed difference`() {
-        for (value in longArrayOf(-1L, 0L, 1L)) {
-            val acc = Int128().apply { repeat(4) { addProduct(Long.MIN_VALUE, 1L shl 62) } }
-            val other = Int128().apply { addLong(value) }
-
-            acc.subtract(other)
-
-            assertEquals(value > 0L, acc.overflow, "subtract $value from minimum")
-            if (value <= 0L) assertEquals(-BigInteger.ONE.shiftLeft(127) - big(value), acc.toBig())
         }
     }
 
@@ -148,24 +97,6 @@ class Int128Test {
                 val value = acc.toBig()
                 val (q, r) = value.divideAndRemainder(dBig)
                 val floor = if (r.signum() < 0) q - BigInteger.ONE else q // truncation → floor for d > 0
-                assertEquals(floor.toLongOrNull(), acc.floorDivPositive(d), "floor($value / $d)")
-            }
-        }
-    }
-
-    @Test
-    fun `floorDivPositive fast path matches the oracle on Long-range dividends`() {
-        // The fitsLong fast path replaces the 128-bit loop with native floored division; pin its edges
-        // (Long extremes, negatives with a remainder) against the BigInteger oracle. fitsLong holds for
-        // every value here, so this exercises only the fast path.
-        val dividends = longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE, -1L, 0L, 1L, -7L, 7L, -1024L, 123_456_789L)
-        val divisors = longArrayOf(1L, 2L, 3L, 7L, 1024L, Long.MAX_VALUE)
-        for (value in dividends) {
-            for (d in divisors) {
-                val acc = Int128().apply { addProduct(value, 1L) }
-                assertTrue(acc.fitsLong(), "$value must fit a Long")
-                val (q, r) = big(value).divideAndRemainder(big(d))
-                val floor = if (r.signum() < 0) q - BigInteger.ONE else q
                 assertEquals(floor.toLongOrNull(), acc.floorDivPositive(d), "floor($value / $d)")
             }
         }

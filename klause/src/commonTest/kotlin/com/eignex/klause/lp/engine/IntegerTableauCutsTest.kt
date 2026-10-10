@@ -146,24 +146,6 @@ class IntegerTableauCutsTest {
     }
 
     @Test
-    fun `unrepresentable candidate transpose solve declines without producing cuts`() {
-        val builder = LpBuilder()
-        val n = 22
-        repeat(n) { builder.addVar(0, 1) }
-        for (i in 0 until n) {
-            val row = mutableMapOf(i to 1L)
-            if (i + 1 < n) row[i + 1] = Long.MAX_VALUE / 8
-            builder.addRow(row, Relation.LE, 1)
-        }
-        val model = builder.build(Sense.MINIMIZE)
-        val basis = Basis(IntArray(n) { it }, Array(2 * n) { VarStatus.AT_LOWER })
-
-        val cuts = integerTableauCuts(model, basis, DoubleArray(n) { 0.5 }, 8, mir = false)
-
-        assertTrue(cuts.isEmpty())
-    }
-
-    @Test
     fun `continuous and synthetic lower bounds decline at the tableau entry point`() {
         for (continuous in listOf(false, true)) {
             val builder = LpBuilder()

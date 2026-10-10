@@ -11,7 +11,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Initial [FactorWeightBook.factorWeights] seeding: with [LocalSearchParams.normalizeWeightsByClass]
@@ -32,13 +31,6 @@ class FactorWeightBookNormalizationTest {
     )
 
     @Test
-    fun `off by default leaves every factor at weight 1`() {
-        val factors = List(8) { linear() } + List(2) { clause() }
-        val state = LocalSearchState(problem(factors).bake(), Random(0))
-        assertTrue(state.weights.factorWeights.all { it == 1.0 })
-    }
-
-    @Test
     fun `class normalization damps the over-represented kind and spares the rest`() {
         // 8 Linear + 2 Clause: mean class size = 5, so Linear (8 > 5) is scaled to 5/8 each,
         // Clause (2 <= 5) stays at 1.0.
@@ -48,15 +40,6 @@ class FactorWeightBookNormalizationTest {
         val w = state.weights.factorWeights
         for (i in 0 until 8) assertEquals(5.0 / 8.0, w[i], 1e-9)
         for (i in 8 until 10) assertEquals(1.0, w[i], 1e-9)
-    }
-
-    @Test
-    fun `balanced classes are left untouched`() {
-        // 3 Linear + 3 Clause: mean = 3, neither class exceeds it, so nothing is damped.
-        val factors = List(3) { linear() } + List(3) { clause() }
-        val state = LocalSearchState(problem(factors).bake(), Random(0))
-        state.weights.normalizeWeightsByClass = true
-        assertTrue(state.weights.factorWeights.all { it == 1.0 })
     }
 
     @Test

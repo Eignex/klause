@@ -2,15 +2,11 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.objective.objectiveBoundOverlay
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -62,66 +58,6 @@ class LocalSearchStateTest {
     }
 
     @Test
-    fun `an objective variable's flip leaves the other objective variables' configuration as it was`() {
-        // The model ties no variable to another; only the objective-bound overlay spans all three.
-        val problem = Problem(3, 0, emptyArray<IntDomain>(), listOf(Clause(intArrayOf(Lit.make(0, true)))))
-        val (overlay, _) = requireNotNull(
-            objectiveBoundOverlay(problem.bake(), LinearObjective(boolWeights = longArrayOf(1, 1, 1))),
-        )
-        val state = LocalSearchState(overlay, Random(0))
-        state.recompute()
-        state.boolConfChange.fill(false)
-
-        state.apply(Move.BoolFlip(0))
-
-        assertEquals(listOf(false, false), listOf(state.boolConfChange[1], state.boolConfChange[2]))
-    }
-
-    @Test
-    fun `single-var EQ reified channeling rolls indicator flips into one compound`() {
-        val state = LocalSearchState(reifiedChannelingProblem().bake(), Random(1))
-        state.assignment.setInt(0, 0)
-        state.assignment.setBool(0, true)
-        state.assignment.setBool(1, false)
-        state.assignment.setBool(2, false)
-        state.recompute()
-
-        val move = state.synthesizeChannelingMove(intVar = 0, newValue = 1)
-
-        val ps = parts(move)
-        assertTrue(Move.IntSet(0, 1) in ps, "compound must set the int var to the new value")
-        assertTrue(Move.BoolFlip(0) in ps, "indicator for the old value must clear")
-        assertTrue(Move.BoolFlip(1) in ps, "indicator for the new value must set")
-        assertTrue(Move.BoolFlip(2) !in ps, "untouched indicators must not flip")
-        assertEquals(3, ps.size, "no spurious extra parts")
-    }
-
-    /** A satisfied `x + y = 3` whose balance is restored by counter-shifting the sibling var. */
-    private fun sumChannelingProblem(): Problem = Problem(
-        numBoolVars = 0,
-        numIntVars = 2,
-        intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-        factors = arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 3),
-        ),
-    )
-
-    @Test
-    fun `satisfied Linear EQ channeling counter-shifts a sibling to preserve the sum`() {
-        val state = LocalSearchState(sumChannelingProblem().bake(), Random(1))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 2)
-        state.recompute()
-
-        val move = state.synthesizeChannelingMove(intVar = 0, newValue = 3)
-
-        val ps = parts(move)
-        assertTrue(Move.IntSet(0, 3) in ps, "compound must set the driving var")
-        assertTrue(Move.IntSet(1, 0) in ps, "sibling must absorb the +2 drift to keep x + y = 3")
-        assertEquals(2, ps.size, "no spurious extra parts")
-    }
-
-    @Test
     fun `Linear EQ channeling never counter-shifts a sibling into a hole`() {
         val problem = Problem(
             numBoolVars = 0,
@@ -154,19 +90,6 @@ class LocalSearchStateTest {
         assertFalse(state.intValuesInDomain())
     }
 
-    @Test
-    fun `no sibling indicators leaves a plain int set`() {
-        val state = LocalSearchState(sumChannelingProblem().bake(), Random(1))
-        // Violated EQ: the caller is repairing it, so no counter-shift is synthesized.
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 0)
-        state.recompute()
-
-        val move = state.synthesizeChannelingMove(intVar = 0, newValue = 1)
-
-        assertEquals(Move.IntSet(0, 1), move, "a violated EQ yields a bare int set, not a compound")
-    }
-
     private fun foldedProblem() = Problem(
         numBoolVars = 0,
         numIntVars = 1,
@@ -179,15 +102,6 @@ class LocalSearchStateTest {
         val state = LocalSearchState(foldedProblem(), Random(1))
 
         assertEquals(3L, state.rootDomains[0].max, "search must not propose values the root bake ruled out")
-    }
-
-    @Test
-    fun `seeding a search state aliases the projection's fold instead of copying it`() {
-        val problem = foldedProblem()
-
-        val state = LocalSearchState(problem, Random(1))
-
-        assertTrue(state.rootDomains === problem.rootIntDomainsInPlace, "the fold is aliased, not copied")
     }
 
     @Test

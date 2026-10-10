@@ -17,6 +17,28 @@ import kotlin.test.assertTrue
 class SolverInvocationTest {
 
     @Test
+    fun `objective precision survives parsing and cache round trips for each protocol`() {
+        val objectives = listOf("9223372036854775808", "9007199254740993", "1/3", "-1/3", "1e400")
+        for (dialect in SolverInvocation.Dialect.entries) {
+            for (objective in objectives) {
+                val lines = when (dialect) {
+                    SolverInvocation.Dialect.MINIZINC -> "_objective = $objective;\n----------\n=========="
+                    SolverInvocation.Dialect.PB_COMPETITION -> "o $objective\ns OPTIMUM FOUND"
+                    SolverInvocation.Dialect.SMT_LIB -> "; objective=$objective\nsat\n; optimizationStatus=optimal"
+                }
+                val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"), dialect)
+                val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(
+                    Reports.json.encodeToString(result),
+                )
+
+                assertEquals(ExactObjective.parse(objective).toString(), decoded.exactObjective)
+                assertEquals(true, decoded.feasible)
+                assertTrue(decoded.proven)
+            }
+        }
+    }
+
+    @Test
     fun `attribution arrival is measured on the subprocess clock`() {
         val r = SolverInvocation.invoke(
             listOf("sh", "-c", "echo '%%%klause-arm: label=bt objective=7 time=123456'; echo '----------'"),

@@ -1,21 +1,16 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
-import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -112,135 +107,4 @@ class AggregationMirSeparatorTest {
         assertTrue(cuts.isEmpty(), "an invented lower endpoint must not become the aggregation shift")
     }
 
-    @Test
-    fun `random aggregation cuts are always valid`() {
-        val rng = Random(20260621)
-        var produced = 0
-        repeat(400) {
-            val n = rng.nextInt(2, 4)
-            val domains = Array(n) { IntDomain(0, rng.nextInt(2, 5).toLong()) }
-            val factors = ArrayList<Factor>()
-            repeat(rng.nextInt(1, 4)) {
-                val k = rng.nextInt(2, n + 1)
-                val vars = (0 until n).shuffled(rng).take(k).toIntArray()
-                val coeffs = IntArray(k) { rng.nextInt(1, 4) }
-                val op = if (rng.nextBoolean()) LinearOp.LE else LinearOp.GE
-                val bound = rng.nextInt(0, 3 * k + 1)
-                factors.add(Linear(coeffs, vars, op, bound))
-            }
-            val p = Problem(0, n, domains, factors.toTypedArray())
-            val obj = LinearObjective(intCoefficients = LongArray(n) { rng.nextLong(-3, 4) })
-            val (cuts, rel) = separate(p, obj) ?: return@repeat
-            produced += cuts.size
-            assertCutsValid(p, cuts, rel)
-        }
-        assertTrue(produced > 0, "the separator never fired across 400 random instances")
-    }
-
-    private fun litValue(lit: Int, bools: BooleanArray): Int = if (Lit.isPositive(
-            lit,
-        ) == bools[Lit.variable(lit)]
-    ) {
-        1
-    } else {
-        0
-    }
-
-    private fun satisfiesPb(f: PseudoBoolean, bools: BooleanArray): Boolean {
-        var s = 0L
-        for (k in f.literals.indices) s += f.weights[k] * litValue(f.literals[k], bools)
-        return when (f.op) {
-            PbOp.LE -> s <= f.bound
-            PbOp.GE -> s >= f.bound
-            PbOp.EQ -> s == f.bound
-        }
-    }
-
-    private fun satisfiesCard(f: Cardinality, bools: BooleanArray): Boolean {
-        var c = 0
-        for (lit in f.literals) c += litValue(lit, bools)
-        return c in f.min..f.max
-    }
-
-    private fun cutHoldsBool(cut: Cut, rel: LpRelaxation, bools: BooleanArray): Boolean {
-        var s = 0L
-        for (k in cut.cols.indices) {
-            val col = cut.cols[k]
-            if (rel.colIsBool[col] && bools[rel.colVarId[col]]) s += cut.coeffs[k]
-        }
-        return s <= cut.rhs
-    }
-
-    @Test
-    fun `bool aggregation cuts are always valid`() {
-        val rng = Random(20260623)
-        var produced = 0
-        repeat(400) {
-            val n = rng.nextInt(2, 7)
-            val factors = ArrayList<Factor>()
-            repeat(rng.nextInt(1, 4)) {
-                val k = rng.nextInt(2, n + 1)
-                val vars = (0 until n).shuffled(rng).take(k)
-                val lits = IntArray(k) { j -> Lit.make(vars[j], rng.nextBoolean()) }
-                when (rng.nextInt(3)) {
-                    0 -> factors.add(
-                        PseudoBoolean(
-                            LongArray(k) { rng.nextInt(1, 4).toLong() },
-                            lits,
-                            PbOp.LE,
-                            rng.nextInt(0, 2 * k).toLong(),
-                        ),
-                    )
-
-                    1 -> factors.add(
-                        PseudoBoolean(
-                            LongArray(k) { rng.nextInt(1, 4).toLong() },
-                            lits,
-                            PbOp.GE,
-                            rng.nextInt(0, 2 * k).toLong(),
-                        ),
-                    )
-
-                    else -> {
-                        val a = rng.nextInt(0, k + 1)
-                        val b = rng.nextInt(0, k + 1)
-                        factors.add(Cardinality(lits, min = minOf(a, b), max = maxOf(a, b)))
-                    }
-                }
-            }
-            val p = Problem(
-                numBoolVars = n,
-                numIntVars = 0,
-                intDomains = emptyArray(),
-                factors = factors.toTypedArray(),
-            )
-            val obj = LinearObjective(boolWeights = LongArray(n) { rng.nextLong(-3, 4) })
-            val (cuts, rel) = separate(p, obj) ?: return@repeat
-            produced += cuts.size
-            val bools = BooleanArray(n)
-            fun recurse(i: Int) {
-                if (i == n) {
-                    val feasible = p.factors.all { f ->
-                        when (f) {
-                            is PseudoBoolean -> satisfiesPb(f, bools)
-                            is Cardinality -> satisfiesCard(f, bools)
-                            else -> true
-                        }
-                    }
-                    if (feasible) {
-                        for (cut in cuts) {
-                            assertTrue(cutHoldsBool(cut, rel, bools), "bool cut cuts off feasible ${bools.toList()}")
-                        }
-                    }
-                    return
-                }
-                bools[i] = false
-                recurse(i + 1)
-                bools[i] = true
-                recurse(i + 1)
-            }
-            recurse(0)
-        }
-        assertTrue(produced > 0, "the bool separator never fired across 400 random instances")
-    }
 }

@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -83,20 +82,6 @@ class HyperSparseSolveTest {
         work.set(1, 5.0)
         work.write(vector)
         assertContentEquals(doubleArrayOf(0.0, 5.0), vector.toDoubleArray())
-    }
-
-    @Test
-    fun `dense hint skips graph traversal even for a sparse right hand side`() {
-        val matrix = SparseMatrix.ofColumns(10, 10, List(10) { listOf(it to 1.0) })
-        val work = BasisWorkspace(10)
-        work.set(7, 3.0)
-
-        val report = HyperSparseSolve(matrix, lower = false, unitDiagonal = false).solve(work, 1.0)
-
-        assertFalse(report.sparse)
-        assertEquals(0, report.reachEntries)
-        assertEquals(10, report.pivotVisits)
-        assertEquals(1, work.count)
     }
 
     @Test

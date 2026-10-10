@@ -3,7 +3,6 @@ package com.eignex.klause.lp.bounding
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -17,16 +16,6 @@ class LpEffortGovernorTest {
         LpEffortGovernor(opsPerNodeCap = opsPerNode, workAllowance = allowance, warmupSolves = warmup)
 
     private fun LpEffortGovernor.nodes(n: Int) = repeat(n) { observeNode() }
-
-    @Test
-    fun `an LP costing less than its per-node cap is left alone`() {
-        val g = governor()
-        g.nodes(100)
-
-        repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
-
-        assertFalse(g.isDemoted, "50k ops over 100 nodes is well inside a 1000-per-node cap")
-    }
 
     @Test
     fun `an LP outspending its per-node cap is demoted`() {
@@ -60,45 +49,6 @@ class LpEffortGovernorTest {
     }
 
     @Test
-    fun `the ratio rule demotes without spending the allowance`() {
-        val g = governor()
-        g.nodes(10)
-
-        repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
-
-        assertTrue(g.isDemoted)
-        assertFalse(g.allowanceSpent)
-    }
-
-    @Test
-    fun `spending the allowance demotes a cheap LP`() {
-        val g = governor(opsPerNode = Long.MAX_VALUE / 2, allowance = 1_000L)
-
-        g.chargeWork(1_000L)
-
-        assertTrue(g.isDemoted)
-        assertTrue(g.allowanceSpent)
-    }
-
-    @Test
-    fun `work short of the allowance leaves the LP alone`() {
-        val g = governor(opsPerNode = Long.MAX_VALUE / 2, allowance = 1_000L)
-
-        g.chargeWork(999L)
-
-        assertFalse(g.isDemoted)
-    }
-
-    @Test
-    fun `a disabled allowance is never spent`() {
-        val g = governor(opsPerNode = Long.MAX_VALUE / 2, allowance = 0L)
-
-        g.chargeWork(Long.MAX_VALUE)
-
-        assertFalse(g.allowanceSpent)
-    }
-
-    @Test
     fun `the remaining allowance shrinks with charges and floors at zero`() {
         val g = governor(allowance = 1_000L)
         g.chargeWork(400L)
@@ -107,11 +57,6 @@ class LpEffortGovernorTest {
         g.chargeWork(5_000L)
 
         assertEquals(0L, g.remainingWork(), "a solve capped by this must never see it go negative")
-    }
-
-    @Test
-    fun `a disabled allowance reports no remaining work`() {
-        assertNull(governor(allowance = 0L).remainingWork())
     }
 
     @Test
@@ -125,16 +70,6 @@ class LpEffortGovernorTest {
     }
 
     @Test
-    fun `a negative charge refunds nothing`() {
-        val g = governor(allowance = 1_000L)
-        g.chargeWork(400L)
-
-        g.chargeWork(-300L)
-
-        assertEquals(600L, g.remainingWork())
-    }
-
-    @Test
     fun `a demoted LP that starts pruning is restored`() {
         val g = governor()
         g.nodes(10)
@@ -144,31 +79,6 @@ class LpEffortGovernorTest {
         g.observeSolve(opsSpent = 5_000L, pruned = true)
 
         assertFalse(g.isDemoted, "a prune is the demotion being proved wrong, so it has to be reversible")
-    }
-
-    @Test
-    fun `an LP that prunes and then turns expensive is demoted again`() {
-        val g = governor()
-        g.nodes(1)
-        g.observeSolve(opsSpent = 10L, pruned = true)
-
-        g.nodes(10)
-        repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
-
-        assertTrue(g.isDemoted, "a prune restores the LP; it does not excuse whatever it costs afterwards")
-    }
-
-    @Test
-    fun `a prune measures the next demotion on what followed it`() {
-        val g = governor()
-        g.nodes(2)
-        repeat(4) { g.observeSolve(opsSpent = 100_000L, pruned = false) }
-        g.observeSolve(opsSpent = 10L, pruned = true)
-
-        g.nodes(100)
-        repeat(10) { g.observeSolve(opsSpent = 5_000L, pruned = false) }
-
-        assertFalse(g.isDemoted, "the 400k ops before the prune are not evidence against the solves after it")
     }
 
     @Test

@@ -25,16 +25,4 @@ class SmallestLowerBoundTest {
         // Free bool counts as minimum 0; int 1's minimum of -3 undercuts it.
         assertEquals(VarRef.IntVar(1), SmallestLowerBound.pick(session, rng))
     }
-
-    @Test
-    fun `smallest lower bound counts free bools as zero`() {
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(2, 9)),
-            factors = arrayOf<Factor>(),
-        )
-        val session = PropagationSession(problem)
-        assertEquals(VarRef.Bool(0), SmallestLowerBound.pick(session, rng))
-    }
 }

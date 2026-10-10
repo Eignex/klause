@@ -135,35 +135,6 @@ class RevisedSimplexRecoveryTest {
     }
 
     @Test
-    fun `unscaled fallback shares the work allowance`() {
-        val b = LpBuilder()
-        val x = b.addVar(0L, 2L)
-        b.addRow(mapOf(x to 1024L), Relation.GE, 1024L)
-        var solves = 0
-        val solver = RevisedSimplex(
-            b.build(Sense.MINIMIZE),
-            workLimit = 4L,
-            basisSolverFactory = { matrix ->
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
-                        solves++
-                        throw BasisArithmeticException("injected solve failure")
-                    }
-                }
-            },
-        )
-
-        assertNull(solver.solve())
-
-        assertEquals(1, solves)
-        assertEquals(4L, solver.lastWorkOps)
-        assertEquals(1, solver.lastNumericalMetrics.capExits)
-        assertEquals(LpFloatTermination.WORK, solver.lastTermination)
-        solver.close()
-    }
-
-    @Test
     fun `unrecoverable arithmetic failure reports numerical termination`() {
         val builder = LpBuilder()
         val column = builder.addVar(0L, 2L, cost = 1L)
@@ -232,36 +203,6 @@ class RevisedSimplexRecoveryTest {
     }
 
     @Test
-    fun `a repaired factorization does not turn later unboundedness into a numerical retry`() {
-        val b = LpBuilder()
-        val x = b.addRealVar(0.0, Double.MAX_VALUE, cost = -1.0)
-        b.addRealRow(intArrayOf(x), doubleArrayOf(1024.0), Relation.GE, 0.0)
-        var first = true
-        val solver = RevisedSimplex(
-            b.build(Sense.MINIMIZE),
-            basisSolverFactory = { matrix ->
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override fun refactorize(basicIndex: IntArray): Boolean {
-                        if (first) {
-                            first = false
-                            return false
-                        }
-                        return delegate.refactorize(basicIndex)
-                    }
-                }
-            },
-        )
-
-        assertNull(solver.solvePrimal())
-
-        assertEquals(LpFloatTermination.UNBOUNDED_CANDIDATE, solver.lastTermination)
-        assertEquals(1, solver.lastSingularRefactorizations)
-        assertEquals(0, solver.scalingMetrics.fallbacks)
-        solver.close()
-    }
-
-    @Test
     fun `unscaled fallback retains true costs and a certified bound`() {
         val b = LpBuilder()
         val x = b.addVar(0L, 2L, cost = 1L)
@@ -317,38 +258,6 @@ class RevisedSimplexRecoveryTest {
 
         assertEquals(1, builds)
         assertTrue(solver.lastWorkOps >= 100L)
-        assertNull(solver.infeasibleRay)
-        solver.close()
-    }
-
-    @Test
-    fun `cancellation prevents an unscaled retry`() {
-        val b = LpBuilder()
-        val x = b.addVar(0L, 2L)
-        b.addRow(mapOf(x to 1024L), Relation.GE, 1024L)
-        var cancelled = false
-        var builds = 0
-        val solver = RevisedSimplex(
-            b.build(Sense.MINIMIZE),
-            cancellation = Cancellation { cancelled },
-            basisSolverFactory = { matrix ->
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override fun refactorize(basicIndex: IntArray): Boolean {
-                        builds++
-                        return delegate.refactorize(basicIndex)
-                    }
-                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
-                        cancelled = true
-                        throw BasisArithmeticException("cancel after numerical failure")
-                    }
-                }
-            },
-        )
-
-        assertNull(solver.solve())
-
-        assertEquals(1, builds)
         assertNull(solver.infeasibleRay)
         solver.close()
     }

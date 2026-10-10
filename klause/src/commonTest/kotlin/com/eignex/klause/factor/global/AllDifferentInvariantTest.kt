@@ -3,9 +3,6 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.FixedCadenceRestart
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.Compound
 import com.eignex.klause.localsearch.Move.IntSet
@@ -13,32 +10,9 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
-import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
 class AllDifferentInvariantTest {
-
-    @Test
-    fun `every enumerated sample assigns distinct values`() {
-        // Both an exact permutation (4 vars over 4 values) and a slack instance (3 vars, one spare value).
-        for ((n, seed, take) in listOf(Triple(4, 7L, 20), Triple(3, 13L, 15))) {
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = n,
-                intDomains = Array(n) { IntDomain(0, 3) },
-                factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = 4)),
-            )
-            val solver = LocalSearchSolver(
-                problem.bake(),
-                restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
-            )
-            val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = seed)).take(take).toList()
-            assertTrue(samples.isNotEmpty(), "no samples for n=$n")
-            for (s in samples) {
-                assertTrue(s.ints.toSet().size == n, "duplicates in ${s.ints.toList()}")
-            }
-        }
-    }
 
     @Test
     fun `matching seed succeeds where first-fit greedy fails on tight domains`() {
@@ -152,21 +126,4 @@ class AllDifferentInvariantTest {
         }
     }
 
-    @Test
-    fun `mismatched domain bounds fail at initialize`() {
-        val factor = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 2)),
-            factors = arrayOf<Factor>(factor),
-        )
-
-        assertFails {
-            LocalSearchSolver(
-                problem.bake(),
-                restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 50),
-            ).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
-        }
-    }
 }

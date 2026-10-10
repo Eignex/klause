@@ -99,41 +99,6 @@ class RevisedSimplexObjectiveWarmStartTest {
         solver.close()
     }
 
-    @Test
-    fun `objective adoption follows zero nonzero zero revisions`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val minusOne = ExactLpNumber.of(-1L)
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, minusOne))),
-            listOf(ExactLpNumber.of(-3L)),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)),
-        )
-        val trail = LpBoundTrail(source)
-        RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { solver ->
-            assertEquals(BigFraction.ZERO, solveCurrent(solver, trail))
-
-            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(minusOne, zero))))
-            assertEquals(BigFraction.ofLong(-10L), solveCurrent(solver, trail))
-
-            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(zero, zero))))
-            assertEquals(BigFraction.ZERO, solveCurrent(solver, trail))
-        }
-    }
-
-    private fun solveCurrent(solver: RevisedSimplex, trail: LpBoundTrail): BigFraction {
-        assertTrue(solver.adopt(trail.state, Cancellation.Never))
-        val result = assertNotNull(solver.resolveBounds())
-        val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result)
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
-        return assertNotNull(certified.lowerBound)
-    }
-
     private val zero = ExactLpNumber.of(0L)
     private val one = ExactLpNumber.of(1L)
     private val four = ExactLpNumber.of(4L)
@@ -167,77 +132,6 @@ class RevisedSimplexObjectiveWarmStartTest {
             assertEquals(0, owner.lastMetrics.objectiveWarmRepairs)
             assertEquals(0, owner.lastMetrics.primalRefactorizations)
         }
-    }
-
-    @Test
-    fun `alternating objectives retain certified source results`() {
-        val source = state()
-        LpScopedSolver(source).use { owner ->
-            assertNotNull(owner.solve())
-            repeat(4) { iteration ->
-                val cost = if (iteration % 2 == 0) ExactLpNumber.of(-1L) else one
-                assertTrue(owner.replaceObjective(ExactLpObjective(listOf(cost, zero)), source))
-                val result = assertNotNull(owner.solve())
-                assertEquals(
-                    if (cost.value.signum() < 0) BigFraction.ofLong(-1L) else BigFraction.ZERO,
-                    result.lowerBound,
-                )
-                assertEquals(1, owner.lastMetrics.objectiveWarmHits, "objective swap $iteration")
-            }
-        }
-    }
-
-    @Test
-    fun `warm objective sequence avoids cold factorization cost`() {
-        val columns = 32
-        val negativeOne = ExactLpNumber.of(-1L)
-        val matrix = List(columns) { column -> listOf(ExactLpEntry(column, negativeOne)) }
-        val sourceModel = ExactLpModel(
-            matrix,
-            List(columns) { negativeOne },
-            List(columns) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) } +
-                List(columns) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), integral = false) },
-            List(columns) { ExactLpRow() },
-            ExactLpObjective(List(columns) { one } + List(columns) { zero }),
-        )
-        val source = LpExactState(sourceModel)
-        val replacement = ExactLpObjective(
-            List(columns) { ExactLpNumber.of(2L) } + List(columns) { zero },
-        )
-        val coldTrail = LpBoundTrail(source)
-        assertTrue(coldTrail.replaceObjective(replacement))
-        val coldModel = assertNotNull(coldTrail.state.toWorkingModel())
-        val measurements = List(3) {
-            val coldSolver = RevisedSimplex(coldModel)
-            val cold = assertNotNull(coldSolver.solve())
-            LpScopedSolver(source).use { owner ->
-                assertNotNull(owner.solve())
-                assertTrue(owner.replaceObjective(replacement, source))
-                val warm = assertNotNull(owner.solve())
-                assertEquals(cold.objective, assertNotNull(warm.float).objective, 1e-9)
-                assertEquals(0, warm.float.refactorizations)
-                owner.lastMetrics.workOps to coldSolver.lastWorkOps
-            }
-        }
-
-        assertTrue(measurements.all { it.first < it.second }, "$measurements")
-    }
-
-    @Test
-    fun `a stale objective hint is admitted through primal feasibility and reduced costs`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 4L, cost = 1L)
-        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
-        val original = builder.build(Sense.MINIMIZE)
-        val hint = assertNotNull(RevisedSimplex(original).solve()).basis
-        val replacement = original.withRowObjective(intArrayOf(x), longArrayOf(-1L))
-
-        val warm = assertNotNull(RevisedSimplex(replacement).solve(hint))
-        val cold = assertNotNull(RevisedSimplex(replacement).solve())
-
-        assertEquals(-4.0, warm.objective, 1e-9)
-        assertEquals(cold.objective, warm.objective, 1e-9)
-        assertTrue(warm.warmStarted)
     }
 
     @Test

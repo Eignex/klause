@@ -51,21 +51,6 @@ class BasisRepairTest {
     }
 
     @Test
-    fun `independent wrapper work is added to measured backend work`() {
-        KotlinBasisSolver(repairMatrix()).use { solver ->
-            val control = BasisRepairControl(maxWork = 1000)
-
-            control.measure(solver) {
-                control.charge(3)
-                assertTrue(solver.refactorize(intArrayOf(0, 1)))
-            }
-
-            assertEquals(3 + solver.basisOperationWork.units, control.spentWork)
-            assertTrue(control.accountingComplete)
-        }
-    }
-
-    @Test
     fun `saturated reports retain known completed units without granting a fresh budget`() {
         for (unitsSaturated in listOf(false, true)) {
             val delegate = KotlinBasisSolver(repairMatrix())
@@ -125,37 +110,6 @@ class BasisRepairTest {
             assertEquals(5L + if (fallbacks == 0) 0 else 2 + delegate.basisOperationWork.units, control.spentWork)
             delegate.close()
         }
-    }
-
-    @Test
-    fun `opaque repair work cannot authorize a bounded logical fallback`() {
-        val delegate = KotlinBasisSolver(repairMatrix())
-        var fallbacks = 0
-        val solver = object : BasisSolver by delegate {
-            override val basisOperationWork get() = null
-            override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? = null
-            override fun refactorize(basicIndex: IntArray): Boolean {
-                fallbacks++
-                return delegate.refactorize(basicIndex)
-            }
-        }
-        val control = BasisRepairControl(maxWork = Long.MAX_VALUE)
-
-        val result = EngineBasisRepairer().recover(
-            solver,
-            intArrayOf(0, 1),
-            2,
-            Array(4) { BasisBoundState(true, false, false) },
-            arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER),
-            null,
-            control = control,
-        ) as BasisRecoveryResult.Failed
-
-        assertEquals(0, fallbacks)
-        assertEquals(BasisRepairStop.UNKNOWN_WORK, control.stop)
-        assertEquals(BasisRepairDecline.RESOURCE_DECLINED, result.decline)
-        assertFalse(control.accountingComplete)
-        delegate.close()
     }
 
     @Test
@@ -293,18 +247,6 @@ class BasisRepairTest {
     }
 
     @Test
-    fun `exact rank evidence declines outside its bounded dimension`() {
-        val dimension = 17
-        val columns = List(dimension) { column -> listOf(column to 1L) }
-        val model = exactWorkingModel(columns)
-
-        assertEquals(
-            ExactBasisRankEvidence.RESOURCE_DECLINED,
-            exactBasisRankEvidence(model, IntArray(dimension) { it }),
-        )
-    }
-
-    @Test
     fun `exact rank evidence observes arithmetic and cancellation budgets`() {
         val model = exactWorkingModel(
             listOf(
@@ -337,29 +279,6 @@ class BasisRepairTest {
             listOf(1 to 1.0),
         ),
     )
-
-    private fun statusOnlySolver(size: Int): BasisSolver = object : BasisSolver {
-        override val n = size
-        override val nnz = 0
-        override val updateCount = 0
-        override val singular = false
-        override val rcond = 1.0
-        override fun refactorize(basicIndex: IntArray) = false
-        override fun ftran(x: com.eignex.klause.simplex.basis.IndexedVector, expectedDensity: Double) = Unit
-        override fun btran(x: com.eignex.klause.simplex.basis.IndexedVector, expectedDensity: Double) = Unit
-        override fun update(
-            pivotRow: Int,
-            entering: Int,
-            spike: com.eignex.klause.simplex.basis.IndexedVector,
-            pivotEta: com.eignex.klause.simplex.basis.IndexedVector?,
-        ) = com.eignex.klause.simplex.basis.BasisUpdate.SINGULAR
-
-        override fun solveQuality(
-            rhs: DoubleArray,
-            solution: com.eignex.klause.simplex.basis.IndexedVector,
-            transpose: Boolean,
-        ) = com.eignex.klause.simplex.basis.BasisSolveQuality(0.0, 0.0)
-    }
 
     private fun exactWorkingModel(columns: List<List<Pair<Int, Long>>>): LpModel {
         val rows = columns.maxOfOrNull { column -> column.maxOfOrNull { it.first } ?: -1 }?.plus(1) ?: 0

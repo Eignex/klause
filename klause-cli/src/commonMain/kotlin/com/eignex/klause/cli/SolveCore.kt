@@ -33,10 +33,7 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.toLongExact
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -910,13 +907,9 @@ private fun reportOpenTheoryOptimum(
 ) {
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
 
-    // An integral value is reported exactly, and as absent past 64 bits rather than as a wrapped number; a fractional
-    // one, from an objective over continuous columns, as the continuous objective.
     fun solution(rendered: String, value: BigFraction?) {
         val signed = if (maximize) value?.negated() else value
-        val integral = signed?.takeIf { it.den == BIG_ONE }?.num
-        val exact = integral?.takeIf { it >= LONG_MIN_BIG && it <= LONG_MAX_BIG }?.toLongExact()
-        output.onSolution(rendered, exact, if (signed != null && integral == null) signed.toDouble() else null)
+        if (signed == null) output.onSolution(rendered, null) else output.onExactSolution(rendered, signed)
     }
     output.onVerdictContext(
         VerdictContext(
@@ -959,6 +952,3 @@ private fun reportOpenTheoryOptimum(
         output.onStatistics(resultStats, resultStats.run.wallMs + routingElapsedMs, found)
     }
 }
-
-private val LONG_MIN_BIG = bigIntOf(Long.MIN_VALUE)
-private val LONG_MAX_BIG = bigIntOf(Long.MAX_VALUE)

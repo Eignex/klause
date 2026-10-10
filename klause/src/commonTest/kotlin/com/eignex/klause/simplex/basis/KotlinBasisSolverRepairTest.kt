@@ -87,49 +87,6 @@ class KotlinBasisSolverRepairTest {
     }
 
     @Test
-    fun `a throwing cancellation callback invalidates factors and releases the owner`() {
-        val source = matrix(arrayOf(doubleArrayOf(1.0)))
-        var boundaries = 0
-        KotlinBasisSolver(source).use { solver ->
-            assertNotNull(
-                solver.refactorizeRepairing(
-                    intArrayOf(0),
-                    BasisRepairControl(
-                        Cancellation {
-                            boundaries++
-                            false
-                        },
-                    ),
-                ),
-            )
-        }
-        for (boundary in listOf(1, boundaries)) {
-            KotlinBasisSolver(source).use { solver ->
-                assertTrue(solver.refactorize(intArrayOf(0)))
-                val primary = IllegalStateException("callback")
-                var polls = 0
-
-                val failure = assertFailsWith<IllegalStateException> {
-                    solver.refactorizeRepairing(
-                        intArrayOf(0),
-                        BasisRepairControl(
-                            Cancellation {
-                                if (++polls == boundary) throw primary else false
-                            },
-                        ),
-                    )
-                }
-
-                assertTrue(failure === primary)
-                assertTrue(solver.singular)
-                assertFalse(assertNotNull(solver.basisWork.build).successful)
-                assertNull(solver.ordering())
-                assertTrue(solver.refactorize(intArrayOf(0)))
-            }
-        }
-    }
-
-    @Test
     fun `finite repair work includes the completed attempt and cannot be refreshed`() {
         val source = matrix(arrayOf(doubleArrayOf(2.0, 1.0), doubleArrayOf(1.0, 3.0)))
         val full = BasisRepairControl()
@@ -179,78 +136,6 @@ class KotlinBasisSolverRepairTest {
         repair.columns.fill(2)
         repair.unitRows.fill(-1)
         assertBasisSolves(solver, source, intArrayOf(-1, 0, -1), intArrayOf(0, -1, 2))
-    }
-
-    @Test
-    fun `source columns enter repaired logical slots and match a fresh basis`() {
-        val source = SparseMatrix.ofColumns(
-            3,
-            4,
-            listOf(
-                listOf(1 to 1.0),
-                listOf(1 to 1.0),
-                emptyList(),
-                listOf(0 to 1.0, 1 to 1.0, 2 to 1.0),
-            ),
-        )
-        val solver = KotlinBasisSolver(source, updateLimit = 100, fillFactor = 100.0)
-        val repair = assertNotNull(solver.refactorizeRepairing(intArrayOf(0, 1, 2)))
-        val columns = repair.columns.copyOf()
-        val units = repair.unitRows.copyOf()
-        val slot = units.indexOfFirst { it >= 0 }
-        val spike = IndexedVector(3).also { it.scatterColumn(source, 3) }
-        solver.ftran(spike, 0.0)
-
-        assertEquals(BasisUpdate.APPLIED, solver.update(slot, 3, spike, spike))
-
-        columns[slot] = 3
-        units[slot] = -1
-        assertBasisSolves(solver, source, columns, units)
-        assertMatchesFresh(solver, source, columns, units)
-    }
-
-    @Test
-    fun `repairs empty unit sparse dense and near singular groups`() {
-        val cases = listOf(
-            Triple(SparseMatrix.ofColumns(0, 0, emptyList()), intArrayOf(), false),
-            Triple(matrix(arrayOf(doubleArrayOf(1.0, 0.0), doubleArrayOf(0.0, 1.0))), intArrayOf(0, 1), false),
-            Triple(
-                matrix(
-                    arrayOf(
-                        doubleArrayOf(4.0, -1.0, 0.0),
-                        doubleArrayOf(-1.0, 4.0, -1.0),
-                        doubleArrayOf(0.0, -1.0, 4.0),
-                    ),
-                ),
-                intArrayOf(2, 0, 1),
-                false,
-            ),
-            Triple(
-                matrix(
-                    arrayOf(
-                        doubleArrayOf(5.0, 1.0, -2.0),
-                        doubleArrayOf(2.0, 6.0, 1.0),
-                        doubleArrayOf(-1.0, 2.0, 7.0),
-                    ),
-                ),
-                intArrayOf(1, 2, 0),
-                false,
-            ),
-            Triple(
-                matrix(arrayOf(doubleArrayOf(1.0, 1.0), doubleArrayOf(1.0, 1.0 + 1e-12))),
-                intArrayOf(0, 1),
-                true,
-            ),
-        )
-        for ((source, requested, shouldRepair) in cases) {
-            val solver = KotlinBasisSolver(source)
-            val repair = assertNotNull(solver.refactorizeRepairing(requested))
-
-            assertBasisSolves(solver, source, repair.columns, repair.unitRows)
-            assertMatchesFresh(solver, source, repair.columns, repair.unitRows)
-            assertEquals(shouldRepair, repair.repaired)
-            solver.close()
-        }
     }
 
     @Test

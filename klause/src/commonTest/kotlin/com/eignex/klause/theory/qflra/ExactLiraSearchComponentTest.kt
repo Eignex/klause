@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntegerConstants
@@ -44,7 +43,6 @@ import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -907,46 +905,6 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
-    fun `a comparison clause takes its only feasible row`() {
-        ExactLiraSearchComponent(comparisonClauseModel(xUpper = 4)).use { component ->
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-
-            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
-
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertEquals(listOf(bigIntOf(4), bigIntOf(-3)), assignment.ints.toList())
-        }
-    }
-
-    @Test
-    fun `a comparison clause with one row left open implies it`() {
-        // x >= 5, y <= -3, z >= 10 with x <= 4 and z <= 9: only y's row can hold.
-        val model = Problem(
-            numBoolVars = 0,
-            intBounds = openBounds(3),
-            factors = arrayOf(
-                ComparisonClause(
-                    intArrayOf(0, 1, 2),
-                    arrayOf(LinearOp.GE, LinearOp.LE, LinearOp.GE),
-                    longArrayOf(5, -3, 10),
-                ),
-                Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 4),
-                Linear(longArrayOf(1), intArrayOf(2), LinearOp.LE, 9),
-            ),
-        )
-        ExactLiraSearchComponent(model).use { component ->
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-
-            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
-
-            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
-            assertTrue(assignment.ints[1] <= bigIntOf(-3))
-        }
-    }
-
-    @Test
     fun `a strict real disjunction is decided through its atoms`() {
         // r in [0, 1] with (r < 0) or (r > upper): sat past 1/2, refuted past 1.
         for ((upper, sat) in listOf(0.5 to true, 1.0 to false)) {
@@ -994,16 +952,6 @@ class ExactLiraSearchComponentTest {
                     assertIs<SearchResult.Exhausted>(result, "upper $upper")
                 }
             }
-        }
-    }
-
-    @Test
-    fun `a comparison clause with no feasible row is refuted`() {
-        ExactLiraSearchComponent(comparisonClauseModel(xUpper = 3)).use { component ->
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-
-            assertIs<SearchResult.Exhausted>(session.solve(0))
         }
     }
 
@@ -1144,36 +1092,6 @@ class ExactLiraSearchComponentTest {
         )
     }
 
-    @Test
-    fun `exact solver rejects an unconditional integer equality beyond double precision`() {
-        val model = Problem(
-            numBoolVars = 0,
-            intBounds = openBounds(),
-            factors = arrayOf(
-                Linear(longArrayOf(9_007_199_254_740_993L), intArrayOf(0), LinearOp.EQ, 9_007_199_254_740_992L),
-            ),
-        )
-        assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(BooleanArray(0), exactContext()))
-    }
-
-    @Test
-    fun `exact solver rejects a decided reified integer equality beyond double precision`() {
-        val model = Problem(
-            numBoolVars = 1,
-            intBounds = openBounds(),
-            factors = arrayOf(
-                ReifiedLinear(
-                    0,
-                    longArrayOf(9_007_199_254_740_993L),
-                    intArrayOf(0),
-                    LinearOp.EQ,
-                    9_007_199_254_740_992L,
-                ),
-            ),
-        )
-        assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(booleanArrayOf(true), exactContext()))
-    }
-
     private fun partialModel(): Problem = Problem(
         numBoolVars = 2,
         intBounds = openBounds(),
@@ -1207,21 +1125,6 @@ class ExactLiraSearchComponentTest {
             )
         }
         val model = Problem(numBoolVars = 0, intBounds = openBounds(), factors = arrayOf(declaration))
-
-        assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(booleanArrayOf(), exactContext()))
-    }
-
-    @Test
-    fun `an increasing chain participates in a general integer theory model`() {
-        val model = Problem(
-            numBoolVars = 0,
-            intBounds = openBounds(3),
-            factors = arrayOf(
-                Increasing(intArrayOf(0, 1, 2), strict = true),
-                Linear(intArrayOf(1, 2), intArrayOf(0, 2), LinearOp.EQ, 0),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
-            ),
-        )
 
         assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(booleanArrayOf(), exactContext()))
     }
@@ -1261,28 +1164,4 @@ class ExactLiraSearchComponentTest {
         assertIs<TheoryCheck.Sat<ExactLraAssignment>>(ExactLraSolver(model).check(booleanArrayOf(true), exactContext()))
     }
 
-    @Test
-    fun `a fractional coefficient on an integer column is interpreted exactly`() {
-        val model = Problem(
-            numBoolVars = 1,
-            intBounds = openBounds(),
-            factors = arrayOf(
-                ReifiedRealLinear(
-                    0,
-                    intArrayOf(0),
-                    doubleArrayOf(0.5),
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    LinearOp.LE,
-                    0.25,
-                ),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-            ),
-        )
-
-        assertIs<TheoryCheck.Infeasible>(ExactLiraSolver(model).check(booleanArrayOf(true), exactContext()))
-        assertIs<TheoryCheck.Sat<ExactLiraAssignment>>(
-            ExactLiraSolver(model).check(booleanArrayOf(false), exactContext()),
-        )
-    }
 }

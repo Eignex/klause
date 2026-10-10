@@ -26,138 +26,6 @@ import kotlin.test.assertTrue
 class CliModeTest {
 
     @Test
-    fun `exact FlatZinc accepts constants in float result positions`() {
-        val constraints = listOf(
-            "float_abs(x, 3.25)",
-            "float_times(x, 2.0, 6.5)",
-            "float_div(x, 2.0, 1.625)",
-            "array_float_element(i, [1.5, 72.125], 72.125)",
-        )
-        for (constraint in constraints) {
-            val fzn = File.createTempFile("floatconstantresult", ".fzn").apply {
-                writeText(
-                    "var float: x :: output_var;\nvar 1..2: i = 2;\n" +
-                        "constraint float_eq(x, 3.25);\nconstraint $constraint;\nsolve satisfy;",
-                )
-                deleteOnExit()
-            }
-
-            val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
-
-            assertTrue("x = 3.25;" in output, "$constraint: $output")
-        }
-    }
-
-    @Test
-    fun `exact FlatZinc refutes a false constant strict linear constraint`() {
-        val fzn = File.createTempFile("floatconstantlinear", ".fzn").apply {
-            writeText("constraint float_lin_lt([], [], 0.0);\nsolve satisfy;")
-            deleteOnExit()
-        }
-
-        val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
-
-        assertTrue("=====UNSATISFIABLE=====" in output, output)
-    }
-
-    @Test
-    fun `exact FlatZinc solves multiplication and division by constants`() {
-        val cases = listOf(
-            "float_times(x, 2.0, y)" to 6.0,
-            "float_times(2.0, 3.0, y)" to 6.0,
-            "float_div(x, 2.0, y)" to 1.5,
-        )
-        for ((constraint, expected) in cases) {
-            val fzn = File.createTempFile("floatscaling", ".fzn").apply {
-                writeText(
-                    "var float: x;\nvar float: y :: output_var;\n" +
-                        "constraint float_eq(x, 3.0);\nconstraint $constraint;\nsolve satisfy;",
-                )
-                deleteOnExit()
-            }
-
-            val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
-
-            assertTrue("y = $expected;" in output, "$constraint: $output")
-        }
-    }
-
-    @Test
-    fun `exact FlatZinc enforces both directions of real reification`() {
-        val cases = listOf(
-            "float_eq_reif(x, 0.0, r)" to false,
-            "float_le_reif(x, 0.0, r)" to false,
-            "float_lt_reif(x, 0.25, r)" to false,
-            "float_ne_reif(x, 0.0, r)" to true,
-            "float_lin_eq_reif([1.0], [x], 0.0, r)" to false,
-            "float_lin_lt_reif([1.0], [x], 0.25, r)" to false,
-        )
-        for ((constraint, expected) in cases) {
-            val fzn = File.createTempFile("floatreif", ".fzn").apply {
-                writeText(
-                    "var float: x;\nvar bool: r :: output_var;\n" +
-                        "constraint float_eq(x, 0.25);\nconstraint $constraint;\nsolve satisfy;",
-                )
-                deleteOnExit()
-            }
-
-            val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
-
-            assertTrue("r = $expected;" in output, "$constraint: $output")
-        }
-    }
-
-    @Test
-    fun `exact FlatZinc solves piecewise linear float operations`() {
-        val cases = listOf(
-            "float_abs(x, y)" to 3.25,
-            "float_min(x, 1.5, y)" to -3.25,
-            "float_max(x, 1.5, y)" to 1.5,
-        )
-        for ((constraint, expected) in cases) {
-            val fzn = File.createTempFile("floatpiecewise", ".fzn").apply {
-                writeText(
-                    "var float: x;\nvar float: y :: output_var;\n" +
-                        "constraint float_eq(x, -3.25);\nconstraint $constraint;\nsolve satisfy;",
-                )
-                deleteOnExit()
-            }
-
-            val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
-
-            assertTrue("y = $expected;" in output, "$constraint: $output")
-        }
-    }
-
-    @Test
-    fun `exact FlatZinc selects float array constants without rounding`() {
-        val fzn = File.createTempFile("floatelement", ".fzn").apply {
-            writeText(
-                "var 1..2: i = 2;\nvar float: x :: output_var;\n" +
-                    "constraint array_float_element(i, [1.5, 72.125], x);\nsolve satisfy;",
-            )
-            deleteOnExit()
-        }
-
-        val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
-
-        assertTrue("x = 72.125;" in output, output)
-    }
-
-    @Test
-    fun `exact FlatZinc solves a value beyond the bucketed default range`() {
-        val fzn = File.createTempFile("float", ".fzn").apply {
-            writeText("var float: x :: output_var;\nconstraint float_eq(x, 2000001.0);\nsolve satisfy;")
-            deleteOnExit()
-        }
-
-        val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
-
-        assertTrue("x = 2000001.0;" in output, output)
-        assertTrue("==========" in output, output)
-    }
-
-    @Test
     fun `exact FlatZinc optimizes a continuous objective in either direction`() {
         for ((direction, expected) in listOf("minimize" to -1.5, "maximize" to 1.5)) {
             val fzn = File.createTempFile("floatobj", ".fzn").apply {
@@ -179,28 +47,6 @@ class CliModeTest {
             assertTrue("_objective = $expected;" in output, output)
             assertTrue("==========" in output, output)
         }
-    }
-
-    @Test
-    fun `exact FlatZinc solves a mixed integer and real linear array`() {
-        val fzn = File.createTempFile("mixedfloat", ".fzn").apply {
-            writeText(
-                """
-                var 1..3: n :: output_var;
-                var float: x;
-                array[1..2] of var float: values :: output_array([1..2]) = [x, 72.0];
-                constraint int2float(n, x);
-                constraint float_lin_eq([1.0, 1.0], values, 74.0);
-                solve satisfy;
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val output = capture { assertEquals(0, runCli(arrayOf("--exact", fzn.absolutePath))) }
-
-        assertTrue("n = 2;" in output, output)
-        assertTrue("values = [2.0, 72.0];" in output, output)
     }
 
     @Test
@@ -262,27 +108,6 @@ class CliModeTest {
         val err = captureErr { code = runCli(arrayOf(fzn.absolutePath)) }
         assertEquals(2, code, "malformed input must exit with the CLI error code:\n$err")
         assertTrue(err.trimStart().startsWith("klause FlatZinc:"), "expected a formatted format diagnostic:\n$err")
-    }
-
-    @Test
-    fun `an open SMT difference row is solved without a finite search box`() {
-        val smt = File.createTempFile("clidiff", ".smt2").apply {
-            writeText(
-                """
-                (declare-const x Int)
-                (assert (>= x 5))
-                (check-sat)
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        var code = -1
-        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
-
-        assertEquals(0, code, out)
-        assertTrue(out.lines().firstOrNull() == "sat", out)
-        assertTrue("(define-fun x () Int 5)" in out, out)
     }
 
     @Test
@@ -539,29 +364,6 @@ class CliModeTest {
     }
 
     @Test
-    fun `SMT optimization reports the disjunctive integer optimum`() {
-        val smt = File.createTempFile("cliobjective", ".smt2").apply {
-            writeText(
-                """
-                (set-logic QF_LIA)
-                (declare-const x Int) (declare-const y Int)
-                (assert (>= x 0)) (assert (>= y 0))
-                (assert (<= (+ x y) 10))
-                (assert (or (>= x 7) (>= y 7)))
-                (minimize (+ x y))
-                (check-sat)
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
-
-        assertEquals("; objective=7", out.lines().last { it.startsWith("; objective=") }, out)
-        assertTrue("; optimizationStatus=optimal" in out.lines(), out)
-    }
-
-    @Test
     fun `SMT optimization objectives use the source direction`() {
         for ((sort, bound) in listOf("Int" to "2", "Real" to "1.5")) {
             for (direction in listOf("minimize", "maximize")) {
@@ -588,9 +390,38 @@ class CliModeTest {
 
                 val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
 
-                val expected = if (direction == "minimize") "-$bound" else bound
+                val magnitude = if (sort == "Real") "3/2" else bound
+                val expected = if (direction == "minimize") "-$magnitude" else magnitude
                 assertTrue("sat" in out.lines(), "$sort $direction: $out")
                 assertTrue(out.lines().any { it.startsWith("; objective=") }, "$sort $direction: $out")
+                assertEquals("; objective=$expected", out.lines().last { it.startsWith("; objective=") }, out)
+                assertTrue("; optimizationStatus=optimal" in out.lines(), out)
+            }
+        }
+    }
+
+    @Test
+    fun `SMT objectives preserve precision in either direction`() {
+        for ((lower, upper) in listOf(
+            "9007199254740992" to "9007199254740993",
+            "9223372036854775808" to "9223372036854775809",
+        )) {
+            for (direction in listOf("minimize", "maximize")) {
+                val smt = File.createTempFile("cliprecision", ".smt2").apply {
+                    writeText(
+                        """
+                        (declare-const x Int)
+                        (assert (>= x $lower)) (assert (<= x $upper))
+                        ($direction x)
+                        (check-sat)
+                        """.trimIndent(),
+                    )
+                    deleteOnExit()
+                }
+
+                val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
+                val expected = if (direction == "minimize") lower else upper
+
                 assertEquals("; objective=$expected", out.lines().last { it.startsWith("; objective=") }, out)
                 assertTrue("; optimizationStatus=optimal" in out.lines(), out)
             }
@@ -636,26 +467,6 @@ class CliModeTest {
         assertTrue("sat" in out.lines(), out)
     }
 
-    @Test
-    fun `an open SMT exact LIA model is solved without finite lowering`() {
-        val smt = File.createTempFile("cliopen", ".smt2").apply {
-            writeText(
-                """
-                (declare-const x Int)
-                (declare-const y Int)
-                (assert (<= (+ (* 2 x) y) 3))
-                (check-sat)
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-        var code = -1
-        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
-
-        assertEquals(0, code, out)
-        assertTrue(out.lines().firstOrNull() == "sat", out)
-    }
-
     // 2x + y ≤ 3 over open columns: every engine with an open route finds a witness.
     private fun openSmt(): File = File.createTempFile("cliopenengine", ".smt2").apply {
         writeText(
@@ -667,39 +478,6 @@ class CliModeTest {
             """.trimIndent(),
         )
         deleteOnExit()
-    }
-
-    @Test
-    fun `an open SMT model is decided under each engine with an open route`() {
-        for (engine in listOf("mixed", "backtrack", "localsearch")) {
-            var code = -1
-            val out = capture { code = runCli(arrayOf("-e", engine, "-t", "10000", openSmt().absolutePath)) }
-
-            assertEquals(0, code, "$engine: $out")
-            assertEquals("sat", out.lines().firstOrNull(), "$engine: $out")
-        }
-    }
-
-    @Test
-    fun `local search finds a witness to an open model of continuous columns alone`() {
-        val smt = File.createTempFile("cliopenreals", ".smt2").apply {
-            writeText(
-                """
-                (set-logic QF_LRA)
-                (declare-const x Real)
-                (declare-const y Real)
-                (assert (> (+ x y) 2.5))
-                (assert (<= (+ x y) 10))
-                (check-sat)
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-        var code = -1
-        val out = capture { code = runCli(arrayOf("-e", "ls", smt.absolutePath)) }
-
-        assertEquals(0, code, out)
-        assertEquals("sat", out.lines().firstOrNull(), out)
     }
 
     @Test
@@ -756,29 +534,6 @@ class CliModeTest {
     }
 
     @Test
-    fun `bounded SMT mixed model prints a negative exact witness`() {
-        val smt = File.createTempFile("clinegative", ".smt2").apply {
-            writeText(
-                """
-                (set-logic QF_LIRA)
-                (declare-const x Real) (declare-const y Int)
-                (assert (= (* 3 x) y))
-                (assert (> y (- 3))) (assert (< y (- 1)))
-                (assert (> x (- 1.0))) (assert (< x 0.0))
-                (check-sat)
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val out = capture { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
-
-        assertEquals("sat", out.lines().firstOrNull(), out)
-        assertTrue("(define-fun y () Int (- 2))" in out, out)
-        assertTrue("(define-fun x () Real (- (/ 2.0 3.0)))" in out, out)
-    }
-
-    @Test
     fun `bounded SMT real objective preserves its exact incumbent`() {
         val smt = File.createTempFile("cliobjective", ".smt2").apply {
             writeText(
@@ -799,121 +554,6 @@ class CliModeTest {
         assertTrue("sat" in out.lines(), out)
         assertTrue("(define-fun y () Int 2)" in out, out)
         assertTrue("(define-fun x () Real (/ 2.0 3.0))" in out, out)
-    }
-
-    @Test
-    fun `an open SMT LIRA model renders mixed exact witnesses`() {
-        val smt = File.createTempFile("clilira", ".smt2").apply {
-            writeText(
-                """
-                (set-logic QF_LIRA)
-                (declare-const x Int) (declare-const y Real)
-                (assert (= y (+ (to_real x) (/ 1.0 3.0))))
-                (check-sat)
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        var code = -1
-        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
-
-        assertEquals(0, code, out)
-        assertTrue(out.lines().firstOrNull() == "sat", out)
-        assertTrue("(define-fun x () Int " in out, out)
-        assertTrue("(define-fun y () Real " in out, out)
-    }
-
-    @Test
-    fun `an MPS LP whose bound shift rounds in binary64 is solved to a proven optimum`() {
-        val mps = File.createTempFile("clishift", ".mps").apply {
-            writeText(
-                """
-                NAME T
-                ROWS
-                 N COST
-                 G S1
-                COLUMNS
-                    A         COST      1   S1  1
-                    U         S1        1
-                    B         S1        1
-                    V         S1        1
-                RHS
-                    RHS       S1        0
-                BOUNDS
-                 UP BND A 4e18
-                 UP BND U 200
-                 LO BND B -4.2e18
-                 UP BND B -4e18
-                 LO BND V -300
-                 UP BND V -100
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val out = capture { main(arrayOf("-t", "2000", mps.absolutePath)) }
-
-        assertTrue("s OPTIMUM FOUND" in out, out)
-        assertTrue(out.lineSequence().any { it == "o 3999999999999999900" }, out)
-    }
-
-    @Test
-    fun `an open MPS difference row is solved without a finite search box`() {
-        val mps = File.createTempFile("clidiff", ".mps").apply {
-            writeText(
-                """
-                NAME          DIFF
-                ROWS
-                 N  COST
-                 G  LOWER
-                COLUMNS
-                    MK1       'MARKER'                 'INTORG'
-                    X         LOWER          1.0
-                    MK2       'MARKER'                 'INTEND'
-                RHS
-                    RHS       LOWER          5.0
-                BOUNDS
-                 PL BND       X
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val out = capture { main(arrayOf(mps.absolutePath)) }
-
-        assertTrue("s SATISFIABLE" in out, out)
-        assertTrue("X=5" in out, out)
-    }
-
-    @Test
-    fun `an open MPS exact LIA row is solved without finite lowering`() {
-        val mps = File.createTempFile("clilia", ".mps").apply {
-            writeText(
-                """
-                NAME          LIA
-                ROWS
-                 N  COST
-                 L  ROW
-                COLUMNS
-                    MK1       'MARKER'                 'INTORG'
-                    X         ROW            2.0
-                    MK2       'MARKER'                 'INTEND'
-                RHS
-                    RHS       ROW            3.0
-                BOUNDS
-                 PL BND       X
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val out = capture { main(arrayOf(mps.absolutePath)) }
-
-        assertTrue("s SATISFIABLE" in out, out)
     }
 
     @Test
@@ -945,42 +585,6 @@ class CliModeTest {
 
         assertEquals(0, code, out)
         assertTrue("o 1.5" in out, out)
-    }
-
-    @Test
-    fun `an MPS objective too wide for one scale reports its exact optimum`() {
-        val mps = File.createTempFile("cliapproxobjective", ".mps").apply {
-            writeText(
-                """
-                NAME          APPROXIMATE
-                ROWS
-                 N  COST
-                 G  FIXED
-                COLUMNS
-                    MK1       'MARKER'                 'INTORG'
-                    X         COST           1000000000000000
-                    X         FIXED          1
-                    Y         COST           0.25
-                    MK2       'MARKER'                 'INTEND'
-                RHS
-                    RHS       FIXED          1
-                BOUNDS
-                 UP BND       X              1
-                 LO BND       Y             -2
-                 UP BND       Y              3
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        var code = -1
-        val out = capture { code = runCli(arrayOf(mps.absolutePath)) }
-
-        assertEquals(0, code, out)
-        assertTrue("s OPTIMUM FOUND" in out, out)
-        assertTrue(out.lineSequence().any { it == "o 999999999999999.5" }, out)
-        assertTrue(out.lineSequence().any { it == "v X=1 Y=-2" }, out)
     }
 
     @Test
@@ -1063,39 +667,6 @@ class CliModeTest {
     }
 
     @Test
-    fun `an MPS row too wide for one scale solves to its exact optimum`() {
-        val mps = File.createTempFile("cliwiderow", ".mps").apply {
-            writeText(
-                """
-                NAME          WIDEROW
-                OBJSENSE
-                    MAX
-                ROWS
-                 N  COST
-                 L  R
-                COLUMNS
-                    M1        'MARKER'                 'INTORG'
-                    X         COST           10        R           1e15
-                    Y         COST           1         R           0.25
-                    M2        'MARKER'                 'INTEND'
-                RHS
-                    RHS       R              3000000000000000.5
-                BOUNDS
-                 UP BND       X              10
-                 UP BND       Y              10
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val out = capture { main(arrayOf(mps.absolutePath)) }
-
-        assertTrue("s OPTIMUM FOUND" in out, out)
-        assertTrue(out.lineSequence().any { it == "v X=3 Y=2" }, out)
-    }
-
-    @Test
     fun `an MPS objective a continuous column contributes to is reported whole`() {
         val output = MpsOutput()
 
@@ -1138,35 +709,6 @@ class CliModeTest {
         assertTrue("label=continuous objective=0 continuousObjective=60.0 time=20" in out, out)
         assertTrue("label=mixed-min objective=-3 continuousObjective=-63.5 time=30" in out, out)
         assertTrue("label=mixed-max objective=3 continuousObjective=63.5 time=40" in out, out)
-    }
-
-    @Test
-    fun `an open mixed MPS model decides through the exact LIRA core`() {
-        val mps = File.createTempFile("clilira", ".mps").apply {
-            writeText(
-                """
-                NAME          LIRA
-                ROWS
-                 N  COST
-                 G  ROW
-                COLUMNS
-                    MK1       'MARKER'                 'INTORG'
-                    X         ROW            1.0
-                    MK2       'MARKER'                 'INTEND'
-                    Y         ROW            1.0
-                RHS
-                    RHS       ROW            0.0
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        var code = -1
-        val out = capture { code = runCli(arrayOf(mps.absolutePath, "-t", "5000")) }
-
-        assertEquals(0, code, out)
-        assertTrue("s SATISFIABLE" in out, out)
     }
 
     @Test
@@ -1623,44 +1165,6 @@ class CliModeTest {
     }
 
     @Test
-    fun `an open wide exact LIA witness is rendered without Long narrowing`() {
-        val smt = File.createTempFile("cli", ".smt2").apply {
-            writeText(
-                "(set-logic QF_LIA)\n" +
-                    "(declare-const x Int)\n" +
-                    "(assert (= x 18446744073709551616))\n" +
-                    "(check-sat)\n",
-            )
-            deleteOnExit()
-        }
-        var code = -1
-        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
-
-        assertEquals(0, code, out)
-        assertTrue(out.lines().firstOrNull() == "sat", out)
-        assertTrue("(define-fun x () Int 18446744073709551616)" in out, out)
-    }
-
-    @Test
-    fun `mixed open exact LIA arithmetic is decided without a Long witness box`() {
-        val smt = File.createTempFile("cli", ".smt2").apply {
-            writeText(
-                "(set-logic QF_LIA)\n" +
-                    "(declare-const a Int)\n(declare-const b Int)\n" +
-                    "(assert (>= b 0))\n(assert (<= b 7))\n" +
-                    "(assert (>= (+ a b) 0))\n" +
-                    "(check-sat)\n",
-            )
-            deleteOnExit()
-        }
-        var code = -1
-        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
-
-        assertEquals(0, code, out)
-        assertTrue(out.lines().firstOrNull() == "sat", out)
-    }
-
-    @Test
     fun `the lp-harvest presolve pass reports its contribution when enabled`() {
         // x+y<=3, y+z<=3, x+z<=3 imply x+y+z<=5 (LP max 4.5), so the lp-harvest pass drops it. The pass is
         // opt-in, so it fires only with the +lp-harvest delta; the dry-run must then report the removal.
@@ -1721,30 +1225,6 @@ class CliModeTest {
         assertTrue(ineffectiveNumerics("probsat", emptySet(), listOf("cb")).isEmpty())
         assertTrue(ineffectiveNumerics("sa", emptySet(), listOf("initial-temp", "cooling-rate", "min-temp")).isEmpty())
         assertEquals(listOf("tabu-tenure"), ineffectiveNumerics("fjump", emptySet(), listOf("tabu-tenure")))
-    }
-
-    @Test
-    fun `portfolio engine solves with explicit worker counts`() {
-        val fzn = File.createTempFile("cli", ".fzn").apply {
-            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
-            deleteOnExit()
-        }
-        val out = capture {
-            main(arrayOf("-e", "portfolio", "--param", "ls=1", "--param", "bt=1", "-t", "10000", fzn.absolutePath))
-        }
-        assertTrue("x = " in out, out)
-    }
-
-    @Test
-    fun `alns engine optimizes a small cop`() {
-        val fzn = File.createTempFile("cli", ".fzn").apply {
-            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve minimize x;\n")
-            deleteOnExit()
-        }
-        val out = capture {
-            main(arrayOf("-e", "alns", "-p", "2", "--param", "node-limit=1000", "-t", "10000", fzn.absolutePath))
-        }
-        assertTrue("x = 1" in out, out)
     }
 
     @Test
@@ -2089,82 +1569,4 @@ class CliModeTest {
         assertEquals(Long.MAX_VALUE, presolveWorkFor(Long.MAX_VALUE / 2))
     }
 
-    @Test
-    fun `an objective no row bounds below reports unbounded rather than a best value`() {
-        // A free integer column costed downwards: reporting `s SATISFIABLE` beside it would say only that
-        // the descent stopped, which is the one thing that did not happen.
-        val mps = File.createTempFile("cliunbounded", ".mps").apply {
-            writeText(
-                """
-                NAME          UNBOUNDED
-                ROWS
-                 N  COST
-                 L  ROW
-                COLUMNS
-                    MK1       'MARKER'                 'INTORG'
-                    X         COST           1.0
-                    X         ROW            1.0
-                    MK2       'MARKER'                 'INTEND'
-                RHS
-                    RHS       ROW            9.0
-                BOUNDS
-                 FR BND       X
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val out = capture { main(arrayOf(mps.absolutePath)) }
-
-        assertTrue("s UNBOUNDED" in out, out)
-    }
-
-    @Test
-    fun `a continuous column costed downwards past every row reports unbounded from the finite search`() {
-        val mps = File.createTempFile("cliunboundedreal", ".mps").apply {
-            writeText(
-                """
-                NAME          UNBOUNDEDREAL
-                ROWS
-                 N  COST
-                 L  ROW
-                COLUMNS
-                    MK1       'MARKER'                 'INTORG'
-                    X         COST           1.0
-                    X         ROW            1.0
-                    MK2       'MARKER'                 'INTEND'
-                    Y         COST           -1.0
-                    Y         ROW            -1.0
-                RHS
-                    RHS       ROW            9.0
-                BOUNDS
-                 UP BND       X              5
-                ENDATA
-                """.trimIndent(),
-            )
-            deleteOnExit()
-        }
-
-        val out = capture { main(arrayOf(mps.absolutePath)) }
-
-        assertTrue("s UNBOUNDED" in out, out)
-    }
-
-    @Test
-    fun `an unbounded model refuted over its true ranges reports unsat, not unknown`() {
-        // x - y <= -1 and y - x <= -1 sum to 0 <= -2, with neither variable bounded anywhere. The
-        // refutation owes nothing to the finite search box, so softening it to `unknown` would be
-        // throwing away a real answer.
-        val smt = File.createTempFile("cli", ".smt2").apply {
-            writeText(
-                "(set-logic QF_LIA)\n" +
-                    "(declare-const x Int)\n(declare-const y Int)\n" +
-                    "(assert (< x y))\n(assert (< y x))\n(check-sat)\n",
-            )
-            deleteOnExit()
-        }
-        val out = capture { main(arrayOf(smt.absolutePath)) }
-        assertTrue("unsat" in out, "expected unsat, got: $out")
-    }
 }

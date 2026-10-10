@@ -35,6 +35,30 @@ class ResultCreditTest {
         File(dir, "$name.csv").also { ReferenceStore.writeCsv(it, rows) }
 
     @Test
+    fun `exact quality wins despite tied approximate values in either direction`() {
+        val boundaries = listOf(
+            "9007199254740992" to "9007199254740993",
+            "9223372036854775808" to "9223372036854775809",
+            "1/3" to "1000000000000000001/3000000000000000000",
+        )
+        val a = ArrayList<ReferenceEntry>()
+        val b = ArrayList<ReferenceEntry>()
+        for ((index, pair) in boundaries.withIndex()) {
+            for (maximize in listOf(false, true)) {
+                val entry = row("p$index-$maximize", 1.0, true, maximize = maximize)
+                a.add(entry.copy(exactObjective = if (maximize) pair.second else pair.first))
+                b.add(entry.copy(exactObjective = if (maximize) pair.first else pair.second))
+            }
+        }
+
+        val wins = ResultCredit.report(listOf(csv("exact", a), csv("rounded", b)))
+            .scores.associate { it.arm to it.wins }
+
+        assertEquals(6, wins["exact"])
+        assertEquals(0, wins["rounded"])
+    }
+
+    @Test
     fun `COP winner is the best objective, direction-aware, and a proven optimum breaks equal-value ties`() {
         // minimize: lower wins. p1/p2 → A (10<20); p3 → B (15<30); p4 tie at 5 but B proved it.
         val a = csv(

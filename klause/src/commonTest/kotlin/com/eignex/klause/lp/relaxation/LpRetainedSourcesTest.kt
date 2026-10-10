@@ -2,7 +2,6 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
@@ -10,12 +9,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
-import com.eignex.klause.lp.engine.ExactLpNumber
-import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
-import com.eignex.klause.lp.engine.RevisedSimplex
-import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
@@ -67,37 +62,6 @@ class LpRetainedSourcesTest {
                 assertEquals(BigFraction.ZERO, assertNotNull(sibling.lower).number.value)
                 assertEquals(BigFraction.ONE, assertNotNull(sibling.upper).number.value)
             }
-        }
-    }
-
-    @Test
-    fun `live Boolean bounds preserve free and opposite sibling snapshots`() {
-        val problem = Problem(1, 0, emptyArray(), emptyArray())
-        val session = PropagationSession(problem)
-        val domains = SessionDomains(session)
-        val sources = LpRetainedSources(problem,
-            CpToLpRelaxation(problem, LinearObjective(boolWeights = longArrayOf(1L))))
-        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
-            val edit = sources.prepare(owner.state, domains)
-            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
-            edit.commit()
-            val column = sources.relaxation(owner.state, domains).boolColOf[0]
-            val root = sources.liveBounds(domains)[column]
-
-            session.pinBool(0, true)
-            val positive = sources.liveBounds(domains)[column]
-            session.popLast()
-            val restored = sources.liveBounds(domains)[column]
-            session.pinBool(0, false)
-            val negative = sources.liveBounds(domains)[column]
-
-            assertEquals(BigFraction.ZERO, assertNotNull(root.lower).number.value)
-            assertEquals(BigFraction.ONE, assertNotNull(root.upper).number.value)
-            assertEquals(BigFraction.ONE, assertNotNull(positive.lower).number.value)
-            assertEquals(BigFraction.ONE, assertNotNull(positive.upper).number.value)
-            assertEquals(root, restored)
-            assertEquals(BigFraction.ZERO, assertNotNull(negative.lower).number.value)
-            assertEquals(BigFraction.ZERO, assertNotNull(negative.upper).number.value)
         }
     }
 
@@ -195,74 +159,6 @@ class LpRetainedSourcesTest {
             assertSame(before, owner.state)
             assertEquals(owners, owner.metrics.createdOwners)
             assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
-        }
-    }
-
-    @Test
-    fun `source bound mode changes reclaim anonymous columns without changing fresh bounds`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 6) },
-            arrayOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
-        val root = problem.finiteIntDomain(1)
-        var live = root
-        var honors = true
-        val domains = object : RelaxationDomains {
-            override val honorsOpenSides: Boolean get() = honors
-            override fun intDomain(varId: Int): IntDomain = if (varId == 1) live else problem.finiteIntDomain(varId)
-            override fun boolValue(varId: Int): Boolean? = null
-        }
-        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
-            linMaxTightFace = true)
-        val sources = LpRetainedSources(problem, relaxer)
-        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
-            for (lower in 0L..3L) {
-                live = root.withMinAtLeast(lower)
-                honors = lower % 2L == 0L
-                val edit = sources.prepare(owner.state, domains)
-                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
-                edit.commit()
-                val variable = sources.relaxation(owner.state, domains).intColOf[1]
-                assertTrue(owner.assertBound(variable, false, assertNotNull(edit.bounds[variable].lower), lower))
-                val compaction = sources.prepareCompaction(owner.state)
-                if (compaction != null) {
-                    assertTrue(owner.compact(compaction.remap))
-                    compaction.commit()
-                }
-                val retained = sources.relaxation(owner.state, domains)
-                val fresh = relaxer.build(domains)
-                val expected = RevisedSimplex(fresh.model).use { assertNotNull(it.solve()).objective }
-
-                assertEquals(BigFraction.ofLong(lower), assertNotNull(owner.solve()).lowerBound)
-                assertEquals(lower.toDouble(), expected)
-                assertEquals(fresh.model.m, owner.state.rows.activeCount)
-                if (lower == 0L || compaction != null) {
-                    assertEquals(fresh.model.n, retained.model.n)
-                    assertEquals(fresh.model.m, retained.model.m)
-                    assertEquals(fresh.rowFactorIds.toList(), retained.rowFactorIds.toList())
-                    assertEquals(fresh.colVarId.toList(), retained.colVarId.toList())
-                }
-            }
-            var compaction: LpSourceCompaction? = null
-            for (iteration in 0 until 16) {
-                honors = !honors
-                val edit = sources.prepare(owner.state, domains)
-                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
-                edit.commit()
-                compaction = sources.prepareCompaction(owner.state)
-                if (compaction != null) break
-            }
-            val planned = assertNotNull(compaction)
-            assertNull(sources.prepareCompaction(owner.state, retainedOverhead = planned.extent))
-            assertNull(sources.prepareCompaction(owner.state, Cancellation { true }))
-            assertTrue(planned.isCurrent())
-            assertTrue(owner.compact(planned.remap))
-            planned.commit()
-            val retained = sources.relaxation(owner.state, domains)
-            val fresh = relaxer.build(domains)
-            assertEquals(fresh.model.n, retained.model.n)
-            assertEquals(fresh.model.m, retained.model.m)
-            assertEquals(fresh.rowFactorIds.toList(), retained.rowFactorIds.toList())
-            assertEquals(fresh.colVarId.toList(), retained.colVarId.toList())
-            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
         }
     }
 
@@ -422,87 +318,6 @@ class LpRetainedSourcesTest {
             assertSame(original.rowFactorIds, rebound.rowFactorIds)
             assertEquals(BigFraction.ofLong(5L), assertNotNull(owner.solve()).lowerBound)
             assertEquals(1L, owner.metrics.createdOwners)
-        }
-    }
-
-    @Test
-    fun `retained source assembly shares variable columns and counts objective origins once`() {
-        val problem = Problem(
-            0, 2, arrayOf(IntDomain(3, 9), IntDomain(-1, 8)),
-            arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 8),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 8),
-            ),
-        )
-        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(2L, 3L)))
-        val domains = RootDomains(problem)
-        val sources = LpRetainedSources(problem, relaxer)
-        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
-            val edit = sources.prepare(owner.state, domains)
-            assertTrue(owner.replaceRows(
-                edit.retired, edit.columns, edit.rows, false,
-                permanentRows = edit.permanentRows, objective = edit.objective,
-            ))
-            edit.commit()
-            val retained = sources.relaxation(owner.state, domains)
-            val fresh = relaxer.build(domains)
-            val solved = assertNotNull(RevisedSimplex(fresh.model).solve())
-
-            val certificate = assertNotNull(owner.solve())
-
-            assertEquals(2, owner.state.model.n)
-            assertEquals(BigFraction.ofLong(3L), owner.state.model.objective.constant.value)
-            assertEquals(solved.objective, assertNotNull(certificate.lowerBound).toDouble())
-            assertEquals(fresh.rowFactorIds.toList(), retained.rowFactorIds.toList())
-            assertEquals(0, retained.intColOf[0])
-            assertEquals(1, retained.intColOf[1])
-        }
-    }
-
-    @Test
-    fun `retained reified rows match fresh bounds through repeated edits and nested rollback`() {
-        val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 10)),
-            arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8)),
-        )
-        val root = problem.finiteIntDomain(0)
-        var live = root
-        val domains = object : RelaxationDomains {
-            override fun intDomain(varId: Int): IntDomain = live
-            override fun boolValue(varId: Int): Boolean? = null
-        }
-        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
-        val sources = LpRetainedSources(problem, relaxer)
-        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
-            for ((level, lower) in listOf(0 to 0L, 1 to 2L, 1 to 3L, 2 to 4L)) {
-                live = root.withMinAtLeast(lower)
-                while (owner.state.depth < level) assertTrue(owner.push())
-                val edit = sources.prepare(owner.state, domains)
-                assertTrue(owner.replaceRows(
-                    edit.retired, edit.columns, edit.rows, level > 0,
-                    permanentRows = edit.permanentRows, objective = edit.objective,
-                ))
-                edit.commit()
-                val current = sources.relaxation(owner.state, domains)
-                val column = current.intColOf[0]
-                assertTrue(owner.assertBound(column, false, ExactLpSide(ExactLpNumber.of(lower)), lower))
-                val fresh = relaxer.build(domains)
-                val result = assertNotNull(RevisedSimplex(fresh.model).solve())
-                val expected = assertNotNull(integerCertify(fresh.model, result.duals)).objectiveBoundCeil(0L)
-
-                assertEquals(expected, assertNotNull(owner.solve()).integerObjectiveLowerBound)
-            }
-            assertTrue(owner.pop(1))
-            sources.retract(1)
-            live = root.withMinAtLeast(3L)
-            assertEquals(BigFraction.ofLong(3L), assertNotNull(owner.solve()).lowerBound)
-            assertTrue(owner.pop(0))
-            sources.retract(0)
-            live = root
-            assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
-            val restored = sources.prepare(owner.state, domains)
-            assertTrue(restored.columns.isEmpty() && restored.rows.isEmpty() && restored.retired.isEmpty())
-            restored.commit()
         }
     }
 

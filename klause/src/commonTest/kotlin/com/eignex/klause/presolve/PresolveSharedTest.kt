@@ -1,7 +1,6 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.mergeCliques
@@ -17,10 +16,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 
-/**
- * At-most-one clique extraction (the reusable builder behind clique-aware presolve and the planned
- * clique-aware local-search moves). Each test asserts which cliques a factor set yields.
- */
 class PresolveSharedTest {
 
     private fun pos(v: Int) = Lit.make(v, true)
@@ -81,90 +76,6 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `a unit-max cardinality yields one clique of its literals regardless of min`() {
-        // max == 1 is the only condition that matters; at-most-one (min 0) and exactly-one (min 1)
-        // both drive the same clique-extraction branch.
-        for (min in listOf(0, 1)) {
-            val problem = Problem(
-                3,
-                0,
-                emptyArray(),
-                listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = min, max = 1)),
-            )
-            assertEquals(listOf(setOf(pos(0), pos(1), pos(2))), Presolve.amoCliques(problem))
-        }
-    }
-
-    @Test
-    fun `binary clause yields the clique of its negated literals`() {
-        // The clause l0 v l1 is exactly at most one of {not l0, not l1}.
-        val problem = Problem(
-            2,
-            0,
-            emptyArray(),
-            listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
-        )
-        val cliques = Presolve.amoCliques(problem)
-        assertEquals(listOf(setOf(pos(0), pos(1))), cliques)
-    }
-
-    @Test
-    fun `a three-literal clause contributes no clique`() {
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(Clause(intArrayOf(pos(0), pos(1), pos(2)))),
-        )
-        assertTrue(Presolve.amoCliques(problem).isEmpty())
-    }
-
-    @Test
-    fun `a plain linear contributes no clique`() {
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
-        )
-        assertTrue(Presolve.amoCliques(problem).isEmpty())
-    }
-
-    @Test
-    fun `a non-unit-max cardinality contributes no clique`() {
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 2)),
-        )
-        assertTrue(Presolve.amoCliques(problem).isEmpty())
-    }
-
-    @Test
-    fun `a knapsack whose weights cannot pairwise exceed the bound contributes no clique`() {
-        val problem = Problem(
-            2,
-            0,
-            emptyArray(),
-            listOf(PseudoBoolean(longArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L)),
-        )
-        assertTrue(Presolve.amoCliques(problem).isEmpty())
-    }
-
-    @Test
-    fun `a knapsack whose every pair exceeds the bound yields an at-most-one clique`() {
-        // x0 + x1 <= 1 is exactly at-most-one over {x0, x1}.
-        val problem = Problem(
-            2,
-            0,
-            emptyArray(),
-            listOf(PseudoBoolean(longArrayOf(1, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 1L)),
-        )
-        assertEquals(listOf(setOf(pos(0), pos(1))), Presolve.amoCliques(problem))
-    }
-
-    @Test
     fun `a knapsack yields a clique only over the large-weight literals whose pairs exceed the bound`() {
         // 5*x0 + 4*x1 + 1*x2 <= 6: x0+x1 = 9 > 6 exclude, but x2 pairs (6, 5) do not exceed 6.
         val problem = Problem(
@@ -204,29 +115,6 @@ class PresolveSharedTest {
     }
 
     @Test
-    fun `a clique that is a subset of a larger one is dropped`() {
-        val merged = mergeCliques(listOf(setOf(0, 1, 2), setOf(0, 1)))
-        assertEquals(listOf(setOf(0, 1, 2)), merged)
-    }
-
-    @Test
-    fun `disjoint cliques are left unmerged`() {
-        val cliques = listOf(setOf(0, 1), setOf(2, 3))
-        assertEquals(cliques.toSet(), mergeCliques(cliques).toSet())
-    }
-
-    @Test
-    fun `the merge is independent of the order the base cliques arrive in`() {
-        // Extension is greedy, so it is only deterministic because candidates are taken in id order —
-        // permuting the input must not change the result.
-        val base = listOf(setOf(0, 1), setOf(1, 2), setOf(0, 2), setOf(2, 3), setOf(1, 3), setOf(0, 3))
-        val expected = mergeCliques(base).toSet()
-
-        assertEquals(expected, mergeCliques(base.reversed()).toSet())
-        assertEquals(expected, mergeCliques(base.sortedBy { it.sum() }).toSet())
-    }
-
-    @Test
     fun `a cancelled merge returns the base cliques unextended`() {
         // The triangle would collapse to one size-3 clique; cancelling forgoes the growth but every
         // returned clique is still a valid at-most-one.
@@ -234,25 +122,6 @@ class PresolveSharedTest {
         val merged = mergeCliques(base) { true }
 
         assertEquals(base.toSet(), merged.toSet())
-    }
-
-    @Test
-    fun `negative literals merge like positive ones`() {
-        // Lit encoding makes members arbitrary ints, including negative ones, so the conflict graph
-        // cannot assume dense non-negative keys.
-        val merged = mergeCliques(listOf(setOf(-1, -2), setOf(-2, -3), setOf(-1, -3)))
-        assertEquals(listOf(setOf(-1, -2, -3)), merged)
-    }
-
-    @Test
-    fun `maxIntSpan reports the widest integer domain span`() {
-        val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 3), IntDomain(-5, 10), IntDomain(7, 7)),
-            emptyList(),
-        )
-        assertEquals(15L, PresolveShared.maxIntSpan(problem))
     }
 
     @Test

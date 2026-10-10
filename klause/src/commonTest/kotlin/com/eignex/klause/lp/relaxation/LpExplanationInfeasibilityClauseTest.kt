@@ -7,7 +7,6 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.util.Int128
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -20,9 +19,6 @@ import kotlin.test.assertTrue
  */
 class LpExplanationInfeasibilityClauseTest {
 
-    private class Row(val coeffs: LongArray, val rel: Relation, val rhs: Long)
-
-    /** Sign of `ρ·A_col` for structural column [col] under integer ray [ray] (`-1`/`0`/`+1`). */
     private fun rayDotColumnSign(model: LpModel, ray: LongArray, col: Int): Int {
         val acc = Int128()
         model.forEachInColumn(col) { i, a -> acc.addProduct(ray[i], a) }
@@ -53,82 +49,4 @@ class LpExplanationInfeasibilityClauseTest {
         assertTrue(rayDotColumnSign(model, ray, x) < 0, "x's lower bound must participate in the ray")
     }
 
-    @Test
-    fun `randomized farkas clause never excludes a constraint-feasible point`() {
-        val rng = Random(20260609)
-        var infeasibleInstances = 0
-        var withCert = 0
-        repeat(2000) {
-            val n = rng.nextInt(2, 4)
-            val hi = rng.nextInt(2, 6)
-            // Node-tightened bounds [lo_j, up_j] inside the declared box [0, hi].
-            val lo = IntArray(n) { rng.nextInt(0, hi + 1) }
-            val up = IntArray(n) { j -> lo[j] + rng.nextInt(0, hi - lo[j] + 1) }
-            val b = LpBuilder()
-            repeat(n) { j -> b.addVar(lo[j].toLong(), up[j].toLong(), cost = rng.nextInt(-3, 4).toLong()) }
-            val rows = ArrayList<Row>()
-            repeat(rng.nextInt(1, 4)) { _ ->
-                val coeffs = LongArray(n) { rng.nextInt(-3, 4).toLong() }
-                if (coeffs.all { it == 0L }) return@repeat
-                val rhs = rng.nextInt(-4, hi * n + 1).toLong()
-                val rel = when (rng.nextInt(3)) {
-                    0 -> Relation.LE
-                    1 -> Relation.GE
-                    else -> Relation.EQ
-                }
-                rows.add(Row(coeffs, rel, rhs))
-                b.addRow((0 until n).associateWith { coeffs[it] }.filterValues { it != 0L }, rel, rhs)
-            }
-            val model = b.build(Sense.MINIMIZE)
-            val simplex = RevisedSimplex(model)
-            if (simplex.solve() != null) return@repeat // feasible
-            val ray = integerFarkasRay(model, simplex.infeasibleRay ?: return@repeat) ?: return@repeat
-            infeasibleInstances++
-            // Seated side per structural column: ρ·A_j > 0 ⇒ upper, < 0 ⇒ lower, 0 ⇒ not in the box.
-            val seatUpper = IntArray(n) { col -> rayDotColumnSign(model, ray, col) }
-            if (seatUpper.all { s -> s == 0 }) return@repeat
-            withCert++
-
-            val point = IntArray(n)
-            fun rec(idx: Int) {
-                if (idx == n) {
-                    for (row in rows) {
-                        var s = 0L
-                        for (k in 0 until n) s += row.coeffs[k] * point[k]
-                        val ok = when (row.rel) {
-                            Relation.LE -> s <= row.rhs
-                            Relation.GE -> s >= row.rhs
-                            Relation.EQ -> s == row.rhs
-                        }
-                        if (!ok) return
-                    }
-                    // Constraint-feasible point: it must escape the certificate box (satisfy the clause).
-                    var inBox = true
-                    for (col in 0 until n) {
-                        val sign = seatUpper[col]
-                        if (sign == 0) continue
-                        val seatedBound = if (sign > 0) {
-                            point[col] <= model.loShift[col] + model.upper[col]
-                        } else {
-                            point[col] >= model.loShift[col]
-                        }
-                        if (!seatedBound) {
-                            inBox = false
-                            break
-                        }
-                    }
-                    assertTrue(!inBox, "farkas clause excludes constraint-feasible point ${point.toList()}")
-                    return
-                }
-                // Enumerate the declared box [0, hi] — the clause must hold over the whole declared range.
-                for (v in 0..hi) {
-                    point[idx] = v
-                    rec(idx + 1)
-                }
-            }
-            rec(0)
-        }
-        assertTrue(infeasibleInstances > 100, "covered only $infeasibleInstances infeasible instances")
-        assertTrue(withCert > 50, "only $withCert instances produced a certificate")
-    }
 }

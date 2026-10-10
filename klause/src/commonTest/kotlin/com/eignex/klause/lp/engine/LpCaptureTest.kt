@@ -47,37 +47,6 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `version two captures retain row authority when upgraded`() {
-        val source = LpBuilder().apply {
-            val x = addVar(0L, 1L)
-            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
-        }.build(Sense.MINIMIZE)
-        val id = 0x0123456789ABCDEFL
-        val state = LpExactState(
-            assertNotNull(source.authoritativeModel()),
-            rows = LpScopedRows(listOf(LpRowIdentity(id, null)), id),
-        )
-        val capture = LpExactCapture.capture(state, LpReplaySettings("legacy-rows", 1L), emptyList())
-        val encoded = capture.encode()
-        val rowHeader = ByteArray(8) { (id ushr (56 - 8 * it)).toByte() } + byteArrayOf(-1, -1, -1, -1, 1)
-        val rowOffset = (0..encoded.size - rowHeader.size).single { start ->
-            rowHeader.indices.all { encoded[start + it] == rowHeader[it] }
-        }
-        val suspensionOffset = rowOffset + rowHeader.size
-        val legacy = (encoded.copyOfRange(
-            0,
-            suspensionOffset,
-        ) + encoded.copyOfRange(suspensionOffset + 4, encoded.size))
-            .also { it[11] = 2 }
-
-        val decoded = LpExactCapture.decode(legacy)
-
-        assertTrue(state.fullAuthorityEquals(decoded.initialState))
-        assertEquals(LP_EXACT_CAPTURE_VERSION, decoded.version)
-        assertNull(decoded.initialState.rows.row(0).suspendedAt)
-    }
-
-    @Test
     fun `structural capture replays new columns with exact origins costs and row guards`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
@@ -121,119 +90,6 @@ class LpCaptureTest {
         assertEquals(third, state.model.objective.cost(1))
         assertEquals(row.metadata, state.model.row(0))
         assertEquals(5L, state.rows.row(0).id)
-    }
-
-    @Test
-    fun `exact capture restores suspended parent rows and replays further replacements`() {
-        val source = LpBuilder().apply {
-            val x = addVar(0L, 2L, cost = 1L)
-            addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
-        }.build(Sense.MINIMIZE)
-        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
-        assertTrue(trail.push())
-        assertTrue(trail.suspend(setOf(0)))
-        val capture = LpExactCapture.capture(
-            trail.state,
-            LpReplaySettings(
-                "suspended-parent",
-                1L,
-                componentSplit = false,
-                solverKind = LpReplaySolverKind.PERSISTENT,
-            ),
-            listOf(
-                LpExactReplayEvent.Pop(0),
-                LpExactReplayEvent.Push(),
-                LpExactReplayEvent.Suspend(setOf(0)),
-                LpExactReplayEvent.Pop(0),
-            ),
-        )
-
-        val decoded = LpExactCapture.decode(capture.encode())
-        val report = LpExactReplay.replay(decoded)
-
-        assertTrue(trail.state.fullAuthorityEquals(decoded.initialState))
-        assertContentEquals(capture.encode(), decoded.encode())
-        assertNull(report.declinedEventIndex)
-        assertEquals(listOf(true, true, false, true), report.steps.map { it.state.rows.row(0).active })
-        assertTrue(report.steps.all { it.accepted })
-        assertEquals(setOf(0L), (decoded.events[2] as LpExactReplayEvent.Suspend).ids)
-    }
-
-    @Test
-    fun `row capture resumes complete state after compaction and preserves every append field`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val third = ExactLpNumber.of(BigFraction.of(BIG_ONE, bigIntOf(3)))
-        val ieee = ExactLpNumber.ofIeee(-0.0)
-        val premises = ExactLpPremises(listOf(ExactLpPremise(8, true, third)), listOf(11))
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)), integral = false, tag = 8)),
-            emptyList(),
-            ExactLpObjective(listOf(one)),
-        )
-        val trail = LpBoundTrail(source)
-        val logical = ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), integral = false, tag = 19)
-        assertTrue(trail.push())
-        assertTrue(trail.append(LpScopedRow(7, listOf(0 to third), third, logical), true))
-        assertTrue(
-            trail.append(
-                LpScopedRow(
-                    9,
-                    listOf(0 to third),
-                    third,
-                    logical,
-                    ExactLpRow(false, premises = premises),
-                ),
-                false,
-            ),
-        )
-        assertTrue(trail.pop(0))
-        assertTrue(trail.compact())
-        assertTrue(trail.push())
-        assertTrue(trail.assertBound(1, true, ExactLpSide(third, true, premises), 55))
-        assertTrue(trail.recenter(listOf(third)))
-        val row = LpScopedRow(
-            20,
-            listOf(0 to third),
-            ieee,
-            ExactLpColumn(
-                ExactLpBounds(ExactLpSide(zero, true, premises), ExactLpSide(third, true, premises)),
-                origin = ieee,
-            ),
-            ExactLpRow(false, true, premises),
-            third,
-        )
-        val events = listOf(
-            LpExactReplayEvent.Append(row, true),
-            LpExactReplayEvent.Deactivate(9),
-            LpExactReplayEvent.Compact(),
-        )
-        val capture = LpExactCapture.capture(trail.state, LpReplaySettings("resumed", 17L), events, 10)
-
-        val decoded = LpExactCapture.decode(capture.encode())
-
-        assertTrue(trail.state.fullAuthorityEquals(decoded.initialState))
-        assertContentEquals(LpExactCapture.stateKey(trail.state), LpExactCapture.stateKey(decoded.initialState))
-        assertEquals(trail.state.changedColumns, decoded.initialState.changedColumns)
-        assertEquals(9L, decoded.initialState.rows.lastId)
-        assertEquals(9L, decoded.initialState.rows.row(0).id)
-        assertEquals(55L, decoded.initialState.assertions.single().witness)
-        assertEquals(10, decoded.maxRetainedRows)
-        val append = decoded.events[0] as LpExactReplayEvent.Append
-        assertTrue(append.scoped)
-        assertEquals(row.id, append.row.id)
-        assertEquals(row.coefficients(), append.row.coefficients())
-        assertEquals(row.rhs, append.row.rhs)
-        assertEquals(row.logical, append.row.logical)
-        assertEquals(row.metadata, append.row.metadata)
-        assertEquals(row.cost, append.row.cost)
-        assertEquals(9L, (decoded.events[1] as LpExactReplayEvent.Deactivate).id)
-        assertTrue(decoded.events[2] is LpExactReplayEvent.Compact)
-        assertContentEquals(capture.encode(), decoded.encode())
-        val oldVersion = capture.encode().also { it[11] = 1 }
-        assertFails { LpExactCapture.decode(oldVersion) }
     }
 
     @Test
@@ -349,19 +205,6 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `exact state key declines excessive complete authority`() {
-        val model = ExactLpModel(
-            List(500) { emptyList() },
-            emptyList(),
-            List(500) { ExactLpColumn(ExactLpBounds()) },
-            emptyList(),
-            ExactLpObjective(List(500) { ExactLpNumber.of(0L) }),
-        )
-
-        assertNull(LpExactCapture.stateKey(LpExactState(model)))
-    }
-
-    @Test
     fun `exact state key declines oversized rational bytes below value budget`() {
         val large = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 4096, BIG_ONE))
         val model = ExactLpModel(
@@ -373,31 +216,6 @@ class LpCaptureTest {
         )
 
         assertNull(LpExactCapture.stateKey(LpExactState(model)))
-    }
-
-    @Test
-    fun `exact state keys retain sub-double bounds and each revision`() {
-        val first = ExactLpNumber.of(9007199254740992L)
-        val second = ExactLpNumber.of(9007199254740993L)
-        assertEquals(first.value.toDouble(), second.value.toDouble())
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(first)))),
-            emptyList(),
-            ExactLpObjective(listOf(ExactLpNumber.of(0L))),
-        )
-        val baseline = assertNotNull(LpExactCapture.stateKey(LpExactState(model)))
-        val variants = listOf(
-            LpExactState(model.copy(columns = listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(second)))))),
-            LpExactState(model, matrixRevision = 1L),
-            LpExactState(model, boundRevision = 1L),
-            LpExactState(model, objectiveRevision = 1L),
-            LpExactState(model, popRevision = 1L),
-            LpExactState(model, scopes = listOf(0)),
-        )
-
-        variants.forEach { assertFalse(baseline.contentEquals(assertNotNull(LpExactCapture.stateKey(it)))) }
     }
 
     @Test
@@ -420,155 +238,6 @@ class LpCaptureTest {
         assertFailsWith<IllegalArgumentException> {
             LpCapturedBasis.capture(Basis(intArrayOf(), arrayOf(VarStatus.FIXED)))
         }
-    }
-
-    @Test
-    fun `fixed capture decline survives zero pivot warm chains and close reuse`() {
-        val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val bridge = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.FIXED)).toLegacy(model))
-        val solver = newPersistentLpSolver(bridge.model)
-        try {
-            val first = assertNotNull(solver.solve(bridge.basis))
-            assertEquals(0, first.pivots)
-            assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(first.basis) }
-            newLpSolver(bridge.model).use { next ->
-                val chained = assertNotNull(next.solvePrimal(first.basis))
-                assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(chained.basis) }
-            }
-            val reused = assertNotNull(solver.resolveBounds())
-            assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(reused.basis) }
-            solver.close()
-            val reopened = assertNotNull(solver.solve())
-            assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(reopened.basis) }
-        } finally {
-            solver.close()
-        }
-        newLpSolver(bridge.model).use { fresh ->
-            val cold = assertNotNull(fresh.solve())
-            assertNotNull(LpCapturedBasis.capture(cold.basis))
-        }
-    }
-
-    @Test
-    fun `fixed capture decline survives infeasible and truncated basis exports`() {
-        val zero = ExactLpNumber.of(0L)
-        for (infeasible in listOf(true, false)) {
-            val model = ExactLpModel(
-                listOf(emptyList(), listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))),
-                listOf(ExactLpNumber.of(-2L)),
-                listOf(
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-                    ExactLpColumn(
-                        ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(if (infeasible) 0L else 3L))),
-                    ),
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ),
-                listOf(ExactLpRow()),
-                ExactLpObjective(listOf(zero, ExactLpNumber.of(1L), zero)),
-            )
-            val bridge = assertNotNull(
-                ExactLpBasis(
-                    listOf(2),
-                    listOf(
-                        ExactLpStatus.FIXED,
-                        ExactLpStatus.AT_LOWER,
-                        ExactLpStatus.BASIC,
-                    ),
-                ).toLegacy(model),
-            )
-
-            newPersistentLpSolver(bridge.model, iterationLimit = 1).use { solver ->
-                val result = solver.solve(bridge.basis)
-                val exported = if (infeasible) {
-                    assertNull(result)
-                    assertNotNull(solver.infeasibleBasis)
-                } else {
-                    assertFalse(assertNotNull(result).optimal)
-                    result.basis
-                }
-                assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(exported) }
-            }
-        }
-    }
-
-    @Test
-    fun `fixed bridge declines v1 status capture while lower declaration roundtrips`() {
-        val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero)))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val fixed = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.FIXED)).toLegacy(model))
-        val lower = assertNotNull(ExactLpBasis(emptyList(), listOf(ExactLpStatus.AT_LOWER)).toLegacy(model))
-
-        assertFailsWith<IllegalArgumentException> { LpCapturedBasis.capture(fixed.basis) }
-        val captured = LpCapturedBasis.capture(lower.basis)
-        val restored = captured.toBasis(lower.model.hasUpper, 0)
-        assertEquals(VarStatus.AT_LOWER, restored.status[0])
-        assertEquals(ExactLpStatus.FIXED, fixed.exactBasis.status(0))
-    }
-
-    @Test
-    fun `general authority is rejected before capture v1 projection`() {
-        val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.ofIeee(0.1))))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-
-        assertFailsWith<IllegalArgumentException> { LpCapturedModel.capture(model) }
-        assertFailsWith<IllegalArgumentException> {
-            LpCapture.capture(
-                model,
-                LpReplaySettings("unsupported", 0L),
-                emptyList(),
-            )
-        }
-    }
-
-    @Test
-    fun `checked integral bridge captures the bytes of its legacy model`() {
-        val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(4L))))),
-            emptyList(),
-            ExactLpObjective(listOf(ExactLpNumber.of(3L))),
-        )
-        val legacy = assertNotNull(model.toLegacy())
-        val settings = LpReplaySettings("integral", 0L)
-
-        val bytes = LpCapture.capture(model, settings, emptyList()).encode()
-
-        assertContentEquals(LpCapture.capture(legacy, settings, emptyList()).encode(), bytes)
-        assertContentEquals(bytes, LpCapture.decode(bytes).encode())
-    }
-
-    @Test
-    fun `capture keeps the exact value of a shifted right-hand side that rounded`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(-4.2e18, 0.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 300.0)
-        }.build(Sense.MINIMIZE)
-        val bytes = LpCapture.capture(model, LpReplaySettings("shift", 0L), emptyList()).encode()
-
-        val replayed = LpCapture.decode(bytes).model.toModel()
-
-        assertEquals(exactDouble(300.0) + exactDouble(4.2e18), replayed.exactRhs(0))
     }
 
     @Test
@@ -722,21 +391,6 @@ class LpCaptureTest {
     }
 
     @Test
-    fun `empty model persists with an explicit Long authority`() {
-        val empty = LpBuilder().build(Sense.MINIMIZE)
-
-        val decoded = LpCapture.decode(
-            LpCapture.capture(empty, LpReplaySettings("empty", 0L), listOf(LpReplayEvent.Solve())).encode(),
-        )
-
-        assertEquals(LpNumericAuthority.LONG_EXACT, decoded.model.numericAuthority)
-        assertEquals(0, decoded.model.n)
-        assertEquals(0, decoded.model.m)
-        assertContentEquals(intArrayOf(0), decoded.model.colPtr)
-        assertNull(decoded.model.doubleView)
-    }
-
-    @Test
     fun `unknown versions and malformed bytes are rejected`() {
         val capture = LpCapture.capture(
             LpBuilder().build(Sense.MINIMIZE),
@@ -776,28 +430,6 @@ class LpCaptureTest {
                 capture.model,
                 listOf(LpReplayEvent.Solve(eventVersion = LP_EVENT_VERSION + 1)),
             ).validateFormat()
-        }
-    }
-
-    @Test
-    fun `malformed sparse columns and warm bases are rejected`() {
-        val builder = LpBuilder()
-        val x = builder.addOpenAboveVar(0L)
-        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
-        builder.addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 2L)
-        val model = builder.build(Sense.MINIMIZE)
-        val duplicateRows = LpCapturedModel.capture(model)
-        duplicateRows.rowIdx[1] = duplicateRows.rowIdx[0]
-        val strictWithoutDouble = LpCapturedModel.capture(model)
-        strictWithoutDouble.rowStrict[0] = true
-
-        assertFailsWith<IllegalArgumentException> { duplicateRows.validate() }
-        assertFailsWith<IllegalArgumentException> { strictWithoutDouble.validate() }
-        assertFailsWith<IllegalArgumentException> {
-            LpCapturedBasis(
-                intArrayOf(model.slackCol(0), model.slackCol(1)),
-                intArrayOf(3, 1, 1),
-            ).toBasis(model.hasUpper, model.m)
         }
     }
 

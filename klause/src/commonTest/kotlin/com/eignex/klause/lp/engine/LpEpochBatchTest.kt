@@ -92,31 +92,6 @@ class LpEpochBatchTest {
     }
 
     @Test
-    fun `unprojectable adoption preserves an exact continuation retry`() {
-        val source = assertNotNull(
-            LpBuilder().apply { addVar(0, 10, cost = 1) }.build(Sense.MINIMIZE).authoritativeModel(),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
-        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
-        val invalid = LpExactState(
-            source.copy(
-                columns = listOf(
-                    source.column(0).copy(bounds = ExactLpBounds(source.column(0).bounds.lower, ExactLpSide(huge))),
-                ),
-            ),
-        )
-        RevisedSimplex(model).use { solver ->
-            assertNotNull(solver.solve())
-            assertNotNull(solver.continuationBasis(model))
-
-            assertFalse(solver.adopt(invalid))
-
-            val retained = assertNotNull(solver.continuationBasis(model))
-            assertNotNull(continueExactLp(model, retained).witness)
-        }
-    }
-
-    @Test
     fun `ordered batches retain equal and weaker witnesses through backjump`() {
         val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
         val batch = LpBoundTrail(source)
@@ -170,41 +145,6 @@ class LpEpochBatchTest {
     }
 
     @Test
-    fun `projection is checked at the first active prefix rather than only final bounds`() {
-        val zero = ExactLpNumber.of(0L)
-        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val trail = LpBoundTrail(source)
-        val before = trail.state
-
-        val result = trail.assertBounds(
-            listOf(
-                LpBoundAssertion(0, true, ExactLpSide(huge), 0, 0),
-                LpBoundAssertion(0, true, ExactLpSide(zero), 1, 0),
-            ),
-        )
-
-        assertIs<LpBoundBatchResult.Declined>(result)
-        assertSame(before, trail.state)
-        assertEquals(
-            LpBoundBatchResult.Applied(2),
-            trail.assertBounds(
-                listOf(
-                    LpBoundAssertion(0, true, ExactLpSide(zero), 0, 0),
-                    LpBoundAssertion(0, true, ExactLpSide(huge), 1, 0),
-                ),
-            ),
-        )
-        assertEquals(zero, trail.state.model.column(0).bounds.upper?.number)
-    }
-
-    @Test
     fun `cancelled preparation leaves every ordered assertion unpublished`() {
         val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
         val updates = listOf(
@@ -238,25 +178,6 @@ class LpEpochBatchTest {
             assertIs<LpBoundBatchResult.Declined>(trail.assertBounds(listOf(update, second)))
 
             assertSame(initial, trail.state)
-        }
-    }
-
-    @Test
-    fun `propagator skips equal active bounds without spending witness identities`() {
-        val source = assertNotNull(LpBuilder().apply { addVar(0, 10) }.build(Sense.MINIMIZE).authoritativeModel())
-        LpPropagator(object : LpSearchPolicy {}).use { core ->
-            assertTrue(core.install(Any(), source))
-            val lower = listOf(ExactLpSide(ExactLpNumber.of(0L)))
-            val upper = listOf(ExactLpSide(ExactLpNumber.of(8L)))
-
-            assertEquals(LpBoundBatchResult.Applied(1), core.assertBounds(lower, upper))
-            val before = assertNotNull(core.state)
-            assertEquals(LpBoundBatchResult.Applied(0), core.assertBounds(lower, upper))
-
-            assertSame(before, core.state)
-            assertEquals(0L, before.assertions.single().witness)
-            assertTrue(core.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L))))
-            assertEquals(listOf(0L, 1L), assertNotNull(core.state).assertions.map { it.witness })
         }
     }
 

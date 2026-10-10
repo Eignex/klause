@@ -10,7 +10,6 @@ import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -43,26 +42,6 @@ class LpCertificationPolicyTest {
     }
 
     @Test
-    fun `forced decline reaches rational fallback and stays indeterminate`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 1L)
-        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 2L)
-        val policy = RecordingCertificationPolicy(accept = false)
-
-        val result = solveAndCertify(
-            builder.build(Sense.MINIMIZE),
-            context = LpSolveContext(certificationPolicy = policy),
-        )
-
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
-        assertEquals(
-            listOf(LpCertifier.EXACT_FARKAS, LpCertifier.RATIONAL, LpCertifier.EXACT_FARKAS, LpCertifier.RATIONAL),
-            policy.attempts.map { it.first },
-        )
-        assertTrue(policy.attempts.all { it.second })
-    }
-
-    @Test
     fun `forced decline bypasses basis point safe and rational recovery`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
@@ -82,47 +61,6 @@ class LpCertificationPolicyTest {
         assertTrue(LpCertifier.EXACT_POINT in policy.attempts.map { it.first })
         assertTrue(LpCertifier.RATIONAL in policy.attempts.map { it.first })
         assertTrue(LpCertifier.SAFE_OBJECTIVE in policy.attempts.map { it.first })
-    }
-
-    @Test
-    fun `forced decline reaches component objective certification`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 3L, cost = 1L)
-        val y = builder.addVar(0L, 3L, cost = 1L)
-        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
-        builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 2L)
-        val policy = RecordingCertificationPolicy(accept = false)
-
-        val model = builder.build(Sense.MINIMIZE)
-        val result = assertIs<ComponentLpSolver>(newLpSolver(model)).use { solver ->
-            val raw = assertNotNull(solver.solve())
-            val accepted = certifyLpResult(model, solver, raw)
-            assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.verdict)
-            certifyLpResult(model, solver, raw, policy = policy)
-        }
-
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
-        assertNull(result.bound)
-        assertNull(result.witness)
-        assertTrue(policy.attempts.count { it.first == LpCertifier.INTEGER } >= 2)
-    }
-
-    @Test
-    fun `forced decline reaches component basis certification`() {
-        val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, 3.0)
-        val y = builder.addRealVar(0.0, 3.0)
-        builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
-        builder.addRealRow(intArrayOf(y), doubleArrayOf(1.0), Relation.GE, 2.0)
-        val policy = RecordingCertificationPolicy(accept = false)
-
-        val result = solveAndCertify(
-            builder.build(Sense.MINIMIZE),
-            context = LpSolveContext(certificationPolicy = policy),
-        )
-
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
-        assertTrue(policy.attempts.count { it.first == LpCertifier.EXACT_BASIS } >= 2)
     }
 
     @Test

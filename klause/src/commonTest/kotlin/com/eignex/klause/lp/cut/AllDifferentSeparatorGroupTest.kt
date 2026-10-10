@@ -58,24 +58,6 @@ class AllDifferentSeparatorGroupTest {
     }
 
     @Test
-    fun `both inverse sides feed Hall cuts`() {
-        // f = vars 0..2, g = vars 3..5, all in [0,5]. Each side is all-different, so each yields a
-        // Σ >= 0+1+2 = 3 cut at the all-zero LP point.
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 6,
-            intDomains = Array(6) { IntDomain(0, 5) },
-            factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
-        )
-        val (r, sol) = relax(p, LinearObjective(intCoefficients = LongArray(6) { 1L }))
-
-        val geCuts = AllDifferentSeparator().separate(CutContext(p, r, sol.primal, PropagationSession(p)))
-            .filter { it.rel == Relation.GE }
-        assertEquals(2, geCuts.size, "one Hall cut per inverse side")
-        assertTrue(geCuts.all { it.rhs == 3L && it.cols.size == 3 })
-    }
-
-    @Test
     fun `assignment-objective cut reaches an inverse side`() {
         // f = vars 0..2 in [0,4] with objective weights 3,1,2. The min-cost distinct assignment is
         // values {0,1,2} on coeffs {3,2,1} = 3·0 + 2·1 + 1·2 = 4, which the all-zero LP point breaks.

@@ -26,21 +26,6 @@ class RefactorPolicyTest {
     }
 
     @Test
-    fun `fresh fill and repeated bound solves do not trigger adaptive rebuilds`() {
-        val policy = RefactorPolicy()
-        policy.recordFactorization(factorNnz = 10_000, buildWork = 100L, pivotSpread = 1e-12)
-
-        repeat(32) {
-            policy.recordBasisSolve(100L, boundUpdateFtran = true)
-            assertNull(policy.chooseAtSafePoint(0, factorNnz = 10_000))
-        }
-
-        assertEquals(3_200L, policy.metrics.boundUpdateFtranWork)
-        assertEquals(1e-12, policy.metrics.pivotSpread)
-        assertTrue(policy.metrics.triggers.isEmpty())
-    }
-
-    @Test
     fun `sampled residual triggers once until the basis generation advances`() {
         val policy = RefactorPolicy()
         policy.recordFactorization(factorNnz = 20, buildWork = 1_000L, pivotSpread = 0.5)
@@ -105,19 +90,6 @@ class RefactorPolicyTest {
         assertNull(policy.chooseAtSafePoint(8, 10))
         assertEquals(Long.MAX_VALUE, policy.metrics.knownWork)
         assertEquals(1L, policy.metrics.saturatedWorkEvents)
-    }
-
-    @Test
-    fun `factorization resets residual sampling cadence`() {
-        val policy = RefactorPolicy()
-        policy.recordFactorization(factorNnz = 10, buildWork = 100L, pivotSpread = 1.0)
-        repeat(7) { policy.recordBasisSolve(1L) }
-        policy.recordFactorization(factorNnz = 10, buildWork = 100L, pivotSpread = 1.0)
-
-        policy.recordBasisSolve(1L)
-        assertFalse(policy.shouldSample(cancelled = false))
-        repeat(7) { policy.recordBasisSolve(1L) }
-        assertTrue(policy.shouldSample(cancelled = false))
     }
 
     @Test

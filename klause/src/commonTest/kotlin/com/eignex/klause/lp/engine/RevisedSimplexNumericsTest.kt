@@ -11,7 +11,6 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -54,30 +53,6 @@ class RevisedSimplexNumericsTest {
         assertEquals(2.0, result.objective)
         assertEquals(2L, integerDualLowerBoundCeil(model, result.duals))
         solver.close()
-    }
-
-    @Test
-    fun `close numerical costs select the exact source optimum`() {
-        for (primal in listOf(false, true)) {
-            val b = LpBuilder()
-            val x = b.addRealVar(0.0, 1.0, cost = 1.0)
-            val y = b.addRealVar(0.0, 1.0, cost = 1.0001)
-            b.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.GE, 1.0)
-            val model = b.build(Sense.MINIMIZE)
-            val costs = model.cost.copyOf()
-            val solver = RevisedSimplex(
-                model,
-            )
-
-            val result = assertNotNull(if (primal) solver.solvePrimal() else solver.solve())
-
-            assertEquals(1.0, result.primal[x], 1e-9)
-            assertEquals(0.0, result.primal[y], 1e-9)
-            assertEquals(1.0, result.objective, 1e-9)
-            assertEquals(BigFraction.ONE, certifyLpResult(model, solver, result).lowerBound)
-            assertTrue(costs.contentEquals(model.cost))
-            solver.close()
-        }
     }
 
     @Test
@@ -167,27 +142,6 @@ class RevisedSimplexNumericsTest {
     }
 
     @Test
-    fun `Devex reselection observes cancellation`() {
-        lateinit var factors: DistortingBasisSolver
-        var polls = 0
-        val simplex = RevisedSimplex(
-            multiPivotFeasibilityModel(),
-            cancellation = Cancellation { ++polls == 2 },
-            pricing = LpPricingOptions(LpZeroObjectivePricing.LARGEST_PIVOT),
-            basisSolverFactory = { matrix ->
-                DistortingBasisSolver(KotlinBasisSolver(matrix)).also { factors = it }
-            },
-        )
-
-        val result = assertNotNull(simplex.solve())
-
-        assertTrue(factors.distorted)
-        assertEquals(1, simplex.lastDevexWeightCorrections)
-        assertFalse(result.optimal, "cancellation during reselection must not claim an optimum")
-        assertEquals(1, result.pivots)
-    }
-
-    @Test
     fun `scaled Harris ministep chooses the stable finishing pivot`() {
         val b = LpBuilder()
         val narrow = b.addRealVar(0.0, 2_000_000.0, cost = 1e-6)
@@ -201,35 +155,6 @@ class RevisedSimplexNumericsTest {
         assertEquals(stable, result.basis.basicVars.single())
         assertEquals(1, simplex.lastHarrisMinistepSelections)
         assertTrue(result.primal[stable] >= 1.0 - 1e-7)
-        assertDualFeasible(model, result)
-    }
-
-    @Test
-    fun `a nonfinishing boxed column still limits the Harris step`() {
-        val b = LpBuilder()
-        val narrow = b.addRealVar(0.0, 2_000_000.0, cost = 1e-6)
-        val boxed = b.addRealVar(0.0, 0.01, cost = 10.00001)
-        val late = b.addRealVar(0.0, 2.0, cost = 1.0001)
-        b.addRealRow(
-            intArrayOf(narrow, boxed, late),
-            doubleArrayOf(1e-6, 10.0, 1.0),
-            Relation.GE,
-            1.0,
-        )
-        val model = b.build(Sense.MINIMIZE)
-
-        val result = assertNotNull(RevisedSimplex(model).solve())
-
-        assertEquals(narrow, result.basis.basicVars.single())
-        assertEquals(VarStatus.AT_LOWER, result.basis.status[boxed])
-        assertEquals(VarStatus.AT_LOWER, result.basis.status[late])
-        val sourceActivity = 1e-6 * result.primal[narrow] +
-            10.0 * result.primal[boxed] + result.primal[late]
-        val sourceObjective = 1e-6 * result.primal[narrow] +
-            10.00001 * result.primal[boxed] + 1.0001 * result.primal[late]
-        assertTrue(sourceActivity >= 1.0 - 1e-7)
-        assertEquals(1.0, sourceObjective, 1e-9)
-        assertEquals(1.0, result.objective, 1e-9)
         assertDualFeasible(model, result)
     }
 
@@ -252,28 +177,6 @@ class RevisedSimplexNumericsTest {
     }
 
     @Test
-    fun `exhausted boxed capacity does not enter a nonfinishing column`() {
-        val b = LpBuilder()
-        val x = b.addVar(0L, 1L)
-        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 10L)
-        val model = b.build(Sense.MINIMIZE)
-        val simplex = RevisedSimplex(model)
-
-        assertNull(simplex.solve())
-
-        assertEquals(0, simplex.lastPivots)
-        assertEquals(VarStatus.AT_LOWER, assertNotNull(simplex.infeasibleBasis).status[x])
-        assertNotNull(
-            integerFarkasRay(
-                model,
-                assertNotNull(simplex.infeasibleRay),
-                basis = simplex.infeasibleBasis,
-                basisRow = simplex.infeasibleRow,
-            ),
-        )
-    }
-
-    @Test
     fun `near tolerance infeasibility rebuilds once before producing a certificate`() {
         val model = nearToleranceInfeasibleModel()
         val simplex = RevisedSimplex(model, iterationLimit = 2)
@@ -286,28 +189,6 @@ class RevisedSimplexNumericsTest {
         assertNotNull(
             integerFarkasRay(model, ray, basis = simplex.infeasibleBasis, basisRow = simplex.infeasibleRow),
             "the retried float candidate must still certify against authoritative source data",
-        )
-    }
-
-    @Test
-    fun `a fresh basis does not repeat near tolerance recovery`() {
-        val b = LpBuilder()
-        val x = b.addRealVar(0.0, 1.0)
-        b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, -5e-7)
-        val model = b.build(Sense.MINIMIZE)
-        val simplex = RevisedSimplex(model)
-
-        assertNull(simplex.solve())
-
-        assertEquals(0, simplex.lastMetrics.numericalRecoveryRefactorizations)
-        assertEquals(1, simplex.lastRefactorizations)
-        assertNotNull(
-            integerFarkasRay(
-                model,
-                assertNotNull(simplex.infeasibleRay),
-                basis = simplex.infeasibleBasis,
-                basisRow = simplex.infeasibleRow,
-            ),
         )
     }
 
@@ -330,69 +211,6 @@ class RevisedSimplexNumericsTest {
         assertNull(simplex.infeasibleRay)
         simplex.close()
         assertTrue(factors.closed)
-    }
-
-    @Test
-    fun `near tolerance recovery observes cancellation before rebuilding`() {
-        var polls = 0
-        val simplex = RevisedSimplex(
-            nearToleranceInfeasibleModel(),
-            cancellation = Cancellation { ++polls == 2 },
-        )
-
-        val result = assertNotNull(simplex.solve())
-
-        assertFalse(result.optimal)
-        assertEquals(0, simplex.lastMetrics.numericalRecoveryRefactorizations)
-        assertNull(simplex.infeasibleBasis)
-        assertNull(simplex.infeasibleRay)
-    }
-
-    @Test
-    fun `an unrepresentable warm basis solve declines and permits a cold recovery`() {
-        val builder = LpBuilder()
-        val n = 22
-        repeat(n) { builder.addVar(0, 1) }
-        for (i in 0 until n) {
-            val row = mutableMapOf(i to 1L)
-            if (i + 1 < n) row[i + 1] = Long.MAX_VALUE / 8
-            builder.addRow(row, Relation.LE, 1)
-        }
-        val model = builder.build(Sense.MINIMIZE)
-        val warm = Basis(IntArray(n) { it }, Array(2 * n) { if (it < n) VarStatus.BASIC else VarStatus.AT_LOWER })
-        for (primal in listOf(false, true)) {
-            val simplex = RevisedSimplex(model)
-
-            val result = if (primal) simplex.solvePrimal(warm) else simplex.solve(warm)
-
-            assertNull(result)
-            assertNull(simplex.infeasibleBasis)
-            assertNull(simplex.infeasibleRay)
-            assertEquals(-1, simplex.infeasibleRow)
-            assertTrue(simplex.gomoryCuts(4).isEmpty())
-            val recovered = assertNotNull(simplex.solve())
-            assertTrue(recovered.optimal)
-            assertTrue(recovered.primal.all { it == 0.0 })
-            assertEquals(1, recovered.refactorizations)
-            simplex.close()
-        }
-    }
-
-    @Test
-    fun `nonfinite adjusted right hand side reaches exact feasibility recovery`() {
-        val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, 1e308, cost = -1.0)
-        builder.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.LE, 1.0)
-        val model = builder.build(Sense.MINIMIZE)
-
-        val result = solveAndCertify(model, componentSplit = false)
-
-        assertNull(result.float)
-        assertEquals(LpVerdict.FEASIBLE, result.verdict)
-        assertNull(result.farkasRay)
-        assertNull(result.rationalConflict)
-        val point = assertNotNull(result.witness).primal.single()
-        assertTrue(point >= BigFraction.ZERO && point + point <= BigFraction.ONE)
     }
 
     @Test

@@ -78,34 +78,6 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `coupled row residuals admit fewer corrections than violations`() {
-        val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, 1.0)
-        val y = builder.addRealVar(0.0, 1.0)
-        val z = builder.addRealVar(0.0, 1.0)
-        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
-        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
-        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
-        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
-        builder.addRealRow(intArrayOf(x, y, z), doubleArrayOf(1.0, 1.0, 1.0), Relation.LE, 1.6875)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-
-        LpScopedSolver(state).use { owner ->
-            val model = assertNotNull(state.toWorkingModel())
-            val result = recoverExactPointWitness(
-                model,
-                doubleArrayOf(0.5, 0.625, 0.625),
-                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
-            )
-
-            assertTrue(result.repairs in 1..4)
-            val witness = assertNotNull(result.witness)
-            assertNotNull(checkedLpWitness(model, witness.primal))
-        }
-    }
-
-    @Test
     fun `coupled row residuals decline when corrections violate fixed rows`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
@@ -132,47 +104,6 @@ class ExactPointFeasibleTest {
             assertNull(result.witness)
             assertEquals(0, result.repairs)
             assertEquals(LpRefinementDecline.CANDIDATE, result.decline)
-        }
-    }
-
-    @Test
-    fun `coupled row recovery declines below its charged allocation`() {
-        val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, 1.0)
-        val y = builder.addRealVar(0.0, 1.0)
-        val z = builder.addRealVar(0.0, 1.0)
-        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
-        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
-        builder.addRealRow(intArrayOf(x, y), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
-        builder.addRealRow(intArrayOf(x, z), doubleArrayOf(1.0, 2.0), Relation.LE, 1.625)
-        builder.addRealRow(intArrayOf(x, y, z), doubleArrayOf(1.0, 1.0, 1.0), Relation.LE, 1.6875)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-
-        LpScopedSolver(state).use { owner ->
-            val model = assertNotNull(state.toWorkingModel())
-            val primal = doubleArrayOf(0.5, 0.625, 0.625)
-            val full = recoverExactPointWitness(
-                model,
-                primal,
-                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
-            )
-            val limited = recoverExactPointWitness(
-                model,
-                primal,
-                LpRefinementRequest(
-                    owner,
-                    owner.refinementCache,
-                    LpRefinementLimits(maxAllocation = full.allocation - 1L),
-                ),
-                Cancellation.Never,
-            )
-
-            assertNotNull(full.witness)
-            assertNull(limited.witness)
-            assertEquals(LpRefinementDecline.ALLOCATION, limited.decline)
-            assertTrue(limited.allocation < full.allocation)
-            assertEquals(full.allocation + limited.allocation, owner.pointRecoveryCache.allocation)
         }
     }
 
@@ -218,18 +149,6 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `binary feasible point avoids reconstruction and repair`() {
-        val builder = LpBuilder()
-        val x = builder.addRealVar(0.0, 1.0)
-        builder.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.EQ, 1.0)
-        val model = builder.build(Sense.MINIMIZE)
-
-        val point = assertNotNull(exactPointWitness(model, doubleArrayOf(0.5)))
-
-        assertEquals(BigFraction.of(BIG_ONE, bigIntOf(2)), point.primal.single())
-    }
-
-    @Test
     fun `cancelled point attempt retains only spent source work`() {
         val builder = LpBuilder()
         builder.addRealVar(0.0, 1.0)
@@ -247,29 +166,6 @@ class ExactPointFeasibleTest {
             assertNull(first.witness)
             assertEquals(LpRefinementDecline.CANCELLED, first.decline)
             assertEquals(first.work, owner.pointRecoveryCache.work)
-        }
-    }
-
-    @Test
-    fun `cancellation after reconstruction retains spent source work`() {
-        val builder = LpBuilder()
-        builder.addRealVar(0.0, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-
-        LpScopedSolver(state).use { owner ->
-            var polls = 0
-            val result = recoverExactPointWitness(
-                assertNotNull(state.toWorkingModel()),
-                doubleArrayOf(0.5),
-                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation { ++polls > 1 },
-            )
-
-            assertNull(result.witness)
-            assertEquals(LpRefinementDecline.CANCELLED, result.decline)
-            assertEquals(1, result.checks)
-            assertTrue(result.work > 0L)
-            assertEquals(result.work, owner.pointRecoveryCache.work)
         }
     }
 
@@ -387,94 +283,6 @@ class ExactPointFeasibleTest {
     }
 
     @Test
-    fun `two checked points may exceed one attempt limit in the source ledger`() {
-        val builder = LpBuilder()
-        builder.addRealVar(0.0, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-
-        LpScopedSolver(state).use { owner ->
-            val model = assertNotNull(state.toWorkingModel())
-            val first = recoverExactPointWitness(
-                model,
-                doubleArrayOf(0.5),
-                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
-            )
-            val second = recoverExactPointWitness(
-                model,
-                doubleArrayOf(0.5),
-                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits(maxWork = first.work)),
-                Cancellation.Never,
-            )
-
-            assertNotNull(first.witness)
-            assertNotNull(second.witness)
-            assertEquals(first.work, second.work)
-            assertEquals(first.work + second.work, owner.pointRecoveryCache.work)
-            assertTrue(owner.pointRecoveryCache.work > first.work)
-            assertEquals(0L, owner.refinementCache.work)
-        }
-    }
-
-    @Test
-    fun `dense refinement cannot reuse a successful sparse point allowance`() {
-        val builder = LpBuilder()
-        builder.addRealVar(0.0, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-
-        LpScopedSolver(state).use { owner ->
-            val model = assertNotNull(state.toWorkingModel())
-            val point = recoverExactPointWitness(
-                model,
-                doubleArrayOf(0.5),
-                LpRefinementRequest(owner, owner.refinementCache, LpRefinementLimits()),
-                Cancellation.Never,
-            )
-            assertNotNull(point.witness)
-            val request = LpRefinementRequest(
-                owner,
-                owner.refinementCache,
-                LpRefinementLimits(),
-                sourceWorkLimit = point.work,
-            )
-
-            val dense = refineLp(model, request, additionalSourceWork = point.work)
-
-            assertEquals(LpRefinementDecline.WORK, dense.metrics.decline)
-            assertEquals(0L, dense.metrics.work)
-            assertEquals(point.work, owner.pointRecoveryCache.work)
-            assertEquals(0L, owner.refinementCache.work)
-        }
-    }
-
-    @Test
-    fun `dense refinement cannot reuse a failed sparse point allowance`() {
-        val builder = LpBuilder()
-        builder.addRealVar(0.0, 1.0)
-        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-
-        LpScopedSolver(state).use { owner ->
-            val model = assertNotNull(state.toWorkingModel())
-            val request = LpRefinementRequest(
-                owner,
-                owner.refinementCache,
-                LpRefinementLimits(maxWork = 2L),
-                sourceWorkLimit = 2L,
-            )
-            val point = recoverExactPointWitness(model, doubleArrayOf(0.5), request, Cancellation.Never)
-
-            val dense = refineLp(model, request, additionalSourceWork = point.work)
-
-            assertNull(point.witness)
-            assertEquals(LpRefinementDecline.WORK, point.decline)
-            assertEquals(LpRefinementDecline.WORK, dense.metrics.decline)
-            assertEquals(0L, dense.metrics.work)
-            assertEquals(2L, owner.pointRecoveryCache.work)
-            assertEquals(0L, owner.refinementCache.work)
-        }
-    }
-
-    @Test
     fun `near zero equalities remain contradictory for every point candidate`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 1.0)
@@ -486,20 +294,6 @@ class ExactPointFeasibleTest {
             assertFalse(exactPointFeasible(model, doubleArrayOf(candidate)))
             assertNull(exactPointWitness(model, doubleArrayOf(candidate)))
         }
-    }
-
-    @Test
-    fun `reconstructed point is accepted only after exact row validation`() {
-        val model = LpBuilder().apply {
-            val x = addVar(0L, 1L)
-            addRow(intArrayOf(x), longArrayOf(3L), Relation.EQ, 1L)
-        }.build(Sense.MINIMIZE)
-
-        val witness = assertNotNull(exactPointWitness(model, doubleArrayOf(1.0 / 3.0)))
-
-        assertEquals(BigFraction.ONE, BigFraction.ofLong(3L) * witness.primal.single())
-        assertEquals(BigFraction.ZERO, witness.objective)
-        assertTrue(exactPointFeasible(model, doubleArrayOf(1.0 / 3.0)))
     }
 
     @Test

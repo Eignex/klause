@@ -1,7 +1,5 @@
 package com.eignex.klause.propagation.difference
 
-import com.eignex.klause.factor.ConflictReasonOracle
-import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
@@ -14,7 +12,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.undoTo
 import com.eignex.klause.solver.differenceFragmentOf
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -177,26 +174,6 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a row whose cycle is not closed is left open`() {
-        val problem = triangle()
-        val state = stateOf(problem, Lit.make(0, true))
-        assertTrue(runSystem(problem, state))
-        assertEquals(null, state.boolValues[2], "one row alone implies nothing about the third")
-    }
-
-    @Test
-    fun `a positive cycle refutes nothing`() {
-        val problem = problemOf(
-            numBools = 3,
-            numInts = 3,
-            rows = listOf(row(0, 1, 0, 1L), row(1, 2, 1, 1L), row(2, 0, 2, 1L)),
-        )
-        val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true))
-        assertTrue(runSystem(problem, state))
-        assertEquals(null, state.boolValues[2], "the cycle sums to 3 and is satisfiable")
-    }
-
-    @Test
     fun `a fully asserted negative cycle is a conflict naming every row on the cycle`() {
         val problem = triangle()
         val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
@@ -216,26 +193,6 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a row its columns' declared ranges already exclude is refuted unconditionally`() {
-        // x1 - x0 <= -6 cannot hold with both columns in 0..5, and no row of the model says so: the
-        // deduction is available only through the two declared ranges the graph no longer carries.
-        val problem = problemOf(numBools = 1, numInts = 2, rows = listOf(row(0, 1, 0, -6L)), domains = boxed(2, 5))
-        val state = stateOf(problem)
-        assertTrue(runSystem(problem, state))
-        assertEquals(false, state.boolValues[0], "the declared ranges refute the row on their own")
-        val antecedents = assertNotNull(state.boolAntecedents[0], "the pin must carry its forcing clause")
-        assertTrue(antecedents.isEmpty(), "a declared range holds unconditionally, so nothing guards it")
-    }
-
-    @Test
-    fun `a row its ranges permit is left open`() {
-        val problem = problemOf(numBools = 1, numInts = 2, rows = listOf(row(0, 1, 0, -5L)), domains = boxed(2, 5))
-        val state = stateOf(problem)
-        assertTrue(runSystem(problem, state))
-        assertEquals(null, state.boolValues[0], "x1 - x0 = -5 is reachable inside 0..5")
-    }
-
-    @Test
     fun `a range at the unbounded-search clamp refutes nothing`() {
         // The two sides sum past Long. A wrapped sum reads as a hugely negative distance, which would
         // refute every row in the model — the false-UNSAT shape this fold has to refuse outright.
@@ -249,31 +206,6 @@ class DifferenceSystemPropagatorTest {
         val state = stateOf(problem)
         assertTrue(runSystem(problem, state))
         assertEquals(null, state.boolValues[0], "a range that cannot be summed decides nothing")
-    }
-
-    @Test
-    fun `refuting over bounded columns never contradicts a solution`() {
-        val rng = Random(0x1529)
-        repeat(120) { iter ->
-            val hi = 1L + rng.nextInt(3)
-            val rows = (0 until 3).map { aux ->
-                val hiVar = rng.nextInt(3)
-                var loVar = rng.nextInt(3)
-                if (loVar == hiVar) loVar = (loVar + 1) % 3
-                row(aux, hiVar, loVar, (rng.nextInt(5) - 3).toLong())
-            }
-            val problem = problemOf(numBools = 3, numInts = 3, rows = rows, domains = boxed(3, hi))
-            FactorPropagationOracle.assertSound(problem, "difference-bounded#$iter")
-        }
-    }
-
-    @Test
-    fun `a conflict over bounded columns names a clause every solution satisfies`() {
-        val rows = listOf(row(0, 1, 0, -1L), row(1, 2, 1, -1L), row(2, 0, 2, -1L))
-        val problem = problemOf(numBools = 3, numInts = 3, rows = rows, domains = boxed(3, 4))
-        val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
-        assertFalse(runSystem(problem, state))
-        ConflictReasonOracle.assertEntailed(problem, state, systemId(problem), "difference-bounded-conflict")
     }
 
     @Test

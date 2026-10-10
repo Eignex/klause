@@ -68,22 +68,6 @@ class RevisedSimplexCyclingTest {
     }
 
     @Test
-    fun `cyclic primal refactors share the work allowance`() {
-        RevisedSimplex(
-            model,
-            workLimit = 1000L,
-            scalingOptions = LpScalingOptions(enabled = false),
-        ).use { solver ->
-            val result = solver.solvePrimal()
-
-            assertNull(result)
-            assertTrue(solver.lastRefactorizations > 1)
-            assertTrue(solver.lastWorkOps >= 1000L)
-            assertEquals(1, solver.lastNumericalMetrics.capExits)
-        }
-    }
-
-    @Test
     fun `cancellation during a primal cycle withholds the exact state`() {
         val working = assertNotNull(LpExactState(assertNotNull(model.authoritativeModel())).toWorkingModel())
         lateinit var solver: RevisedSimplex

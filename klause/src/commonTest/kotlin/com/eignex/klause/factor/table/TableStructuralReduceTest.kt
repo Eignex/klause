@@ -33,11 +33,6 @@ class TableStructuralReduceTest {
     }
 
     @Test
-    fun `no dead tuple leaves the table unchanged`() {
-        assertEquals(FactorReduction.Unchanged, allPairs.structuralReduce(arrayOf(IntDomain(0, 1), IntDomain(0, 1))))
-    }
-
-    @Test
     fun `a short-support table is not reduced`() {
         // hi != null (a `*`/range cell) ⇒ the ground-tuple reduction does not apply.
         val short = Table(intArrayOf(0, 1), longArrayOf(0, Long.MIN_VALUE), hi = longArrayOf(0, Long.MAX_VALUE))

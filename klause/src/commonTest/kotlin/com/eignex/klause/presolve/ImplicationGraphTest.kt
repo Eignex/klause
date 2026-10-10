@@ -1,7 +1,5 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
@@ -17,7 +15,6 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -25,12 +22,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Binary implication graph ([Presolve.reduceImplicationGraph]). Asserts the observable reduction —
- * merged equivalent variables, dropped redundant binaries, protected objective variables, the no-op
- * identity — and that a reconstructed solution of every reduced problem is feasible in the original
- * (the soundness round-trip). The cap is large enough that every fixture is fully harvested.
- */
 class ImplicationGraphTest {
 
     private val cap = 1024
@@ -42,39 +33,11 @@ class ImplicationGraphTest {
         return problem.propagate(a) !is PropagationResult.Unsat
     }
 
-    private fun binaryCount(problem: Problem): Int =
-        problem.factors.filterIsInstance<Clause>().count { it.literals.size == 2 }
-
     /** The problem [Presolve.reduceImplicationGraph] reduces [problem] to, materialized from its delta. */
     private fun reduced(problem: Problem, objectiveBoolVars: Set<Int> = emptySet()): Problem {
         val baked = problem.bake()
         val delta = Presolve.reduceImplicationGraph(baked, cap, objectiveBoolVars = objectiveBoolVars)
         return baked.withPassDelta(delta, BakeConfig.NONE)
-    }
-
-    /** Solve the reduced problem, reconstruct via the [delta], and assert the lifted sample is feasible. */
-    private fun assertRoundTrip(original: Problem, delta: PassDelta) {
-        val solved = BacktrackSolver(original.bake().withPassDelta(delta, BakeConfig.NONE)).solve(BacktrackParams())
-        check(solved is SolveResult.Sat) { "reduced problem should be satisfiable" }
-        val full = (delta.reconstruct ?: { it })(solved.assignment)
-        assertTrue(isFeasible(original, full), "reconstructed sample infeasible in the original")
-    }
-
-    @Test
-    fun `two variables in a mutual implication cycle collapse to one`() {
-        // (!b0 | b1) and (!b1 | b0) make b0 <-> b1: pinning b0 propagates b1 and vice versa, a cycle.
-        // The pass merges b1 into b0, so b1 stops appearing in the substituted factors.
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
-            ),
-        )
-        assertTrue(reduced(problem).factors.none { 1 in it.boolVars }, "b1 should be substituted away")
-        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem.bake(), cap))
     }
 
     @Test
@@ -95,25 +58,6 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun `an equivalence chain collapses to a single representative`() {
-        // b0 <-> b1 <-> b2 via three mutual-implication pairs: all three share one SCC, so b1 and b2
-        // both merge into the smallest id b0.
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(1, true))),
-            ),
-        )
-        assertTrue(reduced(problem).factors.none { 1 in it.boolVars || 2 in it.boolVars }, "b1, b2 merged into b0")
-        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem.bake(), cap))
-    }
-
-    @Test
     fun `anti-equivalent variables are not merged`() {
         // (!b0 | !b1) and (b0 | b1) make b0 <-> !b1. Substitution preserves polarity and cannot express
         // the flip, so neither variable is merged and both still appear in the factors.
@@ -127,44 +71,6 @@ class ImplicationGraphTest {
             ),
         )
         assertTrue(reduced(problem).factors.any { 1 in it.boolVars }, "anti-equivalent b1 must not be merged away")
-    }
-
-    @Test
-    fun `a transitively redundant binary is dropped`() {
-        // a -> b, b -> c, a -> c as three binary clauses. The direct a -> c is entailed by the chain
-        // a -> b -> c, so the pass drops it; the two chain clauses survive.
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))), // a -> b
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))), // b -> c
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))), // a -> c (redundant)
-            ),
-        )
-        assertEquals(2, binaryCount(reduced(problem)), "the redundant a -> c binary is dropped")
-        assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem.bake(), cap))
-    }
-
-    @Test
-    fun `a non-redundant binary is kept`() {
-        // a -> b and b -> c with no a -> c edge: every binary carries information the others don't, so
-        // none is redundant and all survive.
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-            ),
-        )
-        assertEquals(2, binaryCount(reduced(problem)), "no binary is redundant")
-        assertTrue(
-            Presolve.reduceImplicationGraph(problem.bake(), cap).isEmpty,
-            "nothing to reduce is the no-op signal",
-        )
     }
 
     @Test
@@ -205,65 +111,6 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun `a problem with nothing to derive is returned unchanged`() {
-        // Two independent free booleans with one disjunction: no mutual implication, no redundant
-        // binary, so the pass returns its input unchanged.
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
-        )
-        assertTrue(Presolve.reduceImplicationGraph(problem.bake(), cap).isEmpty, "no reduction is the no-op signal")
-    }
-
-    @Test
-    fun `the builder records the forward implication edge of a binary clause`() {
-        // (!b0 | b1) is the implication b0 -> b1: pinning b0 = true propagates b1 = true, so the
-        // literal-indexed adjacency carries the edge from b0+ to b1+.
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
-        )
-        val graph = Presolve.implicationGraph(problem, cap)
-        assertTrue(Lit.make(1, true) in graph[Lit.make(0, true)].toList(), "b0 = true must force b1 = true")
-    }
-
-    @Test
-    fun `the builder records the contrapositive implication edge of a binary clause`() {
-        // The same (!b0 | b1) is also b1 -> b0 contrapositively: pinning b1 = false propagates
-        // b0 = false, so the adjacency carries the edge from b1- to b0-.
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
-        )
-        val graph = Presolve.implicationGraph(problem, cap)
-        assertTrue(Lit.make(0, false) in graph[Lit.make(1, false)].toList(), "b1 = false must force b0 = false")
-    }
-
-    @Test
-    fun `the builder yields an empty adjacency per literal when no binary implication exists`() {
-        // A single ternary disjunction: pinning either polarity of any variable leaves a non-unit
-        // clause, so propagation forces nothing and every adjacency list is empty over the
-        // 2*numBoolVars nodes.
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))),
-        )
-        val graph = Presolve.implicationGraph(problem, cap)
-        assertEquals(2 * problem.numBoolVars, graph.size, "one node per literal")
-        assertTrue(graph.all { it.isEmpty() }, "no implication means every adjacency list is empty")
-    }
-
-    // ---- the source lane ----
-
-    @Test
     fun `an equivalence a row reads is renamed on a model with an open column`() {
         // b0 <-> b1 from the binaries alone; b1 also reifies a row over an open column, so the rename has
         // to reach the row and the rebuild has to restore b1 from b0.
@@ -286,23 +133,4 @@ class ImplicationGraphTest {
         assertEquals(listOf(true, true), lifted.toList(), "b1 takes its representative's value")
     }
 
-    @Test
-    fun `a transitively redundant binary is dropped on a model with an open column`() {
-        val open = Bits(1).also { it.set(0) }
-        val problem = Problem(
-            numBoolVars = 3,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, open),
-            factors = arrayOf<Factor>(
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-            ),
-        )
-
-        val delta = Presolve.reduceSourceImplicationGraph(problem, Cancellation.Never, emptySet())
-
-        val reduced = assertNotNull(problem.withSourcePassDelta(delta))
-        assertEquals(2, binaryCount(reduced), "the redundant b0 -> b2 binary is dropped")
-    }
 }

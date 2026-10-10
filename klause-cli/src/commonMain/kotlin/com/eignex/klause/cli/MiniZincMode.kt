@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OznApplier
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
@@ -192,6 +193,10 @@ internal class MiniZincOutput : OutputProtocol {
     override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
         // `writeFlatZincSolution` / `OznApplier.render` already include the per-solution
         // `----------` terminator; objective is carried in the rendered text.
+        print(rendered)
+    }
+
+    override fun onExactSolution(rendered: String, objective: BigFraction) {
         print(rendered)
     }
 

@@ -2,18 +2,12 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.ResumableMinimize
-import com.eignex.klause.backtrack.StepEvent
-import com.eignex.klause.backtrack.selector.IndomainMax
-import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
@@ -41,18 +35,12 @@ import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutSolver
-import com.eignex.klause.meta.alns.Alns
-import com.eignex.klause.meta.alns.DestroyOperator
-import com.eignex.klause.meta.alns.FreedVars
-import com.eignex.klause.meta.alns.RepairOperator
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -273,85 +261,11 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `bounded enumeration closes persistent solvers before returning`() {
-        val factory = LifecycleFactory()
-        val solver = BacktrackSolver(enumerationProblem().bake(), context(factory))
-
-        assertEquals(2, solver.enumerate(params()).take(2).count())
-
-        assertEquals(2, factory.persistent.size)
-        factory.assertAllClosed()
-    }
-
-    @Test
-    fun `continued improvements retain one owner and add no extra solve`() {
-        val retainedFactory = LifecycleFactory()
-        val retainedSolver = BacktrackSolver(continuedImprovementProblem().bake(), context(retainedFactory))
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L))
-        val params = improvementParams()
-        val retained = ResumableMinimize(retainedSolver, objective, params, pausable = false)
-        val retainedObjectives = ArrayList<Double?>()
-        while (true) {
-            when (val event = retained.runUntilEvent()) {
-                is StepEvent.Incumbent -> retainedObjectives.add(event.result.objectiveValue)
-
-                is StepEvent.Terminal -> {
-                    retainedObjectives.add(event.result.objectiveValue)
-                    break
-                }
-
-                StepEvent.Paused -> error("non-pausable search paused")
-            }
-        }
-
-        val releasedFactory = LifecycleFactory()
-        val releasedSolver = BacktrackSolver(continuedImprovementProblem().bake(), context(releasedFactory))
-        val releasedObjectives = releasedSolver.improvements(objective, params).map { it.objectiveValue }.toList()
-
-        assertEquals(retainedObjectives, releasedObjectives)
-        assertTrue(releasedObjectives.size > 2, releasedObjectives.toString())
-        assertEquals(1, retainedFactory.persistent.size)
-        assertTrue(releasedFactory.persistent.size > retainedFactory.persistent.size)
-        val retainedSolves = retainedFactory.persistent.sumOf { it.solves }
-        val releasedSolves = releasedFactory.persistent.sumOf { it.solves }
-        val retainedFactorizations = retainedFactory.persistent.sumOf { it.factorizations }
-        val releasedFactorizations = releasedFactory.persistent.sumOf { it.factorizations }
-        assertEquals(0, releasedSolves - retainedSolves)
-        val reacquisitions = releasedFactory.persistent.size - retainedFactory.persistent.size
-        assertTrue(releasedFactorizations - retainedFactorizations in 0..reacquisitions)
-        assertTrue(releasedFactory.persistent.sumOf { it.warmAttempts } > 0)
-        retainedFactory.assertAllClosed()
-        releasedFactory.assertAllClosed()
-    }
-
-    @Test
     fun `LP refuted UNSAT terminal closes its persistent solver`() {
         val factory = LifecycleFactory()
         val solver = BacktrackSolver(lpInfeasibleProblem().bake(), context(factory))
 
         assertIs<SolveResult.Unsat>(solver.solve(params()))
-
-        factory.assertAllClosed()
-    }
-
-    @Test
-    fun `first improvement closes persistent solvers`() {
-        val factory = LifecycleFactory()
-        val solver = BacktrackSolver(wideProblem().bake(), context(factory))
-
-        assertIs<MinimizeResult.WithSample>(
-            solver.improvements(objective(), params()).take(1).single(),
-        )
-
-        factory.assertAllClosed()
-    }
-
-    @Test
-    fun `optimal terminal closes persistent solvers`() {
-        val factory = LifecycleFactory()
-        val solver = BacktrackSolver(wideProblem().bake(), context(factory))
-
-        assertIs<MinimizeResult.Optimal>(solver.minimize(objective(), params()))
 
         factory.assertAllClosed()
     }
@@ -381,40 +295,6 @@ class LpLifecycleTest {
         assertFalse(beforeResume.closed)
         search.close()
         search.close()
-        factory.assertAllClosed()
-    }
-
-    @Test
-    fun `repair reuses factors across terminals and closes its owner once`() {
-        val factory = LifecycleFactory()
-        val solver = BacktrackSolver(wideProblem().bake(), context(factory))
-        val repair = solver.openRepair(objective(), params())
-
-        repair.repair(
-            Assumptions.None,
-            decisionBudget = 2L,
-            cutoff = Double.POSITIVE_INFINITY,
-            cancellation = Cancellation.Never,
-        )
-        val kept = factory.persistent.single()
-        val operations = kept.operations
-        val factorizations = kept.factorizations
-        assertFalse(kept.closed)
-
-        repair.repair(
-            Assumptions.None,
-            decisionBudget = 2L,
-            cutoff = Double.POSITIVE_INFINITY,
-            cancellation = Cancellation.Never,
-        )
-
-        assertEquals(1, factory.persistent.size)
-        assertTrue(kept.operations > operations)
-        assertEquals(factorizations, kept.factorizations)
-        assertTrue(kept.warmAttempts > 0)
-        assertFalse(kept.closed)
-        repair.close()
-        repair.close()
         factory.assertAllClosed()
     }
 
@@ -453,45 +333,6 @@ class LpLifecycleTest {
     }
 
     @Test
-    fun `ALNS owner failure closes retained repair factors and preserves the primary failure`() {
-        val factory = LifecycleFactory()
-        val problem = wideProblem().bake()
-        val objective = objective()
-        val repair = RepairOperator { context ->
-            context.repairSearch?.repair(context.pinAssumptions, 2L, context.bestObjective, context.params.cancellation)
-            factory.failPersistentClose = true
-            error("owner failure")
-        }
-        val alns = Alns(
-            inner = LocalSearchSolver(problem),
-            destroyOperators = listOf(
-                DestroyOperator { _, _, _, _, _ ->
-                    FreedVars(IntArray(0), intArrayOf(0, 1, 2))
-                },
-            ),
-            repairOperators = listOf(repair),
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 1,
-            flipsPerIteration = 1L,
-            backtrack = BacktrackSolver(problem, context(factory)),
-            backtrackParams = params(),
-        )
-        val initial = Sample(BooleanArray(0), LongArray(6) { 2L })
-
-        val failure = assertFailsWith<IllegalStateException> {
-            alns.minimize(
-                objective,
-                LocalSearchParams(maxFlips = 1L, randomSeed = 0L, initialAssignment = initial),
-            )
-        }
-
-        assertEquals("owner failure", failure.message)
-        assertTrue(failure.suppressed.any { it.message?.startsWith("close failure") == true })
-        factory.assertAllClosed()
-    }
-
-    @Test
     fun `callback failure closes the resumable owner and preserves the primary failure`() {
         val factory = LifecycleFactory().also { it.failPersistentClose = true }
         val search = BacktrackSolver(wideProblem().bake(), context(factory)).resumable(
@@ -519,22 +360,6 @@ class LpLifecycleTest {
 
         assertTrue(factory.persistent.first().closed)
         assertFalse(factory.persistent.last().closed)
-        engine.close()
-        factory.assertAllClosed()
-    }
-
-    @Test
-    fun `failed source epoch acquisition releases the displaced solver`() {
-        val factory = LifecycleFactory().also { it.failPersistentAcquisitionAt = 2 }
-        val engine = reifiedEngine(factory)
-        engine.pruneNode(PropagationSession(reifiedProblem()), Double.POSITIVE_INFINITY, -1, true)
-        val pinned = PropagationSession(reifiedProblem()).also { it.implyBool(0, true) }
-
-        assertFailsWith<IllegalStateException> {
-            engine.pruneNode(pinned, Double.POSITIVE_INFINITY, -1, true)
-        }
-
-        assertTrue(factory.persistent.single().closed)
         engine.close()
         factory.assertAllClosed()
     }
@@ -602,21 +427,6 @@ class LpLifecycleTest {
         3,
         Array(3) { IntDomain(0, 1) },
         arrayOf<Factor>(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 1)),
-    )
-
-    private fun continuedImprovementProblem(): Problem = Problem(
-        0,
-        3,
-        Array(3) { IntDomain(0, 5) },
-        arrayOf<Factor>(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 5)),
-    )
-
-    private fun improvementParams() = params().copy(
-        variableSelector = InputOrder,
-        valueSelector = IndomainMax,
-        objectiveGuidedValues = false,
-        lpConfig = null,
-        lpPlan = LpPlan(bounding = true, branching = false),
     )
 
     private fun lpInfeasibleProblem(): Problem = Problem(

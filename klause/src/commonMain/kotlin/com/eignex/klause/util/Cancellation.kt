@@ -106,7 +106,7 @@ fun interface Cancellation {
          * Cancel once [deadline] has passed. Deadline-backed (exposes [Cancellation.deadline]), so it
          * composes with [shorten]. Backed by [TimeSource.Monotonic] via the caller's mark.
          */
-        fun until(deadline: ComparableTimeMark): Cancellation = object : Cancellation {
+        fun until(deadline: ComparableTimeMark): Cancellation = object : ClockOnlyCancellation {
             override fun isCancelled(): Boolean = deadline.hasPassedNow()
             override fun deadline(): ComparableTimeMark = deadline
         }
@@ -127,6 +127,8 @@ fun interface Cancellation {
     }
 }
 
+private interface ClockOnlyCancellation : Cancellation
+
 // Flatten library-owned composites at construction so hot polls visit ordered predicates without recursive calls.
 // The deadline and first work meter remain snapshots taken at composition, including for dynamic adapters.
 private class OrCancellation(
@@ -136,8 +138,16 @@ private class OrCancellation(
     private val meter: WorkMeter?,
 ) : Cancellation {
     private val tokens: Array<Cancellation> = buildList<Cancellation> {
-        if (self is OrCancellation) addAll(self.tokens) else if (self !== Cancellation.Never) add(self)
-        if (other is OrCancellation) addAll(other.tokens) else if (other !== Cancellation.Never) add(other)
+        if (self is OrCancellation) {
+            for (token in self.tokens) appendOrdered(token)
+        } else if (self !== Cancellation.Never) {
+            appendOrdered(self)
+        }
+        if (other is OrCancellation) {
+            for (token in other.tokens) appendOrdered(token)
+        } else if (other !== Cancellation.Never) {
+            appendOrdered(other)
+        }
     }.toTypedArray()
 
     override fun isCancelled(): Boolean {
@@ -147,6 +157,20 @@ private class OrCancellation(
 
     override fun deadline(): ComparableTimeMark? = combined
     override fun workMeter(): WorkMeter? = meter
+}
+
+private fun MutableList<Cancellation>.appendOrdered(token: Cancellation) {
+    val last = lastOrNull()
+    if (last is ClockOnlyCancellation && token is ClockOnlyCancellation) {
+        val previous = last.deadline()
+        val next = token.deadline()
+        if (previous is TimeSource.Monotonic.ValueTimeMark && next is TimeSource.Monotonic.ValueTimeMark) {
+            // Adjacent monotonic deadlines have no intervening predicate effects.
+            if (next < previous) this[lastIndex] = token
+            return
+        }
+    }
+    add(token)
 }
 
 /**

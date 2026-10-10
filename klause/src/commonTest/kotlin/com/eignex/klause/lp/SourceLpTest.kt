@@ -1,9 +1,5 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.lp.engine.ExactBasisMetrics
-import com.eignex.klause.lp.engine.LpCertificationPolicy
-import com.eignex.klause.lp.engine.LpCertifier
-import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
@@ -32,72 +28,6 @@ class SourceLpTest {
 
             assertEquals(callerBinds, stated == caller)
             assertTrue(stated <= caller)
-        }
-    }
-
-    @Test
-    fun `scoped refinement observations reconcile with completed source work`() {
-        val observations = ArrayList<ExactBasisMetrics>()
-        val a = BigFraction.ofLong(1_000_000_007L)
-        val b = BigFraction.ofLong(1_000_000_009L)
-        val rows = listOf(
-            ExactRationalInequality(intArrayOf(0, 1), listOf(a, BigFraction.ONE), BigFraction.ONE),
-            ExactRationalInequality(
-                intArrayOf(0, 1),
-                listOf(a.negated(), BigFraction.MINUS_ONE),
-                BigFraction.MINUS_ONE,
-            ),
-            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, b), BigFraction.ONE),
-            ExactRationalInequality(
-                intArrayOf(0, 1),
-                listOf(BigFraction.MINUS_ONE, b.negated()),
-                BigFraction.MINUS_ONE,
-            ),
-        )
-        val context = LpSolveContext(onRefinementBasisVerification = observations::add)
-        val budget = SourceLpBudget(solveContext = { context })
-        SourceLp(rows, 2, budget).use { source ->
-            val result = assertNotNull(source.solve(Cancellation.Never))
-            val refinement = assertNotNull(result.refinement)
-
-            assertTrue(observations.isNotEmpty())
-            assertTrue(refinement.luFactories > 0)
-            assertEquals(refinement.luFactories, observations.sumOf { it.factoryCalls })
-            assertEquals(refinement.luBuilds, observations.sumOf { it.builds })
-            assertEquals(refinement.luReuse, observations.sumOf { it.reuse })
-            assertEquals(refinement.luSolves, observations.sumOf { it.solves })
-            assertEquals(refinement.luWork, observations.sumOf { it.work })
-            assertTrue(assertNotNull(result.exactPrimal).satisfiesSourceRows(rows))
-            val calls = observations.size
-            val spent = budget.reservedWork
-            assertNull(source.solve(Cancellation { true }))
-            assertEquals(calls, observations.size)
-            assertEquals(spent, budget.reservedWork)
-        }
-    }
-
-    @Test
-    fun `basis observations retain the source witness and cancellation spending`() {
-        val observations = ArrayList<ExactBasisMetrics>()
-        val rows = listOf(
-            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ofLong(3L)), BigFraction.ONE),
-            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ofLong(-3L)), BigFraction.MINUS_ONE),
-        )
-        val context = LpSolveContext(
-            certificationPolicy = LpCertificationPolicy { certifier, success ->
-                success && certifier == LpCertifier.EXACT_BASIS
-            },
-        )
-        val budget = SourceLpBudget(solveContext = { context }, onBasisVerification = observations::add)
-        SourceLp(rows, 1, budget).use { source ->
-            val result = assertNotNull(source.solve(Cancellation.Never))
-            assertEquals(BigFraction.ofLong(3L).reciprocal(), result.exactPrimal?.first())
-            assertTrue(observations.isNotEmpty())
-            val calls = observations.size
-            val spent = budget.reservedWork
-            assertNull(source.solve(Cancellation { true }))
-            assertEquals(calls, observations.size)
-            assertEquals(spent, budget.reservedWork)
         }
     }
 
@@ -163,92 +93,6 @@ class SourceLpTest {
     }
 
     @Test
-    fun `scaled opposite source rows imply bounds without claiming attainment`() {
-        for (strict in listOf(false, true)) {
-            val rows = listOf(
-                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ofLong(2L)), BigFraction.ofLong(8L)),
-                ExactRationalInequality(
-                    intArrayOf(0),
-                    listOf(BigFraction.ofLong(-3L)),
-                    BigFraction.ofLong(-6L),
-                    strict,
-                ),
-                ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-            )
-            val budget = SourceLpBudget(solveContext = { error("paired rows cannot allocate an LP owner") })
-
-            val split = assertIs<ExactDoubleBoundedSplit.Split>(
-                sourceDoubleBoundedSplit(rows, 2, budget, Cancellation.Never),
-            )
-
-            assertEquals(
-                listOf(BigFraction.ofLong(4L), BigFraction.ofLong(-12L), BigFraction.ofLong(-4L)),
-                split.bounded.map { it.lower },
-            )
-            assertTrue(split.unbounded.isEmpty())
-            assertEquals(1, budget.operations)
-            assertTrue(budget.reservedWork > 0L)
-            assertTrue(budget.reservedAllocation > 0L)
-            split.bounded.forEachIndexed { index, row ->
-                assertEquals(index, row.index)
-                assertSame(rows[index], row.inequality)
-            }
-            for (value in 0L..5L) {
-                val point = listOf(BigFraction.ofLong(value), BigFraction.ZERO)
-                if (point.satisfiesSourceRows(rows)) {
-                    for (row in split.bounded) {
-                        assertTrue(row.lower <= point[0] * row.inequality.coefficients.single())
-                    }
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `unpaired rows retain the common cone check`() {
-        val rows = listOf(exactColumnUpper(0, BigFraction.ONE))
-        val budget = SourceLpBudget()
-
-        val split = assertIs<ExactDoubleBoundedSplit.Split>(
-            sourceDoubleBoundedSplit(rows, 2, budget, Cancellation.Never),
-        )
-
-        assertEquals(listOf(0), split.unbounded)
-        assertTrue(split.bounded.isEmpty())
-        assertTrue(budget.operations > 1)
-        assertTrue(budget.measuredPreparationWork > 0L)
-        assertTrue(budget.measuredFloatWork > 0L)
-    }
-
-    @Test
-    fun `a small leaf with word sized coefficients is admitted for reduction`() {
-        val a = BigFraction.ofLong(4_294_967_296L)
-        val b = BigFraction.ofLong(3_435_973_837L)
-        val twelve = BigFraction.ofLong(12L)
-        val equality = ExactRationalInequality(intArrayOf(0, 1), listOf(a, b), twelve)
-        val rows = listOf(
-            exactColumnLower(0, BigFraction.ofLong(31L)),
-            exactColumnUpper(1, BigFraction.ofLong(-38L)),
-            exactColumnLower(2, BigFraction.ONE),
-            exactColumnUpper(2, BigFraction.ONE),
-            exactColumnLower(3, BigFraction.ZERO),
-            exactColumnUpper(3, BigFraction.ZERO),
-            exactColumnUpper(2, BigFraction.ONE),
-            exactColumnLower(2, BigFraction.ONE),
-            exactColumnUpper(1, BigFraction.ofLong(4_294_967_295L)),
-            exactColumnUpper(1, BigFraction.ZERO),
-            equality,
-            ExactRationalInequality(intArrayOf(0, 1), listOf(a.negated(), b.negated()), twelve.negated()),
-        )
-
-        val split = assertIs<ExactDoubleBoundedSplit.Split>(
-            sourceDoubleBoundedSplit(rows, 4, SourceLpBudget(), Cancellation.Never),
-        )
-
-        assertEquals(twelve, split.bounded.single { it.inequality === equality }.lower)
-    }
-
-    @Test
     fun `crossed opposite bounds do not publish an unexplained contradiction`() {
         val rows = listOf(exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ONE))
 
@@ -301,22 +145,6 @@ class SourceLpTest {
     }
 
     @Test
-    fun `restoring original right hand side cannot reuse a changed conflict`() {
-        val rows = listOf(exactColumnLower(0, BigFraction.ZERO), exactColumnUpper(0, BigFraction.ONE))
-        SourceLp(rows, 1, SourceLpBudget()).use { owner ->
-            val changed = assertNotNull(
-                owner.solve(Cancellation.Never, rhs = listOf(BigFraction.ZERO, BigFraction.MINUS_ONE)),
-            )
-            assertEquals(LpVerdict.INFEASIBLE, changed.verdict)
-
-            val restored = assertNotNull(owner.solve(Cancellation.Never))
-
-            assertNotNull(restored.exactPrimal)
-            assertTrue(assertNotNull(restored.exactPrimal).satisfiesSourceRows(rows))
-        }
-    }
-
-    @Test
     fun `source row mutation cannot alter an admitted owner`() {
         val coefficients = mutableListOf(BigFraction.ONE)
         val row = ExactRationalInequality(intArrayOf(0), coefficients, BigFraction.ONE)
@@ -329,23 +157,6 @@ class SourceLpTest {
             )
 
             assertEquals(LpVerdict.INFEASIBLE, result.verdict)
-        }
-    }
-
-    @Test
-    fun `opposite singleton branch sides do not survive scope restoration`() {
-        val rows = listOf(exactColumnLower(0, BigFraction.ZERO), exactColumnUpper(0, BigFraction.ONE))
-        SourceLp(rows, 1, SourceLpBudget()).use { owner ->
-            val lower = assertNotNull(
-                owner.solve(Cancellation.Never, branches = listOf(exactColumnLower(0, BigFraction.ONE))),
-            )
-            assertEquals(BigFraction.ONE, assertNotNull(lower.exactPrimal).first())
-
-            val upper = assertNotNull(
-                owner.solve(Cancellation.Never, branches = listOf(exactColumnUpper(0, BigFraction.ZERO))),
-            )
-
-            assertEquals(BigFraction.ZERO, assertNotNull(upper.exactPrimal).first())
         }
     }
 

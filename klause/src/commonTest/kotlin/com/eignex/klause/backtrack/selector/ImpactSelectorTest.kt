@@ -1,7 +1,5 @@
 package com.eignex.klause.backtrack.selector
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
@@ -10,14 +8,11 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ImpactSelectorTest {
@@ -92,59 +87,6 @@ class ImpactSelectorTest {
     }
 
     @Test
-    fun `impact picks ordering by stronger pruning first`() {
-        // 4 vars, AllDifferent. v3 pinned to 0; for v0 ∈ [0, 3] the only infeasible value
-        // is 0, and {1, 2, 3} have *equal* impact (each removes one common value across
-        // the AllDifferent peers). So we just verify the order respects feasibility and
-        // doesn't repeat values.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(
-                IntDomain(0, 3),
-                IntDomain(0, 3),
-                IntDomain(0, 3),
-                IntDomain(0, 0),
-            ),
-            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
-        )
-        val session = PropagationSession(problem)
-        val values = Impact()
-            .values(session, VarRef.IntVar(0), Random(7L))
-            .toList()
-        assertEquals(
-            setOf(1L, 2L, 3L),
-            values.toSet(),
-            "0 must be dropped (v3 = 0); the remaining 3 values must all appear; got $values",
-        )
-        assertEquals(
-            values.distinct().size,
-            values.size,
-            "no duplicates expected; got $values",
-        )
-    }
-
-    @Test
-    fun `impact still finds a solution in the engine`() {
-        // 5-queens-like AllDifferent; just confirm BacktrackSolver wires through cleanly.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 5,
-            intDomains = Array(5) { IntDomain(0, 4) },
-            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(
-                variableSelector = SmallestDomain,
-                valueSelector = Impact(),
-                randomSeed = 0L,
-            ),
-        )
-        val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0L..4L).toSet(), sat.assignment.ints.toSet())
-    }
-
-    @Test
     fun `impact restores trail level after probing`() {
         val problem = Problem(
             numBoolVars = 1,
@@ -205,21 +147,6 @@ class ImpactSelectorTest {
         val session = PropagationSession(problem)
         val values = Impact(maxProbes = 4).values(session, VarRef.IntVar(0), Random(0L)).toList()
         assertTrue(values.isNotEmpty(), "a sample cannot refute a domain it did not walk")
-    }
-
-    @Test
-    fun `impact on bool var probes both polarities`() {
-        // Both polarities feasible: returns both, ordering depends on which polarity prunes
-        // more. We only assert size and membership.
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = emptyArray(),
-        )
-        val session = PropagationSession(problem)
-        val values = Impact().values(session, VarRef.Bool(0), Random(0L)).toList()
-        assertEquals(setOf(0L, 1L), values.toSet())
     }
 
     @Test

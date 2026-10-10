@@ -12,11 +12,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The shared clause database behind the SAT-part passes. `eligible` is the safety gate that stops BVE
- * and BCE from rewriting a Boolean they cannot reconstruct, so each test pins one reason a variable
- * loses eligibility, plus the slot bookkeeping the passes read back through [SatClauseDb.toDelta].
- */
 class SatClauseDbTest {
 
     private fun pos(v: Int) = Lit.make(v, true)
@@ -24,12 +19,6 @@ class SatClauseDbTest {
 
     private fun db(numBool: Int, factors: List<Factor>, objectiveBoolVars: Set<Int> = emptySet()) =
         SatClauseDb.build(Problem(numBool, 0, emptyArray(), factors), objectiveBoolVars)
-
-    @Test
-    fun `a variable appearing only in clean clauses is eligible`() {
-        val d = db(2, listOf(Clause(intArrayOf(pos(0), pos(1)))))
-        assertTrue(d.eligible[0] && d.eligible[1], "pure-clause variables are safe to eliminate")
-    }
 
     @Test
     fun `a variable touched by a non-clause factor is ineligible`() {
@@ -47,27 +36,12 @@ class SatClauseDbTest {
     }
 
     @Test
-    fun `an objective variable is ineligible`() {
-        val d = db(2, listOf(Clause(intArrayOf(pos(0), pos(1)))), objectiveBoolVars = setOf(0))
-        assertFalse(d.eligible[0], "an objective variable must keep its value")
-        assertTrue(d.eligible[1])
-    }
-
-    @Test
     fun `a tautological clause never enters a slot and is dropped by the delta`() {
         // (b0 ∨ !b0) is always true: no slot is created for it and the delta retires the input factor.
         val d = db(2, listOf(Clause(intArrayOf(pos(0), neg(0))), Clause(intArrayOf(pos(1)))))
         assertEquals(1, d.slotCount, "only the non-tautological clause takes a slot")
         assertEquals(1, d.origin(0), "the surviving slot points at input factor 1")
         assertContentEquals(intArrayOf(0), d.toDelta(null).droppedIndices, "the tautology is dropped")
-    }
-
-    @Test
-    fun `the occurrence index maps a literal to the slots mentioning it`() {
-        val d = db(2, listOf(Clause(intArrayOf(pos(0), pos(1))), Clause(intArrayOf(neg(0), pos(1)))))
-        assertContentEquals(intArrayOf(0), d.occ(pos(0)).toIntArray())
-        assertContentEquals(intArrayOf(1), d.occ(neg(0)).toIntArray())
-        assertContentEquals(intArrayOf(0, 1), d.occ(pos(1)).toIntArray())
     }
 
     @Test

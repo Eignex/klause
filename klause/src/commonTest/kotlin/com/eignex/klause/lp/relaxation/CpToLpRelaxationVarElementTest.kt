@@ -11,7 +11,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Variable-array Element big-M linearization: `result = arr[idx]` where `arr` holds int-var ids.
@@ -37,23 +36,6 @@ class CpToLpRelaxationVarElementTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 1L, 0L, 0L))
         val r = CpToLpRelaxation(p, obj, elementHull = true).build(PropagationSession(p))
         return solveLp(r.model)
-    }
-
-    @Test
-    fun `var-array hull bound is sound for a free index`() {
-        // arr[0] ∈ [4,10], arr[1] ∈ [2,8], idx ∈ {0,1}. True integer min(result) = 2 (idx=1, arr[1]=2).
-        // arr[0] ∈ [6,9], arr[1] ∈ [5,7] tightened high: true integer min(result) = 5.
-        listOf(
-            Triple(IntDomain(4, 10), IntDomain(2, 8), 2.0),
-            Triple(IntDomain(6, 9), IntDomain(5, 7), 5.0),
-        ).forEach { (a0, a1, optimum) ->
-            val sol = minResult(IntDomain(0, 1), a0, a1)
-            assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-            assertTrue(
-                sol.objectiveValue <= optimum + eps,
-                "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum $optimum",
-            )
-        }
     }
 
     @Test

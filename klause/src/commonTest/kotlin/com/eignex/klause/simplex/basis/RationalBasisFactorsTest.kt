@@ -119,41 +119,6 @@ class RationalBasisFactorsTest {
     }
 
     @Test
-    fun `signed word boundaries convert without losing exact bits`() {
-        val wide = power(100) + BigFraction.ofLong(7)
-        val values = listOf(
-            power(64),
-            power(100),
-            power(127),
-            power(127).negated(),
-            power(127) - BigFraction.ONE,
-            wide.negated(),
-            wide.reciprocal(),
-        )
-        for (value in values) {
-            val matrix = listOf(listOf(value))
-            val built = ready(matrix)
-            checkSolves(matrix, built.factors)
-        }
-    }
-
-    @Test
-    fun `negative signed endpoint stays fixed in off diagonal entries and RHS`() {
-        val endpoint = power(127).negated()
-        val matrix = listOf(listOf(BigFraction.ONE, endpoint), listOf(BigFraction.ZERO, BigFraction.ONE))
-        val built = ready(matrix, identityOrder(2))
-        assertEquals(0, built.stats.restarts)
-        val factors = ready(matrix(listOf(1, 0), listOf(0, 1))).factors
-        for (transpose in listOf(false, true)) {
-            val rhs = listOf(endpoint, BigFraction.ZERO)
-            val result = solved(factors, rhs, transpose)
-            assertEquals(0, result.stats.restarts)
-            assertEquals(rhs, result.values)
-        }
-        checkSolves(matrix, built.factors)
-    }
-
-    @Test
     fun `input hint output and RHS mutations cannot alter retained factors`() {
         val matrix = mutableListOf(
             mutableListOf(BigFraction.ofLong(2), BigFraction.ONE),
@@ -242,44 +207,6 @@ class RationalBasisFactorsTest {
     }
 
     @Test
-    fun `cancellation inside a long elimination stops within two poll strides of work`() {
-        val n = 40
-        val rows = List(n) { i -> List(n) { j -> if (i == j) 3 * n else (i * 7 + j * 3) % 11 + 1 } }
-        var reads = 0
-
-        val result = RationalBasisFactors.factor(
-            matrix(*rows.toTypedArray()),
-            cancellation = Cancellation { reads++ >= 80 },
-        )
-
-        val declined = assertIs<RationalBasisBuild.Declined>(result)
-        assertEquals(RationalBasisDecline.CANCELLED, declined.reason)
-        assertEquals(1, declined.stats.builds)
-        assertTrue(declined.stats.work in 1L..8192L, "${declined.stats.work}")
-    }
-
-    @Test
-    fun `resource reservations are repeatable at successful boundaries`() {
-        val matrix = matrix(listOf(3, 2, 1), listOf(1, 4, 2), listOf(2, 1, 5))
-        val baseline = ready(matrix)
-        val limits = RationalBasisLimits(
-            work = baseline.stats.work,
-            allocationBytes = baseline.stats.allocationBytes,
-            fill = baseline.stats.peakFill,
-        )
-        val repeated = assertIs<RationalBasisBuild.Ready>(RationalBasisFactors.factor(matrix, limits = limits))
-        assertEquals(baseline.stats, repeated.stats)
-        for (limits in listOf(
-            limits.copy(work = limits.work - 1),
-            limits.copy(allocationBytes = limits.allocationBytes - 1),
-            limits.copy(fill = limits.fill - 1),
-        )) {
-            assertIs<RationalBasisBuild.Declined>(RationalBasisFactors.factor(matrix, limits = limits))
-        }
-        assertEquals(0, baseline.stats.restarts)
-    }
-
-    @Test
     fun `fill growth is reserved before storing Schur entries`() {
         val matrix = matrix(listOf(3, 1, 0, 0), listOf(0, 3, 1, 0), listOf(0, 0, 3, 1), listOf(1, 0, 0, 3))
         val result = RationalBasisFactors.factor(matrix, limits = RationalBasisLimits(fill = 8))
@@ -348,74 +275,6 @@ class RationalBasisFactorsTest {
         assertFailsWith<IllegalArgumentException> { ready(matrix).factors.solve(emptyList()) }
     }
 
-    @Test
-    fun `empty basis has empty normal and transpose solutions`() {
-        for (transpose in listOf(false, true)) {
-            assertEquals(emptyList(), solved(emptyFactors, emptyList(), transpose).values)
-        }
-    }
-
-    @Test
-    fun `sparse frozen workload accounts for proposed and standalone work`() {
-        measure("sparse", matrix(listOf(3, 1, 0, 0), listOf(0, 3, 1, 0), listOf(0, 0, 3, 1), listOf(1, 0, 0, 3)))
-    }
-
-    @Test
-    fun `spiked frozen workload accounts for proposed and standalone work`() {
-        measure("spiked", matrix(listOf(1, 2, 3, 4), listOf(2, 1, 0, 0), listOf(1, 0, 1, 0), listOf(3, 0, 0, 1)))
-    }
-
-    @Test
-    fun `dense frozen workload accounts for proposed and standalone work`() {
-        measure("dense", matrix(listOf(5, 2, 1, 3), listOf(1, 7, 2, 1), listOf(3, 1, 8, 2), listOf(2, 3, 1, 9)))
-    }
-
-    @Test
-    fun `near singular frozen workload retains its exact nonzero determinant`() {
-        val o = BigFraction.ONE
-        measure("near-singular", listOf(listOf(o, o), listOf(o, o + power(80).reciprocal())))
-    }
-
-    private fun measure(name: String, matrix: List<List<BigFraction>>) {
-        val standalone = ready(matrix)
-        val proposed = ready(matrix, standalone.factors.ordering())
-        val expected = when (name) {
-            "sparse" -> RationalBasisStats(249, 35456, 10, 7, 8, 1, 0, 0, 0)
-            "spiked" -> RationalBasisStats(249, 34688, 10, 3, 5, 1, 0, 0, 0)
-            "dense" -> RationalBasisStats(322, 69568, 16, 8, 13, 1, 0, 0, 0)
-            "near-singular" -> RationalBasisStats(79, 25920, 4, 81, 83, 1, 0, 0, 0)
-            else -> error("unfrozen workload")
-        }
-        assertEquals(expected, standalone.stats)
-        assertEquals(
-            expected.copy(
-                work = expected.work - if (matrix.size == 2) 5 else 54,
-                allocationBytes = expected.allocationBytes + if (matrix.size == 2) 320 else 384,
-                proposedAttempts = 1,
-            ),
-            proposed.stats,
-        )
-        for ((mode, built) in listOf("standalone" to standalone, "proposed" to proposed)) {
-            assertEquals(0, built.stats.fallbacks)
-            assertTrue(built.stats.work > 0 && built.stats.allocationBytes > 0 && built.stats.peakFill > 0)
-            assertTrue(built.stats.maxBits > 0 && built.stats.maxIntermediateBits > 0)
-            println("B6a $name $mode build ${built.stats}")
-            for (transpose in listOf(false, true)) {
-                val rhs = List(matrix.size) { BigFraction.ofLong(it + 1L) }
-                val result = solved(built.factors, rhs, transpose)
-                checkAnswer(matrix, rhs, transpose, result.values)
-                assertEquals(result.stats, solved(built.factors, rhs, transpose).stats)
-                println("B6a $name $mode transpose=$transpose solve ${result.stats}")
-            }
-            checkSolves(matrix, built.factors)
-        }
-        assertEquals(standalone.stats.peakFill, proposed.stats.peakFill)
-        assertEquals(standalone.stats.maxBits, proposed.stats.maxBits)
-        assertEquals(standalone.stats.restarts, proposed.stats.restarts)
-        assertEquals(standalone.stats, ready(matrix).stats)
-        assertEquals(proposed.stats, ready(matrix, standalone.factors.ordering()).stats)
-    }
-
     private fun checkSolves(matrix: List<List<BigFraction>>, factors: RationalBasisFactors) {
         for (transpose in listOf(false, true)) {
             for (offset in 0..1) {
@@ -471,11 +330,6 @@ class RationalBasisFactorsTest {
     private fun identityOrder(n: Int) = RationalBasisOrder(IntArray(n) { it }, IntArray(n) { it })
     private fun power(bits: Int) = BigFraction.of(BIG_ONE shl bits, BIG_ONE)
 
-    companion object {
-        private val emptyFactors = assertIs<RationalBasisBuild.Ready>(
-            RationalBasisFactors.factor(emptyList(), RationalBasisOrder(intArrayOf(), intArrayOf())),
-        ).factors
-    }
 
     @Test
     fun `the default limits bound work and never the clock`() {

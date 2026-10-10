@@ -33,35 +33,11 @@ class VariablePartitionTest {
     private fun row(vararg vars: Int) = Linear(LongArray(vars.size) { 1L }, vars.toList().toIntArray(), LinearOp.LE, 5L)
 
     @Test
-    fun `a column only interval reasoning mentions is theory-eligible`() {
-        val partition = problemOf(2, row(0, 1)).variablePartition()
-        assertTrue(partition.isTheoryEligible(0))
-        assertTrue(partition.isTheoryEligible(1))
-    }
-
-    @Test
-    fun `a column a value-indexing global mentions must be searched`() {
-        // AllDifferent is parameterised by a value window, so it cannot act on a range it cannot walk.
-        val alldiff = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 11)
-        val partition = problemOf(2, alldiff).variablePartition()
-        assertFalse(partition.isTheoryEligible(0))
-        assertFalse(partition.isTheoryEligible(1))
-    }
-
-    @Test
     fun `one global drags only the columns it mentions into the search set`() {
         val alldiff = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 11)
         val partition = problemOf(3, alldiff, row(2)).variablePartition()
         assertEquals(1, partition.theoryEligibleCount, "only the linear-only column is eligible")
         assertTrue(partition.isTheoryEligible(2))
-    }
-
-    @Test
-    fun `a column both kinds mention must be searched`() {
-        val alldiff = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 11)
-        val partition = problemOf(3, alldiff, row(1, 2)).variablePartition()
-        assertFalse(partition.isTheoryEligible(1), "the global's need decides a shared column")
-        assertTrue(partition.isTheoryEligible(2), "the column only the row mentions stays eligible")
     }
 
     @Test

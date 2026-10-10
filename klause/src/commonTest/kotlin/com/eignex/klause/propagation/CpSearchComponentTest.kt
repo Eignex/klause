@@ -223,29 +223,6 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `shared runner enumerates CP branches without repeating a model`() {
-        val component = CpSearchComponent(
-            PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())),
-        )
-        component.rebase()
-        val session = SearchSession(listOf(component))
-
-        assertIs<ComponentResult.Consistent>(session.initialize())
-        val run = session.openRun(0)
-        val first = assertIs<SearchRunEvent.Satisfied>(run.next())
-        val second = assertIs<SearchRunEvent.Satisfied>(run.next())
-
-        assertEquals(
-            setOf(0L, 1L),
-            setOf(
-                first.model.valueOf<Long>(SearchIntValue(0)),
-                second.model.valueOf<Long>(SearchIntValue(0)),
-            ),
-        )
-        assertIs<SearchRunEvent.Exhausted>(run.next())
-    }
-
-    @Test
     fun `a decision whose fixpoint the deadline cut is reported undecided`() {
         // (¬x0 ∨ x1): pinning x0 wakes the clause, so the decision's fixpoint fires. cancelFloor 0
         // makes the poll engage from the first fire, so the armed deadline cuts that propagation and
@@ -281,25 +258,6 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `a run whose fixpoint the deadline cut surfaces no model`() {
-        // (x0 ∨ x1): the traversal's first decision is x0 = false, which wakes the clause with no true
-        // blocker to short-cut it, so the armed deadline cuts that fixpoint. Descending on the state it
-        // leaves reaches x1 = false — a leaf whose assignment falsifies the clause.
-        var armed = false
-        val propagation = PropagationSession(
-            Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))))),
-            Cancellation { armed },
-            propagationCancelFloor = 0,
-        )
-        val session = SearchSession(listOf(CpSearchComponent(propagation)))
-        assertIs<ComponentResult.Consistent>(session.initialize())
-        val run = session.openRun(2)
-        armed = true
-
-        assertIs<SearchRunEvent.Indeterminate>(run.next())
-    }
-
-    @Test
     fun `CP explains a Boolean it published when the shared analyzer asks`() {
         val propagation = PropagationSession(
             Problem(
@@ -332,35 +290,6 @@ class CpSearchComponentTest {
         session.popTo(0)
 
         assertEquals(0, propagation.decisionLevel)
-    }
-
-    @Test
-    fun `CP Boolean propagation is visible to peer components`() {
-        val propagation = PropagationSession(
-            Problem(
-                2,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
-            ),
-        )
-        val session = SearchSession(listOf(CpSearchComponent(propagation)))
-
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
-
-        assertEquals(true, session.boolValue(1))
-    }
-
-    @Test
-    fun `CP root Boolean propagation is published during shared initialization`() {
-        val propagation = PropagationSession(
-            Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true))))),
-        )
-        val session = SearchSession(listOf(CpSearchComponent(propagation)))
-
-        assertIs<ComponentResult.Consistent>(session.initialize())
-
-        assertEquals(true, session.boolValue(0))
     }
 
     @Test

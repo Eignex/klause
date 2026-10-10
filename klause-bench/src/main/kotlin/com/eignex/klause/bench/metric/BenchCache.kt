@@ -50,7 +50,7 @@ internal object BenchCache {
         md.update("|$solver|t=${budget.timeoutMillis}".toByteArray())
         provenance?.let { md.update("|build=${it.fingerprint}".toByteArray()) }
         settings?.let { md.update(Reports.json.encodeToString(it).toByteArray()) }
-        md.update("|validation=$validationPolicy|timing=elapsed-v1".toByteArray())
+        md.update("|validation=$validationPolicy|timing=elapsed-v1|objective=exact-v1".toByteArray())
         return md.digest().joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
     }
 

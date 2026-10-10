@@ -139,10 +139,17 @@ Analysis prefers witness time, then valid reported `stats.solveTime` in seconds,
 then elapsed time, then the budget. Undecided runs retain the budget penalty.
 
 SMT-LIB optimization records consume the CLI's objective comments and retain its
-terminal `optimizationStatus` in `stats`. An optimum requires `sat`, a finite objective
+terminal `optimizationStatus` in `stats`. An optimum requires `sat`, a valid exact objective
 and explicit `optimal` status. Plain `sat`, interrupted incumbents (`best-found`) and
 unbounded objectives receive no optimality proof credit; an unbounded record's objective
 belongs to its feasible witness.
+
+Parsed objectives retain canonical integer or reduced rational text in `exactObjective`.
+The legacy numeric `objective` remains an approximate display channel and can be null
+when the value exceeds binary64 range. JSON caches and CSV references retain both
+channels; comparison and reference replacement prefer exact values and fall back to
+legacy numeric values only when exact text is absent. Malformed exact values cannot
+receive objective credit. Cache keys include the objective representation version.
 
 Records retain plain model/data `sourceHashes` and the final rendered candidate
 as `finalWitness`, up to 8 MiB. These captures are outside subprocess timing.
@@ -196,7 +203,7 @@ Run each configuration separately over the same frozen selection:
 ./gradlew :klause-bench:solveCampaign --args="solve suite=core kind=cop engine=cp param=var-selector=smallest-domain timeout=30000 label=domain"
 ```
 
-Use `klause-bench/output/compare.sh [--incomplete] <dirA> <dirB>` on the resulting
+Use `klause-bench/output/compare.sh [--incomplete] <dirA> <dirB>` (Python 3) on the resulting
 configuration directories. It compares shared problems by feasibility, proof and
 direction-aware objective quality, with time breaking ties. Complete mode prefers
 proved optimality; incomplete mode ignores it and splits ties equally. The report

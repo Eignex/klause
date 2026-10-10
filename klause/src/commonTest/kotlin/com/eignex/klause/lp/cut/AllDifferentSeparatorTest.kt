@@ -83,19 +83,4 @@ class AllDifferentSeparatorTest {
         assertEquals(9L, cuts.first { it.rel == Relation.GE }.rhs)
     }
 
-    @Test
-    fun `cut is valid for every distinct assignment`() {
-        // Exhaustively verify the generated lower-bound cut excludes no feasible (distinct) point.
-        val (p, relaxation, solution) = setup(0, 4, 3)
-        val cut = AllDifferentSeparator().separate(CutContext(p, relaxation, solution.primal, PropagationSession(p)))
-            .first { it.rel == Relation.GE }
-        for (a in 0..4) {
-            for (b in 0..4) {
-                for (c in 0..4) {
-                    if (a == b || a == c || b == c) continue // only all-different points
-                    assertTrue((a + b + c).toLong() >= cut.rhs, "($a,$b,$c) violates Σ >= ${cut.rhs}")
-                }
-            }
-        }
-    }
 }

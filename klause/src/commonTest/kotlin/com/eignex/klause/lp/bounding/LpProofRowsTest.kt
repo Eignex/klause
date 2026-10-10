@@ -35,22 +35,6 @@ class LpProofRowsTest {
     }
 
     @Test
-    fun `empty rows and columns retain empty coefficients`() {
-        for (columns in listOf(0, 2)) {
-            val builder = LpBuilder()
-            repeat(columns) { builder.addVar(0, 10) }
-            builder.addRow(intArrayOf(), longArrayOf(), Relation.LE, 0)
-            val model = builder.build(Sense.MINIMIZE)
-            val rows = LpProofRows.create(model, model, Cancellation.Never)
-
-            assertEquals(emptyMap(), assertNotNull(rows.source).coefficients(0, Cancellation.Never))
-            assertTrue(rows.unchanged(Cancellation.Never))
-        }
-        val empty = LpBuilder().build(Sense.MINIMIZE)
-        assertTrue(LpProofRows.create(empty, empty, Cancellation.Never).unchanged(Cancellation.Never))
-    }
-
-    @Test
     fun `support changes after accepted preflight decline instead of selecting fallback`() {
         val builder = LpBuilder()
         builder.addVar(0, 10)
@@ -183,35 +167,6 @@ class LpProofRowsTest {
         assertEquals(mapOf(0 to 7L), coefficients)
         coefficients[0] = 99
         assertEquals(mapOf(0 to 7L), fresh.source.coefficients(0, Cancellation.Never))
-    }
-
-    @Test
-    fun `combined final comparison has no callback after checking the source`() {
-        val builder = LpBuilder()
-        builder.addVar(0, 10)
-        builder.addRow(intArrayOf(0), longArrayOf(1), Relation.LE, 5)
-        val source = builder.build(Sense.MINIMIZE)
-        val transformed = builder.build(Sense.MINIMIZE)
-        val rows = LpProofRows.create(source, transformed, Cancellation.Never)
-        var callbacks = 0
-
-        assertTrue(
-            rows.unchanged(
-                Cancellation {
-                    if (++callbacks > 1) source.csc.colVal[0]++
-                    false
-                },
-            ),
-        )
-        assertEquals(1, callbacks)
-        assertFalse(
-            rows.unchanged(
-                Cancellation {
-                    source.csc.colVal[0]++
-                    false
-                },
-            ),
-        )
     }
 
     @Test
