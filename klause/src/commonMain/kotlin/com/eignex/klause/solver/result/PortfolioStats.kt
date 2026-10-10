@@ -50,4 +50,24 @@ data class ArmSchedule(
     val initializationWork: Long = 0L,
     /** Openings retired because construction was cancelled. */
     val initializationCancelled: Long = 0L,
+    /** The first ordinary exception that retired the arm; distinct from a refuted claim. */
+    val failure: ArmFailure? = null,
+)
+
+/** Bounded diagnostics for an ordinary portfolio arm exception. */
+data class ArmFailure(
+    /** The worker's arm identity, stable across its reseeds. */
+    val armId: Int,
+    /** Exception class name, limited to 128 characters. */
+    val type: String,
+    /** Exception message, limited to 1024 characters; null if the exception supplied none. */
+    val message: String?,
+    /** The operation that failed: opening, slice, one-shot or close. */
+    val phase: String,
+    /** The arm's segment count at failure. */
+    val segment: Long,
+    /** The arm's charged work at failure. */
+    val work: Long,
+    /** Exception and cause trace, limited to 4096 characters. */
+    val trace: String,
 )

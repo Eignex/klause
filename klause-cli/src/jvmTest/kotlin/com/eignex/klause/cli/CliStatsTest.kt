@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpBasisVerificationStats
@@ -26,6 +27,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliStatsTest {
+    @Test
+    fun `portfolio exception diagnostics escape text into one stat line`() {
+        val diagnostic = ArmFailure(7, "IllegalStateException", "row \"R\"\n\t\\", "slice", 2, 30, "cause\r\nframe")
+        val arm = ArmSchedule("bt", 2, 30, meanReward = 0.0, failures = 1, credit = emptyMap(), failure = diagnostic)
+
+        val pairs = portfolioStatPairs(SolveStats(portfolio = PortfolioStats(listOf(arm)))).toMap()
+
+        assertEquals(
+            "{\"armId\":7,\"phase\":\"slice\",\"segment\":2,\"work\":30,\"type\":\"IllegalStateException\"," +
+                "\"message\":\"row \\\"R\\\"\\u000a\\u0009\\\\\",\"trace\":\"cause\\u000d\\u000aframe\"}",
+            pairs["armFailure.bt"],
+        )
+    }
+
     @Test
     fun `refused float phase costs are emitted without a node solve`() {
         val stats = SolveStats(lp = LpStats(phases = mapOf("CLEANUP_STANDALONE" to

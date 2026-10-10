@@ -13,6 +13,25 @@ import kotlin.test.assertTrue
 
 class ValuePrecedeInvariantTest {
 
+    @Test
+    fun `committed cost uses the exact degree after a stateless apply`() {
+        val state = LocalSearchState(problem().bake(), Random(0))
+        state.assignment.setInt(0, 2)
+        state.assignment.setInt(1, 2)
+        state.assignment.setInt(2, 1)
+        state.recompute()
+        val before = state.cost
+        val predicted = state.netDelta(Move.IntSet(0, 1))
+
+        state.apply(Move.IntSet(0, 1))
+
+        assertEquals(-before, predicted)
+        assertEquals(0L, state.cost)
+        assertEquals(state.factors[0].violationDegree(state, 0), state.factorDegree[0])
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
     // s=1, t=2, xs = vars 0..2 over [0,3]
     private fun problem(): Problem = Problem(
         numBoolVars = 0,

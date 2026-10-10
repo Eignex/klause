@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
@@ -30,6 +32,8 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.math.ceil
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
@@ -41,8 +45,8 @@ private fun interface LocalSearchCheckpoint {
 
 /**
  * The local-search engine over a [LocalSearchModel]: strategy, restart cadence and the satisfy and minimize loops.
- * All per-draw state — RNG, assignment, factor payloads, the dedup window — lives inside the per-call sequences so
- * concurrent draws never share state.
+ * Assignments and payloads belong to each draw; strategy and restart policy belong to the engine.
+ * A resumable handle owns the engine exclusively until completion, failure or close.
  *
  * [LocalSearchSolver] is its [com.eignex.klause.solver.Solver] over a baked finite model; a model with an open
  * integer side, which has no baked form, is searched through the engine directly. Local search never refutes a
@@ -59,6 +63,42 @@ internal class LocalSearchEngine(
     val seedImplicitOnRestart: Boolean = false,
     completion: CandidateCompletion? = null,
 ) {
+    private val searchOwned = AtomicBoolean(false)
+
+    private inner class SearchOwnership {
+        private var released = false
+
+        fun release() {
+            if (released) return
+            released = true
+            searchOwned.store(false)
+        }
+    }
+
+    private fun acquireSearch(): SearchOwnership {
+        check(searchOwned.compareAndSet(expectedValue = false, newValue = true)) {
+            "the local-search solver already has an active search"
+        }
+        return SearchOwnership()
+    }
+
+    private inline fun <T> exclusiveSearch(action: () -> T): T {
+        val ownership = acquireSearch()
+        try {
+            return action()
+        } finally {
+            ownership.release()
+        }
+    }
+
+    private fun <T> guarded(sequence: Sequence<T>): Sequence<T> = Sequence {
+        val cursor = exclusiveSearch { sequence.iterator() }
+        object : Iterator<T> {
+            override fun hasNext(): Boolean = exclusiveSearch { cursor.hasNext() }
+            override fun next(): T = exclusiveSearch { cursor.next() }
+        }
+    }
+
     private val problem: Problem = model.problem
     internal var projection: LocalSearchPreparation = LocalSearchPreparation(problem, model.domains)
     internal var invariantNetwork: Lazy<InvariantNetwork?> = lazy {
@@ -179,7 +219,11 @@ internal class LocalSearchEngine(
     }
 
     /** Search once for a solution, syncing learned weights through [warm] when it is non-null. */
-    fun solve(params: LocalSearchParams, warm: WarmState?): SolveResult {
+    fun solve(params: LocalSearchParams, warm: WarmState?): SolveResult = exclusiveSearch {
+        solveExclusive(params, warm)
+    }
+
+    private fun solveExclusive(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
         if (!localSearchSupports(model, completion != null)) {
@@ -219,10 +263,24 @@ internal class LocalSearchEngine(
         // may violate factors.
         if (!localSearchSupports(model, completion != null)) return emptySequence()
         val eff = model.pinsUnder(params.assumptions) ?: return emptySequence()
-        return streamImpl(params, eff, warm).filterNotNull()
+        return guarded(streamImpl(params, eff, warm).filterNotNull())
     }
 
     fun resumableSolve(params: LocalSearchParams, warm: WarmState? = null): ResumableSolve {
+        val ownership = acquireSearch()
+        try {
+            return openResumableSolve(params, warm, ownership)
+        } catch (failure: Throwable) {
+            ownership.release()
+            throw failure
+        }
+    }
+
+    private fun openResumableSolve(
+        params: LocalSearchParams,
+        warm: WarmState?,
+        ownership: SearchOwnership,
+    ): ResumableSolve {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
         val supported = localSearchSupports(model, completion != null)
@@ -266,14 +324,25 @@ internal class LocalSearchEngine(
                 global: Cancellation,
                 sliceMillis: Long,
                 sliceInstructions: Long,
-            ): SolveResult? {
+            ): SolveResult? = try {
+                advance(global, sliceMillis, sliceInstructions)
+            } catch (failure: Throwable) {
+                close()
+                throw failure
+            }
+
+            private fun advance(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult? {
                 check(!closed) { "the local-search handle is closed" }
                 verdict?.let { return it }
                 if (!supported) return unknown(TerminationReason.Unsupported)
                 if (effective == null) {
                     return if (model.refutesModel) {
                         sink.stop()
-                        SolveResult.Unsat(stats = stats).also { verdict = it }
+                        SolveResult.Unsat(stats = stats).also {
+                            verdict = it
+                            cursor = null
+                            ownership.release()
+                        }
                     } else {
                         unknown(TerminationReason.Unsupported)
                     }
@@ -295,13 +364,21 @@ internal class LocalSearchEngine(
                     null
                 }
                 sink.stop()
-                return SolveResult.Sat(sample, stats).also { verdict = it }
+                return SolveResult.Sat(sample, stats).also {
+                    verdict = it
+                    cursor = null
+                    ownership.release()
+                }
             }
 
             private fun unknown(reason: TerminationReason): SolveResult {
                 sink.timedOut = reason == TerminationReason.BudgetExhausted
                 sink.stop()
-                return SolveResult.Unknown(reason, stats).also { verdict = it }
+                return SolveResult.Unknown(reason, stats).also {
+                    verdict = it
+                    cursor = null
+                    ownership.release()
+                }
             }
 
             override fun close() {
@@ -309,6 +386,7 @@ internal class LocalSearchEngine(
                     closed = true
                     cursor = null
                     if (verdict == null) sink.stop()
+                    ownership.release()
                 }
             }
         }
@@ -334,8 +412,9 @@ internal class LocalSearchEngine(
         objective: LinearObjective,
         params: LocalSearchParams,
         warm: WarmState?,
-    ): Sequence<MinimizeResult> = minimizeStream(objective, params, warm, SolveStatsSink(backend = "ls"))
-        .filterNotNull()
+    ): Sequence<MinimizeResult> = guarded(
+        minimizeStream(objective, params, warm, SolveStatsSink(backend = "ls")).filterNotNull(),
+    )
 
     @Suppress("LongParameterList")
     private fun minimizeStream(
@@ -381,6 +460,21 @@ internal class LocalSearchEngine(
     }
 
     fun resumable(objective: LinearObjective, params: LocalSearchParams, warm: WarmState? = null): ResumableSearch {
+        val ownership = acquireSearch()
+        try {
+            return openResumable(objective, params, warm, ownership)
+        } catch (failure: Throwable) {
+            ownership.release()
+            throw failure
+        }
+    }
+
+    private fun openResumable(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+        warm: WarmState?,
+        ownership: SearchOwnership,
+    ): ResumableSearch {
         val sink = SolveStatsSink(backend = "ls")
         var token: Cancellation = Cancellation.Never
         var instructions = 0L
@@ -423,6 +517,18 @@ internal class LocalSearchEngine(
                 sliceMillis: Long,
                 sliceInstructions: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? = try {
+                advance(global, sliceMillis, sliceInstructions, onIncumbent)
+            } catch (failure: Throwable) {
+                close()
+                throw failure
+            }
+
+            private fun advance(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceInstructions: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
             ): MinimizeResult? {
                 check(!closed) { "the local-search handle is closed" }
                 verdict?.let { return it }
@@ -438,7 +544,10 @@ internal class LocalSearchEngine(
                     if (!started) {
                         sink.timedOut = true
                         sink.stop()
-                        return MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats).also { verdict = it }
+                        return MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats).also {
+                            verdict = it
+                            ownership.release()
+                        }
                     }
                     // Resume the pending checkpoint only to finish; the loop checks the shared allowance first.
                     limit = Long.MAX_VALUE
@@ -448,6 +557,8 @@ internal class LocalSearchEngine(
                     val result = cursor.next() ?: return null
                     if (finished) {
                         verdict = result
+                        cursor = emptySequence<MinimizeResult?>().iterator()
+                        ownership.release()
                         return result
                     }
                     if (result is MinimizeResult.WithSample) {
@@ -463,6 +574,7 @@ internal class LocalSearchEngine(
                     closed = true
                     cursor = emptySequence<MinimizeResult?>().iterator()
                     if (verdict == null) sink.stop()
+                    ownership.release()
                 }
             }
         }

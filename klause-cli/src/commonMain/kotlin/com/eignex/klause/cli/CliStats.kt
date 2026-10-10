@@ -323,7 +323,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "profile" to "${it.problemClass} optimizing=${it.optimizing} wide=${it.wide} scheduling=${it.scheduling}"
     }
     val reseeding = stats.portfolio.reseedStaleThreshold?.let { "portfolioReseedStaleThreshold" to "$it" }
-    return listOfNotNull(profile, reseeding) + stats.portfolio.arms.map { arm ->
+    val schedule = stats.portfolio.arms.map { arm ->
         val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
         val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
             " share$channel=us:${t.nanos / NANOS_PER_MICRO},out:${t.exported},in:${t.imported},dup:${t.duplicates}"
@@ -335,6 +335,31 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
             " initWork=${arm.initializationWork} initCancelled=${arm.initializationCancelled}" +
             "$credit$sharing"
     }
+    val failures = stats.portfolio.arms.mapNotNull { arm ->
+        arm.failure?.let {
+            "armFailure.${arm.label}" to
+                "{\"armId\":${it.armId},\"phase\":${diagnosticString(it.phase)},\"segment\":${it.segment}," +
+                "\"work\":${it.work},\"type\":${diagnosticString(it.type)}," +
+                "\"message\":${it.message?.let(::diagnosticString) ?: "null"},\"trace\":${diagnosticString(it.trace)}}"
+        }
+    }
+    return listOfNotNull(profile, reseeding) + schedule + failures
+}
+
+private fun diagnosticString(value: String): String = buildString {
+    append('"')
+    for (char in value) {
+        when (char) {
+            '"' -> append("\\\"")
+            '\\' -> append("\\\\")
+            in '\u0000'..'\u001f', '\u007f', '\u2028', '\u2029' -> {
+                append("\\u")
+                append(char.code.toString(16).padStart(4, '0'))
+            }
+            else -> append(char)
+        }
+    }
+    append('"')
 }
 
 private const val NANOS_PER_MICRO = 1_000L

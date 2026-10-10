@@ -30,3 +30,9 @@ Temporary manifests, raw records and reports belong in the shared
 `klause-evidence/campaigns/<name>/` directory alongside the primary checkout.
 The analyzer is a reusable tool; generated case bundles remain
 outside the repository.
+
+Portfolio exception diagnostics survive in the case record's `stats` map under
+`armFailure.<label>`, using the CLI's bounded single-line JSON object. Inspect its
+arm identity, failed phase, exception type/message and cause trace alongside the
+arm schedule. A retained arm failure does not imply the whole command failed or
+invalidate a sibling's verdict; quarantine faults have separate records.
