@@ -81,8 +81,10 @@ a surviving constraint, objective or shared reified predicate needs them. Unused
 fresh definitions are omitted after following these dependencies to a fixpoint.
 Their unused integer columns and private reified predicates are removed with
 surviving constraints and objectives remapped in both variable namespaces.
-The same dependency closure retains generated Boolean gates and arithmetic
-predicate definitions only when a surviving use needs their value.
+The same dependency closure retains Boolean connective gates and arithmetic
+predicate definitions only when a surviving use needs their value. Boolean-to-integer
+channels remain consumers of an existing Boolean definition, so arithmetic uses retain
+the gate and its inputs.
 Source declarations and arithmetic leaves remain authoritative, including open
 defaults and sparse decision-list selectors. Shared search has no unconstrained
 predicate columns from these omitted definitions.

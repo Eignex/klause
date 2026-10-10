@@ -10,7 +10,6 @@ import com.eignex.klause.lowering.WideLinComb
 import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
-import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_TEN
@@ -313,7 +312,7 @@ private fun lcmOf(a: BigInt, b: BigInt): BigInt = ((a * b) / a.gcd(b)).abs()
 internal fun Compiler.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb): Int {
     val d = a.plus(b.scaled(BigFraction.MINUS_ONE))
     if (op == "=") {
-        return tseitinAnd(
+        return reifyAnd(
             listOf(reifyRealAtom(d, LinearOp.LE, strict = false), reifyRealAtom(d, LinearOp.GE, strict = false)),
         )
     }
