@@ -3,9 +3,11 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import kotlin.random.Random
@@ -15,6 +17,84 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LiteralChannelRepairTest {
+    @Test
+    fun `searched predicate choices preserve protected coordinates`() {
+        for (protection in listOf("source pin", "source owner", "output pin", "output owner", "Boolean pin")) {
+            val problem = Problem(
+                1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                    Clause(intArrayOf(Lit.make(0, true))),
+                ),
+            )
+            val assumptions = when (protection) {
+                "source pin" -> Assumptions.None.withInt(0, 0)
+                "output pin" -> Assumptions.None.withInt(1, 1)
+                "Boolean pin" -> Assumptions.None.withBool(0, true)
+                else -> Assumptions.None
+            }
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(2, 1)
+            if (protection == "source owner") state.moveSink.setOwners(intArrayOf(7, -1))
+            if (protection == "output owner") state.moveSink.setOwners(intArrayOf(-1, 7))
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(1, 1)
+            state.assignment.setBool(0, true)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 1, 0)
+
+            if (protection.startsWith("source")) {
+                state.apply(state.moveSink.list.single())
+                assertEquals(0L, state.assignment.intValue(0))
+                assertTrue(state.factorDegree[0] > 0)
+                assertTrue(state.cost > 0L)
+            } else {
+                assertTrue(state.moveSink.list.isEmpty(), protection)
+            }
+        }
+    }
+
+    @Test
+    fun `searched predicates coordinate bounded source choices`() {
+        for (bound in listOf(0, 1)) {
+            val problem = Problem(
+                1, 2, arrayOf(IntDomain(0, 8), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+                    Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
+                    Clause(intArrayOf(Lit.make(0, bound == 1))),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(2, 1)
+            state.assignment.setInt(0, if (bound == 1) 0L else 1L)
+            state.assignment.setInt(1, 1)
+            state.assignment.setBool(0, bound == 1)
+            state.recompute()
+            val before = state.cost
+
+            state.factors[2].proposeRepairMoves(state, 2, state.moveSink)
+            assertEquals(if (bound == 1) 4 else 1, state.moveSink.list.size)
+            val move = state.moveSink.list.first()
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(0L, state.assignment.intValue(1))
+            assertEquals(state.assignment.intValue(0) == 0L, state.assignment.boolValue(0))
+            assertEquals(0, state.factorDegree[0])
+            assertEquals(0, state.factorDegree[1])
+            assertEquals(0, state.factorDegree[2])
+            assertTrue(state.factorDegree[3] > 0)
+            assertEquals(state.cost - before, predicted)
+            val cost = state.cost
+            state.recompute()
+            assertEquals(cost, state.cost)
+        }
+    }
+
     @Test
     fun `channel fanout preserves independently owned outputs`() {
         val problem = Problem(

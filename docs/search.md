@@ -258,6 +258,9 @@ the affected definition factors retain any resulting violations.
 Diversification kicks also exclude maintained Boolean outputs from direct flips.
 Repairs into retained literal channels change an admissible Boolean input or backsolve
 a retained unary equality into a searched integer or an existing extremum inverse.
+When a Boolean predicate remains searched, unit unary equality sources supply bounded
+coordinated choice moves before a direct flip; all other constraints and duration
+fanout remain graded.
 These repairs check output domains, pins and implicit owners; false equality targets
 sample at most four alternatives from at most 32 present values, and literal chains
 stop at depth 16. The Cumulative duration neighborhood uses the same inverse route.

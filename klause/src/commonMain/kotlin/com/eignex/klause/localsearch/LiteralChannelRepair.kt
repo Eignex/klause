@@ -1,5 +1,7 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 
 internal class LiteralChannelRepair(
@@ -20,6 +22,8 @@ internal class LiteralChannelRepair(
         val desired = (target == 1L) == Lit.isPositive(channel.literal)
         if (state.assumptions.isFrozenBool(b) || state.assignment.boolValue(b) == desired) return 0
         if (sink.allowsBool(b)) {
+            val coordinated = searchedChoices(variable, b, desired, minOf(remaining, MAX_ALTERNATIVES))
+            if (coordinated > 0) return coordinated
             val before = sink.size
             sink.addBoolFlip(b)
             return sink.size - before
@@ -39,6 +43,38 @@ internal class LiteralChannelRepair(
             val cap = minOf(remaining, MAX_ALTERNATIVES)
             added += input(predicate.input, value, depth, cap - added)
             if (added >= cap) break
+        }
+        return added
+    }
+
+    private fun searchedChoices(channel: Int, indicator: Int, desired: Boolean, remaining: Int): Int {
+        var added = 0
+        for (fid in state.projection.boolOccurrences[indicator]) {
+            val row = state.problem.factors[fid] as? ReifiedLinear ?: continue
+            if (row.op != LinearOp.EQ || row.vars.size != 1 || row.vars[0] == channel) continue
+            val constants = row.integerConstants ?: continue
+            val variable = row.vars[0]
+            if (constants.coeff(0) != 1L || !sink.allowsInt(variable)) continue
+            val domain = state.rootDomains[variable]
+            if (desired) {
+                val target = constants.bound
+                if (target !in domain || target == state.assignment.intValue(variable)) continue
+                val before = sink.size
+                sink.addChannelingIntSet(state, variable, target)
+                added += sink.size - before
+            } else {
+                val span = domain.spanOrNull(MAX_CHOICE_VALUES) ?: continue
+                val offset = state.rng.nextInt(span.size)
+                for (i in 0 until span.size) {
+                    val target = span.valueAt((offset + i) % span.size)
+                    if (target == constants.bound || target == state.assignment.intValue(variable)) continue
+                    val before = sink.size
+                    sink.addChannelingIntSet(state, variable, target)
+                    added += sink.size - before
+                    if (added >= remaining) break
+                }
+            }
+            if (added >= remaining) break
         }
         return added
     }

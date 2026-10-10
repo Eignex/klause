@@ -2,9 +2,11 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
@@ -19,6 +21,55 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CumulativeInvariantTest {
+    @Test
+    fun `conditional duration choice repairs grade other Boolean constraints`() {
+        for (bound in listOf(0, 1)) {
+            val factors = arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+                Product(1, 2, 3),
+                Cumulative(
+                    intArrayOf(4, 6), longArrayOf(3, 3), longArrayOf(1, 1), 1,
+                    durationVars = intArrayOf(3, 5),
+                ),
+                Clause(intArrayOf(Lit.make(0, bound == 1))),
+            )
+            val problem = Problem(
+                1, 7, arrayOf(
+                    IntDomain(0, 2), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3),
+                    IntDomain(0, 0), IntDomain(3, 3), IntDomain(0, 0),
+                ), factors,
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(7, 1)
+            val values = longArrayOf(if (bound == 1) 0L else 1L, 1, 3, 3, 0, 3, 0)
+            for ((variable, value) in values.withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.assignment.setBool(0, bound == 1)
+            state.recompute()
+            val before = state.cost
+
+            state.factors[3].proposeRepairMoves(state, 3, state.moveSink)
+            val move = state.moveSink.list.first()
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(state.assignment.intValue(0) == 0L, state.assignment.boolValue(0))
+            assertEquals(0L, state.assignment.intValue(1))
+            assertEquals(0L, state.assignment.intValue(3))
+            assertEquals(0, state.factorDegree[0])
+            assertEquals(0, state.factorDegree[1])
+            assertEquals(0, state.factorDegree[3])
+            assertTrue(state.factorDegree[4] > 0)
+            assertTrue(state.cost > 0L)
+            assertEquals(state.cost - before, predicted)
+            val cost = state.cost
+            state.recompute()
+            assertEquals(cost, state.cost)
+        }
+    }
+
     @Test
     fun `conditional durations repair overload through admissible choices`() {
         for ((bound, retained) in listOf(0 to false, 1 to false, 0 to true, 1 to true)) {
