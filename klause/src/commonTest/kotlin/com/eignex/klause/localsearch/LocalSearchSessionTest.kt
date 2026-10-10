@@ -11,10 +11,14 @@ import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -32,6 +36,84 @@ class LocalSearchSessionTest {
             Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
         ),
     )
+
+    @Test
+    fun `optimization resumes the state prepared after its slice expires`() {
+        var expired = false
+        var initializations = 0
+        var primed = false
+        val restart = FixedCadenceRestart()
+        val policy = object : RestartPolicy by restart {
+            override fun reset() {
+                restart.reset()
+                initializations++
+            }
+
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                restart.restart(state, bestSoFar)
+                if (!primed) {
+                    expired = true
+                    primed = true
+                }
+            }
+        }
+        val session = LocalSearchSolver(weightLearningProblem().bake(), restartPolicy = policy).session()
+        val objective = LinearObjective(boolWeights = LongArray(6) { 1L })
+
+        session.resumable(objective, LocalSearchParams(maxInstructions = 5L, randomSeed = 1L)).use { handle ->
+            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
+            assertEquals(0.0, handle.stats.ls.moves.sum)
+            expired = false
+            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+
+            assertIs<MinimizeResult.Unknown>(result)
+            assertEquals(5.0, handle.stats.ls.moves.sum)
+            assertEquals(1, initializations)
+        }
+    }
+
+    @Test
+    fun `sliced optimization preserves the unsliced walk and learned weights`() {
+        val objective = LinearObjective(boolWeights = LongArray(6) { 1L })
+        val params = LocalSearchParams(maxFlips = 12L, randomSeed = 7L)
+        val uninterrupted = LocalSearchSolver(weightLearningProblem().bake()).session()
+        val expected = uninterrupted.minimize(objective, params)
+        val sliced = LocalSearchSolver(weightLearningProblem().bake()).session()
+
+        sliced.resumable(objective, params).use { handle ->
+            val counted = assertIs<InstructionSlicedSearch>(handle)
+            repeat(3) {
+                assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 3L) {})
+                assertFalse(handle.isDone)
+            }
+            val result = assertNotNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 3L) {})
+
+            assertEquals(expected.stats.ls.moves, result.stats.ls.moves)
+            assertEquals(expected.stats.ls.incumbentViolation, result.stats.ls.incumbentViolation)
+            assertTrue(handle.isDone)
+            assertTrue(
+                assertNotNull(uninterrupted.warmState.factorWeights)
+                    .contentEquals(assertNotNull(sliced.warmState.factorWeights)),
+            )
+        }
+    }
+
+    @Test
+    fun `optimization handle keeps the session assumption stack`() {
+        val problem = Problem(1, 0, emptyArray(), emptyArray())
+        val session = LocalSearchSolver(problem.bake()).session()
+        session.push(Assumptions(bools = mapOf(0 to true)))
+
+        session.resumable(LinearObjective(boolWeights = longArrayOf(1)), LocalSearchParams(maxFlips = 1L))
+            .use { handle ->
+                val result = assertIs<MinimizeResult.BestFound>(
+                    handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {},
+                )
+
+                assertTrue(result.sample.bools[0])
+                assertEquals(1.0, result.objective)
+            }
+    }
 
     @Test
     fun `maxInstructions tightens flip budget vs maxFlips when smaller`() {

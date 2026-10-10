@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
@@ -59,6 +60,9 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : Session<Local
 
     override fun resumableSolve(params: LocalSearchParams): ResumableSolve =
         solver.engine.resumableSolve(applyStack(params), warm)
+
+    override fun resumable(objective: LinearObjective, params: LocalSearchParams): ResumableSearch =
+        solver.engine.resumable(objective, applyStack(params), warm)
 
     override fun samples(params: LocalSearchParams): Sequence<Sample> = solver.engine.samples(applyStack(params), warm)
 

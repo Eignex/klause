@@ -31,7 +31,7 @@ class PortfolioWorker private constructor(
     private val solveFn: (Cancellation, Long?) -> SolveResult,
     private val improvementsFn: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
-    private val resumableFn: ((readBound: () -> Double, cancellation: Cancellation?) -> ResumableSearch)?,
+    private val resumableFn: ((readBound: () -> Double, cancellation: Cancellation?, warmStart: Sample?) -> ResumableSearch)?,
     private val resumableSolveFn: ((Cancellation?) -> ResumableSolve?)?,
     private val withInstructions: Boolean,
     private val closeFn: () -> Unit,
@@ -63,15 +63,17 @@ class PortfolioWorker private constructor(
 
     /**
      * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine
-     * can't be paused/resumed (local search — it restarts cheaply from a warm-started incumbent
-     * instead). [readBound] exposes the portfolio's shared best objective so the resumable backtrack
+     * can't be paused/resumed. [readBound] exposes the portfolio's shared best objective so the resumable backtrack
      * search prunes on it, exactly like [improvements]'s `withBound` seam. A [Portfolio]
-     * holds one handle per backtrack arm and resumes it each segment, so the arm never cold-restarts between
+     * holds one handle per resumable arm and resumes it each segment, so the arm never cold-restarts between
      * slices. */
-    fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound, null)
+    fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound, null, null)
 
-    internal fun newResumableSearch(readBound: () -> Double, cancellation: Cancellation): ResumableSearch? =
-        resumableFn?.invoke(readBound, cancellation)
+    internal fun newResumableSearch(
+        readBound: () -> Double,
+        cancellation: Cancellation,
+        warmStart: Sample? = null,
+    ): ResumableSearch? = resumableFn?.invoke(readBound, cancellation, warmStart)
 
     /**
      * Open a fresh pause/resume handle over this worker's satisfaction search, or `null` when the engine can't be
@@ -152,15 +154,15 @@ class PortfolioWorker private constructor(
                 return if (maxInstructions != null && budget != null) budget(p, maxInstructions) else p
             }
             // A pause/resume handle is available only for an optimising worker over a ResumableOptimizer
-            // engine (backtrack). Opening uses the supplied token; the handle owns cancellation after that.
-            // Warm-start is irrelevant because the live session carries the search.
+            // engine. Opening uses the supplied token; the handle owns cancellation after that.
             val resumableOpt = session.solver as? ResumableOptimizer<P>
-            val resumableFn: ((() -> Double, Cancellation?) -> ResumableSearch)? =
+            val resumableFn: ((() -> Double, Cancellation?, Sample?) -> ResumableSearch)? =
                 if (objective != null && resumableOpt != null) {
-                    { readBound, cancellation ->
+                    { readBound, cancellation, warmStart ->
                         val base = cancellation?.let(::withCancel) ?: params
-                        val p = withBound?.invoke(base, readBound) ?: base
-                        resumableOpt.resumable(objective, p)
+                        var p = withBound?.invoke(base, readBound) ?: base
+                        if (warmStart != null && withWarmStart != null) p = withWarmStart(p, warmStart)
+                        session.resumable(objective, p) ?: resumableOpt.resumable(objective, p)
                     }
                 } else {
                     null
@@ -231,7 +233,7 @@ class PortfolioWorker private constructor(
             solveFn = { _, _ -> error("PortfolioWorker '$label' only minimizes") },
             improvementsFn = improvements,
             samplesFn = { emptySequence() },
-            resumableFn = resumable?.let { open -> { readBound, _ -> open(readBound) } },
+            resumableFn = resumable?.let { open -> { readBound, _, _ -> open(readBound) } },
             resumableSolveFn = null,
             withInstructions = countsInstructions,
             closeFn = {},

@@ -60,6 +60,9 @@ interface Session<P : SolverParams> : AutoCloseable {
      */
     fun resumableSolve(params: P): ResumableSolve? = null
 
+    /** Open an optimisation handle under the current session state, or null when it cannot resume. */
+    fun resumable(objective: LinearObjective, params: P): ResumableSearch? = null
+
     /** Default implementation drains [samples] for one yield. Wraps it in
      *  [SampleResult.Found] when the sequence yields, [SampleResult.Unknown] when it
      *  doesn't. Mirrors [Solver.sample]'s contract. */
@@ -162,6 +165,9 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
 
     override fun resumableSolve(params: P): ResumableSolve? =
         (solver as? ResumableSolver<P>)?.resumableSolve(applyStack(params))
+
+    override fun resumable(objective: LinearObjective, params: P): ResumableSearch? =
+        (solver as? ResumableOptimizer<P>)?.resumable(objective, applyStack(params))
 
     override fun samples(params: P): Sequence<Sample> = solver.samples(applyStack(params))
     override fun enumerate(params: P): Sequence<Sample> = solver.enumerate(applyStack(params))

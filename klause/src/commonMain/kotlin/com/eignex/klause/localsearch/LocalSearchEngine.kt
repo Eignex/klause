@@ -15,6 +15,8 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.InstructionSlicedSolve
+import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -277,20 +279,32 @@ internal class LocalSearchEngine(
         objective: LinearObjective,
         params: LocalSearchParams,
         warm: WarmState?,
-    ): Sequence<MinimizeResult> = sequence {
-        val sink = SolveStatsSink(backend = "ls")
+    ): Sequence<MinimizeResult> = minimizeStream(objective, params, warm, SolveStatsSink(backend = "ls"))
+        .filterNotNull()
+
+    @Suppress("LongParameterList")
+    private fun minimizeStream(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+        warm: WarmState?,
+        sink: SolveStatsSink,
+        checkpoint: SatisfyCheckpoint? = null,
+        onFinished: () -> Unit = {},
+    ): Sequence<MinimizeResult?> = sequence {
         sink.start()
         if (!localSearchSupports(model, completion != null)) {
             // Same soundness boundary as [solve]: LP-only continuous variables, wide int
             // domains, and wide-coefficient factors are not evaluated by local search, so it could
             // optimize an incumbent that ignores — and may violate — them. Decline.
             sink.stop()
+            onFinished()
             yield(MinimizeResult.Unknown(TerminationReason.Unsupported, sink.snapshot()))
             return@sequence
         }
         val eff = model.pinsUnder(params.assumptions)
         if (eff == null) {
             sink.stop()
+            onFinished()
             yield(
                 if (model.refutesModel) {
                     MinimizeResult.Infeasible(stats = sink.snapshot())
@@ -308,7 +322,93 @@ internal class LocalSearchEngine(
         // eliminated a definition the view reads, so the view only guides moves: every incumbent is valued
         // by the linear objective, the one the portfolio checks it against.
         val gradient = params.lsObjective?.takeIf { perMoveInvariants && definitionalSweep != null }
-        runMinimizeStream(gradient ?: objective, objective, params, eff, warm, sink)
+        runMinimizeStream(gradient ?: objective, objective, params, eff, warm, sink, checkpoint, onFinished)
+    }
+
+    fun resumable(objective: LinearObjective, params: LocalSearchParams, warm: WarmState? = null): ResumableSearch {
+        val sink = SolveStatsSink(backend = "ls")
+        var token: Cancellation = Cancellation.Never
+        var instructions = 0L
+        var limit = Long.MAX_VALUE
+        var finished = false
+        var cursor = minimizeStream(
+            objective,
+            params.copy(cancellation = Cancellation { token() }),
+            warm,
+            sink,
+            SatisfyCheckpoint { spent ->
+                instructions = spent
+                spent >= limit
+            },
+            onFinished = { finished = true },
+        ).iterator()
+        return object : InstructionSlicedSearch {
+            private var verdict: MinimizeResult? = null
+            private var best: MinimizeResult.WithSample? = null
+            private var closed = false
+
+            override val isDone: Boolean get() = verdict != null
+            override val stats: SolveStats get() = sink.snapshot()
+            override val work: Long get() = (instructions / LS_INSTRUCTIONS_PER_WORK).toLong()
+
+            override fun runSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? = runInstructionSlice(
+                global,
+                sliceMillis,
+                if (sliceNodes < 0L) Long.MAX_VALUE else ceil(sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong(),
+                onIncumbent,
+            )
+
+            override fun runInstructionSlice(
+                global: Cancellation,
+                sliceMillis: Long,
+                sliceInstructions: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit,
+            ): MinimizeResult? {
+                check(!closed) { "the local-search handle is closed" }
+                verdict?.let { return it }
+                token = if (sliceMillis == Long.MAX_VALUE) {
+                    global
+                } else {
+                    global or Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
+                }
+                val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE
+                limit = instructions + minOf(sliceInstructions, available, Long.MAX_VALUE - instructions)
+                if (token() || sliceInstructions == 0L) return null
+                if (available == 0L) {
+                    sink.timedOut = true
+                    sink.stop()
+                    return (best?.let {
+                        MinimizeResult.BestFound(it.assignment, it.objectiveValue, TerminationReason.BudgetExhausted, stats)
+                    } ?: MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)).also { verdict = it }
+                }
+                while (cursor.hasNext()) {
+                    val result = cursor.next() ?: return null
+                    if (finished) {
+                        verdict = result
+                        return result
+                    }
+                    if (result is MinimizeResult.WithSample) {
+                        best = result
+                        onIncumbent(result)
+                    }
+                }
+                check(finished) { "the local-search stream ended without a verdict" }
+                return verdict
+            }
+
+            override fun close() {
+                if (!closed) {
+                    closed = true
+                    cursor = emptySequence<MinimizeResult?>().iterator()
+                    if (verdict == null) sink.stop()
+                }
+            }
+        }
     }
 
     // The moves one run may make: its own caps, and what is left of the solve's node budget.
@@ -481,13 +581,15 @@ internal class LocalSearchEngine(
      */
     // [guide] scores moves; [objective] values every incumbent this stream reports.
     @Suppress("LongParameterList")
-    private suspend fun SequenceScope<MinimizeResult>.runMinimizeStream(
+    private suspend fun SequenceScope<MinimizeResult?>.runMinimizeStream(
         guide: Objective,
         objective: Objective,
         params: LocalSearchParams,
         effectiveAssumptions: Assumptions,
         warm: WarmState?,
         sink: SolveStatsSink,
+        checkpoint: SatisfyCheckpoint? = null,
+        onFinished: () -> Unit = {},
     ) {
         val state = newMinimizeState(guide, params, effectiveAssumptions, warm)
         // An objective whose sum can pass the 64-bit range is scored from snapshots, which sum it exactly; the live
@@ -556,12 +658,36 @@ internal class LocalSearchEngine(
         var cancelCountdown = 0
         var lastCheckMs = 0L
 
+        fun reportProgress() {
+            checkpoint?.shouldPause(totalFlips)
+            sink.ls.recordWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
+            params.nodeBudget?.spendMoves(totalFlips - charged)
+            charged = totalFlips
+            warm?.captureFrom(state)
+            sink.ls.recordIncumbent(
+                objective = bestObj.takeIf { bestSample != null } ?: Double.NaN,
+                violation = if (bestSample != null) 0.0 else minOf(bestCostInfeasible, state.cost).toDouble(),
+                foundAtMs = bestFoundAtMs,
+            )
+        }
+
         while (totalFlips < maxFlips) {
+            while (checkpoint?.shouldPause(totalFlips) == true) {
+                reportProgress()
+                yield(null)
+                cancelCountdown = 0
+            }
             if (cancelCountdown-- <= 0) {
-                if (params.cancellation()) {
+                while (params.cancellation()) {
+                    if (checkpoint != null) {
+                        reportProgress()
+                        yield(null)
+                        continue
+                    }
                     cancelled = true
                     break
                 }
+                if (cancelled) break
                 // Auto-tune the next poll window to ~[CANCEL_CHECK_TARGET_MS] of wall-clock: cheap flips
                 // keep the full interval (negligible overhead), while expensive move sources
                 // (flip-propagate / clique-swap / ejection chains) shrink it, so a slow flip window can't
@@ -585,10 +711,16 @@ internal class LocalSearchEngine(
                 // Each descent step is O(numVars); the once-per-CANCEL_CHECK_INTERVAL throttle above
                 // is too coarse to keep the optimize phase deadline-responsive. One extra poll per
                 // descent step is negligible against the step's own cost.
-                if (params.cancellation()) {
+                while (params.cancellation()) {
+                    if (checkpoint != null) {
+                        reportProgress()
+                        yield(null)
+                        continue
+                    }
                     cancelled = true
                     break
                 }
+                if (cancelled) break
                 // Score the live assignment without copying it; the snapshot is taken only on a strict
                 // improvement, so the steady state allocates nothing per iteration.
                 if (completion != null) {
@@ -611,6 +743,12 @@ internal class LocalSearchEngine(
                         sink.ls,
                     ) { work -> totalFlips += work }
                     if (decided !is Completion.Witness) {
+                        if (checkpoint != null && decided is Completion.Undecided && params.cancellation()) {
+                            reportProgress()
+                            yield(null)
+                            cancelCountdown = 0
+                            continue
+                        }
                         restartAndRepair(state, restartAnchor(null), params)
                         restartCount++
                         flipsSinceRestart = 0
@@ -626,9 +764,10 @@ internal class LocalSearchEngine(
                         bestFoundAtMs = sink.elapsedMs()
                         params.onEvent?.invoke(SearchEvent.Incumbent(solved))
                         pooled.publish(solution, solved)
-                        params.nodeBudget?.spendMoves(totalFlips - charged)
-                        charged = totalFlips
+                        reportProgress()
                         yield(MinimizeResult.BestFound(solution, solved, TerminationReason.BudgetExhausted))
+                        cancelCountdown = 0
+                        continue
                     }
                 }
                 // Explicit feasible-phase dispatch — exhaustive, no else: every strategy declares its
@@ -722,7 +861,7 @@ internal class LocalSearchEngine(
             totalFlips++
             roundFeedback?.record(costBefore, state.cost, totalFlips)
         }
-        warm?.captureFrom(state)
+        reportProgress()
         val reason = if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted
         sink.stop()
         sink.timedOut = reason == TerminationReason.BudgetExhausted
@@ -739,6 +878,7 @@ internal class LocalSearchEngine(
                 foundAtMs = -1L,
             )
         }
+        onFinished()
         yield(
             if (bestSample != null) {
                 MinimizeResult.BestFound(bestSample, bestObj, reason, sink.snapshot())
