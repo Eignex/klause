@@ -31,8 +31,8 @@ class CellContextTest {
         val model = Problem(
             2, 2, Array(2) { IntDomain(0, 2) },
             arrayOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 2),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 2),
+            ),
         ).bake()
         val context = CellContext.resolve(model, intArrayOf(0), intArrayOf(0))
         val expected = (0L..1L).flatMap { bool -> (0L..2L).map { value -> listOf(bool, value) } }.toSet()
@@ -53,6 +53,18 @@ class CellContextTest {
 
         assertTrue(cell.capped)
         assertFalse(cell.complete)
+        assertEquals(2, cell.count)
+    }
+
+    @Test
+    fun `the largest integer cap permits a complete small cell`() {
+        val model = Problem(1, 0, emptyArray<IntDomain>(), emptyArray()).bake()
+        val context = CellContext.resolve(model, intArrayOf(0), null)
+
+        val cell = context.countCell(emptyList(), cap = Int.MAX_VALUE)
+
+        assertTrue(cell.complete)
+        assertFalse(cell.capped)
         assertEquals(2, cell.count)
     }
 
