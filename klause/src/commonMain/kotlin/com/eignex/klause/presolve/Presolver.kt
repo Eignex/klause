@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.isClausal
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -134,7 +135,7 @@ object Presolver {
         context: PresolveContext = PresolveContext.EMPTY,
         cancellation: Cancellation = Cancellation.Never,
     ): SourcePresolved {
-        val passes = config.problemPasses(context, PresolvePass.Capability.SOURCE)
+        val passes = problemPasses(problem, config, context, PresolvePass.Capability.SOURCE)
         if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
         val ctx = context.withCancellation(cancellation)
             .withPresolveBudget(context.presolveBudget)
@@ -176,6 +177,21 @@ object Presolver {
         return SourcePresolved(host.current, rounds.fired, rounds.infeasible, SourceRebuilds.compose(host.rebuilds))
     }
 
+    private fun problemPasses(
+        problem: Problem,
+        config: PresolveConfig,
+        context: PresolveContext,
+        capability: PresolvePass.Capability,
+    ): List<PresolvePass> {
+        val passes = config.problemPasses(context, capability)
+        // Cardinality conversion displaces native clause propagation and learning. Keep clausal
+        // optimization in that lane unless the caller selects the stronger preparation policy.
+        val preserveClauses = problem.isClausal() && context.objectiveBoolVars.isNotEmpty() &&
+            config.emphasis != PresolveEmphasis.AGGRESSIVE &&
+            PresolvePass.MERGE_AMO_CLIQUES !in config.overrides
+        return if (preserveClauses) passes - PresolvePass.MERGE_AMO_CLIQUES else passes
+    }
+
     /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a
      *  reconstruct mapping its solutions back to the original. [cancellation] is polled between passes
      *  and rounds: a fired deadline returns the partial result so far — every pass is individually
@@ -186,7 +202,7 @@ object Presolver {
         context: PresolveContext = PresolveContext.EMPTY,
         cancellation: Cancellation = Cancellation.Never,
     ): Presolved {
-        val passes = config.problemPasses(context)
+        val passes = problemPasses(problem, config, context, PresolvePass.Capability.FINITE)
         val maxRounds = config.maxRounds
         if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
         // A gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible independent of the
