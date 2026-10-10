@@ -58,7 +58,7 @@ class LocalSearchEngineTest {
 
             val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
 
-            assertTrue(result.assignment.boolValue(0))
+            assertTrue(result.assignment.bools[0])
             assertTrue(initialized.all { it == 1 })
         }
     }
