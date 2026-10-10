@@ -18,6 +18,50 @@ import kotlin.test.assertTrue
 
 class ReifiedLinearPropagatorTest {
     @Test
+    fun `a fixed binary integer implies its equality indicator with a valid bound reason`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            for (target in listOf(0L, 1L)) {
+                for (value in listOf(0L, 1L)) {
+                    val problem = Problem(1, 1, arrayOf(IntDomain(0L, 1L)),
+                        arrayOf(ReifiedLinear(0, longArrayOf(1L), intArrayOf(0), op, target)))
+
+                    PropagationReasonOracle.assertReasonsImply(problem, "$op fixed binary $target $value") { state ->
+                        if (value == 1L) state.tightenIntMin(0, value) else state.tightenIntMax(0, value)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `binary equality channels imply the integer value for either indicator polarity`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            for (target in listOf(0L, 1L)) {
+                for (indicator in listOf(false, true)) {
+                    val problem = Problem(1, 1, arrayOf(IntDomain(0L, 1L)),
+                        arrayOf(ReifiedLinear(0, longArrayOf(-2L), intArrayOf(0), op, -2L * target)))
+
+                    PropagationReasonOracle.assertReasonsImply(problem, "$op binary $target $indicator") { state ->
+                        state.pinBool(0, indicator)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a negated equality over a wider domain retains values outside the binary interval`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0L, 2L)),
+            arrayOf(ReifiedLinear(0, longArrayOf(1L), intArrayOf(0), LinearOp.EQ, 1L)))
+        val state = PropagationState(problem, Assumptions.None)
+        assertTrue(state.pinBool(0, false))
+
+        assertNull(state.runToFixpoint(allFactors = true))
+
+        assertEquals(listOf(0L, 2L), (0L..2L).filter { it in state.intDomains[0] })
+    }
+
+    @Test
     fun `single sided indicator reasons imply the pin for signed rows`() {
         for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.EQ, LinearOp.NE)) {
             for (coefficient in listOf(-1L, 1L)) {

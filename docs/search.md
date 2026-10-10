@@ -121,7 +121,10 @@ its assigned indicator. New indicator pins and opposing assignments retain the
 pin and conflict explanation protocol. Single-sided linear indicator deductions
 record the existing lazy linear payload during trailed search. Conflict analysis
 resolves it against the bounds at the pin, rather than later domains; untrailed
-and two-sided deductions retain eager explanations.
+and two-sided deductions retain eager explanations. Single-variable equality and
+disequality indicators over root domains contained in `{0, 1}` propagate as direct
+channels: an indicator fixes its integer value, and a fixed integer pins the
+indicator. Wider domains retain the general linear propagator.
 
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump.
