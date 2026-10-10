@@ -33,6 +33,33 @@ import kotlin.test.assertEquals
  */
 class LocalSearchStateCompoundProbeTest {
 
+    @Test
+    fun `real score probes preserve the committed row refresh cadence`() {
+        val row = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0)
+        val problem = Problem(
+            0, 0, emptyArray(), arrayOf<Factor>(row),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
+        state.recompute()
+        repeat(4094) { state.apply(Move.RealSet(0, if (it % 2 == 0) 0.25 else 0.5)) }
+        val before = state.assignment.snapshot()
+        val probe = Move.Compound(listOf(Move.RealSet(0, 0.25), Move.RealSet(0, 0.75)))
+
+        repeat(8) {
+            state.netDelta(probe)
+            state.breakScore(probe)
+            state.weightedNetDelta(probe)
+        }
+
+        assertEquals(before, state.assignment.snapshot())
+        state.doublePayload[0] = 5.0
+        state.apply(Move.RealSet(0, 0.25))
+        assertEquals(true, state.cost > 0L, "the row is not refreshed before the 4096th committed real set")
+        state.apply(Move.RealSet(0, 0.5))
+        assertEquals(0L, state.cost, "the 4096th committed real set reconciles the row")
+    }
+
     private data class Case(val name: String, val problem: Problem)
 
     private val cases: List<Case> = listOf(

@@ -23,8 +23,9 @@ import com.eignex.klause.solver.result.SampleResult
 
 /**
  * Local-search [Solver] around a `Problem`. The solver itself only carries engine setup
- * (strategy, restart cadence). All per-draw state — RNG, assignment, factor payloads, the
- * dedup window — lives inside the per-call sequences so concurrent draws never share state.
+ * (strategy, restart cadence). Assignments, RNGs and factor payloads belong to each draw.
+ * Searches must use the solver sequentially because strategy and restart policy are shared.
+ * A resumable handle rejects other searches until it completes, fails or is closed.
  *
  * Three call kinds, each accepting a [LocalSearchParams]:
  *
@@ -113,13 +114,15 @@ class LocalSearchSolver(
 
     /**
      * Open a satisfaction walk whose assignment, RNG and restart state persist between slices. Consume and close
-     * the handle before another search uses this solver's strategy and restart policy.
+     * the handle before another search uses this solver's strategy and restart policy. Opening an overlapping
+     * handle or executing another search throws [IllegalStateException]. Completion and failure release ownership.
      */
     override fun resumableSolve(params: LocalSearchParams): ResumableSolve = engine.resumableSolve(params)
 
     /**
      * Open an optimisation walk retaining its assignment, random state and restart policy across slices.
-     * Consume and close the handle before another search uses this solver's strategy and restart policy.
+     * Opening an overlapping handle or executing another search throws [IllegalStateException]. Completion,
+     * failure and [ResumableSearch.close] release ownership.
      */
     override fun resumable(objective: LinearObjective, params: LocalSearchParams): ResumableSearch =
         engine.resumable(objective, params)

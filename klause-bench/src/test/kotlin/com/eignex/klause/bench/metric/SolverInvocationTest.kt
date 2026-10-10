@@ -17,6 +17,40 @@ import kotlin.test.assertTrue
 class SolverInvocationTest {
 
     @Test
+    fun `portfolio diagnostics survive protocol parsing`() {
+        val diagnostic = """{"armId":7,"phase":"slice","message":"row \"R\"\u000aarm failure"}"""
+        for (dialect in SolverInvocation.Dialect.entries) {
+            val lines = when (dialect) {
+                SolverInvocation.Dialect.MINIZINC -> "%%%mzn-stat: armFailure.failed=$diagnostic\n----------"
+                SolverInvocation.Dialect.PB_COMPETITION -> "c armFailure.failed=$diagnostic\ns SATISFIABLE"
+                SolverInvocation.Dialect.SMT_LIB -> "; armFailure.failed=$diagnostic\nsat"
+            }
+
+            val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"), dialect)
+
+            assertEquals(true, result.feasible)
+            assertEquals(diagnostic, result.stats["armFailure.failed"])
+        }
+    }
+
+    @Test
+    fun `portfolio diagnostics survive lab record serialization`() {
+        val diagnostic = """{"armId":7,"phase":"slice","segment":2,"work":30,"type":"IllegalStateException","message":"row \"R\"\u000aarm failure","trace":"cause\u000aframe"}"""
+        val result = SolverInvocation.Result(
+            feasible = true, objective = null, elapsedMs = 1, timeToBestMs = null, proven = false,
+            stats = mapOf("armFailure.failed" to diagnostic), rawOutput = "", command = "klause",
+        )
+
+        val encoded = Reports.json.encodeToString(SolverInvocation.Result.serializer(), result)
+        val decoded = Reports.json.decodeFromString(SolverInvocation.Result.serializer(), encoded)
+
+        assertEquals(true, decoded.feasible)
+        assertEquals(diagnostic, decoded.stats["armFailure.failed"])
+        val retained = Reports.json.parseToJsonElement(checkNotNull(decoded.stats["armFailure.failed"])).jsonObject
+        assertEquals("7", retained["armId"].toString())
+    }
+
+    @Test
     fun `objective precision survives parsing and cache round trips for each protocol`() {
         val objectives = listOf("9223372036854775808", "9007199254740993", "1/3", "-1/3", "1e400")
         for (dialect in SolverInvocation.Dialect.entries) {

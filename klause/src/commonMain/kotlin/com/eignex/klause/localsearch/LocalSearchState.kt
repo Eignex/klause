@@ -810,7 +810,7 @@ class LocalSearchState(
             settle = { settleBreakMake(touched, { false }, {}) },
             markMovedVar = {},
         )
-        if (++realMovesSinceRefresh >= REAL_REFRESH_INTERVAL && !probeActive) refreshRealRows()
+        if (!probeActive && ++realMovesSinceRefresh >= REAL_REFRESH_INTERVAL) refreshRealRows()
     }
 
     private fun markNeighborConfChange(factorIds: IntArray) {

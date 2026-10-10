@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.PortfolioStats
 import com.eignex.klause.solver.result.SharingStats
@@ -188,6 +189,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
     private val initializationCancelled = LongArray(workers.size)
     private val rewards = DoubleArray(workers.size)
     private val failures = LongArray(workers.size)
+    private val diagnostics = arrayOfNulls<ArmFailure>(workers.size)
     private val faults = LongArray(workers.size)
     private val reseeds = LongArray(workers.size)
 
@@ -200,6 +202,20 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
         maxMillis[arm] = maxOf(maxMillis[arm], elapsed)
         rewards[arm] += reward
         if (failed) failures[arm]++
+    }
+
+    fun failure(arm: Int, failure: Throwable, phase: String) {
+        if (phase == "close") failures[arm]++
+        if (diagnostics[arm] != null) return
+        diagnostics[arm] = ArmFailure(
+            workers[arm].armId,
+            (failure::class.simpleName ?: "Throwable").take(128),
+            failure.message?.take(1024),
+            phase,
+            segments[arm],
+            work[arm],
+            failure.stackTraceToString().take(4096),
+        )
     }
 
     fun initialized(arm: Int, elapsed: Long, work: Long, cancelled: Boolean) {
@@ -238,6 +254,7 @@ internal class ScheduleLog(private val workers: List<PortfolioWorker>) {
                     initializationCancelled = initializationCancelled[arm],
                     meanReward = if (segments[arm] > 0L) rewards[arm] / segments[arm] else 0.0,
                     failures = failures[arm],
+                    failure = diagnostics[arm],
                     faults = faults[arm],
                     credit = ledger.creditOf(arm),
                     sharing = workers[arm].sharingMeter?.snapshot() ?: SharingStats(),

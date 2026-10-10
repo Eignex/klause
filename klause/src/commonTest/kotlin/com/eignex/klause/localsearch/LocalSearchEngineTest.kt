@@ -21,12 +21,129 @@ import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+
+    @Test
+    fun `early root and unsupported verdicts release handle ownership`() {
+        val refuted = Problem(
+            1, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, false))),
+            ),
+        )
+        val unsupported = Problem(
+            0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), emptyArray(),
+        )
+        for (problem in listOf(refuted, unsupported)) {
+            val solver = LocalSearchSolver(problem.bake())
+            val params = LocalSearchParams(maxFlips = 1)
+            val satisfaction = solver.resumableSolve(params)
+            assertTrue(satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) != null)
+            val optimization = solver.resumable(LinearObjective(), params)
+            assertTrue(optimization.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} != null)
+            solver.resumableSolve(params).close()
+            satisfaction.close()
+            optimization.close()
+        }
+    }
+
+    @Test
+    fun `live handles reject overlapping solver and session searches`() {
+        for (optimizing in listOf(false, true)) {
+            val solver = LocalSearchSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
+            val objective = LinearObjective()
+            val params = LocalSearchParams()
+            val session = solver.session()
+            val owner = if (optimizing) {
+                session.resumable(objective, params).also {
+                    assertNull(it.runSlice(Cancellation { true }, Long.MAX_VALUE, -1) {})
+                }
+            } else {
+                session.resumableSolve(params).also {
+                    assertNull(it.runSlice(Cancellation { true }, Long.MAX_VALUE, -1))
+                }
+            }
+
+            assertFailsWith<IllegalStateException> { solver.resumableSolve(params) }
+            assertFailsWith<IllegalStateException> { solver.resumable(objective, params) }
+            assertFailsWith<IllegalStateException> { session.solve(params) }
+            assertFailsWith<IllegalStateException> { session.samples(params).iterator().hasNext() }
+            assertFailsWith<IllegalStateException> { session.minimize(objective, params) }
+
+            owner.close()
+            val next = solver.resumableSolve(params)
+            owner.close()
+            assertFailsWith<IllegalStateException> { solver.resumable(objective, params) }
+            next.close()
+            assertIs<SolveResult.Sat>(solver.solve(params))
+        }
+    }
+
+    @Test
+    fun `terminal handles release the solver before close`() {
+        val solver = LocalSearchSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
+        val params = LocalSearchParams(maxFlips = 1)
+        val objective = LinearObjective()
+        val satisfaction = solver.resumableSolve(params)
+        val verdict = satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1)
+        assertIs<SolveResult.Sat>(verdict)
+        val optimization = solver.resumable(objective, params)
+        assertEquals(verdict, satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))
+        assertTrue(optimization.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} != null)
+        assertIs<SolveResult.Sat>(solver.solve(params))
+        satisfaction.close()
+        optimization.close()
+    }
+
+    @Test
+    fun `failed handles release the solver and cannot be resumed`() {
+        for (optimizing in listOf(false, true)) {
+            var fail = true
+            val policy = object : RestartPolicy {
+                override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
+                override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                    if (fail) error("restart failure")
+                    state.recompute()
+                }
+            }
+            val solver = LocalSearchSolver(
+                Problem(0, 0, emptyArray(), emptyArray()).bake(), restartPolicy = policy,
+            )
+            val params = LocalSearchParams(maxFlips = 1)
+            val objective = LinearObjective()
+            if (optimizing) {
+                val owner = solver.resumable(objective, params)
+                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} }
+                fail = false
+                assertIs<SolveResult.Sat>(solver.solve(params))
+                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} }
+            } else {
+                val owner = solver.resumableSolve(params)
+                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) }
+                fail = false
+                assertIs<SolveResult.Sat>(solver.solve(params))
+                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) }
+            }
+        }
+    }
+
+    @Test
+    fun `incumbent callback failures release optimization ownership`() {
+        val solver = LocalSearchSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
+        val owner = solver.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1))
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { throw IllegalArgumentException("callback failure") }
+        }
+
+        assertEquals("callback failure", failure.message)
+        assertIs<SolveResult.Sat>(solver.solve(LocalSearchParams()))
+    }
 
     @Test
     fun `custom restarts retain independent best infeasible anchors`() {

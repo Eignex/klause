@@ -133,8 +133,14 @@ The scheduler charges the observed instruction delta, while the solve-wide move
 allowance is charged once across slices. Closing or reseeding discards the retained
 state. Root refutations remain authoritative; an unsuccessful local-search walk is
 incomplete.
-An active local-search handle requires exclusive use of its solver and session;
-portfolio workers use separate solvers and close a handle before reseeding it.
+An active local-search handle acquires exclusive ownership of its solver when opened.
+Overlapping handle creation and other search execution throw `IllegalStateException`,
+including searches through another session of that solver. Completion, failure and
+idempotent close release ownership; a cancelled slice remains paused and retains it.
+Keep the owning session's assumptions and warm state unchanged until release.
+Strategy and restart policy are shared by the solver, so streaming draws must also
+be consumed sequentially. Portfolio workers use separate solvers and close a handle
+before reseeding it.
 Optimization handles open through their session so its assumptions and state apply.
 Sessions that decline resumable optimization retain their one-shot improvement stream.
 
@@ -184,13 +190,18 @@ incremental delta; repeated-coordinate linear deltas use a probe of the final va
 Probes apply compound inputs together before
 one definition pass, save affected input/output values, and restore those values directly;
 an inverse definition that cannot write does not strand a derived output. Probe activity
-is suppressed and its best-cost observation is discarded. Weighted probes snapshot and
+is suppressed and its best-cost observation is discarded. Real moves in probes and
+restoration do not advance the committed row-refresh cadence. Weighted probes snapshot and
 scan only factors whose degrees change, in factor-id order to retain the full-scan
 floating-point accumulation order.
 Committed moves reconcile cost and violated membership from exact post-move degrees.
-Reified linear invariants fuse payload updates with that degree; their ordinary apply
-methods retain the delta-returning contract for other callers. Other invariants update
-payloads and then read their degree, independently of the returned apply delta.
+Factor data and engine projections are separate: the local-search projection supplies
+an `Invariant`, while mutable payloads belong to each `LocalSearchState`.
+Candidate `deltaIf*` methods return the exact degree change. Ordinary `apply*` methods
+update payloads after the assignment changes; their return values are implementation-specific
+and callers must read the post-move degree for scoring. Reified linear invariants offer
+an internal fused payload-update and exact-degree path. Other invariants update payloads
+and then read their degree, independently of the returned apply value.
 Optimization retains its best infeasible restart anchor as a private packed assignment.
 Strict cost improvements copy into that storage; a restart materializes an independent
 sample only when no feasible incumbent supersedes the anchor. Published samples and
@@ -198,6 +209,14 @@ samples retained by custom restart policies remain independent of subsequent upd
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
+Each arm retains completed-handle totals separately from its current cumulative
+snapshot. Repeated snapshots replace the live entry; closing captures the final
+counters and merges the handle once, including when reseeding or stopping the pool.
+Ordinary arm exceptions retire their producer and leave siblings running. The schedule
+retains one diagnostic per arm with its identity, operation, segment, charged work,
+exception type/message and cause trace. Type, message and trace are capped at 128,
+1024 and 4096 characters. Output callback exceptions still propagate; source-refuted
+claims remain quarantine faults rather than ordinary exception diagnostics.
 Reseeding preserves terminal verdicts. Arm policy, scheduling and available
 continuous-column capability determine which arms run; unsupported local-search
 arms are filtered from mixed pools while local-search-only requests retain their

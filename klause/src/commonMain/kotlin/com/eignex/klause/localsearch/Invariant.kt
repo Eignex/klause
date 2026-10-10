@@ -6,13 +6,13 @@ package com.eignex.klause.localsearch
  * constraint with a graded violation score and an incremental update rule; this interface is
  * the klause realisation of that concept.
  *
- * Implemented by every factor in `Problem.factors` (via `Factor`), and the type the LS engine
- * ([com.eignex.klause.localsearch.LocalSearchSolver]) uses when dispatching to invariants.
+ * A [com.eignex.klause.ir.Factor] supplies this role through its local-search projection.
+ * The projection describes constraint semantics; mutable payloads belong to [LocalSearchState].
  *
  * Every method defaults to a sound no-op (always-satisfied, zero deltas, naive ±1 repair
  * moves), so a propagation-only factor needs to implement nothing here.
  *
- * See `Factor` for the full constraint contract (deductive + local-search + presolve).
+ * See [com.eignex.klause.ir.Factor] for the engine-neutral constraint contract.
  */
 interface Invariant {
     /** Build this factor's payload from the current assignment. Called once per restart.
@@ -37,10 +37,12 @@ interface Invariant {
      * a real magnitude.
      *
      * **Contract (must hold for cost/gradient consistency):** for every move kind,
-     * `deltaIf*` and `apply*` must return exactly `violationDegree(after) - violationDegree(before)`.
-     * Move scoring uses these deltas. After committing a move, the engine reconciles `cost`,
+     * `deltaIf*` must return exactly `violationDegree(after) - violationDegree(before)`.
+     * Move scoring uses these deltas. After applying a move, the engine reconciles `cost`,
      * per-factor degrees and violated membership from the exact post-move degree rather than
-     * the returned apply delta. A delta that disagrees with this method mis-scores candidates.
+     * the returned apply value. Apply methods must leave payloads consistent with the updated
+     * assignment; their return values are implementation-specific and are not scoring deltas.
+     * A candidate delta that disagrees with this method mis-scores candidates.
      * Degrees should be clamped to a sane range to avoid `Int` overflow in degree arithmetic;
      * the engine sums them into a `Long` cost.
      */
@@ -61,18 +63,19 @@ interface Invariant {
     /**
      * Apply a committed move to this factor's payload. The assignment has already been
      * updated, so factors compare current values against the saved `oldValue` (for int sets)
-     * or recover the pre-flip value by inversion. Returns the same Δ[violationDegree] the
-     * deltaIf* method would have returned before the move.
+     * or recover the pre-flip value by inversion. Called for committed moves and reversible
+     * score probes. The return value is implementation-specific; read [violationDegree] after
+     * application for the exact degree.
      */
     fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int = 0
 
-    /** Apply a committed int-set of [intVar] from [oldValue]; returns the Δ violation-degree. */
+    /** Update payloads after setting [intVar] from [oldValue]. Return semantics match [applyBoolFlip]. */
     fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int = 0
 
     /** Δ violation-degree if real variable [realVar] were set to [newValue], without mutating state. */
     fun deltaIfRealSet(state: LocalSearchState, factorId: Int, realVar: Int, newValue: Double): Int = 0
 
-    /** Apply a committed real-set of [realVar] from [oldValue]; returns the Δ violation-degree. */
+    /** Update payloads after setting [realVar] from [oldValue]. Return semantics match [applyBoolFlip]. */
     fun applyRealSet(state: LocalSearchState, factorId: Int, realVar: Int, oldValue: Double): Int = 0
 
     /**
