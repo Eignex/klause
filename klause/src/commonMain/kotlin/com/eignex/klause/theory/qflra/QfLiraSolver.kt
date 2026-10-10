@@ -118,7 +118,7 @@ class ExactLiraSearchComponent(
     private var parentStop = Cancellation.Never
     private var pollContextStop = true
     private val lpStop = object : Cancellation {
-        override fun isCancelled(): Boolean = operationStop() || pollContextStop && context?.cancelled() == true
+        override fun isCancelled(): Boolean = operationStop() || (pollContextStop && context?.cancelled() == true)
         override fun deadline() = operationStop.deadline()
         override fun workMeter() = operationStop.workMeter()
     }
@@ -188,7 +188,7 @@ class ExactLiraSearchComponent(
         parentStop = solveStop ?: contextStop ?: Cancellation(context::cancelled)
         pollContextStop = solveStop != null && solveStop !== contextStop
         registerDisjunctions(context)
-        beginOperation(context)
+        beginOperation()
         return try {
             if (disjunctionRegistrationDeclined || !system.install() || operationStop()) {
                 ComponentResult.Indeterminate
@@ -201,7 +201,7 @@ class ExactLiraSearchComponent(
     }
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-        beginOperation(context)
+        beginOperation()
         return try {
             if (operationStop()) {
                 ComponentResult.Indeterminate
@@ -216,7 +216,7 @@ class ExactLiraSearchComponent(
     override fun propagate(context: SearchContext): ComponentResult = lp.propagate(context)
     override fun check(context: SearchContext): ComponentCheck = lp.check(context)
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
-        beginOperation(context)
+        beginOperation()
         return try {
             if (operationStop()) {
                 outcome = ComponentCheck.Indeterminate
@@ -516,7 +516,7 @@ class ExactLiraSearchComponent(
     }
 
     private fun relax(context: SearchContext): ComponentResult {
-        beginOperation(context)
+        beginOperation()
         return try {
             relaxWithin(context)
         } finally {
@@ -524,7 +524,7 @@ class ExactLiraSearchComponent(
         }
     }
 
-    private fun beginOperation(context: SearchContext) {
+    private fun beginOperation() {
         operationBudgetExhausted = false
         operationStop = operationAllowance(parentStop)
     }
