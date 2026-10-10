@@ -20,6 +20,39 @@ import kotlin.test.assertTrue
 
 class PresolvePipelineTest {
 
+    @Test
+    fun `isolated wide output uses root propagation without prebake LP`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 10), IntDomain(0, 10)),
+            listOf(Linear(longArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0)),
+        )
+
+        val outcome = PresolvePipeline.run(problem, null, PresolveConfig.NONE, solutionSetSensitive = false)
+
+        assertEquals(20L, outcome.problem.bake().rootIntDomain(0).max)
+        assertEquals(0.0, outcome.stats.lpStats.rootPasses.sum)
+    }
+
+    @Test
+    fun `coupled wide columns retain prebake LP bounds`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 1_000_000_000)),
+            listOf(
+                Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+
+        val outcome = PresolvePipeline.run(problem, null, PresolveConfig.NONE, solutionSetSensitive = false)
+
+        assertEquals(5L, outcome.problem.finiteIntDomain(0).max)
+        assertEquals(5.0, outcome.stats.lpStats.rootPasses.sum)
+    }
+
     private fun isFeasible(problem: Problem, ints: LongArray): Boolean {
         var a = Assumptions.None
         for (v in 0 until problem.numIntVars) a = a.withInt(v, ints[v])
