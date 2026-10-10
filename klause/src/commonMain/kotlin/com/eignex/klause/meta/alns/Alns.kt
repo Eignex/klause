@@ -315,6 +315,7 @@ internal class Alns(
                     .withCancellation(params.cancellation.shorten(BT_BOOTSTRAP_FRACTION)),
             )
             if (cpResult.assignment != null) return cpResult
+            if (params.cancellation()) return MinimizeResult.Unknown(TerminationReason.Cancelled)
         }
         return session?.minimize(objective, params) ?: inner.minimize(objective, params)
     }

@@ -98,6 +98,8 @@ Mixed-pool arms over the same model share it, including ALNS's inner local searc
 Objective-bound overlays keep their own projections. Assignments, RNGs, weights and
 invariant payloads belong to each live state. Projection construction, seeding,
 factor calls and repair searches remain atomic work that can overrun a segment.
+ALNS skips its local-search fallback when the complete-engine bootstrap returns
+without an incumbent after cancellation, avoiding fresh seeding after the deadline.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
