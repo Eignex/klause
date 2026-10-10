@@ -1,7 +1,7 @@
 # Presolve effort campaign (#554)
 
 Status: AWS pilots, metadata integration and both 300-second campaigns complete;
-final discovery analysis pending.
+abort fraction 0.01 frozen for held-out validation (AWS job 914).
 
 The solver baseline is `5471419aa8c832ee1065468a6861bb203a1ff8c7`. The neutral
 controls build is `5ad3707c0c0bfb113f994828265b9f1bafef91c3` ([PR #2378](https://github.com/Eignex/klause/pull/2378)).
@@ -288,8 +288,8 @@ reference, file listing and worker/setup logs are archived under `evidence/907`.
 [CI run 38008545290](https://github.com/Eignex/klause/actions/runs/38008545290)
 produced `evidence/907/analysis.json.gz`. All 36 matched blocks are complete, with
 identical source hashes, one production fingerprint, one search arm, no excluded
-pairs and no invalid source checks. Discovery analysis is pending; no holdout candidate
-has been selected.
+pairs and no invalid source checks. The complete discovery analysis and frozen
+holdout selection are reported below.
 Every reported witness has a retained `_objective` matching its recorded objective.
 
 | Configuration | Reported witnesses (proved) | Source-valid witnesses | Median preparation ms | Maximum preparation ms | Process PAR2 ratio (95% family interval) | Mean quality (95% family interval) |
@@ -328,6 +328,79 @@ The focused screen supports keeping aggressive opt-in. Integer caps reduce probe
 counts and typical preparation cost, but do not provide a hard elapsed-time bound
 and do not recover default quality on this sample. Neither aggressive variant is
 a global-default candidate under the registered selection rule.
+
+## Discovery and frozen holdout candidate
+
+Job 906 completed all 360 cases. [CI run 38011225797](https://github.com/Eignex/klause/actions/runs/38011225797)
+produced `evidence/906/analysis.json.gz`: 120 complete pairs per comparison across
+20 base families, with no excluded or incomplete pairs, mismatched source hashes,
+invalid source checks or retained-objective mismatches. All 296 reported witnesses
+are retained and match their recorded `_objective`. Every production record shares
+the fingerprint from job 907 and has one search arm.
+
+| Configuration | Reported witnesses (proved) | Source-valid witnesses | Median preparation ms | Maximum preparation ms | Process PAR2 ratio (95% family interval) | Mean quality (95% family interval) |
+| --- | ---: | ---: | ---: | ---: | --- | --- |
+| Default | 100 (16) | 42 | 311.5 | 9,888 | 1 | 0 |
+| Conservative | 96 (14) | 38 | 162.5 | 10,099 | 0.769 (0.468–1.119) | -0.058 (-0.167–0.042) |
+| Abort 0.01 | 100 (16) | 42 | 316.5 | 10,435 | 1.059 (1.001–1.171) | 0 (-0.025–0.025) |
+
+Conservative changes recorded work in all 120 pairs. Abort 0.01 changes it in 36
+pairs: all six pairs in each of `yumi-static`, `stable-goods`, `stripboard`, `gbac`,
+`cyclic-rcpsp` and `kidney-exchange`. It matches recorded work in the other 84.
+The default's largest round-entry count is seven, abort 0.01's is six, and
+conservative's is two against its cap of one per round-engine invocation.
+Entries accumulate across the source and finite lanes and include empty schedule
+scans. This gives no reason to expand the default cap of 16. Recorded
+RootBaker probe calls are zero in all three configurations.
+
+| Family | Conservative quality | Abort 0.01 quality | Conservative process ratio | Abort 0.01 process ratio |
+| --- | ---: | ---: | ---: | ---: |
+| carpet-cutting | 0.333 | 0 | 1.451 | 2.621 |
+| rcpsp | 0 | 0 | 0.962 | 0.943 |
+| yumi-static | 0 | 0 | 0.998 | 1.071 |
+| stable-goods | 0.333 | 0 | 2.045 | 0.996 |
+| test-scheduling | 0 | 0 | 1 | 1 |
+| multi-knapsack | -0.333 | 0 | 1.327 | 1.003 |
+| stripboard | 0 | 0 | 1.033 | 1.025 |
+| proteindesign12 | -0.333 | 0.167 | 0.283 | 1.072 |
+| cargo | -0.667 | 0 | 1.965 | 1.000 |
+| gfd-schedule | -0.333 | 0 | 0.027 | 0.999 |
+| gbac | -0.333 | 0 | 0.092 | 1.005 |
+| cyclic-rcpsp | 0 | 0 | 1.020 | 1.028 |
+| kidney-exchange | 0 | 0 | 0.993 | 1.016 |
+| tower_challenge | 0 | 0 | 0.993 | 0.991 |
+| filters | 0 | 0 | 0.994 | 1.019 |
+| neighbours | 0.167 | -0.167 | 0.996 | 0.997 |
+| pattern-set-mining-k2 | 0 | 0 | 0.992 | 1.012 |
+| league | 0 | 0 | 0.978 | 0.995 |
+| ghoulomb | 0 | 0 | 1 | 1 |
+| amaze | 0 | 0 | 0.997 | 1.016 |
+
+Each family contributes six pairs. Conservative loses the two reported
+multi-knapsack proofs and two cargo witnesses. Its very low GFD/GBAC own-best
+timing ratios accompany different objectives and negative mean quality; they
+are not equivalent-result speedups. Its equal-outcome ratio is 0.997
+(0.989–1.004), covering 83 pairs in 15 families. Abort 0.01 has one reported
+improvement in `proteindesign12`, one regression in `neighbours` and 118 ties.
+Its equal-outcome ratio is 1.055 (0.998–1.166), covering 118 pairs in all 20
+families. Its largest timing regression is on carpet-cutting, where recorded
+work matches default; that observation does not establish a presolve-work mechanism.
+Independent source checks cover 38 conservative/default witness pairs and 42
+abort/default pairs. Unchecked witnesses and all proof claims remain reported outcomes.
+
+`selection.json` freezes abort 0.01 as the sole eligible candidate under the
+registered rule: it changes recorded work and has nonnegative mean quality.
+Conservative fails the quality gate. The rule ranks eligible candidates without
+requiring a process ratio below one; abort 0.01's discovery timing provides no
+benefit signal, and selection is not a default recommendation.
+
+[Holdout job 914](http://192.168.50.104:8420/jobs/914) uses
+`experiments/holdout-300.json`, committed before submission, on the same frozen
+source. Default versus abort 0.01, 12 disjoint base families, three seeds and two
+alternating repeats produce 144 cases (12 nominal solver core-hours). Host is
+explicitly AWS; parallel and machines are unset. Holdout cannot select another
+candidate. A shipped-setting change still requires consistent quality and timing
+evidence across discovery and holdout; a null result remains acceptable.
 
 ## Separate deadline diagnostic
 
