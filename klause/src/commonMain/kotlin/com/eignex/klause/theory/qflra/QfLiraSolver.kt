@@ -552,7 +552,7 @@ class ExactLiraSearchComponent(
             return ComponentResult.Indeterminate
         }
         if (!context.consumeCheck()) return ComponentResult.Indeterminate
-        val result = lp.solve(token = operationStop, sparsePointRecovery = true)
+        val result = lp.solve(sparsePointRecovery = true)
             ?: return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate
         dirty = false

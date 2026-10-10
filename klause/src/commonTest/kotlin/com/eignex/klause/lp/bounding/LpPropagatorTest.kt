@@ -64,6 +64,29 @@ import kotlin.test.assertTrue
 
 class LpPropagatorTest {
     @Test
+    fun `owner and distinct call stops both withhold LP proofs`() {
+        for (stopOwner in listOf(false, true)) {
+            var ownerStopped = false
+            var callStopped = false
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+            val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
+                .build(PropagationSession(problem))
+            LpPropagator(object : LpSearchPolicy {}, cancellation = Cancellation { ownerStopped }).use { lp ->
+                assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+                ownerStopped = stopOwner
+                callStopped = !stopOwner
+
+                val result = assertNotNull(lp.solve(token = Cancellation { callStopped }))
+
+                assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+                assertNull(result.witness)
+                assertNull(result.bound)
+                assertNull(result.conflictSupport)
+            }
+        }
+    }
+
+    @Test
     fun `compaction declines a cut edit that would publish uninstalled rows`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))

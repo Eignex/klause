@@ -344,7 +344,7 @@ internal class LpPropagator(
         solveOwned {
             val profile = effort()
             it.solve(
-                token = cancellation or token,
+                token = if (token === cancellation) cancellation else cancellation or token,
                 continuationLimits = profile.continuation,
                 fullContinuation = profile.fullContinuation,
                 observer = certificationObserver,
