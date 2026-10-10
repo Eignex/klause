@@ -140,7 +140,11 @@ private class OrCancellation(
         if (other is OrCancellation) addAll(other.tokens) else if (other !== Cancellation.Never) add(other)
     }.toTypedArray()
 
-    override fun isCancelled(): Boolean {
+    override fun isCancelled(): Boolean = poll()
+
+    override fun invoke(): Boolean = poll()
+
+    private fun poll(): Boolean {
         for (token in tokens) if (token.isCancelled()) return true
         return false
     }
@@ -157,6 +161,8 @@ private class OrCancellation(
 internal fun cancelledWhen(deadlineOf: () -> ComparableTimeMark?, cancelled: () -> Boolean): Cancellation =
     object : Cancellation {
         override fun isCancelled(): Boolean = cancelled()
+
+        override fun invoke(): Boolean = cancelled()
 
         override fun deadline(): ComparableTimeMark? = deadlineOf()
     }
