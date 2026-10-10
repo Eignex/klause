@@ -42,8 +42,8 @@ kotlin {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")
-            implementation("com.eignex:koblas:0.1.1-20261010.042342-251") {
-                version { strictly("0.1.1-20261010.042342-251") }
+            implementation("com.eignex:koblas:0.1.1-20261010.075742-252") {
+                version { strictly("0.1.1-20261010.075742-252") }
             }
             implementation("com.eignex:kumulant:0.3.4-20260922.073440-66")
             implementation("com.eignex:kpermute:1.2.0")
@@ -65,10 +65,10 @@ kotlin {
 dependencies {
     constraints {
         for ((module, pinned) in mapOf(
-            "jvm" to "0.1.1-20261010.042342-254",
-            "linuxx64" to "0.1.1-20261010.042342-250",
-            "linuxarm64" to "0.1.1-20261010.042342-251",
-            "macosarm64" to "0.1.1-20261010.042148-274",
+            "jvm" to "0.1.1-20261010.075742-255",
+            "linuxx64" to "0.1.1-20261010.075742-251",
+            "linuxarm64" to "0.1.1-20261010.075742-252",
+            "macosarm64" to "0.1.1-20261010.075548-275",
         )) {
             add("commonMainImplementation", "com.eignex:koblas-$module:$pinned") {
                 version { strictly(pinned) }
