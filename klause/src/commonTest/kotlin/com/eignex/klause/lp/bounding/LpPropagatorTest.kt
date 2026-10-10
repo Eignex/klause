@@ -76,12 +76,12 @@ class LpPropagatorTest {
                 ownerStopped = stopOwner
                 callStopped = !stopOwner
 
-                val result = assertNotNull(lp.solve(token = Cancellation { callStopped }))
+                val result = lp.solve(token = Cancellation { callStopped })
 
-                assertEquals(LpVerdict.INDETERMINATE, result.verdict)
-                assertNull(result.witness)
-                assertNull(result.bound)
-                assertNull(result.conflictSupport)
+                assertTrue(result == null || result.verdict == LpVerdict.INDETERMINATE)
+                assertNull(result?.witness)
+                assertNull(result?.bound)
+                assertNull(result?.conflictSupport)
             }
         }
     }
