@@ -32,7 +32,9 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         }
     }
 
-    private data class Key(val variable: Int, val value: Long)
+    private sealed interface ComparisonKey
+    private data class Key(val variable: Int, val value: Long, val operator: LinearOp = LinearOp.EQ) : ComparisonKey
+    private data class PairKey(val left: Int, val right: Int, val operator: LinearOp) : ComparisonKey
     private class PendingEquality(val literal: Int, val factor: Factor)
     private data class Owner(val variable: Int, val integer: Boolean)
     private sealed interface Frame {
@@ -44,7 +46,8 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private val definitions = HashMap<Int, Definition>()
     private val booleanDefinitions = HashMap<Int, List<Factor>>()
     private val equalities = HashMap<Key, Int>()
-    private val pendingEqualities = LinkedHashMap<Key, PendingEquality>()
+    private val pendingEqualities = LinkedHashMap<ComparisonKey, PendingEquality>()
+    private val pairEqualities = HashMap<PairKey, Int>()
     private var work = 0
 
     fun define(
@@ -67,8 +70,8 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
 
     fun isDefined(variable: Int): Boolean = variable in definitions
 
-    fun rememberPrimitive(variable: Int, value: Long, literal: Int) {
-        if (variable !in definitions) equalities.getOrPut(Key(variable, value)) { literal }
+    fun rememberPrimitive(variable: Int, value: Long, literal: Int, operator: LinearOp = LinearOp.EQ) {
+        if (variable !in definitions) equalities.getOrPut(Key(variable, value, operator)) { literal }
     }
 
     private fun constantImage(terms: List<LinComb>): Set<Long>? {
@@ -145,15 +148,28 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         )
     }
 
-    fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {
-        val key = Key(variable, value)
+    fun reify(variable: Int, value: Long, builder: Compiler.Builder, operator: LinearOp = LinearOp.EQ): Int? {
+        val key = Key(variable, value, operator)
         equalities[key]?.let { return it }
-        if (definitions[variable]?.image?.contains(value) == false) {
-            return Lit.negate(builder.trueLit()).also { equalities[key] = it }
+        imageTruth(variable, value, operator)?.let { truth ->
+            return truthLiteral(truth, builder).also { equalities[key] = it }
         }
         if (variable !in definitions) return null
         return pendingEqualities.getOrPut(key) {
-            val literal = builder.reifyLinear(longArrayOf(1), intArrayOf(variable), LinearOp.EQ, value)
+            val literal = builder.reifyLinear(longArrayOf(1), intArrayOf(variable), operator, value)
+            PendingEquality(literal, builder.factors.last())
+        }.literal
+    }
+
+    fun reifyPair(left: Int, right: Int, operator: LinearOp, builder: Compiler.Builder): Int? {
+        if (operator != LinearOp.LE && operator != LinearOp.GE) return null
+        val leftImage = definitions[left]?.image?.takeIf { it.size <= PAIR_IMAGE_LIMIT }
+        val rightImage = definitions[right]?.image?.takeIf { it.size <= PAIR_IMAGE_LIMIT }
+        if (leftImage == null && rightImage == null) return null
+        val key = PairKey(left, right, operator)
+        pairEqualities[key]?.let { return it }
+        return pendingEqualities.getOrPut(key) {
+            val literal = builder.reifyLinear(longArrayOf(1, -1), intArrayOf(left, right), operator, 0)
             PendingEquality(literal, builder.factors.last())
         }.literal
     }
@@ -161,7 +177,10 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     fun expandPending(builder: Compiler.Builder) {
         val replaced = HashSet<Factor>()
         for ((key, equality) in pendingEqualities.entries.toList().asReversed()) {
-            val expanded = expand(key.variable, key.value, builder) ?: continue
+            val expanded = when (key) {
+                is Key -> expand(key.variable, key.value, builder, key.operator)
+                is PairKey -> expandPair(key, builder)
+            } ?: continue
             if (expanded == equality.literal) continue
             val clauses = listOf(
                 Clause(intArrayOf(Lit.negate(equality.literal), expanded)),
@@ -175,11 +194,38 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         pendingEqualities.clear()
     }
 
-    private fun expand(variable: Int, value: Long, builder: Compiler.Builder): Int? {
-        val key = Key(variable, value)
+    private fun expandPair(key: PairKey, builder: Compiler.Builder): Int? {
+        pairEqualities[key]?.let { return it }
+        val rightImage = definitions[key.right]?.image?.takeIf { it.size <= PAIR_IMAGE_LIMIT }
+        val leftImage = definitions[key.left]?.image?.takeIf { it.size <= PAIR_IMAGE_LIMIT }
+        val selectRight = rightImage != null && (leftImage == null || rightImage.size <= leftImage.size)
+        val image = if (selectRight) rightImage else leftImage
+        if (image == null || work >= workLimit) return null
+        val selected = if (selectRight) key.right else key.left
+        val other = if (selectRight) key.left else key.right
+        val operator = if (selectRight) key.operator else {
+            if (key.operator == LinearOp.LE) LinearOp.GE else LinearOp.LE
+        }
+        val alternatives = ArrayList<Int>()
+        for (value in image) {
+            if (++work > workLimit) return null
+            val guard = expand(selected, value, builder, LinearOp.EQ) ?: return null
+            val comparison = if (other in definitions) expand(other, value, builder, operator) ?: return null else {
+                builder.reifyRelation(
+                    operatorText(operator), IntComb.Narrow(LinComb(mapOf(other to 1L), 0)),
+                    IntComb.Narrow(LinComb(emptyMap(), value)),
+                )
+            }
+            alternatives.add(builder.foldConditionalAnd(listOf(guard, comparison)))
+        }
+        return builder.foldConditionalOr(alternatives).also { pairEqualities[key] = it }
+    }
+
+    private fun expand(variable: Int, value: Long, builder: Compiler.Builder, operator: LinearOp): Int? {
+        val key = Key(variable, value, operator)
         equalities[key]?.let { return it }
-        if (definitions[variable]?.image?.contains(value) == false) {
-            return Lit.negate(builder.trueLit()).also { equalities[key] = it }
+        imageTruth(variable, value, operator)?.let { truth ->
+            return truthLiteral(truth, builder).also { equalities[key] = it }
         }
         if (variable !in definitions || work >= workLimit) return null
         val pending = ArrayDeque<Frame>()
@@ -195,28 +241,29 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     if (++work > workLimit) return null
                     val term = frame.term
                     val source = term.asSimpleVar()
-                    val cached = source?.let { equalities[Key(it, value)] }
+                    val cached = source?.let { equalities[Key(it, value, operator)] }
                     val definition = source?.let { definitions[it] }
+                    val imageTruth = source?.let { imageTruth(it, value, operator) }
                     when {
                         cached != null -> literals.addLast(cached)
                         term.coeffs.isEmpty() -> literals.addLast(
-                            if (term.constant == value) builder.trueLit() else Lit.negate(builder.trueLit()),
+                            truthLiteral(compare(term.constant, value, operator), builder),
                         )
-                        source != null && definition?.image?.contains(value) == false -> {
-                            val literal = Lit.negate(builder.trueLit())
-                            equalities[Key(source, value)] = literal
+                        source != null && imageTruth != null -> {
+                            val literal = truthLiteral(imageTruth, builder)
+                            equalities[Key(source, value, operator)] = literal
                             literals.addLast(literal)
                         }
                         source != null && definition != null -> {
                             pending.addLast(Frame.Join(source, definition))
-                            scheduleBranches(definition, value, builder, pending)
+                            scheduleBranches(definition, value, builder, pending, operator)
                         }
                         else -> {
                             val literal = builder.reifyRelation(
-                                "=", IntComb.Narrow(term), IntComb.Narrow(LinComb(emptyMap(), value)),
+                                operatorText(operator), IntComb.Narrow(term), IntComb.Narrow(LinComb(emptyMap(), value)),
                             )
                             literals.addLast(literal)
-                            if (source != null) equalities[Key(source, value)] = literal
+                            if (source != null) equalities[Key(source, value, operator)] = literal
                         }
                     }
                 }
@@ -227,9 +274,9 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     for (index in arms.indices.reversed()) arms[index] = literals.removeLast()
                     val alternatives = ArrayList<Int>()
                     for (index in arms.indices) {
-                        val guard = definition.guardTests[index]?.truthWhen(
+                        val guard = if (operator == LinearOp.EQ) definition.guardTests[index]?.truthWhen(
                             definition.arms[index].asSimpleVar(), value,
-                        )
+                        ) else null
                         alternatives += when (guard) {
                             true -> arms[index]
                             false -> Lit.negate(builder.trueLit())
@@ -237,10 +284,10 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                         }
                     }
                     if (default != Lit.negate(builder.trueLit())) {
-                        alternatives += defaultAlternative(definition, default, value, builder)
+                        alternatives += defaultAlternative(definition, default, value, builder, operator)
                     }
                     val literal = builder.foldConditionalOr(alternatives)
-                    equalities[Key(frame.variable, value)] = literal
+                    equalities[Key(frame.variable, value, operator)] = literal
                     literals.addLast(literal)
                 }
             }
@@ -253,14 +300,16 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         value: Long,
         builder: Compiler.Builder,
         pending: ArrayDeque<Frame>,
+        operator: LinearOp,
     ) {
         pending.addLast(
-            if (definition.excludesDefault(value)) Frame.Known(Lit.negate(builder.trueLit()))
+            if (operator == LinearOp.EQ && definition.excludesDefault(value)) Frame.Known(Lit.negate(builder.trueLit()))
             else Frame.Eval(definition.default),
         )
         for (index in definition.arms.indices.reversed()) {
             val arm = definition.arms[index]
-            val excluded = definition.guardTests[index]?.truthWhen(arm.asSimpleVar(), value) == false
+            val excluded = operator == LinearOp.EQ &&
+                definition.guardTests[index]?.truthWhen(arm.asSimpleVar(), value) == false
             pending.addLast(if (excluded) Frame.Known(Lit.negate(builder.trueLit())) else Frame.Eval(arm))
         }
     }
@@ -270,9 +319,10 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         literal: Int,
         value: Long,
         builder: Compiler.Builder,
+        operator: LinearOp,
     ): Int {
         val source = definition.default.asSimpleVar()
-        if (source != null && source in definition.guardColumns) {
+        if (operator == LinearOp.EQ && source != null && source in definition.guardColumns) {
             var simplified = false
             val guards = ArrayList<Int>()
             for (index in definition.guards.indices) {
@@ -290,8 +340,34 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         return builder.foldConditionalAnd(listOf(noArm, literal))
     }
 
+    private fun imageTruth(variable: Int, value: Long, operator: LinearOp): Boolean? {
+        val image = definitions[variable]?.image ?: return null
+        if (operator == LinearOp.EQ) return if (value !in image) false else null
+        if (image.all { compare(it, value, operator) }) return true
+        if (image.none { compare(it, value, operator) }) return false
+        return null
+    }
+
+    private fun truthLiteral(truth: Boolean, builder: Compiler.Builder): Int =
+        if (truth) builder.trueLit() else Lit.negate(builder.trueLit())
+
+    private fun compare(left: Long, right: Long, operator: LinearOp): Boolean = when (operator) {
+        LinearOp.EQ -> left == right
+        LinearOp.LE -> left <= right
+        LinearOp.GE -> left >= right
+        LinearOp.NE -> left != right
+    }
+
+    private fun operatorText(operator: LinearOp): String = when (operator) {
+        LinearOp.EQ -> "="
+        LinearOp.LE -> "<="
+        LinearOp.GE -> ">="
+        LinearOp.NE -> "distinct"
+    }
+
     private companion object {
         const val IMAGE_LIMIT = 1_024
+        const val PAIR_IMAGE_LIMIT = 64
     }
 }
 

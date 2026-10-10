@@ -23,6 +23,131 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `an expanded ordering comparison shares its primitive source predicate`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const p Bool) (declare-const x Int)
+            (assert p) (assert (= p (<= x 4))) (assert (<= (ite b x 9) 4))
+            """.trimIndent(),
+        )
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)))
+
+        assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b")))
+    }
+
+    @Test
+    fun `conditional ordering comparisons select the source guard in either operand position`() {
+        val relations = listOf(
+            "(< (ite b 3 9) 4)", "(<= (ite b 3 9) 3)",
+            "(> (ite b 9 3) 4)", "(>= (ite b 9 3) 9)",
+            "(> 4 (ite b 3 9))", "(>= 3 (ite b 3 9))",
+            "(< 4 (ite b 9 3))", "(<= 9 (ite b 9 3))",
+        )
+        for (relation in relations) {
+            val parsed = SmtLib.parse("(declare-const b Bool) (assert $relation)")
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)))
+
+            assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b")))
+        }
+    }
+
+    @Test
+    fun `ordering two conditional images propagates their guards without arithmetic decisions`() {
+        for (relation in listOf(
+            "(<= (ite b 1 (ite d 9 100)) (ite c 0 2))",
+            "(>= (ite c 0 2) (ite b 1 (ite d 9 100)))",
+        )) {
+            val parsed = SmtLib.parse(
+                "(declare-const b Bool) (declare-const c Bool) (declare-const d Bool) " +
+                    "(assert b) (assert d) (assert $relation)",
+            )
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)))
+
+            assertEquals(false, session.boolValue(parsed.boolVarNames.getValue("c")))
+        }
+    }
+
+    @Test
+    fun `a conditional ordering preserves the arithmetic constraint on its open default`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const x Int)
+            (assert (not b)) (assert (>= x 4)) (assert (< (ite b 1 x) 4))
+            """.trimIndent(),
+        )
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            assertIs<ComponentResult.Conflict>(session.initialize())
+        }
+    }
+
+    @Test
+    fun `an exhausted ordering expansion keeps its numeric branch constraint`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+        )
+        val reader = SExprReader(
+            StringCharSource("(declare-const b Bool) (assert (not b)) (assert (<= (ite b 1 9) 4))"),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            assertIs<ComponentResult.Conflict>(session.initialize())
+        }
+    }
+
+    @Test
+    fun `strict conditional thresholds beyond a signed word retain exact arithmetic`() {
+        for ((relation, value) in listOf(
+            "(< (ite b x 0) -9223372036854775808)" to "-9223372036854775809",
+            "(> (ite b x 0) 9223372036854775807)" to "9223372036854775808",
+        )) {
+            val parsed = SmtLib.parse(
+                "(declare-const b Bool) (declare-const x Int) (assert b) (assert (= x $value)) (assert $relation)",
+            )
+            ExactLiraSearchComponent(parsed.model).use { component ->
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                assertEquals(value, assignment.ints[parsed.intVarNames.getValue("x")].toString())
+            }
+        }
+    }
+
+    @Test
     fun `a final comparison can refute the source after earlier comparisons exceed the expansion budget`() {
         val builder = Compiler.Builder(
             Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),

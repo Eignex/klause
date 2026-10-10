@@ -74,6 +74,11 @@ Asserted and reified equalities between an integer conditional result and a cons
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
 results are shared within one parse; nested definitions are traversed iteratively.
 Primitive equality literals are shared across source uses and branch expansion.
+Conditional integer order comparisons with a constant threshold follow the same
+branch guards. Strict thresholds outside a signed word retain exact arithmetic.
+Non-strict order comparisons between conditional results can expand one operand's
+constant image when it has at most 64 values, comparing the other operand with each
+selected value. Open branch values retain their primitive arithmetic comparisons.
 Comparisons finish open decision lists before expanding their branch tests.
 Constant branch images of at most 1,024 distinct values can reject a comparison
 before visiting its definition tree; unknown or larger images retain exact fallback.

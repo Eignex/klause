@@ -73,7 +73,7 @@ internal fun Compiler.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray,
 /** Assert `a ⟨op⟩ b` (an SMT relation operator) as a hard linear row, lowering to a wide [Linear]
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb) {
-    if (op == "=") conditionalEquality(a, b)?.let {
+    conditionalComparison(op, a, b)?.let {
         forceTrue(it)
         return
     }
@@ -92,11 +92,11 @@ internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb)
 /** Reify `a ⟨op⟩ b` onto a fresh literal, using a wide [com.eignex.klause.factor.arithmetic.ReifiedLinear]
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): Int {
-    if (op == "=") conditionalEquality(a, b)?.let { return it }
+    conditionalComparison(op, a, b)?.let { return it }
     val linOp = relLinearOp(op)
     return when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
         is LinRelation.LongRel -> reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound).also {
-            noteEqAtom(it, linOp, rel.coeffs, rel.vars, rel.bound)
+            noteLinearAtom(it, linOp, rel.coeffs, rel.vars, rel.bound)
         }
 
         is LinRelation.WideRel -> if (rel.vars.isEmpty()) {
@@ -107,29 +107,64 @@ internal fun Compiler.Builder.reifyRelation(op: String, a: IntComb, b: IntComb):
     }
 }
 
-private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
+private fun Compiler.Builder.conditionalComparison(op: String, a: IntComb, b: IntComb): Int? {
     if (a !is IntComb.Narrow || b !is IntComb.Narrow) return null
-    val variable = if (b.lin.coeffs.isEmpty()) a.lin.asSimpleVar() else {
+    if ((op == "<=" || op == ">=") && a.lin.coeffs.isNotEmpty() && b.lin.coeffs.isNotEmpty()) {
+        val left = a.lin.asSimpleVar() ?: return null
+        val right = b.lin.asSimpleVar() ?: return null
+        if (left == right) return null
+        closeIteChain(left)
+        closeIteChain(right)
+        return conditionalEqualities.reifyPair(left, right, relLinearOp(op), this)
+    }
+    val reversed = b.lin.coeffs.isNotEmpty()
+    val variable = if (!reversed) a.lin.asSimpleVar() else {
         if (a.lin.coeffs.isEmpty()) b.lin.asSimpleVar() else null
     } ?: return null
+    val relation = if (!reversed) op else when (op) {
+        "<" -> ">"
+        "<=" -> ">="
+        ">" -> "<"
+        ">=" -> "<="
+        else -> op
+    }
+    var value = if (!reversed) b.lin.constant else a.lin.constant
+    val operator = when (relation) {
+        "=" -> LinearOp.EQ
+        "<=" -> LinearOp.LE
+        ">=" -> LinearOp.GE
+        "<" -> {
+            if (value == Long.MIN_VALUE) return null
+            value--
+            LinearOp.LE
+        }
+        ">" -> {
+            if (value == Long.MAX_VALUE) return null
+            value++
+            LinearOp.GE
+        }
+        else -> return null
+    }
     closeIteChain(variable)
-    val value = if (b.lin.coeffs.isEmpty()) b.lin.constant else a.lin.constant
-    return conditionalEqualities.reify(variable, value, this)?.also { literal ->
-        if (intDomains[variable] is PresolveDomain.Finite) {
+    return conditionalEqualities.reify(variable, value, this, operator)?.also { literal ->
+        if (operator == LinearOp.EQ && intDomains[variable] is PresolveDomain.Finite) {
             iteChains.noteAtom(literal, variable, value, allowsElement = !conditionalEqualities.isDefined(variable))
         }
     }
 }
 
-/** Record `lit ⇔ variable = value` when the reified row is exactly that, so an `ite` chain can read its
- *  condition back off the literal. Only a finite-domain variable is recorded: a chain selector needs a
- *  known index range, and an open one could never index an array. */
-private fun Compiler.Builder.noteEqAtom(lit: Int, op: LinearOp, coeffs: LongArray, vars: IntArray, bound: Long) {
-    if (op != LinearOp.EQ || vars.size != 1) return
+private fun Compiler.Builder.noteLinearAtom(lit: Int, op: LinearOp, coeffs: LongArray, vars: IntArray, bound: Long) {
+    if (vars.size != 1) return
     val c = coeffs[0]
     if (c != 1L && c != -1L) return
     if (c == -1L && bound == Long.MIN_VALUE) return
-    conditionalEqualities.rememberPrimitive(vars[0], bound * c, lit)
+    val operator = if (c == 1L) op else when (op) {
+        LinearOp.LE -> LinearOp.GE
+        LinearOp.GE -> LinearOp.LE
+        else -> op
+    }
+    conditionalEqualities.rememberPrimitive(vars[0], bound * c, lit, operator)
+    if (op != LinearOp.EQ) return
     if (intDomains[vars[0]] !is PresolveDomain.Finite) return
     iteChains.noteAtom(lit, vars[0], bound * c)
 }
