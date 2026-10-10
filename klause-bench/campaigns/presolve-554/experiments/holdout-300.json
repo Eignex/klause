@@ -1,0 +1,21 @@
+{
+  "name": "presolve-554-holdout-300",
+  "description": "Frozen holdout validation of abort fraction 0.01, the only discovery candidate passing the registered work-activity and nonnegative-quality gate. Its discovery process timing was worse, so this is validation rather than a default recommendation. Twelve disjoint base families, one satOptimized CP arm, three seeds and two alternating repeats on the same frozen source. No other candidate is selected using holdout outcomes.",
+  "host": "aws",
+  "problems": {"set": "presolve-554-holdout", "reference": "any"},
+  "base": {
+    "ref": "f6944877bb7a4846d56ce2031b0843da6105515c",
+    "engine": "cp",
+    "processors": "1",
+    "timeout": "300000",
+    "param.bt-arm": "satOptimized",
+    "param.arms": "1",
+    "param.source-validation": "true"
+  },
+  "configs": [
+    {"label": "default", "presolve": "default"},
+    {"label": "abort-0.01", "presolve": "default", "param.presolve-abort-fraction": "0.01"}
+  ],
+  "seeds": [3, 11, 29],
+  "repeats": 2
+}
