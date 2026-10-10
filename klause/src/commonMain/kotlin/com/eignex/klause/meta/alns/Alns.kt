@@ -13,12 +13,15 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.IntHashSet
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
 import kotlin.random.Random
+import kotlin.time.TimeSource
 
 /**
  * Adaptive Large Neighborhood Search meta-optimizer on top of an arbitrary
@@ -147,11 +150,12 @@ internal class Alns(
     @Suppress("TooGenericExceptionCaught", "ThrowingExceptionFromFinally") // cleanup never replaces a primary failure
     override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
         _iterationLog.clear()
+        val telemetry = AlnsStatsSink()
         // Every incumbent is valued by the linear objective, the one the portfolio checks it against: the caller's
         // gradient view reads definitions presolve may have eliminated. The inner solves still descend that view.
         // Initial incumbent for the destroy/repair loop (LS-first, backtrack-fallback — see below).
-        val initialResult = bootstrapIncumbent(objective, params)
-        val initialSample = initialResult.assignment ?: return initialResult
+        val initialResult = bootstrapIncumbent(objective, params, telemetry)
+        val initialSample = initialResult.assignment ?: return withTelemetry(initialResult, telemetry.snapshot())
         var bestSample: Sample = initialSample
         var bestObj = objective.evaluate(bestSample)
         var incumbent = bestSample
@@ -172,12 +176,15 @@ internal class Alns(
         // Persistent CP-repair handle: one session + LP reused across fragments, re-seeded per
         // neighbourhood, so learned clauses and the LP warm start carry between repairs. Only when a
         // backtrack engine is supplied; closed at the end of the run.
+        val repairOpeningStarted = TimeSource.Monotonic.markNow()
         val repairSearch = (backtrack as? BacktrackSolver)?.let { bt ->
             backtrackParams?.let { bp -> bt.openRepair(objective, bp) }
         }
         var primaryFailure: Throwable? = null
 
         try {
+            telemetry.repairCpNodes += repairSearch?.stats?.search?.nodes?.sum?.toLong() ?: 0L
+            telemetry.repairNanos += repairOpeningStarted.elapsedNow().inWholeNanoseconds
             // Counted-work allowance for the whole outer loop (see class KDoc); null leaves the loop bounded
             // only by [maxIterations] and cancellation, as before this seam existed.
             val instructionBudget = params.maxInstructions
@@ -207,6 +214,7 @@ internal class Alns(
                 // portion of iterFlips it used; charging the declared unit keeps counting deterministic
                 // and independent of what happened inside, same as LocalSearchSolver's counted restart.
                 instructionsUsed += iterFlips
+                telemetry.outerAllowance += iterFlips
                 nodeBudget?.spendMoves(iterFlips)
                 pooled.poll(bestObj)?.let { (sample, obj) ->
                     bestSample = sample
@@ -236,8 +244,14 @@ internal class Alns(
                     inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session,
                     backtrack = backtrack, backtrackParams = backtrackParams,
                     repairSearch = repairSearch, bestObjective = bestObj,
+                    recordInnerWork = { nodes, moves ->
+                        telemetry.repairCpNodes += nodes
+                        telemetry.repairLsMoves += moves
+                    },
                 )
+                val repairStarted = TimeSource.Monotonic.markNow()
                 val repaired = repairOperators[repairIdx].repair(context)
+                telemetry.repairNanos += repairStarted.elapsedNow().inWholeNanoseconds
                 if (repaired == null) {
                     destroyBandit.update(destroyIdx, rejectedReward)
                     repairBandit.update(repairIdx, rejectedReward)
@@ -283,6 +297,7 @@ internal class Alns(
                 sample = bestSample,
                 objective = bestObj,
                 reason = TerminationReason.BudgetExhausted,
+                stats = SolveStats(alns = telemetry.snapshot()),
             )
         } catch (failure: Throwable) {
             primaryFailure = failure
@@ -305,19 +320,57 @@ internal class Alns(
      * [BOOTSTRAP_DECISIONS] as the safeguard for a budget-less (deadline-free) run. A pure-LS ALNS (no
      * backtrack engine), or a fragment the bootstrap can't seed, falls back to local search.
      */
-    private fun bootstrapIncumbent(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
+    private fun bootstrapIncumbent(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+        telemetry: AlnsStatsSink,
+    ): MinimizeResult {
         val engine = backtrack
         if (engine != null) {
             val base = backtrackParams ?: BacktrackParams()
+            val started = TimeSource.Monotonic.markNow()
             val cpResult = engine.minimize(
                 objective,
                 base.copy(maxDecisions = BOOTSTRAP_DECISIONS)
                     .withCancellation(params.cancellation.shorten(BT_BOOTSTRAP_FRACTION)),
             )
+            telemetry.bootstrapCpMillis += started.elapsedNow().inWholeMilliseconds
+            telemetry.bootstrapCpNodes += cpResult.stats.search.nodes.sum.toLong()
             if (cpResult.assignment != null) return cpResult
             if (params.cancellation()) return MinimizeResult.Unknown(TerminationReason.Cancelled)
         }
-        return session?.minimize(objective, params) ?: inner.minimize(objective, params)
+        val started = TimeSource.Monotonic.markNow()
+        val result = session?.minimize(objective, params) ?: inner.minimize(objective, params)
+        telemetry.bootstrapLsMillis += started.elapsedNow().inWholeMilliseconds
+        telemetry.bootstrapLsMoves += result.stats.ls.moves.sum.toLong()
+        return result
+    }
+
+    private fun withTelemetry(result: MinimizeResult, telemetry: AlnsStats): MinimizeResult {
+        val stats = result.stats.copy(alns = result.stats.alns.mergedWith(telemetry))
+        return when (result) {
+            is MinimizeResult.Optimal -> result.copy(stats = stats)
+            is MinimizeResult.BestFound -> result.copy(stats = stats)
+            is MinimizeResult.Unbounded -> result.copy(stats = stats)
+            is MinimizeResult.Infeasible -> result.copy(stats = stats)
+            is MinimizeResult.Unknown -> result.copy(stats = stats)
+        }
+    }
+
+    private class AlnsStatsSink {
+        var bootstrapCpNodes = 0L
+        var bootstrapLsMoves = 0L
+        var repairCpNodes = 0L
+        var repairLsMoves = 0L
+        var outerAllowance = 0L
+        var bootstrapCpMillis = 0L
+        var bootstrapLsMillis = 0L
+        var repairNanos = 0L
+
+        fun snapshot() = AlnsStats(
+            bootstrapCpNodes, bootstrapLsMoves, repairCpNodes, repairLsMoves, outerAllowance,
+            bootstrapCpMillis, bootstrapLsMillis, repairNanos / 1_000_000,
+        )
     }
 
     /**

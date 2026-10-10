@@ -10,6 +10,20 @@ import kotlin.test.assertTrue
 class SolveStatsMergeTest {
 
     @Test
+    fun `ALNS phase observations survive portfolio aggregation`() {
+        val left = SolveStats(alns = AlnsStats(13, 7, 17, 5, 120, 9, 8, 3))
+        val right = SolveStats(alns = AlnsStats(2, 3, 5, 7, 80, 4, 3, 2))
+
+        val merged = left.mergedWith(right)
+
+        assertEquals(AlnsStats(15, 10, 22, 12, 200, 13, 11, 5), merged.alns)
+        assertEquals(merged, SolveStats.EMPTY.mergedWith(merged))
+        assertEquals(merged, merged.mergedWith(SolveStats.EMPTY))
+        assertEquals(0.0, merged.ls.moves.sum)
+        assertEquals(0.0, merged.search.nodes.sum)
+    }
+
+    @Test
     fun `local search residual aggregation keeps the breakdown paired with its cost`() {
         val left = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(8, mapOf("Linear" to 8L))))
         val right = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(3, mapOf("Clause" to 3L))))

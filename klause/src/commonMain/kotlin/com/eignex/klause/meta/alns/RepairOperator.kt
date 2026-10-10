@@ -80,6 +80,7 @@ internal data class RepairContext(
     /** The monotone (non-increasing) best-so-far objective — the cutoff [BacktrackRepair] prunes the
      *  fragment against when using [repairSearch] (the reused session needs a monotone cutoff). */
     val bestObjective: Double = Double.POSITIVE_INFINITY,
+    val recordInnerWork: ((nodes: Long, moves: Long) -> Unit)? = null,
 )
 
 /**
@@ -96,6 +97,9 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
         // accumulate across iterations; fall back to the bare inner Optimizer otherwise.
         val result = context.session?.minimize(context.objective, merged)
             ?: context.inner.minimize(context.objective, merged)
+        context.recordInnerWork?.invoke(
+            result.stats.search.nodes.sum.toLong(), result.stats.ls.moves.sum.toLong(),
+        )
         return result.assignment
     }
 
@@ -117,7 +121,11 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
         // Persistent path: reuse one session + LP across fragments, pruning against the monotone
         // best-so-far cutoff (the reused session's accumulated objective bounds stay monotone-tightening).
         context.repairSearch?.let {
-            return it.repair(context.pinAssumptions, maxDecisions, context.bestObjective, context.params.cancellation)
+            val record = context.recordInnerWork
+            val before = if (record != null) it.stats.search.nodes.sum.toLong() else 0L
+            val sample = it.repair(context.pinAssumptions, maxDecisions, context.bestObjective, context.params.cancellation)
+            record?.invoke(it.stats.search.nodes.sum.toLong() - before, 0L)
+            return sample
         }
         // Fallback: a fresh bounded solve per repair, pruning against this iteration's incumbent.
         val engine = context.backtrack ?: return null
@@ -130,7 +138,11 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
                 objectiveBoundSupplier = { incumbentObjective },
                 cancellation = base.cancellation or context.params.cancellation,
             )
-        return engine.minimize(context.objective, pinned).assignment
+        val result = engine.minimize(context.objective, pinned)
+        context.recordInnerWork?.invoke(
+            result.stats.search.nodes.sum.toLong(), result.stats.ls.moves.sum.toLong(),
+        )
+        return result.assignment
     }
 
     override fun toString(): String = "BacktrackRepair($label, maxDecisions=$maxDecisions)"

@@ -235,6 +235,13 @@ before initializing factor costs, avoiding an evaluation of the intermediate
 random assignment. Custom restart policies retain their ordinary restart protocol.
 ALNS skips its local-search fallback when the complete-engine bootstrap returns
 without an incumbent after cancellation, avoiding fresh seeding after the deadline.
+Its terminal statistics distinguish measured bootstrap CP nodes, bootstrap LS moves,
+repair CP nodes and repair LS moves from the declared outer repair allowance.
+Retained CP repair counters contribute each fragment's difference, not its cumulative
+history. Separate wall times include bootstrap construction and seeding and repair
+construction and reseeding. These observations do not alter scheduler work or solve-wide
+budgets; an allowance alone does not establish useful inner search. Direct construction
+and custom repair operators report engine work only when they supply observations.
 Hinted min/max expression outputs, their materialized affine operands and output aliases
 form a one-way definition cone. Unhinted min/max globals remain searched. Competing
 definitions and cyclic cones remain searched; independent constraints on a defined output

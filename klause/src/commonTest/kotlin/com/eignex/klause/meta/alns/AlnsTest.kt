@@ -13,15 +13,21 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Optimizer
+import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SearchStats
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
+import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
@@ -29,6 +35,110 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AlnsTest {
+
+    @Test
+    fun `failed bootstrap reports both engines without charging an outer repair`() {
+        val problem = selectProblem()
+        val backtrack = object : Optimizer<BacktrackParams> by BacktrackSolver(problem) {
+            override fun minimize(objective: LinearObjective, params: BacktrackParams) =
+                MinimizeResult.Unknown(
+                    TerminationReason.BudgetExhausted,
+                    SolveStats(search = SearchStats(nodes = SumResult(13.0))),
+                )
+        }
+        val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun minimize(objective: LinearObjective, params: LocalSearchParams) =
+                MinimizeResult.Unknown(
+                    TerminationReason.BudgetExhausted,
+                    SolveStats(ls = LocalSearchStats(moves = SumResult(7.0))),
+                )
+        }
+
+        val result = Alns(inner = inner, backtrack = backtrack).minimize(
+            selectObjective, LocalSearchParams(maxInstructions = 120),
+        )
+
+        assertIs<MinimizeResult.Unknown>(result)
+        assertEquals(13L, result.stats.alns.bootstrapCpNodes)
+        assertEquals(7L, result.stats.alns.bootstrapLsMoves)
+        assertEquals(0L, result.stats.alns.outerAllowance)
+        assertEquals(0L, result.stats.alns.repairCpNodes)
+        assertEquals(0L, result.stats.alns.repairLsMoves)
+        assertEquals(7.0, result.stats.ls.moves.sum)
+    }
+
+    @Test
+    fun `inner repair counters remain distinct from clipped outer allowances`() {
+        val problem = selectProblem()
+        val sample = selectOptimum()
+        var calls = 0
+        val inner = object : Optimizer<LocalSearchParams> by LocalSearchSolver(problem) {
+            override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
+                calls++
+                return MinimizeResult.BestFound(
+                    sample, objective.evaluate(sample), TerminationReason.BudgetExhausted,
+                    SolveStats(ls = LocalSearchStats(moves = SumResult(7.0))),
+                )
+            }
+        }
+        val alns = Alns(
+            inner = inner,
+            destroyOperators = listOf(DestroyOperator.Random),
+            repairOperators = listOf(InnerLsRepair()),
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
+            maxIterations = 8,
+            flipsPerIteration = 50,
+        )
+
+        val result = alns.minimize(selectObjective, LocalSearchParams(maxInstructions = 120))
+
+        assertEquals(4, calls)
+        assertSame(sample, result.assignment)
+        assertEquals(7L, result.stats.alns.bootstrapLsMoves)
+        assertEquals(21L, result.stats.alns.repairLsMoves)
+        assertEquals(120L, result.stats.alns.outerAllowance)
+        assertEquals(0.0, result.stats.ls.moves.sum)
+    }
+
+    @Test
+    fun `retained complete repair counters count each fragment once`() {
+        val problem = selectProblem()
+        val incumbent = selectOptimum()
+        var cumulativeNodes = 13L
+        var recordedNodes = 0L
+        val retained = object : RepairSearch {
+            override val stats: SolveStats
+                get() = SolveStats(search = SearchStats(nodes = SumResult(cumulativeNodes.toDouble())))
+            override fun repair(
+                assumptions: Assumptions,
+                decisionBudget: Long,
+                cutoff: Double,
+                cancellation: Cancellation,
+            ): Sample {
+                cumulativeNodes += 5
+                return incumbent
+            }
+        }
+        val context = RepairContext(
+            inner = NoFeasibleLs(problem),
+            params = LocalSearchParams(),
+            objective = selectObjective,
+            pinAssumptions = Assumptions.None,
+            incumbent = incumbent,
+            freed = FreedVars(intArrayOf(0), IntArray(0)),
+            repairSearch = retained,
+            recordInnerWork = { nodes, moves ->
+                recordedNodes += nodes
+                assertEquals(0L, moves)
+            },
+        )
+
+        repeat(2) { assertSame(incumbent, BacktrackRepair().repair(context)) }
+
+        assertEquals(10L, recordedNodes)
+        assertEquals(23L, cumulativeNodes)
+    }
 
     /** The default menu's five arms at fixture-sized budgets. The production `deep` arm carries
      *  `flipsOverride = 5_000`, which replaces `maxFlips` rather than being capped by it, so a test that

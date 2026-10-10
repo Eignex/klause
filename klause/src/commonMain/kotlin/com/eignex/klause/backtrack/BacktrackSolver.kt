@@ -25,6 +25,7 @@ import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
@@ -127,6 +128,8 @@ class BacktrackSolver internal constructor(
             rebindable = true,
         )
         return object : RepairSearch {
+            override val stats: SolveStats get() = handle.stats
+
             override fun repair(
                 assumptions: Assumptions,
                 decisionBudget: Long,

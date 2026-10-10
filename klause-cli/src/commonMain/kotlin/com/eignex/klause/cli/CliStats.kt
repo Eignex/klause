@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpContinuationStats
@@ -349,7 +350,18 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
                 "\"message\":${it.message?.let(::diagnosticString) ?: "null"},\"trace\":${diagnosticString(it.trace)}}"
         }
     }
-    return listOfNotNull(profile, reseeding) + schedule + failures
+    val alns = stats.alns
+    val inner = if (alns == AlnsStats()) emptyList() else listOf(
+        "alnsBootstrapCpNodes" to "${alns.bootstrapCpNodes}",
+        "alnsBootstrapLsMoves" to "${alns.bootstrapLsMoves}",
+        "alnsRepairCpNodes" to "${alns.repairCpNodes}",
+        "alnsRepairLsMoves" to "${alns.repairLsMoves}",
+        "alnsOuterAllowance" to "${alns.outerAllowance}",
+        "alnsBootstrapCpMillis" to "${alns.bootstrapCpMillis}",
+        "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
+        "alnsRepairMillis" to "${alns.repairMillis}",
+    )
+    return listOfNotNull(profile, reseeding) + schedule + failures + inner
 }
 
 private fun diagnosticString(value: String): String = buildString {

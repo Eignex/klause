@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.LocalSearchResidual
@@ -28,6 +29,26 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliStatsTest {
+
+    @Test
+    fun `ALNS inner work is printed separately from its outer allowance`() {
+        val stats = SolveStats(alns = AlnsStats(
+            bootstrapCpNodes = 13, bootstrapLsMoves = 7, repairCpNodes = 17, repairLsMoves = 5,
+            outerAllowance = 120, bootstrapCpMillis = 9, bootstrapLsMillis = 8, repairMillis = 3,
+        ))
+
+        val pairs = portfolioStatPairs(stats).toMap()
+
+        assertEquals("13", pairs["alnsBootstrapCpNodes"])
+        assertEquals("7", pairs["alnsBootstrapLsMoves"])
+        assertEquals("17", pairs["alnsRepairCpNodes"])
+        assertEquals("5", pairs["alnsRepairLsMoves"])
+        assertEquals("120", pairs["alnsOuterAllowance"])
+        assertEquals("9", pairs["alnsBootstrapCpMillis"])
+        assertEquals("8", pairs["alnsBootstrapLsMillis"])
+        assertEquals("3", pairs["alnsRepairMillis"])
+        assertTrue(portfolioStatPairs(SolveStats.EMPTY).isEmpty())
+    }
 
     @Test
     fun `a residual observation prints its cost and kind totals before any move`() {
