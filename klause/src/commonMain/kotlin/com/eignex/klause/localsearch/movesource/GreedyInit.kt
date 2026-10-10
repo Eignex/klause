@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch.movesource
 
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.localsearch.MoveSink
 
 /**
  * Greedy-repair restart initializer. Walks variables in randomized order; for each, commits the
@@ -18,12 +19,16 @@ import com.eignex.klause.localsearch.Move
  * a low-violation pose, so a pass stopped early leaves a valid, partly repaired start.
  */
 class GreedyInit {
+    private val eligibility = MoveSink()
 
     /** Run one greedy-repair pass over [state], mutating its assignment in place, until [stop] says to end it. */
     fun run(state: LocalSearchState, stop: () -> Boolean = { false }) {
         val problem = state.problem
         val varCount = problem.numBoolVars + problem.numIntVars
         if (varCount == 0) return
+        eligibility.setAssumptions(state.assumptions)
+        eligibility.setInvariants(state.invariants)
+        eligibility.setOwners(state.seeding.ownerInt)
         val order = IntArray(varCount) { it }
         // Fisher-Yates shuffle on the state's RNG so the pass is deterministic for a given seed.
         for (i in order.size - 1 downTo 1) {
@@ -36,13 +41,13 @@ class GreedyInit {
             if (stop()) break
             if (v < problem.numBoolVars) {
                 val boolId = v
-                if (state.assumptions.isFrozenBool(boolId)) continue
+                if (!eligibility.allowsBool(boolId)) continue
                 val baselineCost = state.cost
                 state.apply(Move.BoolFlip(boolId))
                 if (state.cost > baselineCost) state.apply(Move.BoolFlip(boolId))
             } else {
                 val intId = v - problem.numBoolVars
-                if (state.assumptions.isFrozenInt(intId)) continue
+                if (!eligibility.allowsInt(intId)) continue
                 val d = state.rootDomains[intId]
                 val cur = state.assignment.intValue(intId)
                 if (d.isFixed) continue
