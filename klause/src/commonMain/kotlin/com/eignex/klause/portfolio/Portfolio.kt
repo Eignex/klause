@@ -192,7 +192,8 @@ class Portfolio(
             val openingFailure = opened.exceptionOrNull()
             if (opening && (handle != null || openingFailure != null)) {
                 run.log.initialized(
-                    arm, setup.elapsedNow().inWholeMilliseconds,
+                    arm,
+                    setup.elapsedNow().inWholeMilliseconds,
                     handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L,
                     openingFailure is SearchInitializationCancelled,
                 )
@@ -239,8 +240,17 @@ class Portfolio(
             claim.verified(verification)
             run.locked {
                 run.record(
-                    claim, handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
-                    cumulative = handle != null, work = work, failed = failed,
+                    claim,
+                    handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
+                    cumulative = handle != null,
+                    work = work,
+                    failed = failed,
+                    failure = failure,
+                    phase = when {
+                        openingFailure != null -> "opening"
+                        handle != null -> "slice"
+                        else -> "one-shot"
+                    },
                 )
                 if (claim.fault != null) {
                     run.quarantine(claim)
@@ -377,7 +387,8 @@ class Portfolio(
             val openingFailure = opened.exceptionOrNull()
             if (opening && (handle != null || openingFailure != null)) {
                 run.log.initialized(
-                    arm, setup.elapsedNow().inWholeMilliseconds,
+                    arm,
+                    setup.elapsedNow().inWholeMilliseconds,
                     handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L,
                     openingFailure is SearchInitializationCancelled,
                 )
@@ -443,7 +454,19 @@ class Portfolio(
             }
             run.locked {
                 val stats = handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: terminal?.stats
-                run.record(claim, stats, cumulative = handle != null, work = work, failed = failed)
+                run.record(
+                    claim,
+                    stats,
+                    cumulative = handle != null,
+                    work = work,
+                    failed = failed,
+                    failure = failure,
+                    phase = when {
+                        openingFailure != null -> "opening"
+                        handle != null -> "slice"
+                        else -> "one-shot"
+                    },
+                )
                 if (claim.fault != null) {
                     run.quarantine(claim)
                     return@locked
@@ -461,9 +484,12 @@ class Portfolio(
                     if (claim.improved) {
                         staleSegments[arm] = 0
                     } else if (reseedStaleThreshold > 0 && ++staleSegments[arm] >= reseedStaleThreshold) {
-                        runCatching { handle.close() }
-                        run.handles[arm] = null
-                        run.log.reseeded(arm)
+                        val closed = runCatching { run.closeHandle(arm) }
+                        closed.onFailure {
+                            run.log.failure(arm, it, "close")
+                            run.retire(arm)
+                        }
+                        if (closed.isSuccess) run.log.reseeded(arm)
                         staleSegments[arm] = 0
                     }
                 }
@@ -481,9 +507,13 @@ class Portfolio(
                 }
                 // An arm that threw is retired like one that finished: rescheduling it would only fail again.
                 if (failure != null || (handle != null && terminal != null) ||
-                    (claim.indeterminate &&
-                        (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded))
-                ) run.retire(arm)
+                    (
+                        claim.indeterminate &&
+                        (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded)
+                    )
+                ) {
+                    run.retire(arm)
+                }
             }
         }
         val stats = run.folded()
@@ -560,8 +590,8 @@ class Portfolio(
         private val progress = ProgressCredit(workers.size)
         val log = ScheduleLog(workers)
 
-        // A handle's counters are cumulative, so its entry is replaced; a fresh segment's are merged.
-        private val perArm = arrayOfNulls<SolveStats>(workers.size)
+        private val completedStats = arrayOfNulls<SolveStats>(workers.size)
+        private val liveStats = arrayOfNulls<SolveStats>(workers.size)
         private val busy = BooleanArray(workers.size)
         private val retired = BooleanArray(workers.size)
         private var remaining = workers.size
@@ -638,17 +668,23 @@ class Portfolio(
             val dedicated = lanes == workers.size
             val eligible = eligibleArms()
             val probe = if (dedicated) null else eligible.firstOrNull { !probed[it] && !busy[it] && !retired[it] }
-            val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) null else
+            val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) {
+                null
+            } else {
                 eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
                     .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
+            }
             val probing = probe != null
             val arm = when {
                 dedicated -> lane
+
                 probe != null -> probe.also { probed[it] = true }
+
                 revisit != null -> revisit.also {
                     preparationRevisits[it] = false
                     nextPreparationArm = (it + 1) % workers.size
                 }
+
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
@@ -721,10 +757,23 @@ class Portfolio(
          * verdict counts as less evidence; every arm runs the same slice, so a full segment of any arm weighs one. A
          * segment that [failed] earns nothing and weighs a full one. Call under [locked].
          */
-        fun record(claim: Claim, stats: SolveStats?, cumulative: Boolean, work: Long, failed: Boolean) {
+        @Suppress("LongParameterList")
+        fun record(
+            claim: Claim,
+            stats: SolveStats?,
+            cumulative: Boolean,
+            work: Long,
+            failed: Boolean,
+            failure: Throwable?,
+            phase: String,
+        ) {
             val arm = claim.arm
             if (stats != null) {
-                perArm[arm] = if (cumulative) stats else (perArm[arm] ?: SolveStats.EMPTY).mergedWith(stats)
+                if (cumulative) {
+                    liveStats[arm] = stats
+                } else {
+                    completedStats[arm] = (completedStats[arm] ?: SolveStats.EMPTY).mergedWith(stats)
+                }
                 progress.observe(ledger, arm, stats)
             }
             contributions?.drain { kind, origin, amount ->
@@ -742,6 +791,7 @@ class Portfolio(
                 bandit.update(other, ledger.settleIdle(other, claim.sliceWork), 1.0)
             }
             log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
+            if (failed && failure != null && failure !is UnsoundnessException) log.failure(arm, failure, phase)
             // The probe runs at the base slice for every arm, so its cost stays flat in the arm count.
             if (!claim.probing && !claim.preparationRevisit) {
                 slice = grow(slice, maxSliceMillis)
@@ -764,20 +814,43 @@ class Portfolio(
             if (retired[arm]) return
             retired[arm] = true
             remaining--
-            handles[arm]?.close()
-            handles[arm] = null
+            closeHandle(arm)
             if (remaining == 0) finish()
         }
 
         /** The pool's total counters, every arm that did work included, with the schedule attached. */
-        fun folded(): SolveStats = perArm.filterNotNull().fold(SolveStats.EMPTY) { acc, s -> acc.mergedWith(s) }
+        fun folded(): SolveStats = (completedStats.filterNotNull() + liveStats.filterNotNull())
+            .fold(SolveStats.EMPTY) { acc, stats -> acc.mergedWith(stats) }
             .copy(portfolio = log.stats(ledger).copy(profile = profile, reseedStaleThreshold = reseedStaleThreshold))
+
+        fun closeHandle(arm: Int) {
+            val handle = handles[arm] ?: return
+            val closed = runCatching { handle.close() }
+            val final = runCatching {
+                when (handle) {
+                    is ResumableSearch -> handle.stats
+                    is ResumableSolve -> handle.stats
+                    else -> null
+                }
+            }
+            // Closing can finalize counters; each handle contributes its last snapshot exactly once.
+            val stats = final.getOrNull() ?: liveStats[arm]
+            if (stats != null) completedStats[arm] = (completedStats[arm] ?: SolveStats.EMPTY).mergedWith(stats)
+            liveStats[arm] = null
+            handles[arm] = null
+            val failure = closed.exceptionOrNull()
+            if (failure != null) {
+                final.exceptionOrNull()?.let(failure::addSuppressed)
+                throw failure
+            }
+            final.getOrThrow()
+        }
 
         private fun closeAll(primaryFailure: Throwable?) {
             var closeFailure: Throwable? = null
             for (i in handles.indices) {
                 try {
-                    handles[i]?.close()
+                    closeHandle(i)
                 } catch (failure: Throwable) {
                     closeFailure?.addSuppressed(failure) ?: run { closeFailure = failure }
                 }

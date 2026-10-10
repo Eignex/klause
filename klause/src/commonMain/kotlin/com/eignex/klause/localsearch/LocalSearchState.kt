@@ -810,7 +810,7 @@ class LocalSearchState(
             settle = { settleBreakMake(touched, { false }, {}) },
             markMovedVar = {},
         )
-        if (++realMovesSinceRefresh >= REAL_REFRESH_INTERVAL && !probeActive) refreshRealRows()
+        if (!probeActive && ++realMovesSinceRefresh >= REAL_REFRESH_INTERVAL) refreshRealRows()
     }
 
     private fun markNeighborConfChange(factorIds: IntArray) {
@@ -898,8 +898,11 @@ class LocalSearchState(
         fun collect(part: Move) {
             when (part) {
                 is Move.BoolFlip -> bools.add(part.varId)
+
                 is Move.IntSet -> ints.add(part.varId)
+
                 is Move.RealSet -> {}
+
                 is Move.Compound -> {
                     for (p in part.parts) collect(p)
                     return

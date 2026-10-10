@@ -25,16 +25,17 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
-import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.VarRef
@@ -54,6 +55,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
@@ -201,14 +204,159 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 class PortfolioTest {
 
     @Test
+    fun `a caught reseed close failure retires the arm and retains its incumbent`() {
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        val handle = TrackingResumableSearch(
+            null,
+            MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
+            closeFailure = "close failure",
+        )
+
+        val result = Portfolio.thompson(
+            listOf(trackingWorker("failed", 7, handle)),
+            reseedStaleThreshold = 1,
+        ).use { it.minimize() }
+
+        assertEquals(sample, assertIs<MinimizeResult.BestFound>(result).sample)
+        val arm = result.stats.portfolio.arms.single()
+        val diagnostic = assertNotNull(arm.failure)
+        assertEquals("close", diagnostic.phase)
+        assertEquals("close failure", diagnostic.message)
+        assertEquals(1L, arm.failures)
+        assertEquals(0L, arm.reseeds)
+        assertEquals(1, handle.closes)
+    }
+
+    @Test
+    fun `reseeds retain each handles final counters without counting snapshots twice`() {
+        for (threshold in listOf(0, 2, 3)) {
+            var slices = 0
+            var opened = 0
+            var closed = 0
+            var expectedNodes = 0.0
+            var expectedMoves = 0.0
+            val worker = PortfolioWorker.ofMinimize(
+                "plateau",
+                0,
+                resumable = {
+                    opened++
+                    object : ResumableSearch {
+                        private var runs = 0
+                        private var spent = 0L
+                        private var finished = false
+                        private val observations: Double get() = ((runs + 1) / 2).toDouble()
+                        override val isDone: Boolean get() = false
+                        override val work: Long get() = spent
+                        override val stats: SolveStats get() = SolveStats(
+                            search = SearchStats(nodes = SumResult(7.0 + observations + if (finished) 3.0 else 0.0)),
+                            ls = LocalSearchStats(moves = SumResult(observations * 2.0)),
+                        )
+
+                        override fun runSlice(
+                            global: Cancellation,
+                            sliceMillis: Long,
+                            sliceNodes: Long,
+                            onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                        ): MinimizeResult? {
+                            runs++
+                            spent += sliceNodes.coerceAtLeast(1L)
+                            if (++slices == 1) {
+                                onIncumbent(
+                                    MinimizeResult.BestFound(
+                                    Sample(BooleanArray(0), LongArray(0)),
+                                    0.0,
+                                    TerminationReason.BudgetExhausted,
+                                )
+                                )
+                            }
+                            return null
+                        }
+
+                        override fun close() {
+                            assertEquals(false, finished)
+                            finished = true
+                            closed++
+                            expectedNodes += stats.search.nodes.sum
+                            expectedMoves += stats.ls.moves.sum
+                        }
+                    }
+                },
+            ) { _, _, _, _ -> error("the retained handle must resume") }
+
+            val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
+                it.minimize(Cancellation { slices >= 14 })
+            }
+
+            assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(opened, closed)
+            assertEquals(if (threshold == 0) 1 else 1 + 12 / threshold, opened)
+            assertEquals(expectedNodes, result.stats.search.nodes.sum)
+            assertEquals(expectedMoves, result.stats.ls.moves.sum)
+        }
+    }
+
+    @Test
+    fun `ordinary arm diagnostics preserve the surviving optimization verdict`() {
+        for (phase in listOf("opening", "slice", "one-shot")) {
+            val failedHandle = TrackingResumableSearch(null, onRun = { error("arm failure") })
+            val worker = PortfolioWorker.ofMinimize(
+                "failed",
+                17,
+                resumable = when (phase) {
+                    "opening" -> { _ -> error("arm failure") }
+                    "slice" -> { _ -> failedHandle }
+                    else -> null
+                },
+            ) { _, _, _, _ -> sequence { error("arm failure") } }
+            val sample = Sample(BooleanArray(0), LongArray(0))
+            val sibling = TrackingResumableSearch(MinimizeResult.Optimal(sample, 0.0))
+
+            val result = Portfolio.thompson(listOf(worker, trackingWorker("sibling", 18, sibling))).use {
+                it.minimize()
+            }
+
+            assertEquals(sample, assertIs<MinimizeResult.Optimal>(result).sample)
+            val arm = result.stats.portfolio.arms.first()
+            val diagnostic = assertNotNull(arm.failure)
+            assertEquals(1L, arm.failures)
+            assertEquals(0L, arm.faults)
+            assertEquals(17, diagnostic.armId)
+            assertEquals("IllegalStateException", diagnostic.type)
+            assertEquals("arm failure", diagnostic.message)
+            assertEquals(phase, diagnostic.phase)
+            assertEquals(1L, diagnostic.segment)
+            assertTrue("IllegalStateException: arm failure" in diagnostic.trace)
+            assertNull(result.stats.portfolio.arms.last().failure)
+        }
+    }
+
+    @Test
+    fun `arm exception text is bounded in retained diagnostics`() {
+        val worker = PortfolioWorker.ofMinimize("failed", 0) { _, _, _, _ ->
+            sequence { error("x".repeat(10000)) }
+        }
+
+        val result = Portfolio.thompson(listOf(worker)).use { it.minimize() }
+
+        val diagnostic = assertNotNull(result.stats.portfolio.arms.single().failure)
+        assertEquals(1024, assertNotNull(diagnostic.message).length)
+        assertEquals(4096, diagnostic.trace.length)
+    }
+
+    @Test
     fun `preparation revisits follow every initial sibling admission`() {
         for (instructions in listOf(false, true)) {
             val order = mutableListOf<Int>()
             val prepared = TrackingResumableSearch(
-                null, onRun = { order += 0 }, preparationPending = !instructions,
+                null,
+                onRun = { order += 0 },
+                preparationPending = !instructions,
             )
             val worker = PortfolioWorker.ofMinimize(
-                "prepared", 0, countsInstructions = instructions, resumable = { prepared },
+                "prepared",
+                0,
+                countsInstructions = instructions,
+                resumable = { prepared },
             ) { _, _, _, _ ->
                 error("the retained handle must resume")
             }
@@ -230,7 +378,10 @@ class PortfolioTest {
         val workers = List(3) { arm ->
             val handle = TrackingResumableSearch(null, onRun = { order += arm })
             PortfolioWorker.ofMinimize(
-                "preparing$arm", arm, countsInstructions = true, resumable = { handle },
+                "preparing$arm",
+                arm,
+                countsInstructions = true,
+                resumable = { handle },
             ) { _, _, _, _ ->
                 error("the retained handle must resume")
             }
@@ -749,6 +900,7 @@ class PortfolioTest {
 
         assertEquals(1, assertIs<SolveResult.Sat>(r).assignment.bools.count { it }, "exactly-one violated")
         assertEquals(listOf("unsound"), faults.map { it.workerLabel })
+        assertNull(r.stats.portfolio.arms.first().failure)
     }
 
     @Test
@@ -804,6 +956,13 @@ class PortfolioTest {
         assertIs<SolveResult.Sat>(r)
         assertEquals(1, failing.solves)
         assertEquals(listOf(1L, 0L), r.stats.portfolio.arms.map { it.failures })
+        val diagnostic = assertNotNull(r.stats.portfolio.arms.first().failure)
+        assertEquals("solve failure", diagnostic.message)
+        assertEquals("IllegalStateException", diagnostic.type)
+        assertEquals("one-shot", diagnostic.phase)
+        assertEquals(0, diagnostic.armId)
+        assertEquals(0L, r.stats.portfolio.arms.first().faults)
+        assertNull(r.stats.portfolio.arms.last().failure)
     }
 
     @Test
@@ -1414,6 +1573,7 @@ class PortfolioTest {
         assertEquals(handle.work, result.stats.portfolio.arms.single().work)
         assertEquals(10L, result.stats.portfolio.arms.single().initializationWork)
     }
+
     @Test
     fun `nonresumable session optimization retains stacked assumptions`() {
         val solver = BacktrackSolver(Problem(0, 1, arrayOf(IntDomain(0L, 1L)), emptyArray()).bake())
@@ -1516,7 +1676,9 @@ class PortfolioTest {
         val workers = listOf(
             PortfolioWorker.of("opening", 0, solver.session(), BacktrackParams(), LinearObjective()),
             trackingWorker(
-                "sibling", 1, TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.Unsupported)),
+                "sibling",
+                1,
+                TrackingResumableSearch(MinimizeResult.Unknown(TerminationReason.Unsupported)),
             ),
         )
 
@@ -1525,5 +1687,4 @@ class PortfolioTest {
         assertEquals(1, slices)
         assertTrue(checkNotNull(requestedMillis) <= checkNotNull(remainingMillis) + 1L)
     }
-
 }

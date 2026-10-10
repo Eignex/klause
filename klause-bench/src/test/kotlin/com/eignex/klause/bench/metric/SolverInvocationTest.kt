@@ -17,6 +17,23 @@ import kotlin.test.assertTrue
 class SolverInvocationTest {
 
     @Test
+    fun `portfolio diagnostics survive protocol parsing`() {
+        val diagnostic = """{"armId":7,"phase":"slice","message":"row \"R\"\u000aarm failure"}"""
+        for (dialect in SolverInvocation.Dialect.entries) {
+            val lines = when (dialect) {
+                SolverInvocation.Dialect.MINIZINC -> "%%%mzn-stat: armFailure.failed=$diagnostic\n----------"
+                SolverInvocation.Dialect.PB_COMPETITION -> "c armFailure.failed=$diagnostic\ns SATISFIABLE"
+                SolverInvocation.Dialect.SMT_LIB -> "; armFailure.failed=$diagnostic\nsat"
+            }
+
+            val result = SolverInvocation.invoke(listOf("sh", "-c", "printf '%s\\n' '$lines'"), dialect)
+
+            assertEquals(true, result.feasible)
+            assertEquals(diagnostic, result.stats["armFailure.failed"])
+        }
+    }
+
+    @Test
     fun `objective precision survives parsing and cache round trips for each protocol`() {
         val objectives = listOf("9223372036854775808", "9007199254740993", "1/3", "-1/3", "1e400")
         for (dialect in SolverInvocation.Dialect.entries) {
@@ -120,7 +137,13 @@ class SolverInvocationTest {
     @Test
     fun `reference proofs use solve time then wall clock then legacy budget`() {
         val r = SolverInvocation.Result(
-            false, null, null, proven = true, stats = emptyMap(), rawOutput = "", command = "",
+            false,
+            null,
+            null,
+            proven = true,
+            stats = emptyMap(),
+            rawOutput = "",
+            command = "",
         )
         val cases = listOf(
             r to 60_000L,
@@ -134,14 +157,25 @@ class SolverInvocationTest {
     }
 
     @Test
-    fun `subprocess duration survives caching and legacy caches have unknown elapsed`() {
+    fun `subprocess records survive caching and legacy caches have unknown elapsed`() {
+        val diagnostic = """{"armId":7,"phase":"slice","segment":2,"work":30,"type":"IllegalStateException",""" +
+            """"message":"row \"R\"\u000aarm failure","trace":"cause\u000aframe"}"""
         val r = SolverInvocation.Result(
-            false, null, null, proven = true, stats = emptyMap(), rawOutput = "", command = "", elapsedMs = 140,
+            false,
+            null,
+            null,
+            proven = true,
+            stats = mapOf("armFailure.failed" to diagnostic),
+            rawOutput = "",
+            command = "",
+            elapsedMs = 140,
         )
         val encoded = Reports.json.encodeToString(r)
         val legacy = JsonObject(Reports.json.parseToJsonElement(encoded).jsonObject - "elapsedMs").toString()
+        val decoded = Reports.json.decodeFromString<SolverInvocation.Result>(encoded)
 
-        assertEquals(140, Reports.json.decodeFromString<SolverInvocation.Result>(encoded).elapsedMs)
+        assertEquals(140, decoded.elapsedMs)
+        assertEquals(diagnostic, decoded.stats["armFailure.failed"])
         assertNull(Reports.json.decodeFromString<SolverInvocation.Result>(legacy).elapsedMs)
     }
 

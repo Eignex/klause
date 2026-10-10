@@ -89,7 +89,12 @@ internal class ResumableOpenTheory(
     }
 
     override fun close() {
-        run?.close()
-        run = null
+        val current = run ?: return
+        try {
+            if (verdict == null) state.capture(current.session)
+            current.close()
+        } finally {
+            run = null
+        }
     }
 }

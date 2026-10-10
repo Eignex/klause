@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpBasisVerificationStats
@@ -376,6 +377,7 @@ class CliStatsTest {
             maxMillis = 500,
             initializationMillis = 100,
             reseeds = 2,
+            failure = ArmFailure(7, "IllegalStateException", "row \"R\"\n\t\\", "slice", 2, 30, "cause\r\nframe"),
         )
         val stats = SolveStats(portfolio = PortfolioStats(listOf(arm), reseedStaleThreshold = 4))
 
@@ -385,6 +387,11 @@ class CliStatsTest {
             "segments=3 work=15000 ms=1200 reward=0.5 failures=0 faults=0 maxMs=500 initMs=100 reseeds=2 " +
                 "initWork=0 initCancelled=0 ClauseUses=4",
             pairs["arm.bt-0"],
+        )
+        assertEquals(
+            "{\"armId\":7,\"phase\":\"slice\",\"segment\":2,\"work\":30,\"type\":\"IllegalStateException\"," +
+                "\"message\":\"row \\\"R\\\"\\u000a\\u0009\\\\\",\"trace\":\"cause\\u000d\\u000aframe\"}",
+            pairs["armFailure.bt-0"],
         )
         assertEquals("4", pairs["portfolioReseedStaleThreshold"])
     }

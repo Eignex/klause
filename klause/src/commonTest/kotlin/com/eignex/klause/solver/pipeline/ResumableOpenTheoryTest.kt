@@ -11,6 +11,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -57,7 +58,7 @@ class ResumableOpenTheoryTest {
     }
 
     @Test
-    fun `a paused search reports the glue clauses its theory conflicts taught it`() {
+    fun `closing a paused search retains its learned progress exactly once`() {
         // b_i ⇔ x_i ≥ 5 over open x_i, every pair summing to at most 9, and two clauses each wanting one b true.
         val n = 4
         val open = Bits(n).also { bits -> for (v in 0 until n) bits.set(v) }
@@ -80,8 +81,15 @@ class ResumableOpenTheoryTest {
 
         while (search.runSlice(Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1) == null) {
             pausedGlue = maxOf(pausedGlue, search.stats.search.glueClauses.sum)
+            if (pausedGlue > 0.0) break
         }
 
         assertTrue(pausedGlue > 0.0, "pausedGlue=$pausedGlue")
+        val before = search.stats
+
+        search.close()
+        search.close()
+
+        assertEquals(before, search.stats)
     }
 }

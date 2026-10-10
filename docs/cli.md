@@ -219,3 +219,12 @@ The CLI depends on `:klause` for parsers and engines, and kotlinx-coroutines to 
 the suspend portfolio API. Corpus selection and campaign execution belong to
 [benchmarking](benchmarking.md). [Input semantics](formats.md) describes exact and
 approximate lowering and the limits of each result.
+
+## Portfolio diagnostics
+
+With statistics enabled, `armFailure.<label>` carries a single-line JSON object for
+an ordinary caught arm exception. It contains `armId`, `phase`, `segment`, `work`,
+`type`, `message` and `trace`; control characters are escaped. Labels distinguish
+replicas, while arm IDs remain stable across reseeds. These records are separate
+from quarantine warnings and their `faults` count. A sibling's accepted result can
+still be the run's verdict. See [search accounting](search.md#portfolio-slices).

@@ -19,8 +19,9 @@ import com.eignex.klause.solver.result.MinimizeResult
  * `minimize` overload (not in the base interface because not every backend is an
  * [com.eignex.klause.solver.Optimizer]).
  *
- * **Not thread-safe**: one consumer per session. The same underlying [solver] can back multiple
- * sessions if each is used from one thread.
+ * **Not thread-safe**: one consumer per session. Sessions sharing a [solver] must run searches sequentially.
+ * An active resumable handle excludes searches through every session of that solver until completion,
+ * failure or close. Keep the session's assumption stack and warm state unchanged while its handle is active.
  *
  * Sync points:
  *  - Sync-in: at the start of each call, the warm state is copied into the new
