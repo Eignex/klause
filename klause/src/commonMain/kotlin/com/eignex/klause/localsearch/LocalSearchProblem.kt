@@ -62,7 +62,8 @@ class LocalSearchProblem private constructor(
                     }
                     yield(null)
                 }
-                yield(LocalSearchProblem(problem, invariants, boolOccurrences, intOccurrences, realOccurrences))            }.iterator()
+                yield(LocalSearchProblem(problem, invariants, boolOccurrences, intOccurrences, realOccurrences))
+            }.iterator()
 
         private suspend fun SequenceScope<LocalSearchProblem?>.allocateOccurrences(counts: IntArray): Array<IntArray> {
             val out = Array(counts.size) { EmptyIntArray }
