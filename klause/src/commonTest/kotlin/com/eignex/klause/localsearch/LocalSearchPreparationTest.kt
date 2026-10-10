@@ -8,7 +8,6 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -55,13 +54,15 @@ class LocalSearchPreparationTest {
         val variants = listOf(Move.BoolFlip(0), Move.IntSet(0, 1L), Move.RealSet(0, 1.0))
         for (move in variants) {
             var updates = 0
-            val factor = object : Factor, Invariant {
+            val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+            val factor = object : Factor by clause, Invariant {
                 override val variables = MixedVars(
                     spanInts = intArrayOf(0, 0), boundInts = intArrayOf(0),
                     boolVars = intArrayOf(0, 0), reals = intArrayOf(0, 0),
                 )
 
-                override fun remap(mapping: VarRemap): Factor = error("Remapping is not used by this test")
+                override val boolVars: IntArray get() = variables.boolVars
+                override val intVars: IntArray get() = variables.ints
 
                 override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
                     updates++
