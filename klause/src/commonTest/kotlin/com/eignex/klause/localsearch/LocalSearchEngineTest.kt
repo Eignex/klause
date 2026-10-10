@@ -29,22 +29,17 @@ class LocalSearchEngineTest {
     @Test
     fun `satisfaction resumes initial scoring without repeating completed factors`() {
         var expired = false
-        val initialized = IntArray(513)
-        val factors = Array<Factor>(initialized.size) { id ->
-            val clause = Clause(
-                if (id == initialized.lastIndex) intArrayOf(Lit.make(0, true)) else
-                    intArrayOf(Lit.make(0, true), Lit.make(0, false)),
-            )
-            val invariant = clause.invariantProjection()
-            object : Factor by clause, Invariant by invariant {
+        val initialized = IntArray(512)
+        val factors = Array<Factor>(initialized.size) { _ ->
+            val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+            object : Factor by clause, Invariant {
                 override fun initialize(state: LocalSearchState, factorId: Int) {
-                    invariant.initialize(state, factorId)
                     initialized[factorId]++
                     if (factorId == 255) expired = true
                 }
             }
         }
-        val problem = Problem(1, 0, emptyArray(), factors)
+        val problem = Problem(1, 0, emptyArray(), factors + Clause(intArrayOf(Lit.make(0, true))))
         val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
         val warm = WarmState()
         val params = LocalSearchParams(maxFlips = 2L, initialAssignment = Sample(booleanArrayOf(false), LongArray(0)))
@@ -66,22 +61,20 @@ class LocalSearchEngineTest {
     @Test
     fun `optimization does not publish a partially scored assignment`() {
         var expired = false
-        val initialized = IntArray(513)
-        val factors = Array<Factor>(initialized.size) { id ->
-            val clause = Clause(
-                if (id >= initialized.lastIndex - 1) intArrayOf(Lit.make(0, id == initialized.lastIndex)) else
-                    intArrayOf(Lit.make(0, true), Lit.make(0, false)),
-            )
-            val invariant = clause.invariantProjection()
-            object : Factor by clause, Invariant by invariant {
+        val initialized = IntArray(512)
+        val factors = Array<Factor>(initialized.size) { _ ->
+            val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+            object : Factor by clause, Invariant {
                 override fun initialize(state: LocalSearchState, factorId: Int) {
-                    invariant.initialize(state, factorId)
                     initialized[factorId]++
                     if (factorId == 255) expired = true
                 }
             }
         }
-        val problem = Problem(1, 0, emptyArray(), factors)
+        val problem = Problem(
+            1, 0, emptyArray(),
+            factors + arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, false)))),
+        )
         val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
         val found = mutableListOf<Sample>()
 
