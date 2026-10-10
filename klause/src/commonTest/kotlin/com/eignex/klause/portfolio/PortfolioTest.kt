@@ -1151,26 +1151,33 @@ class PortfolioTest {
             Array<Factor>(8) { mask -> Clause(IntArray(3) { v -> Lit.make(v, mask and (1 shl v) != 0) }) },
         )
         for ((price, instructions) in listOf(1.5 to 10L, 1.0 to 7L, 2.0 to 14L)) {
-            val arms = listOf(
-                PortfolioWorker.of(
-                    "ls",
-                    0,
-                    LocalSearchSolver(problem.bake()).session(),
-                    LocalSearchParams(maxFlips = 100L, randomSeed = 3L),
-                    withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit) },
-                ),
-                PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
-            )
+            for (objective in listOf(null, LinearObjective())) {
+                val arms = listOf(
+                    PortfolioWorker.of(
+                        "ls",
+                        0,
+                        LocalSearchSolver(problem.bake()).session(),
+                        LocalSearchParams(maxFlips = 100L, randomSeed = 3L),
+                        objective = objective,
+                        withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit) },
+                    ),
+                    if (objective == null) {
+                        PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() }
+                    } else {
+                        PortfolioWorker.ofMinimize("done", 1) { _, _, _, _ -> sequenceOf(MinimizeResult.Infeasible()) }
+                    },
+                )
 
-            val result = Portfolio(
-                arms,
-                DiscountedThompson(arms.size, Random(0), Portfolio.DEFAULT_HALF_LIFE),
-                baseSliceWork = 7L,
-                lsInstructionsPerWork = price,
-            ).use { it.solve() }
+                val result = Portfolio(
+                    arms,
+                    DiscountedThompson(arms.size, Random(0), Portfolio.DEFAULT_HALF_LIFE),
+                    baseSliceWork = 7L,
+                    lsInstructionsPerWork = price,
+                ).use { if (objective == null) it.solve().stats else it.minimize().stats }
 
-            assertEquals(instructions.toDouble(), result.stats.ls.moves.sum, "price=$price")
-            assertEquals(7L, result.stats.portfolio.arms[0].work, "price=$price")
+                assertEquals(instructions.toDouble(), result.ls.moves.sum, "price=$price objective=$objective")
+                assertEquals(7L, result.portfolio.arms[0].work, "price=$price objective=$objective")
+            }
         }
     }
 
@@ -1219,14 +1226,18 @@ class PortfolioTest {
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L))
         val allowances = ArrayList<Long>()
         val arms = List(3) { i ->
-            PortfolioWorker.of(
+            val session = LocalSearchSolver(problem.bake()).session()
+            PortfolioWorker.ofMinimize(
                 "ls$i",
                 i,
-                LocalSearchSolver(problem.bake()).session(),
-                LocalSearchParams(randomSeed = 0L),
-                objective = objective,
-                withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit.also(allowances::add)) },
-            )
+                countsInstructions = true,
+            ) { _, _, token, limit ->
+                allowances += requireNotNull(limit)
+                session.improvements(
+                    objective,
+                    LocalSearchParams(randomSeed = 0L, cancellation = token, maxInstructions = limit),
+                )
+            }
         }
 
         Portfolio.thompson(arms, baseSliceWork = 7L).use {
@@ -1252,14 +1263,18 @@ class PortfolioTest {
         )
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L))
         val arms = List(2) { i ->
-            PortfolioWorker.of(
+            val session = LocalSearchSolver(problem.bake()).session()
+            PortfolioWorker.ofMinimize(
                 "ls$i",
                 i,
-                LocalSearchSolver(problem.bake()).session(),
-                LocalSearchParams(randomSeed = 0L),
-                objective = objective,
-                withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit).also { reached += i } },
-            )
+                countsInstructions = true,
+            ) { _, _, token, limit ->
+                reached += i
+                session.improvements(
+                    objective,
+                    LocalSearchParams(randomSeed = 0L, cancellation = token, maxInstructions = limit),
+                )
+            }
         }
         val endless = 1_000_000_000_000L
         return Portfolio(
