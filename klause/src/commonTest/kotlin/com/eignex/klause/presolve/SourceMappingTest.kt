@@ -1,6 +1,9 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -10,6 +13,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.shl
@@ -131,7 +135,14 @@ class SourceMappingTest {
 
     @Test
     fun `source mapping reconstructs arbitrary precision coordinates without a finite projection`() {
-        val source = Problem(0, 2, Array(2) { IntDomain(0, 9) }, emptyArray())
+        val source = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                LongArray(2), LongArray(2),
+                Bits(2).also { it.set(0); it.set(1) }, Bits(2).also { it.set(0); it.set(1) },
+            ),
+            factors = arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)),
+        )
         val target = source.withFactors(emptyArray())
         val rebuild = SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), longArrayOf(1), 1)))
         val mapping = SourceMapping(source, target, PresolvePass.ELIMINATE_AFFINE_SINGLETONS.guarantees, rebuild)
