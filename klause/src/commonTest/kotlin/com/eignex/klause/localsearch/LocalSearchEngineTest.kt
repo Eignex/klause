@@ -58,7 +58,7 @@ class LocalSearchEngineTest {
             LinearObjective(intCoefficients = longArrayOf(1)),
             LocalSearchParams(maxFlips = 6L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0))),
         ).use { handle ->
-            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
         }
 
         assertEquals(listOf(Sample(BooleanArray(0), longArrayOf(1)), Sample(BooleanArray(0), longArrayOf(2))), anchors)
