@@ -110,10 +110,10 @@ each batch and publishes only the complete projection. A suspended arm holds no 
 Assignment seeding, individual factor calls,
 custom restart policies, subsequent restarts and repair searches remain atomic work
 that can overrun a segment.
-Before the first incumbent, an optimization arm whose initial local-search turn
-finishes without an instruction receives one preparation revisit after all initial
-siblings have been admitted. The revisit uses the base allowance and the regular
-family time share; it does not grow later slices. Dedicated lanes resume their own
+Before the first incumbent, an optimization arm that has not executed an instruction
+receives preparation revisits after all initial siblings have been admitted. Unfinished
+arms rotate in arm order until they enter search or terminate. Each revisit uses the
+base allowance and the regular family time share; it does not grow later slices. Dedicated lanes resume their own
 handles directly. No preparation revisit delays an unadmitted sibling.
 Greedy initialization polls cancellation between variables and retains only completed
 coordinate repairs. Its tabu/activity epoch resets on both completion and cancellation;
