@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.solver.differenceFragmentOf
@@ -23,10 +24,13 @@ import com.eignex.klause.solver.differenceFragmentOf
  * propagate exactly through their own [com.eignex.klause.factor.arithmetic.Linear] factors, so a system
  * built only from those repeats work the model already does; it is the reified ones, whose truth the
  * Boolean layer decides, that the joint graph can refute ahead of a decision.
+ * Unary rows connect only to the zero vertex; their bounds and guarded refutations already propagate
+ * through the original factors. A joint system requires an edge between integer columns.
  */
 internal fun BakedProblem.withDifferenceSystem(): BakedProblem {
     val fragment = differenceFragmentOf(factors, numIntVars, intBounds)?.withoutOverHeavyDomainEdges() ?: return this
     if (fragment.edges.none { it.guard != DifferenceEdge.ALWAYS }) return this
+    if (fragment.edges.none { it.source != DifferenceFragment.ZERO && it.target != DifferenceFragment.ZERO }) return this
     // The system is redundant with the rows it reads, so it changes nothing the base fold derived:
     // `alreadyFolded` reuses that fold and `seedDeductions` carries the proven deductions forward.
     return withAppendedFactor(DifferenceSystem(fragment.edges))
