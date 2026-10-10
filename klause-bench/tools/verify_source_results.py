@@ -98,6 +98,7 @@ def mps(text):
     section, objective_row, maximize, marker = None, None, False, False
     rows, coefficients, rhs, ranges, lower, upper, indicators = {}, {}, {}, {}, {}, {}, {}
     columns, integer = set(), set()
+    vector_names = {}
     for raw in text.splitlines():
         parts = raw.split()
         if not parts or raw.startswith("*"):
@@ -132,12 +133,19 @@ def mps(text):
                 coefficients.setdefault(row, []).append((column, value))
         elif section in ("RHS", "RANGES"):
             values = parts[1:] if len(parts) % 2 else parts
+            vector = parts[0] if len(parts) % 2 else vector_names.get(section, "")
+            if vector_names.setdefault(section, vector) != vector:
+                raise ValueError(f"multiple MPS {section} vectors are unsupported")
+            if not values or len(values) % 2:
+                raise ValueError(f"invalid MPS {section} vector")
             target = rhs if section == "RHS" else ranges
             for row, value in zip(values[::2], values[1::2]):
                 assert row not in target
                 target[row] = value
         elif section == "BOUNDS":
-            kind, _, column = parts[:3]
+            kind, vector, column = parts[:3]
+            if vector_names.setdefault(section, vector) != vector:
+                raise ValueError("multiple MPS BOUNDS vectors are unsupported")
             value = parts[3] if len(parts) > 3 else None
             columns.add(column)
             if kind in ("LO", "LI"):

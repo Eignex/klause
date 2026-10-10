@@ -125,6 +125,22 @@ class ProofCheckTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.check(self.case(proven=False, objective=2))
 
+    def test_distinct_mps_vectors_cannot_be_combined(self):
+        prefix = 'NAME fixture\nROWS\n N obj\n E r1\n E r2\nCOLUMNS\n x r1 1\n y r2 1\n'
+        for section in ('RHS\n a r1 1\n b r2 2\n',
+                        'RANGES\n a r1 1\n b r2 2\n',
+                        'BOUNDS\n LO a x 1\n UP b y 2\n'):
+            with self.subTest(section=section.splitlines()[0]):
+                with self.assertRaises(ValueError):
+                    proof_check.mps(prefix + section + 'ENDATA\n')
+
+    def test_unlabelled_mps_vector_continuation_keeps_the_selected_vector(self):
+        text = 'NAME fixture\nROWS\n N obj\n E r1\n E r2\nCOLUMNS\n x r1 1\n y r2 1\nRHS\n a r1 1\n r2 2\nENDATA\n'
+        constraints, _, variables, _ = proof_check.mps(text)
+        solver = z3.Solver()
+        solver.add(*constraints, variables['x'] == 1, variables['y'] == 2)
+        self.assertEqual(solver.check(), z3.sat)
+
 
 if __name__ == '__main__':
     unittest.main()
