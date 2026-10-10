@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
@@ -83,6 +84,56 @@ class LpPropagatorTest {
                 assertNull(result?.bound)
                 assertNull(result?.conflictSupport)
             }
+        }
+    }
+
+    @Test
+    fun `derived bound batches retain each premise and retract together`() {
+        val source = ExactLpModel(
+            listOf(emptyList(), emptyList()), emptyList(),
+            List(2) { ExactLpColumn(ExactLpBounds()) }, emptyList(),
+            ExactLpObjective(List(2) { ExactLpNumber.of(0L) }),
+        )
+        val premises = listOf(SearchAtomPremise.All(emptyList()), SearchAtomPremise.Unavailable)
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(Any(), source))
+            assertTrue(lp.atLevel(1))
+
+            assertIs<LpBoundBatchResult.Applied>(lp.assertDerivedBounds(listOf(
+                LpDerivedBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), premises[0]),
+                LpDerivedBound(1, true, ExactLpSide(ExactLpNumber.of(-2L)), premises[1]),
+            )))
+
+            assertEquals(BigFraction.ofLong(3), lp.state?.activeSide(0, false)?.side?.number?.value)
+            assertEquals(BigFraction.ofLong(-2), lp.state?.activeSide(1, true)?.side?.number?.value)
+            assertEquals(premises[0], lp.activeBoundPremise(0, false))
+            assertEquals(premises[1], lp.activeBoundPremise(1, true))
+            assertTrue(lp.atLevel(0))
+            assertNull(lp.state?.activeSide(0, false))
+            assertNull(lp.state?.activeSide(1, true))
+        }
+    }
+
+    @Test
+    fun `crossed derived bounds retain both conflict premises`() {
+        val source = ExactLpModel(
+            listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())), emptyList(),
+            ExactLpObjective(listOf(ExactLpNumber.of(0L))),
+        )
+        val lowerPremise = SearchAtomPremise.All(emptyList())
+        val upperPremise = SearchAtomPremise.Unavailable
+        LpPropagator(object : LpSearchPolicy {}).use { lp ->
+            assertTrue(lp.install(Any(), source))
+
+            val result = assertIs<LpBoundBatchResult.Conflict>(lp.assertDerivedBounds(listOf(
+                LpDerivedBound(0, false, ExactLpSide(ExactLpNumber.of(3L)), lowerPremise),
+                LpDerivedBound(0, true, ExactLpSide(ExactLpNumber.of(2L)), upperPremise),
+            )))
+
+            assertEquals(2, result.count)
+            assertEquals(lowerPremise, lp.activeBoundPremise(0, false))
+            assertEquals(upperPremise, lp.activeBoundPremise(0, true))
+            assertNotNull(lp.state?.conflict)
         }
     }
 
