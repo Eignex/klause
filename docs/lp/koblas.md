@@ -7,14 +7,7 @@ numerical authority or create another solver.
 
 ## Dependency provenance
 
-Integration base: klause `445d1bd5cdd839424d5c1b7a3768e4d7cb5deeea`.
-Inspected koblas main: `75126edfa77e8dca53d2c496517e918a7ac16a9b`.
-Every Kotlin file in the published source jars matches the inspected koblas main, including its JVM
-hardware-FMA guard. Publication completed before a shell continuation error failed the overall
-[release run](https://github.com/Eignex/koblas/actions/runs/35399195989). Each listed binary and source
-artifact was retrieved and checked separately.
-
-The build pins immutable timestamps for both the KMP root and every platform module. A root timestamp
+The [build](../../klause/build.gradle.kts) pins immutable timestamps for both the KMP root and every platform module. A root timestamp
 alone is insufficient because its Gradle metadata redirects to mutable platform snapshots. Strict
 platform constraints propagate into klause publications.
 
@@ -39,14 +32,13 @@ Record the checkout revision and the resulting artifact hashes separately from p
 checks. Do not publish over a shared `SNAPSHOT`, or commit machine-specific paths. Dependency updates
 must update every platform pin together and repeat provenance and published-metadata verification.
 
-`kumulant:0.3.3` owns its dense numerical types and has no koblas dependency. Its newer development
-checkout is a separate migration and is not substituted into this build.
+`kumulant:0.3.3` owns its dense numerical types and has no koblas dependency.
 
 ## Consumer contracts
 
 | Consumer | Integration contract |
 |---|---|
-| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and snapshots. Each builder owns fixed-size LU scratch; solve-quality checks reuse one dense product buffer. Factor materialization and updates allocate their owned output arrays directly. |
+| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Each builder owns fixed-size LU scratch; solve-quality checks reuse one dense product buffer. Factor materialization and updates allocate their owned output arrays directly. |
 | Sparse slice workflows | Validate windows, indices, capacity and overlap before mutation. Unique scatter/touched support, first-touch order, structural zeros until explicit compaction, positive-zero clearing. Checked scatter delegates to generic primitives; checked dot preserves scalar input order and underflow/nonfinite diagnostics. |
 | `lp.engine` | Pricing and column updates use indexed kernels; checked workflows retain solver semantics. Scaling/refinement keep guarded powers of two, exact accumulation and source maps. No dense vendor Level 2/3 call is required. |
 | `util.SparseSlices` | Shared validated slice workflows serve the LP engine and basis without adding a solver-layer dependency. Other array/permutation/domain helpers have no koblas consumers. |
