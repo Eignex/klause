@@ -123,7 +123,9 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
         context.repairSearch?.let {
             val record = context.recordInnerWork
             val before = if (record != null) it.stats.search.nodes.sum.toLong() else 0L
-            val sample = it.repair(context.pinAssumptions, maxDecisions, context.bestObjective, context.params.cancellation)
+            val sample = it.repair(
+                context.pinAssumptions, maxDecisions, context.bestObjective, context.params.cancellation,
+            )
             record?.invoke(it.stats.search.nodes.sum.toLong() - before, 0L)
             return sample
         }
