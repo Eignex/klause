@@ -35,10 +35,17 @@ class SolverInvocationTest {
 
     @Test
     fun `portfolio diagnostics survive lab record serialization`() {
-        val diagnostic = """{"armId":7,"phase":"slice","segment":2,"work":30,"type":"IllegalStateException","message":"row \"R\"\u000aarm failure","trace":"cause\u000aframe"}"""
+        val diagnostic = """{"armId":7,"phase":"slice","segment":2,"work":30,"type":"IllegalStateException",""" +
+            """"message":"row \"R\"\u000aarm failure","trace":"cause\u000aframe"}"""
         val result = SolverInvocation.Result(
-            feasible = true, objective = null, elapsedMs = 1, timeToBestMs = null, proven = false,
-            stats = mapOf("armFailure.failed" to diagnostic), rawOutput = "", command = "klause",
+            feasible = true,
+            objective = null,
+            elapsedMs = 1,
+            timeToBestMs = null,
+            proven = false,
+            stats = mapOf("armFailure.failed" to diagnostic),
+            rawOutput = "",
+            command = "klause",
         )
 
         val encoded = Reports.json.encodeToString(SolverInvocation.Result.serializer(), result)
@@ -154,7 +161,13 @@ class SolverInvocationTest {
     @Test
     fun `reference proofs use solve time then wall clock then legacy budget`() {
         val r = SolverInvocation.Result(
-            false, null, null, proven = true, stats = emptyMap(), rawOutput = "", command = "",
+            false,
+            null,
+            null,
+            proven = true,
+            stats = emptyMap(),
+            rawOutput = "",
+            command = "",
         )
         val cases = listOf(
             r to 60_000L,
@@ -170,7 +183,14 @@ class SolverInvocationTest {
     @Test
     fun `subprocess duration survives caching and legacy caches have unknown elapsed`() {
         val r = SolverInvocation.Result(
-            false, null, null, proven = true, stats = emptyMap(), rawOutput = "", command = "", elapsedMs = 140,
+            false,
+            null,
+            null,
+            proven = true,
+            stats = emptyMap(),
+            rawOutput = "",
+            command = "",
+            elapsedMs = 140,
         )
         val encoded = Reports.json.encodeToString(r)
         val legacy = JsonObject(Reports.json.parseToJsonElement(encoded).jsonObject - "elapsedMs").toString()
