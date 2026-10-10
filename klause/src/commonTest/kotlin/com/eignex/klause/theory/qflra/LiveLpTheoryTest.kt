@@ -485,8 +485,11 @@ class LiveLpTheoryTest {
     fun `complementary registered integer conflicts refute the full source through shared learning`() {
         val source = Problem(
             0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
-            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+            intBounds = IntBounds.fromModelBounds(
+                LongArray(2), LongArray(2), Bits(2).also { it.set(0); it.set(1) },
+                Bits(2).also { it.set(0); it.set(1) },
+            ),
+            factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.EQ, 1)),
         )
         ExactLiraSearchComponent(source).use { component ->
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
@@ -494,7 +497,10 @@ class LiveLpTheoryTest {
             val split = assertNotNull(
                 SourceBoundAtom.integerSplit(
                     session,
-                    listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                    listOf(
+                        SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
+                        SourceBoundTerm(SearchIntValue(1), BigFraction.ONE),
+                    ),
                     BigFraction.ZERO,
                 ),
             )
@@ -587,7 +593,7 @@ class LiveLpTheoryTest {
                     }
                 }
             }
-            assertEquals(if (scenario == "decline") 3 else 1, created, scenario)
+            assertEquals(when (scenario) { "conflict" -> 0; "decline" -> 3; else -> 1 }, created, scenario)
             assertEquals(created, closed, scenario)
         }
     }

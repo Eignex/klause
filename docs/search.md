@@ -49,7 +49,10 @@ row, fixing and cutoff premises. Open linear theories narrow source-column bound
 from exact row intervals and imply reified comparisons with immutable row and
 bound premises. These bounds follow the LP trail and retract with their decisions.
 Strict real endpoints stay strict; integer endpoints round on the source lattice.
-Each propagation call limits interval passes before the complete LP check, so a
+Affected rows follow source Boolean and exact bound changes through a retained
+queue, including restored bounds after retraction. Equivalent normalized terms
+share their exact activity bounds even when individual source columns are open.
+Each propagation call limits row visits before the complete LP check, so a
 partial interval pass cannot establish feasibility or exhaustion. There is no
 explanation weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
 

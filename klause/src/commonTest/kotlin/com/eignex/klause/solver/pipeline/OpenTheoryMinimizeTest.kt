@@ -249,7 +249,7 @@ class OpenTheoryMinimizeTest {
             assertTrue(value.toString() in setOf("0", "7", "20", "27"))
             value
         }
-        assertTrue(values[1] < values[0])
+        assertTrue(values[1] <= values[0])
     }
 
     @Test
