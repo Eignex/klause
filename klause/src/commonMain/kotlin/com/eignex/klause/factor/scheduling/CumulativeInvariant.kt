@@ -274,7 +274,7 @@ internal class CumulativeInvariant(
             val dom = state.rootDomains[v]
             val runsAtPeak = (peakT >= 0 && r > 0 && d > 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
-                if (durationVars.isNotEmpty() && OptPresence.isPresentInAssignment(presents, i, state) &&
+                if (durationVars.isNotEmpty() && OptionalPresence.isPresentInAssignment(presents, i, state) &&
                     durationRepairs < CUMULATIVE_MAX_DURATION_REPAIRS
                 ) {
                     durationRepairs += ConditionalProductRepair(
