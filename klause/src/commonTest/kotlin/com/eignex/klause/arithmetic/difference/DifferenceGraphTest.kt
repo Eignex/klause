@@ -2,6 +2,7 @@ package com.eignex.klause.arithmetic.difference
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -32,6 +33,30 @@ class DifferenceGraphTest {
         val cycle = graph(2, Triple(1, 0, -1L), Triple(0, 1, -1L)).negativeCycle()
         assertNotNull(cycle)
         assertEquals(2, cycle.size)
+    }
+
+    @Test
+    fun `potentials satisfy nonnegative cycles with incoming paths`() {
+        for (returnWeight in listOf(2L, 3L)) {
+            val g = graph(4, Triple(3, 2, -4L), Triple(2, 0, -3L),
+                Triple(0, 1, -2L), Triple(1, 0, returnWeight))
+
+            val values = assertIs<Potentials.Found>(g.potentials()).values
+
+            assertTrue(values[2] <= values[3] - 4L)
+            assertTrue(values[0] <= values[2] - 3L)
+            assertTrue(values[1] <= values[0] - 2L)
+            assertTrue(values[0] <= values[1] + returnWeight)
+        }
+    }
+
+    @Test
+    fun `potentials detect a negative cycle beside an acyclic component`() {
+        val g = graph(4, Triple(3, 2, -4L), Triple(0, 1, -2L), Triple(1, 0, 1L))
+
+        val result = g.potentials()
+
+        assertEquals(Potentials.Infeasible, result)
     }
 
     @Test

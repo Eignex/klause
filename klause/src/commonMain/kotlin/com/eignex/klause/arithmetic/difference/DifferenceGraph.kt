@@ -90,6 +90,7 @@ internal class DifferenceGraph(val numVars: Int) {
     /** Vertex potentials witnessing feasibility, or why none were produced. */
     fun potentials(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): Potentials {
         val dist = LongArray(numVars)
+        val predecessor = IntArray(numVars) { -1 }
         var untilPoll = POLL_INTERVAL
         repeat(numVars) {
             if (cancelled()) return Potentials.Abandoned
@@ -106,12 +107,37 @@ internal class DifferenceGraph(val numVars: Int) {
                 val relaxed = dist[u] + weight[e]
                 if (relaxed < dist[v]) {
                     dist[v] = relaxed
+                    predecessor[v] = e
                     changed = true
                 }
             }
             if (!changed) return Potentials.Found(dist)
+            if (hasNegativePredecessorCycle(predecessor)) return Potentials.Infeasible
         }
         return Potentials.Infeasible
+    }
+
+    private fun hasNegativePredecessorCycle(predecessor: IntArray): Boolean {
+        val visited = IntArray(numVars) { -1 }
+        for (start in 0 until numVars) {
+            var vertex = start
+            while (visited[vertex] == -1 && predecessor[vertex] >= 0) {
+                visited[vertex] = start
+                vertex = from[predecessor[vertex]]
+            }
+            if (visited[vertex] != start) continue
+            val cycleStart = vertex
+            var sum = 0L
+            var overflow = false
+            do {
+                val edge = predecessor[vertex]
+                if (addOverflows(sum, weight[edge])) overflow = true
+                sum += weight[edge]
+                vertex = from[edge]
+            } while (vertex != cycleStart)
+            if (!overflow && sum < 0L) return true
+        }
+        return false
     }
 
     /**
