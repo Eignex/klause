@@ -1372,21 +1372,22 @@ private fun SearchNode.withPublishedBounds(
         val lower = lowerBound(integer)?.let(::bigIntOf)
         val upper = upperBound(integer)?.let(::bigIntOf)
         if (lower == null && upper == null) continue
-        val list = merged ?: branches.toMutableList().also { merged = it }
-        val index = positions ?: MutableIntIntMap(list.size * 2).also { map ->
-            list.forEachIndexed { at, branch -> map.put(branch.variable, at) }
+        val index = positions ?: MutableIntIntMap(branches.size * 2).also { map ->
+            branches.forEachIndexed { at, branch -> map.put(branch.variable, at) }
             positions = map
         }
         val at = index.getOrDefault(integer, -1)
         if (at < 0) {
+            val list = merged ?: branches.toMutableList().also { merged = it }
             index.put(integer, list.size)
             list += IntegerBranch(integer, lower, upper)
         } else {
-            val existing = list[at]
-            list[at] = existing.copy(
-                lower = maxOfNullable(existing.lower, lower),
-                upper = minOfNullable(existing.upper, upper),
-            )
+            val existing = (merged ?: branches)[at]
+            val nextLower = maxOfNullable(existing.lower, lower)
+            val nextUpper = minOfNullable(existing.upper, upper)
+            if (nextLower === existing.lower && nextUpper === existing.upper) continue
+            val list = merged ?: branches.toMutableList().also { merged = it }
+            list[at] = existing.copy(lower = nextLower, upper = nextUpper)
         }
     }
     return merged?.let { copy(branches = it) } ?: this
