@@ -9,7 +9,8 @@ import com.eignex.klause.solver.Sample
  *
  * [count] is the number of *distinct projections* (onto the context's sampling set) observed,
  * capped at `cap + 1`. [capped] means more than `cap` distinct projections were found.
- * [complete] means enumeration certified exhaustion; otherwise the count is only a lower bound. [representatives] holds one decoded (original-variable) [Sample] per distinct
+ * [complete] means enumeration certified exhaustion; otherwise the count is only a lower bound.
+ * [representatives] holds one decoded (original-variable) [Sample] per distinct
  * projection — reused by [UniGen] to draw a uniform member of the cell.
  */
 internal data class CellResult(

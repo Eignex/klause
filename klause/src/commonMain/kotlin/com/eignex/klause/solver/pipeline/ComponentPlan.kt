@@ -197,15 +197,20 @@ class ComponentPlan internal constructor(
         for (v in 0 until source.numIntVars) {
             val before = source.intBounds
             val after = spec.intBounds
-            require(!before.hasLower(v) || after.hasLower(v) && after.lower(v) >= before.lower(v))
-            require(!before.hasUpper(v) || after.hasUpper(v) && after.upper(v) <= before.upper(v))
+            require(!before.hasLower(v) || (after.hasLower(v) && after.lower(v) >= before.lower(v)))
+            require(!before.hasUpper(v) || (after.hasUpper(v) && after.upper(v) <= before.upper(v)))
             val declared = source.intDomainOrNull(v)
             val narrowed = spec.intDomainOrNull(v)
             require(declared != null || narrowed == null || narrowed.holeCount == 0L) {
                 "objective round must only narrow declared values"
             }
-            require(declared == null || narrowed != null && narrowed.min >= declared.min && narrowed.max <= declared.max &&
-                narrowed == declared.withMinAtLeast(narrowed.min).withMaxAtMost(narrowed.max)) {
+            require(
+                declared == null ||
+                    (
+                        narrowed != null && narrowed.min >= declared.min && narrowed.max <= declared.max &&
+                            narrowed == declared.withMinAtLeast(narrowed.min).withMaxAtMost(narrowed.max)
+                    ),
+            ) {
                 "objective round must only narrow declared values"
             }
         }

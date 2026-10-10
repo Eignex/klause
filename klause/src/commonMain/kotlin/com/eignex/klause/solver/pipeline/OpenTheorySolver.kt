@@ -111,6 +111,9 @@ sealed interface OpenTheoryAssignment {
     }
 }
 
+internal fun SourceMapping.lift(assignment: OpenTheoryAssignment): OpenTheoryAssignment =
+    rebuild.lift(assignment, source.numBoolVars, source.numIntVars)
+
 /**
  * [assignment] with the Boolean columns this rebuild recovers, over a model of [numBoolVars] columns.
  *
@@ -125,9 +128,6 @@ sealed interface OpenTheoryAssignment {
  * Integer values are read at arbitrary precision, which is the width an open route answers in; they are
  * materialized only when a step recovers one, so a Boolean-only reconstruction costs no parsing.
  */
-internal fun SourceMapping.lift(assignment: OpenTheoryAssignment): OpenTheoryAssignment =
-    rebuild.lift(assignment, source.numBoolVars, source.numIntVars)
-
 internal fun SourceRebuilds.lift(
     assignment: OpenTheoryAssignment,
     numBoolVars: Int,
