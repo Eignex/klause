@@ -146,6 +146,7 @@ internal fun Compiler.Builder.lowerOpenIteChains() {
 
 private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
     if (!collapseToElement(chain)) lowerAsDecisionList(chain)
+    conditionalEqualities.define(chain.result, chain.conds, chain.arms, chain.default)
 }
 
 /**
