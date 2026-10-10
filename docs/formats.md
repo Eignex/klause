@@ -91,6 +91,12 @@ not an unlimited completeness guarantee for every integer model.
 
 The MPS parser retains decimal source metadata, integer markers, bounds and
 objective sense. The lowered LP may restate continuous coefficients in binary64.
+An unconditional equality defining a free continuous column as an integral affine
+sum of bounded source integers gives that column a finite integer representation
+when the resulting rows and objective retain their source numbers. The proof uses
+exact source coefficients and bounds; fractional definitions and inexact integer
+lowerings remain continuous. Source column names, witness values and objective
+units are preserved.
 `sourceExact` records exact source correspondence; `toleranceDifference` identifies
 a lowering difference relevant to tolerance publication. Rounded or oversized
 pure-integer rows are rebuilt from source decimals; oversized objectives can use

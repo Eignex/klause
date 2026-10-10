@@ -69,8 +69,8 @@ data class MpsColumn(
 /** An [MpsModel] lowered to a klause model. */
 @Suppress("UndocumentedPublicFunction")
 class MpsCompiled(
-    /** The compiled solver problem — an integer variable per integer MPS column, an LP-only continuous
-     *  variable per (bounded or unbounded) float column. */
+    /** The compiled solver problem — integer variables for integer columns and proven integral definitions,
+     *  with LP-only continuous variables for the remaining float columns. */
     val model: Problem,
     /** Objective, or `null` for a feasibility instance (no `N` row). */
     val objective: LinearObjectiveSpec?,
@@ -386,6 +386,8 @@ private const val MPS_INFINITY = 1e20
  *  - **float columns** become LP-only continuous variables — present in the LP relaxation, absent from CP
  *    search; the simplex resolves them at nodes and leaves. Their real bounds carry through directly, so
  *    an unbounded float keeps an open side of `±∞`.
+ *    An unconditional integral affine definition over bounded integers gives a free float a finite integer id
+ *    when the resulting rows and objective retain their source numbers.
  *  - an **indicated row** (an `INDICATORS` entry) becomes a reified row plus a `guard -> cond` clause over
  *    a Boolean channelled to its binary column, so the row is relaxed at the column's other value.
  *  - a constraint or objective term touching a float becomes a real ([Double]-coefficient) [Linear] row;
@@ -399,7 +401,20 @@ private const val MPS_INFINITY = 1e20
 fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemSettings()): MpsCompiled {
     val exactInput = exactAdapterSnapshot()
     val sourceNumbers = exactInput.sourceNumbers()
-    val isFloat = BooleanArray(variables.size) { !variables[it].integer }
+    val integralDefinitions = integralDefinitions(sourceNumbers)
+    val isFloat = BooleanArray(variables.size) { !variables[it].integer && integralDefinitions[it] == null }
+    if (integralDefinitions.any { it != null }) {
+        val scale = objectiveRowScale(isFloat)
+        val row = if (objective.indices.isNotEmpty() && scale is RowScale.Unrepresentable) {
+            objectiveColumnRow()
+        } else {
+            null
+        }
+        if (exactInput.sourceMismatch(isFloat, scale, row) != null) {
+            integralDefinitions.fill(null)
+            for (index in isFloat.indices) isFloat[index] = !variables[index].integer
+        }
+    }
     val intVarOf = IntArray(variables.size) { -1 }
     val realVarOf = IntArray(variables.size) { -1 }
     var numInt = 0
@@ -433,8 +448,8 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
             realUpper[realVarOf[i]] = openUpper(v.upper)
         } else {
             val id = intVarOf[i]
-            val lo = intLowerOrNull(v.lower)
-            val hi = intUpperOrNull(v.upper)
+            val lo = integralDefinitions[i]?.min ?: intLowerOrNull(v.lower)
+            val hi = integralDefinitions[i]?.max ?: intUpperOrNull(v.upper)
             lower[id] = lo ?: 0L
             upper[id] = hi ?: 0L
             if (lo == null) (openLoBits ?: Bits(numInt).also { openLoBits = it }).set(id)
@@ -513,7 +528,7 @@ fun MpsModel.toProblem(settings: ProblemSettings = KlauseConfig.current.problemS
         sense == ObjectiveSense.MAXIMIZE,
         columns,
         if (objectiveRow == null) objRowScale.multiplier else 1L,
-        numReal,
+        variables.count { !it.integer },
     ).withExactLpModel { exactInput.toExactLpModel() }
         .withSourceModel(
             exactInput,
@@ -665,7 +680,7 @@ private val MPS_INFINITY_EXACT = BigFraction.of(
     BIG_ONE,
 )
 
-private fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
+internal fun MpsSourceNumber?.finiteMps(): MpsSourceNumber? = this?.takeIf {
     it.fraction > MPS_INFINITY_EXACT.negated() && it.fraction < MPS_INFINITY_EXACT
 }
 
