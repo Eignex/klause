@@ -193,16 +193,16 @@ object BacktrackCatalog {
     }
 
     /**
-     * [rankedArms] with [BacktrackArm.LpDefault] third when the model has continuous columns. A row that
+     * [rankedArms] with [BacktrackArm.LpDefault] second when the model has continuous columns. A row that
      * touches a real column never propagates in CP, so on such a model node LP is the only propagation those
-     * rows get, and the first two arms run without it. They keep their slots, since they are what finds most
-     * incumbents there; [PortfolioComposition] gives such a model the backtrack slot for the LP arm.
+     * rows get. Keeping the SAT guard first and admitting the LP workhorse in the second slot gives the
+     * default mixed pool that propagation without changing its size or its local-search positions.
      */
     private fun rankedArms(kind: Kind, realColumns: Boolean): List<BacktrackArm> {
         val order = rankedArms(kind)
         if (!realColumns) return order
         val rest = order.filter { it != BacktrackArm.LpDefault }
-        return rest.take(2) + BacktrackArm.LpDefault + rest.drop(2)
+        return rest.take(1) + BacktrackArm.LpDefault + rest.drop(1)
     }
 
     /** The shared string-boundary / order-driven accessors (see [ArmCatalog]); this catalog supplies
