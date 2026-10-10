@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.ReifiedFactor
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
@@ -70,6 +71,9 @@ internal class SmtLibConditionalEquality {
             definitions.getValue(pending.removeFirst()).factors.forEach(::read)
         }
         factors.removeAll { factor -> owners[factor]?.let { it !in retained } == true }
+        for ((predicate, owner) in predicateOwners) {
+            if (owner !in retained) factors.add(Clause(intArrayOf(Lit.make(predicate, false))))
+        }
     }
 
     fun reify(variable: Int, value: Long, builder: Compiler.Builder): Int? {
