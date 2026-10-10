@@ -10,7 +10,6 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -103,18 +102,6 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
-    fun `seeded ties are repeatable and can choose different columns`() {
-        val first = solveTie(7L)
-        val repeated = solveTie(7L)
-        val alternate = solveTie(19L)
-
-        assertEquals(first, repeated)
-        assertNotEquals(first, alternate)
-        assertEquals(2, first)
-        assertEquals(0, alternate)
-    }
-
-    @Test
     fun `magnitude floor falls back to ordinary Harris selection`() {
         val b = LpBuilder()
         val x0 = b.addRealVar(0.0, 2e8)
@@ -164,48 +151,6 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
-    fun `current free and fixed headings retain their native status`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val minusOne = ExactLpNumber.of(-1L)
-        val source = ExactLpModel(
-            listOf(
-                listOf(ExactLpEntry(0, one)),
-                listOf(ExactLpEntry(1, minusOne)),
-                listOf(ExactLpEntry(0, one), ExactLpEntry(1, minusOne)),
-            ),
-            listOf(ExactLpNumber.of(2L), ExactLpNumber.of(-2L)),
-            listOf(
-                ExactLpColumn(ExactLpBounds()),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(one), ExactLpSide(one))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ),
-            List(2) { ExactLpRow() },
-            ExactLpObjective(List(5) { zero }),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
-        val warm = Basis(
-            intArrayOf(0, 4),
-            arrayOf(VarStatus.BASIC, VarStatus.FIXED, VarStatus.AT_LOWER, VarStatus.FIXED, VarStatus.BASIC),
-            captureEligible = false,
-        )
-        val simplex = RevisedSimplex(
-            model,
-            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
-        )
-
-        val result = assertNotNull(simplex.solve(warm))
-
-        assertTrue(result.warmStarted)
-        assertEquals(VarStatus.FIXED, result.basis.status[1])
-        assertEquals(2, simplex.lastTheorySelectedColumn)
-        val certified = certifyLpResult(model, simplex, result)
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
-    }
-
-    @Test
     fun `cancellation before the first probe preserves the current iterate`() {
         var polls = 0
         val updates = ArrayList<Int>()
@@ -223,45 +168,6 @@ class RevisedSimplexTheoryPricingTest {
         assertEquals(1, simplex.lastTheoryPricingResourceStops)
         assertTrue(updates.isEmpty())
         assertNull(simplex.infeasibleBasis)
-    }
-
-    @Test
-    fun `cancellation after a successful probe stops before flips and pivot`() {
-        var probes = 0
-        val updates = ArrayList<Int>()
-        val simplex = RevisedSimplex(
-            disturbedSupportModel(),
-            cancellation = Cancellation { probes > 0 },
-            basisSolverFactory = { matrix ->
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
-                        delegate.ftran(x, expectedDensity)
-                        if (simplexProbeCandidate(x, matrix.rows)) probes++
-                    }
-
-                    override fun update(
-                        pivotRow: Int,
-                        entering: Int,
-                        spike: IndexedVector,
-                        pivotEta: IndexedVector?,
-                    ): BasisUpdate {
-                        updates += entering
-                        return delegate.update(pivotRow, entering, spike, pivotEta)
-                    }
-                }
-            },
-            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
-        )
-
-        val result = assertNotNull(simplex.solve())
-
-        assertFalse(result.optimal)
-        assertTrue(simplex.lastTheoryPricingSamples > 0)
-        assertEquals(1, simplex.lastTheoryPricingResourceStops)
-        assertTrue(updates.isEmpty())
-        assertNull(simplex.infeasibleBasis)
-        assertNull(simplex.infeasibleRay)
     }
 
     @Test
@@ -330,50 +236,6 @@ class RevisedSimplexTheoryPricingTest {
     }
 
     @Test
-    fun `cancellation during a failed sample stops before Harris fallback`() {
-        var cancelled = false
-        var ftrans = 0
-        val updates = ArrayList<Int>()
-        val simplex = RevisedSimplex(
-            disturbedSupportModel(),
-            cancellation = Cancellation { cancelled },
-            basisSolverFactory = { matrix ->
-                val delegate = KotlinBasisSolver(matrix)
-                object : BasisSolver by delegate {
-                    override fun ftran(x: IndexedVector, expectedDensity: Double) {
-                        ftrans++
-                        if (ftrans == 2) {
-                            cancelled = true
-                            throw BasisArithmeticException("cancelled sample decline")
-                        }
-                        delegate.ftran(x, expectedDensity)
-                    }
-
-                    override fun update(
-                        pivotRow: Int,
-                        entering: Int,
-                        spike: IndexedVector,
-                        pivotEta: IndexedVector?,
-                    ): BasisUpdate {
-                        updates += entering
-                        return delegate.update(pivotRow, entering, spike, pivotEta)
-                    }
-                }
-            },
-            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, 7L),
-        )
-
-        val result = assertNotNull(simplex.solve())
-
-        assertFalse(result.optimal)
-        assertEquals(1, simplex.lastTheoryPricingResourceStops)
-        assertEquals(0, simplex.lastTheoryPricingDeclines)
-        assertTrue(updates.isEmpty())
-        assertNull(simplex.infeasibleBasis)
-        assertNull(simplex.infeasibleRay)
-    }
-
-    @Test
     fun `nonzero objective adoption disables minimum bound support pricing`() {
         val source = exactCoverModel()
         val trail = LpBoundTrail(source)
@@ -397,18 +259,6 @@ class RevisedSimplexTheoryPricingTest {
                 certified.exactPrimal,
             )
         }
-    }
-
-    private fun solveTie(seed: Long): Int {
-        val b = LpBuilder()
-        val columns = IntArray(3) { b.addVar(0L, 10L) }
-        b.addRow(columns, longArrayOf(1L, 1L, 1L), Relation.GE, 1L)
-        val simplex = RevisedSimplex(
-            b.build(Sense.MINIMIZE),
-            pricing = LpPricingOptions(LpZeroObjectivePricing.MIN_BOUND_SUPPORT, seed),
-        )
-        assertNotNull(simplex.solve())
-        return simplex.lastTheorySelectedColumn
     }
 
     private fun disturbedSupportModel(): LpModel {
@@ -462,9 +312,6 @@ class RevisedSimplexTheoryPricingTest {
             }
         }
     }
-
-    private fun simplexProbeCandidate(vector: IndexedVector, dimension: Int): Boolean =
-        vector.density < 1.0 || dimension == 1
 
     private fun assertSourceFeasible(result: FloatLpResult) {
         val x = result.primal

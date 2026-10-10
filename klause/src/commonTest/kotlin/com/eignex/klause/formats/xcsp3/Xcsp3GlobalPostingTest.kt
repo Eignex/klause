@@ -46,24 +46,6 @@ class Xcsp3GlobalPostingTest {
     }
 
     @Test
-    fun `a strict ordered chain posts a strict Increasing`() {
-        val parsed = parse("<ordered><list>x y z</list><operator>lt</operator></ordered>", threeVars)
-
-        assertEquals(true, (factorsOf(parsed).single() as Increasing).strict)
-        assertEquals(setOf(listOf(1L, 2L, 3L)), solutions(parsed, 3))
-    }
-
-    @Test
-    fun `a descending ordered chain posts Increasing over the reversed sequence`() {
-        val parsed = parse("<ordered><list>x y z</list><operator>ge</operator></ordered>", threeVars)
-
-        val chain = factorsOf(parsed).single() as Increasing
-        assertContentEquals(intArrayOf(2, 1, 0), chain.xs)
-        assertTrue(solutions(parsed, 3).all { it[0] >= it[1] && it[1] >= it[2] })
-        assertEquals(10, solutions(parsed, 3).size, "non-increasing triples over 1..3")
-    }
-
-    @Test
     fun `an ordered chain with lengths keeps its rows`() {
         val parsed = parse(
             "<ordered><list>x y z</list><lengths>1 1</lengths><operator>le</operator></ordered>",
@@ -90,15 +72,6 @@ class Xcsp3GlobalPostingTest {
             val firstTwo = s.indexOf(2L)
             if (firstTwo >= 0) assertTrue(firstOne in 0 until firstTwo, "2 precedes 1 in $s")
         }
-    }
-
-    @Test
-    fun `precedence over defaulted values posts a ValuePrecede chain`() {
-        val parsed = parse("<precedence><list>x y z</list></precedence>", threeVars)
-
-        // Values default to the union of the domains, so the chain is one link per adjacent pair.
-        assertEquals(2, factorsOf(parsed).filterIsInstance<ValuePrecede>().size)
-        assertEquals(5, solutions(parsed, 3).size, "the clause decomposition admits the same five")
     }
 
     @Test

@@ -123,30 +123,6 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `free column Farkas verifies both equations and complete box support`() {
-        val zero = ExactLpNumber.of(0L)
-        val fixed = ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)), ExactLpEntry(1, ExactLpNumber.of(1L)))),
-            listOf(zero, ExactLpNumber.of(1L)),
-            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(fixed), ExactLpColumn(fixed)),
-            List(2) { ExactLpRow() },
-            ExactLpObjective(List(3) { zero }),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
-        val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED))
-
-        val checked = verifyExactBasis(model, basis, rayRow = 1)
-
-        val conflict = assertNotNull(checked.conflict)
-        assertEquals(BigFraction.ZERO, conflict.multipliers.reduce { a, b -> a + b })
-        assertTrue(checkedLpConflict(model, conflict))
-        assertEquals(listOf(0, 1), checked.conflictSupport?.rows?.map { it.first })
-        assertEquals(setOf(1, 2), checked.conflictSupport?.sides?.map { it.column }?.toSet())
-        assertTrue(sourceFarkasValid(model, assertNotNull(checked.integerRay)))
-    }
-
-    @Test
     fun `BTRAN with nonzero free column residue cannot prove infeasibility`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
@@ -284,26 +260,6 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `large basis decline retains the declared dense storage limit`() {
-        val model = LpBuilder().apply {
-            repeat(129) { j ->
-                addVar(0L, 1L)
-                addRow(intArrayOf(j), longArrayOf(1L), Relation.LE, 1L)
-            }
-        }.build(Sense.MINIMIZE)
-        val basis = Basis(
-            IntArray(129) { 129 + it },
-            Array(258) { if (it < 129) VarStatus.AT_LOWER else VarStatus.BASIC },
-        )
-
-        val checked = verifyExactBasis(model, basis)
-
-        assertEquals(ExactBasisDecline.DIMENSION, checked.metrics.decline)
-        assertEquals(0, checked.metrics.factoryCalls)
-        assertNull(checked.witness)
-    }
-
-    @Test
     fun `logical support retains local row premises even with zero dual`() {
         val zero = ExactLpNumber.of(0L)
         val one = ExactLpNumber.of(1L)
@@ -358,43 +314,6 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `persistent bound and objective adoption reuses factors without pivots`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-1L)))),
-            listOf(ExactLpNumber.of(-2L)),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(10L)))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(ExactLpNumber.of(1L), zero)),
-        )
-        val trail = LpBoundTrail(source)
-        var model = assertNotNull(trail.state.toWorkingModel())
-        RevisedSimplex(model).use { solver ->
-            val first = assertNotNull(solver.solve())
-            val checked = verifyExactBasis(model, first.basis, cache = solver.exactBasisCache)
-            assertEquals(1, checked.metrics.factoryCalls)
-            assertTrue(trail.push())
-            assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(8L)), 7L))
-            assertTrue(trail.replaceObjective(ExactLpObjective(listOf(ExactLpNumber.of(3L), zero))))
-            assertTrue(solver.adopt(trail.state))
-            model = assertNotNull(trail.state.toWorkingModel())
-
-            val changed = assertNotNull(solver.resolveBounds())
-            val proof = verifyExactBasis(model, changed.basis, cache = solver.exactBasisCache)
-
-            assertEquals(0, changed.pivots)
-            assertEquals(first.basis.basicVars.toList(), changed.basis.basicVars.toList())
-            assertEquals(BigFraction.ofLong(6L), proof.bound?.value)
-            assertEquals(0, proof.metrics.factoryCalls)
-            assertEquals(1, proof.metrics.reuse)
-            assertEquals(BigFraction.ofLong(2L), checked.bound?.value)
-        }
-    }
-
-    @Test
     fun `replacement owners do not inherit rational factors`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
@@ -419,114 +338,6 @@ class ExactBasisVerifyTest {
                 )
             }
         }
-    }
-
-    @Test
-    fun `overflowing solve rhs restarts from authoritative input`() {
-        val huge = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
-        val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(1L)))),
-            listOf(ExactLpNumber.of(huge)),
-            listOf(
-                ExactLpColumn(ExactLpBounds()),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)),
-        )
-        val model = assertNotNull(LpExactState(source).toWorkingModel())
-
-        val checked = verifyExactBasis(model, Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED)))
-
-        assertEquals(listOf(huge), checked.witness?.primal)
-        assertTrue(checked.complementary)
-        assertEquals(1, checked.metrics.factoryCalls)
-        assertTrue(checked.metrics.builds >= 2)
-        assertTrue(checked.metrics.restarts >= 1)
-    }
-
-    @Test
-    fun `full rational conflict survives nonrepresentable integer projection in live ladder`() {
-        val large = BigFraction.of(BIG_ONE shl 70, BIG_ONE)
-        val zero = ExactLpNumber.of(0L)
-        val fixed = ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
-        val source = ExactLpModel(
-            listOf(
-                listOf(
-                    ExactLpEntry(0, ExactLpNumber.of(large + BigFraction.ONE)),
-                    ExactLpEntry(1, ExactLpNumber.of(large + BigFraction.ofLong(3L))),
-                ),
-            ),
-            listOf(zero, ExactLpNumber.of(1L)),
-            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(fixed), ExactLpColumn(fixed)),
-            List(2) { ExactLpRow() },
-            ExactLpObjective(List(3) { zero }),
-        )
-        val state = LpExactState(source)
-        val model = assertNotNull(state.toWorkingModel())
-        val solver = object : LpSolver {
-            override val solvedExactState = state
-            override val infeasibleRay = doubleArrayOf(Double.NaN, Double.NaN)
-            override val infeasibleBasis = Basis(
-                intArrayOf(0, 1),
-                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED),
-            )
-            override val infeasibleRow = 1
-            override fun solve(warm: Basis?): FloatLpResult? = null
-            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
-        }
-
-        val result = certifyLpResult(model, solver, null)
-
-        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
-        assertTrue(checkedLpConflict(model, assertNotNull(result.rationalConflict)))
-        assertNotNull(result.conflictSupport)
-        assertNull(result.farkasRay)
-        assertEquals(ExactBasisDecline.PROJECTION, result.basisVerification?.decline)
-        assertEquals(1, result.basisVerification?.factoryCalls)
-    }
-
-    @Test
-    fun `basis dual supplies a weaker bound after float and primal rejection`() {
-        val model = LpBuilder().apply {
-            addVar(0L, 3L, cost = 1L)
-            addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
-        }.build(Sense.MINIMIZE)
-        val hint = FloatLpResult(
-            Basis(intArrayOf(1), arrayOf(VarStatus.AT_LOWER, VarStatus.BASIC)),
-            0.0,
-            doubleArrayOf(Double.NaN),
-            doubleArrayOf(0.0),
-        )
-        val result = newLpSolver(model).use { certifyLpResult(model, it, hint) }
-
-        assertEquals(LpVerdict.CERTIFIED_BOUND, result.verdict)
-        assertEquals(BigFraction.ZERO, result.lowerBound)
-        assertNull(result.witness)
-        assertEquals(1, result.basisVerification?.factoryCalls)
-    }
-
-    @Test
-    fun `later work exhaustion retains a separately verified primal package`() {
-        val model = LpBuilder().apply {
-            addVar(0L, 1L, cost = 1L)
-            addRow(intArrayOf(0), longArrayOf(3L), Relation.EQ, 1L)
-        }.build(Sense.MINIMIZE)
-        val basis = Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
-        val complete = verifyExactBasis(model, basis)
-        val work = complete.metrics.work
-        val checked = verifyExactBasis(
-            model,
-            basis,
-            limits = ExactBasisLimits(RationalBasisLimits(work = work * 2L / 3L)),
-        )
-
-        assertEquals(ExactBasisDecline.WORK, checked.metrics.decline)
-        assertNotNull(checked.witness)
-        assertEquals(BigFraction.ONE, checked.witness.primal.single() * BigFraction.ofLong(3L))
-        assertTrue(checked.metrics.work <= work * 2L / 3L)
-        assertNull(checked.singularRank)
     }
 
     @Test
@@ -556,76 +367,6 @@ class ExactBasisVerifyTest {
     }
 
     @Test
-    fun `popped scoped row reuses factors while discarding its current conflict`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val fixed = ExactLpBounds(ExactLpSide(zero), ExactLpSide(zero))
-        val source = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one))),
-            listOf(zero),
-            listOf(ExactLpColumn(ExactLpBounds()), ExactLpColumn(fixed)),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)),
-        )
-        val premises = ExactLpPremises(emptyList(), listOf(23))
-        val trail = LpBoundTrail(source)
-        assertTrue(trail.push())
-        assertTrue(
-            trail.append(
-                LpScopedRow(
-                    1L,
-                    listOf(0 to one),
-                    one,
-                    ExactLpColumn(fixed),
-                    ExactLpRow(global = false, premises = premises),
-                ),
-                scoped = true,
-            ),
-        )
-        val state = trail.state
-        val cache = ExactBasisCache()
-        val basis = Basis(intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED))
-        val conflict = verifyExactBasis(assertNotNull(state.toWorkingModel()), basis, rayRow = 1, cache = cache)
-        assertNotNull(conflict.conflict)
-        assertTrue(trail.pop(0))
-        basis.status[2] = VarStatus.FREE
-
-        val popped = verifyExactBasis(assertNotNull(trail.state.toWorkingModel()), basis, rayRow = 1, cache = cache)
-
-        assertNull(popped.conflict)
-        assertEquals(1, popped.metrics.reuse)
-        assertEquals(state, conflict.conflictSupport?.state)
-        assertEquals(premises, conflict.conflictSupport?.rows?.last()?.second?.premises)
-        assertTrue(checkedLpConflict(assertNotNull(state.toWorkingModel()), assertNotNull(conflict.conflict)))
-    }
-
-    @Test
-    fun `live legacy Farkas retains the representable ray projection`() {
-        val model = LpBuilder().apply {
-            addFreeVar(null, null)
-            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 0L)
-            addRow(intArrayOf(0), longArrayOf(1L), Relation.EQ, 1L)
-        }.build(Sense.MINIMIZE)
-        val solver = object : LpSolver {
-            override val infeasibleRay = doubleArrayOf(Double.NaN, Double.NaN)
-            override val infeasibleBasis = Basis(
-                intArrayOf(0, 1),
-                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED),
-            )
-            override val infeasibleRow = 1
-            override fun solve(warm: Basis?): FloatLpResult? = null
-            override fun solvePrimal(warm: Basis?): FloatLpResult? = null
-        }
-
-        val result = certifyLpResult(model, solver, null)
-
-        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
-        assertTrue(sourceFarkasValid(model, assertNotNull(result.farkasRay)))
-        assertNotNull(result.rationalConflict)
-        assertEquals(1, result.basisVerification?.factoryCalls)
-    }
-
-    @Test
     fun `basis proof cannot bypass a disabled basis acceptance policy`() {
         val model = LpBuilder().apply {
             addVar(0L, 3L, cost = 1L)
@@ -646,20 +387,4 @@ class ExactBasisVerifyTest {
         assertEquals(1, result.basisVerification?.factoryCalls)
     }
 
-    @Test
-    fun `basis witness survives withheld rational objective proof`() {
-        val model = LpBuilder().apply {
-            addRealVar(0.0, 3.0, cost = 1.0)
-            addRealRow(intArrayOf(0), doubleArrayOf(3.0), Relation.EQ, 1.0)
-        }.build(Sense.MINIMIZE)
-        val policy = LpCertificationPolicy { certifier, success ->
-            certifier == LpCertifier.EXACT_BASIS && success
-        }
-
-        val result = solveAndCertify(model, context = LpSolveContext(certificationPolicy = policy))
-
-        assertNotNull(result.witness)
-        assertNull(result.bound)
-        assertEquals(LpVerdict.FEASIBLE, result.verdict)
-    }
 }

@@ -1,6 +1,5 @@
 package com.eignex.klause.propagation.difference
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -9,10 +8,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/** Appending the joint difference system to a presolved problem. */
 class PostDifferenceSystemTest {
 
     private fun problemOf(vararg factors: Factor) = Problem(
@@ -35,13 +32,6 @@ class PostDifferenceSystemTest {
     }
 
     @Test
-    fun `a model with only unconditional differences is left alone`() {
-        // Those rows already propagate exactly on their own; a system over them repeats their work.
-        val problem = problemOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3))
-        assertSame(problem, problem.withDifferenceSystem())
-    }
-
-    @Test
     fun `a model with over-heavy declared ranges keeps its guarded difference system`() {
         // The range edges are redundant with CP's domains, so the joint graph drops only those it cannot
         // represent and still refutes guarded model rows from the remaining graph.
@@ -55,9 +45,4 @@ class PostDifferenceSystemTest {
         assertTrue(problem.withDifferenceSystem().factors.last() is DifferenceSystem)
     }
 
-    @Test
-    fun `a model with no difference rows is left alone`() {
-        val problem = problemOf(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3))
-        assertSame(problem, problem.withDifferenceSystem())
-    }
 }

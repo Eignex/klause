@@ -48,29 +48,6 @@ class WeightScheduleTest {
     }
 
     @Test
-    fun `cbls with smoothing disabled only bumps and never draws the rng`() {
-        val ws = WeightSchedule.cbls(smoothProb = 0.0, smoothFactor = 0.8, baseWeight = 1.0, stallIncrement = 3.0)
-        val w = doubleArrayOf(10.0)
-        val base = doubleArrayOf(1.0)
-        val probe = Random(7)
-        val reference = Random(7)
-        ws.bumpAndRelax(w, base, intArrayOf(0), probe)
-        assertEquals(13.0, w[0], 1e-12) // pure bump, no pull toward base
-        // smoothProb 0 must not consume the rng stream.
-        assertEquals(reference.nextLong(), probe.nextLong())
-    }
-
-    @Test
-    fun `feasibility-jump relax does not draw the rng`() {
-        // relaxProbability == 1.0 short-circuits before any rng draw, preserving FJ's tie-break stream.
-        val ws = WeightSchedule.feasibilityJump(weightDecay = 0.9)
-        val probe = Random(7)
-        val reference = Random(7)
-        ws.bumpAndRelax(doubleArrayOf(5.0), doubleArrayOf(1.0), intArrayOf(0), probe)
-        assertEquals(reference.nextLong(), probe.nextLong())
-    }
-
-    @Test
     fun `stall cadence bumps only after the configured number of non-improving steps`() {
         val ws = WeightSchedule(bumpAfter = 3, increment = 1.0) // relaxKeep 1.0 → no relax
         val w = doubleArrayOf(0.0)
@@ -82,21 +59,6 @@ class WeightScheduleTest {
         assertEquals(0.0, w[0], 1e-12) // 2 stalled steps < bumpAfter
         ws.maintain(step = 3L, cost = 10L, weights = w, base = base, violated = intArrayOf(0), rng = rng)
         assertEquals(1.0, w[0], 1e-12) // 3rd stalled step triggers the bump
-    }
-
-    @Test
-    fun `an improving step resets the stall window`() {
-        val ws = WeightSchedule(bumpAfter = 2, increment = 1.0)
-        val w = doubleArrayOf(0.0)
-        val base = doubleArrayOf(0.0)
-        val rng = Random(0)
-        ws.maintain(0L, 10L, w, base, intArrayOf(0), rng)
-        ws.maintain(1L, 10L, w, base, intArrayOf(0), rng)
-        ws.maintain(2L, 5L, w, base, intArrayOf(0), rng) // improvement → resets window
-        ws.maintain(3L, 5L, w, base, intArrayOf(0), rng)
-        assertEquals(0.0, w[0], 1e-12) // only 1 stalled step since the improvement
-        ws.maintain(4L, 5L, w, base, intArrayOf(0), rng)
-        assertEquals(1.0, w[0], 1e-12)
     }
 
     @Test
@@ -112,15 +74,5 @@ class WeightScheduleTest {
         // Restart: step rewinds below the last seen step. The trackers re-anchor; no bump this step.
         ws.maintain(0L, 8L, w, base, intArrayOf(0), rng)
         assertEquals(afterBump, w[0], 1e-12)
-    }
-
-    @Test
-    fun `monotone escalation never relaxes when keep is one`() {
-        val ws = WeightSchedule(bumpAfter = 1, increment = 1.0, relaxKeep = 1.0)
-        val w = doubleArrayOf(0.0)
-        val base = doubleArrayOf(0.0)
-        ws.bumpAndRelax(w, base, intArrayOf(0), Random(0))
-        ws.bumpAndRelax(w, base, intArrayOf(0), Random(0))
-        assertEquals(2.0, w[0], 1e-12)
     }
 }

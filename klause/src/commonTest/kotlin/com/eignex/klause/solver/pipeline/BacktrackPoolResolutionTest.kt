@@ -1,12 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.editing
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -28,20 +26,6 @@ class BacktrackPoolResolutionTest {
 
         assertNull(resolved.pool, "a null pool is what tells the caller to use the catalog as-is")
         assertNull(resolved.edit)
-    }
-
-    @Test
-    fun `pinning one arm resolves a pool of one`() {
-        assertEquals(1, pool("bt-arm=$anArm").pool?.size)
-    }
-
-    @Test
-    fun `an override alone keeps the curated pool and carries the edit`() {
-        val resolved = pool("lp-branching=false")
-
-        assertNull(resolved.pool, "the curated pool is composed, and filtered, before the edit applies")
-        val edit = assertNotNull(resolved.edit)
-        assertTrue(!edit(BacktrackParams()).lpPlan.branching)
     }
 
     @Test

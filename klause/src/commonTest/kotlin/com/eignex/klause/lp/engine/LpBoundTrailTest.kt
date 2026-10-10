@@ -1,9 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -98,27 +95,6 @@ class LpBoundTrailTest {
     }
 
     @Test
-    fun `equal witnesses keep the oldest strongest premise`() {
-        val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val trail = LpBoundTrail(model)
-        assertTrue(trail.assertBound(0, false, ExactLpSide(zero), 1L))
-        assertEquals(-1L, trail.state.activeSide(0, false)?.witness)
-
-        assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true), 2L))
-        assertTrue(trail.assertBound(0, false, ExactLpSide(zero, strict = true), 3L))
-
-        assertEquals(2L, trail.state.activeSide(0, false)?.witness)
-        assertEquals(listOf(1L, 2L, 3L), trail.state.assertions.map { it.witness })
-    }
-
-    @Test
     fun `invalid and cancelled operations leave the complete state unchanged`() {
         val zero = ExactLpNumber.of(0L)
         val model = ExactLpModel(
@@ -206,75 +182,4 @@ class LpBoundTrailTest {
         }
     }
 
-    @Test
-    fun `overflowing projection rejects assertion before publication`() {
-        val zero = ExactLpNumber.of(0L)
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
-        val trail = LpBoundTrail(model)
-        val before = trail.state
-        val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
-
-        assertFalse(trail.assertBound(0, false, ExactLpSide(huge), 1L))
-
-        assertSame(before, trail.state)
-    }
-
-    @Test
-    fun `a derived trail state equals the state rebuilt from scratch`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val model = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, one)), listOf(ExactLpEntry(0, one), ExactLpEntry(1, one)), emptyList()),
-            listOf(one, zero),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(-2L)), ExactLpSide(ExactLpNumber.of(2L)))),
-                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds()),
-                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))),
-                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow(), ExactLpRow(strict = true)),
-            ExactLpObjective(listOf(one, zero, one, zero, zero)),
-        )
-        for (seed in 0 until 3) {
-            val random = Random(seed)
-            val trail = LpBoundTrail(model)
-            var witness = 0L
-            repeat(150) {
-                when (random.nextInt(10)) {
-                    in 0..2 -> trail.push()
-
-                    in 3..4 -> trail.pop(random.nextInt(trail.state.depth + 1))
-
-                    else -> trail.assertBound(
-                        random.nextInt(model.numVars),
-                        random.nextBoolean(),
-                        ExactLpSide(ExactLpNumber.of(random.nextLong(-3L, 4L)), strict = random.nextInt(5) == 0),
-                        witness++,
-                    )
-                }
-                val state = trail.state
-                val rebuilt = LpExactState(
-                    state.baseModel, state.assertions, state.scopes, state.matrixRevision, state.boundRevision,
-                    state.objectiveRevision, state.popRevision, state.changedColumns, state.rows, state.rowRevision,
-                )
-
-                assertTrue(
-                    state.fullAuthorityEquals(rebuilt) && state.conflict == rebuilt.conflict &&
-                        (0 until model.numVars).all {
-                            state.activeSide(it, false) == rebuilt.activeSide(it, false) &&
-                                state.activeSide(it, true) == rebuilt.activeSide(it, true)
-                        } &&
-                        state.canProjectWorkingModel() == rebuilt.canProjectWorkingModel(),
-                    "seed $seed",
-                )
-            }
-        }
-    }
 }

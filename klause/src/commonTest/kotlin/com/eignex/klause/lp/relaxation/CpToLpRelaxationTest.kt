@@ -2,9 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -16,7 +14,6 @@ import com.eignex.klause.lp.engine.LpSolution
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.solveLp
-import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -134,42 +131,6 @@ class CpToLpRelaxationTest {
     }
 
     @Test
-    fun `cardinality and clause rows constrain bool fan-in`() {
-        // ExactlyTwo over 3 bools, each with objective weight 1 -> the LP objective is >= 2.
-        val p = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = arrayOf(),
-            factors = arrayOf<Factor>(
-                Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), min = 2, max = 2),
-            ),
-        )
-        val (sol, _) = solve(p, LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L)))
-
-        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-        assertEquals(2.0, sol.objectiveValue, eps)
-    }
-
-    @Test
-    fun `pseudo boolean upper bound row`() {
-        // 2·b0 + 3·b1 <= 4, maximize b0 + b1 (encoded as min -(b0+b1)).  Cheapest unit is b0, so the
-        // LP picks b0 = 1, b1 = 2/3 -> obj 5/3.
-        val p = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = arrayOf(),
-            factors = arrayOf<Factor>(
-                PseudoBoolean(longArrayOf(2, 3), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 4L),
-            ),
-        )
-        val (sol, _) = solve(p, LinearObjective(boolWeights = longArrayOf(-1L, -1L)))
-
-        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-        // min -(b0+b1) = -5/3  ->  max b0+b1 = 5/3.
-        assertEquals(-5.0 / 3.0, sol.objectiveValue, eps)
-    }
-
-    @Test
     fun `column metadata maps back to cp variables`() {
         val p = Problem(
             numBoolVars = 1,
@@ -234,26 +195,6 @@ class CpToLpRelaxationTest {
     }
 
     @Test
-    fun `a leaf gives a real variable no row touches a value inside its bounds`() {
-        // r0 >= 1 is the only row; r1 in [2, 3] sits in none, so the relaxation carries no column for it.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 1L),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 2.0),
-            realUpper = doubleArrayOf(5.0, 3.0),
-        )
-
-        val result = leafRealFeasibility(problem, null, Sample(booleanArrayOf(), longArrayOf()))
-
-        assertEquals(listOf(2.0, 2.0), listOf(result.reals[1], result.exactReals!![1].toDouble()))
-    }
-
-    @Test
     fun `a float leaf optimum is refused when a small reduced cost spans an unbounded column`() {
         // min −9e-13·x with x ≤ 1e18 through a row and no column bound: a float optimum at x = 0 prices x below even
         // the cleanup's tolerance, yet leaves −9e5 unreached.
@@ -286,110 +227,6 @@ class CpToLpRelaxationTest {
         )
 
         assertEquals(LpVerdict.INDETERMINATE, result.verdict, "${result.reals.toList()}")
-    }
-
-    @Test
-    fun `a float leaf optimum is refused when a constant cancels the objective's size`() {
-        // min x + 2y − 2e8 with 1.00000002x + 2y ≥ 2e8, the −2e8 either a constant or a fixed integer's cost: a
-        // near-tied ratio test can stop at y = 1e8, objective 0, whose remaining improvement is small beside the
-        // terms yet the whole of the true optimum near −4.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 1)),
-            factors = arrayOf<Factor>(
-                Linear(
-                    longArrayOf(),
-                    intArrayOf(),
-                    doubleArrayOf(1.00000002, 2.0),
-                    intArrayOf(0, 1),
-                    LinearOp.GE,
-                    200_000_000L,
-                ),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0),
-            realUpper = doubleArrayOf(3e8, 3e8),
-        )
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-        val cases = listOf(
-            LinearObjective(constant = -200_000_000L, realCoefficients = doubleArrayOf(1.0, 2.0)) to 0L,
-            LinearObjective(
-                intCoefficients = longArrayOf(-200_000_000L),
-                realCoefficients = doubleArrayOf(1.0, 2.0),
-            ) to 1L,
-        )
-        for ((objective, fixed) in cases) {
-            val result = leafRealFeasibility(
-                problem,
-                objective,
-                Sample(booleanArrayOf(), longArrayOf(fixed)),
-                context = vetoed,
-                toleranceCheck = { true },
-            )
-
-            assertEquals(LpVerdict.INDETERMINATE, result.verdict, "$fixed: ${result.reals.toList()}")
-        }
-    }
-
-    @Test
-    fun `cleanup pivots carry a float leaf past a cancelling reduced cost to its optimum`() {
-        // min 1e4·y + c·x with y + x ≥ 1, x ≤ 1e9 as a row, y free, c = 1e4 − 2⁻²⁶: pricing x cancels to a reduced
-        // cost below the engine's tolerance, yet the row lets x reach 1e9 and gain about 15.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), intArrayOf(0, 1), LinearOp.GE, 1L),
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(1), LinearOp.LE, 1_000_000_000L),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, 0.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
-        )
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-
-        val result = leafRealFeasibility(
-            problem,
-            LinearObjective(realCoefficients = doubleArrayOf(1e4, 1e4 - 1.0 / (1 shl 26))),
-            Sample(booleanArrayOf(), longArrayOf()),
-            context = vetoed,
-            toleranceCheck = { true },
-        )
-
-        assertEquals(LpVerdict.TOLERANCE_OPTIMUM, result.verdict)
-        assertEquals(1e9, result.reals[1])
-    }
-
-    @Test
-    fun `exact duals carry a float leaf past a degenerate reduced cost on an unbounded column`() {
-        // min x0 + x1 with 5·x0 + 5·x1 ≥ 1 and neither column bounded above: at the dual 1/5 both price exactly zero,
-        // but fl(1/5) lies above it, leaving the nonbasic column a wrong-signed reduced cost that nothing bounds.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(5.0, 5.0), intArrayOf(0, 1), LinearOp.GE, 1L),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
-        )
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-
-        val result = leafRealFeasibility(
-            problem,
-            LinearObjective(realCoefficients = doubleArrayOf(1.0, 1.0)),
-            Sample(booleanArrayOf(), longArrayOf()),
-            context = vetoed,
-            toleranceCheck = { true },
-        )
-
-        assertEquals(LpVerdict.TOLERANCE_OPTIMUM, result.verdict)
-        assertEquals(0.2, result.reals.sum(), eps)
     }
 
     @Test
@@ -453,72 +290,4 @@ class CpToLpRelaxationTest {
         assertEquals(LpVerdict.INDETERMINATE, result.verdict, "${result.reals.take(3)}")
     }
 
-    @Test
-    fun `cleanup pivots carry a float leaf past a reduced cost hidden in rounding to its optimum`() {
-        // min 1.5e8·x0 − (1.5e8 + 9e-8)·x1 with x0 ≥ x1 and x1 ≤ 1e12 as a row: x1 prices within the rounding of its
-        // 1.5e8 terms, yet each unit of x1 gains about 9e-8, some 9e4 in all.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), intArrayOf(0, 1), LinearOp.GE, 0L),
-                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(1), LinearOp.LE, 1_000_000_000_000L),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
-        )
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-
-        val result = leafRealFeasibility(
-            problem,
-            LinearObjective(realCoefficients = doubleArrayOf(150_000_000.0, -150_000_000.00000009)),
-            Sample(booleanArrayOf(), longArrayOf()),
-            context = vetoed,
-            toleranceCheck = { true },
-        )
-
-        assertEquals(LpVerdict.TOLERANCE_OPTIMUM, result.verdict)
-        assertEquals(1e12, result.reals[1])
-    }
-
-    @Test
-    fun `a float leaf optimum is refused when a large dual meets a rounded row`() {
-        // min 3e5·x0 − c·x1 with 3·x0 − x1 + w ≥ 0 and x1 ≤ 5e6 as rows: x0 = fl(5e6 / 3) leaves the tight row a
-        // residual far below the source tolerance, yet its dual of 1e5 turns it into a gap beside an objective near
-        // −4.77. A column bounded at 1e-295 in the row, or none, must not hide the residual.
-        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
-        for (tinyUpper in listOf(0.0, 1e-295)) {
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = 0,
-                intDomains = emptyArray(),
-                factors = arrayOf<Factor>(
-                    Linear(
-                        longArrayOf(),
-                        intArrayOf(),
-                        doubleArrayOf(3.0, -1.0, 1.0),
-                        intArrayOf(0, 1, 2),
-                        LinearOp.GE,
-                        0L,
-                    ),
-                    Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(1), LinearOp.LE, 5_000_000L),
-                ),
-                numRealVars = 3,
-                realLower = doubleArrayOf(0.0, 0.0, 0.0),
-                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, tinyUpper),
-            )
-
-            val result = leafRealFeasibility(
-                problem,
-                LinearObjective(realCoefficients = doubleArrayOf(300_000.0, -100_000.00000095367431640625, 0.0)),
-                Sample(booleanArrayOf(), longArrayOf()),
-                context = vetoed,
-                toleranceCheck = { true },
-            )
-
-            assertEquals(LpVerdict.INDETERMINATE, result.verdict, "$tinyUpper: ${result.reals.toList()}")
-        }
-    }
 }

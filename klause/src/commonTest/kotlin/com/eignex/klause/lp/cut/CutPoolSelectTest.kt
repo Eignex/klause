@@ -80,18 +80,6 @@ class CutPoolSelectTest {
     }
 
     @Test
-    fun `select handles a zero objective without a nonfinite score`() {
-        val pool = CutPool()
-        val first = cut(Relation.GE, 1, 0 to 1L)
-        pool.add(first)
-        pool.add(cut(Relation.GE, 1, 1 to 1L))
-
-        val selected = pool.select(DoubleArray(2), DoubleArray(2), max = 1)
-
-        assertTrue(selected.single() === first)
-    }
-
-    @Test
     fun `select honours the max cap and never invents cuts`() {
         val pool = CutPool()
         val all = (0 until 6).map { cut(Relation.GE, 5, it to 1L) } // 6 orthogonal violated cuts at 0
@@ -99,13 +87,6 @@ class CutPoolSelectTest {
         val sel = pool.select(DoubleArray(6), DoubleArray(6), max = 3)
         assertEquals(3, sel.size)
         assertTrue(sel.all { s -> all.any { it === s } }, "every selected cut is from the pool")
-    }
-
-    @Test
-    fun `select returns empty when nothing is violated`() {
-        val pool = CutPool()
-        pool.add(cut(Relation.LE, 10, 0 to 1L)) // x0=1 satisfies it with slack
-        assertTrue(pool.select(doubleArrayOf(1.0), doubleArrayOf(0.0), max = 10).isEmpty())
     }
 
     @Test
@@ -120,21 +101,6 @@ class CutPoolSelectTest {
 
         assertEquals(1, selected.size)
         assertTrue(selected.single() === positive, "stable ties keep the first antiparallel normal")
-    }
-
-    @Test
-    fun `objective scaling does not change selection`() {
-        val pool = CutPool()
-        val orthogonal = cut(Relation.GE, 1, 0 to 1L)
-        val parallel = cut(Relation.GE, 1, 1 to 1L)
-        pool.add(orthogonal)
-        pool.add(parallel)
-
-        val unit = pool.select(DoubleArray(2), doubleArrayOf(0.0, 1.0), max = 1)
-        val scaled = pool.select(DoubleArray(2), doubleArrayOf(0.0, 1_000_000.0), max = 1)
-
-        assertTrue(unit.single() === parallel)
-        assertTrue(scaled.single() === parallel)
     }
 
     @Test

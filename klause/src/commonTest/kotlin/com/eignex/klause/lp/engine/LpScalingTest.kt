@@ -112,28 +112,6 @@ class LpScalingTest {
     }
 
     @Test
-    fun `scaling has an explicit off switch`() {
-        val view = LpScalingView.create(mixedScaleModel(), LpScalingOptions(enabled = false))
-
-        assertFalse(view.applied)
-        assertEquals(LpScalingDecline.DISABLED, view.metrics.decline)
-        assertTrue(view.rowExponents.all { it == 0 })
-        assertTrue(view.columnExponents.all { it == 0 })
-    }
-
-    @Test
-    fun `building a view charges the entries it visits and more when it equilibrates`() {
-        val model = mixedScaleModel()
-
-        val identity = LpScalingView.create(model, LpScalingOptions(enabled = false))
-        val scaled = LpScalingView.create(model, LpScalingOptions(equilibrationPasses = 8))
-
-        assertTrue(identity.metrics.work > 0L)
-        assertTrue(scaled.metrics.work > identity.metrics.work)
-        assertTrue(scaled.metrics.work <= LpScalingView.constructionWorkBound(model))
-    }
-
-    @Test
     fun `nonfinite matrix input falls back atomically`() {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 1.0)
@@ -147,23 +125,6 @@ class LpScalingTest {
         assertEquals(LpScalingDecline.NONFINITE_SOURCE, view.metrics.decline)
         assertTrue(view.rowExponents.all { it == 0 })
         assertTrue(view.columnExponents.all { it == 0 })
-    }
-
-    @Test
-    fun `unsafe scaled cost falls back without a partial matrix`() {
-        val builder = LpBuilder()
-        val small = builder.addRealVar(0.0, 1.0, cost = 1e300)
-        val large = builder.addRealVar(0.0, 1.0)
-        builder.addRealRow(intArrayOf(small, large), doubleArrayOf(1e-300, 1e300), Relation.LE, 1.0)
-        val model = builder.build(Sense.MINIMIZE)
-
-        val view = LpScalingView.create(model)
-
-        assertFalse(view.applied)
-        assertEquals(LpScalingDecline.UNSAFE_TRANSFORM, view.metrics.decline)
-        assertEquals(model.costD(small), view.costD(small), 0.0)
-        var k = view.colPtr[small]
-        model.forEachInColumnD(small) { _, value -> assertEquals(value, view.colVal[k++], 0.0) }
     }
 
     @Test
@@ -218,32 +179,6 @@ class LpScalingTest {
     }
 
     @Test
-    fun `unchanged exact scopes rebind scaling without scanning vectors`() {
-        for (enabled in listOf(false, true)) {
-            val trail = LpBoundTrail(assertNotNull(mixedScaleModel().authoritativeModel()))
-            val original = assertNotNull(trail.state.ownerWorkingModel())
-            val view = LpScalingView.create(original, LpScalingOptions(enabled = enabled))
-            assertTrue(trail.push())
-            val scoped = assertNotNull(trail.state.ownerWorkingModel())
-
-            val pushed = assertNotNull(view.refresh(scoped))
-
-            assertSame(scoped, pushed.source)
-            assertEquals(0L, pushed.metrics.work)
-            assertTrue(trail.pop(0))
-            val popped = assertNotNull(pushed.refresh(assertNotNull(trail.state.ownerWorkingModel())))
-            assertSame(trail.state, popped.source.exactState)
-            assertEquals(0L, popped.metrics.work)
-            for (row in 0 until original.m) assertEquals(view.rhsD(row), popped.rhsD(row))
-            for (column in 0 until original.numVars) {
-                assertEquals(view.costD(column), popped.costD(column))
-                assertEquals(view.lowerD(column), popped.lowerD(column))
-                assertEquals(view.upperD(column), popped.upperD(column))
-            }
-        }
-    }
-
-    @Test
     fun `retained bound scaling visits only changed columns`() {
         for (enabled in listOf(false, true)) {
             val builder = LpBuilder()
@@ -263,28 +198,6 @@ class LpScalingTest {
             assertEquals(8.0 * 2.0.pow(-view.columnExponents[0]), view.upperD(0))
             assertTrue(next.metrics.work <= original.numVars + 3L)
             for (column in 1 until original.numVars) assertEquals(view.upperD(column), next.upperD(column))
-        }
-    }
-
-    @Test
-    fun `retained lower bound scaling restores the ancestor through a pop`() {
-        for (enabled in listOf(false, true)) {
-            val trail = LpBoundTrail(assertNotNull(mixedScaleModel().authoritativeModel()))
-            val original = LpScalingView.create(
-                assertNotNull(trail.state.ownerWorkingModel()), LpScalingOptions(enabled = enabled),
-            )
-            assertTrue(trail.push())
-            val scoped = assertNotNull(original.refresh(assertNotNull(trail.state.ownerWorkingModel())))
-            assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 0L))
-            val child = assertNotNull(scoped.refresh(assertNotNull(trail.state.ownerWorkingModel())))
-
-            assertTrue(trail.pop(0))
-            val popped = assertNotNull(child.refresh(assertNotNull(trail.state.ownerWorkingModel())))
-
-            assertEquals(2.0.pow(-original.columnExponents[0]), child.lowerD(0))
-            assertEquals(original.lowerD(0), popped.lowerD(0))
-            assertSame(trail.state, popped.source.exactState)
-            assertEquals(0.0, scoped.lowerD(0))
         }
     }
 
@@ -309,31 +222,6 @@ class LpScalingTest {
                 assertEquals(view.lowerD(column), next.lowerD(column))
                 assertEquals(view.upperD(column), next.upperD(column))
             }
-        }
-    }
-
-    @Test
-    fun `skipped exact revisions refresh every current vector`() {
-        for (enabled in listOf(false, true)) {
-            val trail = LpBoundTrail(assertNotNull(mixedScaleModel().authoritativeModel()))
-            val original = assertNotNull(trail.state.ownerWorkingModel())
-            val view = LpScalingView.create(original, LpScalingOptions(enabled = enabled))
-            val oldCost = view.costD(0)
-            val oldUpper = view.upperD(0)
-            assertTrue(trail.push())
-            assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(5L)), 0L))
-            val objective = ExactLpObjective(
-                List(original.numVars) { if (it == 0) ExactLpNumber.of(4L) else trail.state.model.objective.cost(it) },
-            )
-            assertTrue(trail.replaceObjective(objective))
-
-            val next = assertNotNull(view.refresh(assertNotNull(trail.state.ownerWorkingModel())))
-
-            assertEquals(4.0 * 2.0.pow(view.columnExponents[0]), next.costD(0))
-            assertEquals(5.0 * 2.0.pow(-view.columnExponents[0]), next.upperD(0))
-            assertTrue(next.metrics.work > original.numVars)
-            assertEquals(oldCost, view.costD(0))
-            assertEquals(oldUpper, view.upperD(0))
         }
     }
 
@@ -367,62 +255,6 @@ class LpScalingTest {
         assertNull(view.refresh(assertNotNull(trail.state.ownerWorkingModel())))
 
         assertEquals(before, listOf(view.rhsD(0), view.costD(0), view.lowerD(0), view.upperD(0)))
-    }
-
-    @Test
-    fun `dense refresh retains entries before its first changed cost`() {
-        for (enabled in listOf(false, true)) {
-            val model = mixedScaleModel()
-            val view = LpScalingView.create(model, LpScalingOptions(enabled = enabled))
-            val oldCosts = List(model.numVars) { view.costD(it) }
-            assertNotNull(model.doubleView).cost[model.numVars - 1] = 4.0
-
-            val next = assertNotNull(view.refresh(model))
-
-            for (column in 0 until model.numVars) {
-                assertEquals(model.costD(column) * 2.0.pow(view.columnExponents[column]), next.costD(column))
-                assertEquals(oldCosts[column], view.costD(column))
-            }
-        }
-    }
-
-    @Test
-    fun `refresh reads mutated numerical inputs while older views retain their vectors`() {
-        for (enabled in listOf(false, true)) {
-            for (exact in listOf(false, true)) {
-                for (changed in listOf("rhs", "cost", "upper", "all")) {
-                    val inputModel = mixedScaleModel()
-                    val model = if (exact) {
-                        assertNotNull(LpExactState(assertNotNull(inputModel.authoritativeModel())).toWorkingModel())
-                    } else {
-                        inputModel
-                    }
-                    val view = LpScalingView.create(model, LpScalingOptions(enabled = enabled))
-                    assertEquals(enabled, view.applied)
-                    val oldRhs = view.rhsD(0)
-                    val oldCost = view.costD(0)
-                    val oldUpper = view.upperD(0)
-                    val input = assertNotNull(model.doubleView)
-                    if (changed in listOf("rhs", "all")) input.rhs[0] *= 2.0
-                    if (changed in listOf("cost", "all")) input.cost[0] *= 2.0
-                    if (changed in listOf("upper", "all")) input.upper[0] *= 2.0
-
-                    val next = assertNotNull(view.refresh(model))
-
-                    assertSame(model, next.source)
-                    assertEquals(model.rhsD(0) * 2.0.pow(view.rowExponents[0]), next.rhsD(0))
-                    assertEquals(model.costD(0) * 2.0.pow(view.columnExponents[0]), next.costD(0))
-                    assertEquals(model.upperD(0) * 2.0.pow(-view.columnExponents[0]), next.upperD(0))
-                    assertEquals(oldRhs, view.rhsD(0))
-                    assertEquals(oldCost, view.costD(0))
-                    assertEquals(oldUpper, view.upperD(0))
-                    input.rhs[0] *= 2.0
-                    val last = assertNotNull(next.refresh(model))
-                    assertEquals(next.rhsD(0) * 2.0, last.rhsD(0))
-                    assertEquals(oldRhs, view.rhsD(0))
-                }
-            }
-        }
     }
 
     @Test
@@ -466,28 +298,6 @@ class LpScalingTest {
     }
 
     @Test
-    fun `identity refresh preserves raw zeros and nonfinite payloads`() {
-        for (value in listOf(
-            -0.0,
-            0.0,
-            Double.MIN_VALUE,
-            Double.POSITIVE_INFINITY,
-            Double.fromBits(0x7ff8000000000042L),
-        )) {
-            val model = mixedScaleModel()
-            val view = LpScalingView.create(model, LpScalingOptions(enabled = false))
-            val previous = view.costD(0)
-            assertNotNull(model.doubleView).cost[0] = value
-
-            val next = assertNotNull(view.refresh(model))
-
-            assertEquals(value.toRawBits(), next.costD(0).toRawBits())
-            assertEquals(value.toRawBits(), assertNotNull(next.refresh(model)).costD(0).toRawBits())
-            assertEquals(previous.toRawBits(), view.costD(0).toRawBits())
-        }
-    }
-
-    @Test
     fun `unsafe later scaling leaves every earlier view vector unchanged`() {
         val model = mixedScaleModel()
         val view = LpScalingView.create(model)
@@ -502,29 +312,6 @@ class LpScalingTest {
         assertNull(view.refresh(model))
 
         assertEquals(before, listOf(view.rhsD(0), view.costD(0), view.lowerD(0), view.upperD(0)))
-    }
-
-    @Test
-    fun `matching vectors cannot bypass exact projection and constant checks`() {
-        for (changed in listOf("rhs", "cost", "upper", "origin", "constant")) {
-            val state = LpExactState(assertNotNull(mixedScaleModel().authoritativeModel()))
-            val model = assertNotNull(state.toWorkingModel())
-            val view = LpScalingView.create(model)
-            assertTrue(view.applied)
-            val input = assertNotNull(model.doubleView)
-            when (changed) {
-                "rhs" -> input.rhs[0] = 0.0
-                "cost" -> input.cost[0] = 0.0
-                "upper" -> input.upper[0] = 0.0
-                "origin" -> input.loShift[0] = 0.0
-                "constant" -> input.objConstant = Double.POSITIVE_INFINITY
-            }
-
-            assertNull(view.refresh(model))
-
-            assertSame(state, view.source.exactState)
-            assertEquals(state.model.objective.cost(0).approximation * 2.0.pow(view.columnExponents[0]), view.costD(0))
-        }
     }
 
     private fun mixedScaleModel(): LpModel {

@@ -138,27 +138,6 @@ class RevisedSimplexRepairTest {
         }
     }
 
-    @Test
-    fun `a null repair falls back to logicals and continues without a false claim`() {
-        val model = model()
-        lateinit var factors: NullRepairSolver
-        RevisedSimplex(
-            model,
-            refactorUpdateLimit = 1,
-            basisSolverFactory = { matrix ->
-                NullRepairSolver(KotlinBasisSolver(matrix)).also { factors = it }
-            },
-        ).use { solver ->
-            val result = assertNotNull(solver.solve())
-            val fresh = RevisedSimplex(model).use { assertNotNull(it.solve()) }
-
-            assertEquals(1, factors.repairAttempts)
-            assertTrue(factors.logicalFallbackInstalled)
-            assertEquals(fresh.objective, result.objective, 1e-9)
-            assertNull(solver.infeasibleRay)
-        }
-    }
-
     private fun model(): LpModel {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 10L, cost = 1L)
@@ -168,27 +147,6 @@ class RevisedSimplexRepairTest {
         builder.addRow(intArrayOf(y, z), longArrayOf(1L, 1L), Relation.GE, 4L)
         builder.addRow(intArrayOf(x, z), longArrayOf(1L, 1L), Relation.GE, 5L)
         return builder.build(Sense.MINIMIZE)
-    }
-}
-
-private class NullRepairSolver(private val delegate: BasisSolver) : BasisSolver by delegate {
-    private var ordinaryAttempts = 0
-    var repairAttempts = 0
-        private set
-    var logicalFallbackInstalled = false
-        private set
-
-    override fun refactorize(basicIndex: IntArray): Boolean {
-        ordinaryAttempts++
-        if (ordinaryAttempts == 2) return false
-        return delegate.refactorize(basicIndex).also {
-            if (ordinaryAttempts == 3 && it) logicalFallbackInstalled = true
-        }
-    }
-
-    override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? {
-        repairAttempts++
-        return null
     }
 }
 

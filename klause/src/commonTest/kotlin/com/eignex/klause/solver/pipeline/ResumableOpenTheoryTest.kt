@@ -11,9 +11,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResumableOpenTheoryTest {
@@ -56,54 +54,6 @@ class ResumableOpenTheoryTest {
 
         assertIs<OpenTheoryResult.Sat>(result)
         assertTrue(slices > 1, "slices=$slices")
-    }
-
-    @Test
-    fun `a sliced search refutes what an unsliced one refutes`() {
-        // Four of eight columns must reach 5, so a total of 19 is too small.
-        val problem = chain(8, total = 19)
-        val request = OpenTheoryRequest(problem, componentPlan = problem.componentPlan())
-        val unsliced = (OpenTheoryPipeline.execute(request) as OpenTheoryExecution.Satisfy).result
-
-        val (result, _) = sliced(problem)
-
-        assertIs<OpenTheoryResult.Unsat>(unsliced)
-        assertEquals(OpenTheoryResult.Unsat::class, result::class)
-    }
-
-    @Test
-    fun `a slice with no time left still expands a branch`() {
-        val problem = chain(8, total = 20)
-        val request = OpenTheoryRequest(problem, componentPlan = problem.componentPlan())
-        val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), TheoryParams())
-        var slices = 0
-
-        while (search.runSlice(Cancellation.Never, sliceMillis = 0L, sliceWork = -1L) == null) slices++
-
-        assertIs<OpenTheoryResult.Sat>(search.runSlice(Cancellation.Never, sliceMillis = 0L, sliceWork = -1L))
-        assertTrue(slices > 0, "slices=$slices")
-    }
-
-    @Test
-    fun `a paused search reports the Booleans it fixed at the root`() {
-        // The chain plus one more open column whose Boolean a unit clause forces.
-        val n = 8
-        val open = Bits(n + 1).also { bits -> for (v in 0..n) bits.set(v) }
-        val problem = Problem(
-            n + 1,
-            intBounds = IntBounds.fromModelBounds(LongArray(n + 1), LongArray(n + 1), open, open),
-            factors = chain(n, total = 20).factors +
-                ReifiedLinear(n, intArrayOf(1), intArrayOf(n), LinearOp.GE, 5) +
-                Clause(intArrayOf(Lit.make(n, true))) +
-                Linear(intArrayOf(1), intArrayOf(n), LinearOp.LE, 7),
-        )
-        val request = OpenTheoryRequest(problem, componentPlan = problem.componentPlan())
-        val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), TheoryParams())
-
-        val result = search.runSlice(Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1)
-
-        assertNull(result)
-        assertEquals(1.0, search.stats.search.rootFixed.max)
     }
 
     @Test

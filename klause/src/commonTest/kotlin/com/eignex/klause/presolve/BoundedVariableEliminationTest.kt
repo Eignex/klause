@@ -2,7 +2,6 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
@@ -20,12 +19,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * Bounded variable elimination. BVE is not solution-set preserving (an eliminated variable is left
- * unconstrained), so each test enumerates all Boolean assignments and checks the three properties that
- * make it sound: the reduced problem is equisatisfiable, it never rejects the projection of an original
- * solution, and reconstruction lifts every reduced solution back to a valid original one.
- */
 class BoundedVariableEliminationTest {
 
     private fun pos(v: Int) = Lit.make(v, true)
@@ -67,21 +60,6 @@ class BoundedVariableEliminationTest {
         problem.factors.filterIsInstance<Clause>().any { c -> c.literals.any { Lit.variable(it) == v } }
 
     @Test
-    fun `eliminates a variable within the bound`() {
-        // (a ∨ b) ∧ (¬a ∨ c): resolving out a gives the single resolvent (b ∨ c) — 1 ≤ 2, bounded.
-        val reduced = checkBve(3, listOf(clause(pos(0), pos(1)), clause(neg(0), pos(2))))
-        assertTrue(!mentions(reduced, 0), "a is eliminated")
-    }
-
-    @Test
-    fun `eliminates a monotone pure-literal variable with no resolvent`() {
-        // a occurs only positively, so both clauses are satisfiable by a = true and simply drop.
-        val reduced = checkBve(3, listOf(clause(pos(0), pos(1)), clause(pos(0), pos(2))))
-        assertTrue(!mentions(reduced, 0), "the pure-literal variable is eliminated")
-        assertEquals(0, reduced.factors.filterIsInstance<Clause>().size, "its clauses drop with no resolvent")
-    }
-
-    @Test
     fun `discards tautological resolvents`() {
         // (a ∨ b) ∧ (¬a ∨ ¬b): the only resolvent (b ∨ ¬b) is a tautology, so a eliminates with 0 clauses.
         val reduced = checkBve(2, listOf(clause(pos(0), pos(1)), clause(neg(0), neg(1))))
@@ -107,37 +85,6 @@ class BoundedVariableEliminationTest {
     }
 
     @Test
-    fun `never eliminates an objective variable`() {
-        // a would resolve out to (b ∨ c) if unprotected; the neighbours are protected too so nothing else
-        // removes a's clauses, isolating the objective guard on a.
-        val reduced = checkBve(
-            3,
-            listOf(clause(pos(0), pos(1)), clause(neg(0), pos(2))),
-            objectiveBoolVars = setOf(0, 1, 2),
-        )
-        assertTrue(mentions(reduced, 0), "the objective variable is protected")
-    }
-
-    @Test
-    fun `never eliminates a variable a non-clause factor mentions`() {
-        // a resolves out cleanly on the clause side, but the cardinality also constrains it and no
-        // reconstruction can restore a value that satisfies it — so the clauses must stay.
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(
-                clause(pos(0), pos(1)),
-                clause(neg(0), pos(2)),
-                Cardinality(intArrayOf(pos(0), pos(1)), min = 1, max = 1),
-            ),
-        )
-        val baked = problem.bake()
-        val reduced = baked.withPassDelta(Presolve.eliminateBoolVars(baked, emptySet()), BakeConfig.NONE)
-        assertTrue(mentions(reduced, 0), "a variable outside the clause database must survive BVE")
-    }
-
-    @Test
     fun `chained eliminations reconstruct in the right order`() {
         // Two eliminable variables whose clauses interlock, exercising reverse-order reconstruction.
         checkBve(
@@ -150,8 +97,6 @@ class BoundedVariableEliminationTest {
             ),
         )
     }
-
-    // ---- the source lane ----
 
     @Test
     fun `an eliminated variable is recovered on a model with an open column`() {

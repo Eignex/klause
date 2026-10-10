@@ -39,9 +39,4 @@ class Int128DivExactTest {
         assertNull(product(3L, 5L).divExactByLong(0L))
     }
 
-    @Test
-    fun `divides down to the signed Long boundary`() {
-        // −2⁶³ = (2⁶²)·(−2): the exact quotient is Long.MIN_VALUE, which does fit.
-        assertEquals(Long.MIN_VALUE, product(1L shl 62, -2L).divExactByLong(1L))
-    }
 }

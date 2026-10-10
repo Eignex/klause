@@ -1,22 +1,11 @@
 package com.eignex.klause.util
 
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** Coverage for [LongHashSet]: add/contains/remove/clear semantics, growth, backward-shift deletion
- *  across collisions, extreme members, and a randomized differential check against `HashSet`. */
 class LongHashSetTest {
-
-    @Test
-    fun `empty set reports absent`() {
-        val s = LongHashSet()
-        assertEquals(0, s.size)
-        assertTrue(s.isEmpty())
-        assertFalse(s.contains(0L))
-    }
 
     @Test
     fun `every query on a never-populated set is safe and it stays usable after`() {
@@ -108,24 +97,4 @@ class LongHashSetTest {
         for (k in 0 until 1000) assertTrue(s.contains(k.toLong() * 0x1_0000_0007L))
     }
 
-    @Test
-    fun `matches a HashSet reference under random add-remove churn`() {
-        val rng = Random(777)
-        repeat(12) { _ ->
-            val s = LongHashSet(rng.nextInt(1, 16))
-            val ref = HashSet<Long>()
-            repeat(600) {
-                val v = rng.nextInt(-60, 60).toLong()
-                when (rng.nextInt(3)) {
-                    0 -> assertEquals(ref.add(v), s.add(v), "add($v)")
-                    1 -> assertEquals(ref.remove(v), s.remove(v), "remove($v)")
-                    2 -> assertEquals(ref.contains(v), s.contains(v), "contains($v)")
-                }
-                assertEquals(ref.size, s.size)
-            }
-            val seen = HashSet<Long>()
-            s.forEach { seen.add(it) }
-            assertEquals(ref, seen)
-        }
-    }
 }

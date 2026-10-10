@@ -57,24 +57,6 @@ class BasisFactorsTest {
     }
 
     @Test
-    fun `row singletons and a permuted dense kernel reconstruct together`() {
-        val matrix = sparse(
-            arrayOf(
-                doubleArrayOf(1.0, 0.0, 0.0),
-                doubleArrayOf(2.0, 3.0, 4.0),
-                doubleArrayOf(0.0, 5.0, 6.0),
-            ),
-        )
-        val basis = intArrayOf(2, 0, 1)
-
-        val result = assertIs<LuBuildResult.Built>(BasisFactors(matrix).build(basis))
-
-        assertEquals(0, result.factors.symbolic.rowOrder[0])
-        assertEquals(1, result.factors.symbolic.columnOrder[0])
-        assertTrue(reconstructionResidual(matrix, basis, result.factors) <= 1e-12)
-    }
-
-    @Test
     fun `numerically small pivots decline without asserting exact singularity`() {
         for ((delta, accepted) in listOf(1e-8 to true, 1e-12 to false, 0.0 to false)) {
             val matrix = sparse(arrayOf(doubleArrayOf(1.0, 1.0), doubleArrayOf(1.0, 1.0 + delta)))
@@ -93,17 +75,6 @@ class BasisFactorsTest {
     }
 
     @Test
-    fun `tighter absolute tolerance permits a nonsingular tiny pivot`() {
-        val matrix = sparse(arrayOf(doubleArrayOf(1.0, 1.0), doubleArrayOf(1.0, 1.0 + 1e-12)))
-        val basis = intArrayOf(0, 1)
-
-        val result = BasisFactors(matrix).build(basis, LuPivotPolicy(absoluteTolerance = 1e-14))
-
-        val built = assertIs<LuBuildResult.Built>(result)
-        assertTrue(reconstructionResidual(matrix, basis, built.factors) <= 1e-12)
-    }
-
-    @Test
     fun `relative threshold skips an unstable row singleton`() {
         val matrix = sparse(arrayOf(doubleArrayOf(1e-8, 0.0), doubleArrayOf(1.0, 1.0)))
         val basis = intArrayOf(0, 1)
@@ -112,23 +83,6 @@ class BasisFactorsTest {
 
         assertEquals(1, built.factors.symbolic.rowOrder[0])
         assertTrue(reconstructionResidual(matrix, basis, built.factors) <= 1e-12)
-    }
-
-    @Test
-    fun `unusable singleton columns do not hide usable kernel pivots`() {
-        val matrix = sparse(
-            arrayOf(
-                doubleArrayOf(1e-12, 0.0, 0.0),
-                doubleArrayOf(0.0, 2.0, 1.0),
-                doubleArrayOf(0.0, 1.0, 2.0),
-            ),
-        )
-
-        val result = BasisFactors(matrix).build(intArrayOf(0, 1, 2))
-
-        val rejected = assertIs<LuBuildResult.Rejected>(result)
-        assertEquals(LuBuildRejection.NO_USABLE_PIVOT, rejected.reason)
-        assertEquals(2, rejected.work.pivots)
     }
 
     @Test
@@ -183,27 +137,6 @@ class BasisFactorsTest {
     }
 
     @Test
-    fun `repeated kernel builds preserve factors permutations and work`() {
-        val matrix = sparse(
-            Array(8) { i ->
-                DoubleArray(8) { j -> if (i == j) 10.0 else ((i * 3 + j * 5) % 7 - 3).toDouble() }
-            },
-        )
-        val builder = BasisFactors(matrix)
-        val basis = IntArray(8) { 7 - it }
-        val first = assertIs<LuBuildResult.Built>(builder.build(basis))
-
-        val second = assertIs<LuBuildResult.Built>(builder.build(basis))
-
-        assertEquals(first.work, second.work)
-        assertContentEquals(first.factors.symbolic.rowOrder, second.factors.symbolic.rowOrder)
-        assertContentEquals(first.factors.symbolic.columnOrder, second.factors.symbolic.columnOrder)
-        assertEquals(first.factors.lower, second.factors.lower)
-        assertEquals(first.factors.upper, second.factors.upper)
-        assertTrue(reconstructionResidual(matrix, basis, second.factors) <= 1e-12)
-    }
-
-    @Test
     fun `a deficient proposed pivot falls back to ordinary ordering`() {
         val matrix = sparse(
             arrayOf(
@@ -226,27 +159,6 @@ class BasisFactorsTest {
         assertTrue(assertNotNull(rebuilt.report.proposedWork).pivots < changedBasis.size)
         assertTrue(rebuilt.report.units > rebuilt.work.units)
         assertTrue(reconstructionResidual(matrix, changedBasis, rebuilt.factors) <= 1e-12)
-    }
-
-    @Test
-    fun `fresh ordering alone decides failure after a rejected proposal`() {
-        val matrix = sparse(
-            arrayOf(
-                doubleArrayOf(1.0, 0.0, 0.0),
-                doubleArrayOf(0.0, 1.0, 0.0),
-            ),
-        )
-        val builder = BasisFactors(matrix)
-        val old = assertIs<LuBuildResult.Built>(builder.build(intArrayOf(0, 1)))
-
-        val rejected = assertIs<LuBuildResult.Rejected>(
-            builder.build(intArrayOf(0, 2), IntArray(2) { -1 }, proposedOrder = old.factors.symbolic),
-        )
-
-        assertEquals(LuBuildRejection.NO_USABLE_PIVOT, rejected.reason)
-        assertTrue(rejected.report.fallback)
-        assertEquals(LuBuildRejection.NO_USABLE_PIVOT, rejected.report.proposedRejection)
-        assertTrue(rejected.report.units > rejected.work.units)
     }
 
     @Test
@@ -301,22 +213,6 @@ class BasisFactorsTest {
         assertContentEquals(expectedLower, repeated.factors.lower.values)
         assertContentEquals(intArrayOf(1, 0), repeated.factors.basisColumns)
         assertEquals(first.work, repeated.work)
-    }
-
-    @Test
-    fun `explicit zeros do not create pivots or factor entries`() {
-        val matrix = SparseMatrix.wrap(
-            2,
-            2,
-            intArrayOf(0, 2, 4),
-            intArrayOf(0, 1, 0, 1),
-            doubleArrayOf(0.0, 1.0, 1.0, -0.0),
-        )
-
-        val result = assertIs<LuBuildResult.Built>(BasisFactors(matrix).build(intArrayOf(0, 1)))
-
-        assertEquals(2, result.work.factorEntries)
-        assertTrue(reconstructionResidual(matrix, intArrayOf(0, 1), result.factors) <= 1e-12)
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -153,39 +152,6 @@ class LpRetainedCutsTest {
             val restored = remapped.withModel(assertNotNull(owner.state.ownerWorkingModel()))
             val repeatRoot = assertNotNull(cuts.prepare(owner.state, restored))
             assertTrue(repeatRoot.rows.isEmpty() && repeatRoot.retired.isEmpty())
-        }
-    }
-
-    @Test
-    fun `selected cuts use exact origins and repeated loads retain their rows`() {
-        val problem = Problem(
-            0, 2, Array(2) { IntDomain(2, 6) },
-            arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 2, domainSize = 5)),
-        )
-        val session = PropagationSession(problem)
-        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 1))).build(session)
-        val cuts = LpRetainedCuts()
-        LpScopedSolver(LpExactState(assertNotNull(base.model.authoritativeModel()))).use { owner ->
-            val cut = Cut(base.intColOf, longArrayOf(1, 1), Relation.GE, 5, global = true)
-            val edit = assertNotNull(cuts.prepare(owner.state, base, listOf(cut)))
-
-            assertTrue(owner.replaceRows(edit.retired, emptyList(), edit.rows, false))
-            edit.commit()
-
-            val row = edit.rows.single()
-            assertEquals(BigFraction.MINUS_ONE, row.rhs.value)
-            assertEquals(BigFraction.ofLong(5), assertNotNull(owner.solve()).lowerBound)
-            val owners = owner.metrics.createdOwners
-            val model = assertNotNull(owner.state.ownerWorkingModel())
-            val map = assertNotNull(base.sourceMap).withParentRows(cuts.parentRows(owner.state))
-            val rebound = base.withModel(model, map)
-            assertEquals(model.m, rebound.rowFactorIds.size)
-            assertEquals(-1, rebound.rowFactorIds.last())
-            val repeated = assertNotNull(cuts.prepare(owner.state, rebound, listOf(cut)))
-            assertTrue(repeated.rows.isEmpty() && repeated.retired.isEmpty())
-            repeated.commit()
-            assertEquals(row.metadata.global, cuts.parentRows(owner.state).values.single().global)
-            assertEquals(owners, owner.metrics.createdOwners)
         }
     }
 

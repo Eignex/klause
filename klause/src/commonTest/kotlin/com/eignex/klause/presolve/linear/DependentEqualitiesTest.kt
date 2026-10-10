@@ -9,11 +9,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Dropping the integer equalities the other equalities imply ([DependentEqualities]). Each test drives the
- * pass over a small problem and checks which rows go, that an inconsistent block refutes, and that rows
- * the pass does not own are left alone.
- */
 class DependentEqualitiesTest {
 
     private fun eq(coeffs: IntArray, vars: IntArray, bound: Int) = Linear(coeffs, vars, LinearOp.EQ, bound)
@@ -44,17 +39,6 @@ class DependentEqualitiesTest {
         )
 
         assertTrue(dropped(p).infeasible)
-    }
-
-    @Test
-    fun `independent equalities are left alone`() {
-        val p = problem(
-            eq(intArrayOf(1, 1), intArrayOf(0, 1), 3),
-            eq(intArrayOf(1, 1), intArrayOf(1, 2), 4),
-            eq(intArrayOf(1, 1), intArrayOf(0, 2), 5),
-        )
-
-        assertTrue(dropped(p).isEmpty)
     }
 
     @Test

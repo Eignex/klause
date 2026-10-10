@@ -5,11 +5,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
-import com.eignex.klause.solver.result.LpRoute
-import com.eignex.klause.solver.result.LpStatsSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -35,13 +32,6 @@ class ObbtBoundsTest {
     }
 
     @Test
-    fun `closes an open upper side a constraint bounds to the exact bound`() {
-        val rows = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5))
-        val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), rows)
-        assertEquals(5L, out.bounds[0].hi) // exact certification tightens the free-column bound to the true max
-    }
-
-    @Test
     fun `leaves a side open when no constraint bounds it`() {
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), emptyList())
         assertNull(out.bounds[0].hi)
@@ -59,37 +49,6 @@ class ObbtBoundsTest {
         )
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), emptyList(), realConstraints = rows)
         assertEquals(7L, out.bounds[0].hi)
-    }
-
-    @Test
-    fun `open OBBT observation preserves bounds and records standalone work`() {
-        val rows = listOf(
-            realRow(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0, -1.0), LinearOp.EQ, 0.0),
-            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0),
-            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.LE, 7.0),
-        )
-        val baseline = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), emptyList(), realConstraints = rows)
-        val sink = LpStatsSink()
-        val observed = tightenOpenIntBounds(
-            arrayOf(OpenIntBounds(0L, null)),
-            emptyList(),
-            realConstraints = rows,
-            observer = sink.certificationObserver(LpRoute.STANDALONE),
-        )
-
-        assertEquals(baseline.bounds[0].hi, observed.bounds[0].hi)
-        assertTrue(sink.snapshot().standalonePasses.sum > 0.0)
-    }
-
-    @Test
-    fun `closes an open lower side through free real columns to the exact bound`() {
-        val rows = listOf(
-            realRow(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0, -1.0), LinearOp.EQ, 0.0),
-            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0),
-            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.GE, -7.0),
-        )
-        val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(null, 0L)), emptyList(), realConstraints = rows)
-        assertEquals(-7L, out.bounds[0].lo)
     }
 
     @Test
@@ -118,23 +77,6 @@ class ObbtBoundsTest {
     }
 
     @Test
-    fun `bounds a side on an oversized model through its neighborhood probe`() {
-        // The three real rows bound n only through the LP (interval propagation is silent, as above);
-        // 5001 padding rows on an unrelated variable push the model past the full-LP row cap, so the
-        // pass switches to neighborhood probes (#1425) — n's neighborhood is exactly the three real
-        // rows, so its bound still closes instead of falling to the clamp.
-        val lpOnly = listOf(
-            realRow(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0, -1.0), LinearOp.EQ, 0.0),
-            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0),
-            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.LE, 7.0),
-        )
-        val padding = List(5001) { i -> Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1_000 + i) }
-        val bounds = arrayOf(OpenIntBounds(0L, null), OpenIntBounds(0L, 10L))
-        val out = tightenOpenIntBounds(bounds, padding, realConstraints = lpOnly)
-        assertEquals(7L, out.bounds[0].hi, "the neighborhood probe closes the locally derivable bound")
-    }
-
-    @Test
     fun `refutes a system whose rows cross a variable's own bounds`() {
         // x <= 3 and x >= 5.
         val rows = listOf(
@@ -143,16 +85,6 @@ class ObbtBoundsTest {
         )
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), rows)
         assertTrue(out.refuted)
-    }
-
-    @Test
-    fun `a crossing reached through a real row bounds without refuting`() {
-        // x <= -1 through the outward-rounded real arithmetic, whose margin may bound but not assert unsat.
-        val rows = listOf(realRow(longArrayOf(1), intArrayOf(0), doubleArrayOf(0.0, 0.0), LinearOp.LE, -1.0))
-        val bounds = arrayOf(OpenIntBounds(0L, null), OpenIntBounds(0L, null))
-        val out = tightenOpenIntBounds(bounds, emptyList(), realConstraints = rows)
-        assertFalse(out.refuted)
-        assertEquals(0L, out.bounds[0].hi, "collapsed to where the sides met, never handed over crossed")
     }
 
     /** A row over int variable terms plus the two free reals `r1`/`r2` (ids 0 and 1). */

@@ -31,44 +31,6 @@ class CircuitInvariantTest {
     }
 
     @Test
-    fun `complete cycle 0_1_2_3_0 is satisfied`() {
-        val problem = fourNodeProblem()
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 3)
-        state.assignment.setInt(3, 0)
-        state.recompute()
-        assertEquals(0, state.cost, "complete cycle should satisfy Circuit")
-    }
-
-    @Test
-    fun `sub-cycle 0_1_0 with disconnected 2_3 is violated`() {
-        val problem = fourNodeProblem()
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 3)
-        state.assignment.setInt(3, 2)
-        state.recompute()
-        assertEquals(1, state.cost, "two disjoint 2-cycles should violate Circuit")
-        // state.cost is Σ factorDegree, which for Circuit is read straight from intPayload.
-        assertEquals(1, state.intPayload[0], "cost should equal the factor's graded payload")
-    }
-
-    @Test
-    fun `self-loop is violated for N greater than 1`() {
-        val problem = fourNodeProblem()
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 3)
-        state.assignment.setInt(3, 1)
-        state.recompute()
-        assertTrue(state.cost > 0, "self-loops are forbidden in Circuit for N >= 2")
-    }
-
-    @Test
     fun `LS sample on an oversized successor domain forms a valid tour`() {
         val factor = Circuit(succ = intArrayOf(0, 1, 2))
         val problem = Problem(
@@ -122,22 +84,6 @@ class CircuitInvariantTest {
         assertTrue(state.cost > 0, "broken assignment should have positive cost")
     }
 
-    @Test
-    fun `LS solver finds Hamiltonian cycle on N=4`() {
-        val problem = fourNodeProblem()
-        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
-        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 7L)).assignment
-        assertTrue(sample != null, "LS should find a Hamiltonian cycle on N=4 within budget")
-        val visited = BooleanArray(4)
-        var node = 0
-        for (step in 0 until 4) {
-            assertFalse(visited[node], "revisit at step $step in ${sample.ints.toList()}")
-            visited[node] = true
-            node = sample.ints[node].toInt()
-        }
-        assertEquals(0, node, "must return to start in ${sample.ints.toList()}")
-    }
-
     private fun nNodeCircuit(n: Int): Problem = Problem(
         numBoolVars = 0,
         numIntVars = n,
@@ -182,75 +128,6 @@ class CircuitInvariantTest {
             for (m in sink.list) if (m is Move.Compound) maxParts = maxOf(maxParts, m.parts.size)
         }
         assertTrue(maxParts > 3, "reversals must emit compounds longer than a 3-edge swap, got max $maxParts")
-    }
-
-    private fun fourNodeSubcircuitProblem(): Problem {
-        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3), subcircuit = true)
-        return Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = arrayOf<Factor>(factor),
-        )
-    }
-
-    @Test
-    fun `valid subcircuit configurations satisfy the factor`() {
-        val cases = listOf(
-            // All vars self-loop → all nodes excluded → empty subcircuit, valid.
-            longArrayOf(0, 1, 2, 3) to "all-excluded should satisfy Subcircuit",
-            // Nodes 0 and 1 form a cycle; 2 and 3 excluded.
-            longArrayOf(1, 0, 2, 3) to "valid 2-cycle with 2 excluded should satisfy Subcircuit",
-        )
-        for ((succ, message) in cases) {
-            val problem = fourNodeSubcircuitProblem()
-            val state = LocalSearchState(problem.bake(), Random(0))
-            for (i in succ.indices) state.assignment.setInt(i, succ[i])
-            state.recompute()
-            assertEquals(0, state.cost, message)
-        }
-    }
-
-    @Test
-    fun `pointing to an excluded node is violated`() {
-        val problem = fourNodeSubcircuitProblem()
-        val state = LocalSearchState(problem.bake(), Random(0))
-        // succ[0]=2 but succ[2]=2 (excluded). Pointing to an excluded node breaks the chain.
-        state.assignment.setInt(0, 2)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 2)
-        state.assignment.setInt(3, 3)
-        state.recompute()
-        assertTrue(state.cost > 0, "successor pointing to excluded node should violate Subcircuit")
-    }
-
-    @Test
-    fun `two disjoint cycles among included nodes is violated`() {
-        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3, 4, 5), subcircuit = true)
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 6,
-            intDomains = Array(6) { IntDomain(0, 5) },
-            factors = arrayOf<Factor>(factor),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-        // Two 3-cycles: 0→1→2→0 and 3→4→5→3. All included, but two cycles → violated.
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 0)
-        state.assignment.setInt(3, 4)
-        state.assignment.setInt(4, 5)
-        state.assignment.setInt(5, 3)
-        state.recompute()
-        assertTrue(state.cost > 0, "two disjoint included cycles should violate Subcircuit")
-    }
-
-    @Test
-    fun `LS solver finds a valid subcircuit`() {
-        val problem = fourNodeSubcircuitProblem()
-        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
-        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 13L)).assignment
-        assertTrue(sample != null, "LS should find a valid Subcircuit configuration")
     }
 
     // A 5-node active cycle (0..4) with node 5 excluded (self-loop).

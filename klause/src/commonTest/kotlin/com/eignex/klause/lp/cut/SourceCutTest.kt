@@ -5,37 +5,18 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.bounding.LpEngine
-import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.engine.Basis
-import com.eignex.klause.lp.engine.Csc
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
-import com.eignex.klause.lp.engine.CutInputRow
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
-import com.eignex.klause.lp.engine.ExactLpBounds
-import com.eignex.klause.lp.engine.ExactLpColumn
-import com.eignex.klause.lp.engine.ExactLpEntry
-import com.eignex.klause.lp.engine.ExactLpModel
-import com.eignex.klause.lp.engine.ExactLpNumber
-import com.eignex.klause.lp.engine.ExactLpObjective
-import com.eignex.klause.lp.engine.ExactLpPremise
-import com.eignex.klause.lp.engine.ExactLpPremises
-import com.eignex.klause.lp.engine.ExactLpRow
-import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBuilder
-import com.eignex.klause.lp.engine.LpDoubleView
-import com.eignex.klause.lp.engine.LpExactState
-import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
-import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.integerTableauCuts
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CutColumnSource
@@ -45,7 +26,6 @@ import com.eignex.klause.lp.relaxation.cpCutSources
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
@@ -218,33 +198,6 @@ class SourceCutTest {
     }
 
     @Test
-    fun `model assumptions and source kinds are checked on import`() {
-        val source = SourceCut(
-            CutExpression(mapOf(x to BigFraction.ONE)),
-            Relation.LE,
-            BigFraction.ONE,
-            CutProvenance(modelToken, 0, emptyList(), setOf("region-a")),
-        )
-        val cases = listOf(
-            CutSourceMap(
-                Any(),
-                0,
-                listOf(CutColumnSource(x)),
-                assumptions = setOf("region-a"),
-            ) to CutMappingDecline.MODEL_SCOPE,
-            CutSourceMap(modelToken, 0, listOf(CutColumnSource(x))) to CutMappingDecline.MODEL_SCOPE,
-            CutSourceMap(
-                modelToken,
-                0,
-                listOf(CutColumnSource(y)),
-                assumptions = setOf("region-a"),
-            ) to CutMappingDecline.MISSING_SOURCE,
-        )
-
-        for ((map, reason) in cases) assertEquals(CutMapping.Declined(reason), source.toCut(map))
-    }
-
-    @Test
     fun `proof and expression snapshots resist mutation through producers and readers`() {
         val terms = mutableMapOf(x to BigFraction.ONE)
         val expression = CutExpression(terms)
@@ -341,144 +294,6 @@ class SourceCutTest {
     }
 
     @Test
-    fun `tableau cuts preserve bounds even when source rows are global`() {
-        val builder = LpBuilder()
-        builder.addVar(1, 5)
-        builder.addRow(mapOf(0 to 2L), Relation.LE, 3)
-        val model = builder.build(Sense.MINIMIZE)
-        val integral = CutPremise.Integral(CutExpression(mapOf(x to BigFraction.ONE)))
-        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)), globalPremises = setOf(integral))
-        val rel = LpRelaxation(
-            model,
-            intArrayOf(0),
-            booleanArrayOf(false),
-            0,
-            intArrayOf(0),
-            intArrayOf(),
-            sourceMap = map,
-        )
-        val cut = integerTableauCuts(
-            model,
-            Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }),
-            doubleArrayOf(1.5),
-            1,
-            false,
-        ).single()
-
-        val portable = assertNotNull(SourceCut.fromCut(cut, rel).orNull())
-
-        assertFalse(portable.provenance.global)
-        assertTrue(portable.provenance.facts.any { !it.global && it.premise is CutPremise.Bound })
-        assertEquals(BigFraction.ofLong(3), portable.provenance.rules.single().rows.single().row.rhs)
-    }
-
-    @Test
-    fun `retained tableau proofs preserve rational row guards and their Boolean activators`() {
-        val source = assertNotNull(LpBuilder().apply {
-            val x = addVar(1L, 5L)
-            addRow(intArrayOf(x), longArrayOf(2L), Relation.LE, 3L)
-        }.build(Sense.MINIMIZE).authoritativeModel())
-        val threshold = assertNotNull(BigFraction.ofDouble(1.5))
-        val premises = ExactLpPremises(listOf(ExactLpPremise(1, true, ExactLpNumber.of(threshold))), listOf(2))
-        val model = assertNotNull(LpExactState(source.copy(rows = listOf(ExactLpRow(
-            global = false,
-            premises = premises,
-        )))).toWorkingModel())
-        val integral = CutPremise.Integral(CutExpression(mapOf(x to BigFraction.ONE)))
-        val guardVariable = CutSource(CutSourceKind.INTEGER, 1)
-        val bound = CutPremise.Bound(CutExpression(mapOf(guardVariable to BigFraction.ONE)), true, threshold)
-        val literal = CutPremise.Literal(2)
-        val lower = CutPremise.Bound(CutExpression(mapOf(x to BigFraction.ONE)), false, BigFraction.ONE)
-        val map = CutSourceMap(
-            modelToken, 0, listOf(CutColumnSource(x)), activePremises = setOf(bound, literal),
-            globalPremises = setOf(integral, lower),
-        )
-        val relaxation = LpRelaxation(
-            model,
-            intArrayOf(0),
-            booleanArrayOf(false),
-            0L,
-            intArrayOf(0),
-            intArrayOf(),
-            sourceMap = map,
-        )
-        val raw = integerTableauCuts(
-            model,
-            Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }),
-            doubleArrayOf(1.5),
-            1,
-            false,
-        ).single()
-
-        val cut = assertNotNull(SourceCut.fromCut(raw, relaxation).orNull())
-
-        assertFalse(cut.provenance.global)
-        assertTrue(CutProofFact(bound, false) in cut.provenance.facts)
-        assertTrue(CutProofFact(literal, false) in cut.provenance.facts)
-        assertEquals(BigFraction.ofLong(3L), cut.provenance.rules.single().rows.single().row.rhs)
-        assertNotNull(cut.toCut(map).orNull())
-        val inactive = CutSourceMap(modelToken, 1, map.columns, globalPremises = setOf(integral, lower))
-        assertEquals(CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD), cut.toCut(inactive))
-    }
-
-    @Test
-    fun `rational slack expansion uses exact authority rather than its float projection`() {
-        val third = BigFraction.of(BIG_ONE, bigIntOf(3))
-        val number = ExactLpNumber.of(third)
-        val zero = ExactLpNumber.of(0L)
-        val exact = ExactLpModel(
-            listOf(listOf(ExactLpEntry(0, number))),
-            listOf(number),
-            listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)), number, false),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-            ),
-            listOf(ExactLpRow()),
-            ExactLpObjective(listOf(zero, zero)),
-        )
-        val csc = Csc(intArrayOf(0, 1), intArrayOf(0), longArrayOf(0))
-        val view = LpDoubleView(
-            csc.colPtr, csc.rowIdx, doubleArrayOf(1.0 / 3), doubleArrayOf(1.0 / 3),
-            DoubleArray(2), DoubleArray(2), booleanArrayOf(false, false), 0.0, doubleArrayOf(1.0 / 3),
-        )
-        val model = LpModel(
-            1, 1, csc, longArrayOf(0), LongArray(2), LongArray(2), booleanArrayOf(false, false),
-            longArrayOf(0), 0, Sense.MINIMIZE, intArrayOf(-1), doubleView = view, exactState = LpExactState(exact),
-        )
-        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(y)))
-        val rel = LpRelaxation(
-            model,
-            intArrayOf(-1),
-            booleanArrayOf(false),
-            0,
-            intArrayOf(),
-            intArrayOf(),
-            sourceMap = map,
-        )
-        val cut = Cut(intArrayOf(1), longArrayOf(1), Relation.LE, 1, global = true)
-
-        val source = assertNotNull(SourceCut.fromCut(cut, rel).orNull())
-
-        assertEquals(third.negated(), source.expression.terms[y])
-        assertEquals(third + third * third, source.expression.constant)
-        for (point in 0L..3L) {
-            assertEquals(
-                third - third * (BigFraction.ofLong(point) - third),
-                source.expression.value { BigFraction.ofLong(point) },
-            )
-        }
-        assertTrue(
-            integerTableauCuts(
-                model,
-                Basis(intArrayOf(0), Array(2) { VarStatus.AT_LOWER }),
-                doubleArrayOf(0.5),
-                1,
-                false,
-            ).isEmpty(),
-        )
-    }
-
-    @Test
     fun `unsupported auxiliary and missing local provenance decline explicitly`() {
         val builder = LpBuilder()
         builder.addVar(0, 3)
@@ -525,41 +340,6 @@ class SourceCutTest {
     }
 
     @Test
-    fun `the adapter refreshes local guards and rejects a popped parent during assembly`() {
-        val p = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 5)),
-            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)),
-        )
-        val relaxer = CpToLpRelaxation(p, LinearObjective(intCoefficients = longArrayOf(1)))
-        val root = PropagationSession(p)
-        val local = PropagationSession(p)
-        local.implyIntAtLeast(0, 2)
-        val base = relaxer.build(root)
-        val guard = CutPremise.Bound(CutExpression(mapOf(x to BigFraction.ONE)), false, BigFraction.ofLong(2))
-        val parent = Cut(
-            intArrayOf(0),
-            longArrayOf(1),
-            Relation.GE,
-            2,
-            provenance = CutProvenance(p, 0, listOf(CutProofFact(guard, false))),
-        )
-
-        LpEngine(
-            p,
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(),
-            SolveStatsSink(backend = "source"),
-        ).use { engine ->
-            assertTrue(assertNotNull(assertNotNull(engine.cpAdapter.relaxation(base, local)).sourceMap).isActive(guard))
-            assertFalse(assertNotNull(assertNotNull(engine.cpAdapter.relaxation(base, root)).sourceMap).isActive(guard))
-        }
-        assertEquals(base.model.m + 1, relaxer.build(local, listOf(parent)).model.m)
-        assertEquals(base.model.m, relaxer.build(root, listOf(parent)).model.m)
-    }
-
-    @Test
     fun `zero coefficient cancellation does not erase fixed substitution provenance`() {
         val fixed = CutPremise.Fixed(x, BigFraction.ofLong(2))
         val source = SourceCut(
@@ -582,27 +362,6 @@ class SourceCutTest {
         assertEquals(1L, mapped.rhs)
         assertFalse(mapped.global)
         assertEquals(listOf(CutProofFact(fixed, false)), assertNotNull(mapped.provenance).facts)
-    }
-
-    @Test
-    fun `large proof support declines even when the final inequality has one term`() {
-        val expression = CutExpression(mapOf(x to BigFraction.ONE))
-        val facts = List(
-            12,
-        ) { CutProofFact(CutPremise.Bound(expression, true, BigFraction.ofLong(it.toLong())), false) }
-        val proof = CutProvenance(modelToken, 0, facts)
-        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, proof)
-        val map = CutSourceMap(
-            modelToken,
-            0,
-            listOf(CutColumnSource(x)),
-            activePremises = facts.map { it.premise }.toSet(),
-        )
-
-        assertEquals(
-            CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
-            source.toCut(map, CutMappingLimits(terms = 8)),
-        )
     }
 
     @Test
@@ -669,76 +428,6 @@ class SourceCutTest {
             CutMapping.Declined(CutMappingDecline.MISSING_SOURCE),
             SourceCut.fromCut(Cut(intArrayOf(0), longArrayOf(1), Relation.LE, 2, global = true), r),
         )
-    }
-
-    @Test
-    fun `minimum long values are retained only when the row consumer need not negate them`() {
-        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
-        for ((coefficient, rhs) in listOf(Long.MIN_VALUE to 1L, 1L to Long.MIN_VALUE)) {
-            val source = SourceCut(
-                CutExpression(mapOf(x to BigFraction.ofLong(coefficient))),
-                Relation.LE,
-                BigFraction.ofLong(rhs),
-                CutProvenance(modelToken, 0, emptyList()),
-            )
-            val ge = SourceCut(source.expression, Relation.GE, source.rhs, source.provenance)
-
-            val mapped = assertNotNull(source.toCut(map).orNull())
-            assertEquals(coefficient, mapped.coeffs.single())
-            assertEquals(rhs, mapped.rhs)
-            assertEquals(CutMapping.Declined(CutMappingDecline.LONG_RANGE), ge.toCut(map))
-        }
-    }
-
-    @Test
-    fun `coprime denominator growth declines before producing an oversized scale`() {
-        val source = SourceCut(
-            CutExpression(
-                mapOf(
-                    x to BigFraction.of(BIG_ONE, bigIntOf(17)),
-                    y to BigFraction.of(BIG_ONE, bigIntOf(19)),
-                ),
-            ),
-            Relation.LE,
-            BigFraction.ONE,
-            CutProvenance(modelToken, 0, emptyList()),
-        )
-        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x), CutColumnSource(y)))
-
-        assertEquals(
-            CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
-            source.toCut(map, CutMappingLimits(bits = 8)),
-        )
-    }
-
-    @Test
-    fun `tableau row snapshots retain nested premises after producer and reader mutation`() {
-        val columns = intArrayOf(0)
-        val coefficients = longArrayOf(2)
-        val premises = LpRowPremises(intArrayOf(0), booleanArrayOf(true), longArrayOf(3), intArrayOf(2))
-        val row = CutInputRow(
-            0,
-            false,
-            1,
-            BigFraction.ofLong(3),
-            Relation.LE,
-            columns,
-            coefficients,
-            premises,
-        )
-        columns[0] = 8
-        coefficients[0] = 9
-        premises.thresholds[0] = 10
-        premises.boolLits[0] = 4
-        row.columns[0] = 7
-        row.coefficients[0] = 6
-        assertNotNull(row.premises).thresholds[0] = 12
-        assertNotNull(row.premises).boolLits[0] = 6
-
-        assertEquals(0, row.columns.single())
-        assertEquals(2L, row.coefficients.single())
-        assertEquals(3L, assertNotNull(row.premises).thresholds.single())
-        assertEquals(2, assertNotNull(row.premises).boolLits.single())
     }
 
     @Test

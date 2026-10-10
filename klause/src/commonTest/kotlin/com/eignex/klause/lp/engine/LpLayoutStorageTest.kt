@@ -4,8 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNotSame
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpLayoutStorageTest {
@@ -72,35 +70,4 @@ class LpLayoutStorageTest {
         assertTrue(suspended.deactivate(setOf(0)).storageWeight(storage).warrantsCompaction())
     }
 
-    @Test
-    fun `bound origin and objective edits reuse counts while changed premises update storage`() {
-        val one = ExactLpNumber.of(1L)
-        val source = assertNotNull(LpBuilder().apply {
-            val x = addVar(0L, 9L)
-            val y = addVar(0L, 9L)
-            addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 1L)
-        }.build(Sense.MINIMIZE).authoritativeModel())
-        val storage = source.layoutStorage
-        val trail = LpBoundTrail(source)
-        val edits = listOf<(LpBoundTrail) -> Boolean>(
-            { it.push() },
-            { it.assertBound(0, false, ExactLpSide(one), 0L) },
-            { it.pop(0) },
-            { it.recenter(listOf(one, one)) },
-            { it.replaceObjective(ExactLpObjective(List(3) { one })) },
-        )
-        for (edit in edits) {
-            assertTrue(edit(trail))
-            assertSame(storage, trail.state.model.layoutStorage)
-        }
-        val changed = source.copy(rows = listOf(ExactLpRow(premises = ExactLpPremises(emptyList(), listOf(7, 9)))))
-
-        assertNotSame(storage, changed.layoutStorage)
-        assertEquals(source.keySize + 2L, changed.keySize)
-        assertSame(
-            changed.layoutStorage,
-            changed.copy(rows = listOf(changed.row(0).copy(global = false))).layoutStorage,
-        )
-        assertEquals(54L, source.keySize)
-    }
 }

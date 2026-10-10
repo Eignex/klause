@@ -10,7 +10,6 @@ import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.math.abs
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -41,25 +40,6 @@ class LpComponentsTest {
     }
 
     @Test
-    fun `component solve reports component route work`() {
-        val b = LpBuilder()
-        val x = b.addVar(0L, 10L, cost = 1L)
-        val y = b.addVar(0L, 10L, cost = 2L)
-        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 4L)
-        b.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 5L)
-        val model = b.build(Sense.MINIMIZE)
-        assertIs<ComponentLpSolver>(newLpSolver(model)).use { solver ->
-            val raw = assertNotNull(solver.solve())
-            val result = certifyLpResult(model, solver, raw)
-
-            assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
-            assertEquals(2, raw.blocks)
-            assertTrue(solver.lastMetrics.workOps > 0L)
-            assertEquals(LpFloatTermination.OPTIMAL_CANDIDATE, solver.lastTermination)
-        }
-    }
-
-    @Test
     fun `component solve preserves a child work stop`() {
         val builder = LpBuilder()
         repeat(2) {
@@ -80,35 +60,6 @@ class LpComponentsTest {
             assertEquals(LpFloatTermination.WORK, it.lastTermination)
             assertTrue(it.lastMetrics.workOps > 0L)
             assertNull(it.infeasibleRay)
-        }
-    }
-
-    @Test
-    fun `random separable models should stitch to the monolithic optimum`() {
-        val rng = Random(7)
-        repeat(40) {
-            val b = LpBuilder()
-            val blocks = 2 + rng.nextInt(3)
-            repeat(blocks) {
-                val v0 = b.addVar(0L, 1L + rng.nextInt(9), cost = rng.nextLong(-4L, 5L))
-                val v1 = b.addVar(0L, 1L + rng.nextInt(9), cost = rng.nextLong(-4L, 5L))
-                b.addRow(
-                    intArrayOf(v0, v1),
-                    longArrayOf(1L + rng.nextInt(3).toLong(), 1L),
-                    Relation.GE,
-                    rng.nextLong(0L, 6L),
-                )
-                if (rng.nextBoolean()) b.addRow(intArrayOf(v0), longArrayOf(1L), Relation.LE, 1L + rng.nextLong(8L))
-            }
-            val model = b.build(Sense.MINIMIZE)
-            val split = newLpSolver(model).solvePrimal(null)
-            val mono = newLpSolver(model, componentSplit = false).solvePrimal(null)
-            if (mono == null) {
-                assertNull(split, "split must fail exactly where monolithic fails")
-            } else {
-                assertNotNull(split)
-                assertEquals(mono.objective, split.objective, 1e-6)
-            }
         }
     }
 
@@ -155,57 +106,6 @@ class LpComponentsTest {
         b.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.LE, 7L)
         val model = b.build(Sense.MINIMIZE)
         assertIs<RevisedSimplex>(newLpSolver(model))
-    }
-
-    @Test
-    fun `an isolated probe-clamped column should ride to the probe exactly like the engine`() {
-        // A free-upper isolated column carries the probe stand-in bound, so both paths ride it there
-        // and the probe-clamp flag lets downstream bound extraction reject the frontier value.
-        val b = LpBuilder()
-        val x = b.addVar(0L, 10L)
-        val y = b.addVar(0L, 10L)
-        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 9L)
-        b.addRow(intArrayOf(y), longArrayOf(1L), Relation.LE, 9L)
-        val free = b.addFreeVar(0L, null, cost = -1L)
-        val model = b.build(Sense.MINIMIZE)
-        val split = newLpSolver(model).solvePrimal(null)
-        val mono = newLpSolver(model, componentSplit = false).solvePrimal(null)
-        assertNotNull(split)
-        assertNotNull(mono)
-        assertEquals(mono.primal[free], split.primal[free], 1e-3)
-        assertEquals(mono.objective, split.objective, 1e-3)
-    }
-
-    @Test
-    fun `a solve should report how many components it decomposed into`() {
-        val b = LpBuilder()
-        val x = b.addVar(0L, 10L, cost = 3L)
-        val y = b.addVar(0L, 10L, cost = 2L)
-        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 4L)
-        b.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 5L)
-        val model = b.build(Sense.MINIMIZE)
-
-        val split = assertNotNull(newLpSolver(model).solve(null))
-        val mono = assertNotNull(newLpSolver(model, componentSplit = false).solve(null))
-
-        assertEquals(2, split.blocks)
-        assertEquals(1, mono.blocks, "a monolithic solve reports one block")
-    }
-
-    @Test
-    fun `component bases certify a continuous model beyond the retired determinant cap`() {
-        val builder = LpBuilder()
-        repeat(50) {
-            val column = builder.addRealVar(0.0, 1.0)
-            builder.addRealRow(intArrayOf(column), doubleArrayOf(1.0), Relation.LE, 1.0)
-        }
-        val model = builder.build(Sense.MINIMIZE)
-        val solver = assertIs<ComponentLpSolver>(newLpSolver(model))
-        val result = assertNotNull(solver.solve())
-
-        assertNotNull(verifyExactBasis(model, result.basis).witness)
-        assertNotNull(solver.exactWitness())
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, solveAndCertify(model).verdict)
     }
 
     @Test

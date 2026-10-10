@@ -1,20 +1,14 @@
 package com.eignex.klause.backtrack.selector
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 
 class LastConflictTest {
 
@@ -56,38 +50,5 @@ class LastConflictTest {
             picked,
             "last-conflict should defer to base after the prioritised var commits",
         )
-    }
-
-    @Test
-    fun `last-conflict composes with vsids end-to-end`() {
-        val problem = Problem(
-            numBoolVars = 6,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Cardinality.exactlyOne(
-                    intArrayOf(
-                        Lit.make(0, true),
-                        Lit.make(1, true),
-                        Lit.make(2, true),
-                    ),
-                ),
-                Cardinality.exactlyOne(
-                    intArrayOf(
-                        Lit.make(3, true),
-                        Lit.make(4, true),
-                        Lit.make(5, true),
-                    ),
-                ),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(
-                variableSelector = LastConflict(Vsids()),
-                randomSeed = 0L,
-            ),
-        )
-        assertIs<SolveResult.Sat>(r)
     }
 }

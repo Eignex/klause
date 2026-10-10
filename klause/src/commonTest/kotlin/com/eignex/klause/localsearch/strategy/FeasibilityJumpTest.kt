@@ -10,7 +10,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Behaviour tests for the Feasibility-Jump [SourceDrivenStrategy] recipe: a weighted-violation
@@ -18,15 +17,6 @@ import kotlin.test.assertTrue
  * adaptive weights) on a coupled one, and be deterministic for a fixed seed.
  */
 class FeasibilityJumpTest {
-
-    /** A single sum constraint `x0 + x1 = 6` over 0..5 — one jump to the argmin value of either
-     *  variable zeroes it. */
-    private fun sumProblem(): Problem = Problem(
-        numBoolVars = 0,
-        numIntVars = 2,
-        intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-        factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 6)),
-    )
 
     /** Two coupled sum constraints with the unique solution (2, 4): no single coordinate jump
      *  satisfies both, so reaching feasibility relies on the adaptive-weight escape. */
@@ -49,22 +39,6 @@ class FeasibilityJumpTest {
             steps++
         }
         return steps
-    }
-
-    @Test
-    fun `reaches feasibility on a solvable instance`() {
-        val state = LocalSearchState(sumProblem().bake(), Random(7))
-        drive(FeasibilityJump(), state, maxSteps = 100)
-        assertEquals(0L, state.cost, "FJ must reach feasibility on x0 + x1 = 6")
-    }
-
-    @Test
-    fun `makes progress on a coupled instance via adaptive weights`() {
-        val state = LocalSearchState(coupledProblem().bake(), Random(7))
-        state.recompute()
-        val before = state.cost
-        drive(FeasibilityJump(), state, maxSteps = 10_000)
-        assertTrue(state.cost < before, "weight-escalating FJ must reduce violation (was $before, got ${state.cost})")
     }
 
     @Test

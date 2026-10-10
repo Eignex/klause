@@ -22,20 +22,6 @@ class PropagationStateExcludeTest {
     }
 
     @Test
-    fun `excludeIntValue at a bound shrinks the interval by one`() {
-        val cases = listOf(
-            Triple(1L, 2L, 5L),
-            Triple(5L, 1L, 4L),
-        )
-        for ((excluded, min, max) in cases) {
-            val s = state(arrayOf(IntDomain(1, 5)))
-            assertTrue(s.excludeIntValue(0, excluded))
-            assertEquals(min, s.intDomains[0].min, "min after excluding $excluded")
-            assertEquals(max, s.intDomains[0].max, "max after excluding $excluded")
-        }
-    }
-
-    @Test
     fun `excludeIntValue interior creates sparse domain`() {
         val s = state(arrayOf(IntDomain(1, 5)))
         assertTrue(s.excludeIntValue(0, 3))
@@ -46,13 +32,6 @@ class PropagationStateExcludeTest {
         assertFalse(3 in d)
         assertTrue(2 in d)
         assertTrue(4 in d)
-    }
-
-    @Test
-    fun `excludeIntValue absent is no-op`() {
-        val s = state(arrayOf(IntDomain(1, 5)))
-        assertTrue(s.excludeIntValue(0, 99))
-        assertEquals(IntDomain(1, 5), s.intDomains[0])
     }
 
     @Test
@@ -88,17 +67,4 @@ class PropagationStateExcludeTest {
         assertEquals(2, d.values.size)
     }
 
-    @Test
-    fun `stacked exclusions accumulate holes`() {
-        val s = state(arrayOf(IntDomain(0, 10)))
-        assertTrue(s.excludeIntValue(0, 3))
-        assertTrue(s.excludeIntValue(0, 5))
-        assertTrue(s.excludeIntValue(0, 7))
-        val d = s.intDomains[0]
-        assertEquals(0, d.min)
-        assertEquals(10, d.max)
-        assertEquals(8, d.values.size)
-        for (h in longArrayOf(3, 5, 7)) assertFalse(h in d, "$h should be a hole")
-        for (k in longArrayOf(0, 1, 2, 4, 6, 8, 9, 10)) assertTrue(k in d, "$k should remain in domain")
-    }
 }

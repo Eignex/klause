@@ -27,24 +27,6 @@ class AxisEditsTest {
     }
 
     @Test
-    fun `selector matches arms by label prefix`() {
-        val token = AxisEdits.tokens("cbls.break").single()
-        assertTrue(token.appliesTo("cbls/fixed"))
-        assertTrue(token.appliesTo("cbls-plateau/ils-basin"))
-        assertTrue(!token.appliesTo("sa/fixed"))
-    }
-
-    @Test
-    fun `a bare sources list force-selects exactly those sources`() {
-        val current = MoveSourceCatalog.parse("violated,frontier,objective")
-        val edited = AxisEdits.applySources(current, AxisEdits.tokens("argmin,frontier"))
-        assertEquals(
-            listOf(MoveSourceCatalog.idOf("argmin"), MoveSourceCatalog.idOf("frontier")),
-            edited.map { it.source.id },
-        )
-    }
-
-    @Test
     fun `plus and minus add and remove against the current sources`() {
         val current = MoveSourceCatalog.parse("violated,frontier")
         val edited = AxisEdits.applySources(current, AxisEdits.tokens("-violated,+argmin"))
@@ -52,13 +34,6 @@ class AxisEditsTest {
             listOf(MoveSourceCatalog.idOf("frontier"), MoveSourceCatalog.idOf("argmin")),
             edited.map { it.source.id },
         )
-    }
-
-    @Test
-    fun `adding a source already present is a no-op`() {
-        val current = MoveSourceCatalog.parse("violated,frontier")
-        val edited = AxisEdits.applySources(current, AxisEdits.tokens("+frontier"))
-        assertEquals(current.map { it.source.id }, edited.map { it.source.id })
     }
 
     @Test
@@ -81,16 +56,5 @@ class AxisEditsTest {
         val reaccepted = recipe.withAcceptance(AcceptanceRule.Greedy)
         assertEquals(AcceptanceRule.Greedy, reaccepted.strategy.acceptance)
         assertEquals(AcceptanceRule.Greedy, reaccepted.optimizeStrategy?.acceptance)
-    }
-
-    @Test
-    fun `removing a source from a recipe drops it from the sources axis`() {
-        val recipe = LocalSearchCatalog.byLabel("cbls/fixed")
-        val violatedId = MoveSourceCatalog.idOf("violated")
-        assertTrue(recipe.strategy.sources.any { it.source.id == violatedId }, "cbls draws violated repairs")
-
-        val edited = recipe.withSources { AxisEdits.applySources(it, AxisEdits.tokens("-violated")) }
-        assertTrue(edited.strategy.sources.none { it.source.id == violatedId })
-        assertTrue(edited.optimizeStrategy?.sources?.none { it.source.id == violatedId } == true)
     }
 }

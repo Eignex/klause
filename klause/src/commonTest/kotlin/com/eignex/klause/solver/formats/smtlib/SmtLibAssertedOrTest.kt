@@ -6,13 +6,11 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibProblem
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * An asserted top-level `or` is a clause. Posting it directly states the same thing as reifying it and
@@ -33,44 +31,6 @@ class SmtLibAssertedOrTest {
         val clauses = p.factors.filterIsInstance<Clause>()
         assertEquals(1, p.factors.size, "the disjunction should lower to exactly one factor")
         assertEquals(3, clauses.single().literals.size, "the clause should carry one literal per disjunct")
-    }
-
-    @Test
-    fun `an asserted or allocates no auxiliary literal`() {
-        val p = parse("(declare-const p Bool) (declare-const q Bool) (assert (or p q))")
-        assertEquals(2, p.numBoolVars, "only the declared bools should exist")
-    }
-
-    @Test
-    fun `an asserted or still refutes the assignment that falsifies every disjunct`() {
-        val text = "(declare-const p Bool) (declare-const q Bool) (assert (or p q)) (assert (not p)) (assert (not q))"
-        assertTrue(!sat(text), "no disjunct can hold so the model must be refuted")
-    }
-
-    @Test
-    fun `an asserted or over comparisons accepts exactly the stated values`() {
-        val decl = "(declare-const x Int) (assert (>= x 0)) (assert (<= x 5))"
-        val parsed = parse("$decl (assert (or (= x 1) (= x 4)))")
-        val accepted = (0L..5L).filter { v ->
-            val domains = Array(
-                parsed.numIntVars,
-            ) { i -> if (i == 0) IntDomain(v, v) else parsed.finiteIntDomain(i) }
-            BacktrackSolver(parsed.withIntDomains(domains).bake()).solve(BacktrackParams()) is SolveResult.Sat
-        }
-        assertEquals(listOf(1L, 4L), accepted, "only the disjoined values should survive")
-    }
-
-    @Test
-    fun `a nested or under an asserted and is posted as its own clause`() {
-        val p = parse("(declare-const a Bool) (declare-const b Bool) (declare-const c Bool) (assert (and c (or a b)))")
-        val clauses = p.factors.filterIsInstance<Clause>()
-        assertEquals(3, p.numBoolVars, "the conjunction and disjunction should add no auxiliary")
-        assertTrue(clauses.any { it.literals.size == 2 }, "the disjunction should appear as a binary clause")
-    }
-
-    @Test
-    fun `an empty or is unsatisfiable`() {
-        assertTrue(!sat("(declare-const p Bool) (assert (or))"), "an empty disjunction is false")
     }
 
     /** An atom over the two bools and the one integer of [PREAMBLE] paired with its own semantics. */

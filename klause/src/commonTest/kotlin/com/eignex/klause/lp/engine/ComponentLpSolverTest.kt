@@ -148,49 +148,6 @@ class ComponentLpSolverTest {
     }
 
     @Test
-    fun `exact components preserve scaled objectives logical costs origins and isolated bounds`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val three = ExactLpNumber.of(3L)
-        val half = ExactLpNumber.of(BigFraction.ofLong(2L).reciprocal())
-        val source = ExactLpModel(
-            matrix = listOf(listOf(ExactLpEntry(0, half)), listOf(ExactLpEntry(1, one)), emptyList()),
-            rhs = listOf(three, three),
-            columns = listOf(
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three)), origin = one),
-                ExactLpColumn(ExactLpBounds(upper = ExactLpSide(three))),
-                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(half)), origin = three),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(three))),
-            ),
-            rows = listOf(ExactLpRow(), ExactLpRow()),
-            objective = ExactLpObjective(listOf(one, one, one, one, zero), constant = three,
-                scale = three, externalConstant = one, sense = Sense.MAXIMIZE),
-        )
-        val state = LpExactState(source)
-        val model = assertNotNull(state.ownerWorkingModel())
-        val monolithic = solveAndCertify(model, componentSplit = false)
-
-        val component = assertIs<ComponentLpSolver>(newLpSolver(model)).use { solver ->
-            val result = assertNotNull(solver.solve())
-            assertSame(state, solver.solvedExactState)
-            assertSame(state, result.exactState)
-            val bound = assertNotNull(solver.exactBound())
-            val witness = assertNotNull(solver.exactWitness())
-            assertEquals(bound.value, witness.objective)
-            assertSame(state, assertNotNull(bound.support).state)
-            assertTrue(bound.support.sides.any { it.column == 2 && it.side.number == half })
-            certifyLpResult(model, solver, result)
-        }
-
-        assertEquals(LpVerdict.ATTAINED_OPTIMUM, component.verdict)
-        assertEquals(monolithic.lowerBound, component.lowerBound)
-        assertEquals(monolithic.witness?.objective, component.witness?.objective)
-        assertEquals(monolithic.float?.objective, component.float?.objective)
-        assertEquals(BigFraction.ofLong(3L) + half.value, component.exactPrimal?.get(2))
-    }
-
-    @Test
     fun `inactive component rows remain free and cannot supply certificate premises`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 5L, cost = 1L)

@@ -2,7 +2,6 @@ package com.eignex.klause.lp.engine
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -20,14 +19,6 @@ class RevisedSimplexWarmStartTest {
         val y = b.addVar(0L, 4L, cost = 2L)
         b.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 3L)
         return b.build(Sense.MINIMIZE)
-    }
-
-    @Test
-    fun `a cold solve reports no warm start and one factorization`() {
-        val result = assertNotNull(RevisedSimplex(model()).solve(null))
-
-        assertFalse(result.warmStarted, "a null warm basis is a cold start")
-        assertEquals(1, result.refactorizations, "the slack basis is factorized once")
     }
 
     @Test

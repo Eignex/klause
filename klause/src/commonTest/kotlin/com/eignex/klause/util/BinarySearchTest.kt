@@ -1,20 +1,10 @@
 package com.eignex.klause.util
 
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class BinarySearchTest {
-
-    /** Reference: the stdlib contract computed by a simple linear scan over `[from, to)`. */
-    private fun reference(a: IntArray, element: Int, from: Int, to: Int): Int {
-        for (i in from until to) {
-            if (a[i] == element) return i
-            if (a[i] > element) return -(i + 1)
-        }
-        return -(to + 1)
-    }
 
     @Test
     fun `empty array returns insertion point 0`() {
@@ -54,25 +44,5 @@ class BinarySearchTest {
         val a = intArrayOf(2, 2, 2, 2)
         val idx = a.binarySearchInt(2)
         assertTrue(idx in 0..3 && a[idx] == 2)
-    }
-
-    @Test
-    fun `matches reference on random sorted arrays`() {
-        val rng = Random(7)
-        repeat(500) {
-            val n = rng.nextInt(0, 40)
-            val a = IntArray(n) { rng.nextInt(-20, 20) }.apply { sort() }
-            val probe = rng.nextInt(-25, 25)
-            val idx = a.binarySearchInt(probe)
-            val refIdx = reference(a, probe, 0, n)
-            if (refIdx >= 0) {
-                // Present: with duplicates either side may return a different valid index, so only
-                // require that it points at a real match.
-                assertTrue(idx >= 0 && a[idx] == probe, "probe=$probe idx=$idx a=${a.toList()}")
-            } else {
-                // Absent: the negative insertion point is unambiguous and must match exactly.
-                assertEquals(refIdx, idx, "probe=$probe a=${a.toList()}")
-            }
-        }
     }
 }

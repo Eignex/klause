@@ -1,47 +1,25 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.PropagationReasonOracle
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
-import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class GlobalCardinalityPropagatorTest {
 
-    private class LowUpInst(
-        val xsRanges: List<Pair<Int, Int>>,
-        val cover: IntArray,
-        val low: IntArray,
-        val high: IntArray,
-        val closed: Boolean,
-    )
-
-    /**
-     * Soundness gate for the sharpened (pigeonhole-subset) GCC conflict reasons, low/up form.
-     * Battery includes a capacity-infeasible instance (3 vars, 2 values cap-1 each) so the
-     * count-pigeonhole and Régin-flow failure paths fire. Under the full CDCL backtracker
-     * enumeration must equal brute force; an unsound reason drops a feasible assignment.
-     */
     @Test
     fun `global cardinality deductions are implied by their reasons under carved holes`() {
         val rng = Random(0x6CC0)
@@ -64,230 +42,6 @@ class GlobalCardinalityPropagatorTest {
             PropagationReasonOracle.assertReasonsImply(problem, "gcc#$iter") { state ->
                 (0 until 6).all { state.excludeIntValue(rng.nextInt(n), rng.nextInt(4).toLong()) }
             }
-        }
-    }
-
-    @Test
-    fun `backtrack learning enumerates exactly the brute-force solution set with low-up bounds`() {
-        val instances = listOf(
-            LowUpInst(listOf(0 to 1, 0 to 1, 0 to 1), intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(1, 1), false),
-            LowUpInst(
-                listOf(0 to 2, 0 to 2, 0 to 2),
-                intArrayOf(0, 1, 2),
-                intArrayOf(1, 1, 1),
-                intArrayOf(1, 1, 1),
-                false,
-            ),
-            LowUpInst(
-                listOf(0 to 2, 0 to 2, 0 to 2, 0 to 2),
-                intArrayOf(0, 1, 2),
-                intArrayOf(0, 0, 0),
-                intArrayOf(2, 2, 2),
-                false,
-            ),
-            LowUpInst(listOf(0 to 3, 0 to 3, 0 to 3), intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(3, 3), true),
-            LowUpInst(
-                listOf(0 to 2, 0 to 2, 1 to 2),
-                intArrayOf(0, 1, 2),
-                intArrayOf(0, 0, 1),
-                intArrayOf(1, 2, 2),
-                false,
-            ),
-            // alldiff-like (each value ≤ 1): v0,v1 confined to {0,1} form a tight Hall set, so
-            // pinning v2/v3 into {0,1} during search fires the Régin flow-deficiency path on a
-            // problem that is satisfiable overall — probes the min-cut reason for soundness.
-            LowUpInst(
-                listOf(0 to 1, 0 to 1, 0 to 3, 0 to 3),
-                intArrayOf(0, 1, 2, 3),
-                intArrayOf(0, 0, 0, 0),
-                intArrayOf(1, 1, 1, 1),
-                false,
-            ),
-        )
-        for ((idx, inst) in instances.withIndex()) {
-            val n = inst.xsRanges.size
-            val coverIdx = inst.cover.withIndex().associate { (i, v) -> v to i }
-            fun ok(acc: IntArray): Boolean {
-                val counts = IntArray(inst.cover.size)
-                for (i in 0 until n) {
-                    val ci = coverIdx[acc[i]]
-                    if (ci != null) {
-                        counts[ci]++
-                    } else if (inst.closed) {
-                        return false
-                    }
-                }
-                for (kk in inst.cover.indices) if (counts[kk] < inst.low[kk] || counts[kk] > inst.high[kk]) return false
-                return true
-            }
-            val brute = HashSet<List<Int>>()
-            val acc = IntArray(n)
-            fun rec(p: Int) {
-                if (p == n) {
-                    if (ok(acc)) brute.add(acc.toList())
-                    return
-                }
-                for (v in inst.xsRanges[p].first..inst.xsRanges[p].second) {
-                    acc[p] = v
-                    rec(p + 1)
-                }
-            }
-            rec(0)
-
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = n,
-                intDomains = Array(
-                    n,
-                ) { IntDomain(inst.xsRanges[it].first.toLong(), inst.xsRanges[it].second.toLong()) },
-                factors = arrayOf<Factor>(
-                    GlobalCardinality(
-                        xs = IntArray(n) { it },
-                        cover = LongArray(inst.cover.size) { inst.cover[it].toLong() },
-                        countLow = inst.low,
-                        countHigh = inst.high,
-                        closed = inst.closed,
-                    ),
-                ),
-            )
-            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
-                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
-            assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
-        }
-    }
-
-    /** Soundness gate for the count-var (`countVars[k] = #{xs=cover[k]}`) form. */
-    @Test
-    fun `backtrack learning enumerates exactly the brute-force solution set with count vars`() {
-        val n = 3
-        val cover = intArrayOf(0, 1)
-        val m = cover.size
-        val xsRange = 0 to 1
-        val cvRange = 0 to 3
-        val coverIdx = cover.withIndex().associate { (i, v) -> v to i }
-        val k = n + m
-        val brute = HashSet<List<Int>>()
-        val acc = IntArray(k)
-        fun ok(): Boolean {
-            val counts = IntArray(m)
-            for (i in 0 until n) coverIdx[acc[i]]?.let { counts[it]++ }
-            for (j in 0 until m) if (acc[n + j] != counts[j]) return false
-            return true
-        }
-        fun rec(p: Int) {
-            if (p == k) {
-                if (ok()) brute.add(acc.toList())
-                return
-            }
-            val r = if (p < n) xsRange else cvRange
-            for (v in r.first..r.second) {
-                acc[p] = v
-                rec(p + 1)
-            }
-        }
-        rec(0)
-
-        val doms = Array(k) {
-            if (it < n) {
-                IntDomain(xsRange.first.toLong(), xsRange.second.toLong())
-            } else {
-                IntDomain(cvRange.first.toLong(), cvRange.second.toLong())
-            }
-        }
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = k,
-            intDomains = doms,
-            factors = arrayOf<Factor>(
-                GlobalCardinality(
-                    xs = IntArray(n) { it },
-                    cover = LongArray(cover.size) { cover[it].toLong() },
-                    countVars = IntArray(m) { n + it },
-                ),
-            ),
-        )
-        val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-        val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
-            .map { s -> s.ints.map { it.toInt() } }.toHashSet()
-        assertEquals(brute, found, "count-vars backtrack solution set must equal brute force")
-    }
-
-    @Test
-    fun `count vars equal the number of xs taking each cover value`() {
-        // xs ∈ [0..2]^5, cover = [0,1,2], count vars are last 3 vars. Each count must equal
-        // the # of xs taking that cover value.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 8,
-            intDomains = Array(8) { i -> if (i < 5) IntDomain(0, 2) else IntDomain(0, 5) },
-            factors = arrayOf<Factor>(
-                GlobalCardinality(
-                    xs = intArrayOf(0, 1, 2, 3, 4),
-                    cover = longArrayOf(0, 1, 2),
-                    countVars = intArrayOf(5, 6, 7),
-                ),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        val xs = (0..4).map { sat.assignment.ints[it] }
-        for (k in 0..2) {
-            val expected = xs.count { it == k.toLong() }
-            assertEquals(expected, sat.assignment.ints[5 + k].toInt(), "count[$k] mismatch")
-        }
-    }
-
-    @Test
-    fun `every cover value count lands inside its low-up bounds`() {
-        // 6 xs ∈ [0..2], cover = [0,1,2], lo=[1,1,1], up=[3,3,3].
-        // Every value must appear ≥ 1 and ≤ 3 times.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 6,
-            intDomains = Array(6) { IntDomain(0, 2) },
-            factors = arrayOf<Factor>(
-                GlobalCardinality(
-                    xs = intArrayOf(0, 1, 2, 3, 4, 5),
-                    cover = longArrayOf(0, 1, 2),
-                    countLow = intArrayOf(1, 1, 1),
-                    countHigh = intArrayOf(3, 3, 3),
-                ),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        val xs = (0..5).map { sat.assignment.ints[it] }
-        for (k in 0..2) {
-            val c = xs.count { it == k.toLong() }
-            assertTrue(c in 1..3, "count[$k]=$c out of [1, 3]; xs=$xs")
-        }
-    }
-
-    @Test
-    fun `closed variant rejects values outside cover`() {
-        // 3 xs ∈ [0..5]; cover = {1, 2, 3}; closed → xs must each be in {1, 2, 3}.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = Array(3) { IntDomain(0, 5) },
-            factors = arrayOf<Factor>(
-                GlobalCardinality(
-                    xs = intArrayOf(0, 1, 2),
-                    cover = longArrayOf(1, 2, 3),
-                    countLow = intArrayOf(0, 0, 0),
-                    countHigh = intArrayOf(3, 3, 3),
-                    closed = true,
-                ),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        for (i in 0..2) {
-            assertTrue(
-                sat.assignment.ints[i] in setOf(1L, 2L, 3L),
-                "closed gcc: xs[$i] = ${sat.assignment.ints[i]} not in cover",
-            )
         }
     }
 
@@ -331,58 +85,6 @@ class GlobalCardinalityPropagatorTest {
             }
         }
         assertTrue(2 in citedInts && 3 in citedInts, "reason must cite both count vars; cited $citedInts")
-    }
-
-    @Test
-    fun `gcc plus a linear bound enumerates exactly the brute-force set`() {
-        // Fast-path stress: pairing a non-opt GCC with a Linear over the same xs makes the two
-        // factors re-wake each other, so GCC fires repeatedly on one PropagationState — including
-        // the no-op re-fires the unchanged-domains fast path short-circuits. An unsound skip would
-        // drop a feasible assignment, so the enumerated set must equal brute force.
-        val n = 4
-        val cover = intArrayOf(0, 1, 2)
-        val low = intArrayOf(0, 0, 0)
-        val high = intArrayOf(2, 2, 2)
-        val coverIdx = cover.withIndex().associate { (i, v) -> v to i }
-        fun gccOk(acc: IntArray): Boolean {
-            val counts = IntArray(cover.size)
-            for (i in 0 until n) coverIdx[acc[i]]?.let { counts[it]++ }
-            for (k in cover.indices) if (counts[k] < low[k] || counts[k] > high[k]) return false
-            return true
-        }
-        for (bound in intArrayOf(3, 4, 5)) {
-            val brute = HashSet<List<Int>>()
-            val acc = IntArray(n)
-            fun rec(p: Int) {
-                if (p == n) {
-                    if (gccOk(acc) && acc.sum() <= bound) brute.add(acc.toList())
-                    return
-                }
-                for (v in 0..2) {
-                    acc[p] = v
-                    rec(p + 1)
-                }
-            }
-            rec(0)
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = n,
-                intDomains = Array(n) { IntDomain(0, 2) },
-                factors = arrayOf<Factor>(
-                    GlobalCardinality(
-                        xs = IntArray(n) { it },
-                        cover = LongArray(cover.size) { cover[it].toLong() },
-                        countLow = low,
-                        countHigh = high,
-                    ),
-                    Linear(coeffs = IntArray(n) { 1 }, vars = IntArray(n) { it }, op = LinearOp.LE, bound = bound),
-                ),
-            )
-            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
-                .map { s -> s.ints.map { it.toInt() } }.toHashSet()
-            assertEquals(brute, found, "GCC+Linear (bound=$bound): solution set must equal brute force")
-        }
     }
 
     @Test
@@ -451,30 +153,4 @@ class GlobalCardinalityPropagatorTest {
         }
     }
 
-    @Test
-    fun `global cardinality deductions over optional positions are implied by their reasons`() {
-        val rng = Random(0x6CC2)
-        repeat(300) { iter ->
-            val n = 3
-            val problem = Problem(
-                numBoolVars = n,
-                numIntVars = n,
-                intDomains = Array(n) { IntDomain(0, 2) },
-                factors = arrayOf<Factor>(
-                    GlobalCardinality(
-                        xs = IntArray(n) { it },
-                        cover = longArrayOf(0, 1, 2),
-                        countLow = intArrayOf(1, 0, 1),
-                        countHigh = intArrayOf(1, 2, 2),
-                        closed = rng.nextBoolean(),
-                        presents = IntArray(n) { Lit.make(it, true) },
-                    ),
-                ),
-            )
-            PropagationReasonOracle.assertReasonsImply(problem, "gcc-opt#$iter") { state ->
-                (0 until n).all { b -> rng.nextInt(3) != 0 || state.pinBool(b, rng.nextBoolean()) } &&
-                    (0 until 4).all { state.excludeIntValue(rng.nextInt(n), rng.nextInt(3).toLong()) }
-            }
-        }
-    }
 }

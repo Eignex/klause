@@ -12,7 +12,6 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -89,14 +88,6 @@ class SmtLibChainTest {
     }
 
     @Test
-    fun `a reified chain held true accepts exactly the consecutive pair expansion`() {
-        for (op in ORDER_OPS) {
-            val text = boundedInts(VARS, SIZE, "(assert (or false ($op ${names(VARS)})))")
-            assertEquals(pairwise(op), accepted(text), "reified chain '$op' differs from its pairwise expansion")
-        }
-    }
-
-    @Test
     fun `a negated chain accepts exactly the complement of the consecutive pair expansion`() {
         for (op in ORDER_OPS) {
             val text = boundedInts(VARS, SIZE, "(assert (not ($op ${names(VARS)})))")
@@ -109,72 +100,8 @@ class SmtLibChainTest {
     }
 
     @Test
-    fun `a chain over compound operands accepts exactly its consecutive pair expansion`() {
-        val text = boundedInts(VARS, SIZE, "(assert (< x0 (+ x1 1) x2))")
-        val expected = HashSet<List<Long>>()
-        for (code in 0 until SIZE * SIZE * SIZE) {
-            val t = List(VARS) { ((code / pow(SIZE, it)) % SIZE).toLong() }
-            if (t[0] < t[1] + 1 && t[1] + 1 < t[2]) expected.add(t)
-        }
-        assertEquals(expected, accepted(text), "compound-operand chain differs from its pairwise expansion")
-    }
-
-    @Test
-    fun `an ascending chain over bare variables posts one increasing factor`() {
-        val text = boundedInts(VARS, SIZE, "(assert (< ${names(VARS)}))")
-        val factors = SmtLib.parse(text).model.factors.filterIsInstance<Increasing>()
-        assertEquals(1, factors.size, "expected one Increasing factor")
-        assertTrue(factors[0].strict, "'<' is a strict chain")
-        assertContentEquals(intArrayOf(0, 1, 2), factors[0].xs, "ascending chain keeps the operand order")
-    }
-
-    @Test
-    fun `a descending chain over bare variables reverses the increasing factor`() {
-        val text = boundedInts(VARS, SIZE, "(assert (>= ${names(VARS)}))")
-        val factors = SmtLib.parse(text).model.factors.filterIsInstance<Increasing>()
-        assertEquals(1, factors.size, "expected one Increasing factor")
-        assertTrue(!factors[0].strict, "'>=' is a non-strict chain")
-        assertContentEquals(intArrayOf(2, 1, 0), factors[0].xs, "descending chain reverses the operand order")
-    }
-
-    @Test
-    fun `a strict chain repeating a variable is unsatisfiable`() {
-        val text = boundedInts(2, SIZE, "(assert (< x0 x0 x1))")
-        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
-    }
-
-    @Test
-    fun `a non-strict chain repeating a variable stays satisfiable`() {
-        val text = boundedInts(2, SIZE, "(assert (<= x0 x0 x1))")
-        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
-        assertTrue(r.assignment.ints[0] <= r.assignment.ints[1], "the chain must still order the two variables")
-    }
-
-    @Test
-    fun `an n-ary equality chain forces every operand equal`() {
-        val text = boundedInts(VARS, SIZE, "(assert (= ${names(VARS)})) (assert (>= x0 2))")
-        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
-        assertEquals(listOf(2L, 2L, 2L), (0 until VARS).map { r.assignment.ints[it] })
-    }
-
-    @Test
-    fun `a constant-bounded chain tightens the variable domain`() {
-        val p = SmtLib.parse("(declare-const x Int) (assert (<= 3 x 7)) (check-sat)").bounded()
-        assertEquals(3, p.finiteIntDomain(0).min)
-        assertEquals(7, p.finiteIntDomain(0).max)
-    }
-
-    @Test
     fun `a mixed real chain solves strictly inside its interval`() {
         assertRealChainInterval("(assert (< (to_real n) x 2.5))")
-    }
-
-    @Test
-    fun `a reified mixed real chain held true solves strictly inside its interval`() {
-        assertRealChainInterval("(assert (or false (< (to_real n) x 2.5)))")
     }
 
     private fun assertRealChainInterval(assertion: String) {

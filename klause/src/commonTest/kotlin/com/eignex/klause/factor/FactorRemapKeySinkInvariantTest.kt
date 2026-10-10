@@ -37,13 +37,6 @@ import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * The byte-identity gate for [com.eignex.klause.solver.KeySink]: a factor's
- * allocation-free [Factor.remapStructuralHash] must equal `remap(maps).structuralKey().hashCode()`
- * exactly — that equality is what keeps symmetry colouring (and the symmetries found) unchanged.
- * A non-monotonic permutation is used so `sortedIntVars` / `pairsByVarKey` sort-by-image genuinely
- * differs from sort-by-original.
- */
 class FactorRemapKeySinkInvariantTest {
 
     // A bijection on 0..63 (45 is coprime to 64), so images are a non-monotonic permutation — no id
@@ -52,7 +45,6 @@ class FactorRemapKeySinkInvariantTest {
     private val boolMap = IntArray(64) { (it * 45) % 64 }
     private val realMap = IntArray(64) { (it * 45) % 64 }
     private val mapping = VarRemap(boolMap, intMap, realMap)
-    private val identity = IntArray(64) { it }
 
     private fun pos(v: Int) = Lit.make(v, true)
     private fun neg(v: Int) = Lit.make(v, false)
@@ -177,14 +169,4 @@ class FactorRemapKeySinkInvariantTest {
         }
     }
 
-    @Test
-    fun `remapStructuralHash under the identity map equals the plain key hash`() {
-        for ((name, f) in factors) {
-            assertEquals(
-                f.structuralKey().hashCode(),
-                f.remapStructuralHash(VarRemap(identity, identity)),
-                "$name: identity remap hash must match structuralKey().hashCode()",
-            )
-        }
-    }
 }

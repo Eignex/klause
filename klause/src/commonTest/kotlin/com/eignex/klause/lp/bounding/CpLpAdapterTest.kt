@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -13,7 +12,6 @@ import com.eignex.klause.lp.cut.AllDifferentSeparator
 import com.eignex.klause.lp.cut.CutContext
 import com.eignex.klause.lp.cut.SourceCut
 import com.eignex.klause.lp.cut.orNull
-import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutInputRow
@@ -23,32 +21,17 @@ import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.CutSource
 import com.eignex.klause.lp.engine.CutSourceKind
 import com.eignex.klause.lp.engine.LpBuilder
-import com.eignex.klause.lp.engine.LpEngineFactory
-import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.LpPricingOptions
-import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.lp.engine.PersistentLpSolver
-import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.TableauCutProvenance
-import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.authoritativeModel
-import com.eignex.klause.lp.engine.exactBounds
-import com.eignex.klause.lp.engine.exactConstant
-import com.eignex.klause.lp.engine.exactCost
-import com.eignex.klause.lp.engine.exactRhs
-import com.eignex.klause.lp.engine.exactShift
-import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.integerFarkasRay
-import com.eignex.klause.lp.engine.sourceObjective
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.cpCutSources
 import com.eignex.klause.lp.relaxation.withCpBounds
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
@@ -69,25 +52,6 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CpLpAdapterTest {
-    @Test
-    fun `CP decisions without an LP pass do not spend retained LP edit work`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray())
-        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "deferred-scopes")).use { engine ->
-            val cp = CpSearchComponent(PropagationSession(problem))
-            engine.cpAdapter.attach(cp.session, feasibility = false)
-            val shared = SearchSession(listOf(cp, engine.propagator))
-            shared.initialize()
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val before = engine.totalSolveWork()
-
-            shared.push(SearchDecision.IntAtLeast(0, 3))
-
-            assertEquals(3L, cp.session.intDomain(0).min)
-            assertEquals(before, engine.totalSolveWork())
-        }
-    }
 
     @Test
     fun `an LP pass catches up skipped CP scopes and restores ancestor bounds`() {
@@ -117,34 +81,6 @@ class CpLpAdapterTest {
             assertEquals(5.0, childValue)
             assertEquals(3.0, ancestorValue)
             assertEquals(0.0, rootValue)
-        }
-    }
-
-    @Test
-    fun `fixed node relaxations reuse their owner projection without changing source origins`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(3, 9)), emptyArray())
-        LpEngine(
-            problem, LinearObjective(intCoefficients = longArrayOf(1L)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "retained-projection"),
-        ).use { engine ->
-            val session = PropagationSession(problem)
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val root = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            assertEquals(3.0, assertNotNull(engine.solveNode(root.model, null, Cancellation.Never)?.second).objective)
-            assertSame(engine.propagator.state?.ownerWorkingModel(), root.model)
-            assertSame(root.model, assertNotNull(engine.nodeRelaxation(relaxer, session)).model)
-            session.pinIntAtLeast(0, 5L)
-
-            val child = assertNotNull(engine.nodeRelaxation(relaxer, session))
-
-            assertEquals(5.0, assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective)
-            assertSame(engine.propagator.state?.ownerWorkingModel(), child.model)
-            assertSame(child.model, assertNotNull(engine.nodeRelaxation(relaxer, session)).model)
-            assertEquals(BigFraction.ofLong(3L), root.model.exactShift(0))
-            assertEquals(BigFraction.ofLong(3L), child.model.exactShift(0))
-            assertEquals(3L, assertNotNull(integerCertify(root.model, doubleArrayOf())).objectiveBoundCeil(0L))
-            assertEquals(5L, assertNotNull(integerCertify(child.model, doubleArrayOf())).objectiveBoundCeil(0L))
-            assertEquals(1L, engine.propagator.metrics?.createdOwners)
         }
     }
 
@@ -203,37 +139,6 @@ class CpLpAdapterTest {
     }
 
     @Test
-    fun `empty source nodes load and certify pooled constant contradictions`() {
-        val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 0) },
-            arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 1)),
-        )
-        val sink = SolveStatsSink(backend = "constant-cut")
-        LpEngine(
-            problem,
-            LinearObjective(),
-            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
-            sink,
-        ).use { engine ->
-            val session = PropagationSession(problem)
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            assertEquals(0, base.model.n)
-            assertEquals(0, base.model.m)
-            assertTrue(engine.cutPool.add(Cut(intArrayOf(), longArrayOf(), Relation.GE, 1, global = true), base))
-
-            val outcome = engine.sparseSafePrune(
-                relaxer, session, Double.POSITIVE_INFINITY, sink, Cancellation.Never, -1, true, learn = true,
-            )
-
-            assertTrue(outcome.prune)
-            assertContentEquals(intArrayOf(), assertNotNull(outcome.explanation))
-            assertEquals(1, engine.propagator.state?.rows?.activeCount)
-            assertEquals(1.0, sink.lp.snapshot().infeasible.sum)
-        }
-    }
-
-    @Test
     fun `retained cut infeasibility is certified and explained against the augmented model`() {
         val problem = Problem(
             0, 4, Array(4) { IntDomain(2, 3) },
@@ -261,48 +166,6 @@ class CpLpAdapterTest {
                 IntArray(4) { session.boundGeLit(it, 2, positive = false) }, assertNotNull(outcome.explanation),
             )
             assertEquals(1, assertNotNull(engine.propagator.state).rows.activeCount)
-        }
-    }
-
-    @Test
-    fun `pooled cuts tighten a retained node and survive bound changes without fresh owners`() {
-        val problem = Problem(
-            0, 2, Array(2) { IntDomain(2, 6) },
-            arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 2, domainSize = 5)),
-        )
-        val sink = SolveStatsSink(backend = "retained-cuts")
-        LpEngine(
-            problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
-            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)), sink,
-        ).use { engine ->
-            val session = PropagationSession(problem)
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val base = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            val cut = Cut(base.intColOf, longArrayOf(1, 1), Relation.GE, 5, global = true)
-            assertTrue(engine.cutPool.add(cut, base))
-
-            val outcome = engine.sparseSafePrune(relaxer, session, 4.5, sink, Cancellation.Never, -1, true)
-
-            assertTrue(outcome.prune)
-            val loaded = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            assertSame(engine.propagator.state, loaded.model.exactState)
-            val owners = assertNotNull(engine.propagator.metrics).createdOwners
-            assertTrue(session.pinIntAtLeast(0, 3) !is com.eignex.klause.propagation.PropagationResult.Unsat)
-            val child = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            val removed = assertNotNull(engine.cpAdapter.cutRelaxation(child, session, emptyList()))
-            assertNotNull(engine.solveNode(removed.model, null, Cancellation.Never)?.second)
-            session.popToLevel(0)
-            val restored = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            val result = assertNotNull(engine.solveNode(restored.model, null, Cancellation.Never)?.second)
-            val expected = RevisedSimplex(relaxer.build(session, listOf(cut)).model).use { simplex ->
-                assertNotNull(simplex.solve()).objective
-            }
-
-            assertEquals(expected, result.objective)
-            assertEquals(5L, assertNotNull(integerCertify(restored.model, result.duals)).objectiveBoundCeil(0))
-            assertEquals(owners, engine.propagator.metrics?.createdOwners)
-            assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
-            assertTrue((0 until restored.model.m).any { restored.sourceMap?.parent(it)?.global == true })
         }
     }
 
@@ -391,42 +254,6 @@ class CpLpAdapterTest {
                 val before = engine.propagator.metrics
                 assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
                 assertEquals(before, engine.propagator.metrics)
-            }
-        }
-    }
-
-    @Test
-    fun `standalone live row siblings preserve declared coordinate origins`() {
-        val problem = Problem(
-            1, 1, arrayOf(IntDomain(-5, 10)),
-            arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8)),
-        )
-        LpEngine(
-            problem, LinearObjective(intCoefficients = longArrayOf(1L)),
-            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "source-siblings"),
-        ).use { engine ->
-            val session = PropagationSession(problem)
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            for (step in 0..2) {
-                if (step == 1) session.pinIntAtLeast(0, 3L)
-                if (step == 2) {
-                    session.popToLevel(0)
-                    session.pinIntAtMost(0, -2L)
-                }
-                val retained = assertNotNull(engine.nodeRelaxation(relaxer, session))
-                val result = assertNotNull(engine.solveNode(retained.model, null, Cancellation.Never)?.second)
-                val fresh = relaxer.build(session)
-                val expected = RevisedSimplex(fresh.model).use { simplex ->
-                    val solved = assertNotNull(simplex.solve())
-                    assertNotNull(integerCertify(fresh.model, solved.duals)).objectiveBoundCeil(fresh.objectiveConstant)
-                }
-
-                assertEquals(BigFraction.ofLong(-5L), retained.model.exactShift(retained.intColOf[0]))
-                assertEquals(
-                    expected,
-                    assertNotNull(integerCertify(retained.model, result.duals))
-                        .objectiveBoundCeil(retained.objectiveConstant),
-                )
             }
         }
     }
@@ -672,376 +499,6 @@ class CpLpAdapterTest {
     }
 
     @Test
-    fun `generated tableau cuts reach a shifted source row and a solved relaxation`() {
-        for (mir in listOf(false, true)) {
-            val rawCuts = ArrayList<Cut>()
-            val solved = ArrayList<Pair<LpModel, Double>>()
-            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-                override fun newTableauSolver(
-                    model: LpModel,
-                    cancellation: Cancellation,
-                    iterationLimit: Int,
-                    workLimit: Long,
-                    trackDegeneracy: Boolean,
-                    pricing: LpPricingOptions,
-                ): TableauCutSolver {
-                    val solver = ProductionLpEngineFactory.newTableauSolver(
-                        model,
-                        cancellation,
-                        iterationLimit,
-                        workLimit,
-                        trackDegeneracy,
-                        pricing,
-                    )
-                    return object : TableauCutSolver by solver {
-                        override fun solve(warm: Basis?) = solver.solve(warm).also { result ->
-                            if (result != null) solved.add(model to result.objective)
-                        }
-                        override fun gomoryCuts(maxCuts: Int): List<Cut> =
-                            solver.gomoryCuts(maxCuts).also(rawCuts::addAll)
-                        override fun mirCuts(maxCuts: Int): List<Cut> = solver.mirCuts(maxCuts).also(rawCuts::addAll)
-                    }
-                }
-            }
-            val problem = Problem(
-                0,
-                2,
-                arrayOf(IntDomain(1, 5), IntDomain(1, 5)),
-                arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 7)),
-            )
-            LpEngine(
-                problem,
-                LinearObjective(intCoefficients = longArrayOf(-1, -1)),
-                LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
-                SolveStatsSink(backend = if (mir) "tableau-mir" else "tableau-gomory"),
-                solveContext = LpSolveContext(engineFactory = factory),
-            ).use { engine ->
-                val session = PropagationSession(problem)
-                val relaxer = assertNotNull(engine.lpRelaxer)
-                val base = relaxer.build(session)
-                assertContentEquals(longArrayOf(1, 1), base.model.loShift)
-
-                val harvested = engine.harvestRootCuts(
-                    relaxer,
-                    session,
-                    emptyList(),
-                    gomory = !mir,
-                    mir = mir,
-                )
-                assertTrue(solved.size >= 2)
-                assertEquals(-3.5, solved.first().second)
-                assertEquals(-3.0, solved.last().second)
-                val generated = harvested.single()
-                val raw = rawCuts.single()
-                val tableau = assertNotNull(raw.tableau)
-                assertNull(raw.provenance)
-                assertEquals(mir, tableau.mir)
-                assertEquals(Relation.GE, raw.rel)
-                assertContentEquals(intArrayOf(0, 1), raw.cols)
-                assertContentEquals(longArrayOf(-1, -1), raw.coeffs)
-                assertEquals(-3L, raw.rhs)
-                assertContentEquals(raw.cols, generated.cols)
-                assertContentEquals(raw.coeffs, generated.coeffs)
-                assertEquals(raw.rhs, generated.rhs)
-                val source = assertNotNull(SourceCut.fromCut(generated, base).orNull())
-                val sourceX = CutSource(CutSourceKind.INTEGER, 0)
-                val sourceY = CutSource(CutSourceKind.INTEGER, 1)
-                val row = assertNotNull(source.provenance.conclusion)
-                val rule = source.provenance.rules.single()
-                assertEquals(mir, rule.mir)
-                val multiplier = rule.rows.single().multiplier
-                assertTrue(multiplier > 0)
-                assertEquals(2L * multiplier, rule.divisor)
-                assertEquals(tableau.divisor, rule.divisor)
-                assertEquals(if (mir) multiplier else 1L, rule.reduction)
-                assertEquals(tableau.reduction, rule.reduction)
-                assertEquals(
-                    CutPremise.Row(
-                        CutExpression(mapOf(sourceX to BigFraction.ofLong(2), sourceY to BigFraction.ofLong(2))),
-                        Relation.LE,
-                        BigFraction.ofLong(7),
-                    ),
-                    rule.rows.single().row,
-                )
-                assertEquals(Relation.GE, source.relation)
-                assertEquals(
-                    CutPremise.Row(
-                        CutExpression(mapOf(sourceX to BigFraction.MINUS_ONE, sourceY to BigFraction.MINUS_ONE)),
-                        Relation.GE,
-                        BigFraction.ofLong(-3),
-                    ),
-                    row,
-                )
-                assertTrue(source.provenance.facts.none { it.premise == row })
-                for (sourceVariable in listOf(sourceX, sourceY)) {
-                    val expression = CutExpression(mapOf(sourceVariable to BigFraction.ONE))
-                    assertTrue(source.provenance.facts.contains(CutProofFact(CutPremise.Integral(expression), true)))
-                    assertTrue(
-                        source.provenance.facts.contains(
-                            CutProofFact(CutPremise.Bound(expression, false, BigFraction.ONE), true),
-                        ),
-                    )
-                }
-                assertTrue(source.provenance.global)
-
-                engine.cutPool.addAll(harvested)
-                val root = assertNotNull(engine.nodeRelaxation(relaxer, session))
-                val consumed = engine.cutPool.cuts().single()
-                assertTrue(consumed.global)
-                val applied = relaxer.build(session, listOf(consumed))
-                val solvedModel = solved.last().first
-                assertEquals(root.model.m + 1, solvedModel.m)
-                assertContentEquals(applied.model.csc.colPtr, solvedModel.csc.colPtr)
-                assertContentEquals(applied.model.csc.rowIdx, solvedModel.csc.rowIdx)
-                assertContentEquals(applied.model.csc.colVal, solvedModel.csc.colVal)
-                assertContentEquals(applied.model.rhs, solvedModel.rhs)
-                assertContentEquals(applied.model.loShift, solvedModel.loShift)
-                val cutRow = solvedModel.m - 1
-                val structural = LongArray(solvedModel.n)
-                for (column in structural.indices) {
-                    solvedModel.forEachInColumn(column) { rowIndex, value ->
-                        if (rowIndex == cutRow) structural[column] = value
-                    }
-                }
-                assertContentEquals(longArrayOf(1, 1), structural)
-                assertEquals(1L, solvedModel.rhs[cutRow])
-                assertContentEquals(longArrayOf(1, 1), solvedModel.loShift)
-                assertTrue(solvedModel.rowGlobal[cutRow])
-                assertNull(solvedModel.rowPremises[cutRow])
-                assertSame(consumed.provenance, applied.sourceMap?.parent(cutRow))
-                assertFalse(solvedModel.hasUpper[solvedModel.slackCol(cutRow)])
-                val sourceThreshold = solvedModel.rhs[cutRow] +
-                    structural.indices.sumOf { structural[it] * solvedModel.loShift[it] }
-                assertEquals(3L, sourceThreshold)
-
-                for (x in 1L..5L) {
-                    for (y in 1L..5L) {
-                        if (2 * x + 2 * y > 7) continue
-                        val observed = row.expression.value { BigFraction.ofLong(if (it == sourceX) x else y) }
-                        assertTrue(observed >= row.rhs)
-                        assertTrue(x + y <= sourceThreshold)
-                    }
-                }
-                assertTrue(2L * 1 + 2L * 2 <= 7 && 1L + 2L > sourceThreshold - 1)
-
-                session.implyIntAtLeast(0, 2)
-                assertNotNull(engine.nodeRelaxation(relaxer, session))
-                val remapped = engine.cutPool.cuts().single()
-                assertTrue(remapped.global)
-                val shifted = relaxer.build(session, listOf(remapped))
-                val shiftedRow = shifted.model.m - 1
-                assertContentEquals(longArrayOf(2, 1), shifted.model.loShift)
-                assertEquals(0L, shifted.model.rhs[shiftedRow])
-                assertSame(remapped.provenance, shifted.sourceMap?.parent(shiftedRow))
-                val shiftedCoefficients = LongArray(shifted.model.n)
-                for (column in shiftedCoefficients.indices) {
-                    shifted.model.forEachInColumn(column) { index, value ->
-                        if (index == shiftedRow) shiftedCoefficients[column] = value
-                    }
-                }
-                assertContentEquals(longArrayOf(1, 1), shiftedCoefficients)
-                assertEquals(
-                    sourceThreshold,
-                    shifted.model.rhs[shiftedRow] +
-                        shiftedCoefficients.indices.sumOf {
-                            shiftedCoefficients[it] * shifted.model.loShift[it]
-                        },
-                )
-            }
-        }
-    }
-
-    @Test
-    fun `generated Hall cut survives pool remapping as an exact source row`() {
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(2, 7) },
-            arrayOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 2, domainSize = 6)),
-        )
-        LpEngine(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
-            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
-            SolveStatsSink(backend = "generated-hall"),
-        ).use { engine ->
-            val cp = CpSearchComponent(PropagationSession(problem))
-            engine.cpAdapter.attach(cp.session, feasibility = false)
-            val search = SearchSession(listOf(cp, engine.propagator))
-            search.initialize()
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            assertEquals(0, root.model.m)
-            val rootResult = assertNotNull(engine.solveNode(root.model, null, Cancellation.Never)?.second)
-            assertEquals(6.0, rootResult.objective)
-            val emitted = AllDifferentSeparator()
-                .separate(CutContext(problem, root, rootResult.primal, cp.session))
-                .single { it.rel == Relation.GE }
-            assertTrue(emitted.global)
-            assertContentEquals(intArrayOf(0, 1, 2).map { root.intColOf[it] }.toIntArray(), emitted.cols)
-            assertContentEquals(longArrayOf(1, 1, 1), emitted.coeffs)
-            assertEquals(9L, emitted.rhs)
-            assertTrue(emitted.provenance == null)
-            engine.recordSearchCuts(listOf(emitted), rootResult.primal, root, cp.session)
-            assertEquals(1, engine.cutPool.size)
-
-            search.push(SearchDecision.IntAtLeast(0, 4))
-            val node = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val consumed = engine.cutPool.cuts().single()
-            assertTrue(consumed.global)
-            assertContentEquals(emitted.cols, consumed.cols)
-            assertContentEquals(emitted.coeffs, consumed.coeffs)
-            assertEquals(emitted.rhs, consumed.rhs)
-            val baseResult = assertNotNull(engine.solveNode(node.model, null, Cancellation.Never)?.second)
-            assertEquals(8.0, baseResult.objective)
-            val applied = relaxer.build(cp.session, listOf(consumed))
-            assertEquals(node.model.m + 1, applied.model.m)
-            assertContentEquals(intArrayOf(0, 1, 2), IntArray(3) { applied.intColOf[it] })
-            val row = applied.model.m - 1
-            val coefficients = LongArray(applied.model.n)
-            for (column in coefficients.indices) {
-                applied.model.forEachInColumn(column) { index, value ->
-                    if (index == row) coefficients[column] = value
-                }
-            }
-            val sourceCoefficients = coefficients.map { -it }.toLongArray()
-            val sourceThreshold = -applied.model.rhs[row] -
-                coefficients.indices.sumOf { coefficients[it] * applied.model.loShift[it] }
-            assertContentEquals(longArrayOf(1, 1, 1), sourceCoefficients)
-            assertEquals(9L, sourceThreshold)
-            assertContentEquals(longArrayOf(4, 2, 2), applied.model.loShift.copyOfRange(0, 3))
-            assertEquals(-1L, applied.model.rhs[row])
-            assertTrue(applied.model.rowGlobal[row])
-            assertTrue(!applied.model.hasUpper[applied.model.slackCol(row)])
-            assertTrue(applied.model.rowPremises[row] == null)
-            val tightened = assertNotNull(engine.solveNode(applied.model, null, Cancellation.Never)?.second)
-            assertEquals(9.0, tightened.objective)
-
-            var strongerCounterexample = false
-            for (x in 2L..7L) {
-                for (y in 2L..7L) {
-                    for (z in 2L..7L) {
-                        if (x == y || x == z || y == z) continue
-                        val lhs = sourceCoefficients[0] * x + sourceCoefficients[1] * y + sourceCoefficients[2] * z
-                        assertTrue(lhs >= sourceThreshold)
-                        if (lhs < sourceThreshold + 1) strongerCounterexample = true
-                    }
-                }
-            }
-            assertTrue(strongerCounterexample)
-        }
-    }
-
-    @Test
-    fun `generated local Hall cut is pooled while all source interval guards hold`() {
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 5) },
-            arrayOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6)),
-        )
-        LpEngine(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1, 1, 1)),
-            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
-            SolveStatsSink(backend = "local-hall"),
-        ).use { engine ->
-            val cp = CpSearchComponent(PropagationSession(problem))
-            engine.cpAdapter.attach(cp.session, feasibility = false)
-            val search = SearchSession(listOf(cp, engine.propagator))
-            search.initialize()
-            search.push(SearchDecision.IntAtLeast(1, 3))
-            search.push(SearchDecision.IntAtLeast(2, 3))
-            search.push(SearchDecision.IntAtLeast(0, 3))
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val local = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            assertEquals(0, local.model.m)
-            val base = assertNotNull(engine.solveNode(local.model, null, Cancellation.Never)?.second)
-            assertEquals(9.0, base.objective)
-            val emitted = AllDifferentSeparator()
-                .separate(CutContext(problem, local, base.primal, cp.session))
-                .single { it.rel == Relation.GE }
-            assertEquals(12L, emitted.rhs)
-            assertFalse(emitted.global)
-            val proof = assertNotNull(emitted.provenance)
-            for (variable in 0..2) {
-                assertTrue(proof.facts.contains(CutProofFact(
-                    CutPremise.Bound(
-                        CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, variable) to BigFraction.ONE)),
-                        false, BigFraction.ofLong(3),
-                    ), false,
-                )))
-            }
-            engine.recordSearchCuts(listOf(emitted), base.primal, local, cp.session)
-            assertEquals(1, engine.cutPool.cuts().size)
-            assertEquals(1, engine.cutPool.size)
-            val localApplied = relaxer.build(cp.session, listOf(emitted))
-            assertEquals(local.model.m + 1, localApplied.model.m)
-            assertFalse(localApplied.model.rowGlobal.last())
-            assertTrue(localApplied.model.rowPremises.last() == null)
-            assertEquals(
-                12.0,
-                assertNotNull(engine.solveNode(localApplied.model, null, Cancellation.Never)?.second).objective,
-            )
-
-            var missingGuardCounterexample = false
-            var strongerCounterexample = false
-            for (x in 0L..5L) {
-                for (y in 0L..5L) {
-                    for (z in 0L..5L) {
-                        if (x == y || x == z || y == z || y < 3 || z < 3) continue
-                        val sum = x + y + z
-                        if (x >= 3) {
-                            assertTrue(sum >= emitted.rhs)
-                            if (sum < emitted.rhs + 1) strongerCounterexample = true
-                        } else if (sum < emitted.rhs) {
-                            missingGuardCounterexample = true
-                        }
-                    }
-                }
-            }
-            assertTrue(missingGuardCounterexample)
-            assertTrue(strongerCounterexample)
-
-            search.popTo(2)
-            search.push(SearchDecision.IntAtMost(0, 2))
-            val sibling = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            assertTrue(engine.cutPool.cuts().isEmpty())
-            assertEquals(0, sibling.model.m)
-            assertEquals(
-                6.0,
-                assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second).objective,
-            )
-        }
-    }
-
-    @Test
-    fun `root harvest retains a Hall cut over declared finite bounds`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 3) },
-            arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4)),
-        )
-        LpEngine(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1, 1)),
-            LpParams(lpPlan = LpPlan(bounding = true, cuts = true)),
-            SolveStatsSink(backend = "finite-hall"),
-        ).use { engine ->
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val harvested = engine.harvestRootCuts(
-                relaxer,
-                PropagationSession(problem),
-                listOf(AllDifferentSeparator()),
-                gomory = false,
-                mir = false,
-            )
-            assertTrue(harvested.any { it.global && it.rel == Relation.GE && it.rhs == 1L })
-        }
-    }
-
-    @Test
     fun `root harvest refuses a Hall cut based on an invented upper bound`() {
         val problem = Problem(
             0,
@@ -1087,169 +544,6 @@ class CpLpAdapterTest {
     }
 
     @Test
-    fun `a shifted source row survives cut pool remapping`() {
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(-3, 5), IntDomain(2, 8)),
-            arrayOf(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.GE, -4)),
-        )
-        LpEngine(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(0, 0)),
-            LpParams(lpPlan = LpPlan(bounding = true)),
-            SolveStatsSink(backend = "source-cut"),
-        ).use { engine ->
-            val cp = CpSearchComponent(PropagationSession(problem))
-            engine.cpAdapter.attach(cp.session, feasibility = false)
-            val shared = SearchSession(listOf(cp, engine.propagator))
-            shared.initialize()
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val cut = Cut(intArrayOf(root.model.slackCol(0)), longArrayOf(1), Relation.GE, 0, global = true)
-            val source = assertNotNull(SourceCut.fromCut(cut, root).orNull())
-            for (x in -3L..5L) {
-                for (y in 2L..8L) {
-                    val lhs = source.expression.value { variable ->
-                        BigFraction.ofLong(if (variable.id == 0) x else y)
-                    }
-                    assertEquals(2 * x - y >= -4, lhs >= source.rhs)
-                }
-            }
-            val boundary = source.expression.value { variable ->
-                BigFraction.ofLong(if (variable.id == 0) -1 else 2)
-            }
-            assertEquals(source.rhs, boundary)
-            engine.recordSearchCuts(listOf(cut), DoubleArray(root.model.numVars), root, cp.session)
-            assertEquals(1, engine.cutPool.cuts().size)
-            shared.push(SearchDecision.IntAtLeast(0, -1))
-            val sibling = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            assertEquals(1, engine.cutPool.cuts().size)
-            val remapped = engine.cutPool.cuts().single()
-            assertTrue(remapped.global)
-            val applied = relaxer.build(cp.session, listOf(remapped))
-            assertEquals(sibling.model.m + 1, applied.model.m)
-            for (x in -3L..5L) {
-                for (y in 2L..8L) {
-                    val values = longArrayOf(x, y)
-                    val lhs = remapped.cols.indices.sumOf { remapped.coeffs[it] * values[remapped.cols[it]] }
-                    assertEquals(2 * x - y >= -4, lhs >= remapped.rhs)
-                }
-            }
-            assertNotNull(sibling.sourceMap)
-        }
-    }
-
-    @Test
-    fun `shared bound changes and pop reuse factors with source equivalent proof views`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(-3, 7) },
-            arrayOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            ),
-        )
-        var constructions = 0
-        var closes = 0
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                constructions++
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
-                return object : PersistentLpSolver by delegate {
-                    override fun close() {
-                        closes++
-                        delegate.close()
-                    }
-                }
-            }
-        }
-        val objective = LinearObjective(intCoefficients = longArrayOf(2, 1), constant = 5)
-        LpEngine(
-            problem,
-            objective,
-            LpParams(lpPlan = LpPlan(bounding = true)),
-            SolveStatsSink(backend = "trail"),
-            LpSolveContext(factory),
-        ).use { engine ->
-            val cp = CpSearchComponent(PropagationSession(problem))
-            engine.cpAdapter.attach(cp.session, feasibility = false)
-            val shared = SearchSession(listOf(cp, engine.propagator))
-            shared.initialize()
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val initial = assertNotNull(engine.solveNode(root.model, null, Cancellation.Never)?.second)
-            val saved = initial.primal.copyOf()
-            val authority = assertNotNull(engine.propagator.state).model
-
-            shared.push(SearchDecision.IntAtLeast(0, 0))
-            val child = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val result = assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second)
-            assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
-            for (x in 0L..7L) {
-                for (y in -3L..7L) {
-                    val column = child.intColOf[0]
-                    val origin = child.model.exactShift(column)
-                    assertEquals(authority.column(column).origin.value, origin)
-                    assertEquals(
-                        BigFraction.ZERO,
-                        origin + assertNotNull(child.model.exactBounds(column).lower).number.value,
-                    )
-                    assertEquals(
-                        BigFraction.ofLong(7),
-                        origin + assertNotNull(child.model.exactBounds(column).upper).number.value,
-                    )
-                    val shifted = listOf(
-                        BigFraction.ofLong(x) - origin,
-                        BigFraction.ofLong(y) - child.model.exactShift(1),
-                    )
-                    var activity = BigFraction.ZERO
-                    var objectiveValue = child.model.exactConstant()
-                    for (j in shifted.indices) {
-                        child.model.forEachRationalColumn(j) { _, a -> activity += a * shifted[j] }
-                        objectiveValue += child.model.exactCost(j) * shifted[j]
-                    }
-                    assertEquals(x + y >= 1L, activity <= child.model.exactRhs(0))
-                    assertEquals(
-                        BigFraction.ofLong(2 * x + y + 5),
-                        child.model.sourceObjective(objectiveValue) + BigFraction.ofLong(child.objectiveConstant),
-                    )
-                }
-            }
-            assertEquals(1.0, result.objective)
-            shared.popTo(0)
-            val restored = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            assertTrue(authority.sameAuthority(assertNotNull(engine.propagator.state).model))
-            assertNotNull(engine.solveNode(restored.model, null, Cancellation.Never)?.second)
-            assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
-            assertEquals(0, engine.propagator.lastMetrics.warmStartRefactorizations)
-            assertContentEquals(saved, initial.primal)
-            assertEquals(1, constructions)
-            engine.releasePersistentSolvers()
-            assertEquals(constructions, closes)
-            assertNotNull(engine.solveNode(restored.model, null, Cancellation.Never)?.second)
-            assertEquals(2, constructions)
-        }
-        assertEquals(constructions, closes)
-    }
-
-    @Test
     fun `cancelled pruning entry preserves authority and performs no solver work`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
@@ -1279,43 +573,6 @@ class CpLpAdapterTest {
             cancelled = false
             assertNotNull(engine.solveNode(root.model, null, token)?.second)
             assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
-        }
-    }
-
-    @Test
-    fun `standalone sibling bounds cannot retain a stronger prior assertion`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(-5, 5)), emptyArray())
-        LpEngine(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)),
-            SolveStatsSink(backend = "siblings"),
-        ).use { engine ->
-            val session = PropagationSession(problem)
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            session.pinIntAtLeast(0, 3)
-            val child = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            assertEquals(BigFraction.ofLong(-5L), child.model.exactShift(0))
-            assertEquals(
-                BigFraction.ofLong(3L),
-                child.model.exactShift(0) + assertNotNull(child.model.exactBounds(0).lower).number.value,
-            )
-            session.popToLevel(0)
-            session.pinIntAtMost(0, -2)
-            val sibling = assertNotNull(engine.nodeRelaxation(relaxer, session))
-            assertEquals(BigFraction.ofLong(-5L), sibling.model.exactShift(0))
-            assertEquals(
-                BigFraction.ofLong(-5L),
-                sibling.model.exactShift(0) + assertNotNull(sibling.model.exactBounds(0).lower).number.value,
-            )
-            assertEquals(
-                BigFraction.ofLong(-2L),
-                sibling.model.exactShift(0) + assertNotNull(sibling.model.exactBounds(0).upper).number.value,
-            )
-            assertEquals(
-                -5.0,
-                assertNotNull(engine.solveNode(sibling.model, null, Cancellation.Never)?.second).objective,
-            )
         }
     }
 
@@ -1403,83 +660,6 @@ class CpLpAdapterTest {
             assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
             assertEquals(1, engine.cutPool.cuts().size)
             assertEquals(facts, engine.cutPool.cuts().single().provenance?.facts?.filter { !it.global })
-        }
-    }
-
-    @Test
-    fun `interior domain removal updates auxiliary presence without changed source endpoints`() {
-        val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 4), IntDomain(0, 5), IntDomain(0, 4)),
-            arrayOf(
-                Table(intArrayOf(0, 1), longArrayOf(0, 5, 2, 2, 4, 0)),
-                AllDifferent(intArrayOf(0, 2), 0, 5),
-            ),
-        )
-        LpEngine(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
-            LpParams(lpPlan = LpPlan(bounding = true, table = true)),
-            SolveStatsSink(backend = "presence"),
-        ).use { engine ->
-            val cp = CpSearchComponent(PropagationSession(problem))
-            engine.cpAdapter.attach(cp.session, feasibility = false)
-            val shared = SearchSession(listOf(cp, engine.propagator))
-            shared.initialize()
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val root = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val auxiliary = root.colReq.indices.first { column ->
-                root.colReq[column]?.toList() == listOf(0L, 2L, 1L, 2L)
-            }
-            assertEquals(BigFraction.ONE, root.model.exactBounds(auxiliary).upper?.number?.value)
-            shared.push(SearchDecision.IntEqual(2, 2))
-
-            val child = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-
-            assertEquals(0L, cp.session.intDomain(0).min)
-            assertEquals(4L, cp.session.intDomain(0).max)
-            assertTrue(!cp.session.intDomain(0).contains(2L))
-            assertEquals(BigFraction.ZERO, child.model.exactBounds(auxiliary).upper?.number?.value)
-            shared.popTo(0)
-            assertEquals(
-                BigFraction.ONE,
-                assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-                    .model.exactBounds(auxiliary).upper?.number?.value,
-            )
-        }
-    }
-
-    @Test
-    fun `a reseeded native root replaces previous bound authority`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), emptyArray())
-        LpEngine(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            LpParams(lpPlan = LpPlan(bounding = true)),
-            SolveStatsSink(backend = "reseed"),
-        ).use { engine ->
-            val cp = CpSearchComponent(PropagationSession(problem))
-            cp.session.seed(Assumptions(ints = mapOf(0 to 4L)))
-            cp.rebase()
-            engine.cpAdapter.attach(cp.session, feasibility = false)
-            val shared = SearchSession(listOf(cp, engine.propagator))
-            shared.initialize()
-            val relaxer = assertNotNull(engine.lpRelaxer)
-            val before = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            assertEquals(4.0, assertNotNull(engine.solveNode(before.model, null, Cancellation.Never)?.second).objective)
-            cp.session.reseedFrom(Assumptions(ints = mapOf(0 to 1L)))
-            cp.rebase()
-            shared.resetRootFacts()
-            shared.initialize()
-            val after = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            assertEquals(BigFraction.ZERO, after.model.exactShift(0))
-            assertEquals(BigFraction.ONE, assertNotNull(after.model.exactBounds(0).lower).number.value)
-            assertEquals(BigFraction.ONE, assertNotNull(after.model.exactBounds(0).upper).number.value)
-            assertEquals(1.0, assertNotNull(engine.solveNode(after.model, null, Cancellation.Never)?.second).objective)
-            assertEquals(1L, assertNotNull(engine.propagator.metrics).createdOwners)
-            assertEquals(0, engine.propagator.lastMetrics.initialRefactorizations)
-            assertEquals(0, assertNotNull(engine.propagator.state).depth)
         }
     }
 

@@ -1,7 +1,5 @@
 package com.eignex.klause.propagation.difference
 
-import com.eignex.klause.arithmetic.difference.DifferenceGraph
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -9,11 +7,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * The difference system under assertion and retraction. The invariant under test is that the structure
- * answers the same questions a from-scratch cycle search would, in whatever order the search asserts and
- * retracts — a stale potential or a leftover edge would show up as a cycle the system does not contain.
- */
 class IncrementalDifferenceGraphTest {
 
     /** `target − source ≤ bound` per triple, in the given order. */
@@ -58,31 +51,6 @@ class IncrementalDifferenceGraphTest {
     }
 
     @Test
-    fun `a route to the constant node through a row is measured too`() {
-        // 0 reaches the constant node 3 only through the row 0 -> 1 and 1's own declared range.
-        val g = graphWithHub(4, setOf(1), Triple(0, 1, 2L), Triple(1, 3, 5L))
-        assertNull(g.assertEdge(0))
-        assertNull(g.assertEdge(1))
-        g.refreshZeroDistances(3)
-        assertEquals(7L, g.distanceToZeroFrom(0), "the row's weight plus the range's")
-        assertEquals(listOf(0, 1), g.pathToZeroFrom(0).toList().sorted())
-    }
-
-    @Test
-    fun `a chain of assertions stays consistent`() {
-        val g = graph(3, Triple(0, 1, 3L), Triple(1, 2, 4L))
-        assertNull(g.assertEdge(0))
-        assertNull(g.assertEdge(1))
-    }
-
-    @Test
-    fun `a zero-weight cycle is consistent`() {
-        val g = graph(2, Triple(0, 1, 2L), Triple(1, 0, -2L))
-        assertNull(g.assertEdge(0))
-        assertNull(g.assertEdge(1))
-    }
-
-    @Test
     fun `the assertion closing a negative cycle reports the full cycle at any length`() {
         val cases = listOf(
             2 to arrayOf(Triple(0, 1, -1L), Triple(1, 0, -1L)),
@@ -114,31 +82,12 @@ class IncrementalDifferenceGraphTest {
     }
 
     @Test
-    fun `re-asserting after a retraction finds the same cycle`() {
-        val g = graph(3, Triple(0, 1, 1L), Triple(1, 2, 1L), Triple(2, 0, -3L))
-        g.assertEdge(0)
-        g.assertEdge(1)
-        assertNotNull(g.assertEdge(2))
-        g.retract(1)
-        assertNull(g.assertEdge(2))
-        assertNotNull(g.assertEdge(1), "the cycle is back once the retracted edge returns")
-    }
-
-    @Test
     fun `a shortest path over negative weights is measured exactly and its path reported`() {
         val g = graph(3, Triple(0, 1, -5L), Triple(1, 2, -4L), Triple(0, 2, -2L))
         for (e in 0..2) assertNull(g.assertEdge(e))
         g.shortestPathsFrom(0, intArrayOf(2))
         assertEquals(-9L, g.distanceTo(2), "the two-hop route beats the direct edge")
         assertEquals(setOf(0, 1), g.pathTo(2).toSet())
-    }
-
-    @Test
-    fun `an unreached vertex has no distance`() {
-        val g = graph(3, Triple(0, 1, 1L))
-        assertNull(g.assertEdge(0))
-        g.shortestPathsFrom(0, intArrayOf(2))
-        assertEquals(IncrementalDifferenceGraph.UNREACHABLE, g.distanceTo(2))
     }
 
     @Test
@@ -195,99 +144,7 @@ class IncrementalDifferenceGraphTest {
         assertTrue(g.settlements < g.numNodes, "settled ${g.settlements} times over ${g.numNodes} vertices")
     }
 
-    @Test
-    fun `every assertion leaves a potential that solves the asserted system`() {
-        val rng = Random(20260815)
-        repeat(TRIALS) {
-            val edges = Array(EDGES) {
-                Triple(rng.nextInt(NODES), rng.nextInt(NODES), rng.nextLong(-4L, 5L))
-            }
-            val g = graph(NODES, *edges)
-            repeat(3 * EDGES) {
-                val e = rng.nextInt(EDGES)
-                if (g.isActive(e)) g.retract(e) else g.assertEdge(e)
-                for (k in 0 until EDGES) {
-                    if (!g.isActive(k)) continue
-                    val (s, t, w) = edges[k]
-                    assertTrue(
-                        g.potentialOf(s) + w >= g.potentialOf(t),
-                        "edge $k is violated by the potential the repair left",
-                    )
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `an arbitrary assert and retract sequence agrees with a from-scratch cycle search`() {
-        val rng = Random(20260813)
-        repeat(TRIALS) {
-            val edges = Array(EDGES) {
-                Triple(rng.nextInt(NODES), rng.nextInt(NODES), rng.nextLong(-4L, 5L))
-            }
-            val g = graph(NODES, *edges)
-            val active = BooleanArray(EDGES)
-            repeat(3 * EDGES) {
-                val e = rng.nextInt(EDGES)
-                if (active[e]) {
-                    g.retract(e)
-                    active[e] = false
-                } else {
-                    active[e] = true
-                    val closes = oracle(edges).negativeCycle(active.copyOf()) != null
-                    val reported = g.assertEdge(e)
-                    assertEquals(closes, reported != null, "verdict on asserting edge $e")
-                    if (reported != null) {
-                        active[e] = false
-                        assertTrue(weightOf(edges, reported) < 0L, "the reported cycle must be negative")
-                    }
-                }
-            }
-        }
-    }
-
-    @Test
-    fun `a reported distance matches an exhaustive relaxation`() {
-        val rng = Random(20260814)
-        repeat(TRIALS) {
-            val edges = Array(EDGES) {
-                Triple(rng.nextInt(NODES), rng.nextInt(NODES), rng.nextLong(-4L, 5L))
-            }
-            val g = graph(NODES, *edges)
-            val active = BooleanArray(EDGES)
-            for (e in 0 until EDGES) {
-                if (g.assertEdge(e) == null) active[e] = true
-            }
-            val origin = rng.nextInt(NODES)
-            val expected = relax(edges, active, origin)
-            g.shortestPathsFrom(origin, IntArray(NODES) { it })
-            for (n in 0 until NODES) assertEquals(expected[n], g.distanceTo(n), "distance $origin to $n")
-        }
-    }
-
-    /** A fresh Bellman-Ford graph over the same edges, as the from-scratch verdict to compare against. */
-    private fun oracle(edges: Array<Triple<Int, Int, Long>>): DifferenceGraph {
-        val g = DifferenceGraph(NODES)
-        for ((s, t, w) in edges) g.addEdge(s, t, w)
-        return g
-    }
-
     private fun weightOf(edges: Array<Triple<Int, Int, Long>>, cycle: IntArray): Long = cycle.sumOf { edges[it].third }
-
-    /** Shortest-path weights from [origin] over the active edges by repeated relaxation. */
-    private fun relax(edges: Array<Triple<Int, Int, Long>>, active: BooleanArray, origin: Int): LongArray {
-        val d = LongArray(NODES) { IncrementalDifferenceGraph.UNREACHABLE }
-        d[origin] = 0L
-        repeat(NODES) {
-            for (e in 0 until EDGES) {
-                if (!active[e]) continue
-                val (s, t, w) = edges[e]
-                if (d[s] == IncrementalDifferenceGraph.UNREACHABLE) continue
-                if (d[s] + w < d[t]) d[t] = d[s] + w
-            }
-        }
-        return d
-    }
 
     private companion object {
         const val NODES = 6

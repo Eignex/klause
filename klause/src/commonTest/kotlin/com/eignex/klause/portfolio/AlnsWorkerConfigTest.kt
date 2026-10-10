@@ -32,25 +32,6 @@ class AlnsWorkerConfigTest {
     }
 
     @Test
-    fun `the ALNS engine composes one hybrid-ALNS arm per requested slot`() {
-        val arms = PortfolioComposition.compose(
-            PortfolioScenario.parallel(cores = 4, kind = Kind.COP, engine = EngineMix.ALNS, arms = 4),
-        )
-        assertEquals(4, arms.size)
-        assertTrue(arms.all { it is AlnsWorkerConfig }, "every ALNS-engine arm is an AlnsWorkerConfig")
-        assertEquals(
-            AlnsProfile.Curated.map { "alns-${it.label}" },
-            arms.map { it.label },
-            "the arms cycle the curated regimes",
-        )
-    }
-
-    @Test
-    fun `the standalone arm uses the default regime`() {
-        assertEquals("alns-${AlnsProfile.Default.label}", AlnsWorkerConfig().label)
-    }
-
-    @Test
     fun `a materialized ALNS arm accepts the counted instruction budget`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),

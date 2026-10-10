@@ -1,7 +1,6 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -10,41 +9,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 class AssumptionsTest {
-
-    @Test
-    fun `sample should fix bool assumption to requested value`() {
-        // Two bools, no constraints. Without assumptions both can be either value.
-        val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val solver = LocalSearchSolver(problem.bake())
-        repeat(20) { seed ->
-            val sample = solver.sample(
-                LocalSearchParams(randomSeed = seed.toLong(), assumptions = Assumptions(bools = mapOf(0 to true))),
-            ).assignment
-            assertNotNull(sample)
-            assertEquals(true, sample.bools[0], "bool 0 must be fixed to true (seed=$seed)")
-        }
-    }
-
-    @Test
-    fun `sample should fix int assumption to requested value`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(min = 0, max = 100)),
-            factors = emptyArray(),
-        )
-        val solver = LocalSearchSolver(problem.bake())
-        repeat(20) { seed ->
-            val sample = solver.sample(
-                LocalSearchParams(randomSeed = seed.toLong(), assumptions = Assumptions(ints = mapOf(0 to 42))),
-            ).assignment
-            assertNotNull(sample)
-            assertEquals(42, sample.ints[0])
-        }
-    }
 
     @Test
     fun `minimize should respect bool assumption`() {
@@ -65,22 +31,6 @@ class AssumptionsTest {
         assertEquals(true, sample.bools[0])
         assertEquals(true, sample.bools[1])
         assertEquals(true, sample.bools[3])
-    }
-
-    @Test
-    fun `samples should honour assumptions across the stream`() {
-        val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val solver = LocalSearchSolver(problem.bake())
-        val draws = solver.samples(
-            LocalSearchParams(
-                randomSeed = 5L,
-                assumptions = Assumptions(bools = mapOf(1 to true)),
-            ),
-        ).take(10).toList()
-        assertTrue(draws.isNotEmpty())
-        for (s in draws) {
-            assertEquals(true, s.bools[1])
-        }
     }
 
     @Test

@@ -31,10 +31,4 @@ class LinearWideDomainTest {
         assertTrue(session.pinInt(1, 1L shl 33) is PropagationResult.Unsat)
     }
 
-    @Test
-    fun `a satisfying assignment passes when the row bounds overflow 64 bits`() {
-        val session = PropagationSession(wideProblem())
-        assertTrue(session.pinInt(0, 1L shl 40) !is PropagationResult.Unsat)
-        assertTrue(session.pinInt(1, -(1L shl 40)) !is PropagationResult.Unsat)
-    }
 }

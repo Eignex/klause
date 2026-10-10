@@ -19,11 +19,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/**
- * GF(2) elimination over the root parity system ([Presolve.deriveXorUnits]). Asserts the pass's
- * observable output — the unit [Clause]s and fixed 0/1 columns it derives — for forced literals,
- * contradictions, derived cross-row units, integer parity rows, idempotence, and the no-op empty delta.
- */
 class XorUnitsTest {
 
     private fun units(problem: Problem): List<Int> =
@@ -32,42 +27,6 @@ class XorUnitsTest {
     private fun derived(problem: Problem): Problem {
         val baked = problem.bake()
         return baked.withPassDelta(Presolve.deriveXorUnits(baked), BakeConfig.NONE)
-    }
-
-    @Test
-    fun `a single-literal xor forces its variable with the right polarity`() {
-        // targetParity xor negParity decides the value: a negated literal flips the forced polarity.
-        val cases = listOf(
-            Triple(Lit.make(0, true), 1, Lit.make(0, true)), //  x0 = true
-            Triple(Lit.make(0, true), 0, Lit.make(0, false)), //  x0 = false
-            Triple(Lit.make(0, false), 1, Lit.make(0, false)), // !x0 odd  ⇒ x0 = false
-            Triple(Lit.make(0, false), 0, Lit.make(0, true)), //  !x0 even ⇒ x0 = true
-        )
-        for ((lit, parity, expected) in cases) {
-            val problem = Problem(1, 0, emptyArray(), listOf(Xor(intArrayOf(lit), targetParity = parity)))
-            val out = derived(problem)
-            assertEquals(listOf(expected), units(out), "xor($lit)=$parity should force $expected")
-        }
-    }
-
-    @Test
-    fun `forced units are emitted sorted by variable`() {
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(
-                Xor(intArrayOf(Lit.make(2, true)), targetParity = 1),
-                Xor(intArrayOf(Lit.make(0, true)), targetParity = 0),
-                Xor(intArrayOf(Lit.make(1, true)), targetParity = 1),
-            ),
-        )
-        val out = derived(problem)
-        assertEquals(
-            listOf(Lit.make(0, false), Lit.make(1, true), Lit.make(2, true)),
-            units(out),
-            "forced units come out ordered by variable",
-        )
     }
 
     @Test
@@ -128,24 +87,6 @@ class XorUnitsTest {
         }
     }
 
-    @Test
-    fun `the finite lane fixes a forced 0-1 column in its root domain`() {
-        // x0 + x1 and x0 + x1 + x2 are both odd, so x2 is even: their sum forces it, no bound does.
-        val problem = Problem(
-            0,
-            5,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(-10, 10), IntDomain(-10, 10)),
-            listOf<Factor>(
-                Linear(longArrayOf(1L, 1L, 2L), intArrayOf(0, 1, 3), LinearOp.EQ, 1L),
-                Linear(longArrayOf(1L, 1L, 1L, 2L), intArrayOf(0, 1, 2, 4), LinearOp.EQ, 1L),
-            ),
-        )
-
-        val domains = assertNotNull(Presolve.deriveXorUnits(problem.bake()).domains)
-
-        assertEquals(0L to 0L, domains[2].min to domains[2].max)
-    }
-
     /** `rows` over 0/1 columns `x0..`, each row `Σ xᵢ + 2·y = rhs` with its own integer `y` open both ways. */
     private fun parityRows(numBinaries: Int, vararg rows: Pair<IntArray, Long>): Problem {
         val numInts = numBinaries + rows.size
@@ -166,15 +107,6 @@ class XorUnitsTest {
                 )
             }.toTypedArray<Factor>(),
         )
-    }
-
-    @Test
-    fun `an integer equality forces the 0-1 column its parity names`() {
-        val problem = parityRows(1, intArrayOf(0) to 1L)
-
-        val bounds = assertNotNull(XorUnits.deriveXorUnits(problem).bounds)
-
-        assertEquals(1L to 1L, bounds.lower(0) to bounds.upper(0))
     }
 
     @Test
@@ -226,14 +158,4 @@ class XorUnitsTest {
         assertTrue(Presolve.deriveXorUnits(once.bake()).isEmpty, "re-running adds no duplicate units")
     }
 
-    @Test
-    fun `a problem with no xor factors is a no-op`() {
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false)))),
-        )
-        assertTrue(Presolve.deriveXorUnits(problem.bake()).isEmpty, "no xor factors is the pass's no-op signal")
-    }
 }

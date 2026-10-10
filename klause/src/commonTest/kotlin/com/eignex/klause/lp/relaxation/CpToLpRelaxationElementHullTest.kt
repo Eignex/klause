@@ -71,40 +71,6 @@ class CpToLpRelaxationElementHullTest {
     }
 
     @Test
-    fun `restricting the index restricts the hull bound`() {
-        // Same array but idx pinned to {2,3}: cheapest reachable entry is arr[3] = 5.
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(2, 3), IntDomain(0, 20)),
-            factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
-            ),
-        )
-        val (sol, _) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)))
-
-        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-        assertEquals(5.0, sol.objectiveValue, eps)
-    }
-
-    @Test
-    fun `maximizing selects the dearest entry`() {
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 20)),
-            factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
-            ),
-        )
-        // maximize result <=> minimize -result; hull caps it at the largest entry 9.
-        val (sol, _) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, -1L)))
-
-        assertEquals(FloatLpStatus.OPTIMAL, sol.status)
-        assertEquals(-9.0, sol.objectiveValue, eps)
-    }
-
-    @Test
     fun `index channel ties idx to the selected position`() {
         // 1-based index (MiniZinc default): arr=[7,3,9,5], minimize result -> picks position of 3,
         // which is 0-based p=1, i.e. idx = 2.

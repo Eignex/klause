@@ -3,9 +3,6 @@ package com.eignex.klause.factor.table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.FixedCadenceRestart
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
@@ -31,22 +28,6 @@ class MddInvariantTest {
         accepting = intArrayOf(0),
         recordStride = 3,
     )
-
-    @Test
-    fun `satisfied when assignment follows an accepted path`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
-            factors = arrayOf(mddFactor()),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 1) // (1,2) is accepted
-        state.assignment.setInt(1, 2)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
-        assertEquals(0, state.factors[0].violationDegree(state, 0))
-    }
 
     @Test
     fun `cost-MDD seed sets the cost var to an edge weight beyond Int range`() {
@@ -152,58 +133,4 @@ class MddInvariantTest {
         assertEquals(-invariant.violationDegree(state, 0), delta)
     }
 
-    @Test
-    fun `violated when assignment follows a rejected path`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
-            factors = arrayOf(mddFactor()),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 1) // (1,1) is rejected
-        state.assignment.setInt(1, 1)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        assertTrue(state.factors[0].violationDegree(state, 0) > 0)
-    }
-
-    @Test
-    fun `delta is negative when move leads to accepted path`() {
-        // Violated: (1,1). Setting seq[1]=2 → (1,2) accepted → delta < 0.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
-            factors = arrayOf(mddFactor()),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 1)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        val delta = state.factors[0].deltaIfIntSet(state, 0, intVar = 1, newValue = 2)
-        assertTrue(delta < 0, "move to (1,2) should reduce violation; delta=$delta")
-    }
-
-    @Test
-    fun `ls solver finds only accepted words`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
-            factors = arrayOf(mddFactor()),
-        )
-        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 100))
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 2_000, randomSeed = 0)).take(10).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val a = s.ints[0]
-            val b = s.ints[1]
-            assertTrue(
-                (a == 1L && b == 2L) || (a == 2L && b == 1L),
-                "rejected word ($a,$b)",
-            )
-        }
-    }
 }

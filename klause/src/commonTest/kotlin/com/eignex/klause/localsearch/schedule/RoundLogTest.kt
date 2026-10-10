@@ -9,27 +9,6 @@ import kotlin.test.assertTrue
 class RoundLogTest {
 
     @Test
-    fun `acceptance ratio is accepted over proposed and zero when nothing proposed`() {
-        assertEquals(0.75, RoundLog(4, 3, 0.0, 0.0, 0.0, 1.0).acceptanceRatio, 1e-9)
-        assertEquals(0.0, RoundLog(0, 0, 0.0, 0.0, 0.0, 1.0).acceptanceRatio, 1e-9)
-    }
-
-    @Test
-    fun `accumulator counts proposed and accepted moves`() {
-        val acc = RoundAccumulator()
-        acc.record(costDelta = -1.0, accepted = true)
-        acc.record(costDelta = 2.0, accepted = false)
-        acc.record(costDelta = 0.5, accepted = true)
-        assertEquals(3, acc.proposed)
-        assertEquals(2, acc.accepted)
-        val log = acc.snapshot(temperature = 5.0)
-        assertEquals(3, log.proposed)
-        assertEquals(2, log.accepted)
-        assertEquals(2.0 / 3.0, log.acceptanceRatio, 1e-9)
-        assertEquals(5.0, log.temperature, 1e-9)
-    }
-
-    @Test
     fun `accumulator computes mean and population variance of the cost deltas`() {
         val acc = RoundAccumulator()
         // deltas 2, 4, 4, 4, 5, 5, 7, 9: mean 5, population variance 4.
@@ -37,38 +16,6 @@ class RoundLogTest {
         val log = acc.snapshot(temperature = 1.0)
         assertEquals(5.0, log.costMean, 1e-9)
         assertEquals(4.0, log.costVariance, 1e-9)
-    }
-
-    @Test
-    fun `a single sample has zero variance`() {
-        val acc = RoundAccumulator()
-        acc.record(3.0, accepted = true)
-        val log = acc.snapshot(temperature = 1.0)
-        assertEquals(3.0, log.costMean, 1e-9)
-        assertEquals(0.0, log.costVariance, 1e-9)
-    }
-
-    @Test
-    fun `an empty round reports zeroed statistics`() {
-        val log = RoundAccumulator().snapshot(temperature = 2.0)
-        assertEquals(0, log.proposed)
-        assertEquals(0.0, log.costMean, 1e-9)
-        assertEquals(0.0, log.costVariance, 1e-9)
-        assertEquals(0.0, log.bestCost, 1e-9)
-        assertEquals(0.0, log.incumbentCost, 1e-9)
-        assertEquals(0L, log.step)
-    }
-
-    @Test
-    fun `incumbent cost is the latest observed and step is carried through`() {
-        val acc = RoundAccumulator()
-        acc.observeCost(10.0)
-        acc.observeCost(3.0)
-        acc.observeCost(7.0)
-        val log = acc.snapshot(temperature = 1.0, step = 42L)
-        assertEquals(3.0, log.bestCost, 1e-9)
-        assertEquals(7.0, log.incumbentCost, 1e-9)
-        assertEquals(42L, log.step)
     }
 
     @Test

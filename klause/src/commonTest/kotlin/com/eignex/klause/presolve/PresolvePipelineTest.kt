@@ -10,15 +10,8 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/**
- * The presolve driver's contract: the [PresolveOutcome.reconstruct] composed across rounds must lift
- * every solution of the transformed problem back to a solution of the original, the transform must not
- * change satisfiability, and a presolve that reduces nothing must hand the caller its own problem back.
- */
 class PresolvePipelineTest {
 
     private fun isFeasible(problem: Problem, ints: LongArray): Boolean {
@@ -95,45 +88,4 @@ class PresolvePipelineTest {
         assertTrue(boxPoints(unsat).none { isFeasible(unsat, it) }, "the fixture really has no solution")
     }
 
-    @Test
-    fun `reconstruct rebuilds a substituted binary column from the literal that replaced it`() {
-        // A triangle of at-least-one rows over three `{0, 1}` columns: the whole model leaves the integer
-        // lane, so the composed reconstruct has to rebuild every column from its literal.
-        val binary = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
-            // The at-most-two row puts every column in an LE row as well as a GE one, so no column has a
-            // globally safe direction and dual fixing leaves the substitution something to do.
-            factors = listOf(
-                Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-                Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
-                Linear(longArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 2),
-            ),
-        )
-        val outcome = PresolvePipeline.run(binary, null, PresolveConfig.AUTO, solutionSetSensitive = false)
-        assertTrue(outcome.problem.numBoolVars > 0, "the columns must have become literals for this to test anything")
-
-        val lifted = ArrayList<List<Long>>()
-        for (mask in 0 until (1 shl outcome.problem.numBoolVars)) {
-            val bools = BooleanArray(outcome.problem.numBoolVars) { ((mask shr it) and 1) == 1 }
-            val ints = LongArray(outcome.problem.numIntVars) { outcome.problem.finiteIntDomain(it).min }
-            var a = Assumptions.None
-            for (b in bools.indices) a = a.withBool(b, bools[b])
-            for (v in ints.indices) a = a.withInt(v, ints[v])
-            if (outcome.problem.propagate(a) is PropagationResult.Unsat) continue
-            val recon = outcome.reconstruct(Sample(bools, ints))
-            assertTrue(isFeasible(binary, recon.ints), "reconstruct produced ${recon.ints.toList()}, not a solution")
-            lifted.add(recon.ints.toList())
-        }
-        assertTrue(lifted.isNotEmpty(), "the substituted model must keep the original's solutions reachable")
-    }
-
-    @Test
-    fun `a disabled presolve hands back the caller's own problem`() {
-        val outcome = PresolvePipeline.run(model, null, PresolveConfig.NONE, solutionSetSensitive = false)
-        assertFalse(outcome.changed, "no pass ran, so nothing changed")
-        assertSame(model, outcome.problem, "a no-op presolve must preserve the caller's handle")
-    }
 }

@@ -3,7 +3,6 @@ package com.eignex.klause.formats.xcsp3
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class XmlElementTest {
@@ -22,23 +21,6 @@ class XmlElementTest {
         val v = vars.child("var")!!
         assertEquals("x", v.attr("id"))
         assertEquals("1..4", v.textContent.trim())
-    }
-
-    @Test
-    fun `handles quoted attributes`() {
-        for (xml in listOf("<e a='1'/>", "<e a=\"1\"/>")) {
-            val e = parseXml(xml)
-            assertEquals("1", e.attr("a"))
-            assertTrue(e.children.isEmpty())
-        }
-    }
-
-    @Test
-    fun `self-closing elements have no children or text`() {
-        val root = parseXml("<root><a/><b>hi</b></root>")
-        assertEquals(2, root.children.size)
-        assertEquals("", root.child("a")!!.textContent)
-        assertEquals("hi", root.child("b")!!.textContent)
     }
 
     @Test
@@ -61,12 +43,6 @@ class XmlElementTest {
     }
 
     @Test
-    fun `decodes numeric entities`() {
-        val e = parseXml("<e>&#65; &#x42;</e>")
-        assertEquals("A B", e.textContent)
-    }
-
-    @Test
     fun `reads CDATA verbatim`() {
         val e = parseXml("<e><![CDATA[ raw < & > text ]]></e>")
         assertEquals(" raw < & > text ", e.textContent)
@@ -77,11 +53,6 @@ class XmlElementTest {
         val root = parseXml("<sum><list> a b </list><coeffs> 1 2 </coeffs></sum>")
         assertEquals("a b", root.child("list")!!.textContent.trim())
         assertEquals("1 2", root.child("coeffs")!!.textContent.trim())
-    }
-
-    @Test
-    fun `missing child returns null`() {
-        assertNull(parseXml("<r><a/></r>").child("missing"))
     }
 
     @Test

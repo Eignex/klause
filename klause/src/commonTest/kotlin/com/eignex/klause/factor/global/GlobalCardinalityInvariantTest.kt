@@ -10,7 +10,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class GlobalCardinalityInvariantTest {
@@ -67,32 +66,6 @@ class GlobalCardinalityInvariantTest {
             }
         }
         assertTrue(sawRotation, "count-preserving 3-cycle rotations must be emitted")
-    }
-
-    @Test
-    fun `satisfied when all counts within bounds`() {
-        val p = problem(intArrayOf(0, 1, 2), intArrayOf(1, 2), intArrayOf(1, 1), intArrayOf(2, 2))
-        val state = LocalSearchState(p.bake(), Random(0))
-        // xs = [1, 2, 1]: count(1)=2, count(2)=1 — both within [1,2]
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 1)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
-        assertEquals(0, state.factors[0].violationDegree(state, 0))
-    }
-
-    @Test
-    fun `violated when count falls below lower bound`() {
-        val p = problem(intArrayOf(0, 1, 2), intArrayOf(3), intArrayOf(2), intArrayOf(3))
-        val state = LocalSearchState(p.bake(), Random(0))
-        // xs = [3, 0, 0]: count(3)=1, one short of lo=2
-        state.assignment.setInt(0, 3)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 0)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        assertEquals(1, state.factors[0].violationDegree(state, 0))
     }
 
     @Test

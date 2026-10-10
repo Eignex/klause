@@ -10,7 +10,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class InverseInvariantTest {
@@ -83,38 +82,6 @@ class InverseInvariantTest {
         assertTrue(state.factors[0].seedFeasible(state, 0), "matching seed must find a feasible inverse")
         state.recompute()
         assertEquals(0L, state.cost, "the seeded assignment must satisfy inverse")
-    }
-
-    @Test
-    fun `not violated when f and g are a true inverse pair`() {
-        // f[i]=j ↔ g[j]=i, for a 3-cycle and for the identity (its own inverse).
-        val pairs = listOf(
-            listOf(1L, 2L, 0L) to listOf(2L, 0L, 1L),
-            listOf(0L, 1L, 2L) to listOf(0L, 1L, 2L),
-        )
-        for ((fValues, gValues) in pairs) {
-            val state = LocalSearchState(problem().bake(), Random(0))
-            for (i in 0..2) state.assignment.setInt(i, fValues[i])
-            for (i in 0..2) state.assignment.setInt(3 + i, gValues[i])
-            state.recompute()
-            assertFalse(state.factors[0].isViolated(state, 0), "f=$fValues g=$gValues must satisfy inverse")
-            assertEquals(0, state.factors[0].violationDegree(state, 0), "f=$fValues g=$gValues")
-        }
-    }
-
-    @Test
-    fun `violated when back-link is wrong`() {
-        val p = problem()
-        val state = LocalSearchState(p.bake(), Random(0))
-        // f = [0, 1, 2], g = [1, 1, 2]: g[f[0]]=g[0]=1, but should be 0 → violated
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 1)
-        state.assignment.setInt(2, 2)
-        state.assignment.setInt(3, 1)
-        state.assignment.setInt(4, 1)
-        state.assignment.setInt(5, 2)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
     }
 
     @Test

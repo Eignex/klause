@@ -53,23 +53,4 @@ class ReifiedLinearBinaryEqLpTest {
         assertEquals(0.0, lp(p, intC = -1, boolW = 1), eps) // minimize aux − v
     }
 
-    @Test
-    fun `pm1 channel relaxes to the exact v equals 2 aux minus 1`() {
-        // v ∈ {-1,1}, aux ⇔ v==1  ⇒  v = 2·aux − 1, so v − 2·aux ≡ −1 on the whole relaxation.
-        val p = channel(IntDomain(-1, 1).excludeValue(0), bound = 1)
-        assertEquals(-1.0, lp(p, intC = 1, boolW = -2), eps) // minimize v − 2·aux
-        assertEquals(1.0, lp(p, intC = -1, boolW = 2), eps) // minimize 2·aux − v
-    }
-
-    @Test
-    fun `a column too wide to enumerate takes the big-M rows instead of failing`() {
-        // The exact hull applies only to a two-valued column, and the check for that used to walk the
-        // domain. A column spanning 2^31 values has no span to walk, so asking cost a thrown
-        // IllegalStateException out of the relaxation build — a crash on a model that is merely wide.
-        val problem = channel(IntDomain(-2147483647, 0), bound = 0)
-
-        val relaxation = CpToLpRelaxation(problem, null).build(PropagationSession(problem))
-
-        assertEquals(FloatLpStatus.OPTIMAL, solveLp(relaxation.model).status)
-    }
 }

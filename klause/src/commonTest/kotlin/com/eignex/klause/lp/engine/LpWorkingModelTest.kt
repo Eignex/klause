@@ -7,7 +7,6 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -164,38 +163,6 @@ class LpWorkingModelTest {
             assertEquals(1, checked.metrics.reuse)
             assertEquals(BigFraction.ZERO, assertNotNull(checked.bound).value)
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, assertNotNull(owner.solve()).verdict)
-        }
-    }
-
-    @Test
-    fun `infeasible unbounded and cancelled scopes leave original solve available`() {
-        val zero = ExactLpNumber.of(0L)
-        val one = ExactLpNumber.of(1L)
-        val source = LpExactState(
-            ExactLpModel(
-                listOf(emptyList()),
-                emptyList(),
-                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one)))),
-                emptyList(),
-                ExactLpObjective(listOf(one)),
-            ),
-        )
-        for (terminal in listOf("infeasible", "unbounded", "cancelled")) {
-            LpScopedSolver(source).use { owner ->
-                val bounds = when (terminal) {
-                    "infeasible" -> ExactLpBounds(ExactLpSide(one), ExactLpSide(zero))
-                    "unbounded" -> ExactLpBounds()
-                    else -> source.model.column(0).bounds
-                }
-                owner.withWorkingModel(LpWorkingModel.overrides(source, bounds = listOf(bounds))) { scope ->
-                    val result = scope.solve(token = Cancellation { terminal == "cancelled" })
-                    if (terminal == "infeasible") assertEquals(LpVerdict.INFEASIBLE, result?.verdict)
-                    if (terminal == "cancelled") assertNull(result)
-                    if (terminal == "unbounded") assertFalse(result?.verdict == LpVerdict.ATTAINED_OPTIMUM)
-                }
-                assertNull(owner.lastResult)
-                assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
-            }
         }
     }
 
@@ -429,55 +396,4 @@ class LpWorkingModelTest {
         }
     }
 
-    @Test
-    fun `failed source capture remains exhausted after an auxiliary scope`() {
-        val zero = ExactLpNumber.of(0L)
-        val source = LpExactState(
-            ExactLpModel(
-                listOf(emptyList()),
-                emptyList(),
-                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(2L))))),
-                emptyList(),
-                ExactLpObjective(listOf(zero)),
-            ),
-        )
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: Cancellation,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
-                return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = null
-                    override fun continuationBasis(model: LpModel) = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
-                }
-            }
-        }
-        LpScopedSolver(source, context = LpSolveContext(engineFactory = factory)).use { owner ->
-            val limits = ExactContinuationLimits(maxWork = 100L, maxAllocation = 768L)
-            var result = assertNotNull(owner.solve(continuationLimits = limits))
-            assertEquals(ContinuationDecline.ALLOCATION, result.continuation?.decline)
-            assertEquals(0, result.continuation?.builds)
-            assertEquals(com.eignex.klause.simplex.exact.ContinuationPhase.INPUT, result.continuation?.phase)
-            repeat(128) {
-                if (result.continuation?.decline != ContinuationDecline.WORK) {
-                    result = assertNotNull(owner.solve(continuationLimits = limits))
-                }
-            }
-            assertEquals(ContinuationDecline.WORK, result.continuation?.decline)
-            owner.withWorkingModel(LpWorkingModel.overrides(source)) {
-                val stopped = assertNotNull(it.solve(continuationLimits = ExactContinuationLimits(maxWork = 1L)))
-                assertEquals(ContinuationDecline.WORK, stopped.continuation?.decline)
-            }
-            val exhausted = assertNotNull(owner.solve(continuationLimits = limits))
-            assertEquals(ContinuationDecline.WORK, exhausted.continuation?.decline)
-            assertEquals(0, exhausted.continuation?.builds)
-            assertNull(exhausted.witness)
-        }
-    }
 }

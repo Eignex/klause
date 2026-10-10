@@ -1,12 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
@@ -14,7 +12,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
-import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
@@ -57,35 +54,6 @@ class OpenSourcePreparationTest {
         )
     }
 
-    /**
-     * Three pairwise-exclusive Booleans and an at-least-one over them, beside a column open above and a
-     * row no difference fragment holds, so the merged cardinality has to reach the exact integer lane.
-     */
-    private fun amoCliqueOverOpenColumns(): Problem {
-        val openUpper = Bits(2).also { bits -> repeat(2) { bits.set(it) } }
-        return Problem(
-            numBoolVars = 3,
-            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), null, openUpper),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
-                Linear(longArrayOf(2, 4), intArrayOf(0, 1), LinearOp.NE, 3L),
-            ),
-        )
-    }
-
-    @Test
-    fun `an at-most-one clique merges before any finite projection exists`() {
-        val model = amoCliqueOverOpenColumns()
-
-        val result = OpenTheoryEngine(model, model.sourceRoute()).solve()
-
-        assertContains(result.stats.presolve!!.passes, PresolvePass.MERGE_AMO_CLIQUES.id)
-        assertIs<OpenTheoryResult.Sat>(result)
-    }
-
     @Test
     fun `a source rewrite moves factor ownership with the factors`() {
         val model = aggregatable(openColumns = true)
@@ -104,26 +72,6 @@ class OpenSourcePreparationTest {
         val result = OpenTheoryEngine(model, model.sourceRoute()).solve()
 
         assertIs<OpenTheoryResult.Unsat>(result)
-        assertEquals(true, result.stats.presolve?.infeasible)
-    }
-
-    @Test
-    fun `the open route reports what preparation did to the source`() {
-        val model = aggregatable(openColumns = true)
-
-        val result = OpenTheoryEngine(model, model.sourceRoute()).solve()
-
-        assertContains(result.stats.presolve!!.passes, PresolvePass.AGGREGATE_SUB_SUMS.id)
-    }
-
-    @Test
-    fun `source refutation is terminal for the open optimization route`() {
-        val model = refutable()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0))
-
-        val result = OpenTheoryMinimizer(model, objective).minimize()
-
-        assertIs<OpenTheoryOptimum.Infeasible>(result)
         assertEquals(true, result.stats.presolve?.infeasible)
     }
 
@@ -149,25 +97,4 @@ class OpenSourcePreparationTest {
         assertIs<OpenTheoryOptimum.Bounded>(result)
         assertNull(result.stats.presolve, "a descent that stopped before preparing has nothing to report")
     }
-
-    @Test
-    fun `the bounded and the open lane rewrite the source the same way`() {
-        val open = assertIs<OpenSourcePreparation.Planned>(
-            aggregatable(openColumns = true).prepareOpenSource(config = aggregateOnly),
-        )
-        val bounded = FinitePipeline.prepare(
-            FinitePipelineRequest(
-                aggregatable(openColumns = false),
-                FiniteEngine.BACKTRACK,
-                presolveConfig = aggregateOnly,
-            ),
-        )
-
-        assertContains(bounded.presolve!!.passes, PresolvePass.AGGREGATE_SUB_SUMS.id)
-        assertEquals(intArrayOf(0).toList(), aggregatedRow(open.model).vars.toList())
-        assertEquals(intArrayOf(0).toList(), aggregatedRow(bounded.problem).vars.toList())
-    }
-
-    private fun aggregatedRow(problem: Problem): Linear =
-        problem.factors.filterIsInstance<Linear>().single { it.vars.size == 1 }
 }

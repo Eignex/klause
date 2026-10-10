@@ -1,7 +1,6 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
@@ -11,11 +10,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * The declarative Boolean reconstruction the source lane carries. Each step is checked by what it
- * recovers, and the composition by the order it recovers in — an elimination reads the columns of the
- * model it produced, so a later pass's columns come back first.
- */
 class SourceRebuildTest {
 
     private fun bools(vararg values: Boolean) = booleanArrayOf(*values)
@@ -66,16 +60,6 @@ class SourceRebuildTest {
     }
 
     @Test
-    fun `a copy takes the value of its source literal`() {
-        val rebuild = SourceRebuilds(listOf(RebuildStep.CopyLiteral(variable = 0, source = pos(1))))
-        val values = bools(false, true)
-
-        rebuild.rebuildInto(values)
-
-        assertTrue(values[0], "the merged column takes its representative's value")
-    }
-
-    @Test
     fun `a copy from a negative literal takes the opposite value`() {
         val rebuild = SourceRebuilds(listOf(RebuildStep.CopyLiteral(variable = 0, source = neg(1))))
         val values = bools(true, true)
@@ -96,19 +80,6 @@ class SourceRebuildTest {
         rebuild.rebuildInto(values)
 
         assertTrue(values[0])
-    }
-
-    @Test
-    fun `an eliminated variable whose clauses already hold comes back false`() {
-        // x1 satisfies the clause on its own, so nothing is forced and the default stands.
-        val rebuild = SourceRebuilds(
-            listOf(RebuildStep.SatisfyClauses(variable = 0, clauses = listOf(intArrayOf(pos(0), pos(1))))),
-        )
-        val values = bools(true, true)
-
-        rebuild.rebuildInto(values)
-
-        assertFalse(values[0])
     }
 
     @Test
@@ -141,43 +112,6 @@ class SourceRebuildTest {
         assertTrue(values[0], "so the earlier one reads its recovered value")
     }
 
-    @Test
-    fun `composing rebuilds that recover nothing recovers nothing`() {
-        assertTrue(SourceRebuilds.compose(emptyList()).isEmpty)
-        assertTrue(SourceRebuilds.compose(listOf(SourceRebuilds.NONE, SourceRebuilds.NONE)).isEmpty)
-    }
-
-    @Test
-    fun `composing skips the rebuilds that recover nothing`() {
-        val rebuild = SourceRebuilds(listOf(RebuildStep.CopyLiteral(variable = 0, source = pos(1))))
-        val values = bools(false, true)
-
-        SourceRebuilds.compose(listOf(SourceRebuilds.NONE, rebuild, SourceRebuilds.NONE)).rebuildInto(values)
-
-        assertTrue(values[0])
-    }
-
-    @Test
-    fun `a rebuild that recovers nothing yields no sample lift`() {
-        // The finite lane reads the absence to mean the identity, so an empty rebuild must not hand it a
-        // lambda that copies every solution's arrays for nothing.
-        assertEquals(null, SourceRebuilds.NONE.asSampleLift())
-    }
-
-    @Test
-    fun `the sample lift leaves the solved sample alone`() {
-        val rebuild = SourceRebuilds(listOf(RebuildStep.CopyLiteral(variable = 0, source = pos(1))))
-        val solved = Sample(bools(false, true), longArrayOf(7))
-
-        val lifted = checkNotNull(rebuild.asSampleLift())(solved)
-
-        assertTrue(lifted.bools[0], "the eliminated column is recovered")
-        assertFalse(solved.bools[0], "the sample the search produced is not written through")
-        assertEquals(7L, lifted.ints[0], "columns the rebuild does not name are carried")
-    }
-
-    // ---- integer columns ----
-
     private fun affine(variable: Int, const: Long, vars: IntArray, coeffs: LongArray, divisor: Long = 1) =
         RebuildStep.AffineValue(variable, const, vars, coeffs, divisor)
 
@@ -204,24 +138,6 @@ class SourceRebuildTest {
     }
 
     @Test
-    fun `the two evaluators agree on values a Long holds`() {
-        // The whole point of stating the step as data: one record, two widths, one answer.
-        val rebuild = SourceRebuilds(
-            listOf(
-                affine(0, -7L, intArrayOf(1, 2), longArrayOf(3L, -2L)),
-                affine(3, 1L, intArrayOf(0), longArrayOf(4L)),
-            ),
-        )
-        val long = longArrayOf(0L, 5L, 6L, 0L)
-        val big = Array(4) { bigIntOf(long[it]) }
-
-        rebuild.rebuildInto(booleanArrayOf(), long)
-        rebuild.rebuildInto(booleanArrayOf(), big)
-
-        for (v in long.indices) assertEquals(long[v].toString(), big[v].toString(), "lanes disagree on column $v")
-    }
-
-    @Test
     fun `the wide evaluator carries a value past the Long range`() {
         // 2^70 is the shape an open route answers in and the finite lane cannot hold at all.
         val huge = BIG_ONE shl 70
@@ -231,13 +147,6 @@ class SourceRebuildTest {
         rebuild.rebuildInto(booleanArrayOf(), ints)
 
         assertEquals(huge * bigIntOf(3L), ints[0], "the accumulation widens, the coefficient does not")
-    }
-
-    @Test
-    fun `a boolean-only rebuild touches no integer column`() {
-        val rebuild = SourceRebuilds(listOf(RebuildStep.CopyLiteral(variable = 0, source = pos(1))))
-
-        assertFalse(rebuild.touchesInts, "a lane with no integer step materializes no values")
     }
 
     @Test

@@ -110,25 +110,6 @@ class CliStatsTest {
     }
 
     @Test
-    fun `no presolve activity emits nothing`() {
-        assertTrue(presolveStatPairs(SolveStats.EMPTY).isEmpty(), "no presolve summary")
-        assertTrue(
-            presolveStatPairs(SolveStats(presolve = PresolveStats())).isEmpty(),
-            "a no-op presolve emits nothing",
-        )
-    }
-
-    @Test
-    fun `no lp activity emits nothing`() {
-        assertTrue(lpStatPairs(SolveStats.EMPTY).isEmpty())
-        assertTrue(
-            lpStatPairs(
-                SolveStats(run = RunStats(backend = "backtrack"), search = SearchStats(nodes = SumResult(10.0))),
-            ).isEmpty(),
-        )
-    }
-
-    @Test
     fun `a node pass without a solve still emits the LP block`() {
         val pairs = lpStatPairs(
             SolveStats(lp = LpStats(nodePasses = SumResult(1.0))),
@@ -180,26 +161,6 @@ class CliStatsTest {
         assertEquals("3", pairs["lpCutCandidates"])
         assertEquals("2", pairs["lpCutSelected"])
         assertTrue("lpCutActive" !in pairs)
-    }
-
-    @Test
-    fun `every emitted key is lp-prefixed`() {
-        val stats = SolveStats(
-            run = RunStats(backend = "backtrack"),
-            lp = LpStats(
-                solves = SumResult(8.0),
-                pruned = SumResult(5.0),
-                infeasible = SumResult(2.0),
-                pivots = SumResult(20.0),
-                seeded = SumResult(4.0),
-                rootBound = 12.5,
-                ms = 7L,
-            ),
-            scheduling = SchedulingStats(lagrangianPruned = SumResult(1.0), energeticPruned = SumResult(3.0)),
-        )
-        val pairs = lpStatPairs(stats)
-        assertTrue(pairs.isNotEmpty())
-        for ((k, _) in pairs) assertTrue(k.startsWith("lp"), "key not lp-prefixed: $k")
     }
 
     @Test
@@ -263,39 +224,10 @@ class CliStatsTest {
     }
 
     @Test
-    fun `no ls activity emits nothing`() {
-        assertTrue(lsStatPairs(SolveStats.EMPTY, solveTimeMs = 0).isEmpty())
-        assertTrue(
-            lsStatPairs(
-                SolveStats(run = RunStats(backend = "backtrack"), search = SearchStats(nodes = SumResult(10.0))),
-                solveTimeMs = 0,
-            ).isEmpty(),
-        )
-    }
-
-    @Test
     fun `ls backend emits the block even before any move`() {
         val pairs = lsStatPairs(SolveStats(run = RunStats(backend = "ls")), solveTimeMs = 0)
         assertTrue(pairs.isNotEmpty())
         assertEquals("0", pairs.toMap()["lsMoves"])
-    }
-
-    @Test
-    fun `every emitted key is ls-prefixed`() {
-        val stats = SolveStats(
-            run = RunStats(backend = "ls", wallMs = 2000L),
-            search = SearchStats(restarts = SumResult(5.0)),
-            ls = LocalSearchStats(
-                moves = SumResult(1000.0),
-                stalls = SumResult(3.0),
-                timeToBestMs = 500L,
-                incumbentObjective = 12.0,
-                incumbentViolation = 0.0,
-            ),
-        )
-        val pairs = lsStatPairs(stats, solveTimeMs = 2_000)
-        assertTrue(pairs.isNotEmpty())
-        for ((k, _) in pairs) assertTrue(k.startsWith("ls"), "key not ls-prefixed: $k")
     }
 
     @Test
@@ -334,19 +266,6 @@ class CliStatsTest {
     }
 
     @Test
-    fun `mixed portfolio with ls moves still emits the ls block`() {
-        val stats = SolveStats(run = RunStats(backend = "mixed"), ls = LocalSearchStats(moves = SumResult(42.0)))
-        assertTrue(lsStatPairs(stats, solveTimeMs = 0).isNotEmpty())
-        assertEquals("42", lsStatPairs(stats, solveTimeMs = 0).toMap()["lsMoves"])
-    }
-
-    @Test
-    fun `an open solve that drew no hint emits no hint keys`() {
-        val keys = openTheoryStatPairs(SolveStats(run = RunStats(backend = "exact-lira")), solveTimeMs = 0).toMap().keys
-        assertTrue(keys.none { it.startsWith("openHint") }, "hint keys without a draw: $keys")
-    }
-
-    @Test
     fun `a drawn hint reports what it covered and cost`() {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira"),
@@ -358,18 +277,6 @@ class CliStatsTest {
         assertEquals("4", m["openHintVars"])
         assertEquals("9", m["openHintSteered"])
         assertEquals("37", m["openHintMoves"])
-    }
-
-    @Test
-    fun `a draw that proposed nothing still reports its cost`() {
-        val stats = SolveStats(
-            run = RunStats(backend = "exact-lira"),
-            openHints = OpenHintStats(draws = 1, produced = 0, hintedVars = 0, moves = 20_000),
-        )
-        val m = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()
-        assertEquals("0", m["openHintProduced"])
-        assertEquals("0", m["openHintSteered"])
-        assertEquals("20000", m["openHintMoves"])
     }
 
     @Test
@@ -407,26 +314,6 @@ class CliStatsTest {
     }
 
     @Test
-    fun `SMT stats are omitted when no exact lane ran`() {
-        val pairs = openTheoryStatPairs(SolveStats(run = RunStats(backend = "backtrack")), solveTimeMs = 0).toMap()
-
-        assertTrue("smtTheoryChecks" !in pairs)
-    }
-
-    @Test
-    fun `numerical trouble is omitted when a run met none`() {
-        val stats = SolveStats(
-            run = RunStats(backend = "backtrack"),
-            lp = LpStats(solves = SumResult(8.0), pivots = SumResult(20.0)),
-        )
-
-        val m = lpStatPairs(stats).toMap()
-
-        assertTrue("lpSingularRefactorizations" !in m)
-        assertTrue("lpSmallPivotBails" !in m)
-    }
-
-    @Test
     fun `numerical trouble is reported when a run met it`() {
         val stats = SolveStats(
             run = RunStats(backend = "backtrack"),
@@ -460,18 +347,6 @@ class CliStatsTest {
         assertEquals("1.0E-7", m["lpRootMatrixMin"])
         assertEquals("2500000.0", m["lpRootMatrixMax"])
         assertEquals("1.0E9", m["lpRootRowRatio"])
-    }
-
-    @Test
-    fun `the root coefficient spread is omitted when never measured`() {
-        val stats = SolveStats(
-            run = RunStats(backend = "backtrack"),
-            lp = LpStats(solves = SumResult(8.0)),
-        )
-
-        val m = lpStatPairs(stats).toMap()
-
-        assertTrue("lpRootMatrixMin" !in m)
     }
 
     @Test

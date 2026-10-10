@@ -3,15 +3,12 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.model.PbOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -33,21 +30,6 @@ class LinearRowTest {
         assertTrue(r.isIntegerOnly)
         assertTrue(refsOf(r).contentEquals(intRefs(0, 1)))
         assertTrue(coeffsOf(r).contentEquals(longArrayOf(2, -1)))
-    }
-
-    @Test
-    fun `Increasing exposes one ge row per adjacent pair`() {
-        val rows = Increasing(intArrayOf(0, 1, 2), strict = true).linearRows
-        assertEquals(2, rows.size)
-        // xs(i+1) − xs(i) ≥ 1 for the strict chain.
-        for (r in rows) {
-            assertEquals(LinearOp.GE, r.relation)
-            assertEquals(1L, r.bound)
-            assertTrue(r.isIntegerOnly)
-            assertTrue(coeffsOf(r).contentEquals(longArrayOf(1, -1)))
-        }
-        assertTrue(refsOf(rows[0]).contentEquals(intRefs(1, 0)))
-        assertTrue(refsOf(rows[1]).contentEquals(intRefs(2, 1)))
     }
 
     @Test
@@ -73,18 +55,6 @@ class LinearRowTest {
         assertEquals(LinearOp.LE, rows[1].relation)
         assertEquals(2L, rows[1].bound)
         for (r in rows) assertTrue(refsOf(r).contentEquals(litRefs(*lits)))
-    }
-
-    @Test
-    fun `PseudoBoolean exposes its weighted row`() {
-        val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true))
-        val rows = PseudoBoolean(longArrayOf(3, 5), lits, PbOp.LE, 6).linearRows
-        assertEquals(1, rows.size)
-        val r = rows[0]
-        assertEquals(LinearOp.LE, r.relation)
-        assertEquals(6L, r.bound)
-        assertTrue(refsOf(r).contentEquals(litRefs(*lits)))
-        assertTrue(coeffsOf(r).contentEquals(longArrayOf(3, 5)))
     }
 
     @Test

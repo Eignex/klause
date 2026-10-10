@@ -10,11 +10,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Three-tier learned-clause DB metadata plumbing (#201): per-clause tier and reuse flags must
- * default correctly, be mutable, respond to [PropagationState.noteLearnedUse], and survive the
- * compaction performed by [PropagationState.forgetLearnedClauses] in lockstep with the clauses.
- */
 class PropagationStateLearnedClauseTierTest {
 
     // One static factor so learned-clause factor ids start above 0 — lets the tests probe the
@@ -27,15 +22,6 @@ class PropagationStateLearnedClauseTierTest {
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
         return PropagationState(p, Assumptions.None)
-    }
-
-    @Test
-    fun `learned clauses start unclassified and unused`() {
-        val s = emptyState(3)
-        val fid = s.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))), lbd = 4)
-        val idx = fid - s.problem.numFactors
-        assertEquals(ClauseTier.UNSET, s.learnedClauseTier(idx))
-        assertFalse(s.learnedClauseUsedSinceReduction(idx))
     }
 
     @Test

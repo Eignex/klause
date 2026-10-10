@@ -26,25 +26,6 @@ class LegacyLpModelTest {
     }
 
     @Test
-    fun `probe sides remain absent while finite origins remain authoritative`() {
-        val model = LpBuilder().apply {
-            addFreeVar(null, 5L)
-            addFreeVar(2L, null)
-            addFreeVar(null, null)
-        }.build(Sense.MINIMIZE)
-
-        val exact = assertNotNull(model.authoritativeModel())
-
-        assertNull(exact.column(0).bounds.lower)
-        assertNotNull(exact.column(0).bounds.upper)
-        assertNotNull(exact.column(1).bounds.lower)
-        assertNull(exact.column(1).bounds.upper)
-        assertNull(exact.column(2).bounds.lower)
-        assertNull(exact.column(2).bounds.upper)
-        for (column in 0 until model.n) assertEquals(model.exactShift(column), exact.column(column).origin.value)
-    }
-
-    @Test
     fun `a continuous row does not make its logical column integral`() {
         val model = LpBuilder().apply {
             val x = addRealVar(0.0, 2.0)

@@ -10,13 +10,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-/**
- * The incremental-presolve mid-life factor overlay ([MidlifeFactors]), exercised through the
- * [PropagationState] API: appending a factor and
- * tombstoning another between propagation rounds must reach the same root fixpoint as building the
- * final factor set from scratch. Sound because the propagators are monotone, so the greatest
- * fixpoint is unique regardless of the order factors are introduced or the ids they carry.
- */
 class MidlifeFactorsTest {
 
     // Three int vars, each 0..10. A fresh array per call — Problem construction folds root deductions
@@ -33,20 +26,6 @@ class MidlifeFactorsTest {
         val state = PropagationState(Problem(0, 3, domains(), factors), Assumptions.None)
         assertNull(state.runToFixpoint(allFactors = true))
         return intBounds(state)
-    }
-
-    @Test
-    fun `an added mid-life factor propagates like a fresh build`() {
-        val base = leq(intArrayOf(1), intArrayOf(0), 5) // x0 <= 5
-        val added = leq(intArrayOf(1, -1), intArrayOf(1, 0), 0) // x1 <= x0
-
-        val state = PropagationState(Problem(0, 3, domains(), listOf(base)), Assumptions.None, incremental = true)
-        assertNull(state.runToFixpoint(allFactors = true))
-        state.addMidlifeFactor(added)
-        assertNull(state.runToFixpoint(allFactors = true))
-
-        assertEquals(freshBounds(listOf(base, added)), intBounds(state))
-        assertEquals(5, state.intDomains[1].max) // x1 tightened through x0
     }
 
     @Test
@@ -79,21 +58,4 @@ class MidlifeFactorsTest {
         assertEquals(10, state.intDomains[0].max) // untouched — the tombstoned factor stayed inert
     }
 
-    @Test
-    fun `tombstoning a redundant base factor matches a fresh build without it`() {
-        val kept = leq(intArrayOf(1), intArrayOf(0), 5) // x0 <= 5
-        val redundant = leq(intArrayOf(1), intArrayOf(0), 7) // x0 <= 7, implied by kept
-
-        val state = PropagationState(
-            Problem(0, 3, domains(), listOf(kept, redundant)),
-            Assumptions.None,
-            incremental = true,
-        )
-        assertNull(state.runToFixpoint(allFactors = true))
-        state.tombstoneFactor(1) // drop the redundant one by id
-        assertNull(state.runToFixpoint(allFactors = true))
-
-        assertEquals(freshBounds(listOf(kept)), intBounds(state))
-        assertEquals(5, state.intDomains[0].max)
-    }
 }

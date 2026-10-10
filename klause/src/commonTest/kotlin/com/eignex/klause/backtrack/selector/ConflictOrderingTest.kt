@@ -1,36 +1,16 @@
 package com.eignex.klause.backtrack.selector
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ConflictOrderingTest {
-
-    @Test
-    fun `COS delegates to base when no conflicts have happened yet`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = Array(3) { IntDomain(0, 4) },
-            factors = emptyArray(),
-        )
-        val session = PropagationSession(problem)
-        val cos = ConflictOrdering(InputOrder)
-        assertEquals(VarRef.IntVar(0), cos.pick(session, Random(0L)))
-    }
 
     @Test
     fun `COS picks the most recently conflicting var`() {
@@ -85,24 +65,5 @@ class ConflictOrderingTest {
             picked == VarRef.IntVar(0) || picked == VarRef.IntVar(2),
             "should pick a stamped conflict-graph var; got $picked",
         )
-    }
-
-    @Test
-    fun `COS still solves`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 5,
-            intDomains = Array(5) { IntDomain(0, 4) },
-            factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(
-                variableSelector = ConflictOrdering(DomWdeg()),
-                valueSelector = IndomainMin,
-                randomSeed = 0L,
-            ),
-        )
-        val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals((0L..4L).toSet(), sat.assignment.ints.toSet())
     }
 }

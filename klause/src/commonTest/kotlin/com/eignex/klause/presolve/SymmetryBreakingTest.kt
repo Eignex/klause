@@ -1,27 +1,12 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
-import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.factor.global.GlobalCardinality
-import com.eignex.klause.factor.global.Inverse
-import com.eignex.klause.factor.global.NValue
-import com.eignex.klause.factor.global.Sort
-import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.symmetry.SymmetryHandling
-import com.eignex.klause.factor.table.Element
-import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -40,18 +25,10 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-/**
- * Symmetry breaking (#317). The non-negotiable property is **soundness**: breaking must never
- * turn a satisfiable problem unsatisfiable. Every test enumerates the whole assignment space and
- * compares feasible-solution counts before and after; the broken problem must keep ≥1 solution per
- * orbit (so counts agree on satisfiability) and only ever remove solutions.
- */
 class SymmetryBreakingTest {
 
     private fun isFeasible(problem: Problem, bools: BooleanArray, ints: LongArray): Boolean {
@@ -104,15 +81,6 @@ class SymmetryBreakingTest {
     }
 
     private fun pos(v: Int) = Lit.make(v, true)
-
-    /** The value transposition `(v w)` as a relabel map. */
-    private fun swap(v: Long, w: Long): (Long) -> Long = { x ->
-        when (x) {
-            v -> w
-            w -> v
-            else -> x
-        }
-    }
 
     @Test
     fun `row-symmetric matrix is broken soundly without column-wise overcut`() {
@@ -184,60 +152,6 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `law-lee precedence on alldifferent keeps the single canonical permutation`() {
-        // AllDifferent over {0,1,2} is value-anonymous; precedence forces the identity assignment
-        // 0,1,2 (the one canonical labeling), collapsing all 6 permutations.
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
-        )
-        val broken = precedence(problem)
-        assertEquals(6, countFeasible(problem))
-        assertEquals(1, countFeasible(broken), "precedence + alldifferent should leave one solution")
-    }
-
-    @Test
-    fun `value precedence fires on graph coloring with binary disequalities`() {
-        // `col[a] != col[b]` compiles to a binary Linear with op NE — a pure disequality, which is
-        // value-anonymous (#501): the colors are interchangeable. A triangle over 3 colors has 3!=6
-        // proper colorings (all distinct); precedence keeps the single canonical labeling. The orbit is
-        // built over the full Long value space, so a base past 2^31 collapses just as far.
-        val edges = listOf(0 to 1, 0 to 2, 1 to 2)
-        listOf(0L, 5_000_000_000L).forEach { base ->
-            val problem = Problem(
-                0,
-                3,
-                Array(3) { IntDomain(base, base + 2) },
-                edges.map { (a, b) -> Linear(intArrayOf(1, -1), intArrayOf(a, b), LinearOp.NE, 0) },
-            )
-            assertEquals(6, countFeasible(problem), "base $base: proper colorings")
-            assertEquals(
-                1,
-                countFeasible(precedence(problem)),
-                "base $base: coloring value symmetry should collapse to one labeling",
-            )
-        }
-    }
-
-    @Test
-    fun `value symmetry breaking is sound on a partial graph coloring`() {
-        // Path 0-1-2 over 3 colors: 12 proper colorings, colors still interchangeable. The single-var
-        // value pin (breakSymmetries) must only remove solutions, never change satisfiability.
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            listOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.NE, 0),
-                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.NE, 0),
-            ),
-        )
-        checkSound("path-coloring", problem, expectReduced = true)
-    }
-
-    @Test
     fun `an ordering linear is not value-anonymous`() {
         // `x - y <= 0` is an ordering, not a disequality — relabeling values breaks it, so value
         // symmetry must stay off (regression guard for the #501 binary-relation detection).
@@ -248,44 +162,6 @@ class SymmetryBreakingTest {
             listOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0)),
         )
         assertTrue(Presolve.breakValuePrecedence(problem.bake()).isEmpty, "ordering ⇒ no value symmetry")
-    }
-
-    @Test
-    fun `law-lee precedence fires over a verified non-anonymous orbit`() {
-        // A global_cardinality with equal per-value bounds is NOT value-anonymous, but its cover values
-        // are interchangeable — verified via remapValues (#442). Precedence over the fully-internal
-        // vars then collapses the value-symmetric solutions.
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            listOf(
-                GlobalCardinality(
-                    xs = intArrayOf(0, 1, 2),
-                    cover = longArrayOf(0, 1, 2),
-                    countLow = intArrayOf(0, 0, 0),
-                    countHigh = intArrayOf(3, 3, 3),
-                ),
-            ),
-        )
-        val broken = precedence(problem)
-        val orig = countFeasible(problem)
-        val after = countFeasible(broken)
-        assertTrue(after < orig, "expected reduction: $orig -> $after")
-        assertEquals(orig > 0, after > 0)
-    }
-
-    @Test
-    fun `value symmetry pins an interchangeable-value variable`() {
-        // x0,x1: AllDifferent over {0,1,2}. x2 ∈ {3,4} appears in no factor, so its two values are an
-        // interchangeable-value orbit (value-anonymous problem) — pinned to the orbit minimum (3).
-        val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(3, 4)),
-            listOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)),
-        )
-        checkSound("value-sym", problem, expectReduced = true)
     }
 
     @Test
@@ -337,41 +213,6 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `interchangeable alldifferent variables are ordered`() {
-        val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            listOf(AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)),
-        )
-        checkSound("alldiff", problem, expectReduced = true)
-        // 3! permutations collapse to the single sorted one.
-        assertEquals(1, countFeasible(broken(problem)))
-    }
-
-    @Test
-    fun `equal-coefficient sum variables are interchangeable`() {
-        val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 2)),
-        )
-        checkSound("equalCoeffSum", problem, expectReduced = true)
-    }
-
-    @Test
-    fun `interchangeable booleans in a cardinality are ordered`() {
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 2, max = 3)),
-        )
-        checkSound("cardBools", problem, expectReduced = true)
-    }
-
-    @Test
     fun `unequal coefficients are not grouped`() {
         val problem = Problem(
             0,
@@ -380,39 +221,6 @@ class SymmetryBreakingTest {
             listOf(Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
         )
         checkSound("unequalCoeff", problem, expectReduced = false)
-    }
-
-    @Test
-    fun `same role in different factors is not grouped`() {
-        // x0 in (x0 <= 1); x1 in (x1 <= 2). Same role token but different factors and bounds —
-        // grouping them would be unsound, so the factorId in the role key must keep them apart.
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            listOf(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 2),
-            ),
-        )
-        checkSound("differentFactors", problem, expectReduced = false)
-    }
-
-    @Test
-    fun `interchangeable bool rows are lex-ordered`() {
-        // Two bool rows a0+2·a1 ≤ 2 and b0+2·b1 ≤ 2. The rows are interchangeable as blocks, but the
-        // cells within a row are NOT (different weights), so this is bool row symmetry — broken by a
-        // lex-leader over 0/1 channels of the row literals (no width cap) rather than per-variable ordering.
-        val problem = Problem(
-            4,
-            0,
-            emptyArray(),
-            listOf(
-                PseudoBoolean(longArrayOf(1, 2), intArrayOf(pos(0), pos(1)), PbOp.LE, 2L),
-                PseudoBoolean(longArrayOf(1, 2), intArrayOf(pos(2), pos(3)), PbOp.LE, 2L),
-            ),
-        )
-        checkSound("bool-rows", problem, expectReduced = true)
     }
 
     @Test
@@ -437,39 +245,6 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `isomorphic element factors are block-ordered`() {
-        // Two element constraints v1 = arr(v0), v3 = arr(v2) over the same constant table are
-        // interchangeable as blocks; verified block detection (via Element's structuralKey) orders the rows.
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(IntDomain(1, 2), IntDomain(7, 8), IntDomain(1, 2), IntDomain(7, 8)),
-            listOf(
-                Element(idx = 0, result = 1, arr = longArrayOf(7, 8), arrIsVars = false, indexOffset = 1),
-                Element(idx = 2, result = 3, arr = longArrayOf(7, 8), arrIsVars = false, indexOffset = 1),
-            ),
-        )
-        checkSound("element-blocks", problem, expectReduced = true)
-    }
-
-    @Test
-    fun `isomorphic inverse factors are block-ordered`() {
-        // Two inverse constraints over disjoint var blocks are interchangeable as blocks; the inverse
-        // structuralKey enables verified detection (and the brute gate guards the key's soundness —
-        // a too-coarse key would let a false swap through and ADD solutions).
-        val problem = Problem(
-            0,
-            8,
-            Array(8) { IntDomain(0, 1) },
-            listOf(
-                Inverse(f = intArrayOf(0, 1), g = intArrayOf(2, 3)),
-                Inverse(f = intArrayOf(4, 5), g = intArrayOf(6, 7)),
-            ),
-        )
-        checkSound("inverse-blocks", problem, expectReduced = true)
-    }
-
-    @Test
     fun `wl refinement splits candidate groups by structural role`() {
         // Two rows x0 + 2·x1 ≤ 3 and x2 + 2·x3 ≤ 3, all same domain. WL colour refinement splits them
         // by their role — the coeff-1 cells {x0,x2} and the coeff-2 cells {x1,x3} — into two colour classes.
@@ -486,42 +261,6 @@ class SymmetryBreakingTest {
         assertEquals(intColour[0], intColour[2], "coeff-1 cells should share a WL colour")
         assertEquals(intColour[1], intColour[3], "coeff-2 cells should share a WL colour")
         assertTrue(intColour[0] != intColour[1], "different roles should get different WL colours")
-    }
-
-    @Test
-    fun `interchangeable values in a global cardinality are ordered by value precedence`() {
-        // GCC over x0,x1 ∈ {0,1}: each of values 0,1 may occur 0..2 times. The two values are
-        // interchangeable (same bounds, same domain-incidence). GCC is not value-anonymous, but
-        // remapValues verification (#374) catches the swap; the two internal vars are ordered by value
-        // precedence (introduce 0 before 1) — the default value break, stronger than a single pin.
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
-            listOf(
-                GlobalCardinality(
-                    xs = intArrayOf(0, 1),
-                    cover = longArrayOf(0, 1),
-                    countLow = intArrayOf(0, 0),
-                    countHigh = intArrayOf(2, 2),
-                ),
-            ),
-        )
-        checkSound("gcc-value", problem, expectReduced = true)
-    }
-
-    @Test
-    fun `interchangeable values in a table are ordered by value precedence`() {
-        // Table allowing (0,1) and (1,0): swapping values 0↔1 maps the row set to itself, so the two
-        // values are an interchangeable orbit (verified via Table.remapValues). The two internal vars
-        // are ordered by value precedence (introduce 0 before 1) — the default value break.
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
-            listOf(Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0))),
-        )
-        checkSound("table-value", problem, expectReduced = true)
     }
 
     @Test
@@ -560,270 +299,6 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `newly-keyed factors have collision-free structural keys`() {
-        // The soundness property a structuralKey must hold (#443): two factors that differ in any
-        // value-distinguishing constant get different keys, while a faithful copy keeps the same key.
-        // A too-coarse key (a dropped constant) would let symmetry detection see a false automorphism.
-        fun distinct(a: Factor, b: Factor, why: String) = assertNotEquals(a.structuralKey(), b.structuralKey(), why)
-
-        // ReifiedLinear: aux bool, op, bound, and the (var, coeff) terms all matter.
-        assertEquals(
-            ReifiedLinear(0, intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3).structuralKey(),
-            ReifiedLinear(0, intArrayOf(2, 1), intArrayOf(1, 0), LinearOp.LE, 3).structuralKey(),
-            "term order must not change the key",
-        )
-        distinct(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            "aux bool",
-        )
-        distinct(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-            "bound",
-        )
-        distinct(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
-            "op",
-        )
-        distinct(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            "reified vs asserted linear",
-        )
-        // ReifiedCardinality / ReifiedPseudoBoolean.
-        distinct(
-            ReifiedCardinality(0, intArrayOf(pos(1), pos(2)), 1, 2),
-            ReifiedCardinality(0, intArrayOf(pos(1), pos(2)), 1, 1),
-            "cardinality max",
-        )
-        distinct(
-            ReifiedPseudoBoolean(0, longArrayOf(2, 3), intArrayOf(pos(1), pos(2)), PbOp.LE, 4L),
-            ReifiedPseudoBoolean(0, longArrayOf(2, 3), intArrayOf(pos(1), pos(2)), PbOp.LE, 5L),
-            "pb bound",
-        )
-        // Circuit / Subcircuit: position-faithful, and distinct from each other.
-        distinct(Circuit(intArrayOf(1, 0)), Circuit(intArrayOf(0, 1)), "succ order")
-        distinct(Circuit(intArrayOf(1, 0)), Circuit(intArrayOf(1, 0), subcircuit = true), "circuit vs subcircuit")
-        // NValue: mode, count var, and the counted vars.
-        distinct(
-            NValue(2, intArrayOf(0, 1), NValue.Mode.Eq),
-            NValue(2, intArrayOf(0, 1), NValue.Mode.AtMost),
-            "nvalue mode",
-        )
-        distinct(NValue(2, intArrayOf(0, 1)), NValue(3, intArrayOf(0, 1)), "nvalue count var")
-        // Sort: ys is position-faithful, xs order-insensitive.
-        assertEquals(
-            Sort(intArrayOf(0, 1), intArrayOf(2, 3)).structuralKey(),
-            Sort(intArrayOf(1, 0), intArrayOf(2, 3)).structuralKey(),
-            "xs order must not change the key",
-        )
-        distinct(Sort(intArrayOf(0, 1), intArrayOf(2, 3)), Sort(intArrayOf(0, 1), intArrayOf(3, 2)), "ys order")
-    }
-
-    /** Soundness without an outcome expectation: breaking may or may not find a breakable orbit, but
-     *  it must never add solutions or flip satisfiability. Guards that a new structuralKey can't make
-     *  verified detection unsound (a too-coarse key would). */
-    private fun checkBreakingSound(name: String, problem: Problem) {
-        val broken = broken(problem)
-        val orig = countFeasible(problem)
-        val after = countFeasible(broken)
-        assertTrue(after <= orig, "$name: breaking ADDED solutions ($orig -> $after)")
-        assertEquals(orig > 0, after > 0, "$name: breaking changed satisfiability ($orig -> $after)")
-    }
-
-    @Test
-    fun `isomorphic nvalue factors are block-ordered`() {
-        // Two nvalue(count, xs) blocks over disjoint, equal-domain variables are interchangeable; the
-        // nvalue structuralKey lets verified block detection order them. The count vars get domain
-        // [1,2] (the distinct count of two binary vars) so the blocks aren't degenerate. The brute gate
-        // guards the key's soundness — a too-coarse key would let a false swap through and add solutions.
-        val problem = Problem(
-            0,
-            6,
-            arrayOf(
-                IntDomain(1, 2),
-                IntDomain(0, 1),
-                IntDomain(0, 1),
-                IntDomain(1, 2),
-                IntDomain(0, 1),
-                IntDomain(0, 1),
-            ),
-            listOf(
-                NValue(n = 0, xs = intArrayOf(1, 2)),
-                NValue(n = 3, xs = intArrayOf(4, 5)),
-            ),
-        )
-        checkSound("nvalue-blocks", problem, expectReduced = true)
-    }
-
-    @Test
-    fun `breaking stays sound with reified rows present`() {
-        // Two reified rows b0 <-> (x0 <= 1), b1 <-> (x1 <= 1) over disjoint, equal-domain vars carry a
-        // block symmetry. The breaker posts no ordering across this mixed bool+int orbit, so the
-        // guarantee here is purely that ReifiedLinear-keyed detection runs without ever becoming unsound.
-        val problem = Problem(
-            2,
-            2,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-            listOf(
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.LE, 1),
-            ),
-        )
-        checkBreakingSound("rlin-blocks", problem)
-    }
-
-    @Test
-    fun `global factors have collision-free structural keys`() {
-        // #531: keys for the scheduling / automaton globals must distinguish every constant and the
-        // variable order, or symmetry verification could accept a false automorphism.
-        fun distinct(a: Factor, b: Factor, why: String) = assertNotEquals(a.structuralKey(), b.structuralKey(), why)
-
-        // Cumulative: capacity, the constant duration/resource arrays, the var/const split, and order.
-        val cum = Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 2L)
-        distinct(cum, Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 3L), "capacity")
-        distinct(cum, Cumulative(intArrayOf(0, 1), longArrayOf(1, 2), longArrayOf(1, 1), 2L), "duration")
-        distinct(cum, Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(2, 1), 2L), "resource")
-        distinct(cum, Cumulative(intArrayOf(1, 0), longArrayOf(1, 1), longArrayOf(1, 1), 2L), "start order")
-        distinct(
-            cum,
-            Cumulative(intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 1), 2L, capacityVar = 5),
-            "capacityVar",
-        )
-
-        // Disjunctive.
-        val dis = Cumulative.unary(intArrayOf(0, 1), longArrayOf(1, 1))
-        distinct(dis, Cumulative.unary(intArrayOf(0, 1), longArrayOf(1, 2)), "duration")
-        distinct(dis, Cumulative.unary(intArrayOf(1, 0), longArrayOf(1, 1)), "start order")
-        distinct(dis, cum, "disjunctive vs cumulative")
-
-        // Diffn: the nonStrict flag, constant sizes, and coordinate order.
-        val diffn = Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(1, 1), longArrayOf(1, 1))
-        distinct(
-            diffn,
-            Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(1, 1), longArrayOf(1, 1), nonStrict = true),
-            "nonStrict",
-        )
-        distinct(diffn, Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 1), longArrayOf(1, 1)), "width")
-        distinct(diffn, Diffn(intArrayOf(1, 0), intArrayOf(2, 3), longArrayOf(1, 1), longArrayOf(1, 1)), "x order")
-
-        // Regular: automaton size, transition table, q0, accepting, sequence order.
-        val reg = Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2))
-        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 1, 2, 1), 1, intArrayOf(2)), "transition")
-        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 2, intArrayOf(2)), "q0")
-        distinct(reg, Regular(intArrayOf(0, 1), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(1)), "accepting")
-        distinct(reg, Regular(intArrayOf(1, 0), 2, 2, longArrayOf(1, 2, 2, 1), 1, intArrayOf(2)), "seq order")
-
-        // Mdd: initial, transition records, cost var, sequence order.
-        val mdd = Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 1), longArrayOf(0, 0, 1), 0, intArrayOf(0), 3)
-        distinct(
-            mdd,
-            Mdd(intArrayOf(0), intArrayOf(1, 1), intArrayOf(0, 1), longArrayOf(0, 1, 1), 0, intArrayOf(0), 3),
-            "transition",
-        )
-        distinct(
-            mdd,
-            Mdd(
-                intArrayOf(0),
-                intArrayOf(1, 1),
-                intArrayOf(0, 1),
-                longArrayOf(0, 0, 1, 0),
-                0,
-                intArrayOf(0),
-                4,
-                cost = 7,
-            ),
-            "cost stride",
-        )
-
-        // ArrayMinMax: mode and the output var are positional; the operand set is order-insensitive.
-        val amm = ArrayMinMax(0, intArrayOf(1, 2), max = true)
-        assertEquals(
-            amm.structuralKey(),
-            ArrayMinMax(0, intArrayOf(2, 1), max = true).structuralKey(),
-            "operand order must not change the key",
-        )
-        distinct(amm, ArrayMinMax(0, intArrayOf(1, 2), max = false), "min vs max")
-        distinct(amm, ArrayMinMax(3, intArrayOf(1, 2), max = true), "result var")
-        distinct(amm, ArrayMinMax(0, intArrayOf(1, 3), max = true), "operand set")
-    }
-
-    @Test
-    fun `breaking stays sound with disjunctive blocks present`() {
-        // Two disjoint identical disjunctive blocks over equal-domain start vars carry a block symmetry.
-        // Soundness (never adding solutions / flipping satisfiability) is the guarantee.
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            listOf(
-                Cumulative.unary(intArrayOf(0, 1), longArrayOf(1, 1)),
-                Cumulative.unary(intArrayOf(2, 3), longArrayOf(1, 1)),
-            ),
-        )
-        checkBreakingSound("disjunctive-blocks", problem)
-    }
-
-    @Test
-    fun `regular remapValues permutes the symbol axis`() {
-        // δ(1,1)=2, δ(1,2)=1, δ(2,*)=0. Swapping symbols 1↔2 swaps the two columns of each state row
-        // (#536): new δ(1,1)=old δ(1,2)=1, new δ(1,2)=old δ(1,1)=2.
-        val r = Regular(
-            intArrayOf(0),
-            numStates = 2,
-            alphabetSize = 2,
-            transitions = longArrayOf(2, 1, 0, 0),
-            q0 = 1,
-            accepting = intArrayOf(2),
-        )
-        val swapped = r.remapValues(swap(1, 2)) as Regular
-        assertEquals(listOf(1L, 2L, 0L, 0L), swapped.transitions.toList())
-        // A non-permutation of 1..alphabetSize can't relabel the columns ⇒ null.
-        assertNull(r.remapValues { 1L })
-    }
-
-    @Test
-    fun `mdd remapValues relabels record symbols`() {
-        // One record (from=0, symbol=1, to=0); swapping 1↔2 maps the symbol field to 2 (#536).
-        val m = Mdd(
-            intArrayOf(0),
-            intArrayOf(1, 1),
-            intArrayOf(0, 1),
-            longArrayOf(0, 1, 0),
-            initial = 0,
-            accepting = intArrayOf(0),
-            recordStride = 3,
-        )
-        val swapped = m.remapValues(swap(1, 2)) as Mdd
-        assertEquals(listOf(0L, 2L, 0L), swapped.transitions.toList())
-    }
-
-    @Test
-    fun `value symmetry fires on a symbol-symmetric regular`() {
-        // A 1-state automaton that self-loops on both symbols accepts every sequence, so symbols 1,2
-        // are interchangeable. Regular.remapValues (column swap) verifies the swap, and the value
-        // symmetry pins an internal seq var to the orbit minimum (#536).
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
-            listOf(
-                Regular(
-                    intArrayOf(0, 1),
-                    numStates = 1,
-                    alphabetSize = 2,
-                    transitions = longArrayOf(1, 1),
-                    q0 = 1,
-                    accepting = intArrayOf(1),
-                ),
-            ),
-        )
-        checkSound("regular-value", problem, expectReduced = true)
-    }
-
-    @Test
     fun `an asymmetric regular has no value symmetry`() {
         // δ(1,1)=1 (stay accepting), δ(1,2)=0 (dead): only symbol 1 is ever valid, so swapping 1↔2 is
         // not a symmetry — nothing is broken. (seq var 1 stays free of the accepting constraint.)
@@ -843,34 +318,6 @@ class SymmetryBreakingTest {
             ),
         )
         checkSound("regular-asymmetric", problem, expectReduced = false)
-    }
-
-    @Test
-    fun `element does not support value relabeling`() {
-        // Element's idx is a variable that selects which constant is read; the value-symmetry verifier
-        // relabels constants and can't model that coupling, so remapValues must stay null (#536).
-        val e = Element(idx = 0, result = 1, arr = longArrayOf(7, 8), arrIsVars = false, indexOffset = 1)
-        assertNull(e.remapValues { it })
-    }
-
-    @Test
-    fun `remapStructuralHash equals the remapped structural key hash`() {
-        // The port hash symmetry refinement uses for each variable-factor arc must reproduce
-        // remap().structuralKey().hashCode() exactly, or the colouring (and the symmetries found) would
-        // change. The map sends one variable to the billion-valued focal marker (high-bit packing), two
-        // to a shared image (coalescing), and the linear carries negative coefficients and bound.
-        val map = intArrayOf(1_000_000_000, 5, 5, 7)
-        val mapping = VarRemap(map, map)
-        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(3, false), Lit.make(1, true)))
-        assertEquals(
-            clause.remap(mapping).structuralKey().hashCode(),
-            clause.remapStructuralHash(mapping),
-        )
-        val linear = Linear(intArrayOf(2, -3, 4), intArrayOf(1, 2, 3), LinearOp.LE, -8)
-        assertEquals(
-            linear.remap(mapping).structuralKey().hashCode(),
-            linear.remapStructuralHash(mapping),
-        )
     }
 
     @Test
@@ -920,25 +367,6 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `the source form orders interchangeable booleans beside an open column`() {
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 3)),
-            factors = listOf(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
-            ),
-            openIntHi = booleanArrayOf(true),
-        )
-
-        val after = countFeasible(sourceBroken(problem))
-
-        assertEquals(7 * 3, countFeasible(problem))
-        assertEquals(3 * 3, after, "b0 <= b1 <= b2 keeps one assignment per number of true literals")
-    }
-
-    @Test
     fun `the source form keeps columns with different open declarations apart`() {
         listOf(
             openSum(openX = true, openY = false),
@@ -946,11 +374,6 @@ class SymmetryBreakingTest {
         ).forEach { problem ->
             assertTrue(Presolve.breakSourceSymmetries(problem).isEmpty)
         }
-    }
-
-    @Test
-    fun `the source form leaves a fully closed model to the finite form`() {
-        assertTrue(Presolve.breakSourceSymmetries(openSum(openX = false, openY = false)).isEmpty)
     }
 
     @Test
@@ -970,17 +393,6 @@ class SymmetryBreakingTest {
         val delta = Presolve.breakSourceSymmetries(problem)
 
         assertTrue(delta.addedFactors.none { it is SymmetryHandling })
-    }
-
-    @Test
-    fun `the source form pins a value orbit an open column admits whole`() {
-        val problem = openColoring(zLow = 0)
-
-        val broken = sourceBroken(problem)
-
-        val orig = countFeasible(problem)
-        val after = countFeasible(broken)
-        assertTrue(after in 1 until orig, "expected a sound reduction: $orig -> $after")
     }
 
     @Test

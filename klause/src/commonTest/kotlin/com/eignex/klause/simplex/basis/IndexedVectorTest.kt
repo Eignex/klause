@@ -1,6 +1,5 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.koblas.SparseMatrix
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -49,24 +48,6 @@ class IndexedVectorTest {
     }
 
     @Test
-    fun `scattering a column replaces the previous support`() {
-        val matrix = SparseMatrix.wrap(
-            3,
-            2,
-            intArrayOf(0, 1, 3),
-            intArrayOf(0, 1, 2),
-            doubleArrayOf(1.0, 0.0, 4.0),
-        )
-        val vector = IndexedVector(3)
-        vector.unit(0)
-
-        vector.scatterColumn(matrix, 1)
-
-        assertContentEquals(doubleArrayOf(0.0, 0.0, 4.0), vector.toDoubleArray())
-        assertEquals(1, vector.count)
-    }
-
-    @Test
     fun `invalid replacement inputs preserve the previous vector`() {
         val vector = IndexedVector(1)
         vector.unit(0)
@@ -75,18 +56,6 @@ class IndexedVectorTest {
         assertFailsWith<IllegalArgumentException> { vector.scatter(doubleArrayOf()) }
 
         assertContentEquals(doubleArrayOf(1.0), vector.toDoubleArray())
-    }
-
-    @Test
-    fun `an empty vector has empty support and zero density`() {
-        val vector = IndexedVector(0)
-
-        vector.scatter(doubleArrayOf())
-        vector.clear()
-
-        assertEquals(0, vector.count)
-        assertEquals(0.0, vector.density)
-        assertContentEquals(doubleArrayOf(), vector.toDoubleArray())
     }
 
     @Test

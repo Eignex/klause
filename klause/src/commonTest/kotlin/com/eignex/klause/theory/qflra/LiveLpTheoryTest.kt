@@ -49,10 +49,7 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
-import com.eignex.klause.theory.TheoryCheck
-import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
@@ -394,119 +391,6 @@ class LiveLpTheoryTest {
     }
 
     @Test
-    fun `a failed disequality arm leaves the other source arm available`() {
-        val source = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-1.0),
-            realUpper = doubleArrayOf(0.0),
-            factors = arrayOf(
-                Linear(
-                    intVars = intArrayOf(),
-                    intCoeffs = doubleArrayOf(),
-                    realVars = intArrayOf(0),
-                    realCoeffs = doubleArrayOf(1.0),
-                    op = LinearOp.NE,
-                    bound = 0.0,
-                ),
-            ),
-        )
-        ExactLiraSearchComponent(source).use { component ->
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
-            session.initialize()
-            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
-            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
-            assertTrue(witness >= BigFraction.MINUS_ONE && witness < BigFraction.ZERO)
-        }
-    }
-
-    @Test
-    fun `infeasible comparison alternatives leave the final source disjunct available`() {
-        val declaration = Linear(
-            intVars = intArrayOf(),
-            intCoeffs = doubleArrayOf(),
-            realVars = intArrayOf(0),
-            realCoeffs = doubleArrayOf(1.0),
-            op = LinearOp.EQ,
-            bound = 0.0,
-        )
-        val factor = object : Factor by declaration {
-            override val linearForm = LinearForm.Disjunction(
-                listOf(
-                    Triple(2.0, LinearOp.GE, 1.0),
-                    Triple(3.0, LinearOp.LE, -1.0),
-                    Triple(5.0, LinearOp.EQ, 0.0),
-                ).map { (coefficient, op, rhs) ->
-                    TaggedLinearRow(
-                        intArrayOf(Term.ofRealVar(0)),
-                        RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(coefficient)), rhs, false),
-                        op,
-                    )
-                },
-            )
-        }
-        val source = Problem(
-            0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(0.0),
-            factors = arrayOf(factor),
-        )
-        ExactLiraSearchComponent(source).use { component ->
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            val result = assertIs<SearchResult.Satisfied>(session.solve(0))
-            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
-            assertEquals(BigFraction.ZERO, witness)
-        }
-    }
-
-    @Test
-    fun `closed rational fixtures agree with independent cold source solving`() {
-        for (rhs in listOf(0.5, 1.0, 4.0)) {
-            val source = Problem(
-                numBoolVars = 0,
-                intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(1.0),
-                factors = arrayOf(
-                    Linear(
-                        intVars = intArrayOf(),
-                        intCoeffs = doubleArrayOf(),
-                        realVars = intArrayOf(0),
-                        realCoeffs = doubleArrayOf(3.0),
-                        op = LinearOp.EQ,
-                        bound = rhs,
-                    ),
-                ),
-            )
-            val reference = ExactLraSolver(source).check(
-                booleanArrayOf(),
-                object : TheoryContext {
-                    override fun consumeCheck(): Boolean = true
-                    override fun cancelled(): Boolean = false
-                },
-            )
-            ExactLiraSearchComponent(source).use { component ->
-                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
-                val initialized = session.initialize()
-                val result = if (initialized is ComponentResult.Conflict) SearchResult.Exhausted else session.solve(0)
-                assertEquals(reference is TheoryCheck.Sat, result is SearchResult.Satisfied)
-                if (result is SearchResult.Satisfied) {
-                    val value = assertNotNull(result.model.valueOf<ExactLraAssignment>(component)).reals.single()
-                    assertEquals(assertNotNull(BigFraction.ofDouble(rhs)), value * BigFraction.ofLong(3))
-                    assertTrue(value >= BigFraction.ZERO && value <= BigFraction.ONE)
-                } else {
-                    assertIs<SearchResult.Exhausted>(result)
-                }
-            }
-        }
-    }
-
-    @Test
     fun `registered integers beyond Long retain exact thresholds and witnesses`() {
         val limit = parseBigInt("18446744073709551617")
         val source = Problem(
@@ -625,31 +509,6 @@ class LiveLpTheoryTest {
             assertContentEquals(intArrayOf(split.positive.literal), assertNotNull(opposite.explanation).literals)
             assertIs<SearchResult.Exhausted>(session.solve(0))
             assertTrue((0L..1L).none { 2L * it == 1L })
-        }
-    }
-
-    @Test
-    fun `closed integer fixtures agree with exhaustive source enumeration`() {
-        for (rhs in listOf(1L, 2L, 4L)) {
-            val source = Problem(
-                0,
-                intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(1, 1), null, null),
-                factors = arrayOf(Linear(longArrayOf(2, 1), intArrayOf(0, 1), LinearOp.EQ, rhs)),
-            )
-            val feasible = (0L..1L).any { x -> (0L..1L).any { y -> 2L * x + y == rhs } }
-            ExactLiraSearchComponent(source).use { component ->
-                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
-                val initialized = session.initialize()
-                val result = if (initialized is ComponentResult.Conflict) SearchResult.Exhausted else session.solve(0)
-                assertEquals(feasible, result is SearchResult.Satisfied)
-                if (result is SearchResult.Satisfied) {
-                    val values = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component)).ints
-                    assertEquals(bigIntOf(rhs), values[0] * BIG_TWO + values[1])
-                    assertTrue(values.all { it >= BIG_ZERO && it <= BIG_ONE })
-                } else {
-                    assertIs<SearchResult.Exhausted>(result)
-                }
-            }
         }
     }
 

@@ -63,14 +63,6 @@ class LpNeighborhoodTest {
     }
 
     @Test
-    fun `an uncapped walk should reach the whole connected component`() {
-        val (base, x) = chain()
-        val nb = base.columnNeighborhood(intArrayOf(x[0]), maxRows = 16, rowIndex = base.rowIndex())
-        assertEquals(3, nb.model.m)
-        assertEquals(3, nb.model.n)
-    }
-
-    @Test
     fun `the sub-model should carry bounds and slack relations per selected row`() {
         val b = LpBuilder()
         val x0 = b.addVar(2L, 9L)

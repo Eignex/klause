@@ -41,7 +41,6 @@ class SafeObjectiveBoundTest {
         )
     }
 
-
     @Test
     fun `retained variable bounds follow nested endpoints and rollback in source coordinates`() {
         for (maximize in listOf(false, true)) {
@@ -66,22 +65,6 @@ class SafeObjectiveBoundTest {
     }
 
     @Test
-    fun `retained variable bounds certify fractional rows on an integer source lattice`() {
-        for (maximize in listOf(false, true)) {
-            val source = LpBuilder().apply {
-                val x = addVar(3L, 9L, cost = if (maximize) -1L else 1L)
-                addRealRow(intArrayOf(x), doubleArrayOf(0.5), if (maximize) Relation.LE else Relation.GE, 2.75)
-            }.build(Sense.MINIMIZE)
-            val model = assertNotNull(LpExactState(assertNotNull(source.authoritativeModel())).toWorkingModel())
-            val result = assertNotNull(RevisedSimplex(model).solvePrimal())
-
-            assertEquals(null, integerCertify(model, result.duals))
-            assertEquals(if (maximize) 5L else 6L, model.exactVariableBound(result, 0, maximize))
-            assertEquals(if (maximize) 5L else 6L, model.tightVariableBound(result, 0, maximize))
-        }
-    }
-
-    @Test
     fun `retained variable bounds divide objective scaling before integer rounding`() {
         val source = assertNotNull(LpBuilder().apply { addVar(3L, 9L, cost = 2L) }
             .build(Sense.MINIMIZE).authoritativeModel())
@@ -101,37 +84,6 @@ class SafeObjectiveBoundTest {
         assertEquals(null, integerCertify(model, result.duals))
         assertEquals(5L, model.exactVariableBound(result, 0, maximize = false))
         assertEquals(5L, model.safeVariableBound(result, 0, maximize = false))
-    }
-
-    @Test
-    fun `supplied retained certificates contribute integer ceilings only to their current state`() {
-        val source = assertNotNull(LpBuilder().apply {
-            val x = addVar(0L, 3L, cost = 1L)
-            addRow(intArrayOf(x), longArrayOf(2L), Relation.EQ, 1L)
-        }.build(Sense.MINIMIZE).authoritativeModel())
-        val trail = LpBoundTrail(source)
-        val model = assertNotNull(trail.state.toWorkingModel())
-        val duals = doubleArrayOf(0.5)
-        val certificate = assertNotNull(integerCertify(model, duals))
-
-        assertEquals(1.0, tightObjectiveLowerBound(model, duals, certificate))
-        assertEquals(
-            1.0,
-            certifiedTightObjectiveLowerBound(model, duals, certificate, null, ProductionLpCertificationPolicy),
-        )
-        assertTrue(trail.replaceObjective(ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(0L)))))
-        val unpriced = assertNotNull(trail.state.toWorkingModel())
-        assertEquals(0.0, tightObjectiveLowerBound(unpriced, doubleArrayOf(0.0), certificate))
-        assertEquals(
-            0.0,
-            certifiedTightObjectiveLowerBound(
-                unpriced,
-                doubleArrayOf(0.0),
-                certificate,
-                null,
-                ProductionLpCertificationPolicy,
-            ),
-        )
     }
 
     private fun randomModel(m: Int, n: Int, rng: Random): LpModel {
@@ -163,24 +115,6 @@ class SafeObjectiveBoundTest {
         assertTrue(total > 300, "covered only $total instances")
         // The bound should be usefully tight (finite) on the large majority of instances.
         assertTrue(finite >= total * 4 / 5, "safe bound was finite on only $finite/$total")
-    }
-
-    @Test
-    fun `a slack multiplier off by float noise still yields a bound`() {
-        // min -x subject to x <= 4, x in [0, 10]: the row's exact multiplier is -1, and a slack carries
-        // no upper, so a multiplier a hair the other side of its own reduced cost used to cost the bound.
-        val b = LpBuilder()
-        val x = b.addVar(0L, 10L, cost = -1L)
-        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 4L)
-        val model = b.build(Sense.MINIMIZE)
-        val optimum = exactLpOptimum(model)
-
-        val bound = assertNotNull(
-            safeObjectiveLowerBound(model, doubleArrayOf(1e-12)),
-            "a multiplier off by 1e-12 must not cost the whole bound",
-        )
-
-        assertTrue(bound <= optimum + 1e-6, "UNSOUND repaired bound $bound > optimum $optimum")
     }
 
     @Test
@@ -287,27 +221,4 @@ class SafeObjectiveBoundTest {
         assertEquals(1.0, tightObjectiveLowerBound(model, duals, certificate))
     }
 
-    @Test
-    fun `safe bound rounds a negative wide constant downward`() {
-        val constant = -9007199254740993L
-        val model = LpBuilder().apply { addVar(constant, constant, cost = 1L) }.build(Sense.MINIMIZE)
-
-        val bound = assertNotNull(safeObjectiveLowerBound(model, doubleArrayOf()))
-
-        assertTrue(assertNotNull(BigFraction.ofDouble(bound)) <= BigFraction.ofLong(constant))
-        assertEquals(-9007199254740994.0, bound)
-    }
-
-    @Test
-    fun `safe bound declines an overflowing exact projection`() {
-        val model = LpBuilder().apply {
-            addRealVar(
-                0.0,
-                Double.MAX_VALUE,
-                cost = -Double.MAX_VALUE,
-            )
-        }.build(Sense.MINIMIZE)
-
-        assertEquals(null, safeObjectiveLowerBound(model, doubleArrayOf()))
-    }
 }

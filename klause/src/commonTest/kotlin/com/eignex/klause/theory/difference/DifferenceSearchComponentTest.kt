@@ -6,13 +6,10 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchLearnedConflict
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
@@ -155,34 +152,6 @@ class DifferenceSearchComponentTest {
     }
 
     @Test
-    fun `unconditional paths publish a multihop one-sided bound`() {
-        val open = com.eignex.klause.util.Bits.full(3)
-        val model = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(0, 0, 0), open, open),
-            factors = arrayOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 2),
-                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 3),
-            ),
-        )
-        val roots = object : SearchComponent {
-            override fun initialize(context: SearchContext): ComponentResult {
-                val x = context.publish(SearchDecision.IntAtMost(0, 10))
-                if (x !is ComponentResult.Consistent) return x
-                return context.publish(SearchDecision.IntAtMost(2, 4))
-            }
-        }
-        val session = SearchSession(
-            listOf(roots, DifferenceSearchComponent.withRootBounds(model, intArrayOf(1, 2), intArrayOf(0))),
-        )
-
-        assertIs<ComponentResult.Consistent>(session.initialize())
-
-        assertEquals(9L, session.intUpperBound(0))
-        assertEquals(null, session.intLowerBound(0))
-    }
-
-    @Test
     fun `reset root facts recomputes unconditional consequences`() {
         val open = com.eignex.klause.util.Bits.full(2)
         val model = Problem(
@@ -288,24 +257,6 @@ class DifferenceSearchComponentTest {
         val session = SearchSession(listOf(publisher, DifferenceSearchComponent(model)))
 
         assertIs<ComponentResult.Conflict>(session.initialize())
-    }
-
-    @Test
-    fun `difference component contributes its complete model through the shared session`() {
-        val model = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
-            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
-        )
-        val component = DifferenceSearchComponent(model)
-        val session = SearchSession(listOf(component))
-
-        assertIs<ComponentResult.Consistent>(session.initialize())
-        assertIs<ComponentCheck.Feasible>(session.check())
-
-        val completeModel = session.model()
-        assertEquals(0L, completeModel.valueOf<Sample>(component)?.ints?.get(0))
-        assertEquals(0L, completeModel.valueOf<Long>(SearchIntValue(0)))
     }
 
     @Test

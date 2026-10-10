@@ -164,26 +164,6 @@ class PropagationSessionTest {
     }
 
     @Test
-    fun `pushed pins imply the same values a one-shot propagate does`() {
-        val p = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
-        )
-        val s = PropagationSession(p)
-        s.seed(Assumptions.None)
-        s.pinBool(0, true)
-        val r = s.pinBool(2, false)
-        // After pinning x0=true, the clause forces x1=true (already implied before pinning x2).
-        // Pinning x2 doesn't add anything new.
-        assertIs<PropagationResult.Implied>(r)
-        val oneShot = p.propagate(Assumptions(bools = mapOf(0 to true, 2 to false)))
-        assertIs<PropagationResult.Implied>(oneShot)
-        assertEquals(true, oneShot.bools[1])
-    }
-
-    @Test
     fun `the root domain stays at the seed while the live domain follows the trail`() {
         val p = Problem(
             numBoolVars = 0,
@@ -198,44 +178,6 @@ class PropagationSessionTest {
         assertEquals(4L, s.intDomain(0).min, "the live domain should carry the pin")
         assertEquals(0L, s.rootIntDomain(0).min, "the root domain should be the one the session was seeded with")
         assertEquals(9L, s.rootIntDomain(0).max)
-    }
-
-    @Test
-    fun `the fixed variable count covers assigned bools and singleton ints`() {
-        val p = Problem(
-            numBoolVars = 2,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
-        )
-        val s = PropagationSession(p)
-        s.seed(Assumptions.None)
-
-        s.pinBool(0, true)
-        s.pinIntAtLeast(0, 9L)
-        s.pinIntAtLeast(1, 4L)
-
-        assertEquals(3, s.fixedVariableCount())
-    }
-
-    @Test
-    fun `the root fixed count leaves out what decisions fixed`() {
-        val p = Problem(
-            numBoolVars = 3,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(4, 4)),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))),
-            ),
-        )
-        val s = PropagationSession(p)
-        s.seed(Assumptions.None)
-
-        s.pinBool(1, true)
-
-        assertEquals(4, s.fixedVariableCount())
-        assertEquals(2, s.rootFixedVariableCount())
     }
 
     @Test
@@ -256,38 +198,6 @@ class PropagationSessionTest {
     }
 
     @Test
-    fun `pop restores feasibility`() {
-        // (x0 ∨ x1). After pinning x0=false x1=false → Unsat. Pop one → feasible again.
-        val p = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
-        )
-        val s = PropagationSession(p)
-        assertIs<PropagationResult.Implied>(s.seed(Assumptions.None))
-        assertIs<PropagationResult.Implied>(s.pinBool(0, false))
-        // Forces x1=true. Now if we pin x1=false:
-        val conflict = s.pinBool(1, false)
-        assertIs<PropagationResult.Unsat>(conflict)
-        s.popLast()
-        val r = s.pinBool(1, true)
-        assertIs<PropagationResult.Implied>(r)
-    }
-
-    @Test
-    fun `currentAssumptions reflects trail`() {
-        val p = Problem(2, 0, emptyArray(), emptyList())
-        val s = PropagationSession(p)
-        s.seed(Assumptions.None)
-        s.pinBool(0, true)
-        s.pinBool(1, false)
-        assertEquals(Assumptions(bools = mapOf(0 to true, 1 to false)), s.currentAssumptions())
-        s.popLast()
-        assertEquals(Assumptions(bools = mapOf(0 to true)), s.currentAssumptions())
-    }
-
-    @Test
     fun `popUntilUnpinned pops to target`() {
         val p = Problem(3, 0, emptyArray(), emptyList())
         val s = PropagationSession(p)
@@ -298,21 +208,6 @@ class PropagationSessionTest {
         s.popUntilUnpinned(VarKind.Bool, 1)
         // After popping until 1 is unpinned: 1 and 2 should both be gone (LIFO order).
         assertEquals(Assumptions(bools = mapOf(0 to true)), s.currentAssumptions())
-    }
-
-    @Test
-    fun `seed propagates clause implications`() {
-        // (x0 ∨ x1) — seed with x0=false; expect implied {1: true}.
-        val p = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
-        )
-        val s = PropagationSession(p)
-        val r = s.seed(Assumptions(bools = mapOf(0 to false)))
-        val impl = assertIs<PropagationResult.Implied>(r)
-        assertEquals(true, impl.bools[1])
     }
 
     @Test

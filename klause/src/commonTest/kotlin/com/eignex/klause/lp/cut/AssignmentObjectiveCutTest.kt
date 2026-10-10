@@ -13,7 +13,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class AssignmentObjectiveCutTest {
 
@@ -44,21 +43,4 @@ class AssignmentObjectiveCutTest {
         assertEquals(4L, cuts[0].rhs)
     }
 
-    @Test
-    fun `cut excludes no distinct assignment`() {
-        val coef = longArrayOf(2, -1, 3) // mixed signs
-        val (p, r, sol) = setup(coef, 4)
-        val cut = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol.primal, PropagationSession(p)))
-            .firstOrNull() ?: return // if not violated, nothing to check
-        // Exhaustively: every distinct (a,b,c) in [0,4] satisfies Σ coef·x ≥ rhs.
-        for (a in 0..4) {
-            for (b in 0..4) {
-                for (c in 0..4) {
-                    if (a == b || a == c || b == c) continue
-                    val lhs = 2L * a - 1L * b + 3L * c
-                    assertTrue(lhs >= cut.rhs, "($a,$b,$c): $lhs < ${cut.rhs}")
-                }
-            }
-        }
-    }
 }

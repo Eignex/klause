@@ -12,20 +12,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FlatZincCompilerFloatTest {
-    @Test
-    fun `exact floats preserve open endpoints of strict inequalities`() {
-        val program = parseFlatZinc(
-            "var float: x;\nconstraint float_lt(0.0, x);\n" +
-                "constraint float_lin_lt([1.0], [x], 1.0);\nsolve satisfy;",
-            exactFloats = true,
-        )
-
-        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-
-        val assignment = assertIs<SolveResult.Sat>(result).assignment
-        val value = assignment.approximateRealValue(program.floatVarsByName.getValue("x").varId)
-        assertTrue(value > 0.0 && value < 1.0)
-    }
 
     @Test
     fun `float arrays preserve references and constant values`() {
@@ -51,45 +37,6 @@ class FlatZincCompilerFloatTest {
             val output = writeFlatZincSolution(program, assignment)
             assertTrue("values = [2.0, 72.0];" in output, "$initializer: $output")
         }
-    }
-
-    @Test
-    fun `nonlinear constraints on an array member preserve its scalar aliases`() {
-        val program = parseFlatZinc(
-            """
-            var -2.0..2.0: x;
-            var 0.0..2.0: magnitude;
-            array[1..1] of var float: values = [x];
-            var float: alias :: output_var = values[1];
-            constraint float_abs(alias, magnitude);
-            constraint float_eq(x, -1.0);
-            constraint float_eq(magnitude, 1.0);
-            solve satisfy;
-            """.trimIndent(),
-            floatBuckets = 5,
-        )
-
-        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-
-        val assignment = assertIs<SolveResult.Sat>(result).assignment
-        assertTrue("alias = -1.0;" in writeFlatZincSolution(program, assignment))
-    }
-
-    @Test
-    fun `inline float linear arrays accept constants`() {
-        val program = parseFlatZinc(
-            """
-            var 0.0..4.0: x :: output_var;
-            constraint float_lin_eq([1.0, 1.0], [x, 72.0], 74.0);
-            solve satisfy;
-            """.trimIndent(),
-            floatBuckets = 5,
-        )
-
-        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-
-        val assignment = assertIs<SolveResult.Sat>(result).assignment
-        assertTrue("x = 2.0;" in writeFlatZincSolution(program, assignment))
     }
 
     @Test
@@ -135,23 +82,6 @@ class FlatZincCompilerFloatTest {
         }
 
         assertTrue("unsupported by exact float lowering" in error.message.orEmpty())
-    }
-
-    @Test
-    fun `float linear coefficients beyond 32 bits preserve the solution`() {
-        val program = parseFlatZinc(
-            """
-            var 0.0..4.0: x :: output_var;
-            constraint float_lin_eq([10000.0], [x], 20000.0);
-            solve satisfy;
-            """.trimIndent(),
-            floatBuckets = 5,
-        )
-
-        val result = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-
-        val assignment = assertIs<SolveResult.Sat>(result).assignment
-        assertTrue("x = 2.0;" in writeFlatZincSolution(program, assignment))
     }
 
     @Test

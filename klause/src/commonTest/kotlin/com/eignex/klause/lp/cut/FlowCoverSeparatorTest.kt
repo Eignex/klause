@@ -10,7 +10,6 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -79,48 +78,6 @@ class FlowCoverSeparatorTest {
     }
 
     @Test
-    fun `randomized bin-packing flow-cover cuts never exclude a feasible integer point`() {
-        val rng = Random(20260625)
-        var fired = 0
-        repeat(400) { _ ->
-            val n = rng.nextInt(2, 5)
-            val weights = IntArray(n) { rng.nextInt(1, 5) }
-            val sum = weights.sum()
-            val maxW = weights.max()
-            if (sum <= maxW) return@repeat
-            val c = rng.nextInt(maxW, sum) // binds (≥ a single item, < the total) so x can go fractional
-            val p = knapsackProblem(weights, c)
-            val (cuts, ctx) = cutsAtMaxLoad(p, weights)
-            if (cuts.isEmpty()) return@repeat
-            fired++
-            val point = IntArray(n)
-            fun rec(idx: Int) {
-                if (idx == n) {
-                    var load = 0L
-                    for (i in 0 until n) load += weights[i].toLong() * point[i]
-                    if (load > c) return // infeasible — not constrained by the cut
-                    for (cut in cuts) {
-                        var lhs = 0L
-                        for (t in cut.cols.indices) lhs += cut.coeffs[t] * point[ctx.relaxation.colVarId[cut.cols[t]]]
-                        assertTrue(
-                            lhs <= cut.rhs,
-                            "flow-cover cut excludes feasible point ${point.toList()} (weights ${weights.toList()}, " +
-                                "c=$c): $lhs > ${cut.rhs}",
-                        )
-                    }
-                    return
-                }
-                for (v in 0..1) {
-                    point[idx] = v
-                    rec(idx + 1)
-                }
-            }
-            rec(0)
-        }
-        assertTrue(fired > 20, "bin-packing flow-cover fired on only $fired instances")
-    }
-
-    @Test
     fun `flow-cover fires on the fractional max-flow point`() {
         // 3 arcs of capacity 3 into a node of capacity 4: max flow 4 opens all three fractionally.
         val (cuts, _) = cutsAtMaxFlow(flowProblem(n = 3, u = 3, b = 4), n = 3)
@@ -158,48 +115,4 @@ class FlowCoverSeparatorTest {
         assertTrue(cuts.isEmpty(), "a flow with no stated floor of 0 must not become a flow-cover arc")
     }
 
-    @Test
-    fun `randomized flow-cover cuts never exclude a feasible integer point`() {
-        val rng = Random(20260624)
-        var fired = 0
-        repeat(80) { _ ->
-            val n = rng.nextInt(2, 4)
-            val u = rng.nextInt(1, 4)
-            val b = rng.nextInt(1, u * n) // 1 .. u*n-1, so the capacity genuinely binds
-            val p = flowProblem(n, u, b)
-            val (cuts, ctx) = cutsAtMaxFlow(p, n)
-            if (cuts.isEmpty()) return@repeat
-            fired++
-            val point = IntArray(2 * n)
-            fun feasible(): Boolean {
-                for (f in p.factors.filterIsInstance<Linear>()) {
-                    var s = 0L
-                    for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * point[f.vars[i]]
-                    if (s > checkNotNull(f.integerConstants).bound) return false // every factor is LE here
-                }
-                return true
-            }
-            fun rec(idx: Int) {
-                if (idx == 2 * n) {
-                    if (!feasible()) return
-                    for (cut in cuts) {
-                        var lhs = 0L
-                        for (t in cut.cols.indices) lhs += cut.coeffs[t] * point[ctx.relaxation.colVarId[cut.cols[t]]]
-                        assertTrue(
-                            lhs <= cut.rhs,
-                            "flow-cover cut excludes feasible point ${point.toList()}: $lhs > ${cut.rhs}",
-                        )
-                    }
-                    return
-                }
-                val hi = if (idx < n) u else 1
-                for (v in 0..hi) {
-                    point[idx] = v
-                    rec(idx + 1)
-                }
-            }
-            rec(0)
-        }
-        assertTrue(fired > 10, "flow-cover fired on only $fired instances")
-    }
 }

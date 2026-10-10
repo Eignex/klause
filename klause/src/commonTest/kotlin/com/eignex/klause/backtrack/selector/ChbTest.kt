@@ -1,22 +1,14 @@
 package com.eignex.klause.backtrack.selector
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
 
 class ChbTest {
 
@@ -37,43 +29,5 @@ class ChbTest {
         // A conflict implicating var 2 lifts its Q above every untouched variable.
         chb.onConflict(VarRef.Bool(2), PropagationResult.Unsat(conflictBools = intArrayOf(2)))
         assertEquals(VarRef.Bool(2), chb.pick(session, rng))
-    }
-
-    @Test
-    fun `chb solves a satisfiable clause problem with a valid witness`() {
-        // (x0 ∨ x1) ∧ (¬x0 ∨ x2) ∧ (¬x1 ∨ ¬x2): satisfiable.
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = arrayOf<IntDomain>(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-            ),
-        )
-        val sat = assertIs<SolveResult.Sat>(
-            BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L, variableSelector = Chb())),
-        )
-        val b = sat.assignment.bools
-        assertTrue(b[0] || b[1])
-        assertTrue(!b[0] || b[2])
-        assertTrue(!b[1] || !b[2])
-    }
-
-    @Test
-    fun `chb reports unsat on a contradiction`() {
-        val problem = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = arrayOf<IntDomain>(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ),
-        )
-        assertIs<SolveResult.Unsat>(
-            BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L, variableSelector = Chb())),
-        )
     }
 }

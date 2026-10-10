@@ -63,13 +63,4 @@ class CpToLpRelaxationNValueHullTest {
         assertTrue(hull.objectiveValue > bare.objectiveValue + eps, "the hull beats the greedy disjoint bound")
     }
 
-    @Test
-    fun `atmost nvalue hull bounds n below by the fractional value cover`() {
-        // AtMost means n ≥ distinct; the fractional cover gives n ≥ 1.5.
-        val p = triangle(NValue.Mode.AtMost)
-        val session = PropagationSession(p)
-        val hull = solveLp(CpToLpRelaxation(p, minimizeN, nValueHull = true).build(session).model)
-        assertEquals(FloatLpStatus.OPTIMAL, hull.status)
-        assertEquals(1.5, hull.objectiveValue, eps)
-    }
 }

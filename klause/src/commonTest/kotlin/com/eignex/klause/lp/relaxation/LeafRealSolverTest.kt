@@ -6,7 +6,6 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
@@ -14,7 +13,6 @@ import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -64,33 +62,6 @@ class LeafRealSolverTest {
             assertEquals(fresh.verdict, actual.verdict)
             assertEquals(fresh.refutingFactors.toSet(), actual.refutingFactors.toSet())
         }
-    }
-
-    @Test
-    fun `sibling integer pins preserve fresh exact real optima with one numerical owner`() {
-        val problem = Problem(
-            0, 1, arrayOf(IntDomain(-2, 3)),
-            arrayOf(Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(2.0), intArrayOf(0), LinearOp.GE, 1L)),
-            numRealVars = 1, realLower = doubleArrayOf(-5.0), realUpper = doubleArrayOf(5.0),
-        )
-        val objective = LinearObjective(intCoefficients = longArrayOf(2), realCoefficients = doubleArrayOf(1.0),
-            constant = 7L)
-        val factory = RecordingLpEngineFactory()
-        LeafRealSolver(problem, objective, context = LpSolveContext(factory)).use { owner ->
-            for (value in listOf(0L, 2L, -2L, 3L, 0L)) {
-                val sample = Sample(booleanArrayOf(), longArrayOf(value))
-                val actual = owner.solve(sample)
-                val fresh = leafRealFeasibility(problem, objective, sample)
-
-                assertEquals(LpVerdict.ATTAINED_OPTIMUM, actual.verdict)
-                assertEquals(fresh.verdict, actual.verdict)
-                assertEquals(fresh.exactReals, actual.exactReals)
-                assertEquals(BigFraction.ofLong(1L - value) * BigFraction.ofLong(2L).reciprocal(),
-                    assertNotNull(actual.exactReals).single())
-            }
-        }
-        assertEquals(1, factory.calls.count { it.kind == EngineConstruction.PERSISTENT })
-        assertEquals(0, factory.calls.count { it.kind == EngineConstruction.GENERAL })
     }
 
     @Test

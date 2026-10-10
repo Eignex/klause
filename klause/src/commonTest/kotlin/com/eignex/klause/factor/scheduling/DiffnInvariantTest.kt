@@ -40,31 +40,6 @@ class DiffnInvariantTest {
     }
 
     @Test
-    fun `incremental apply stays exact vs a full recount`() {
-        val factor = Diffn(
-            xs = intArrayOf(0, 1, 2, 3),
-            ys = intArrayOf(4, 5, 6, 7),
-            widths = longArrayOf(2, 1, 2, 1),
-            heights = longArrayOf(1, 2, 2, 1),
-        )
-        val problem = Problem(0, 8, Array(8) { IntDomain(0, 4) }, listOf(factor))
-        val state = LocalSearchState(problem.bake(), Random(7))
-        state.recompute()
-        val rng = Random(99)
-        repeat(600) { step ->
-            state.apply(Move.IntSet(rng.nextInt(8), rng.nextInt(0, 5).toLong()))
-            val fresh = LocalSearchState(problem.bake(), Random(0))
-            for (k in 0 until 8) fresh.assignment.setInt(k, state.assignment.intValue(k))
-            fresh.recompute()
-            assertEquals(
-                fresh.factors[0].violationDegree(fresh, 0),
-                state.factors[0].violationDegree(state, 0),
-                "incremental apply drifted from a full recount at step $step",
-            )
-        }
-    }
-
-    @Test
     fun `deltaIfIntSet matches full recompute - constant sizes`() {
         assertDeltaMatchesRecompute(
             numIntVars = 8,

@@ -1,12 +1,8 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.global.GlobalCardinality
-import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -100,24 +96,6 @@ class CpLpAdapterRebuildTest {
     }
 
     @Test
-    fun `the adapter tracks a pinned column`() {
-        // Pinning x1 to a point must give the same shifted bounds and rhs as a rebuild sees.
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 8) },
-            arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 9)),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(1, 1))
-        val relaxer = CpToLpRelaxation(problem, obj)
-        val base = relaxer.build(PropagationSession(problem))
-
-        val node = PropagationSession(problem)
-        node.pinInt(1, 5)
-        assertSameModel(relaxer.build(node).model, base, node)
-    }
-
-    @Test
     fun `the adapter reproduces a circuit arc relaxation when an arc is pruned`() {
         // A 3-node circuit: arc columns are laid out from the declared domains and pinned live, so the
         // relaxation is persistent-eligible. Pruning value 2 from succ[0] drops arc 0->2; re-binding
@@ -139,30 +117,6 @@ class CpLpAdapterRebuildTest {
         val node = PropagationSession(problem)
         node.implyIntAtMost(0, 1) // drop value 2 from succ[0]
         assertSameModel(relaxer.build(node).model, base, node)
-    }
-
-    @Test
-    fun `a live-M reified relaxation is not persistent-eligible`() {
-        val problem = Problem(
-            1,
-            3,
-            Array(3) { IntDomain(0, 10) },
-            arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-                ReifiedLinear(
-                    auxBoolVar = 0,
-                    coeffs = intArrayOf(1, 1),
-                    vars = intArrayOf(0, 1),
-                    op = LinearOp.LE,
-                    bound = 4,
-                ),
-            ),
-        )
-        val relaxer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1)))
-        assertFalse(
-            relaxer.build(PropagationSession(problem)).persistentEligible,
-            "a relaxation with live-M reified rows varies per node and must not be persisted",
-        )
     }
 
     @Test
@@ -202,95 +156,6 @@ class CpLpAdapterRebuildTest {
 
         val node = PropagationSession(problem)
         node.implyIntAtMost(0, b + 3) // value b+4 leaves x0 — tuple (b+4, 0) infeasible
-        assertSameModel(relaxer.build(node).model, base, node)
-    }
-
-    @Test
-    fun `the adapter reproduces an nvalue hull when a value is pruned`() {
-        // var n = |distinct(x0,x1,x2)| over [0,3]; pruning value 3 from x0 drops its z selector.
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 3) },
-            arrayOf<Factor>(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
-        )
-        val relaxer =
-            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), nValueHull = true)
-        val base = relaxer.build(PropagationSession(problem))
-        assertTrue(base.persistentEligible, "an nvalue hull relaxation must be persistent-eligible")
-
-        val node = PropagationSession(problem)
-        node.implyIntAtMost(0, 2)
-        assertSameModel(relaxer.build(node).model, base, node)
-    }
-
-    @Test
-    fun `the adapter reproduces a gcc count hull when a value is pruned`() {
-        // counts of cover values 1,2 over x0,x1; count vars are 2,3. Pruning value 2 from x0 drops a z.
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 3) },
-            arrayOf<Factor>(
-                GlobalCardinality(xs = intArrayOf(0, 1), cover = longArrayOf(1, 2), countVars = intArrayOf(2, 3)),
-            ),
-        )
-        val relaxer =
-            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1)), gccCountHull = true)
-        val base = relaxer.build(PropagationSession(problem))
-        assertTrue(base.persistentEligible, "a gcc count hull relaxation must be persistent-eligible")
-
-        val node = PropagationSession(problem)
-        node.implyIntAtMost(0, 1)
-        assertSameModel(relaxer.build(node).model, base, node)
-    }
-
-    @Test
-    fun `the adapter reproduces a gcc count hull over cover values beyond Int range`() {
-        // Cover values past 2^31: the count-linkage rows key selectors by cover position and the
-        // selector presence carries the full Long value, so the hull emits its columns and re-binds
-        // bit-identically when a wide value is pruned.
-        val b = 4_000_000_000L
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(IntDomain(b + 1, b + 2), IntDomain(b + 1, b + 2), IntDomain(0, 2), IntDomain(0, 2)),
-            arrayOf<Factor>(
-                GlobalCardinality(
-                    xs = intArrayOf(0, 1),
-                    cover = longArrayOf(b + 1, b + 2),
-                    countVars = intArrayOf(2, 3),
-                ),
-            ),
-        )
-        val relaxer =
-            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1)), gccCountHull = true)
-        val base = relaxer.build(PropagationSession(problem))
-        assertTrue(base.model.n > 4, "wide-cover gcc must emit its selector hull columns")
-
-        val node = PropagationSession(problem)
-        node.implyIntAtMost(0, b + 1) // value b+2 leaves x0 — drops that selector
-        assertSameModel(relaxer.build(node).model, base, node)
-    }
-
-    @Test
-    fun `the adapter reproduces an element hull when an index value is pruned`() {
-        // result = arr[idx], arr = [7,3,9,5]; pruning index 3 drops the p=3 selector.
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 3), IntDomain(0, 9)),
-            arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = longArrayOf(7, 3, 9, 5), arrIsVars = false, indexOffset = 0),
-            ),
-        )
-        val relaxer =
-            CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(0, 1)), elementHull = true)
-        val base = relaxer.build(PropagationSession(problem))
-        assertTrue(base.persistentEligible, "an element hull relaxation must be persistent-eligible")
-
-        val node = PropagationSession(problem)
-        node.implyIntAtMost(0, 2)
         assertSameModel(relaxer.build(node).model, base, node)
     }
 

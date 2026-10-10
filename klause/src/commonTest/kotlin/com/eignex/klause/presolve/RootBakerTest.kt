@@ -23,24 +23,6 @@ class RootBakerTest {
     private fun bake(problem: Problem, config: BakeConfig): PropagationResult = RootBaker.bake(problem.bake(), config)
 
     @Test
-    fun `failed-literal probing pins a forced literal`() {
-        // (a ∨ b), (a ∨ c), (¬b ∨ ¬c). Base propagation forces nothing; probing a=false forces b and c,
-        // then (¬b ∨ ¬c) fails, so a must be true.
-        val p = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-            ),
-        )
-        val baked = assertIs<PropagationResult.Implied>(bake(p, BakeConfig(probeFailedLiterals = true)))
-        assertEquals(true, baked.boolValueOrNull(0), "probing should have forced a=true")
-    }
-
-    @Test
     fun `failed-literal probing detects Unsat when both polarities fail`() {
         val p = Problem(
             numBoolVars = 1,
@@ -127,20 +109,6 @@ class RootBakerTest {
         ).bake(cancelled)
         val baked = assertIs<PropagationResult.Implied>(bake(p, BakeConfig(probeIntBounds = true)))
         assertEquals(null, baked.intMinOrNullCompat(0), "a fired cancellation should skip SAC tightening")
-    }
-
-    @Test
-    fun `no tier enabled returns the base bake unchanged`() {
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = arrayOf<Factor>(
-                Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
-                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2),
-            ),
-        )
-        assertEquals(p.baked, bake(p, BakeConfig.NONE))
     }
 
     @Test

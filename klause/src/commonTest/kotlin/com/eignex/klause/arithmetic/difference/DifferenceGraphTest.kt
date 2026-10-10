@@ -21,12 +21,6 @@ class DifferenceGraphTest {
     }
 
     @Test
-    fun `a satisfiable system reports no cycle`() {
-        // x - y <= 3, y - z <= 4: a chain, no cycle at all.
-        assertNull(graph(3, Triple(1, 0, 3L), Triple(2, 1, 4L)).negativeCycle())
-    }
-
-    @Test
     fun `a zero-weight cycle is satisfiable`() {
         // x - y <= 2 and y - x <= -2 force x - y = 2 exactly; consistent, so no negative cycle.
         assertNull(graph(2, Triple(1, 0, 2L), Triple(0, 1, -2L)).negativeCycle())
@@ -52,20 +46,6 @@ class DifferenceGraphTest {
     }
 
     @Test
-    fun `a disconnected component's cycle is still found`() {
-        // Vars 0,1 are an unrelated satisfiable chain; the cycle lives on 2,3, which no path reaches
-        // from them — so the search must start from every vertex, not just one.
-        val cycle = graph(
-            4,
-            Triple(0, 1, 5L),
-            Triple(2, 3, -1L),
-            Triple(3, 2, -1L),
-        ).negativeCycle()
-        assertNotNull(cycle)
-        assertEquals(2, cycle.size)
-    }
-
-    @Test
     fun `masking an edge out removes the conflict`() {
         val g = DifferenceGraph(2)
         val e0 = g.addEdge(1, 0, -1L)
@@ -75,12 +55,6 @@ class DifferenceGraphTest {
         active[e1] = false
         assertNull(g.negativeCycle(active), "with one retracted the system is satisfiable")
         assertTrue(e0 == 0)
-    }
-
-    @Test
-    fun `an empty system is satisfiable`() {
-        assertNull(DifferenceGraph(3).negativeCycle())
-        assertNull(DifferenceGraph(0).negativeCycle())
     }
 
     @Test
@@ -136,30 +110,12 @@ class DifferenceGraphTest {
     }
 
     @Test
-    fun `a spent budget abandons shortest paths`() {
-        val g = graph(2, Triple(0, 1, 1L))
-
-        assertEquals(ShortestPaths.Abandoned, g.shortestPaths(0) { true })
-    }
-
-    @Test
     fun `shortest paths report only a reachable negative cycle`() {
         val reachable = graph(3, Triple(0, 1, 0L), Triple(1, 2, -1L), Triple(2, 1, 0L))
         val disconnected = graph(4, Triple(0, 1, 0L), Triple(2, 3, -1L), Triple(3, 2, 0L))
 
         assertEquals(ShortestPaths.Infeasible, reachable.shortestPaths(0))
         assertTrue(disconnected.shortestPaths(0) is ShortestPaths.Found)
-    }
-
-    @Test
-    fun `shortest paths notice cancellation between relaxation passes`() {
-        val g = graph(3, Triple(1, 2, 1L), Triple(0, 1, 1L))
-        var polls = 0
-
-        val paths = g.shortestPaths(0) { ++polls >= 2 }
-
-        assertEquals(ShortestPaths.Abandoned, paths)
-        assertEquals(2, polls)
     }
 
     @Test

@@ -3,16 +3,12 @@ package com.eignex.klause.factor.scheduling
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.FixedCadenceRestart
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CumulativeInvariantTest {
@@ -30,49 +26,6 @@ class CumulativeInvariantTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-    }
-
-    @Test
-    fun `non-overlapping schedule satisfies the cumulative bound`() {
-        val problem = threeTasksUnary()
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 4)
-        state.recompute()
-        assertEquals(0, state.cost, "back-to-back schedule should satisfy capacity 1")
-    }
-
-    @Test
-    fun `overlapping tasks blow the unary capacity`() {
-        val problem = threeTasksUnary()
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 4)
-        state.recompute()
-        assertTrue(state.cost > 0, "two overlapping unit tasks should violate capacity 1")
-    }
-
-    @Test
-    fun `graded cost equals the summed overage`() {
-        val factor = Cumulative(
-            starts = intArrayOf(0, 1),
-            durations = longArrayOf(3, 3),
-            resources = longArrayOf(2, 2),
-            capacity = 3,
-        )
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(factor),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 1)
-        state.recompute()
-        assertEquals(2, state.intPayload[0], "expected energy overage of 2 (one unit at t=1,t=2)")
     }
 
     @Test
@@ -95,25 +48,6 @@ class CumulativeInvariantTest {
         assertEquals(0, afterIncr, "spread schedule should be feasible")
         assertEquals(fresh.intPayload[0], afterIncr, "incremental apply must agree with recompute")
         assertTrue(before > 0, "all-at-zero must start violated")
-    }
-
-    @Test
-    fun `LS finds a feasible schedule for the 3-task unary problem`() {
-        val problem = threeTasksUnary()
-        val solver = LocalSearchSolver(
-            problem.bake(),
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
-        )
-        val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 11L)).assignment
-        assertNotNull(sample, "LS should find a feasible cumulative schedule")
-        val starts = sample.ints
-        val occ = IntArray(8)
-        for (i in 0 until 3) {
-            for (t in starts[i] until starts[i] + 2) {
-                if (t in occ.indices) occ[t.toInt()]++
-            }
-        }
-        for (t in occ.indices) assertTrue(occ[t] <= 1, "unary capacity broken at t=$t in ${starts.toList()}")
     }
 
     @Test

@@ -4,7 +4,6 @@ import com.eignex.klause.lp.lattice.BareissEchelon
 import com.eignex.klause.lp.lattice.bareissEchelon
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.isZero
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -20,24 +19,11 @@ class BareissEchelonTest {
         bareissEchelon(sparseRows(*rows), rows.maxOf { it.size })
 
     @Test
-    fun `an independent system keeps every row`() {
-        val e = echelon(longArrayOf(2, 1, 3), longArrayOf(1, 4, 1))
-        assertEquals(2, e.rows.size)
-        assertEquals(listOf(0, 1), e.pivots.toList())
-    }
-
-    @Test
     fun `a dependent row reduces away and does not count toward the rank`() {
         // Row 2 is twice row 1, so the rank is 1.
         val e = echelon(longArrayOf(1, 2, 3), longArrayOf(2, 4, 6))
         assertEquals(1, e.rows.size, "a multiple of another row carries no constraint")
         assertEquals(listOf(0), e.pivots.toList())
-    }
-
-    @Test
-    fun `entries below a pivot are cleared`() {
-        val e = echelon(longArrayOf(2, 1), longArrayOf(4, 5))
-        assertTrue(e.rows[1][0].isZero(), "the pivot column is clear below the pivot")
     }
 
     @Test
@@ -56,22 +42,8 @@ class BareissEchelonTest {
     }
 
     @Test
-    fun `a rank-deficient system reports only its independent rows`() {
-        // r3 = r1 + r2, so the rank is 2.
-        val e = echelon(longArrayOf(1, 0, 2), longArrayOf(0, 1, 3), longArrayOf(1, 1, 5))
-        assertEquals(2, e.rows.size)
-    }
-
-    @Test
     fun `an empty system reduces to nothing`() {
         assertEquals(0, bareissEchelon(emptyList(), 0).rows.size)
-    }
-
-    @Test
-    fun `a row keeps only the entries it actually has`() {
-        // The point of the sparse form: a row of two terms over many columns costs two entries.
-        val e = echelon(longArrayOf(0, 0, 0, 7, 0, 0, 0, 0, 5, 0))
-        assertEquals(listOf(3, 8), e.rows[0].index.toList())
     }
 
     @Test

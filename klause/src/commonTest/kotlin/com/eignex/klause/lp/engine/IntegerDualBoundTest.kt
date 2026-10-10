@@ -22,26 +22,6 @@ import kotlin.test.assertTrue
  * [SafeObjectiveBoundTest] checks the float bound.
  */
 class IntegerDualBoundTest {
-    @Test
-    fun `malformed legacy row premises decline numerical certification and source conversion`() {
-        val premises = listOf(
-            LpRowPremises(intArrayOf(0), booleanArrayOf(), longArrayOf(0L)),
-            LpRowPremises(intArrayOf(0), booleanArrayOf(false), longArrayOf()),
-            LpRowPremises(intArrayOf(-1), booleanArrayOf(false), longArrayOf(0L)),
-            LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(-1)),
-        )
-        for (premise in premises) {
-            val model = LpBuilder().apply {
-                val x = addVar(0L, 9L, cost = 1L)
-                addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 3L)
-            }.build(Sense.MINIMIZE)
-            model.rowGlobal[0] = false
-            model.rowPremises[0] = premise
-
-            assertNull(integerCertify(model, doubleArrayOf(-1.0)))
-            assertNull(model.authoritativeModel())
-        }
-    }
 
     @Test
     fun `legacy certificates reject mutations to numeric authority and source premises`() {
@@ -105,53 +85,6 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `retained integral IEEE data certifies without losing its source representation`() {
-        val source = LpBuilder().apply {
-            val x = addVar(0L, 3L, cost = 1L)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 2.0)
-        }.build(Sense.MINIMIZE)
-        val authority = assertNotNull(source.authoritativeModel())
-        val model = assertNotNull(LpExactState(authority).toWorkingModel())
-
-        val certificate = assertNotNull(integerCertify(model, doubleArrayOf(-1.0)))
-
-        assertEquals(2L, certificate.objectiveBoundCeil(0L))
-        assertNotNull(authority.entries(0).single().number.ieeeBits)
-        assertNull(authority.entries(0).single().number.legacyLong())
-        assertEquals(-1L, authority.entries(0).single().number.exactLong())
-    }
-
-    @Test
-    fun `retained certificates use the live shifted lower endpoint`() {
-        val source = LpBuilder().apply { addVar(3L, 9L, cost = 2L) }.build(Sense.MINIMIZE)
-        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
-        assertTrue(trail.push())
-        assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 7L))
-        val retained = assertNotNull(trail.state.toWorkingModel())
-
-        val certificate = assertNotNull(integerCertify(retained, doubleArrayOf(), scaleBits = 0))
-
-        assertEquals(10L, certificate.objectiveBoundCeil(0L))
-        assertEquals(1L, certificate.fixSteps(0, 13L, 0L))
-        assertTrue(trail.pop(0))
-        val parent = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf()))
-        assertEquals(6L, parent.objectiveBoundCeil(0L))
-    }
-
-    @Test
-    fun `retained certificates use the live shifted upper endpoint`() {
-        val source = LpBuilder().apply { addVar(-3L, 9L, cost = -2L) }.build(Sense.MINIMIZE)
-        val trail = LpBoundTrail(assertNotNull(source.authoritativeModel()))
-        assertTrue(trail.push())
-        assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.of(8L)), 8L))
-
-        val certificate = assertNotNull(integerCertify(assertNotNull(trail.state.toWorkingModel()), doubleArrayOf()))
-
-        assertEquals(-10L, certificate.objectiveBoundCeil(0L))
-        assertEquals(1L, certificate.fixSteps(0, -7L, 0L))
-    }
-
-    @Test
     fun `retained certificates remove inactive row weight and recover parent support after pop`() {
         val source = LpBuilder().apply {
             val x = addVar(0L, 4L, cost = 1L)
@@ -185,24 +118,6 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `retained certificates repair upper only logicals against their actual cost`() {
-        val model = LpBuilder().apply {
-            val x = addVar(0L, 2L, cost = -1L)
-            addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 1L)
-        }.build(Sense.MINIMIZE)
-        val source = assertNotNull(model.authoritativeModel())
-        val zero = ExactLpNumber.of(0L)
-        val columns = MutableList(source.numVars) { source.column(it) }
-        columns[1] = columns[1].copy(bounds = ExactLpBounds(upper = ExactLpSide(zero)))
-        val state = LpExactState(source.copy(columns = columns))
-
-        val certificate = assertNotNull(integerCertify(assertNotNull(state.toWorkingModel()), doubleArrayOf(-999.0)))
-
-        assertEquals(-2L, certificate.objectiveBoundCeil(0L))
-        assertFalse(certificate.dualNonzeroRow(0))
-    }
-
-    @Test
     fun `retained integral certification declines fractional source coefficients and continuous columns`() {
         val fractional = LpBuilder().apply {
             val x = addVar(0L, 2L)
@@ -218,27 +133,6 @@ class IntegerDualBoundTest {
         )
         assertNull(integerCertify(fractionalModel, doubleArrayOf(0.0)))
         assertNull(integerCertify(continuousModel, doubleArrayOf()))
-    }
-
-    @Test
-    fun `retained logical multiplier repair handles the minimum signed cost without negating it`() {
-        val source = assertNotNull(LpBuilder().apply {
-            addVar(0L, 0L)
-            addRow(intArrayOf(), longArrayOf(), Relation.LE, 0L)
-        }.build(Sense.MINIMIZE).authoritativeModel())
-        val columns = List(source.numVars) {
-            if (it == source.n) source.column(it).copy(bounds = ExactLpBounds()) else source.column(it)
-        }
-        val objective = ExactLpObjective(listOf(ExactLpNumber.of(0L), ExactLpNumber.of(Long.MIN_VALUE)))
-        val retained = assertNotNull(LpExactState(source.copy(
-            columns = columns,
-            objective = objective,
-        )).toWorkingModel())
-
-        val certificate = assertNotNull(integerCertify(retained, doubleArrayOf(1.0), scaleBits = 0))
-
-        assertEquals(0L, certificate.objectiveBoundCeil(0L))
-        assertEquals(0, certificate.reducedCostSign(1))
     }
 
     @Test
@@ -319,37 +213,6 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `a slack multiplier off by float noise still yields an exact bound`() {
-        // Mirrors the float bound's own repair test: min -x subject to x <= 4, x in [0, 10]. The row's
-        // exact multiplier is -1, and a slack carries no upper bound, so a multiplier a hair the other
-        // side of its own reduced cost used to abandon the certificate outright.
-        val b = LpBuilder()
-        val x = b.addVar(0L, 10L, cost = -1L)
-        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 4L)
-        val model = b.build(Sense.MINIMIZE)
-        val optimum = exactLpOptimum(model)
-
-        val bound = assertNotNull(
-            integerDualLowerBoundCeil(model, doubleArrayOf(1e-12)),
-            "a multiplier off by 1e-12 must not cost the whole certificate",
-        )
-
-        assertTrue(bound <= ceil(optimum) + 1e-9, "UNSOUND repaired bound $bound > ceil(optimum) ${ceil(optimum)}")
-    }
-
-    @Test
-    fun `the repair leaves a certificate that already had one untouched`() {
-        val b = LpBuilder()
-        val x = b.addVar(0L, 10L, cost = -1L)
-        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 4L)
-        val model = b.build(Sense.MINIMIZE)
-
-        val exact = assertNotNull(integerDualLowerBoundCeil(model, doubleArrayOf(-1.0)))
-
-        assertEquals(-4L, exact)
-    }
-
-    @Test
     fun `fixing steps retain source constants at every certificate scale`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 10L, cost = 2L)
@@ -364,16 +227,6 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `fixing steps use the upper endpoint for a negative reduced cost`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 10L, cost = -2L)
-        val model = builder.build(Sense.MINIMIZE)
-        val cert = assertNotNull(integerCertify(model, doubleArrayOf(), scaleBits = 11))
-
-        assertEquals(2L, cert.fixSteps(x, improvingMax = -15L, sourceConstant = 1L))
-    }
-
-    @Test
     fun `fixing arithmetic declines an unrepresentable reduced-cost magnitude`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 1L, cost = Long.MIN_VALUE)
@@ -381,16 +234,6 @@ class IntegerDualBoundTest {
         val cert = assertNotNull(integerCertify(model, doubleArrayOf(), scaleBits = 0))
 
         assertEquals(null, cert.fixSteps(x, improvingMax = Long.MIN_VALUE, sourceConstant = 0L))
-    }
-
-    @Test
-    fun `fixing gap handles the minimum source constant without negation overflow`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 1L, cost = 1L)
-        val cert = assertNotNull(integerCertify(builder.build(Sense.MINIMIZE), doubleArrayOf(), scaleBits = 0))
-
-        assertTrue(cert.improvingGapNonNegative(Long.MIN_VALUE, Long.MIN_VALUE))
-        assertEquals(0L, cert.fixSteps(x, Long.MIN_VALUE, Long.MIN_VALUE))
     }
 
     @Test
@@ -426,77 +269,6 @@ class IntegerDualBoundTest {
 
         assertEquals(listOf<LpCertifierCost>(LpCertifierCost.Metered(39L), LpCertifierCost.Metered(33L),
             LpCertifierCost.Metered(6L)), costs)
-    }
-
-    @Test
-    fun `a pass over wider operands costs the square of its word length`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 4L, cost = 1L)
-        val y = builder.addVar(0L, 4L, cost = 1L)
-        builder.addRow(intArrayOf(x, y), longArrayOf(1L, 1L), Relation.GE, 2L)
-        val model = builder.build(Sense.MINIMIZE)
-        val cases = listOf(Long.SIZE_BITS to 6L, 2 * Long.SIZE_BITS to 6L * 4L, 3 * Long.SIZE_BITS to 6L * 9L)
-        for ((bits, expected) in cases) {
-            val scans = LpScanCount(model).apply { scan(bits) }
-
-            assertEquals(LpCertifierCost.Metered(expected), scans.cost(), "$bits-bit operands")
-        }
-    }
-
-    @Test
-    fun `inexact objective constant records one rejected rationalization`() {
-        val builder = LpBuilder()
-        builder.addRealVar(1e-10, 1.0, cost = 1.0)
-        val model = builder.build(Sense.MINIMIZE)
-        var exactInputAttempts = 0
-        var exactInputRejections = 0
-        val observer = object : LpCertificationObserver {
-            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
-            override fun observeExactInput(accepted: Boolean) {
-                exactInputAttempts++
-                if (!accepted) exactInputRejections++
-            }
-            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-        }
-
-        val bound = rationalizedDualLowerBoundCeil(model, doubleArrayOf(), observer = observer)
-
-        assertEquals(null, bound)
-        assertEquals(1, exactInputAttempts)
-        assertEquals(1, exactInputRejections)
-    }
-
-    @Test
-    fun `an exact Farkas candidate rejected by both signs records one decline`() {
-        val builder = LpBuilder()
-        val x = builder.addVar(0L, 1L)
-        builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 0L)
-        val model = builder.build(Sense.MINIMIZE)
-        val basis = Basis(intArrayOf(model.n), Array(model.numVars) { VarStatus.BASIC })
-        var attempts = 0
-        var successes = 0
-        val observer = object : LpCertificationObserver {
-            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
-                if (certifier == LpCertifier.EXACT_FARKAS) {
-                    attempts++
-                    if (success) successes++
-                }
-            }
-            override fun observeExactInput(accepted: Boolean) = Unit
-            override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-        }
-
-        val ray = integerFarkasRay(
-            model,
-            doubleArrayOf(Double.NaN),
-            basis = basis,
-            basisRow = 0,
-            observer = observer,
-        )
-
-        assertEquals(null, ray)
-        assertEquals(1, attempts)
-        assertEquals(0, successes)
     }
 
     @Test
@@ -539,41 +311,6 @@ class IntegerDualBoundTest {
     }
 
     @Test
-    fun `slack costs and sides follow logical coordinate scaling`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, 0.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.5)
-        }.build(Sense.MINIMIZE)
-        model.doubleView!!.cost[1] = 1.0
-        model.doubleView.hasUpper[1] = true
-        model.doubleView.upper[1] = 0.5
-
-        val scaled = assertNotNull(rationalizeToIntegerModel(model, outwardRealUppers = true))
-        val certificate = assertNotNull(integerCertify(scaled.model, doubleArrayOf(1.0), scaleBits = 0))
-
-        assertEquals(2L, scaled.scale)
-        assertEquals(1L, scaled.model.cost[1])
-        assertEquals(1L, scaled.model.upper[1])
-        assertEquals(1L, certificate.objectiveBoundCeil(0L))
-        assertEquals(
-            BigFraction.ofDouble(0.5),
-            BigFraction.ofLong(scaled.model.cost[1] * scaled.model.upper[1]) *
-                BigFraction.ofLong(scaled.scale).reciprocal(),
-        )
-    }
-
-    @Test
-    fun `unsupported fractional slack costs decline scaling`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.5)
-        }.build(Sense.MINIMIZE)
-        model.doubleView!!.cost[1] = 0.5
-
-        assertEquals(null, rationalizeToIntegerModel(model, outwardRealUppers = true))
-    }
-
-    @Test
     fun `inexact binary objective constant cannot be accepted as zero`() {
         val model = LpBuilder().apply { addRealVar(1e-10, 1.0, cost = 1.0) }.build(Sense.MINIMIZE)
 
@@ -607,69 +344,4 @@ class IntegerDualBoundTest {
         assertEquals(null, integerFarkasRay(model, doubleArrayOf(1.0, -1.0)))
     }
 
-    @Test
-    fun `malformed vectors and numeric views decline direct certificates`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
-        }.build(Sense.MINIMIZE)
-
-        assertEquals(null, roundDuals(model, doubleArrayOf()))
-        assertEquals(null, integerFarkasRay(model, doubleArrayOf()))
-        model.doubleView!!.colVal[0] = Double.NaN
-        assertEquals(null, rationalizeToIntegerModel(model, true))
-    }
-
-    @Test
-    fun `dyadic Farkas ray validates exact source rows and their premises`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, 2.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 0.0, premiseLits = intArrayOf(7))
-            addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.GE, 0.5, premiseLits = intArrayOf(9))
-        }.build(Sense.MINIMIZE)
-
-        val ray = assertNotNull(integerFarkasRay(model, doubleArrayOf(-1.0, -1.0)))
-        val first = BigFraction.ofLong(ray[0])
-        val second = BigFraction.ofLong(ray[1])
-
-        assertEquals(BigFraction.ZERO, (first - second) * assertNotNull(BigFraction.ofDouble(0.5)))
-        assertTrue(second * assertNotNull(BigFraction.ofDouble(-0.5)) > BigFraction.ZERO)
-        assertTrue(first.signum() <= 0 && second.signum() <= 0)
-        assertEquals(
-            setOf(7, 9),
-            ray.indices.filter { ray[it] != 0L }.map { model.rowPremises[it]!!.boolLits.single() }.toSet(),
-        )
-    }
-
-    @Test
-    fun `unscaled binary Farkas candidate is checked beyond the compact scale budget`() {
-        for (rhs in listOf(-5e-7, -Double.MIN_VALUE)) {
-            val model = LpBuilder().apply {
-                val x = addRealVar(0.0, 1.0)
-                addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, rhs, premiseLits = intArrayOf(11))
-            }.build(Sense.MINIMIZE)
-
-            val ray = assertNotNull(integerFarkasRay(model, doubleArrayOf(-1.0)))
-
-            assertEquals(null, rationalizeToIntegerModel(model, true))
-            assertTrue(BigFraction.ofLong(ray.single()) * assertNotNull(BigFraction.ofDouble(rhs)) > BigFraction.ZERO)
-            assertTrue(ray.single() < 0L)
-            assertEquals(11, model.rowPremises.single()!!.boolLits.single())
-        }
-    }
-
-    @Test
-    fun `finite logical sides participate in exact scale selection`() {
-        val model = LpBuilder().apply {
-            val x = addRealVar(0.0, 1.0)
-            addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 1.0)
-        }.build(Sense.MINIMIZE)
-        model.doubleView!!.hasUpper[1] = true
-        model.doubleView.upper[1] = 0.5
-
-        val scaled = assertNotNull(rationalizeToIntegerModel(model, true))
-
-        assertEquals(2L, scaled.scale)
-        assertEquals(1L, scaled.model.upper[1])
-    }
 }

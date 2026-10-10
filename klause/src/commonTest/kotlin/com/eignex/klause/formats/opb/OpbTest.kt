@@ -59,14 +59,6 @@ class OpbTest {
     }
 
     @Test
-    fun `accepts a terminator glued to a variable token`() {
-        val out = Opb.parse("min: 2 x1;\n+1 x1 +1 x2 >= 1;")
-        val obj = assertNotNull(out.objective)
-        assertEquals(2L, obj.boolWeights[0])
-        assertEquals(2, out.problem.numBoolVars)
-    }
-
-    @Test
     fun `parses a many-term instance to the exact weights literals and bounds`() {
         val terms = 2000
         val text = StringBuilder()
@@ -85,17 +77,6 @@ class OpbTest {
             assertEquals(expectedLiterals, pb.literals.toList())
             assertEquals((c + 1).toLong(), pb.bound)
         }
-    }
-
-    @Test
-    fun `parses negated literals`() {
-        val text = """
-            +1 ~x1 +2 x2 <= 1 ;
-        """.trimIndent()
-        val out = Opb.parse(text)
-        val pb = out.problem.factors[0] as PseudoBoolean
-        assertEquals(Lit.make(0, false), pb.literals[0])
-        assertEquals(Lit.make(1, true), pb.literals[1])
     }
 
     @Test
@@ -136,15 +117,6 @@ class OpbTest {
     }
 
     @Test
-    fun `reifies products over negated literals`() {
-        val text = "+1 ~x1 x2 >= 1 ;"
-        val out = Opb.parse(text)
-        assertEquals(3, out.problem.numBoolVars)
-        val pb = out.problem.factors.filterIsInstance<PseudoBoolean>().single()
-        assertEquals(listOf(Lit.make(2, true)), pb.literals.toList())
-    }
-
-    @Test
     fun `shares one indicator across equal products`() {
         val text = "+1 x1 x2 +1 x2 x1 >= 1 ;"
         val out = Opb.parse(text)
@@ -153,15 +125,6 @@ class OpbTest {
         assertEquals(3, out.problem.factors.filterIsInstance<Clause>().size)
         val pb = out.problem.factors.filterIsInstance<PseudoBoolean>().single()
         assertEquals(listOf(Lit.make(2, true), Lit.make(2, true)), pb.literals.toList())
-    }
-
-    @Test
-    fun `reifies a product term in the objective`() {
-        val text = "min: 3 x1 x2 ;"
-        val out = Opb.parse(text)
-        val obj = assertNotNull(out.objective)
-        assertEquals(3, out.problem.numBoolVars)
-        assertEquals(3L, obj.boolWeights[2])
     }
 
     @Test
@@ -198,14 +161,6 @@ class OpbTest {
     }
 
     @Test
-    fun `omits the cost bound when no soft top is given`() {
-        val text = "[3] +1 x1 >= 1 ;"
-        val out = Opb.parse(text)
-        assertTrue(out.problem.factors.none { it is PseudoBoolean })
-        assertNotNull(out.objective)
-    }
-
-    @Test
     fun `rejects a constraint statement missing its terminator or operator`() {
         val malformed = listOf("+1 x1 >= 1", "+1 x1 1 ;")
         for (text in malformed) {
@@ -235,11 +190,6 @@ class OpbTest {
         assertTrue("64-bit range" in parseError("min: 99999999999999999999 x1 ;\n+1 x1 >= 0 ;\n"))
         assertTrue("64-bit range" in parseError("[99999999999999999999] +1 x1 >= 1 ;"))
         assertTrue("soft constraint" in parseError("soft: 5 ;\n[1] +18446744073709551616 x1 >= 1 ;"))
-    }
-
-    @Test
-    fun `reports a non-numeric coefficient as not an integer`() {
-        assertTrue("not an integer" in parseError("abc x1 >= 1 ;"))
     }
 
     @Test

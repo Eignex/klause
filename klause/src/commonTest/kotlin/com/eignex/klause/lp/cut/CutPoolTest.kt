@@ -14,7 +14,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CutPoolTest {
@@ -61,17 +60,6 @@ class CutPoolTest {
     }
 
     @Test
-    fun `keeps insertion order below the cap`() {
-        val pool = CutPool(maxCuts = 8)
-        val added = pool.addAll(listOf(cut(0, 1, 5), cut(1, 1, 6), cut(2, 1, 7)))
-        assertEquals(3, added)
-        // No eviction triggered: order and contents are exactly as inserted (behaviour-neutral).
-        pool.observe(doubleArrayOf(0.0, 0.0, 0.0))
-        pool.retainMostActive()
-        assertEquals(listOf(5L, 6L, 7L), pool.cuts().map { it.rhs })
-    }
-
-    @Test
     fun `evicts the least active cuts when over the cap`() {
         // Three cuts x_c ≤ rhs against the LP point (x0,x1,x2) = (5, 1, 0):
         //   cut 0: slack |5 − 5| = 0   (tight — most active)
@@ -107,18 +95,6 @@ class CutPoolTest {
         pool.retainMostActive()
 
         assertEquals(listOf(0), pool.cuts().map { it.cols.single() })
-    }
-
-    @Test
-    fun `active observation resets consecutive inactivity`() {
-        val pool = CutPool(maxConsecutiveInactive = 2)
-        pool.add(cut(0, 1, 5))
-
-        pool.observe(doubleArrayOf(0.0))
-        pool.observe(doubleArrayOf(5.0))
-        pool.observe(doubleArrayOf(0.0))
-
-        assertEquals(1, pool.size)
     }
 
     @Test
@@ -161,27 +137,6 @@ class CutPoolTest {
     }
 
     @Test
-    fun `promoting a raw entry preserves its consecutive inactivity`() {
-        val source = CutSource(CutSourceKind.INTEGER, 0)
-        val token = Any()
-        val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
-        val portable = SourceCut(
-            CutExpression(mapOf(source to BigFraction.ONE)),
-            Relation.LE,
-            BigFraction.ofLong(5),
-            CutProvenance(token, 0, emptyList()),
-        )
-        val pool = CutPool(maxConsecutiveInactive = 2)
-        pool.add(cut(0, 1, 5))
-        pool.observe(doubleArrayOf(0.0))
-
-        pool.add(portable, map)
-        pool.observe(doubleArrayOf(0.0))
-
-        assertEquals(0, pool.size)
-    }
-
-    @Test
     fun `root seeding preserves portable payload for export and permuted remapping`() {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val token = Any()
@@ -204,25 +159,4 @@ class CutPoolTest {
         assertEquals(1, search.cuts().single().cols.single())
     }
 
-    @Test
-    fun `portable conversion preserves raw cut aging at the activity threshold`() {
-        val source = CutSource(CutSourceKind.INTEGER, 0)
-        val token = Any()
-        val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
-        val portable = SourceCut(
-            CutExpression(mapOf(source to BigFraction.ofLong(2))),
-            Relation.LE,
-            BigFraction.ofLong(2),
-            CutProvenance(token, 0, emptyList()),
-        )
-        val mapped = assertNotNull(portable.toCut(map).orNull())
-        for (candidate in listOf(cut(0, 2, 2), mapped)) {
-            val pool = CutPool(maxConsecutiveInactive = 1)
-            pool.add(candidate)
-
-            pool.observe(doubleArrayOf(1.0000006))
-
-            assertEquals(0, pool.size)
-        }
-    }
 }

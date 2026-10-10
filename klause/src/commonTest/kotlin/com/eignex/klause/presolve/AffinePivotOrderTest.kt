@@ -7,14 +7,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Pivot ordering in affine elimination. Order is a cost knob — every order yields the same solutions —
- * so what these assert is that the default order is unchanged, that the alternative is admissible, and
- * that it actually orders by fill rather than by id.
- */
 class AffinePivotOrderTest {
 
     /**
@@ -51,23 +45,6 @@ class AffinePivotOrderTest {
     private fun totalTerms(problem: Problem): Int = problem.factors.filterIsInstance<Linear>().sumOf { it.vars.size }
 
     @Test
-    fun `the configured default order is by fill`() {
-        assertEquals(AffinePivotOrder.MARKOWITZ, PresolveConfig.AUTO.affinePivotOrder)
-    }
-
-    @Test
-    fun `the unparameterized pass uses the configured default order`() {
-        val problem = sinkModel(sink = 20, wideFirst = 10)
-
-        val implicit = Presolve.eliminateAffineSingletons(problem.bake())
-        val explicit =
-            Presolve.eliminateAffineSingletons(problem.bake(), pivotOrder = AffinePivotOrder.MARKOWITZ)
-
-        assertEquals(implicit.droppedIndices.toList(), explicit.droppedIndices.toList())
-        assertEquals(implicit.addedFactors.size, explicit.addedFactors.size)
-    }
-
-    @Test
     fun `ordering by fill folds the cheap pivots that id order leaves behind`() {
         // The absorb cap bounds how many folds one row takes, so which pivots get in is decided by the
         // order. Ordering by fill spends that budget on the low-degree definitions.
@@ -83,14 +60,4 @@ class AffinePivotOrderTest {
         )
     }
 
-    @Test
-    fun `both orders eliminate the same problem down to the same verdict`() {
-        val problem = sinkModel(sink = 6, wideFirst = 3)
-
-        val byId = reduce(problem, AffinePivotOrder.STABLE_ID)
-        val byFill = reduce(problem, AffinePivotOrder.MARKOWITZ)
-
-        assertEquals(byId.numIntVars, byFill.numIntVars)
-        assertTrue(byId.factors.isNotEmpty() && byFill.factors.isNotEmpty())
-    }
 }

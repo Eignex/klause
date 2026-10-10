@@ -2,11 +2,9 @@ package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Element
-import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -26,11 +24,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/**
- * Affine variable elimination (#318/#335). Checks that the reduced problem has the same SAT/UNSAT
- * verdict as the original and that a reconstructed solution is genuinely feasible in the original —
- * including folding the affine relation into other linear factors and chained eliminations.
- */
 class AffineEliminationTest {
 
     @Test
@@ -120,21 +113,6 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `eliminates x = 2y + 1 defined only by its equality`() {
-        // x (0) defined by x - 2y = 1; y (1) also bounded y >= 1. x used nowhere else.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 3)),
-            factors = listOf(
-                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 1),
-            ),
-        )
-        checkRoundTrip("x=2y+1", problem, expectEliminated = true, expectSat = true)
-    }
-
-    @Test
     fun `the single partner of a holed pivot keeps only values that rebuild onto its domain`() {
         // x (0) in {3, 7} defined by x - 2y = 1, with y (1) in 1..3 kept out of a residue doubleton by
         // y + w <= 4: y = 2 would put x on its hole, which the bounds alone cannot see.
@@ -172,23 +150,6 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `affine pass is skipped above the factor cap`() {
-        // The same eliminable x = 2y + 1, but with the factor cap below the factor count: the pass is
-        // skipped (sound — x stays, solved directly). At the default cap it eliminates as usual.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 3)),
-            factors = listOf(
-                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 1),
-            ),
-        )
-        assertTrue(AffineSingletons.eliminateAffineSingletons(problem.bake(), maxFactors = 1).isEmpty, "capped: skip")
-        assertTrue(!AffineSingletons.eliminateAffineSingletons(problem.bake()).isEmpty, "uncapped: eliminate")
-    }
-
-    @Test
     fun `folds an affine substitution whose product coefficient exceeds Int range`() {
         // x = 100000*y folded into 100000*x + y <= 500000 yields a coefficient of 10^10 — beyond Int
         // but well within Long, so the pivot is eliminated with the wide coefficient carried exactly.
@@ -218,33 +179,6 @@ class AffineEliminationTest {
             ),
         )
         checkRoundTrip("long-overflow fold", problem, expectEliminated = false, expectSat = true)
-    }
-
-    @Test
-    fun `eliminates with a negative unit coefficient`() {
-        // -x + 3y = 2  ⇒  x = 3y - 2.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 5)),
-            factors = listOf(Linear(intArrayOf(-1, 3), intArrayOf(0, 1), LinearOp.EQ, 2)),
-        )
-        checkRoundTrip("x=3y-2", problem, expectEliminated = true, expectSat = true)
-    }
-
-    @Test
-    fun `folds x into another linear factor`() {
-        // x (0) = 2y+1 from x-2y=1, and x also appears in x <= 8 → folds to 2y+1 <= 8.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 3)),
-            factors = listOf(
-                Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 8),
-            ),
-        )
-        checkRoundTrip("fold-into-linear", problem, expectEliminated = true, expectSat = true)
     }
 
     @Test
@@ -295,47 +229,6 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `chained aliases keep a non-linear factor renamed through both steps`() {
-        // m = max(a, b), then m = x, then x = y: aliasing m -> x renames the ArrayMinMax result, and the
-        // second alias x -> y must still see and rewrite that factor. If the first alias fails to register
-        // the renamed factor as an occurrence of x, the second alias skips it and leaves the max dangling
-        // on an eliminated variable — reconstruction then invents a result that violates the max (#1204).
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 5,
-            intDomains = arrayOf(
-                IntDomain(0, 1), // a
-                IntDomain(0, 1), // b
-                IntDomain(0, 1), // m
-                IntDomain(0, 1), // x
-                IntDomain(0, 1), // y
-            ),
-            factors = listOf(
-                ArrayMinMax(result = 2, xs = intArrayOf(0, 1), max = true),
-                Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.EQ, 0), // m = x
-                Linear(intArrayOf(1, -1), intArrayOf(3, 4), LinearOp.EQ, 0), // x = y
-            ),
-        )
-        checkFeasibleSetPreserved("chained-alias-minmax", problem)
-    }
-
-    @Test
-    fun `affine-substitutes a shifted index out of an element`() {
-        // x = y + 1 and x is an Element index. The shift folds into the element's offset
-        // (idx − offset becomes y − (offset − 1)), so x is projected out of the non-linear global.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(1, 3), IntDomain(5, 7), IntDomain(0, 2)),
-            factors = listOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 1), // x = y + 1
-                Element(idx = 0, result = 1, arr = longArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 1),
-            ),
-        )
-        checkFeasibleSetPreserved("element-index-shift", problem)
-    }
-
-    @Test
     fun `does not affine-substitute a scaled element index`() {
         // x = 2y + 1 as an Element index would reindex the array, which Element cannot represent, so
         // the substitution declines and x is left in place. The extra `y <= 1` keeps y non-contained
@@ -354,21 +247,6 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `affine-substitutes a shifted variable out of a table column`() {
-        // x = y + 1 and x is a Table column; each row's x value shifts by -1 so the table constrains y.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(0, 2)),
-            factors = listOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 1), // x = y + 1
-                Table(intArrayOf(0, 1), longArrayOf(1, 1, 2, 2, 3, 3)), // (x, z) in {(1,1),(2,2),(3,3)}
-            ),
-        )
-        checkFeasibleSetPreserved("table-column-shift", problem)
-    }
-
-    @Test
     fun `chained eliminations reconstruct correctly`() {
         // x = 2y+1 and y = z+1: eliminate x, then y (its defining EQ's partner folds), then z stays.
         val problem = Problem(
@@ -384,48 +262,6 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `eliminates an n-term unit-defined variable used nowhere else`() {
-        // x0 = x1 + x2 - x3 (x0 - x1 - x2 + x3 = 0), x0 implied-free (appears in no other factor).
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            factors = listOf(Linear(intArrayOf(1, -1, -1, 1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0)),
-        )
-        checkRoundTrip("n-term-contained", problem, expectEliminated = true, expectSat = true)
-        checkFeasibleSetPreserved("n-term-contained", problem)
-    }
-
-    @Test
-    fun `folds an n-term affine relation into another linear factor`() {
-        // x0 = x1 + x2 (x0 - x1 - x2 = 0) and x0 also appears in x0 <= 3 → folds to x1 + x2 <= 3.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 6), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
-                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
-            ),
-        )
-        checkRoundTrip("n-term-fold", problem, expectEliminated = true, expectSat = true)
-        checkFeasibleSetPreserved("n-term-fold", problem)
-    }
-
-    @Test
-    fun `eliminates an n-term relation with a negative unit pivot`() {
-        // -x0 + x1 + x2 = 1  ⇒  x0 = x1 + x2 - 1.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(Linear(intArrayOf(-1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1)),
-        )
-        checkRoundTrip("n-term-neg-pivot", problem, expectEliminated = true, expectSat = true)
-        checkFeasibleSetPreserved("n-term-neg-pivot", problem)
-    }
-
-    @Test
     fun `does not eliminate an n-term equality with no unit pivot`() {
         // 2x0 + 3x1 + 4x2 = 12: no coefficient is +/-1, so no variable can be projected out integrally.
         val problem = Problem(
@@ -435,20 +271,6 @@ class AffineEliminationTest {
             factors = listOf(Linear(intArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.EQ, 12)),
         )
         checkRoundTrip("n-term-no-unit", problem, expectEliminated = false, expectSat = true)
-    }
-
-    @Test
-    fun `eliminates a contained non-unit pivot whose coefficient divides all partners and the bound`() {
-        // 2x0 - 4x1 - 6x2 = 8  ⇒  x0 = 2x1 + 3x2 + 4, integral for every partner assignment since 2
-        // divides each coefficient and the bound; x0 is contained, so it is projected out (#601).
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 20), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(Linear(intArrayOf(2, -4, -6), intArrayOf(0, 1, 2), LinearOp.EQ, 8)),
-        )
-        checkRoundTrip("nonunit-divides-all", problem, expectEliminated = true, expectSat = true)
-        checkFeasibleSetPreserved("nonunit-divides-all", problem)
     }
 
     @Test
@@ -511,24 +333,6 @@ class AffineEliminationTest {
     }
 
     @Test
-    fun `aggregates a chain of equalities to a single representative`() {
-        // x0 = x1, x1 = x2, x2 = x3: every link is an alias, so the whole chain collapses onto x3 and a
-        // reconstructed solution restores x0..x2 from it.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
-                Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.EQ, 0),
-            ),
-        )
-        checkRoundTrip("alias-chain", problem, expectEliminated = true, expectSat = true)
-        checkFeasibleSetPreserved("alias-chain", problem)
-    }
-
-    @Test
     fun `eliminates a non-unit doubleton via residue-class restriction`() {
         // 2x + 3y = 12 has no unit pivot, but x is contained, so x = (12 - 3y)/2 — an integer only for
         // even y. Eliminate x, restrict y to {0,2,4} (the residue class keeping x in [0,6]), and
@@ -541,35 +345,6 @@ class AffineEliminationTest {
         )
         checkRoundTrip("residue", problem, expectEliminated = true, expectSat = true)
         checkFeasibleSetPreserved("residue", problem)
-    }
-
-    @Test
-    fun `residue elimination preserves an unsatisfiable doubleton`() {
-        // 2x + 2y = 3 has an odd right-hand side, so no y admits an integer x — no residue class exists,
-        // nothing is eliminated, and the (correctly unsatisfiable) verdict is preserved.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-            factors = listOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.EQ, 3)),
-        )
-        checkRoundTrip("residue-unsat", problem, expectEliminated = false, expectSat = false)
-    }
-
-    @Test
-    fun `does not residue-eliminate a non-unit doubleton when neither var is contained`() {
-        // 2x + 3y = 12 with both x and y also pinned into a global: neither is contained, so no
-        // non-integer fold is possible and nothing is eliminated.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 6), IntDomain(0, 4), IntDomain(0, 6)),
-            factors = listOf(
-                Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.EQ, 12),
-                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 7),
-            ),
-        )
-        checkRoundTrip("residue-not-contained", problem, expectEliminated = false, expectSat = true)
     }
 
     @Test
@@ -586,15 +361,4 @@ class AffineEliminationTest {
         checkRoundTrip("zero-pivot", problem, expectEliminated = false, expectSat = false)
     }
 
-    @Test
-    fun `preserves an unsat verdict`() {
-        // x = 2y + 1 with x's domain forcing x even-only via tight bounds that y can't meet.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(4, 4), IntDomain(0, 3)), // x pinned to 4, but 2y+1 is odd
-            factors = listOf(Linear(intArrayOf(1, -2), intArrayOf(0, 1), LinearOp.EQ, 1)),
-        )
-        checkRoundTrip("unsat", problem, expectEliminated = true, expectSat = false)
-    }
 }

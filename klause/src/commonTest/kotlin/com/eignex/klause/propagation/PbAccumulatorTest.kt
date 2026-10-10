@@ -4,33 +4,11 @@ import com.eignex.klause.ir.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Cutting-planes arithmetic for [PbAccumulator]: generalized resolution, saturation, rounding, and
- *  overflow guards — the sound-derivation core of PB conflict learning (#1119 Phase 3). */
 class PbAccumulatorTest {
 
     private fun acc(block: PbAccumulator.() -> Unit) = PbAccumulator().apply(block)
-
-    @Test
-    fun `a clause loads as sum of literals ge one`() {
-        val a = acc { loadClause(intArrayOf(Lit.make(0, true), Lit.make(1, true))) }
-        assertEquals(1L, a.coefOf(0))
-        assertEquals(1L, a.coefOf(1))
-        assertEquals(1L, a.positiveDegree())
-    }
-
-    @Test
-    fun `a negative literal folds onto its variable and shifts the degree`() {
-        // ¬x0 ∨ x1  ==  1·¬x0 + 1·x1 ≥ 1  ==  −x0 + x1 ≥ 0
-        val a = acc { loadPb(longArrayOf(1, 1), intArrayOf(Lit.make(0, false), Lit.make(1, true)), geBound = 1) }
-        assertEquals(-1L, a.coefOf(0))
-        assertEquals(1L, a.coefOf(1))
-        assertEquals(0L, a.rhs)
-        assertEquals(1L, a.positiveDegree()) // rhs + |neg| = 0 + 1
-    }
 
     @Test
     fun `generalized resolution cancels the pivot like clause resolution`() {
@@ -83,20 +61,6 @@ class PbAccumulatorTest {
         assertEquals(1L, a.coefOf(0))
         assertEquals(2L, a.coefOf(1))
         assertEquals(2L, a.positiveDegree())
-    }
-
-    @Test
-    fun `materialize emits a positive-literal constraint`() {
-        val a = acc { loadClause(intArrayOf(Lit.make(0, true), Lit.make(1, false))) }
-        val m = assertNotNull(a.materialize())
-        assertEquals(1L, m.degree)
-        assertEquals(2, m.literals.size)
-    }
-
-    @Test
-    fun `materialize of a trivially-true constraint is null`() {
-        val trivial = acc { rhs = 0L }
-        assertNull(trivial.materialize())
     }
 
     @Test

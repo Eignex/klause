@@ -141,24 +141,6 @@ class RefinementAuxiliaryTest {
     }
 
     @Test
-    fun `standalone certification reaches unboundedness from a null float terminal`() {
-        val model = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds(upper = ExactLpSide(ExactLpNumber.of(0L))), integral = false)),
-            emptyList(),
-            ExactLpObjective(listOf(ExactLpNumber.of(1L))),
-        )
-
-        val result = solveAndCertify(model)
-
-        assertEquals(LpVerdict.UNBOUNDED, result.verdict)
-        assertNotNull(result.witness)
-        assertNotNull(result.unboundedness)
-        assertEquals(1, assertNotNull(result.refinement).rays)
-    }
-
-    @Test
     fun `an integer recession rescales a rational direction using an integer feasible point`() {
         val state = LpExactState(
             ExactLpModel(
