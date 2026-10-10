@@ -140,7 +140,9 @@ class OpenWitnessTest {
             Triple(false, BigFraction.ofLong(3), false),
         )
         for ((truth, value, accepted) in cases) {
-            val point = Sample(booleanArrayOf(truth), LongArray(0), exactReals = listOf(value))
+            val point = Sample(
+                booleanArrayOf(truth), LongArray(0), reals = doubleArrayOf(value.toDouble()), exactReals = listOf(value),
+            )
             val verdict = openWitnessVerifier(source, null).verify(Candidate(point, null))
 
             if (accepted) assertIs<Verification.Accepted<*, *>>(verdict) else assertIs<Verification.Rejected>(verdict)
