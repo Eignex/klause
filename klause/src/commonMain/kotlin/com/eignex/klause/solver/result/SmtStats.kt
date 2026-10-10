@@ -98,6 +98,7 @@ data class SmtStats(
 
 /** Mutable exact-SMT telemetry for one top-level open-theory request. */
 internal class SmtStatsSink {
+    var diagnosticCounters: (() -> Unit)? = null
     private var sourceLp = SourceLpWorkStats()
 
     fun observeSourceLp(delta: SourceLpWorkStats) {
@@ -157,10 +158,13 @@ internal class SmtStatsSink {
         if (wide) wideWitnessAccepted++
     }
 
-    fun snapshot(): SmtStats = SmtStats(
+    fun snapshot(): SmtStats {
+        diagnosticCounters?.invoke()
+        return SmtStats(
         conflicts, explainedConflicts, unexplainedConflicts, conflictLiterals,
         reductionRequests, reductionCacheHits, reductionAccepted, reductionDeclined, reductionNs,
         witnessCandidates, witnessAccepted, strictWitnessCandidates, strictWitnessAccepted,
         wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp,
-    )
+        )
+    }
 }
