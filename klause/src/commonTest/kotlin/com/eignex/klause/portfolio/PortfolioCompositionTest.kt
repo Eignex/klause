@@ -12,6 +12,40 @@ import kotlin.test.assertTrue
 class PortfolioCompositionTest {
 
     @Test
+    fun `curated satisfaction root cuts require an explicit override`() {
+        for (requested in listOf(null, false, true)) {
+            val edit = requested?.let { enabled ->
+                { params: BacktrackParams -> params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = enabled)) }
+            }
+            val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK, arms = 4)
+                .copy(btEdit = edit)
+
+            val params = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
+                .map { it.recipe.build(1L, null) }.filter { it.lpConfig != null }
+
+            assertEquals(2, params.size)
+            assertEquals(List(2) { requested == true }, params.map { it.lpPlan.rootCutHarvest })
+        }
+    }
+
+    @Test
+    fun `optimization and explicit satisfaction pools retain their root cut plans`() {
+        val scenarios = listOf(
+            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK, arms = 4),
+            PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK, arms = 1)
+                .copy(btPool = listOf { BacktrackCatalog.byLabel("lp-aggressive") }),
+        )
+
+        for (scenario in scenarios) {
+            val params = PortfolioComposition.compose(scenario).filterIsInstance<BacktrackWorkerConfig>()
+                .map { it.recipe.build(1L, null) }.filter { it.lpConfig != null }
+
+            assertTrue(params.isNotEmpty())
+            assertTrue(params.all { it.lpPlan.rootCutHarvest })
+        }
+    }
+
+    @Test
     fun `expanding a sequential optimization pool keeps the small pool positions`() {
         val small = PortfolioScenario.sequential(Kind.COP)
         for (problemClass in listOf(ProblemClass.FiniteCp, ProblemClass.MixedInteger)) {

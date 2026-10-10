@@ -394,7 +394,9 @@ The satisfaction backtrack palette includes conservative LP after default and
 aggressive LP. Applicability and LP ceilings filter the palette; the four
 backtrack slots of the default mixed satisfaction pool retain their ordering.
 Root variable shaving and hull pruning remain explicit plan options. Root cuts
-follow the resolved plan and have an independent off control.
+follow the resolved plan. Curated satisfaction workers require an explicit
+`lp-root-cuts=true` override to harvest root cuts; explicit pools retain their
+requested root-cut plans.
 
 ## Statistics
 
