@@ -2,11 +2,11 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentResult
@@ -30,28 +30,34 @@ internal class ExactLiraEqualities(
     private val zero = model.numIntVars
     // A simple forest path has at most zero links; leave room to subtract two path offsets.
     private val room = bigIntOf(Long.MAX_VALUE / (8L * (zero.toLong() + 2L)))
-    private val rows = if (model.numRealVars != 0) emptyList() else {
+    private val comparisons = if (model.numRealVars != 0) emptyList() else {
         model.factors.flatMapIndexed { factorIndex, factor ->
             if (factor.linearForm is LinearForm.Disjunction) emptyList() else {
                 factor.linearRows.mapIndexedNotNull { rowIndex, row ->
                     if ((0 until row.size).any { Term.isBool(row.ref(it)) }) return@mapIndexedNotNull null
-                    val comparison = forms[factorIndex][rowIndex].comparison(true) { false }
-                    val terms = comparison.terms.entries.toList()
-                    if (terms.isEmpty() || terms.size > 2) return@mapIndexedNotNull null
-                    val first = terms[0]
-                    val second = terms.getOrNull(1)
-                    if (second != null && first.value != second.value.negated()) return@mapIndexedNotNull null
-                    val positive = first.value.signum() > 0
-                    val magnitude = if (positive) first.value else first.value.negated()
-                    if (magnitude.isZero) return@mapIndexedNotNull null
-                    Prepared(
-                        if (positive) first.key else second?.key ?: zero,
-                        if (positive) second?.key ?: zero else first.key,
-                        comparison.bound * magnitude.reciprocal(), comparison.op, comparison.strict, row.activator,
-                    )
+                    forms[factorIndex][rowIndex].comparison(true) { false } to row.activator
                 }
             }
         }
+    }
+    private val rows = comparisons.mapNotNull { (comparison, activator) ->
+        val terms = comparison.terms.entries.toList()
+        if (terms.isEmpty() || terms.size > 2) return@mapNotNull null
+        val first = terms[0]
+        val second = terms.getOrNull(1)
+        if (second != null && first.value != second.value.negated()) return@mapNotNull null
+        val positive = first.value.signum() > 0
+        val magnitude = if (positive) first.value else first.value.negated()
+        if (magnitude.isZero) return@mapNotNull null
+        Prepared(
+            if (positive) first.key else second?.key ?: zero,
+            if (positive) second?.key ?: zero else first.key,
+            comparison.bound * magnitude.reciprocal(), comparison.op, comparison.strict, activator,
+        )
+    }
+    private val general = comparisons.filter { (comparison, _) ->
+        val coefficients = comparison.terms.values
+        coefficients.size != 1 && (coefficients.size != 2 || coefficients.first() != coefficients.last().negated())
     }
     var implied = false
         private set
@@ -59,7 +65,7 @@ internal class ExactLiraEqualities(
     fun propagate(context: SearchContext, stop: Cancellation): ComponentResult {
         implied = false
         if (stop()) return ComponentResult.Indeterminate
-        if (rows.isEmpty()) return ComponentResult.Consistent
+        if (rows.isEmpty() && general.isEmpty()) return ComponentResult.Consistent
         val stride = PollStride()
         val metered = stop.workMeter() != null
         val progressStop = Cancellation { (metered || stride.due()) && stop() }
@@ -117,7 +123,44 @@ internal class ExactLiraEqualities(
             if (accepted !is ComponentResult.Consistent) return accepted
             implied = true
         }
-        return if (stop()) ComponentResult.Indeterminate else ComponentResult.Consistent
+        val result = propagateGeneral(forest, context, stop, progressStop)
+        return if (stop()) ComponentResult.Indeterminate else result
+    }
+
+    private fun propagateGeneral(
+        forest: EqualityForest,
+        context: SearchContext,
+        stop: Cancellation,
+        progressStop: Cancellation,
+    ): ComponentResult {
+        for ((comparison, activator) in general) {
+            if (progressStop()) return ComponentResult.Indeterminate
+            val value = forest.constant(comparison.terms, progressStop) ?: continue
+            val truth = comparison.truth(value)
+            val assigned = if (activator == ALWAYS) true else context.boolValue(activator)
+            if (assigned == truth) continue
+            val premises = forest.expressionPremises(comparison.terms, progressStop)
+                ?: return ComponentResult.Indeterminate
+            if (assigned != null) {
+                return conflict(context, premises, if (activator == ALWAYS) ALWAYS else Lit.make(activator, assigned), stop)
+            }
+            val decision = SearchDecision.Bool(Lit.make(activator, truth))
+            val reason = context.explainAtoms(SearchAtomPremise.All(premises), decision) ?: continue
+            if (stop()) return ComponentResult.Indeterminate
+            val result = context.imply(decision.literal, reason)
+            if (result !is ComponentResult.Consistent) return result
+            val accepted = accept(decision, context)
+            if (accepted !is ComponentResult.Consistent) return accepted
+            implied = true
+        }
+        return ComponentResult.Consistent
+    }
+
+    private fun ExactComparison.truth(value: BigFraction): Boolean = when (op) {
+        LinearOp.EQ -> value == bound
+        LinearOp.NE -> value != bound
+        LinearOp.LE -> if (strict) value < bound else value <= bound
+        LinearOp.GE -> if (strict) value > bound else value >= bound
     }
 
     private fun conflict(
@@ -174,6 +217,38 @@ internal class ExactLiraEqualities(
             val first = find(target)
             val second = find(source)
             return if (first.first == second.first) first.second - second.second else null
+        }
+
+        fun constant(terms: Map<Int, BigFraction>, stop: Cancellation): BigFraction? {
+            val zero = parent.lastIndex
+            val zeroRoot = find(zero).first
+            val coefficients = HashMap<Int, BigFraction>()
+            for ((column, coefficient) in terms) {
+                if (stop()) return null
+                val root = find(column).first
+                if (root != zeroRoot) coefficients[root] = (coefficients[root] ?: BigFraction.ZERO) + coefficient
+            }
+            if (coefficients.values.any { !it.isZero }) return null
+            var value = BigFraction.ZERO
+            for ((column, coefficient) in terms) {
+                if (stop()) return null
+                val (root, offset) = find(column)
+                val relative = if (root == zeroRoot) checkNotNull(difference(column, zero)) else offset
+                if (relative != 0L) value += coefficient * BigFraction.ofLong(relative)
+            }
+            return value
+        }
+
+        fun expressionPremises(terms: Map<Int, BigFraction>, stop: Cancellation): List<SearchAtomPremise>? {
+            val zero = parent.lastIndex
+            val zeroRoot = find(zero).first
+            val result = ArrayList<SearchAtomPremise>()
+            for (column in terms.keys) {
+                if (stop()) return null
+                val root = find(column).first
+                result += premises(column, if (root == zeroRoot) zero else root, stop) ?: return null
+            }
+            return result
         }
 
         fun join(target: Int, source: Int, value: Long, guard: Int): Boolean {

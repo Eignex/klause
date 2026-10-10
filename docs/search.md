@@ -99,6 +99,9 @@ Integer difference equalities form a weighted forest, including declared fixed
 columns. Exact offsets decide comparisons even when no individual column has a
 bound. Explanation paths cite the selected source equality guards, including
 complemented disequalities; an inconsistent offset path refutes its active guards.
+Larger source expressions are also constant when their coefficients cancel within
+each open forest component. Their comparison reasons cite the equality paths that
+justify the offsets; no individual column bound is required.
 The forest is rebuilt from current assertions, so retraction drops their effects.
 Wide offsets are omitted from this redundant check and remain with the full theory.
 Equality-forest scans poll ordinary cancellation within 64 visits and check it
