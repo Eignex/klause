@@ -157,26 +157,26 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `custom restarts retain independent best infeasible anchors`() {
+    fun `custom restarts retain independent feasible incumbent anchors`() {
         val problem = Problem(
             0,
             1,
             arrayOf(IntDomain(0, 3)),
-            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
         )
         val anchors = mutableListOf<Sample>()
         val restart = object : RestartPolicy {
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 2
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 if (bestSoFar != null) anchors += bestSoFar
-                state.assignment.setInt(0, 0)
+                state.assignment.setInt(0, 3)
                 state.recompute()
             }
         }
         var picks = 0
         val strategy = SourceDrivenStrategy(
             sources = emptyList(),
-            perturbation = { Move.IntSet(0, longArrayOf(1, 0, 2, 0)[picks++]) },
+            perturbation = { Move.IntSet(0, longArrayOf(1, 3, 2, 3)[picks++]) },
             feasibleDescent = FeasibleDescent.SelfOwned,
         )
         val search = LocalSearchEngine(
@@ -187,10 +187,10 @@ class LocalSearchEngineTest {
         )
 
         search.resumable(
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            LocalSearchParams(maxFlips = 6L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0))),
+            LinearObjective(intCoefficients = longArrayOf(-1)),
+            LocalSearchParams(maxFlips = 4L, initialAssignment = Sample(BooleanArray(0), longArrayOf(3))),
         ).use { handle ->
-            assertIs<MinimizeResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            assertIs<MinimizeResult.BestFound>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
         }
 
         assertEquals(listOf(Sample(BooleanArray(0), longArrayOf(1)), Sample(BooleanArray(0), longArrayOf(2))), anchors)
@@ -374,10 +374,15 @@ class LocalSearchEngineTest {
             override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 1
             override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
                 anchors += bestSoFar
-                state.restart()
+                state.assignment.setBool(0, true)
+                state.recompute()
             }
         }
-        val search = LocalSearchEngine(LocalSearchModel.open(problem), restartPolicy = policy)
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem),
+            strategy = SourceDrivenStrategy(sources = emptyList(), feasibleDescent = FeasibleDescent.RatchetAsConstraint),
+            restartPolicy = policy,
+        )
 
         search.resumable(
             LinearObjective(boolWeights = longArrayOf(1)),
