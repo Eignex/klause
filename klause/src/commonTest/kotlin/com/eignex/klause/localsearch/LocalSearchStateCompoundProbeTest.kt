@@ -41,6 +41,31 @@ class LocalSearchStateCompoundProbeTest {
     )
 
     @Test
+    fun `weighted compound predictions match the committed degree change`() {
+        for (case in cases) {
+            val baked = case.problem.bake()
+            for (seed in 0 until 3) {
+                val state = LocalSearchState(baked, Random(seed))
+                state.restart()
+                val weights = state.weights.factorWeights
+                for (i in weights.indices) weights[i] = (i + 1) * 0.25
+                val compound = randomCompound(case.problem, state, Random(seed + 100)) ?: continue
+                val sibling = LocalSearchState(baked, Random(seed))
+                copyAssignment(state, sibling)
+                sibling.recompute()
+                val before = sibling.factorDegree.copyOf()
+
+                val predicted = state.weightedNetDelta(compound)
+                sibling.apply(compound)
+
+                var expected = 0.0
+                for (i in before.indices) expected += weights[i] * (sibling.factorDegree[i] - before[i])
+                assertEquals(expected, predicted, "${case.name} seed=$seed")
+            }
+        }
+    }
+
+    @Test
     fun `compound probes leave touchCount and break-make untouched`() {
         for (case in cases) {
             val baked = case.problem.bake()

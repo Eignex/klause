@@ -139,14 +139,26 @@ class LocalSearchState(
     /** Accepted-move step counter (the search clock); see [TabuBook.step]. */
     val step: Long get() = tabu.step
 
-    /** Eagerly-maintained make/break vectors for `Move.BoolFlip`. `boolBreakCount[v]` counts
-     *  currently-satisfied invariants that would become violated if `v` is flipped; `boolMakeCount[v]`
-     *  is the symmetric count of currently-violated invariants that would become satisfied. Both
-     *  updated incrementally in [applyBoolFlip] and [applyIntSet] over the move's invariant
-     *  neighbourhood. Strategies querying break/make per pick (probSat, WalkSat, DDFW) read these in
-     *  O(1), trading an O(Σ arity²) per-flip update cost for predictable O(1) query latency. */
-    internal val boolBreakCount: IntArray = IntArray(problem.numBoolVars)
-    internal val boolMakeCount: IntArray = IntArray(problem.numBoolVars)
+    // Walks that never query Boolean break/make scores avoid their initialization and maintenance cost.
+    private val cachedBoolBreakCount: IntArray = IntArray(problem.numBoolVars)
+    private val cachedBoolMakeCount: IntArray = IntArray(problem.numBoolVars)
+    private var boolScoresInitialized = false
+    internal val boolBreakCount: IntArray
+        get() {
+            initializeBoolScores()
+            return cachedBoolBreakCount
+        }
+    internal val boolMakeCount: IntArray
+        get() {
+            initializeBoolScores()
+            return cachedBoolMakeCount
+        }
+
+    private fun initializeBoolScores() {
+        if (boolScoresInitialized) return
+        boolScoresInitialized = true
+        addAllBreakMake()
+    }
 
     /** Aggregated hard cost = `Σ factorDegree`, the graded total violation. `Long` because a
      *  single tight arithmetic factor can carry a residual near [Int.MAX_VALUE] and the sum
@@ -182,8 +194,7 @@ class LocalSearchState(
     // every flip.
     private val confNeighbours = BooleanArray(problem.factors.size) { problem.factors[it] !is ObjectiveBoundFactor }
 
-    // Degree scratch reused by evaluateCompound so an apply+revert probe allocates nothing on its
-    // array-copy path (the dominant LS allocation source). State is per-worker, so no locking.
+    // A weighted probe saves only degrees that change, avoiding a model-wide copy and scan per candidate.
     private var degScratch: IntArray? = null
 
     // Per-part probe scratch reused across evaluateCompound calls, grown on demand to the widest
@@ -293,7 +304,7 @@ class LocalSearchState(
         clearViolationState()
         initializeFactors()
         // Initialize break/make vectors from factor deltas (payloads are current after initialize()).
-        addAllBreakMake()
+        if (boolScoresInitialized) addAllBreakMake()
         if (cost < bestCostSeen) bestCostSeen = cost
     }
 
@@ -302,9 +313,9 @@ class LocalSearchState(
     private fun clearViolationState() {
         for (i in 0 until problem.numFactors) violated.remove(i)
         cost = 0L
-        for (v in boolBreakCount.indices) {
-            boolBreakCount[v] = 0
-            boolMakeCount[v] = 0
+        for (v in cachedBoolBreakCount.indices) {
+            cachedBoolBreakCount[v] = 0
+            cachedBoolMakeCount[v] = 0
         }
     }
 
@@ -607,13 +618,14 @@ class LocalSearchState(
      *  contribution, `+1` re-adds it post-move. Inline so the hot apply path stays allocation-free. */
     @Suppress("NOTHING_TO_INLINE")
     private inline fun adjustBoolBreakMake(factorId: Int, sign: Int) {
+        if (!boolScoresInitialized) return
         val f = factors[factorId]
         for (w in problem.factors[factorId].boolVars) {
             val d = f.deltaIfBoolFlipped(this, factorId, w)
             if (d > 0) {
-                boolBreakCount[w] += sign
+                cachedBoolBreakCount[w] += sign
             } else if (d < 0) {
-                boolMakeCount[w] += sign
+                cachedBoolMakeCount[w] += sign
             }
         }
     }
@@ -652,6 +664,7 @@ class LocalSearchState(
     // Brute-force factors subtract their pre-move break/make contributions; incremental factors fold the whole
     // delta into their own update once the move is committed.
     private inline fun retractBruteForce(touchedFactors: IntArray, maintainsIncrementally: (Invariant) -> Boolean) {
+        if (!boolScoresInitialized) return
         for (factorId in touchedFactors) {
             if (!maintainsIncrementally(factors[factorId])) adjustBoolBreakMake(factorId, -1)
         }
@@ -672,6 +685,7 @@ class LocalSearchState(
         maintainsIncrementally: (Invariant) -> Boolean,
         updateIncremental: (factorId: Int) -> Unit,
     ) {
+        if (!boolScoresInitialized) return
         for (factorId in touchedFactors) {
             if (maintainsIncrementally(factors[factorId])) {
                 updateIncremental(factorId)
@@ -821,10 +835,9 @@ class LocalSearchState(
         val oldStep = tabu.step
         val oldCost = cost
         val oldBestCost = bestCostSeen
-        // Degree snapshot for the exact weighted delta. Skipped when no strategy touched the weights
-        // (all 1.0 ⇒ weighted == raw netDelta).
+        // With unallocated weights, weighted and raw deltas agree and need no degree snapshots.
         val degBefore = if (weights.allocated) {
-            (degScratch ?: IntArray(factorDegree.size)).also { degScratch = it }.also { factorDegree.copyInto(it) }
+            (degScratch ?: IntArray(factorDegree.size)).also { degScratch = it }
         } else {
             null
         }
@@ -897,7 +910,10 @@ class LocalSearchState(
     private fun weightedDegreeDelta(degBefore: IntArray): Double {
         val w = weights.factorWeights
         var delta = 0.0
-        for (i in degBefore.indices) {
+        // Keep factor-id order so floating-point accumulation matches a full degree scan.
+        probeTouchedList.backingData.sort(0, probeTouchedList.size)
+        for (p in 0 until probeTouchedList.size) {
+            val i = probeTouchedList[p]
             val d = factorDegree[i] - degBefore[i]
             if (d != 0) delta += w[i] * d
         }
@@ -917,6 +933,7 @@ class LocalSearchState(
         if (breakProbeActive && !probeTouched[factorId]) {
             probeTouched[factorId] = true
             probeWasViolated[factorId] = factorDegree[factorId] > 0
+            degScratch?.set(factorId, factorDegree[factorId])
             probeTouchedList.add(factorId)
         }
         factorDegree[factorId] = newDegree
