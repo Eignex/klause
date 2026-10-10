@@ -52,6 +52,13 @@ fun FinitePipeline.portfolioExecutor(
         onFault = onFault,
     ).also {
         it.reserveBeforeIncumbentOnly = true
+        if (scenario.cores == 1 && scenario.engine == EngineMix.MIXED && scenario.kind == Kind.COP &&
+            scenario.btPool == null && scenario.lsPool == null
+        ) {
+            it.incumbentProbeArms = workers.indices.filter { arm ->
+                arm >= scenario.arms && workers[arm].label == "bt/lp-default"
+            }.toSet()
+        }
         it.evidenceVerification = PortfolioEvidence(
             ModelIdentity.of(problem, objective),
             finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck),

@@ -1584,6 +1584,49 @@ class PortfolioTest {
     }
 
     @Test
+    fun `incumbent probes continue only after earning progress`() {
+        for (productive in listOf(false, true)) {
+            val reached = ArrayList<Int>()
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+                trackingWorker("probe", 1, ScriptedSearch({ productive && it == 0 }, start = 500.0) { reached += 1 }),
+            )
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = 2
+                override val random = Random(0)
+                override fun choose() = 1
+                override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+                override fun reset() = Unit
+            }
+
+            val result = Portfolio(workers, bandit).use {
+                it.incumbentProbeArms = setOf(1)
+                it.minimize(Cancellation { reached.size >= 4 })
+            }
+
+            assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(if (productive) listOf(0, 1, 1, 1) else listOf(0, 1, 0, 0), reached)
+        }
+    }
+
+    @Test
+    fun `incumbent probes retain feasibility work before a witness`() {
+        val slices = IntArray(2)
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ false }) { slices[0]++ }),
+            trackingWorker("probe", 1, ScriptedSearch({ it == 2 }) { slices[1]++ }),
+        )
+
+        val result = Portfolio.thompson(workers, minShares = doubleArrayOf(0.0, 1.0)).use {
+            it.incumbentProbeArms = setOf(1)
+            it.minimize(Cancellation { slices.sum() >= 5 })
+        }
+
+        assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(4, slices[1])
+    }
+
+    @Test
     fun `a short budget still splits into segments however long the slices are`() {
         val reached = ArrayList<Int>()
         val deadline = Cancellation.until(TimeSource.Monotonic.markNow() + 200.milliseconds)

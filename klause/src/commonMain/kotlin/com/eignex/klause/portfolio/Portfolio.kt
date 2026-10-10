@@ -143,6 +143,7 @@ class Portfolio(
     private val minShares: DoubleArray = DoubleArray(0),
 ) : PortfolioExecutor {
     internal var reserveBeforeIncumbentOnly: Boolean = false
+    internal var incumbentProbeArms: Set<Int> = emptySet()
 
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
         PortfolioEvidence(it, CandidateVerifier.trusting())
@@ -598,6 +599,7 @@ class Portfolio(
         private val retired = BooleanArray(workers.size)
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
+        private val productive = BooleanArray(workers.size)
         private val preparationRevisits = BooleanArray(workers.size)
         private var nextPreparationArm = 0
 
@@ -676,7 +678,6 @@ class Portfolio(
                 eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
                     .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
             }
-            val probing = probe != null
             val arm = when {
                 dedicated -> lane
 
@@ -690,6 +691,7 @@ class Portfolio(
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
+            val probing = probe != null || (improving && arm in incumbentProbeArms && !productive[arm])
             busy[arm] = true
             Claim(
                 arm,
@@ -783,6 +785,7 @@ class Portfolio(
             }
             val earned = ledger.settle(arm, work)
             val reward = if (failed) 0.0 else earned
+            if (reward > 0.0 || claim.improved) productive[arm] = true
             val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
             bandit.update(arm, reward, weight)
             families.record(workers[arm].family, progressed = reward > 0.0, plateau = improving)
@@ -790,7 +793,9 @@ class Portfolio(
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.
             for (other in workers.indices) {
                 if (other == arm || busy[other] || retired[other] || !ledger.hasPending(other)) continue
-                bandit.update(other, ledger.settleIdle(other, claim.sliceWork), 1.0)
+                val idleReward = ledger.settleIdle(other, claim.sliceWork)
+                if (idleReward > 0.0) productive[other] = true
+                bandit.update(other, idleReward, 1.0)
             }
             log.record(arm, work, claim.started.elapsedNow().inWholeMilliseconds, reward, failed)
             if (failed && failure != null && failure !is UnsoundnessException) log.failure(arm, failure, phase)
@@ -799,6 +804,9 @@ class Portfolio(
                 slice = grow(slice, maxSliceMillis)
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
+            if (claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
+                !failed && claim.fault == null
+            ) retire(arm)
         }
 
         /** Quarantine [claim]'s arm for its refuted claim: retire it, count the fault, and report it. Call under
