@@ -22,6 +22,34 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `a source Boolean retains a later arithmetic comparison after unused predicates are omitted`() {
+        for (value in listOf(3, 4)) {
+            val parsed = SmtLib.parse(
+                """
+                (declare-const b Bool) (declare-const x Int) (declare-const result Bool)
+                (assert b)
+                (assert (= (ite b 1 2) 1))
+                (assert (= result (= x 3)))
+                (assert (= x $value))
+                """.trimIndent(),
+            )
+            ExactLiraSearchComponent(parsed.model).use { component ->
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                assertEquals(true, assignment.bools[parsed.boolVarNames.getValue("b")])
+                assertEquals(value == 3, assignment.bools[parsed.boolVarNames.getValue("result")])
+            }
+        }
+    }
+
+    @Test
     fun `a conditional cannot take a conflicting selector value without arithmetic checks`() {
         for (comparison in listOf("(= (ite (= s 0) s 2) 1)", "(= (ite (= s 0) 2 s) 0)")) {
             val parsed = SmtLib.parse(
