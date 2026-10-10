@@ -69,11 +69,10 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(3, w.numOriginalBoolVars)
-        assertEquals(5, w.problem.numBoolVars)
-        assertEquals(3, w.problem.factors.size)
-        assertEquals(0L, w.objective.boolWeights[0])
-        assertEquals(1L, w.objective.boolWeights[3])
-        assertEquals(2L, w.objective.boolWeights[4])
+        assertEquals(3, w.problem.numBoolVars)
+        assertEquals(1, w.problem.factors.size)
+        assertEquals(1L, w.objective.boolWeights[0])
+        assertEquals(2L, w.objective.boolWeights[1])
     }
 
     @Test
@@ -85,9 +84,9 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(3, w.numOriginalBoolVars)
-        assertEquals(4, w.problem.numBoolVars)
-        assertEquals(2, w.problem.factors.size)
-        assertEquals(1L, w.objective.boolWeights[3])
+        assertEquals(w.numOriginalBoolVars, w.problem.numBoolVars)
+        assertEquals(1, w.problem.factors.size)
+        assertEquals(1L, w.objective.boolWeights[0])
     }
 
     @Test
@@ -114,20 +113,20 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(2, w.numOriginalBoolVars)
-        assertEquals(4, w.problem.numBoolVars)
-        assertEquals(3, w.problem.factors.size)
-        assertEquals(5L, w.objective.boolWeights[2])
-        assertEquals(3L, w.objective.boolWeights[3])
+        assertEquals(w.numOriginalBoolVars, w.problem.numBoolVars)
+        assertEquals(1, w.problem.factors.size)
+        assertEquals(5L, w.objective.boolWeights[0])
+        assertEquals(3L, w.objective.boolWeights[1])
     }
 
     @Test
     fun `an empty soft clause becomes a fixed objective cost`() {
-        // `4 0` is an always-falsified soft clause; only `2 -1 0` needs a relaxation variable.
+        // `4 0` is an always-falsified soft clause.
         val w = Dimacs.parseWcnf("h 1 0\n4 0\n2 -1 0\n")
         assertEquals(1, w.numOriginalBoolVars)
-        assertEquals(2, w.problem.numBoolVars)
+        assertEquals(1, w.problem.numBoolVars)
         assertEquals(4L, w.objective.constant)
-        assertEquals(2L, w.objective.boolWeights[1])
+        assertEquals(2L, w.objective.boolWeights[0])
     }
 
     @Test
