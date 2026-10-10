@@ -191,7 +191,7 @@ class ExactLiraSearchComponentTest {
 
                 val result = assertIs<SearchResult.Satisfied>(session.solve(model.numBoolVars))
 
-                val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+                val assignment = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
                 assertEquals(upper, assignment.bools[0])
                 assertEquals(!upper, assignment.reals.single() > BigFraction.ZERO)
                 session.popTo(0)
