@@ -15,31 +15,41 @@ import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.*
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.solver.ScoringCapability
+import com.eignex.klause.solver.executionCapabilities
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Builds the local-search-engine view of immutable factor data. [domains], when given, are the domains the search
  * moves over: a linear row whose running sum can leave the 64-bit range over them takes the exact
  * [ExactLinearInvariant].
  */
-internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Invariant = when (this) {
-    is AllDifferent -> AllDifferentInvariant(
-        vars,
-        domainMin,
-        domainSize,
-        presents,
-        exceptValues,
-        occurrencesByVar,
-        { state, idx -> present(state, idx) },
-    )
+internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Invariant {
+    val capabilities = executionCapabilities()
+    check(capabilities.scoring != ScoringCapability.UNSUPPORTED) {
+        "unsupported local-search route for ${this::class.simpleName}; implement Invariant or delegate to NoInvariant"
+    }
+    return buildInvariantProjection(domains).also {
+        check((it === NoInvariant) == (capabilities.scoring == ScoringCapability.INERT)) {
+            "local-search capability disagrees with projection for ${this::class.simpleName}"
+        }
+    }
+}
+
+private fun Factor.buildInvariantProjection(domains: Array<IntDomain>?): Invariant = when (this) {
+    is AllDifferent -> allDifferentInvariantProjection()
 
     is ArrayMinMax -> ArrayMinMaxInvariant(result, xs, max)
 
     is Cardinality -> CardinalityInvariant(boolVars, literals, min, max)
 
     is Circuit -> if (subcircuit) {
-        SubcircuitInvariant(succ, n, ::computeCost)
+        SubcircuitInvariant(succ, n, CircuitScoring(succ, subcircuit)::computeCost)
     } else {
-        CircuitInvariant(succ, n, ::computeCost)
+        CircuitInvariant(succ, n, CircuitScoring(succ, subcircuit)::computeCost)
     }
 
     is Clause -> ClauseInvariant.of(this)
@@ -61,7 +71,7 @@ internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Inva
         closed,
         presents,
         coverIndexByValue,
-        { state, idx -> present(state, idx) },
+        { state, idx -> OptionalPresence.isPresentInAssignment(presents, idx, state) },
     )
 
     is Increasing -> IncreasingInvariant(xs, gap)
@@ -91,7 +101,10 @@ internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Inva
 
     is Mdd -> MddInvariant(seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost)
 
-    is NValue -> NValueInvariant(n, xs, mode, presents, { state, idx -> present(state, idx) })
+    is NValue -> NValueInvariant(
+        n, xs, mode, presents,
+        { state, idx -> OptionalPresence.isPresentInAssignment(presents, idx, state) },
+    )
 
     is ObjectiveBoundFactor ->
         if (realVars.isEmpty() && (domains == null || !objectiveSumIsWide(boolWeights, intVars, intCoeffs, domains))) {
@@ -130,7 +143,7 @@ internal fun Factor.invariantProjection(domains: Array<IntDomain>? = null): Inva
 
     is SymmetricAllDifferent -> SymmetricAllDifferentInvariant(xs, indexOffset)
 
-    is Table -> TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi)
+    is Table -> tableInvariantProjection()
 
     is ValuePrecede -> ValuePrecedeInvariant(s, t, xs)
 
@@ -159,4 +172,28 @@ private fun Cumulative.cumulativeInvariantProjection(): Invariant {
     } else {
         cumulative
     }
+}
+
+private fun Table.tableInvariantProjection(): Invariant {
+    val (single, multi) = tableColumnMaps(xs, arity)
+    return TableInvariant(xs, tuples, arity, numTuples, single, multi, hi)
+}
+
+private fun AllDifferent.allDifferentInvariantProjection(): Invariant {
+    val counts = MutableIntIntMap()
+    for (v in vars) counts.addTo(v, 1)
+    val keys = IntArrayList(counts.size)
+    val values = IntArrayList(counts.size)
+    counts.forEach { v, count ->
+        keys.add(v)
+        values.add(count)
+    }
+    val occurrences = IntIntMap.build(keys.toIntArray(), values.toIntArray(), absent = 0)
+    val except = if (exceptSet.isEmpty()) AllDifferentInvariant.NO_EXCEPT else {
+        LongHashSet(exceptSet.size).also { set -> for (value in exceptSet) set.add(value) }
+    }
+    return AllDifferentInvariant(
+        vars, domainMin, domainSize, presents, except, occurrences,
+        { state, idx -> OptionalPresence.isPresentInAssignment(presents, idx, state) },
+    )
 }

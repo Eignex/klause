@@ -1,11 +1,11 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.scheduling.internals.CumulativeThetaTree
 import com.eignex.klause.factor.scheduling.internals.MandatoryProfile
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
+import com.eignex.klause.propagation.OptionalPresence
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boolPinnedAt
@@ -53,7 +53,7 @@ internal class DisjunctivePropagator(
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        state.propagatorFailures[this] ?: OptPresence.withPresencePremises(
+        state.propagatorFailures[this] ?: OptionalPresence.withPresencePremises(
             presents,
             state,
             collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0),
@@ -119,7 +119,7 @@ internal class DisjunctivePropagator(
             return false
         }
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             if (d == 0L) continue
             if (!shaveAgainstProfile(state, profile, i, d)) return false
@@ -132,7 +132,7 @@ internal class DisjunctivePropagator(
     private fun mandatoryProfile(state: PropagationState, effDur: LongArray): MandatoryProfile {
         val profile = MandatoryProfile()
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             if (d == 0L) continue
             val dom = state.intDomains[starts[i]]
@@ -185,7 +185,7 @@ internal class DisjunctivePropagator(
     private fun detectablePrecedences(state: PropagationState, effDur: LongArray): Boolean {
         for (i in 0 until n) {
             if (effDur[i] == 0L) continue
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val vi = starts[i]
             val di = state.intDomains[vi]
             var newMinI = di.min
@@ -193,7 +193,7 @@ internal class DisjunctivePropagator(
             for (j in 0 until n) {
                 if (j == i) continue
                 if (effDur[j] == 0L) continue
-                if (!OptPresence.isDefinitelyPresent(presents, j, state)) continue
+                if (!OptionalPresence.isDefinitelyPresent(presents, j, state)) continue
                 val dj = state.intDomains[starts[j]]
                 if (di.min + effDur[i] > dj.max) {
                     if (dj.min + effDur[j] > di.max) {
@@ -292,7 +292,7 @@ internal class DisjunctivePropagator(
     private fun edgeFindingTasks(state: PropagationState, effDur: LongArray): IntArrayList {
         val active = IntArrayList()
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             if (effDur[i] > 0) active.add(i)
         }
         return active

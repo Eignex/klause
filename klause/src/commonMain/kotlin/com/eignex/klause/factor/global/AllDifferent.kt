@@ -20,10 +20,6 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * `intVars(i) != intVars(j)` for every pair `i < j`. Stored payload:
@@ -71,16 +67,6 @@ class AllDifferent(
     /** Canonical excepted values (deduped, sorted) for [structuralKey] / [remap]. */
     private val exceptSorted: LongArray =
         if (exceptSet.isEmpty()) EmptyLongArray else exceptSet.distinct().sorted().toLongArray()
-
-    /** Membership view of [exceptSet] for the hot value checks; the shared empty set when none. */
-    internal val exceptValues: LongHashSet =
-        if (exceptSet.isEmpty()) {
-            AllDifferentInvariant.NO_EXCEPT
-        } else {
-            LongHashSet(
-                exceptSet.size,
-            ).also { s -> for (e in exceptSet) s.add(e) }
-        }
 
     // Propagation strength: full GAC via bipartite matching plus SCC support pruning over the
     // definitely-present positions. IntDomain supports interior holes, so non-matching
@@ -190,23 +176,4 @@ class AllDifferent(
     }
 
     override val variables: VarList = MixedVars(spanInts = vars, boolVars = OptPresence.presenceVarIds(presents))
-
-    /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
-     *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the
-     *  common case where each var appears exactly once this is always 1. */
-    internal val occurrencesByVar: IntIntMap = run {
-        val counts = MutableIntIntMap()
-        for (v in vars) counts.addTo(v, 1)
-        val keys = IntArrayList(counts.size)
-        val values = IntArrayList(counts.size)
-        counts.forEach { k, count ->
-            keys.add(k)
-            values.add(count)
-        }
-        IntIntMap.build(
-            keys = keys.toIntArray(),
-            values = values.toIntArray(),
-            absent = 0,
-        )
-    }
 }

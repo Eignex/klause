@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.scheduling.internals.CumulativeEff
 import com.eignex.klause.factor.scheduling.internals.CumulativeThetaTree
@@ -8,6 +7,7 @@ import com.eignex.klause.factor.scheduling.internals.EdgeFindingOmegas
 import com.eignex.klause.factor.scheduling.internals.MandatoryProfile
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
+import com.eignex.klause.propagation.OptionalPresence
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boolPinnedAt
@@ -47,7 +47,7 @@ internal class CumulativePropagator(
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        state.propagatorFailures[this] ?: OptPresence.withPresencePremises(
+        state.propagatorFailures[this] ?: OptionalPresence.withPresencePremises(
             presents,
             state,
             collectLinearTightenAntecedents(state, intVars, excludeIdx = -1, extraLit = 0),
@@ -146,7 +146,7 @@ internal class CumulativePropagator(
         val effRes = eff.res
         val effCap = eff.cap
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             if (effDur[i] > 0 && effRes[i] > effCap) {
                 return fail(state) {
                     task(i)
@@ -159,7 +159,7 @@ internal class CumulativePropagator(
         if (!edgeFindingPass(state, effDur, effRes, effCap)) return false
         val profile = MandatoryProfile()
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             val r = effRes[i]
             if (d == 0L || r == 0L) continue
@@ -168,7 +168,7 @@ internal class CumulativePropagator(
         }
         if (!profile.build(effCap)) return fail(state) { overloadAt(profile.overloadTime, -1) }
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val d = effDur[i]
             val r = effRes[i]
             if (d == 0L || r == 0L) continue
@@ -226,7 +226,7 @@ internal class CumulativePropagator(
     private fun energeticNaivePass(state: PropagationState): Boolean {
         val act = IntArrayList()
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             if (minDur(state, i) > 0 && minHeight(state, i) >= 0) act.add(i)
         }
         val m = act.size
@@ -282,7 +282,7 @@ internal class CumulativePropagator(
         val cap = capMax(state)
         val profile = MandatoryProfile()
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val lst = state.intDomains[starts[i]].max
             val ect = state.intDomains[starts[i]].min + minDur(state, i)
             val h = minHeight(state, i)
@@ -290,7 +290,7 @@ internal class CumulativePropagator(
         }
         if (!profile.build(cap)) return fail(state) { overloadAt(profile.overloadTime, -1) }
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             val lst = state.intDomains[starts[i]].max
             val ect = state.intDomains[starts[i]].min + minDur(state, i)
             if (lst >= ect) continue
@@ -304,7 +304,7 @@ internal class CumulativePropagator(
         if (n < 2 || effCap == 0L) return true
         val active = IntArrayList()
         for (i in 0 until n) {
-            if (!OptPresence.isDefinitelyPresent(presents, i, state)) continue
+            if (!OptionalPresence.isDefinitelyPresent(presents, i, state)) continue
             if (effDur[i] > 0 && effRes[i] > 0) active.add(i)
         }
         val m = active.size
