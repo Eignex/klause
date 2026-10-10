@@ -104,6 +104,10 @@ def mps(text):
             continue
         if raw[0] not in " \t":
             section = parts[0]
+            if section not in ("NAME", "ROWS", "COLUMNS", "RHS", "RANGES", "BOUNDS", "INDICATORS", "OBJSENSE", "ENDATA"):
+                raise ValueError(f"unsupported MPS section {section}")
+            if section != "NAME" and len(parts) != 1:
+                raise ValueError(f"unsupported inline MPS section {section}")
             continue
         if section == "OBJSENSE":
             assert parts[0] in ("MIN", "MAX", "MINIMIZE", "MAXIMIZE")
@@ -111,11 +115,13 @@ def mps(text):
         elif section == "ROWS":
             kind, row = parts
             assert kind in ("N", "L", "G", "E")
+            assert row not in rows, "duplicate MPS row"
             rows[row] = kind
             if kind == "N" and objective_row is None:
                 objective_row = row
         elif section == "COLUMNS":
             if "'MARKER'" in parts:
+                assert parts[-1] in ("'INTORG'", "'INTEND'"), "unsupported integer marker"
                 marker = "'INTORG'" in parts
                 continue
             column = parts[0]
