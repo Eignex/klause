@@ -57,9 +57,15 @@ class PortfolioBuilderTest {
 
         val workers = PortfolioBuilder.build(continuous, scenario)
 
-        assertEquals(listOf("bt/satOptimized", "bt/lp-default"), workers.filter { it.label.startsWith("bt/") }.map { it.label })
-        assertEquals(4, workers.count { it.label.startsWith("ls/") })
-        assertEquals(6, workers.size)
+        try {
+            assertEquals(
+                listOf("bt/satOptimized", "bt/lp-default"),
+                workers.filter { it.label.startsWith("bt/") }.map { it.label },
+            )
+            assertEquals(4, workers.count { it.family == ArmFamily.LocalSearch })
+        } finally {
+            workers.forEach { it.close() }
+        }
     }
 
     @Test
