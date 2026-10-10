@@ -13,6 +13,7 @@ This tree is the internal implementation contract and developer workflow referen
 |---|---|
 | [Architecture](architecture.md) | Modules, package boundaries and model ownership |
 | [Search and propagation](search.md) | Shared search, explanations, learned clauses and portfolio slices |
+| [Presolve cancellation](presolve.md) | Fresh rebuild token ownership, phase allowances and probe telemetry |
 | [LP architecture](lp/architecture.md) | Model authority, bound trails, sparse basis and consumers |
 | [LP certification](lp/certification.md) | Exact bounds, witnesses, conflicts, rays and resource limits |
 | [Input semantics](formats.md) | Finite and open routing, float lowering and MPS result contracts |
@@ -22,6 +23,7 @@ This tree is the internal implementation contract and developer workflow referen
 | [CLI](cli.md) | Frontend registry, engine selection, flags and environment defaults |
 | [MiniZinc](minizinc.md) | Solver registration, wrappers and native predicate coverage |
 | [Benchmarking](benchmarking.md) | Selection, saved results, source validation, caching and profiling |
+| [Paired lab records](benchmark-records.md) | Matched record analysis, timing scopes and external CI evidence |
 | [LP capture and replay](lp/replay.md) | Basis traces and retained/fresh consumer diagnostics |
 | [Fixture provenance](testing/fixtures.md) | Committed test and benchmark data, identities and licenses |
 | [Diagnostic tools](testing/tools.md) | Reusable opt-in probes and profiling |
