@@ -38,6 +38,7 @@ class ElementInvariantTest {
             state.assignment.setInt(0, rowOffset)
             state.assignment.setInt(1, colOffset)
             state.assignment.setInt(2, 0)
+            state.assignment.setInt(3, 9)
             state.assignment.setBool(0, false)
             state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2))).network(4, 1)
             state.recompute()
@@ -64,6 +65,7 @@ class ElementInvariantTest {
             state.assignment.setInt(0, 1)
             state.assignment.setInt(1, 0)
             state.assignment.setInt(2, 2)
+            state.assignment.setInt(3, 9)
             state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2))).network(4, 0)
             if (!pinned) state.moveSink.setOwners(intArrayOf(7, -1, -1, -1))
             state.recompute()
@@ -86,6 +88,7 @@ class ElementInvariantTest {
         val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 9)
         state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 3, intArrayOf(1))).network(3, 0)
         state.recompute()
 
@@ -104,6 +107,7 @@ class ElementInvariantTest {
         val state = LocalSearchState(problem.bake(), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 9)
         state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 3, intArrayOf(1))).network(3, 0)
         state.recompute()
 
