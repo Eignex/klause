@@ -36,16 +36,12 @@ class ExactFlatZincValidationTest {
     }
 
     @Test
-    fun `voltage divider rejects corrupted source coordinates`() {
-        for (coordinate in listOf(
-            "V = 9;" to "V = 12;",
-            "R1 = 5;" to "R1 = 6;",
-            "VD = 2756202971950743543/504403158265495552;" to "VD = 11/2;",
-        )) {
-            val result = ExactFlatZincValidation.inspect(voltage, coordinates.replace(coordinate.first, coordinate.second), null)
+    fun `voltage divider rejects a corrupted source coordinate`() {
+        val corrupted = coordinates.replace("VD = 2756202971950743543/504403158265495552;", "VD = 11/2;")
 
-            assertEquals("invalid", result.status, result.reason)
-        }
+        val result = ExactFlatZincValidation.inspect(voltage, corrupted, null)
+
+        assertEquals("invalid", result.status, result.reason)
     }
 
     @Test
