@@ -1,7 +1,5 @@
-# lp-component-split
+# LP component-split tools
 
-LP component-split fixture generation and saved-record analysis.
+Generate the current component-split fixtures and analyze externally stored case records.
 
-See [diagnostic tools and artifact guidance](../../../docs/testing/tools.md).
-Recorded cases apply to their pinned revisions; inputs, manifests, scripts and raw
-observations remain in this directory.
+See [fixture generation and analysis](../../../docs/testing/tools.md#component-split-fixtures).

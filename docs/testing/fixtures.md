@@ -59,13 +59,13 @@ Regenerate using
 [generate.py](../../klause-bench/scripts/lp-component-split/generate.py).
 These fixtures are explicit experiments rather than CI smoke selection.
 
-## Saved campaign artifacts
+## Measurement storage
 
-Campaign directories under `klause-bench` retain manifests, raw outputs,
-provenance, specs, analyzers and source inputs. Their READMEs describe how to use
-those files. Recorded results apply to their pinned revisions and semantics;
-they do not establish the current checkout's solve rate, correctness or speed.
-Keep raw evidence unchanged when updating system documentation.
+Keep generated outputs and historical campaign bundles outside the repository.
+`klause-bench` contains the active harness, current corpus fixtures, named sets
+and reusable tools. Installed CLI solve records remain local under the ignored
+`klause-bench/output/<config>/` directories. Preserve source identities, licenses,
+effective settings and build/runtime provenance in any external measurement archive.
 
 ## FlatZinc witness
 

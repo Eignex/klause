@@ -62,6 +62,10 @@ in KDoc. Keep fixture identities/licenses in [provenance](testing/fixtures.md)
 and immutable capture manifests. Repository agent instructions and GitHub
 templates retain their functional locations.
 
+Keep benchmark result directories local and ignored. Historical campaign bundles,
+one-off reports and measurement archives belong outside the repository;
+`klause-bench` retains the active harness, current fixtures/sets and reusable tools.
+
 Read the relevant architecture and contract pages before changing a subsystem.
 Maintain them in the same change as code affecting ownership, dependencies,
 invariants, result/proof semantics, resource policy or developer workflows.

@@ -24,7 +24,7 @@ This tree is the internal implementation contract and developer workflow referen
 | [Benchmarking](benchmarking.md) | Selection, saved results, source validation, caching and profiling |
 | [LP capture and replay](lp/replay.md) | Basis traces and retained/fresh consumer diagnostics |
 | [Fixture provenance](testing/fixtures.md) | Committed test and benchmark data, identities and licenses |
-| [Diagnostic tools](testing/tools.md) | Opt-in probes, profiling and saved campaign analyzers |
+| [Diagnostic tools](testing/tools.md) | Reusable opt-in probes and profiling |
 
 Architecture contracts constrain implementation: preserve their dependency,
 authority, soundness and lifecycle rules when changing code. A deliberate contract
@@ -34,6 +34,7 @@ closed dependency list remains a hard boundary.
 Keep all standalone documentation here, as required by [repository rules](../.rules).
 READMEs elsewhere identify their contents and link here. Public API KDoc stays with
 source; agent instructions, GitHub templates and license notices retain their
-functional locations. Inputs, manifests, scripts and raw measurements stay with
-their artifacts. Document current Klause behavior without other-solver references or comparisons
+functional locations. Active fixture inputs/manifests and reusable scripts stay
+with their consumers; generated measurements and historical campaign bundles stay
+outside the repository. Document current Klause behavior without other-solver references or comparisons
 or historical campaign narratives.

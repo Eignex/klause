@@ -1,3 +1,0 @@
-09f8a56c0bdc36edb57c79fa37f214d785348ee53f679cca5f87979036eaa479  klause-cli/build/install/klause-cli-jvm/lib/klause-jvm-SNAPSHOT.jar
-7ada0b34de5749aeb2fbd10998e0cd7bf428691a560fdf5b7847f2d60b27a72f  klause-cli/build/install/klause-cli-jvm/lib/klause-cli-jvm-SNAPSHOT.jar
-10f2caedf05e048e0d1615ba8a39380b398b97321f73fbed130c5b4af74fbd52  klause-cli/build/install/klause-cli-jvm/bin/klause-cli

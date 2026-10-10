@@ -1,6 +1,0 @@
-2026-10-09T21:03:59.7361747Z HEAD is now at db49654 Merge 39dc3e2a84c78984e2edff9588911a415734e5a1 into 80e6add305cf2936804e4ce11dfc914543d4b9ea
-2026-10-09T21:03:59.7412195Z [command]/usr/bin/git log -1 --format=%H
-2026-10-09T21:03:59.7436959Z db49654c3d2047c87d0447b926921fb310a58f66
-2026-10-09T21:04:16.2073719Z ##[group]Run ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport
-2026-10-09T21:07:57.0937717Z BUILD SUCCESSFUL in 3m 40s
-2026-10-09T21:07:59.6329812Z SHA256 digest of uploaded artifact is 57a5e5c11605ef42bc2f9b4cd26beab04f0ecd8d7c3fa23c70a26d3e0d5c0486

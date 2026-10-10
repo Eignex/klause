@@ -1,2 +1,0 @@
-=== preview: solve over 1 instance(s) ===
-  LCTES/cruise-control.nosummaries  [SMTLIB/CSP]

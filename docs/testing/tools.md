@@ -1,4 +1,4 @@
-# Diagnostic tools and saved artifacts
+# Diagnostic tools
 
 The tools below are opt-in. They use retained fixtures or explicitly selected
 corpus inputs and do not run during ordinary tests. Rebuild the CLI with
@@ -28,8 +28,8 @@ It rejects incomplete/failed records and missing elapsed timing, separating proo
 counts and incumbent times from subprocess duration. Optional split/component
 counters omitted when zero are read as zero. `noise.py` requires balanced
 `off/on/on/off` order, completeness and matching outcomes before reporting
-paired duration and duplicate-arm variation. Saved records live under
-[component-split reports](../../klause-bench/reports/lp-component-split-1455/).
+paired duration and duplicate-arm variation. Store case records and raw outputs
+in an external measurement archive.
 
 ## Repair-chain probe
 
@@ -54,9 +54,7 @@ full-solve quality.
 
 ## Table profiling
 
-[table-throughput](../../klause-bench/scripts/table-throughput/) retains fixed-node
-and fixed-deadline specifications plus raw measurements. A useful profiling
-invocation after installing the CLI is:
+A useful table profiling invocation after installing the CLI is:
 
 ```sh
 KLAUSE_CLI_OPTS="-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1 -XX:StartFlightRecording=filename=table.jfr,settings=profile" \
@@ -69,56 +67,19 @@ jfr print --json --events jdk.ExecutionSample table.jfr
 Separate root construction, propagation and explanation samples. Compare
 fixed-node timing only when decisions, failures, restarts, root fixings and
 depth match and both runs spend the cap. Deadline runs measure search progress;
-they can reach different prefixes. Recorded specs pin their own historical
-builds and are not current default settings.
+they can reach different prefixes. Profiles stay separate from uninstrumented
+timing; frame disappearance after inlining is not an absolute CPU saving.
 
-## Exact-arithmetic diagnostics
+## Record handling
 
-[exact-projection](../../klause-bench/exact-projection/) retains profile,
-fixed-work, deadline and witness records with their analyzers:
+Use the active harness's [result records](../benchmarking.md#saved-results) and
+[source checks](../benchmarking.md#source-validation) for new measurements.
+Freeze source hashes, settings and build/runtime identities before comparing
+runs. Store generated outputs and historical bundles outside the repository.
+Missing metrics remain explicit, and unknown outcomes supply no witness or proof.
 
-```sh
-python3 klause-bench/exact-projection/profile.py /path/to/profile-directory
-python3 klause-bench/exact-projection/compare.py /path/to/cases.json
-python3 klause-bench/exact-projection/summarize.py /path/to/cases.json /path/to/output-prefix
-```
-
-Profiles are independent of uninstrumented timing. Frame disappearance after
-inlining is not an absolute CPU saving. Witness records check source feasibility;
-unknown outcomes supply no witness or proof. Preserve pinned manifests and
-build/runtime identities when analyzing saved cases.
-
-## Saved search and propagation campaigns
-
-These directories contain specs, raw records, provenance and analysis scripts:
-
-| Directory | Subject |
-|---|---|
-| [learned-clauses](../../klause-bench/learned-clauses/) | Shared conflict coverage, retention selection and experimental ranking |
-| [rws-conflict](../../klause-bench/rws-conflict/) | Native CP Boolean-pin undo lifetime reproducer and controls |
-| [propagation-oracle](../../klause-bench/reports/propagation-oracle-2315/) | Independent propagation source checks and controls |
-| [construction](../../klause-bench/construction-2328/) | Resumable-arm startup accounting and controls |
-| [arms campaign](../../klause-bench/campaigns/arms-414/) | Pool composition, reseeding, incumbent attribution and source checks |
-| [presolve campaign](../../klause-bench/campaigns/presolve-554/) | Effort settings, rounds, probing and deadline controls |
-| [wall-clock records](../../klause-bench/reports/wall-clock-2353/) | Subprocess elapsed-time fallback controls |
-
-Current learned-clause, pin lifetime and scheduling behavior is documented in
-[search](../search.md); presolve knobs are in the [CLI guide](../cli.md#flags).
-Pinned experiment options can belong to unmerged or removed code. Read their
-specifications and analyzer arguments before attempting a rerun.
-
-The learned-clause analyzer takes case JSON, a frozen manifest and arm JSON:
-
-```sh
-python3 klause-bench/learned-clauses/analyze.py cases.json manifest.json arms.json \
-  --baseline baseline --output results
-python3 klause-bench/rws-conflict/summarize.py \
-  spec.json cases.json arms.json job.json results.json
-python3 klause-bench/campaigns/presolve-554/analyze.py cases.json --control explicit-default
-```
-
-Analyzers enforce their recorded corpus, completion and identity requirements.
-Retain missing metrics explicitly. Shared conflict counters do not describe
-native CP analysis. A reported SAT result or agreement between runs is not an
-independent source-witness check. Fixed-deadline cases stopped before a decision
-cap do not establish fixed-work throughput.
+Shared conflict counters do not describe native CP analysis. A reported SAT
+result or agreement between runs is not an independent source-witness check.
+Fixed-deadline cases stopped before a decision cap do not establish fixed-work
+throughput. Current search behavior is documented in [search](../search.md);
+presolve settings are in the [CLI guide](../cli.md#flags).

@@ -1,5 +1,0 @@
-case,build,pool,seed,repeat,btSetupMs,btSearchAndOverheadMs,btWork,btInitWork,lsSegments,lsMs,lsWork,alnsSegments,alnsMs,alnsWork
-13,main,default,3,0,4387,163,13250,,1,891,0,0,0,0
-14,candidate,default,3,0,2335,3,0,0,4,1988,0,1,793,5000
-15,main,arms12,3,0,4448,173,13250,,1,874,0,0,0,0
-12,candidate,arms12,3,0,2369,3,0,0,5,2678,0,1,769,5000

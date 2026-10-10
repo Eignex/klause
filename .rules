@@ -75,7 +75,10 @@ Read `docs/benchmarking.md` before benchmarking. In short:
   applicable. Agent instruction files and functional GitHub templates retain their required locations;
   public API KDoc stays with source. Inputs, manifests, scripts and raw evidence are artifacts, not guides.
 - Document only the current Klause system. Exclude references/comparisons to other solvers, historical campaign
-  narratives and speculative implementation plans. Preserve fixture attribution and raw evidence.
+  narratives and speculative implementation plans. Preserve fixture attribution.
+- Keep `klause-bench` focused on the active harness, corpus inputs, named sets and reusable tools. Do not
+  commit generated solve outputs, historical campaign bundles or one-off evidence reports there; keep
+  measurement archives outside the repository.
 - Keep `docs/README.md` and links current. Remove superseded files when consolidating documentation.
 
 ## Solver boundaries
