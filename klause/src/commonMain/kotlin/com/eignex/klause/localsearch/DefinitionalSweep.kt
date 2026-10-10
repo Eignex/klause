@@ -489,6 +489,10 @@ class InvariantNetwork internal constructor(
     /** True iff bool var `v` is definitionally determined (should not be searched). */
     fun isDefinedBool(v: Int): Boolean = definedBool[v]
 
+    internal fun readsInt(v: Int): Boolean = intReaders[v].isNotEmpty()
+
+    internal fun readsBool(v: Int): Boolean = boolReaders[v].isNotEmpty()
+
     /** The node at [index] (indexes ascend in topological order). */
     fun node(index: Int): DefinitionalSweep.SweepNode = nodeArr[index]
 

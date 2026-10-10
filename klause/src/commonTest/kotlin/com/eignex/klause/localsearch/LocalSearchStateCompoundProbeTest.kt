@@ -18,8 +18,10 @@ import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 /**
@@ -39,6 +41,112 @@ class LocalSearchStateCompoundProbeTest {
         mixedReifiedCase(),
         permutationCase(),
     )
+
+    @Test
+    fun `definition input scores include the propagated assignment`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 1) },
+            factors = arrayOf(Clause(intArrayOf(Lit.make(1, false)))),
+        )
+        val network = InvariantNetwork(
+            listOf(
+                DefinitionalSweep.SweepNode.Bool2Int(0, 0),
+                DefinitionalSweep.SweepNode.CmpReif(1, longArrayOf(1, 1), intArrayOf(0, 1), 1L, LinearOp.EQ),
+            ),
+            2,
+            2,
+        )
+        val objective = LinearObjective(boolWeights = longArrayOf(0, 3), intCoefficients = longArrayOf(2, 0))
+        for (move in listOf(Move.BoolFlip(0), Move.IntSet(1, 1))) {
+            val state = LocalSearchState(problem.bake(), Random(7))
+            state.invariants = network
+            state.recompute()
+            state.weights.factorWeights[0] = 2.5
+            state.shaping.objective = objective
+            state.shaping.shapingLambda = 0.5
+            val cost = state.cost
+            val value = objective.evaluate(state.assignment)
+            val predicted = state.netDelta(move)
+            val weighted = state.weightedNetDelta(move)
+            val breakScore = state.breakScore(move)
+            val objectiveDelta = state.objectiveDelta(objective, move)
+            val shapedDelta = state.shapedObjectiveDelta(move)
+
+            state.apply(move)
+
+            assertEquals(state.cost - cost, predicted)
+            assertEquals(predicted * 2.5, weighted)
+            assertEquals(1, breakScore)
+            assertEquals(objective.evaluate(state.assignment) - value, objectiveDelta)
+            assertEquals(checkNotNull(objectiveDelta) * 0.5, shapedDelta)
+            val inverse = if (move is Move.BoolFlip) move else Move.IntSet(1, 0)
+            assertEquals(1, state.makeScore(inverse))
+        }
+    }
+
+    @Test
+    fun `compound probes restore derived values when the inverse cannot write`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = Array(3) { IntDomain(0, 2) },
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 0)),
+        )
+        val state = LocalSearchState(problem.bake(), Random(7))
+        state.invariants = InvariantNetwork(
+            listOf(DefinitionalSweep.SweepNode.ElementDef(1, 0, null, longArrayOf(2), 0)),
+            3,
+            0,
+        )
+        state.assignment.setInt(0, 1)
+        state.recompute()
+        val sample = state.assignment.snapshot()
+        val cost = state.cost
+        val step = state.step
+        val touched = state.tabu.lastTouched.copyOf()
+        val counts = state.tabu.touchCount.copyOf()
+        val move = Move.Compound(listOf(Move.IntSet(0, 0), Move.IntSet(2, 1)))
+
+        state.netDelta(move)
+        state.breakScore(move)
+        state.weightedNetDelta(move)
+
+        assertEquals(sample, state.assignment.snapshot())
+        assertEquals(cost, state.cost)
+        assertEquals(step, state.step)
+        assertContentEquals(touched, state.tabu.lastTouched)
+        assertContentEquals(counts, state.tabu.touchCount)
+        state.recompute()
+        assertEquals(cost, state.cost)
+    }
+
+    @Test
+    fun `compound scoring propagates definitions after all inputs change`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = Array(3) { IntDomain(0, 2) },
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 0)),
+        )
+        val state = LocalSearchState(problem.bake(), Random(7))
+        state.invariants = InvariantNetwork(
+            listOf(DefinitionalSweep.SweepNode.ElementDef(2, 0, intArrayOf(1), null, 0)),
+            3,
+            0,
+        )
+        state.assignment.setInt(1, 2)
+        state.recompute()
+        val move = Move.Compound(listOf(Move.IntSet(1, 1), Move.IntSet(0, 1)))
+        val before = state.cost
+
+        val predicted = state.netDelta(move)
+        state.apply(move)
+
+        assertEquals(state.cost - before, predicted)
+        assertEquals(0L, predicted)
+    }
 
     @Test
     fun `weighted compound predictions match the committed degree change`() {

@@ -22,6 +22,7 @@ import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
 import kotlin.random.Random
 
@@ -197,13 +198,10 @@ class LocalSearchState(
     // A weighted probe saves only degrees that change, avoiding a model-wide copy and scan per candidate.
     private var degScratch: IntArray? = null
 
-    // Per-part probe scratch reused across evaluateCompound calls, grown on demand to the widest
-    // compound seen; only the first `parts.size` entries are live. Probes are strictly nested per
-    // worker (never concurrent, no re-entrancy), so a single set is safe — as with [degScratch].
-    private val inverseScratch = ArrayList<Move>()
-    private var slotScratch: IntArray = EmptyIntArray
-    private var savedTouchedScratch: LongArray = EmptyLongArray
-    private var savedTouchCountScratch: IntArray = EmptyIntArray
+    // Coordinates include definition outputs so a NO_WRITE inverse cannot strand a probe's output.
+    private val probeSlots = IntArrayList()
+    private val probeSlotSet = IntHashSet()
+    private var savedValuesScratch: LongArray = EmptyLongArray
 
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
     // degree changes during a probe's forward apply, snapshotting its pre-probe violated status on
@@ -214,7 +212,7 @@ class LocalSearchState(
     private val probeWasViolated: BooleanArray = BooleanArray(problem.numFactors)
     private val probeTouchedList: IntArrayList = IntArrayList()
 
-    // Set for the whole apply+revert span of a compound probe. While active, applyBoolFlip /
+    // Set for the whole apply+revert span of a move probe. While active, applyBoolFlip /
     // applyIntSet skip configuration-change maintenance: a probe restores its start assignment, so
     // any conf-change marks would have to be reverted anyway.
     private var probeActive = false
@@ -413,48 +411,53 @@ class LocalSearchState(
     }
 
     /**
-     * Number of currently-satisfied factors that would become violated if [move] were
-     * applied. Used by strategies (WalkSAT-style noise/greedy, probSAT-style weighting) to
-     * score repair candidates. Computed on demand by walking the var's occurrence list and
-     * asking each factor for its `deltaIf*`.
+     * Count of factors whose violation degree increases under a primitive [move]. Compound moves
+     * count factors becoming violated. Definition inputs use a reversible propagated probe;
+     * other primitives read occurrence deltas or maintained Boolean scores.
      */
-    fun breakScore(move: Move): Int = when (move) {
-        is Move.BoolFlip -> boolBreakCount[move.varId]
+    fun breakScore(move: Move): Int {
+        if (feedsDefinitions(move)) return evaluateMove(move).breakScore
+        return when (move) {
+            is Move.BoolFlip -> boolBreakCount[move.varId]
 
-        is Move.IntSet -> {
-            var count = 0
-            forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d > 0) count++ }
-            count
+            is Move.IntSet -> {
+                var count = 0
+                forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d > 0) count++ }
+                count
+            }
+
+            is Move.RealSet -> {
+                var count = 0
+                forEachRealFactorDelta(move.varId, move.newValue) { _, d -> if (d > 0) count++ }
+                count
+            }
+
+            is Move.Compound -> evaluateMove(move).breakScore
         }
-
-        is Move.RealSet -> {
-            var count = 0
-            forEachRealFactorDelta(move.varId, move.newValue) { _, d -> if (d > 0) count++ }
-            count
-        }
-
-        is Move.Compound -> evaluateCompound(move).breakScore
     }
 
-    /** Count of currently-violated factors that would become satisfied if [move] were
-     *  applied. Symmetric to [breakScore]. O(1) for `BoolFlip` via [boolMakeCount];
-     *  O(arity) for `IntSet`. Used by probSat/SATLike-style strategies that want both. */
-    fun makeScore(move: Move): Int = when (move) {
-        is Move.BoolFlip -> boolMakeCount[move.varId]
+    /** Count of factors whose violation degree decreases under a primitive [move]. Definition
+     *  inputs use a reversible propagated probe; other primitives use occurrence deltas or
+     *  maintained Boolean scores. Compound moves return zero. */
+    fun makeScore(move: Move): Int {
+        if (move !is Move.Compound && feedsDefinitions(move)) return evaluateMove(move).makeScore
+        return when (move) {
+            is Move.BoolFlip -> boolMakeCount[move.varId]
 
-        is Move.IntSet -> {
-            var count = 0
-            forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d < 0) count++ }
-            count
+            is Move.IntSet -> {
+                var count = 0
+                forEachIntFactorDelta(move.varId, move.newValue) { _, d -> if (d < 0) count++ }
+                count
+            }
+
+            is Move.RealSet -> {
+                var count = 0
+                forEachRealFactorDelta(move.varId, move.newValue) { _, d -> if (d < 0) count++ }
+                count
+            }
+
+            is Move.Compound -> 0 // Compound make rarely useful; skip the apply-revert dance.
         }
-
-        is Move.RealSet -> {
-            var count = 0
-            forEachRealFactorDelta(move.varId, move.newValue) { _, d -> if (d < 0) count++ }
-            count
-        }
-
-        is Move.Compound -> 0 // Compound make rarely useful; skip the apply-revert dance.
     }
 
     /**
@@ -464,9 +467,9 @@ class LocalSearchState(
      * [ObjectiveShaping.objective] is null, or the objective isn't a [LinearObjective], so non-shaping
      * callers see identical behavior.
      *
-     * Two fast paths are recognised: [LinearObjective] (O(1) coefficient lookup per move) and
-     * [IncrementalObjective] (caller-supplied `deltaIfApplied`). Anything else returns `0.0`, since
-     * a generic objective would need an apply-revert with full re-evaluation per candidate.
+     * Direct primitives use coefficient lookup for [LinearObjective] or the caller-supplied
+     * [IncrementalObjective.deltaIfApplied]. Moves feeding definitions and compound moves use a
+     * reversible probe of their resulting assignment. Other objective types contribute `0.0`.
      */
     fun shapedBreakScore(move: Move): Double = breakScore(move).toDouble() + shapedObjectiveDelta(move)
 
@@ -480,6 +483,8 @@ class LocalSearchState(
         val obj = shaping.objective ?: return 0.0
         val lambda = shaping.shapingLambda
         if (lambda == 0.0) return 0.0
+        if (obj !is LinearObjective && obj !is IncrementalObjective) return 0.0
+        if (feedsDefinitions(move) || move is Move.Compound) return lambda * evaluateMove(move, obj).objectiveDelta
         val delta = when (obj) {
             is LinearObjective -> linearObjectiveDelta(move, obj)
             is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
@@ -490,16 +495,20 @@ class LocalSearchState(
 
     /**
      * Raw per-move objective delta `evaluate(applyMove(current)) − evaluate(current)`, computed
-     * against the current assignment WITHOUT committing the move. Returns `null` for objectives with
-     * no incremental path, signalling the caller to fall back to `apply` + full [Objective.evaluate].
+     * against the current assignment without committing the move. Definition inputs and compounds
+     * use a reversible probe; direct primitives return `null` for objectives with no incremental
+     * path, signalling the caller to fall back to `apply` + full [Objective.evaluate].
      *
      * Unlike [shapedObjectiveDelta], this is unscaled — the delta the optimize-side descent scores
      * candidates by, paired with [netDelta] for the feasibility/cost side.
      */
-    fun objectiveDelta(obj: Objective, move: Move): Double? = when (obj) {
-        is LinearObjective -> linearObjectiveDelta(move, obj)
-        is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
-        else -> null
+    fun objectiveDelta(obj: Objective, move: Move): Double? {
+        if (feedsDefinitions(move) || move is Move.Compound) return evaluateMove(move, obj).objectiveDelta
+        return when (obj) {
+            is LinearObjective -> linearObjectiveDelta(move, obj)
+            is IncrementalObjective -> obj.deltaIfApplied(assignment, move)
+            else -> null
+        }
     }
 
     private fun linearObjectiveDelta(move: Move, obj: LinearObjective): Double = when (move) {
@@ -568,26 +577,29 @@ class LocalSearchState(
     }
 
     /** Net cost change if [move] were applied, without mutating state. */
-    fun netDelta(move: Move): Long = when (move) {
-        is Move.BoolFlip -> {
-            var sum = 0L
-            forEachBoolFactorDelta(move.varId) { _, d -> sum += d }
-            sum
-        }
+    fun netDelta(move: Move): Long {
+        if (feedsDefinitions(move)) return evaluateMove(move).netDelta
+        return when (move) {
+            is Move.BoolFlip -> {
+                var sum = 0L
+                forEachBoolFactorDelta(move.varId) { _, d -> sum += d }
+                sum
+            }
 
-        is Move.IntSet -> {
-            var sum = 0L
-            forEachIntFactorDelta(move.varId, move.newValue) { _, d -> sum += d }
-            sum
-        }
+            is Move.IntSet -> {
+                var sum = 0L
+                forEachIntFactorDelta(move.varId, move.newValue) { _, d -> sum += d }
+                sum
+            }
 
-        is Move.RealSet -> {
-            var sum = 0L
-            forEachRealFactorDelta(move.varId, move.newValue) { _, d -> sum += d }
-            sum
-        }
+            is Move.RealSet -> {
+                var sum = 0L
+                forEachRealFactorDelta(move.varId, move.newValue) { _, d -> sum += d }
+                sum
+            }
 
-        is Move.Compound -> evaluateCompound(move).netDelta
+            is Move.Compound -> evaluateMove(move).netDelta
+        }
     }
 
     /**
@@ -598,6 +610,7 @@ class LocalSearchState(
      */
     fun weightedNetDelta(move: Move): Double {
         val w = weights.factorWeights
+        if (feedsDefinitions(move)) return evaluateMove(move).weightedNetDelta
         return when (move) {
             is Move.BoolFlip -> {
                 var sum = 0.0
@@ -626,7 +639,7 @@ class LocalSearchState(
             // Compound: exact, via the same apply-evaluate-revert raw netDelta uses, diffing
             // per-factor degrees against the weight vector. A per-part approximation against the
             // initial state would double-count intermediate breaks on strongly-coupled chains.
-            is Move.Compound -> evaluateCompound(move).weightedNetDelta
+            is Move.Compound -> evaluateMove(move).weightedNetDelta
         }
     }
 
@@ -864,84 +877,135 @@ class LocalSearchState(
         return pick
     }
 
-    /**
-     * Apply [move] forward, observe (newly-violated, net-cost-diff), revert via inverse primitives,
-     * and restore step / lastTouched / conf-change so the state is exactly as it was before.
-     */
-    private fun evaluateCompound(move: Move.Compound): CompoundEval {
-        val oldStep = tabu.step
+    private fun feedsDefinitions(move: Move): Boolean {
+        val net = invariants ?: return false
+        return when (move) {
+            is Move.BoolFlip -> net.readsBool(move.varId)
+            is Move.IntSet -> net.readsInt(move.varId)
+            is Move.RealSet -> false
+            is Move.Compound -> move.parts.any { feedsDefinitions(it) }
+        }
+    }
+
+    private fun saveProbeCoordinates(move: Move) {
+        probeSlots.clear()
+        probeSlotSet.clear()
+        fun saveSlot(slot: Int) {
+            if (probeSlotSet.add(slot)) probeSlots.add(slot)
+        }
+        val ints = IntArrayList(2)
+        val bools = IntArrayList(2)
+        fun collect(part: Move) {
+            when (part) {
+                is Move.BoolFlip -> bools.add(part.varId)
+                is Move.IntSet -> ints.add(part.varId)
+                is Move.RealSet -> {}
+                is Move.Compound -> {
+                    for (p in part.parts) collect(p)
+                    return
+                }
+            }
+            saveSlot(slotOf(part))
+        }
+        collect(move)
+        val net = invariants
+        if (net != null) {
+            for (idx in net.affectedNodes(ints.toIntArray(), bools.toIntArray())) {
+                val node = net.node(idx)
+                saveSlot(if (node.outIsBool) node.out else problem.numBoolVars + node.out)
+            }
+        }
+        if (savedValuesScratch.size < probeSlots.size) savedValuesScratch = LongArray(probeSlots.size)
+        for (i in 0 until probeSlots.size) savedValuesScratch[i] = probeValue(probeSlots[i])
+    }
+
+    private fun probeValue(slot: Int): Long = when {
+        slot < problem.numBoolVars -> if (assignment.boolValue(slot)) 1L else 0L
+        slot < problem.numBoolVars + problem.numIntVars -> assignment.intValue(slot - problem.numBoolVars)
+        else -> assignment.realValue(slot - problem.numBoolVars - problem.numIntVars).toRawBits()
+    }
+
+    private fun restoreProbeCoordinates() {
+        for (i in probeSlots.size - 1 downTo 0) {
+            val slot = probeSlots[i]
+            val value = savedValuesScratch[i]
+            if (probeValue(slot) == value) continue
+            when {
+                slot < problem.numBoolVars -> applyBoolFlip(slot)
+                slot < problem.numBoolVars + problem.numIntVars -> applyIntSet(slot - problem.numBoolVars, value)
+                else -> applyRealSet(slot - problem.numBoolVars - problem.numIntVars, Double.fromBits(value))
+            }
+        }
+    }
+
+    // Use the committed move's single propagation pass and restore saved outputs without replaying definitions.
+    private fun evaluateMove(move: Move, objective: Objective? = null): MoveEval {
         val oldCost = cost
         val oldBestCost = bestCostSeen
-        // With unallocated weights, weighted and raw deltas agree and need no degree snapshots.
-        val degBefore = if (weights.allocated) {
+        val oldTracking = activityTracking
+        val oldObjective = if (objective != null && objective !is LinearObjective) objective.evaluate(assignment) else 0.0
+        val degBefore = if (weights.allocated || move !is Move.Compound) {
             (degScratch ?: IntArray(factorDegree.size)).also { degScratch = it }
         } else {
             null
         }
-        val n = move.parts.size
-        // Inverse per part (BoolFlip self-inverts; IntSet needs current value). Reused list, refilled.
-        val inverses = inverseScratch
-        inverses.clear()
-        for (p in move.parts) inverses += inverseOf(p)
-        // Save lastTouched / touchCount for each affected slot; the apply+revert dance overwrites
-        // them, and a probe must not register as real cross-epoch activity (ALNS keys on touchCount).
-        // Reused scratch grown to the widest compound; only [0, n) is live.
-        if (slotScratch.size < n) {
-            slotScratch = IntArray(n)
-            savedTouchedScratch = LongArray(n)
-            savedTouchCountScratch = IntArray(n)
-        }
-        val touchedSlots = slotScratch
-        val savedTouched = savedTouchedScratch
-        val savedTouchCount = savedTouchCountScratch
-        for (i in 0 until n) {
-            val slot = slotOf(move.parts[i])
-            touchedSlots[i] = slot
-            savedTouched[i] = tabu.lastTouched[slot]
-            savedTouchCount[i] = tabu.touchCount[slot]
-        }
-
+        saveProbeCoordinates(move)
         probeTouchedList.clear()
         probeActive = true
+        activityTracking = false
         breakProbeActive = true
-        applyParts(move.parts)
-        breakProbeActive = false
-
-        val breakCount = settleProbeBreaks()
-        val netDelta: Long = cost - oldCost
-        val weightedNetDelta = if (degBefore != null) weightedDegreeDelta(degBefore) else netDelta.toDouble()
-
-        revertParts(inverses)
-        probeActive = false
-
-        // Conf-change needs no restore — it was left untouched for the whole probe (see probeActive).
-        tabu.step = oldStep
-        for (i in 0 until n) tabu.lastTouched[touchedSlots[i]] = savedTouched[i]
-        for (i in 0 until n) tabu.touchCount[touchedSlots[i]] = savedTouchCount[i]
-        bestCostSeen = oldBestCost
-
-        return CompoundEval(breakScore = breakCount, netDelta = netDelta, weightedNetDelta = weightedNetDelta)
-    }
-
-    // The probe's passes are separate methods so each compiles on its own: inlined into one body, the apply path
-    // appears twice and the per-factor loop makes C2 compile the whole of it again on-stack.
-    private fun applyParts(parts: List<Move>) {
-        for (p in parts) apply(p)
-    }
-
-    private fun revertParts(inverses: List<Move>) {
-        for (i in inverses.indices.reversed()) apply(inverses[i])
-    }
-
-    // Factors the probe turned violated, clearing the probe's touched marks.
-    private fun settleProbeBreaks(): Int {
-        var breakCount = 0
-        for (i in 0 until probeTouchedList.size) {
-            val fid = probeTouchedList[i]
-            if (factorDegree[fid] > 0 && !probeWasViolated[fid]) breakCount++
-            probeTouched[fid] = false
+        try {
+            apply(move)
+            breakProbeActive = false
+            var breakCount = 0
+            var makeCount = 0
+            for (i in 0 until probeTouchedList.size) {
+                val fid = probeTouchedList[i]
+                val delta = if (degBefore != null) factorDegree[fid] - degBefore[fid] else 0
+                if (move is Move.Compound) {
+                    if (factorDegree[fid] > 0 && !probeWasViolated[fid]) breakCount++
+                } else if (delta > 0) {
+                    breakCount++
+                } else if (delta < 0) {
+                    makeCount++
+                }
+            }
+            val delta = cost - oldCost
+            val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
+            val objectiveDelta = when (objective) {
+                is LinearObjective -> probeLinearObjectiveDelta(objective)
+                null -> 0.0
+                else -> objective.evaluate(assignment) - oldObjective
+            }
+            return MoveEval(breakCount, makeCount, delta, weighted, objectiveDelta)
+        } finally {
+            breakProbeActive = false
+            restoreProbeCoordinates()
+            for (i in 0 until probeTouchedList.size) probeTouched[probeTouchedList[i]] = false
+            probeActive = false
+            activityTracking = oldTracking
+            bestCostSeen = oldBestCost
         }
-        return breakCount
+    }
+
+    private fun probeLinearObjectiveDelta(objective: LinearObjective): Double {
+        var delta = 0.0
+        for (i in 0 until probeSlots.size) {
+            val slot = probeSlots[i]
+            val old = savedValuesScratch[i]
+            if (slot < problem.numBoolVars) {
+                val coefficient = objective.boolWeights.getOrElse(slot) { 0L }
+                delta += (coefficient * (probeValue(slot) - old)).toDouble()
+            } else if (slot < problem.numBoolVars + problem.numIntVars) {
+                val coefficient = objective.intCoefficients.getOrElse(slot - problem.numBoolVars) { 0L }
+                delta += (coefficient * (probeValue(slot) - old)).toDouble()
+            } else {
+                val real = slot - problem.numBoolVars - problem.numIntVars
+                val coefficient = objective.realCoefficients.getOrElse(real) { 0.0 }
+                delta += coefficient * (assignment.realValue(real) - Double.fromBits(old))
+            }
+        }
+        return delta
     }
 
     private fun weightedDegreeDelta(degBefore: IntArray): Double {
@@ -957,7 +1021,13 @@ class LocalSearchState(
         return delta
     }
 
-    private data class CompoundEval(val breakScore: Int, val netDelta: Long, val weightedNetDelta: Double)
+    private data class MoveEval(
+        val breakScore: Int,
+        val makeScore: Int,
+        val netDelta: Long,
+        val weightedNetDelta: Double,
+        val objectiveDelta: Double,
+    )
 
     // Reconcile exact degrees independently of apply status deltas; fused updates avoid a second degree read.
     private fun updateViolation(factorId: Int, newDegree: Int = factors[factorId].violationDegree(this, factorId)) {
