@@ -99,7 +99,7 @@ Equality keys whose sign reversal exceeds a signed word retain their arithmetic 
 A parse expands comparisons after lowering all assertions and objectives, following
 the Boolean definitions needed by source declarations, objectives and unowned root
 constraints. The newest root constraints seed the frontier first; expanded definitions
-extend it with their branch predicates. Expansion shares a limit of 65,536 visits; comparisons
+extend it with their branch predicates. Expansion shares a limit of 1,048,576 visits; comparisons
 that cannot finish retain their exact arithmetic encoding. Numeric branch definitions remain enforced whenever
 a surviving constraint, objective or shared reified predicate needs them. Unused
 fresh definitions are omitted after following these dependencies to a fixpoint.

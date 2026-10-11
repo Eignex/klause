@@ -11,7 +11,7 @@ import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 
-internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
+internal class SmtLibConditionalEquality(private val workLimit: Int = 1_048_576) {
     class UnusedColumns(val ints: Set<Int>, val bools: Set<Int>)
 
     private class Definition(
