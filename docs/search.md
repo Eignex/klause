@@ -85,6 +85,10 @@ publication checks; a zero heuristic score is not an exact certificate.
 Gaussian XOR and difference-system helpers deliberately omit local-search scoring:
 their retained source rows enforce the assignment. Symmetry helpers also omit
 scoring because source witnesses need not satisfy a chosen CP representative.
+The finite difference system is posted after presolve only when its fragment has
+a guarded edge and an edge between two unfixed root integer columns. Edges to zero
+or root-fixed columns act as unary bounds and retain their original propagators.
+An unconditional edge between unfixed columns can still join unary guarded bounds.
 Objective-bound overlays deliberately omit CP propagation. Every inert built-in
 role carries a reason. A sound LP family can decline emission under feature,
 resource or domain gates, and omitted rows weaken the relaxation.
