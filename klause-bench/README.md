@@ -142,6 +142,9 @@ experiment rather than directly on the lab Mac, where a run competes with the la
 
 Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
+XCSP3 references accept only `cp-sat`; `solve-one backend=reference solver=cp-sat`
+uses the CPMpy importer and OR-Tools engine. Unsupported solver names are rejected
+before invocation and cannot supply a reference verdict under another engine's label.
 Check failed, unsupported and missing cases before interpreting comparisons.
 Lab agreement and regression confirmation remain recorded-result evidence;
 [independent source validation](#source-validation) defines stronger checks.

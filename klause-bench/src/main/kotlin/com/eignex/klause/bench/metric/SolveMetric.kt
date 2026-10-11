@@ -192,6 +192,9 @@ internal object SolveMetric {
         /** For a reference solve, which of the format's reference solvers runs; null for its default. */
         referenceSolver: String? = null,
     ): SolveRecord {
+        if (solverId == REFERENCE) {
+            ReferenceSolve.solverIdFor(ref, REFERENCE_MINIZINC_BACKEND, referenceSolver)
+        }
         val settings = settings(solverId, search)
         if (solverId == SolverInvocation.KLAUSE) {
             SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
