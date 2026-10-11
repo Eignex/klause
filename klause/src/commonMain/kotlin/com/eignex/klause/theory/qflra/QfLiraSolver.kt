@@ -113,6 +113,7 @@ class ExactLiraSearchComponent(
     private var outcome: ComponentCheck? = null
     private var candidate: List<BigFraction>? = null
     private var dirty = true
+    private var sourceInstalled = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: Cancellation? = null
     private var operationAllowance: (Cancellation) -> Cancellation = { it.shorten(0.5) }
@@ -192,7 +193,10 @@ class ExactLiraSearchComponent(
         registerDisjunctions(context)
         beginOperation()
         return try {
-            if (disjunctionRegistrationDeclined || !system.install() || operationStop()) {
+            val pinnedDifferenceRoot = model.numIntVars == 0 &&
+                bools.indices.all { context.boolValue(it) != null } &&
+                solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
+            if (disjunctionRegistrationDeclined || (!pinnedDifferenceRoot && !installSource()) || operationStop()) {
                 ComponentResult.Indeterminate
             } else {
                 lp.initialize(context).takeUnless { operationStop() } ?: ComponentResult.Indeterminate
@@ -208,6 +212,7 @@ class ExactLiraSearchComponent(
             if (operationStop()) {
                 ComponentResult.Indeterminate
             } else {
+                if (decision is SearchDecision.Theory && !installSource()) return ComponentResult.Indeterminate
                 val result = lp.assertWithin(decision, context, operationStop)
                 if (operationStop()) ComponentResult.Indeterminate else result
             }
@@ -448,7 +453,13 @@ class ExactLiraSearchComponent(
         return ComponentResult.Consistent
     }
 
+    private fun installSource(): Boolean {
+        if (sourceInstalled) return true
+        return system.install().also { sourceInstalled = it }
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
+        if (!installSource()) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((factorIndex, factor) in model.factors.withIndex()) {
             for ((index, row) in factor.linearRows.withIndex()) {
@@ -552,6 +563,23 @@ class ExactLiraSearchComponent(
             }
         ) {
             return ComponentResult.Consistent
+        }
+        // A pinned root can certify its source witness without preparing a numerical basis.
+        if (!sourceInstalled && context.decisionLevel == 0 && bools.none { it == UNASSIGNED }) {
+            if (!context.consumeCheck()) return ComponentResult.Indeterminate
+            when (val result = realDifference?.check(bools, operationStop)) {
+                RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
+                is RealDifferenceSystem.Result.Feasible -> {
+                    candidate = result.point
+                    acceptWitness(result.point)?.let {
+                        assignment = it
+                        outcome = ComponentCheck.Feasible
+                        dirty = false
+                        return ComponentResult.Consistent
+                    }
+                }
+                else -> Unit
+            }
         }
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
