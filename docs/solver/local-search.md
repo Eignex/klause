@@ -32,7 +32,13 @@ Objective-bound overlays keep their own projections. Each Boolean, integer and r
 variable's occurrence index contains each active factor once, in factor order. A move
 updates that invariant once; the invariant accounts for all positions reading the
 coordinate, including positions with different presence literals. Assignments, RNGs,
-weights and invariant payloads belong to each live state. Resumable handles retain
+weights and invariant payloads belong to each live state. Immutable per-factor integer
+lookups store their arrays on one owner, shared with the projection. Compact key ranges
+use offset arrays; sparse ranges use primitive probing with storage bounded by entry
+count. Duplicate keys retain their last payload, while occurrence indexes separately
+account for aliased positions. These lookups allocate no mutable per-worker cache.
+
+Resumable handles retain
 private initialization cursors for state buffers,
 assignment loading or randomization, implicit seed election and ownership, definition
 readers and evaluation, warm weights and activity, greedy coordinate order, and factor
