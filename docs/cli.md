@@ -134,6 +134,10 @@ Solver-control flags are common to **every** mode:
   - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
     `smooth-factor`; recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
     (`greedy|walksat|probsat|skew|sa`), `cb`, `skew-alpha`, `cooling-rate`, `initial-temp`, `min-temp`
+  - portfolio slices: `slice-work` (positive, default `5000`), `slice-max-work` (at least
+    `slice-work`, default `150000`) and `slice-growth` (finite and at least `1`, default `1.5`).
+    Under `-s`, `portfolioBaseSliceWork`, `portfolioMaxSliceWork` and `portfolioSliceGrowth`
+    report the effective policy, including omitted defaults.
   - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`, `ls-residuals` (boolean,
     default `false`). Residual reporting observes ordinary LS arms without changing
     their recipes; ALNS bootstrap is excluded. Under `-s`, `lsBestResidualViolation`
