@@ -53,7 +53,8 @@ does not refine it or require its producing arithmetic context. The common
 `OpenTheoryAssignment.ExactNra` witness preserves this representation.
 `algebraicRealValue(id)` returns its typed scalar through reconstruction wrappers.
 Other routes retain their existing rational text and return null from that accessor.
-For irrational values, `realValue(id)` returns `root(index;[c0,c1,...])`: coefficients
+Point-identified rational values use reduced rational text. Other algebraic values
+use `root(index;[c0,c1,...])` from `realValue(id)`: coefficients
 are exact rationals in ascending exponent order, and the index is one-based among
 the defining polynomial's distinct real roots in increasing order. This text carries
 an exact value; callers rendering another format use the typed metadata.

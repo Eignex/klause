@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.simplex.exact.BigFraction
@@ -34,8 +35,46 @@ class PolynomialTheoryRequestTest {
         assertEquals(1, witness.assignment.boolCount)
         assertEquals(2, witness.assignment.realCount)
         assertEquals(true, witness.boolValue(0))
-        assertEquals(BigFraction.ONE, assertNotNull(witness.algebraicRealValue(0)).rational)
+        val arithmetic = AlgebraicArithmetic()
+        val actual = assertNotNull(witness.algebraicRealValue(0))
+        assertEquals(0, arithmetic.compare(actual, arithmetic.rational(BigFraction.ONE)))
         assertNotNull(witness.algebraicRealValue(1))
+    }
+
+    @Test
+    fun `helper free variables retain their definition scope under caller lets`() {
+        for ((definition, call) in listOf(
+            "(define-fun f ((y Real)) Real (* x y))" to "(= (f 2) 14)",
+            "(define-fun f () Real x)" to "(= f 7)",
+        )) {
+            val input = assertIs<SmtLibInput.Polynomial>(
+                SmtLibAdmission.parse(
+                    "(declare-const x Real) $definition (assert (= x 1)) " +
+                        "(assert (let ((x 7)) $call)) (check-sat)",
+                ),
+            )
+
+            val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest())
+
+            assertIs<OpenTheoryResult.Unsat>(execution.result)
+        }
+    }
+
+    @Test
+    fun `helper arguments read caller bindings before entering definition scope`() {
+        val input = assertIs<SmtLibInput.Polynomial>(
+            SmtLibAdmission.parse(
+                "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) (assert (= x 1)) " +
+                    "(assert (let ((x 7)) (= (f x) 7))) (check-sat)",
+            ),
+        )
+
+        val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest())
+
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+        val arithmetic = AlgebraicArithmetic()
+        val actual = assertNotNull(witness.algebraicRealValue(0))
+        assertEquals(0, arithmetic.compare(actual, arithmetic.rational(BigFraction.ONE)))
     }
 
     @Test
