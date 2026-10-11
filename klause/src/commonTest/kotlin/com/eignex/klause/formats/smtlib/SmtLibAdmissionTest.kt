@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -130,6 +131,46 @@ class SmtLibAdmissionTest {
         assertEquals(SmtLibInput.Interrupted, input)
         assertEquals(1, opens)
         assertEquals(1, reads)
+    }
+
+    @Test
+    fun `work exhaustion in lexical fallback closes the source without publishing metadata`() {
+        var opens = 0
+        var closes = 0
+        var charged = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = opens == 2 && charged >= 1
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        val input = SmtLibAdmission.parse(
+            {
+                opens++
+                val source = StringCharSource(
+                    "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
+                        "(assert (let ((x 7)) (= (f (+ 1 1)) 14))) (check-sat)",
+                )
+                object : CharSource, AutoCloseable {
+                    override fun next(): String? = source.next()
+                    override fun close() { closes++ }
+                }
+            },
+            cancellation = cancellation,
+        )
+
+        assertEquals(SmtLibInput.Interrupted, input)
+        assertEquals(2, opens)
+        assertEquals(2, closes)
+        assertEquals(1L, charged)
+    }
+
+    @Test
+    fun `lexical fallback rejects an assertion using a later helper`() {
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLibAdmission.parse(
+                "(assert (= (f 1) 1)) (define-fun f ((x Real)) Real x) (check-sat)",
+            )
+        }
     }
 
     @Test
