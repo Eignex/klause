@@ -79,15 +79,17 @@ class LpSatisfactionFeasibilityTest {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
-            intDomains = Array(3) { IntDomain(0, 5) },
+            intDomains = Array(3) { IntDomain(0, 2) },
             factors = arrayOf<Factor>(
-                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 6),
+                AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3),
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 1),
             ),
         )
 
         val result = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(lpPlan = LpPlan(bounding = true, cuts = true, cutSearchMaxDepth = 0)),
+            BacktrackParams(lpPlan = LpPlan(
+                bounding = true, cuts = true, gomory = false, mir = false, boundMaxDepth = 0, cutSearchMaxDepth = 0,
+            )),
         )
 
         val sat = assertIs<SolveResult.Sat>(result)
