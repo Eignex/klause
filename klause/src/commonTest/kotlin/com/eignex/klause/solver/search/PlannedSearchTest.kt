@@ -13,17 +13,17 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.propagation.CpIntId
-import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.FactorOwner
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PlannedSearchTest {

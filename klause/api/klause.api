@@ -648,6 +648,9 @@ public final class com/eignex/klause/compile/CompiledSchema {
 	public final fun minimize (Lcom/eignex/klause/schema/BoolHandle;)Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun minimize (Lcom/eignex/klause/schema/FloatHandle;)Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun minimize (Lcom/eignex/klause/schema/IntHandle;)Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun sourceId-pKhLlgM (Lcom/eignex/klause/schema/BoolHandle;)I
+	public final fun sourceId-qEcKiRM (Lcom/eignex/klause/schema/IntHandle;)I
+	public final fun sourceRealId-osvNY_8 (Lcom/eignex/klause/schema/FloatHandle;)Lcom/eignex/klause/ir/SourceRealId;
 }
 
 public final class com/eignex/klause/compile/CompilerKt {
@@ -3169,6 +3172,20 @@ public final class com/eignex/klause/ir/SearchHints {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/ir/SourceBoolId {
+	public static final synthetic fun box-impl (I)Lcom/eignex/klause/ir/SourceBoolId;
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public final fun getIndex ()I
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
+}
+
 public final class com/eignex/klause/ir/SourceIntDomains {
 	public static final field Companion Lcom/eignex/klause/ir/SourceIntDomains$Companion;
 	public final fun declaredOrNull (I)Lcom/eignex/klause/ir/IntDomain;
@@ -3181,6 +3198,34 @@ public final class com/eignex/klause/ir/SourceIntDomains {
 
 public final class com/eignex/klause/ir/SourceIntDomains$Companion {
 	public final fun ofBounds (Lcom/eignex/klause/ir/IntBounds;)Lcom/eignex/klause/ir/SourceIntDomains;
+}
+
+public final class com/eignex/klause/ir/SourceIntId {
+	public static final synthetic fun box-impl (I)Lcom/eignex/klause/ir/SourceIntId;
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public final fun getIndex ()I
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
+}
+
+public final class com/eignex/klause/ir/SourceRealId {
+	public static final synthetic fun box-impl (I)Lcom/eignex/klause/ir/SourceRealId;
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public final fun getIndex ()I
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
 }
 
 public final class com/eignex/klause/ir/SpanIntVars : com/eignex/klause/ir/VarList {
@@ -3266,14 +3311,17 @@ public final class com/eignex/klause/ir/VarRemap {
 	public fun <init> ([I[I[I)V
 	public synthetic fun <init> ([I[I[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun bool (I)I
+	public final fun bool-nyTK-eE (I)Lcom/eignex/klause/ir/SourceBoolId;
 	public final fun bools ([I)[I
 	public final fun getBoolCount ()I
 	public final fun getIntCount ()I
 	public final fun int (I)I
+	public final fun int-2RJHsHY (I)Lcom/eignex/klause/ir/SourceIntId;
 	public final fun ints ([I)[I
 	public final fun lit (I)I
 	public final fun lits ([I)[I
 	public final fun real (I)I
+	public final fun real-aGB7QtI (I)Lcom/eignex/klause/ir/SourceRealId;
 	public final fun reals ([I)[I
 }
 
@@ -4906,6 +4954,12 @@ public final class com/eignex/klause/lp/RelaxationBuilder$DefaultImpls {
 	public static fun statesBothBounds (Lcom/eignex/klause/lp/RelaxationBuilder;[I)Z
 }
 
+public final class com/eignex/klause/lp/RelaxationBuilderKt {
+	public static final fun boolColumn-38kEHM8 (Lcom/eignex/klause/lp/RelaxationBuilder;I)Lcom/eignex/klause/lp/engine/LpColumnId;
+	public static final fun intColumn-bTkilQY (Lcom/eignex/klause/lp/RelaxationBuilder;I)Lcom/eignex/klause/lp/engine/LpColumnId;
+	public static final fun realColumn-UGn7ghg (Lcom/eignex/klause/lp/RelaxationBuilder;I)Lcom/eignex/klause/lp/engine/LpColumnId;
+}
+
 public final class com/eignex/klause/lp/bounding/LpAutoConfig {
 	public static final field ENERGETIC_OPS_PER_CHECK J
 	public static final field INSTANCE Lcom/eignex/klause/lp/bounding/LpAutoConfig;
@@ -5136,6 +5190,20 @@ public final class com/eignex/klause/lp/cut/CutSharing$DefaultImpls {
 }
 
 public final class com/eignex/klause/lp/cut/SharedCut {
+}
+
+public final class com/eignex/klause/lp/engine/LpColumnId {
+	public static final synthetic fun box-impl (I)Lcom/eignex/klause/lp/engine/LpColumnId;
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public final fun getIndex ()I
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
 }
 
 public final class com/eignex/klause/lp/engine/LpZeroObjectivePricing : java/lang/Enum {
@@ -7916,6 +7984,20 @@ public final class com/eignex/klause/propagation/CpBranching$None : com/eignex/k
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/propagation/CpIntId {
+	public static final synthetic fun box-impl (I)Lcom/eignex/klause/propagation/CpIntId;
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public final fun getIndex ()I
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
+}
+
 public final class com/eignex/klause/propagation/CpSearchComponent : com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/SearchConflictResolver, com/eignex/klause/solver/search/SearchModelBlocker {
 	public fun <init> (Lcom/eignex/klause/propagation/PropagationSession;[ILcom/eignex/klause/propagation/CpBranching;)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/PropagationSession;[ILcom/eignex/klause/propagation/CpBranching;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -9113,8 +9195,10 @@ public final class com/eignex/klause/solver/pipeline/ComponentPlanKt {
 
 public final class com/eignex/klause/solver/pipeline/CpProblemProjection {
 	public final fun cpId (I)I
+	public final fun cpId-NGFiV_c (I)Lcom/eignex/klause/propagation/CpIntId;
 	public final fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
 	public final fun sourceId (I)I
+	public final fun sourceId-5Ypk3k4 (I)I
 }
 
 public final class com/eignex/klause/solver/pipeline/EngineParams {
@@ -11104,6 +11188,7 @@ public final class com/eignex/klause/solver/result/UnsoundnessException : java/l
 }
 
 public final class com/eignex/klause/solver/search/AssembledSearchModel {
+	public final fun valueOf (Lcom/eignex/klause/solver/search/TypedSearchValueKey;)Ljava/lang/Object;
 	public final fun valueOf (Ljava/lang/Object;)Ljava/lang/Object;
 }
 
@@ -11321,14 +11406,17 @@ public final class com/eignex/klause/solver/search/SearchAtomRegistryKt {
 	public static synthetic fun explainAtoms$default (Lcom/eignex/klause/solver/search/SearchContext;Lcom/eignex/klause/solver/search/SearchAtomPremise;Lcom/eignex/klause/solver/search/SearchDecision;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchExplanation;
 }
 
-public final class com/eignex/klause/solver/search/SearchBoolValue : com/eignex/klause/solver/search/SearchValueKey {
+public final class com/eignex/klause/solver/search/SearchBoolValue : com/eignex/klause/solver/search/TypedSearchValueKey {
 	public fun <init> (I)V
 	public final fun component1 ()I
 	public final fun copy (I)Lcom/eignex/klause/solver/search/SearchBoolValue;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/SearchBoolValue;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchBoolValue;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueType ()Lkotlin/reflect/KClass;
 	public final fun getVariable ()I
 	public fun hashCode ()I
+	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun snapshot (Z)Ljava/lang/Boolean;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -11557,6 +11645,34 @@ public final class com/eignex/klause/solver/search/SearchDecisionBudget$Unlimite
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/search/SearchExactIntValue : com/eignex/klause/solver/search/TypedSearchValueKey {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-2srAOhM ()I
+	public final fun copy-BbWYBdc (I)Lcom/eignex/klause/solver/search/SearchExactIntValue;
+	public static synthetic fun copy-BbWYBdc$default (Lcom/eignex/klause/solver/search/SearchExactIntValue;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchExactIntValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueType ()Lkotlin/reflect/KClass;
+	public final fun getVariable-2srAOhM ()I
+	public fun hashCode ()I
+	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun snapshot (Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchExactRealValue : com/eignex/klause/solver/search/TypedSearchValueKey {
+	public synthetic fun <init> (ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-P0Uu7zc ()I
+	public final fun copy-NWoOmUI (I)Lcom/eignex/klause/solver/search/SearchExactRealValue;
+	public static synthetic fun copy-NWoOmUI$default (Lcom/eignex/klause/solver/search/SearchExactRealValue;IILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchExactRealValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getValueType ()Lkotlin/reflect/KClass;
+	public final fun getVariable-P0Uu7zc ()I
+	public fun hashCode ()I
+	public fun snapshot (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/search/SearchExplanation {
 	public fun <init> ([I)V
 	public final fun component1 ()[I
@@ -11710,6 +11826,17 @@ public final class com/eignex/klause/solver/search/SearchModelDisposition$Surfac
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/search/SearchModelKey : com/eignex/klause/solver/search/TypedSearchValueKey {
+	public fun <init> (Lkotlin/reflect/KClass;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Lkotlin/reflect/KClass;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getValueType ()Lkotlin/reflect/KClass;
+	public fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/eignex/klause/solver/search/SearchModelKeyKt {
+	public static final fun contribute (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/TypedSearchValueKey;Ljava/lang/Object;)V
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchModelPolicy {
@@ -12104,6 +12231,15 @@ public final class com/eignex/klause/solver/search/TheoryComponent$DefaultImpls 
 	public static fun propagate (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun reasonFor (Lcom/eignex/klause/solver/search/TheoryComponent;I)Lcom/eignex/klause/solver/search/SearchExplanation;
 	public static fun retract (Lcom/eignex/klause/solver/search/TheoryComponent;I)V
+}
+
+public abstract interface class com/eignex/klause/solver/search/TypedSearchValueKey : com/eignex/klause/solver/search/SearchValueKey {
+	public abstract fun getValueType ()Lkotlin/reflect/KClass;
+	public fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class com/eignex/klause/solver/search/TypedSearchValueKey$DefaultImpls {
+	public static fun snapshot (Lcom/eignex/klause/solver/search/TypedSearchValueKey;Ljava/lang/Object;)Ljava/lang/Object;
 }
 
 public abstract interface class com/eignex/klause/solver/search/VarRef {
