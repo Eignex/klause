@@ -38,6 +38,45 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
+    fun `relaxation channels retain the necessary source cost`() {
+        val solver = BacktrackSolver(Problem(
+            4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(3, true))),
+            ),
+        ).bake())
+        val objective = LinearObjective(boolWeights = longArrayOf(0L, 0L, 1L, 2L))
+        val primal = assertNotNull(MonotoneClausePrimal.create(
+            solver, objective, BacktrackParams(), Cancellation.Never,
+        ))
+        primal.use {
+            val sample = assertNotNull(it.advance())
+            assertEquals(1L, objective.evaluateLong(sample))
+            assertTrue(sample.bools[0] || sample.bools[1])
+        }
+    }
+
+    @Test
+    fun `polishing preserves caller pins on free variables`() {
+        val solver = BacktrackSolver(Problem(
+            3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
+            ),
+        ).bake())
+        val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L, 0L))
+        val primal = assertNotNull(MonotoneClausePrimal.create(
+            solver, objective, BacktrackParams(assumptions = Assumptions(bools = mapOf(2 to true))), Cancellation.Never,
+        ))
+        primal.use {
+            val sample = assertNotNull(it.advance())
+            assertEquals(2L, objective.evaluateLong(sample))
+            assertTrue(sample.bools[2])
+        }
+    }
+
+    @Test
     fun `negative occurrence of a costly variable disables the probe`() {
         val solver = BacktrackSolver(Problem(
             1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false)))),
