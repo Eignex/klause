@@ -50,7 +50,10 @@ jobs:
       # already covers. Keeping them separate avoids running lintDocs twice per push. Kover only
       # reports JVM coverage, so native tests run in their own job without its instrumentation.
       - name: Run JVM tests with coverage
-        run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test -x :klause-numerics:linuxX64Test -x :klause-lattice:linuxX64Test koverXmlReport
+        run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test -x :klause-numerics:linuxX64Test -x :klause-lattice:linuxX64Test koverXmlReport :klause-cli:installJvmDist
+
+      - name: Start the installed JVM CLI
+        run: klause-cli/build/install/klause-cli-jvm/bin/klause-cli --version
 
       - name: Upload test reports
         if: always()
@@ -75,7 +78,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: klause/build/reports/kover/report.xml
+          files: klause/build/reports/kover/report.xml,klause-numerics/build/reports/kover/report.xml,klause-lattice/build/reports/kover/report.xml
           fail_ci_if_error: false
 
   native-test:
@@ -107,7 +110,10 @@ jobs:
           restore-keys: ${{ runner.os }}-konan-
 
       - name: Run Linux native tests
-        run: ./gradlew --refresh-dependencies :klause-numerics:linuxX64Test :klause-lattice:linuxX64Test :klause:linuxX64Test :klause-cli:linuxX64Test
+        run: ./gradlew --refresh-dependencies :klause-numerics:linuxX64Test :klause-lattice:linuxX64Test :klause:linuxX64Test :klause-cli:linkReleaseExecutableLinuxX64
+
+      - name: Start the Linux native CLI
+        run: klause-cli/build/bin/linuxX64/releaseExecutable/klause-cli.kexe --version
 
       - name: Upload native test reports
         if: always()

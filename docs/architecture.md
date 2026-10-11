@@ -81,7 +81,8 @@ arrays are borrowed read-only by consumers. No hot-loop buffer copies are added.
 Exact simplex continuation, rational basis workspaces and LP certificates stay
 with their current solver owner. Module extraction does not widen `lp.engine`'s
 closed list. Leaf tests run in the owning module; existing model/LP/theory tests
-and the CLI validate consumption across JVM and Native module boundaries.
+and runnable CLI distribution/executable smoke checks validate consumption across
+JVM and Native module boundaries.
 No build-time or solving-speed improvement is implied by this module graph.
 
 ## Model and ownership
