@@ -486,4 +486,70 @@ class LiteralChannelRepairTest {
         }
     }
 
+    @Test
+    fun `conditional product inverses follow retained unary predicates`() {
+        for (op in LinearOp.entries) {
+            val problem = Problem(
+                1, 4, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), op, 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                    Product(1, 2, 3),
+                    Linear(intArrayOf(1), intArrayOf(3), LinearOp.EQ, 0),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
+            state.invariants = sweep.network(4, 1)
+            state.assignment.setInt(0, when (op) {
+                LinearOp.EQ -> 1L
+                LinearOp.GE -> 2L
+                else -> 0L
+            })
+            state.assignment.setInt(2, 3)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+            val before = state.cost
+            val objective = assertNotNull(sweep.functionalObjective(intArrayOf(3), longArrayOf(1), 0, true))
+
+            val added = ConditionalProductRepair(state, state.moveSink, 3, 4).propose()
+            assertTrue(added in 1..4)
+            val move = state.moveSink.list.first()
+            val costDelta = state.netDelta(move)
+            val objectiveDelta = state.objectiveDelta(objective, move)
+            state.apply(move)
+
+            assertEquals(0L, state.assignment.intValue(3))
+            assertEquals(-before, costDelta)
+            assertEquals(-3.0, objectiveDelta)
+            assertEquals(0.0, objective.evaluate(state.assignment))
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `ordered predicate complements decline unreachable signed endpoints`() {
+        for ((op, bound) in listOf(LinearOp.LE to Long.MAX_VALUE, LinearOp.GE to Long.MIN_VALUE)) {
+            val problem = Problem(
+                1, 2, arrayOf(IntDomain(-1, 1), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, longArrayOf(1), intArrayOf(0), op, bound),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
+            state.invariants = sweep.network(2, 1)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 1, 0)
+
+            assertTrue(state.moveSink.list.isEmpty())
+            assertEquals(0L, state.cost)
+        }
+    }
+
 }
