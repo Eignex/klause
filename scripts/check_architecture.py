@@ -121,7 +121,10 @@ def violations(text):
             if within(owner, package) and not any(within(target, prefix) for prefix in allowed):
                 results.append((code.count("\n", 0, dependency.start()) + 1, owner, target))
         for package, forbidden in FORBIDDEN.items():
-            if within(owner, package) and any(within(target, prefix) for prefix in forbidden):
+            if within(owner, package) and any(
+                within(target, prefix) or (target.endswith(".*") and prefix.startswith(target[:-1]))
+                for prefix in forbidden
+            ):
                 results.append((code.count("\n", 0, dependency.start()) + 1, owner, target))
     return results
 
