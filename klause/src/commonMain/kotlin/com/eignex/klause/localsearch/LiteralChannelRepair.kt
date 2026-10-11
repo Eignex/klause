@@ -37,16 +37,45 @@ internal class LiteralChannelRepair(
         if (depth >= MAX_DEPTH || remaining <= 0 || state.assumptions.isFrozenBool(b) ||
             state.assignment.boolValue(b) == desired
         ) return 0
-        val predicate = state.invariants?.equalityPredicate(b) ?: return 0
+        val predicate = state.invariants?.unaryPredicate(b) ?: return 0
         val domain = state.rootDomains[predicate.input]
-        if (desired) {
+        val equality = (predicate.op == LinearOp.EQ && desired) || (predicate.op == LinearOp.NE && !desired)
+        if (equality) {
             if (predicate.value !in domain) return 0
             return input(predicate.input, predicate.value, depth, minOf(remaining, MAX_ALTERNATIVES))
         }
-        return predicateAlternatives(predicate, depth, remaining)
+        if (predicate.op == LinearOp.EQ || predicate.op == LinearOp.NE) {
+            return predicateAlternatives(predicate, desired, depth, remaining)
+        }
+        val below = (predicate.op == LinearOp.LE) == desired
+        val threshold = when {
+            !desired && predicate.op == LinearOp.LE -> {
+                if (predicate.value == Long.MAX_VALUE) return 0
+                predicate.value + 1L
+            }
+            !desired && predicate.op == LinearOp.GE -> {
+                if (predicate.value == Long.MIN_VALUE) return 0
+                predicate.value - 1L
+            }
+            else -> predicate.value
+        }
+        if ((below && threshold < domain.min) || (!below && threshold > domain.max)) return 0
+        val clamped = domain.clamp(threshold)
+        val target = when {
+            below && clamped > threshold -> domain.lower(clamped)
+            !below && clamped < threshold -> domain.higher(clamped)
+            else -> clamped
+        }
+        if (predicate.holds(target) != desired) return 0
+        return input(predicate.input, target, depth, minOf(remaining, MAX_ALTERNATIVES))
     }
 
-    private fun predicateAlternatives(predicate: EqualityPredicateDefinition, depth: Int, remaining: Int): Int {
+    private fun predicateAlternatives(
+        predicate: UnaryPredicateDefinition,
+        desired: Boolean,
+        depth: Int,
+        remaining: Int,
+    ): Int {
         val domain = state.rootDomains[predicate.input]
         val span = domain.spanOrNull(MAX_CHOICE_VALUES)
         val offset = if (span == null) 0 else state.rng.nextInt(span.size)
@@ -56,7 +85,7 @@ internal class LiteralChannelRepair(
         for (i in 0 until (span?.size ?: MAX_CHOICE_VALUES.toInt())) {
             val value = if (span == null) next else span.valueAt((offset + i) % span.size)
             if (span == null) next = if (next == domain.max) domain.min else domain.higher(next)
-            if (value == predicate.value || value == state.assignment.intValue(predicate.input)) continue
+            if (predicate.holds(value) != desired || value == state.assignment.intValue(predicate.input)) continue
             added += input(predicate.input, value, depth, cap - added)
             if (added >= cap) break
         }

@@ -150,6 +150,7 @@ internal class LocalSearchResidualRecorder {
         is DefinitionalSweep.SweepNode.ElementDef -> "ElementDef"
         is LiteralIntDefinition -> "LiteralIntDefinition"
         is EqualityPredicateDefinition -> "EqualityPredicateDefinition"
+        is ComparisonPredicateDefinition -> "ComparisonPredicateDefinition"
         is ElementResultDefinition -> "ElementResultDefinition"
         else -> "unsupported-definition"
     }

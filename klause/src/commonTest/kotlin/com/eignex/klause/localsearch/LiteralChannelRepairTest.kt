@@ -408,4 +408,82 @@ class LiteralChannelRepairTest {
         state.recompute()
         assertEquals(0L, state.cost)
     }
+    @Test
+    fun `unary predicate inverses attain channel targets across domain holes`() {
+        for (op in LinearOp.entries) for (desired in listOf(false, true)) {
+            val domain = IntDomain(-3, 3).excludeValue(0)
+            val problem = Problem(
+                1, 2, arrayOf(domain, IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), op,
+                        if (op == LinearOp.LE || op == LinearOp.GE) 0 else 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ),
+            )
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = sweep.network(2, 1)
+            val start = when (op) {
+                LinearOp.EQ -> if (desired) -3L else 1L
+                LinearOp.NE -> if (desired) 1L else -3L
+                LinearOp.LE -> if (desired) 3L else -3L
+                LinearOp.GE -> if (desired) -3L else 3L
+            }
+            state.assignment.setInt(0, start)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 1, if (desired) 1L else 0L)
+
+            assertTrue(state.moveSink.list.isNotEmpty())
+            assertTrue(state.moveSink.list.size <= 4)
+            for (move in state.moveSink.list) {
+                val predicted = state.netDelta(move)
+                state.apply(move)
+                assertEquals(desired, state.assignment.boolValue(0))
+                assertEquals(if (desired) 1L else 0L, state.assignment.intValue(1))
+                assertTrue(state.assignment.intValue(0) in domain)
+                assertEquals(0L, predicted)
+                assertEquals(0L, state.cost)
+                state.recompute()
+                assertEquals(0L, state.cost)
+                state.assignment.setInt(0, start)
+                sweep.sweep(state.assignment, state.rootDomains)
+                state.recompute()
+            }
+        }
+    }
+
+    @Test
+    fun `ordered predicate inverses preserve protected coordinates`() {
+        for (protection in listOf("output pin", "source pin", "Boolean pin", "output owner", "source owner")) {
+            val problem = Problem(
+                1, 2, arrayOf(IntDomain(-3, 3), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ),
+            )
+            val assumptions = when (protection) {
+                "output pin" -> Assumptions.None.withInt(1, 1)
+                "source pin" -> Assumptions.None.withInt(0, -3)
+                "Boolean pin" -> Assumptions.None.withBool(0, true)
+                else -> Assumptions.None
+            }
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
+            state.invariants = sweep.network(2, 1)
+            if (protection == "output owner") state.moveSink.setOwners(intArrayOf(-1, 7))
+            if (protection == "source owner") state.moveSink.setOwners(intArrayOf(7, -1))
+            state.assignment.setInt(0, -3)
+            state.assignment.setInt(1, 1)
+            state.assignment.setBool(0, true)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 1, 0)
+
+            assertTrue(state.moveSink.list.isEmpty(), protection)
+        }
+    }
+
 }

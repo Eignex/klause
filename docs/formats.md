@@ -349,8 +349,11 @@ integer columns, so existing Product admission maintains the source output durin
 Either operand and equality orientation and negated Boolean literals retain this encoding;
 zero, negative literals and general arithmetic expressions retain ordinary arithmetic lowering.
 The compiler marks the fresh binary channels as deterministic outputs. Domain-aware
-definition inference maintains those literal values and their unique unary equality
-predicates when the predicates have no other Boolean factor occurrences.
+definition inference maintains those literal values and their unique unit unary
+predicates when the predicates have no other Boolean factor occurrences. Equality,
+disequality and ordered comparisons admit safe unit-coefficient normalization;
+[local-search definitions](solver/local-search.md#maintained-literal-channels) retain
+bounded inverse repairs and objective gradients across both coordinate spaces.
 
 WCNF objectives with equal soft weights fold unit costs into the original Boolean
 objective.
