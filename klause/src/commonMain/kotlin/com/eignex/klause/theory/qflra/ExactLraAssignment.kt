@@ -1,7 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.SnapshotValues
+import com.eignex.klause.solver.snapshotValues
 
 /** An exact QF_LRA assignment, independent of the finite CP [com.eignex.klause.solver.Sample]. */
 class ExactLraAssignment(
@@ -15,7 +15,7 @@ class ExactLraAssignment(
     /** Independent copy of the Boolean coordinates. */
     val bools: BooleanArray get() = booleanValues.copyOf()
 
-    private val realValues: List<BigFraction> = SnapshotValues(reals)
+    private val realValues: List<BigFraction> = snapshotValues(reals)
 
     /** Owned read-only rational coordinates. */
     val reals: List<BigFraction> get() = realValues

@@ -395,7 +395,7 @@ internal class ResumableMinimize(
     internal fun replacingObjective(next: LinearObjective, freshParams: BacktrackParams): ResumableMinimize {
         check(!replaced) { "search has been replaced" }
         val sample = incumbents.current()?.assignment?.let {
-            it.copy()
+            Sample.fromOwned(it.bools, it.ints)
         }
         val root = solver.problem.conditionedRoot(freshParams.assumptions, freshParams.cancellation)
         val rootPins = (root.baked as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None

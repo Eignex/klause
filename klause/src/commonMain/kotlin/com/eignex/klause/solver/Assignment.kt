@@ -112,7 +112,7 @@ class Sample private constructor(
     ) : this(bools, ints, reals, exactReals, exactInts, owned = false)
 
     /** Arbitrary-precision integer coordinates, when supplied by an exact open theory. */
-    val exactInts: List<BigInt>? = exactInts?.let { SnapshotValues(it) }
+    val exactInts: List<BigInt>? = exactInts?.let { snapshotValues(it) }
     private val booleanValues = if (owned) bools else bools.copyOf()
     private val integerValues = if (owned) ints else ints.copyOf()
 
@@ -136,7 +136,7 @@ class Sample private constructor(
     internal var witnessCertificate: EvidenceCertificate? = null
 
     /** Certified real values indexed by real variable id, when a residual LP supplied them. */
-    val exactReals: List<BigFraction>? = exactReals?.let { SnapshotValues(it) }
+    val exactReals: List<BigFraction>? = exactReals?.let { snapshotValues(it) }
     private val approximateReals = if (owned) reals else reals.copyOf()
 
     /** Independent copy of the approximate real coordinates. */
@@ -248,3 +248,6 @@ internal class SnapshotValues<T>(values: List<T>) : AbstractList<T>() {
     override val size: Int get() = snapshot.size
     override fun get(index: Int): T = snapshot[index]
 }
+
+internal fun <T> snapshotValues(values: List<T>): List<T> =
+    if (values is SnapshotValues<*>) values else SnapshotValues(values)
