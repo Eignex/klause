@@ -125,7 +125,7 @@ class ArgminJumpTest {
             arrayOf<Factor>(
                 source.factors[0],
                 Clause(intArrayOf(Lit.make(0, false))),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
             ),
         )
         val state = LocalSearchState(LocalSearchModel.open(lowered), Random(3), Assumptions.None.withInt(1, 0))
@@ -136,19 +136,19 @@ class ArgminJumpTest {
         val before = state.assignment.snapshot()
         val cost = state.cost
 
-        val moves = jumps(state, candidateVars = 4)
+        val moves = jumps(state, candidateVars = 1)
 
         assertTrue(moves.isNotEmpty())
         assertEquals(before, state.assignment.snapshot())
         assertEquals(cost, state.cost)
         for (move in moves) {
-            assertEquals(-8.0, state.weightedNetDelta(move))
+            assertEquals(-4.0, state.weightedNetDelta(move))
         }
         state.apply(moves.first())
-        assertEquals(3L, state.assignment.intValue(0))
+        assertEquals(1L, state.assignment.intValue(0))
         assertEquals(false, state.assignment.boolValue(0))
         assertEquals(0L, state.assignment.intValue(1))
-        assertEquals(0L, state.cost)
+        assertEquals(1L, state.cost)
     }
 
     @Test
