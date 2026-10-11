@@ -1,10 +1,16 @@
 # Polynomial real theory
 
+`solveQfNra` decides a neutral `PolynomialRealFormula` over declared real and Boolean
+IDs. Normalization expands exact rational polynomial expressions and retains each
+atom's original left-minus-right sign and relation. The formula evaluator preserves
+Boolean references and arbitrary `Not`, `And` and `Or` structure. Source parsing and
+frontend routing remain caller responsibilities; the theory reads no input format.
+
 ## Projection families
 
 [PolynomialProjection](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)
 constructs a complete Collins projection family for rational multivariate
-polynomials. It reads the [exact polynomial kernel](../architecture.md#numerical-package-ownership)
+polynomials. It reads the [exact polynomial kernel](../arithmetic/polynomial.md)
 and owns selection of projection operations and declared variable order.
 The theory does not materialize finite CP domains or depend on the linear engines.
 
@@ -28,8 +34,67 @@ structure. Together they preserve delineability, including repeated roots, share
 roots and vanishing leading coefficients. The complete projection includes all
 reducta rather than relying on a nonvanishing discriminant or leading coefficient.
 
+## Lifting and truth
+
+Traversal uses an iterative stack in ascending variable order. Each projection
+polynomial specializes at the exact earlier coordinates. Identically-zero
+specializations add no roots; nonzero constants also add none. Kernel isolation
+supplies every distinct real root, and exact comparison sorts and deduplicates the
+union. Each root is a section sample; kernel rational samples lie strictly inside
+the intervening and unbounded sectors. Empty families still contribute a whole-line
+sector, so every declared dimension receives a coordinate.
+
+At a prefix, only original atoms whose variables are all assigned have definite
+truth. Higher atoms and every Boolean variable remain unknown. A three-valued false
+formula prunes that base cell because those lower signs are invariant throughout
+the cell. No prefix supplies a satisfying result. At a complete sample, exact
+algebraic evaluation decides every atom and iterative Boolean search preserves
+reference correlation. Unused Boolean IDs receive false. The complete assignment
+is checked against the normalized source formula before capture.
+
+Full Collins projection and exhaustive section/sector traversal provide a
+sign-invariant decomposition, including degree loss and nullification. A satisfying
+result requires a complete exact witness; an unsatisfiable result requires exhaustion
+of every unpruned cell and its Boolean alternatives. Root indices in returned
+`AlgebraicReal` values identify their rational defining polynomial's distinct roots,
+not the position in a specialized lifting family.
+
+## Results and invocation resources
+
+`QfNraAssignment` owns Boolean and real-coordinate buffers. Array and list getters
+return independent snapshots; immutable algebraic scalars survive later invocations.
+Results retain counts for projected polynomials, visited prefix cells and native
+work. They retain no mutable traversal, refinement or cancellation state.
+
+`QfNraParams.maximumWork` is nullable for unlimited work; zero prevents entry. One
+counted scope spans source-ID validation, normalization, projection, lifting,
+Boolean search and the final publication poll. Each charge reaches the caller's
+meter once, and the scope retains the caller's deadline. These native work units
+are separate from legacy open-theory policy units. A stop before publication returns
+`Unknown` with interruption or work-limit reason, never partial SAT or UNSAT.
+
+Kernel allocation caps remain configurable through `polynomialLimits`. Dense,
+matrix or checked-degree declines return `Unknown(ResourceLimit)` with the resource
+kind. Caps do not truncate accepted polynomials or restrict their mathematical
+semantics. See [kernel resources](../arithmetic/polynomial.md#invocation-resources)
+and [scope composition](resources.md).
+
 The returned family owns its level buffers. Input list mutation and mutation of a
 returned list do not change captured families. Immutable kernel polynomials may be
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family. See
 [resource allowances](resources.md) for the containing scope.
+
+## Witness ownership
+
+[ExactNraAssignment](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/ExactNraAssignment.kt)
+captures Boolean buffers and an immutable list of exact real scalars. Scalar metadata
+survives the producing arithmetic context and reconstructs each coordinate by its
+rational defining polynomial and distinct-root index. Coordinates are never rounded
+to rational points or binary64 for publication.
+
+The pipeline's `OpenTheoryAssignment.ExactNra` preserves these values beside its
+linear rational witnesses. Its `algebraicRealValue(id)` extension follows source
+reconstruction wrappers without replacing the exact real coordinate. Rational
+coordinates retain reduced rational text; irrational text and the typed metadata
+contract are defined in the [API contract](../api.md).

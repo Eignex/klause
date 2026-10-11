@@ -38,7 +38,7 @@ Packages below are under `com.eignex.klause` in
 | `meta` | Adaptive large-neighbourhood search and core-guided optimization | Composes solver mechanisms |
 | `count` | Exact/approximate counting and near-uniform sampling | Uses compiled finite models and bounded solver cells |
 | `theory.difference`, `theory.lia`, `theory.qflra` | Open arithmetic fragments | Must not materialize finite CP domains |
-| `theory.qfnra` | Complete polynomial CAD projection-family construction | Reads the exact polynomial kernel; no finite domains or linear-engine state |
+| `theory.qfnra` | Complete polynomial-real decision with exact CAD and Boolean search | Reads neutral polynomial formulas and the exact kernel; no finite domains or linear-engine state |
 | `solver.pipeline` | Source routing and one verdict surface | Selects theory once; frontends render assignments |
 | `solver.search` | Component protocol, decisions, traversal, retraction, learning and complete checks | Owns shared lifecycle across CP and theory components |
 
@@ -76,10 +76,11 @@ contracts and the configurable resource limits.
 The [library API contract](api.md) classifies supported, experimental and implementation
 surfaces and defines typed mapping and migration boundaries.
 
-The [polynomial real theory](solver/qfnra.md) selects complete Collins projection
-families over the exact kernel. It preserves declared dimensions and owns descending
-elimination order and projection-family buffers. Mathematical arithmetic remains in
-the kernel; projection policy remains in the theory.
+The [polynomial real theory](solver/qfnra.md) decides neutral polynomial-real formulas
+with complete Collins projection, exact lifting and correlated Boolean search.
+It preserves declared dimensions and owns traversal, source-atom truth, complete
+witness capture and verdict publication. Mathematical arithmetic remains in the
+kernel. One invocation scope covers normalization through publication.
 
 ## Model and ownership
 

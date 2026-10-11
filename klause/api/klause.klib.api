@@ -2437,6 +2437,22 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.toString|toString(){}[0]
     }
 
+    final class ExactNra : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra|null[0]
+        constructor <init>(com.eignex.klause.theory.qfnra/ExactNraAssignment) // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.<init>|<init>(com.eignex.klause.theory.qfnra.ExactNraAssignment){}[0]
+
+        final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.assignment|{}assignment[0]
+            final fun <get-assignment>(): com.eignex.klause.theory.qfnra/ExactNraAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.assignment.<get-assignment>|<get-assignment>(){}[0]
+
+        final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.boolValue|boolValue(kotlin.Int){}[0]
+        final fun component1(): com.eignex.klause.theory.qfnra/ExactNraAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.theory.qfnra/ExactNraAssignment = ...): com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.copy|copy(com.eignex.klause.theory.qfnra.ExactNraAssignment){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.hashCode|hashCode(){}[0]
+        final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.intValue|intValue(kotlin.Int){}[0]
+        final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.realValue|realValue(kotlin.Int){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactNra.toString|toString(){}[0]
+    }
+
     final class Rebuilt : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt|null[0]
         constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, kotlin/BooleanArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>?) // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Rebuilt.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>?){}[0]
 
@@ -12715,6 +12731,22 @@ final class com.eignex.klause.theory.qflra/SourceBoundTerm { // com.eignex.klaus
     final fun toString(): kotlin/String // com.eignex.klause.theory.qflra/SourceBoundTerm.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.theory.qfnra/ExactNraAssignment { // com.eignex.klause.theory.qfnra/ExactNraAssignment|null[0]
+    constructor <init>(kotlin/BooleanArray, kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>) // com.eignex.klause.theory.qfnra/ExactNraAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>){}[0]
+
+    final val boolCount // com.eignex.klause.theory.qfnra/ExactNraAssignment.boolCount|{}boolCount[0]
+        final fun <get-boolCount>(): kotlin/Int // com.eignex.klause.theory.qfnra/ExactNraAssignment.boolCount.<get-boolCount>|<get-boolCount>(){}[0]
+    final val bools // com.eignex.klause.theory.qfnra/ExactNraAssignment.bools|{}bools[0]
+        final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.theory.qfnra/ExactNraAssignment.bools.<get-bools>|<get-bools>(){}[0]
+    final val realCount // com.eignex.klause.theory.qfnra/ExactNraAssignment.realCount|{}realCount[0]
+        final fun <get-realCount>(): kotlin/Int // com.eignex.klause.theory.qfnra/ExactNraAssignment.realCount.<get-realCount>|<get-realCount>(){}[0]
+    final val reals // com.eignex.klause.theory.qfnra/ExactNraAssignment.reals|{}reals[0]
+        final fun <get-reals>(): kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal> // com.eignex.klause.theory.qfnra/ExactNraAssignment.reals.<get-reals>|<get-reals>(){}[0]
+
+    final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.theory.qfnra/ExactNraAssignment.boolValue|boolValue(kotlin.Int){}[0]
+    final fun realValue(kotlin/Int): com.eignex.klause.arithmetic.polynomial/AlgebraicReal // com.eignex.klause.theory.qfnra/ExactNraAssignment.realValue|realValue(kotlin.Int){}[0]
+}
+
 final class com.eignex.klause.util/Bits { // com.eignex.klause.util/Bits|null[0]
     constructor <init>(kotlin/Int) // com.eignex.klause.util/Bits.<init>|<init>(kotlin.Int){}[0]
 
@@ -13502,6 +13534,7 @@ final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.s
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planPortfolio(com.eignex.klause.solver.pipeline/PortfolioPlanRequest): com.eignex.klause.solver.pipeline/PortfolioPlan // com.eignex.klause.solver.pipeline/planPortfolio|planPortfolio@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.PortfolioPlanRequest){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? = ...): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function1<com.eignex.klause.portfolio.ArmFault,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks){}[0]
+final fun (com.eignex.klause.solver.pipeline/OpenTheoryAssignment).com.eignex.klause.solver.pipeline/algebraicRealValue(kotlin/Int): com.eignex.klause.arithmetic.polynomial/AlgebraicReal? // com.eignex.klause.solver.pipeline/algebraicRealValue|algebraicRealValue@com.eignex.klause.solver.pipeline.OpenTheoryAssignment(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.search/SearchContext).com.eignex.klause.solver.search/explainAtoms(com.eignex.klause.solver.search/SearchAtomPremise, com.eignex.klause.solver.search/SearchDecision? = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/explainAtoms|explainAtoms@com.eignex.klause.solver.search.SearchContext(com.eignex.klause.solver.search.SearchAtomPremise;com.eignex.klause.solver.search.SearchDecision?;kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>).com.eignex.klause.backtrack.selector/asSelector(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/asSelector|asSelector@com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]

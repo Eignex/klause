@@ -33,7 +33,7 @@ internal object Suites {
         listOf(
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
             smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit,
-        ) + QfNraSuites.all
+        ) + QfNraSuites.all + QfNraCanonicalSuite.suite
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the

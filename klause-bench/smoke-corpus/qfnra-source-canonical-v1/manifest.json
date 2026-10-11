@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "attribution": "Canonical source-syntax variants of original Eignex Klause fixtures; Apache-2.0.",
+  "cases": [
+    {
+      "suite": "smtlib-qfnra-source-canonical-v1",
+      "name": "degeneracy/degree-drop",
+      "path": "klause-bench/smoke-corpus/qfnra-source-canonical-v1/degeneracy/degree-drop.smt2",
+      "sha256": "96cc619f25e2de8347e908bd35f49458f0695cd3aadc8b1aac759e1b68c58836",
+      "expected": "sat",
+      "membership": "polynomial-real",
+      "reason": "x=0 drops the degree in y to one, giving y=1.",
+      "origin": "Self-authored Eignex Klause regression fixture",
+      "license": "Apache-2.0",
+      "derivation": {
+        "suite": "smtlib-qfnra-core-v1",
+        "name": "degeneracy/degree-drop",
+        "path": "klause-bench/smoke-corpus/qfnra-v1/core/degeneracy/degree-drop.smt2",
+        "sha256": "cd7a060e254603bb8fe6493b059bf527293679d8d8071b131f053d673fc223ec",
+        "transformation": "Replace each bare negative numeral -1 atom with canonical SMT subtraction (- 1); preserve all other source bytes."
+      }
+    },
+    {
+      "suite": "smtlib-qfnra-source-canonical-v1",
+      "name": "degeneracy/equal-degree-common-root",
+      "path": "klause-bench/smoke-corpus/qfnra-source-canonical-v1/degeneracy/equal-degree-common-root.smt2",
+      "sha256": "32cc95aaf4fadaa536c2f820579f5c03bb5b58f57739caa6f9c8594f3b2474ef",
+      "expected": "sat",
+      "membership": "polynomial-real",
+      "reason": "At x=0 both equal-degree polynomials specialize to y^2-1; shared y=1 section.",
+      "origin": "Self-authored Eignex Klause regression fixture",
+      "license": "Apache-2.0",
+      "derivation": {
+        "suite": "smtlib-qfnra-core-v1",
+        "name": "degeneracy/equal-degree-common-root",
+        "path": "klause-bench/smoke-corpus/qfnra-v1/core/degeneracy/equal-degree-common-root.smt2",
+        "sha256": "f1b3590532fc3bf5b4f69a2585fc627efa2a51c83decd6c0f33531fe2e879c6e",
+        "transformation": "Replace each bare negative numeral -1 atom with canonical SMT subtraction (- 1); preserve all other source bytes."
+      }
+    }
+  ]
+}

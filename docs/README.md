@@ -27,7 +27,7 @@ User-facing documentation is maintained separately at
 | [Search and propagation](solver/search.md) | Shared traversal, finite fixpoints, explanations, learned clauses, open real feasibility and clausal primal preparation |
 | [Presolve](solver/presolve.md) | Transformation guarantees, source mappings, cancellation and phase accounting |
 | [Local search](solver/local-search.md) | Projections, resumable state, initialization, definitions, moves and scoring |
-| [Polynomial real theory](solver/qfnra.md) | Complete polynomial CAD projection families, variable ordering and owned construction |
+| [Polynomial real theory](solver/qfnra.md) | Complete polynomial-real decision, CAD projection and lifting, exact witnesses and invocation resources |
 | [Resource allowances](solver/resources.md) | Scope composition, units, sentinels, overspend and parallel quotas |
 | [Portfolios](solver/portfolio.md) | Witness/proof admission, slice scheduling, arm selection, reseeding and failures |
 | [LP architecture](lp/architecture.md) | Exact model authority, bound trails, basis owners, consumers and cuts |
