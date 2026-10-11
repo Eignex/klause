@@ -497,6 +497,33 @@ records and missing elapsed time, and separates proofs/incumbent time from proce
 duration. Optional split counters omitted at zero are read as zero. Noise analysis
 requires balanced `off/on/on/off` pairs and matching outcomes. Save raw cases externally.
 
+### Coordinator lifecycle probe
+
+[scripts/coordinator-lifecycle](scripts/coordinator-lifecycle/) compares fresh and
+instruction-sliced local-search runs over an existing DIMACS fixture such as
+[php4](smoke-corpus/dimacs/php4.cnf). Parsing and root
+baking are outside measurement; fresh engine/projection construction, initialization,
+stepping, publication, work charging and cleanup are inside. Both satisfaction and
+Boolean-objective minimization run with a fixed seed and instruction allowance. The
+probe checks every published witness against the original clauses and hashes witnesses,
+objectives, final counters and retained weights/activity. These checks do not certify
+infeasibility. Round zero warms the JVM; rounds one–four repeat the same work.
+
+```sh
+./gradlew -I klause-bench/scripts/coordinator-lifecycle/coordinator-lifecycle.init.gradle \
+  :klause:coordinatorLifecycleProbe --args="/absolute/path/to/instance.cnf 3 107 32"
+```
+
+`-PlifecycleProbeCli=/absolute/path/to/klause-cli-jvm` selects an installed distribution's
+classes. Build each pinned distribution with `:klause-cli:installJvmDist` before comparing;
+record its installed-build/runtime provenance and the probe source identity. Use the
+same fixture, seed, allowance, repetitions, JVM settings and machine. Match hashes,
+reported work and witnesses before comparing allocations or time. Thread allocated bytes
+are exact for the measured JVM thread; validation, hashing and wrapper dispatch are
+included. The probe's prepared-model consumer scope differs from whole-CLI loading,
+portfolio scheduling and source completion; pair it with matched uninstrumented CLI
+controls before drawing end-to-end conclusions. Save raw measurements externally.
+
 ### Repair-chain probe
 
 [scripts/repair-chains](scripts/repair-chains/) measures 1000 proposal calls after
