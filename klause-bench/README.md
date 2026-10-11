@@ -639,9 +639,9 @@ requires balanced `off/on/on/off` pairs and matching outcomes. Save raw cases ex
 state and root batches, then the full assumption/LP/search installation. Parsing and
 baking are outside measurement. Use `synthetic` for independent integer rows with
 512 assumption pins, or an uncompressed XCSP3 optimization input. A zero solve-wide
-decision allowance prevents decisions; a token fires at installation handoff. The
-final segment includes the first cancelled search dispatch. LP solves and work are
-reported separately, so any root work remains visible. Round zero warms
+decision allowance prevents decisions; a token fires at installation handoff before
+the first search dispatch. LP solves and work are reported separately and must stay
+zero throughout this construction measurement. Round zero warms
 the JVM; later rounds repeat the same construction. Root-domain hashes, propagation
 work and charged work must match before comparing timings or allocation totals.
 
