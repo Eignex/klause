@@ -85,7 +85,6 @@ class Assignment private constructor(
         }
     }
 
-
     internal val boolWordCount: Int get() = bits.words.size
 
     internal fun randomizeBoolWords(rng: Random, from: Int, end: Int) {
@@ -103,8 +102,9 @@ class Assignment private constructor(
     )
 
     internal fun copySteps(target: Assignment, batch: Int): Sequence<Unit> = sequence {
-        require(numBoolVars == target.numBoolVars && numIntVars == target.numIntVars &&
-            numRealVars == target.numRealVars)
+        require(
+            numBoolVars == target.numBoolVars && numIntVars == target.numIntVars && numRealVars == target.numRealVars,
+        )
         for (from in bits.words.indices step batch) {
             bits.words.copyInto(target.bits.words, from, from, minOf(from + batch, bits.words.size))
             yield(Unit)
