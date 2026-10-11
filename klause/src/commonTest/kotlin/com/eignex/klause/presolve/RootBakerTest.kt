@@ -182,6 +182,61 @@ class RootBakerTest {
     }
 
     @Test
+    fun `native propagation charges stop a root fixpoint before refutation`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 1_000_000), IntDomain(0, 1_000_000)), listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, -1),
+        ))
+        val entries = 2L + source.numFactors + source.factors.sumOf { it.structuralKeyWeight.toLong() }
+        val budget = PresolveBudget(53L * entries + 1L)
+
+        val result = source.bake(budget.orSpent(Cancellation.Never))
+
+        assertIs<PropagationResult.Implied>(result.baked)
+        assertEquals(0L, budget.remaining())
+        assertTrue(budget.rootPropagationWork > 0L)
+        assertTrue(result.rootIntDomain(0).min < result.rootIntDomain(0).max)
+    }
+
+    @Test
+    fun `repair exhaustion retains its deductions and stops subsequent probes`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+        ))
+        val reference = PresolveBudget(Long.MAX_VALUE)
+        val root = source.bake(reference.orSpent(Cancellation.Never))
+        root.propagate(Assumptions.None.withInt(0, 0), root.cancellation)
+        root.propagate(Assumptions.None.withTightenedMin(0, 1), root.cancellation)
+        val budget = PresolveBudget(reference.spent())
+        val problem = source.bake(budget.orSpent(Cancellation.Never))
+
+        val result = assertIs<PropagationResult.Implied>(RootBaker.bake(problem, BakeConfig(probeIntHoles = true)))
+
+        assertEquals(1L, result.intMinOrNullCompat(0))
+        assertEquals(1L, result.intMinOrNullCompat(1))
+        assertEquals(2L, budget.probeCalls)
+        assertEquals(0L, budget.remaining())
+    }
+
+    @Test
+    fun `zero integer call caps skip bound and hole probes`() {
+        for (config in listOf(
+            BakeConfig(probeIntHoles = true, probeBudgetPerVar = 0),
+            BakeConfig(probeIntHoles = true, probeTotalBudget = 0),
+        )) {
+            val budget = PresolveBudget(Long.MAX_VALUE)
+            val root = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
+                .bake(budget.orSpent(Cancellation.Never))
+
+            RootBaker.bake(root, config)
+
+            assertEquals(0L, budget.probeCalls)
+            assertEquals(1L, budget.rootConstructionEntries)
+        }
+    }
+
+    @Test
     fun `outer cancellation after a failed probe retains the proven exclusion`() {
         val source = Problem(2, 0, emptyArray(), listOf(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
