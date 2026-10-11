@@ -2,18 +2,14 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
 import kotlin.time.TimeSource
 
 internal class MonotoneClausePrimal private constructor(
@@ -32,7 +28,6 @@ internal class MonotoneClausePrimal private constructor(
     private var index = 0
     private var repair: ResumableMinimize? = null
     private var completedWork = 0L
-    private var reduced: ReducedTrial? = null
     private var trial: Assumptions? = null
     private var pure: List<Int> = emptyList()
     private var trialSample: Sample? = null
@@ -89,41 +84,34 @@ internal class MonotoneClausePrimal private constructor(
         if (isDone) return null
         val startWork = work
         val start = TimeSource.Monotonic.markNow()
+        val search = repair ?: try {
+            ResumableMinimize(
+                solver, LinearObjective(),
+                BacktrackPresets.satOptimized(
+                    params.randomSeed, inprocess = false, cancellation = phaseToken,
+                ).copy(
+                    assumptions = params.assumptions, nativeSat = params.nativeSat,
+                    pbLearning = false, nodeBudget = params.nodeBudget, targetPhasing = false,
+                    valueSelector = IndomainMin,
+                ),
+                rebindable = true,
+            ).also { repair = it }
+        } catch (cancelled: SearchInitializationCancelled) {
+            completedWork += cancelled.work
+            close()
+            return null
+        }
         while (!isDone && !params.cancellation()) {
             if (trial == null) {
                 trials++
                 val next = accepted.withBool(variables[index], false)
                 val simplified = purePins(next)
-                val projection = reduce(simplified.first)
-                if (projection == null) {
-                    if (phaseToken()) return null
-                    index++
-                    continue
-                }
                 trial = next
                 pure = simplified.second
-                reduced = projection
-                repair = try {
-                    ResumableMinimize(
-                        projection.solver, LinearObjective(),
-                        BacktrackPresets.satOptimized(
-                            params.randomSeed, inprocess = false, cancellation = phaseToken,
-                        ).copy(
-                            nativeSat = params.nativeSat, pbLearning = false, nodeBudget = params.nodeBudget,
-                            targetPhasing = false, valueSelector = IndomainMin,
-                            maxDecisions = Long.MAX_VALUE,
-                        ),
-                        rebindable = true,
-                    )
-                } catch (cancelled: SearchInitializationCancelled) {
-                    completedWork += cancelled.work
-                    close()
-                    return null
-                }
+                search.rebind(simplified.first, Long.MAX_VALUE)
             }
             val nodes = if (sliceNodes < 0L) -1L else (sliceNodes - (work - startWork)).coerceAtLeast(0L)
             val millis = (sliceMillis - start.elapsedNow().inWholeMilliseconds).coerceAtLeast(0L)
-            val search = checkNotNull(repair)
             val terminal = search.runSlice(phaseToken, millis, nodes) { trialSample = it.sample }
             if (terminal == null && trialSample == null) return null
             index++
@@ -131,16 +119,13 @@ internal class MonotoneClausePrimal private constructor(
             trial = null
             val sample = trialSample ?: (terminal as? MinimizeResult.WithSample)?.sample
             trialSample = null
-            val lifted = sample?.let { checkNotNull(reduced).lift(it, solver.problem.numBoolVars) }
-            retireRepair()
-            reduced = null
-            if (lifted == null) {
+            if (sample == null) {
                 if (terminal is MinimizeResult.Infeasible) infeasible++ else incomplete++
                 continue
             }
             models++
             accepted = completedTrial
-            polishing = lifted
+            polishing = Sample(sample.bools.copyOf(), sample.ints)
             polishingVariables = pure + variables
             polishingIndex = 0
             polishingPureCount = pure.size
@@ -148,75 +133,6 @@ internal class MonotoneClausePrimal private constructor(
             if (polishing != null) return null
         }
         return null
-    }
-
-    private class ReducedTrial(
-        val solver: BacktrackSolver,
-        val pins: Assumptions,
-        val variables: IntArray,
-    ) {
-        fun lift(sample: Sample, sourceSize: Int): Sample {
-            val values = BooleanArray(sourceSize)
-            pins.forEachBool { variable, value -> values[variable] = value }
-            for (i in variables.indices) values[variables[i]] = sample.bools[i]
-            return Sample(values, LongArray(0))
-        }
-    }
-
-    private fun reduce(pins: Assumptions): ReducedTrial? {
-        val fixed = pins.bools
-        val mapping = IntArray(solver.problem.numBoolVars) { -1 }
-        val present = BooleanArray(solver.problem.numBoolVars)
-        for (clause in clauses) {
-            if (phaseToken()) return null
-            literalWork += clause.literals.size
-            if (clause.literals.any { literal ->
-                    fixed[Lit.variable(literal)]?.let { Lit.evaluate(literal, it) } == true
-                }
-            ) continue
-            for (literal in clause.literals) {
-                val variable = Lit.variable(literal)
-                if (variable !in fixed) present[variable] = true
-            }
-        }
-        val variables = IntArrayList()
-        for (variable in present.indices) {
-            if (!present[variable]) continue
-            mapping[variable] = variables.size
-            variables.add(variable)
-        }
-        val residual = mutableListOf<Clause>()
-        for (clause in clauses) {
-            if (phaseToken()) return null
-            literalWork += clause.literals.size
-            if (clause.literals.any { literal ->
-                    fixed[Lit.variable(literal)]?.let { Lit.evaluate(literal, it) } == true
-                }
-            ) continue
-            val literals = IntArrayList(clause.literals.size)
-            for (literal in clause.literals) {
-                val variable = Lit.variable(literal)
-                if (variable in fixed) continue
-                literals.add(Lit.make(mapping[variable], Lit.isPositive(literal)))
-            }
-            if (literals.size == 0) {
-                rejected++
-                return null
-            }
-            residual.add(Clause(literals.toIntArray()))
-        }
-        val problem = Problem(
-            variables.size, 0, emptyArray(), Array<Factor>(residual.size) { residual[it] },
-        ).bake(phaseToken)
-        if (phaseToken()) return null
-        return ReducedTrial(BacktrackSolver(problem, solver.lpSolveContext), pins, variables.toIntArray())
-    }
-
-    private fun retireRepair() {
-        val search = repair ?: return
-        completedWork += search.work
-        repair = null
-        search.close()
     }
 
     private fun purePins(trial: Assumptions): Pair<Assumptions, List<Int>> {
@@ -279,7 +195,7 @@ internal class MonotoneClausePrimal private constructor(
     override fun close() {
         if (closed) return
         closed = true
-        retireRepair()
+        repair?.close()
     }
 
     companion object {

@@ -116,7 +116,7 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `reduced trials restore original coordinates and caller pins`() {
+    fun `clausal trials retain original coordinates and caller pins`() {
         val solver = BacktrackSolver(Problem(
             33, 0, emptyArray(), arrayOf(
                 Clause(intArrayOf(Lit.make(28, true), Lit.make(31, true))),
@@ -143,7 +143,7 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
-    fun `baked root pins survive trial reduction`() {
+    fun `baked root pins survive clausal trials`() {
         val problem = Problem(
             4, 0, emptyArray(), arrayOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),

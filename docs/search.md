@@ -432,11 +432,10 @@ seed incumbents through greedy feasibility repairs when those variables occur
 only positively in hard clauses. A private satisfaction repair keeps unaccepted
 cost variables true and tries their cheap values in descending weight order.
 A bounded pure-literal fixpoint fixes free residual variables to satisfying values.
-Each trial removes clauses satisfied by its pins, drops false pinned literals, and
-compacts the remaining Boolean coordinates in source order into an isolated clausal model. Returned
-models restore the caller and baked-root pins and original coordinates before polishing and verification.
-Learned clauses remain local to that reduced trial. Only
-feasible trials are retained. Clause-local polishing releases these pins and removes unnecessary
+Trials reseed one private source-coordinate satisfaction session with caller,
+baked-root, cost and pure-literal assumptions. Assumption-guarded learned clauses
+and search phases remain local to that session and survive between trials. Only
+feasible trials retain their cheaper cost assumptions. Clause-local polishing releases these pins and removes unnecessary
 costly values; polishing resumes across slices before the composed verifier checks the full
 proposal for publication.
 A completed proposal can be verified and delivered while the arm repays slice work
@@ -456,6 +455,6 @@ and is skipped behind an existing shared incumbent or within repair fragments.
 The search counters distinguish eligible clausal probe starts, feasibility trial starts,
 returned trial models, completed improving proposals, and proposals verified and installed
 as arm incumbents. The CLI emits these counters together when a probe starts, including
-zero counts for stages it did not reach. Outcome counters separate an empty residual
-clause, a private infeasible verdict, and an incomplete stop without a model. They
+zero counts for stages it did not reach. Outcome counters distinguish a private infeasible verdict from an incomplete
+stop without a model. Residual-clause rejections remain zero for assumption trials. They
 describe heuristic progress and carry no proof.
