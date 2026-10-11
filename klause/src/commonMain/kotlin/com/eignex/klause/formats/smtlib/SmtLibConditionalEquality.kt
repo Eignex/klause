@@ -49,6 +49,30 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private val pairEqualities = HashMap<PairKey, Int>()
     private val orderedImages = HashMap<Int, LongArray>()
     private var work = 0
+    private var diagnosticPending = emptyMap<String, Int>()
+    private val diagnosticCompleted = HashMap<String, Int>()
+    private var diagnosticImagesBefore = 0
+    private var diagnosticImagesAfter = 0
+    private var diagnosticPairsEligible = 0
+
+    private fun diagnosticName(key: ComparisonKey): String = when (key) {
+        is Key -> key.operator.name
+        is PairKey -> "PAIR_${key.operator.name}"
+    }
+
+    fun printDiagnosticCounters(unused: UnusedColumns, factors: Int) {
+        for (operator in listOf("EQ", "LE", "GE", "PAIR_LE", "PAIR_GE")) {
+            println("; conditionalPending_$operator=${diagnosticPending[operator] ?: 0}")
+            println("; conditionalCompleted_$operator=${diagnosticCompleted[operator] ?: 0}")
+        }
+        println("; conditionalImagesBefore=$diagnosticImagesBefore")
+        println("; conditionalImagesAfter=$diagnosticImagesAfter")
+        println("; conditionalPairsEligible=$diagnosticPairsEligible")
+        println("; conditionalExpansionVisits=$work")
+        println("; conditionalDefinedInts=${definitions.size}")
+        println("; conditionalRetainedIntDefinitions=${definitions.size - unused.ints.size}")
+        println("; conditionalFactors=$factors")
+    }
 
     fun define(
         variable: Int,
@@ -197,7 +221,15 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
 
     fun expandPending(builder: Compiler.Builder, objective: LinearObjectiveSpec?) {
+        diagnosticPending = pendingEqualities.keys.groupingBy(::diagnosticName).eachCount()
+        diagnosticImagesBefore = definitions.values.count { it.image != null }
         finishImages()
+        diagnosticImagesAfter = definitions.values.count { it.image != null }
+        diagnosticPairsEligible = pendingEqualities.keys.filterIsInstance<PairKey>().count { key ->
+            listOf(key.left, key.right).any { variable ->
+                definitions[variable]?.image?.let { it.size <= PAIR_IMAGE_LIMIT } == true
+            }
+        }
         val owned = ownedPredicateFactors(builder.factors)
         val queries = pendingEqualities.entries.associateBy { Lit.variable(it.value.literal) }
         val pending = ArrayDeque<Int>()
@@ -226,6 +258,8 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     builder.factors.addAll(clauses)
                     definePredicate(variable, clauses)
                     replaced.add(equality.factor)
+                    val name = diagnosticName(key)
+                    diagnosticCompleted[name] = (diagnosticCompleted[name] ?: 0) + 1
                 }
             }
             booleanDefinitions[variable]?.forEach { factor ->

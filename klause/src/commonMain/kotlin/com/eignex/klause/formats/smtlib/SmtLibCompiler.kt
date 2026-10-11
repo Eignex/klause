@@ -297,6 +297,7 @@ internal object Compiler {
                 realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
                 realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
             )
+            conditionalEqualities.printDiagnosticCounters(removed, model.factors.size)
             return SmtLibProblem(
                 model,
                 objective = objective,
