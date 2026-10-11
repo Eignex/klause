@@ -257,7 +257,7 @@ internal class ResumableMinimize(
     private var firstRun = true
     private val inprocessing = Inprocessing.from(params, sink.search)
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
-    private val traversal = OptimizationTraversalPolicy()
+    private val traversal by lazy(LazyThreadSafetyMode.NONE) { OptimizationTraversalPolicy() }
 
     // Built lazily so it binds the engine's session (created inside the engine's constructor). Its first
     // use is the first-run boundExchange work, well after construction.
