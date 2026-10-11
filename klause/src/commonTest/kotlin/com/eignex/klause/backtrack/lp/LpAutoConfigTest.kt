@@ -182,7 +182,10 @@ class LpAutoConfigTest {
         val settings = KlauseConfig.DEFAULT.copy(
             lpCeilingTableauCells = Long.MAX_VALUE, lpMaxTableauCells = Long.MAX_VALUE,
         ).problemSettings()
-        val p = problem(NValue(513, IntArray(513) { it }), intVars = 514).withSettings(settings)
+        val p = Problem(
+            0, 514, Array(514) { if (it == 513) IntDomain(0, 513) else IntDomain(0, 0) },
+            arrayOf(NValue(513, IntArray(513) { it })), settings = settings,
+        )
         val expected = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
         var actual: LpPlan? = null
         val planning = sequence<Unit> {

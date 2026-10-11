@@ -256,6 +256,15 @@ class PropagationSession private constructor(
     }.iterator()
 
     private fun preparePin(boolean: Boolean, v: Int, value: Long): Sequence<PropagationResult?> = sequence {
+        val alreadyPinned = if (boolean) {
+            boolPinned[v] == if (value != 0L) 1 else 0
+        } else {
+            intPinnedSet[v] && intPinnedVal[v] == value
+        }
+        if (alreadyPinned) {
+            yield(null)
+            return@sequence
+        }
         val pinned = if (boolean) state.pinBoolAsDecision(v, value != 0L) else state.setIntAsDecision(v, value)
         if (!pinned) {
             yield(revertAndUnsat(state.conflictLevels ?: EmptyIntArray))

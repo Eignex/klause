@@ -167,4 +167,30 @@ class PropagationPreparationTest {
         assertEquals(260, session.decisionLevel)
         assertTrue((0 until 260).all { session.intDomain(it) == IntDomain(0, 0) })
     }
+
+    @Test
+    fun `a boolean assumption preserves watched wakes across a pause`() {
+        val problem = Problem(
+            261, 0, emptyArray(),
+            Array(260) { Clause(intArrayOf(Lit.make(0, false), Lit.make(it + 1, true))) },
+        )
+        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        var ready: PropagationSession? = null
+        while (ready == null) ready = preparation.advance()
+        val session = assertNotNull(ready)
+        val assumptions = Assumptions.None.withBool(0, true)
+        val seed = session.prepareSeed(assumptions)
+        val expected = PropagationSession(problem, nativeSat = false)
+        expected.seed(assumptions)
+
+        assertNull(seed.next())
+        while (seed.next() == null) Unit
+
+        assertEquals(1, session.decisionLevel)
+        assertEquals(expected.work, session.work)
+        for (v in 0 until 261) assertEquals(expected.boolValue(v), session.boolValue(v))
+        session.popLast()
+        assertNull(session.boolValue(0))
+        assertNull(session.boolValue(260))
+    }
 }

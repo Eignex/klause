@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -85,5 +86,21 @@ class PreparingMinimizeTest {
             search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
         }
         search.close()
+    }
+
+    @Test
+    fun `a construction refutation preserves shared cutoff result semantics`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, -1)),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(objectiveBoundSupplier = { 0.0 })
+        PreparingMinimize(BacktrackSolver(problem), objective, params).use { search ->
+            val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+
+            assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
+            assertTrue(search.isDone)
+        }
     }
 }
