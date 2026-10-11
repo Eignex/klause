@@ -566,7 +566,7 @@ class Xcsp3GlobalPostingTest {
         val day = parsed.intVarNames.getValue("day")
         val elementId = problem.factors.indexOfFirst { it is Element }
         val element = problem.factors[elementId] as Element
-        val state = LocalSearchState(problem.bake(), Random(5))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
         state.assignment.setInt(day, 0)
         state.assignment.setInt(element.idx, 1)
         state.assignment.setInt(element.result, 9)
@@ -574,6 +574,9 @@ class Xcsp3GlobalPostingTest {
         state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
         sweep.sweep(state.assignment, state.rootDomains, problem.factors)
         state.recompute()
+        assertEquals(1L, state.assignment.intValue(element.idx))
+        assertEquals(9L, state.assignment.intValue(element.result))
+        assertTrue(state.factors[elementId].isViolated(state, elementId))
 
         state.factors[elementId].proposeRepairMoves(state, elementId, state.moveSink)
         state.apply(state.moveSink.list.single())
