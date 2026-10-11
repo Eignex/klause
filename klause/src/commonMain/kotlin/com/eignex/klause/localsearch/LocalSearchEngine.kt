@@ -207,6 +207,11 @@ internal class LocalSearchEngine(
         state.invariants = invariantNetwork.value
     }
 
+    private fun phaseTimer(params: LocalSearchParams, sink: SolveStatsSink?): LocalSearchPhaseTimer? {
+        if (!params.reportPhaseTimes || sink == null) return null
+        return LocalSearchPhaseTimer().also { sink.ls.phaseNanos = it::snapshot }
+    }
+
     /** A one-line summary of this engine's configuration under [params]. */
     fun describe(params: LocalSearchParams): String {
         val sources = strategy.sources.joinToString(",") { it.source.id.label }
@@ -457,6 +462,7 @@ internal class LocalSearchEngine(
         sink: SolveStatsSink,
         checkpoint: LocalSearchCheckpoint? = null,
         onFinished: () -> Unit = {},
+        timing: LocalSearchPhaseTimer? = phaseTimer(params, sink),
     ): Sequence<MinimizeResult?> = sequence {
         sink.start()
         if (!localSearchSupports(model, completion != null)) {
@@ -489,8 +495,8 @@ internal class LocalSearchEngine(
         // eliminated a definition the view reads, so the view only guides moves: every incumbent is valued
         // by the linear objective, the one the portfolio checks it against.
         val gradient = params.lsObjective?.takeIf { perMoveInvariants && definitionalSweep != null }
-        runMinimizeStream(gradient ?: objective, objective, params, eff, warm, sink, checkpoint, onFinished)
-    }
+        runMinimizeStream(gradient ?: objective, objective, params, eff, warm, sink, checkpoint, onFinished, timing)
+    }.withActiveLocalSearchTime(timing)
 
     fun resumable(objective: LinearObjective, params: LocalSearchParams, warm: WarmState? = null): ResumableSearch {
         val ownership = acquireSearch()
@@ -625,10 +631,11 @@ internal class LocalSearchEngine(
         sink: SolveStatsSink? = null,
         checkpoint: LocalSearchCheckpoint? = null,
     ): Sequence<Sample?> {
+        val timing = phaseTimer(params, sink)
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val maxFlips = moveCap(params)
         return sequence {
-            val state = newSatisfyState(params, effectiveAssumptions, warm, seed, checkpoint)
+            val state = newSatisfyState(params, effectiveAssumptions, warm, seed, checkpoint, timing)
             val residuals = if (params.reportResiduals) LocalSearchResidualRecorder() else null
             var flipsSinceRestart = 0
             // Best-cost-so-far snapshot (even while infeasible): an IteratedLocalSearchRestart
@@ -661,7 +668,7 @@ internal class LocalSearchEngine(
             // A restart transition consumes one unit of the maxFlips/maxInstructions allowance, same as
             // an applied move (see [LocalSearchParams.maxInstructions]).
             fun countedRestart(anchor: Sample?) {
-                restarts.restart(state, bestSoFar = anchor)
+                timing.inPhase("seeding") { restarts.restart(state, bestSoFar = anchor) }
                 moves++
                 flipsSinceYield++
                 restartCount++
@@ -742,7 +749,7 @@ internal class LocalSearchEngine(
                         continue
                     }
                     val costBefore = state.cost
-                    val move = strategy.pickMove(state)
+                    val move = timing.inPhase("selection") { strategy.pickMove(state) }
                     if (move == null) {
                         countedRestart(bestSnap)
                         roundFeedback?.endRound()
@@ -752,7 +759,7 @@ internal class LocalSearchEngine(
                         }
                         continue
                     }
-                    state.apply(move)
+                    timing.inPhase("application") { state.apply(move) }
                     moves++
                     if (state.cost < bestCost) {
                         bestCost = state.cost
@@ -771,7 +778,7 @@ internal class LocalSearchEngine(
                 // Abandoned sequences may not fire this; accepted loss.
                 reportProgress()
             }
-        }
+        }.withActiveLocalSearchTime(timing)
     }
 
     /**
@@ -795,8 +802,9 @@ internal class LocalSearchEngine(
         sink: SolveStatsSink,
         checkpoint: LocalSearchCheckpoint? = null,
         onFinished: () -> Unit = {},
+        timing: LocalSearchPhaseTimer? = null,
     ) {
-        val state = newMinimizeState(guide, params, effectiveAssumptions, warm, checkpoint)
+        val state = newMinimizeState(guide, params, effectiveAssumptions, warm, checkpoint, timing)
         val residuals = if (params.reportResiduals) LocalSearchResidualRecorder() else null
         // An objective whose sum can pass the 64-bit range is scored from snapshots, which sum it exactly; the live
         // assignment's Long evaluation would wrap.
@@ -1006,12 +1014,14 @@ internal class LocalSearchEngine(
                     // states. Best-feasible is snapshotted above, so wandering never loses the incumbent. A
                     // feasibility-breaking pick is reverted and retried; a null pick is a local optimum.
                     FeasibleDescent.SelfOwned -> {
-                        val m = (descentStrategy ?: strategy).pickMove(state)
+                        val m = timing.inPhase("selection") { (descentStrategy ?: strategy).pickMove(state) }
                         if (m != null) {
                             feasibleMisses = 0
                             val savedSnap = state.assignment.snapshot()
-                            state.apply(m)
-                            if (state.cost != 0L) revertMove(state, m, savedSnap)
+                            timing.inPhase("application") {
+                                state.apply(m)
+                                if (state.cost != 0L) revertMove(state, m, savedSnap)
+                            }
                             flipsSinceRestart++
                             totalFlips++
                             continue
@@ -1048,7 +1058,9 @@ internal class LocalSearchEngine(
             // Pre-feasibility: drive through the unified strategy when one is configured, else the
             // satisfy-mode strategy.
             val costBefore = state.cost
-            val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
+            val move = timing.inPhase("selection") {
+                if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
+            }
             if (move == null) {
                 restartAndRepair(state, restartAnchor(), params, checkpoint, ::reportProgress)
                 restartCount++
@@ -1057,7 +1069,7 @@ internal class LocalSearchEngine(
                 roundFeedback?.endRound() // a restart ends the round; don't span it
                 continue
             }
-            state.apply(move)
+            timing.inPhase("application") { state.apply(move) }
             if (state.cost in 1 until bestCostInfeasible) {
                 bestCostInfeasible = state.cost
             }
@@ -1103,12 +1115,17 @@ internal class LocalSearchEngine(
         effectiveAssumptions: Assumptions,
         warm: WarmState?,
         checkpoint: LocalSearchCheckpoint?,
-    ): LocalSearchState {
+        timing: LocalSearchPhaseTimer? = null,
+    ): LocalSearchState = timing.inPhase("seeding") {
         val seed = params.randomSeed ?: Random.Default.nextLong()
-        val state = LocalSearchState(model, Random(seed), effectiveAssumptions, preparedProjection(params, checkpoint))
-        state.violationSoftCap = params.violationSoftCap
-        state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
-        installInvariants(state)
+        val state = timing.inPhase("preparation") {
+            LocalSearchState(model, Random(seed), effectiveAssumptions, preparedProjection(params, checkpoint)).also {
+                it.phaseTimer = timing
+                it.violationSoftCap = params.violationSoftCap
+                it.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
+                installInvariants(it)
+            }
+        }
         warm?.applyTo(state)
         // Mirror newSatisfyState: a restart policy instance can be reused across solves (one tuning
         // recipe over many problems), so clear its per-solve state before any restart here — else a
@@ -1142,7 +1159,7 @@ internal class LocalSearchEngine(
         // raise cost), so on a cost-0 seed it would wander across equal-cost feasibles and discard the
         // seed's objective — defeating the warm start.
         if (greedyRepairOnRestart && isLargeEnoughForGreedy() && !seeded) greedyRepairPass(state, params, checkpoint)
-        return state
+        state
     }
 
     /** Build and prime the per-call [LocalSearchState] for a [streamImpl] satisfy draw: config the
@@ -1154,11 +1171,16 @@ internal class LocalSearchEngine(
         warm: WarmState?,
         seed: Long,
         checkpoint: LocalSearchCheckpoint?,
-    ): LocalSearchState {
-        val state = LocalSearchState(model, Random(seed), effectiveAssumptions, preparedProjection(params, checkpoint))
-        state.violationSoftCap = params.violationSoftCap
-        state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
-        installInvariants(state)
+        timing: LocalSearchPhaseTimer? = null,
+    ): LocalSearchState = timing.inPhase("seeding") {
+        val state = timing.inPhase("preparation") {
+            LocalSearchState(model, Random(seed), effectiveAssumptions, preparedProjection(params, checkpoint)).also {
+                it.phaseTimer = timing
+                it.violationSoftCap = params.violationSoftCap
+                it.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
+                installInvariants(it)
+            }
+        }
         warm?.applyTo(state)
         // A restart policy instance can be reused across solves (a tuning campaign runs one
         // recipe over many problems); clear its per-solve state so a stale incumbent — possibly
@@ -1177,7 +1199,7 @@ internal class LocalSearchEngine(
         } else if (sliced) {
             recomputeInitial(state, params, checkpoint)
         }
-        return state
+        state
     }
 
     // Zero violation over continuous columns needs completion; refuting rows gain weight to steer the search.
@@ -1216,7 +1238,7 @@ internal class LocalSearchEngine(
         params: LocalSearchParams,
         checkpoint: LocalSearchCheckpoint?,
         onPause: () -> Unit,
-    ) {
+    ) = state.phaseTimer.inPhase("seeding") {
         restarts.restart(state, anchor)
         if (greedyRepairOnRestart && isLargeEnoughForGreedy()) greedyRepairPass(state, params, checkpoint, onPause)
     }

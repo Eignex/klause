@@ -130,6 +130,7 @@ class LocalSearchState(
     private val hasVariableElements: Boolean by lazy(LazyThreadSafetyMode.NONE) {
         problem.factors.any { it is Element && it.arrIsVars }
     }
+    internal var phaseTimer: LocalSearchPhaseTimer? = null
 
     /** DDFW-style per-invariant dynamic weights and their class-normalised baseline. */
     val weights: FactorWeightBook = FactorWeightBook(problem)

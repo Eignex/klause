@@ -586,10 +586,11 @@ fun buildPortfolioScenario(
     val phaseRetention = p.double("phase-retention")
     val reseedStaleThreshold = p.int("reseed-stale-threshold")
     val reportLsResiduals = p.bool("ls-residuals") ?: false
+    val reportLsPhaseTimes = p.bool("ls-phase-times") ?: false
     if (reseedStaleThreshold != null && reseedStaleThreshold < 0) {
         pipelineConfigError("reseed-stale-threshold must be >= 0")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, phase-retention, reseed-stale-threshold, ls-residuals")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -622,6 +623,7 @@ fun buildPortfolioScenario(
         annotationArm = annotationArm,
         nodeBudget = nodeBudget,
         reportLsResiduals = reportLsResiduals,
+        reportLsPhaseTimes = reportLsPhaseTimes,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }

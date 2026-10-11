@@ -27,6 +27,8 @@ data class LocalSearchStats(
     val completionsUndecided: SumResult = ZERO_COUNT,
     /** Optional best committed assignment's graded violations; not a witness or a completion verdict. */
     val bestResidual: LocalSearchResidual? = null,
+    /** Active elapsed nanoseconds by phase, excluding suspended idle time. Empty when disabled. */
+    val phaseNanos: Map<String, Long> = emptyMap(),
 ) {
     /** Combine two workers: moves/stalls add, earliest time-to-best wins, incumbent from the lower violation. */
     fun mergedWith(o: LocalSearchStats): LocalSearchStats = LocalSearchStats(
@@ -55,6 +57,10 @@ data class LocalSearchStats(
             o.bestResidual.cost < bestResidual.cost -> o.bestResidual
             else -> bestResidual
         },
+        phaseNanos = (phaseNanos.keys + o.phaseNanos.keys).associateWith { phase ->
+            val first = phaseNanos[phase] ?: 0L
+            first + minOf(o.phaseNanos[phase] ?: 0L, Long.MAX_VALUE - first)
+        },
     )
 }
 
@@ -75,6 +81,7 @@ internal class LocalSearchStatsSink {
     private var completionsRefuted: Long = 0L
     private var completionsUndecided: Long = 0L
     var bestResidual: LocalSearchResidual? = null
+    var phaseNanos: (() -> Map<String, Long>)? = null
 
     /** Count one decided candidate: [refuted] or [undecided] when it was not accepted. */
     fun recordCompletion(refuted: Boolean, undecided: Boolean) {
@@ -108,5 +115,6 @@ internal class LocalSearchStatsSink {
         completionsRefuted = SumResult(completionsRefuted.toDouble()),
         completionsUndecided = SumResult(completionsUndecided.toDouble()),
         bestResidual = bestResidual,
+        phaseNanos = phaseNanos?.invoke() ?: emptyMap(),
     )
 }

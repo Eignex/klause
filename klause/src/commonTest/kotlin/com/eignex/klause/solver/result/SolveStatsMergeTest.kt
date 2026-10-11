@@ -10,6 +10,18 @@ import kotlin.test.assertTrue
 class SolveStatsMergeTest {
 
     @Test
+    fun `local search phase times add across workers without losing missing phases`() {
+        val left = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("seeding" to 7L, "selection" to 11L)))
+        val right = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("preparation" to 3L, "selection" to 13L)))
+
+        val merged = left.mergedWith(right)
+
+        assertEquals(mapOf("preparation" to 3L, "seeding" to 7L, "selection" to 24L), merged.ls.phaseNanos)
+        assertEquals(merged, SolveStats.EMPTY.mergedWith(merged))
+        assertEquals(merged, merged.mergedWith(SolveStats.EMPTY))
+    }
+
+    @Test
     fun `ALNS phase observations survive portfolio aggregation`() {
         val left = SolveStats(alns = AlnsStats(13, 7, 17, 5, 120, 9, 8, 3))
         val right = SolveStats(alns = AlnsStats(2, 3, 5, 7, 80, 4, 3, 2))

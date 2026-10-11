@@ -265,12 +265,17 @@ private fun appendRouteCertifierStats(
  */
 internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum
-    if (stats.run.backend != "ls" && moves == 0.0 && stats.ls.bestResidual == null) return emptyList()
+    if (stats.run.backend != "ls" && moves == 0.0 && stats.ls.bestResidual == null &&
+        stats.ls.phaseNanos.isEmpty()
+    ) return emptyList()
 
     val out = ArrayList<Pair<String, String>>()
     out += "lsMoves" to "${moves.toLong()}"
     out += "lsRestarts" to "${stats.search.restarts.sum.toLong()}"
     out += "lsStalls" to "${stats.ls.stalls.sum.toLong()}"
+    for ((phase, nanos) in stats.ls.phaseNanos.entries.sortedBy { it.key }) {
+        out += "lsPhaseNanos.$phase" to nanos.toString()
+    }
     if (solveTimeMs > 0L) out += "lsMovesPerSec" to round4(moves / (solveTimeMs / 1000.0))
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
     if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)

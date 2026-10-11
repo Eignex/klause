@@ -14,6 +14,7 @@ import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -32,6 +33,68 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+
+    @Test
+    fun `resumable minimization reports active phase times only when requested`() {
+        for (enabled in listOf(false, true)) {
+            val problem = Problem(
+                0, 1, arrayOf(IntDomain(0, 3)),
+                arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+            )
+            val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+            val params = LocalSearchParams(
+                maxFlips = 3, randomSeed = 3L, reportPhaseTimes = enabled,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
+            )
+
+            search.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { handle ->
+                val counted = assertIs<InstructionSlicedSearch>(handle)
+                assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {})
+                val paused = handle.stats.ls.phaseNanos
+
+                assertEquals(paused, handle.stats.ls.phaseNanos)
+                assertEquals(enabled, paused.isNotEmpty())
+                if (enabled) {
+                    assertEquals(setOf("preparation", "seeding", "selection", "application", "other"), paused.keys)
+                    assertTrue(paused.values.all { it >= 0L })
+                    assertTrue(paused.values.sum() > 0L)
+                    assertTrue(paused.getValue("selection") > 0L)
+                    assertTrue(paused.getValue("application") > 0L)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `resumable satisfaction reports active phase times only when requested`() {
+        for (enabled in listOf(false, true)) {
+            val problem = Problem(
+                0, 1, arrayOf(IntDomain(0, 3)),
+                arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+            )
+            val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+            val params = LocalSearchParams(
+                maxFlips = 3, randomSeed = 3L, reportPhaseTimes = enabled,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
+            )
+
+            search.resumableSolve(params).use { handle ->
+                val counted = assertIs<InstructionSlicedSolve>(handle)
+                assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                val paused = handle.stats.ls.phaseNanos
+
+                assertEquals(paused, handle.stats.ls.phaseNanos)
+                assertEquals(enabled, paused.isNotEmpty())
+                if (enabled) {
+                    assertEquals(setOf("preparation", "seeding", "selection", "application", "other"), paused.keys)
+                    assertTrue(paused.values.all { it >= 0L })
+                    assertTrue(paused.values.sum() > 0L)
+                    assertTrue(paused.getValue("selection") > 0L)
+                    assertTrue(paused.getValue("application") > 0L)
+                }
+            }
+        }
+    }
 
     @Test
     fun `residual reporting retains the best committed assignment after a worse move`() {

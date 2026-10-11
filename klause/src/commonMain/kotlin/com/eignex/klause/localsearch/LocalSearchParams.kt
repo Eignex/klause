@@ -109,6 +109,8 @@ data class LocalSearchParams(
     val normalizeWeightsByClass: Boolean = false,
     /** Collect graded violations by factor kind at strict committed-cost improvements. Disabled by default. */
     val reportResiduals: Boolean = false,
+    /** Record active preparation, seeding, selection and application time. Disabled by default. */
+    val reportPhaseTimes: Boolean = false,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

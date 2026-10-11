@@ -129,6 +129,8 @@ data class PortfolioScenario(
     val nodeBudget: NodeBudget? = null,
     /** Collect the ordinary local-search arms' best committed residuals by factor kind. Disabled by default. */
     val reportLsResiduals: Boolean = false,
+    /** Record the ordinary local-search arms' active phase times. Disabled by default. */
+    val reportLsPhaseTimes: Boolean = false,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
@@ -167,6 +169,7 @@ data class PortfolioScenario(
  */
 internal sealed interface WorkerConfig {
     fun withLsResiduals(): WorkerConfig = this
+    fun withLsPhaseTimes(): WorkerConfig = this
 
     /** Telemetry id (the catalog label, before the engine prefix is added in [materialize]). */
     val label: String
