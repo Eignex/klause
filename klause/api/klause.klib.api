@@ -3580,6 +3580,7 @@ final class com.eignex.klause.backtrack.selector/Chb : com.eignex.klause.backtra
     final fun fresh(): com.eignex.klause.backtrack.selector/Chb // com.eignex.klause.backtrack.selector/Chb.fresh|fresh(){}[0]
     final fun onCommit(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack.selector/Chb.onCommit|onCommit(com.eignex.klause.solver.search.VarRef){}[0]
     final fun onConflict(com.eignex.klause.solver.search/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/Chb.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef?, com.eignex.klause.solver.search/BranchingConflict) // com.eignex.klause.backtrack.selector/Chb.onConflict|onConflict(com.eignex.klause.solver.search.VarRef?;com.eignex.klause.solver.search.BranchingConflict){}[0]
     final fun onPropagation(com.eignex.klause.propagation/PropagationResult.Implied) // com.eignex.klause.backtrack.selector/Chb.onPropagation|onPropagation(com.eignex.klause.propagation.PropagationResult.Implied){}[0]
     final fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/Chb.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
 }

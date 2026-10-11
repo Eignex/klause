@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IndexedMaxHeap
@@ -24,15 +25,15 @@ import kotlin.random.Random
  * size α starts at [alphaStart] and decays by [alphaStep] per conflict down to [alphaFloor],
  * so early conflicts move scores fast and the estimate settles as evidence accumulates.
  *
- * Picks the unpinned variable with the highest `Q`. Ties broken by variable-id order (bools
- * precede ints). Scores persist across [onRestart] — like VSIDS, the learned ordering is the
+ * Picks the unpinned variable with the highest `Q`. Ties follow the heap order.
+ * Scores persist across [onRestart] — like VSIDS, the learned ordering is the
  * point. Uses the same combined-id [IndexedMaxHeap] and pinned-skip pick machinery as [Vsids], so
  * it drops into the [com.eignex.klause.backtrack.BacktrackParams.variableSelector] slot with
  * no engine changes.
  *
  * Hook mapping (exactly the hooks VSIDS already consumes):
  *  - [onConflict] — advances the conflict counter, decays α, and bumps every variable in the
- *    conflict reason set (and the failed decision) with the conflict multiplier; those
+ *    conflict reason set (and the failed decision, once) with the conflict multiplier; those
  *    variables' `lastConflict` is set to the current count, so their reward denominator is 1.
  *  - [onPropagation] / [onCommit] — assigned-variable reward, recency-discounted by how long
  *    ago the variable last appeared in a conflict.
@@ -111,14 +112,18 @@ class Chb(
         return result
     }
 
-    override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
+    override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) =
+        onConflict(varRef, BranchingConflict(unsat.conflictBools, unsat.conflictInts))
+
+    override fun onConflict(varRef: VarRef?, conflict: BranchingConflict) {
         val h = heap ?: return
         conflicts++
-        for (b in unsat.conflictBools) bumpConflict(h, idOfBool(b))
-        for (i in unsat.conflictInts) bumpConflict(h, idOfInt(i))
+        for (b in conflict.bools) bumpConflict(h, idOfBool(b))
+        for (i in conflict.ints) bumpConflict(h, idOfInt(i))
         when (varRef) {
-            is VarRef.Bool -> bumpConflict(h, idOfBool(varRef.varId))
-            is VarRef.IntVar -> bumpConflict(h, idOfInt(varRef.varId))
+            is VarRef.Bool -> if (varRef.varId !in conflict.bools) bumpConflict(h, idOfBool(varRef.varId))
+            is VarRef.IntVar -> if (varRef.varId !in conflict.ints) bumpConflict(h, idOfInt(varRef.varId))
+            null -> Unit
         }
         // Decay the learning rate toward the floor as conflicts accumulate.
         if (alpha > alphaFloor) alpha = (alpha - alphaStep).coerceAtLeast(alphaFloor)
