@@ -32,7 +32,8 @@ Objective-bound overlays keep their own projections. Each Boolean, integer and r
 variable's occurrence index contains each active factor once, in factor order. A move
 updates that invariant once; the invariant accounts for all positions reading the
 coordinate, including positions with different presence literals. Assignments, RNGs,
-weights and invariant payloads belong to each live state. Resumable handles retain private initialization cursors for state buffers,
+weights and invariant payloads belong to each live state. Resumable handles retain
+private initialization cursors for state buffers,
 assignment loading or randomization, implicit seed election and ownership, definition
 readers and evaluation, warm weights and activity, greedy coordinate order, and factor
 payloads. Cancellation is polled before each retained step. Explicit loops advance in
