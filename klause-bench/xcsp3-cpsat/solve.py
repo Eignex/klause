@@ -11,10 +11,33 @@ or null for a CSP / no incumbent), maximize (bool or null). The bench maps these
 import json
 import sys
 
+VERSION = "xcsp3-matrix-row-major-v1"
+
+
+def read_model(path):
+    import cpmpy as cp
+    from cpmpy.tools.xcsp3.parser_callbacks import CallbacksCPMPy
+    from pycsp3.parser.xparser import CallbackerXCSP3, ParserXCSP3
+
+    class RowMajorCallbacks(CallbacksCPMPy):
+        def ctr_element_matrix(self, matrix, i, j, condition):
+            cells = cp.cpm_array([self.get_cpm_vars(row) for row in matrix])
+            rows, columns = cells.shape
+            row, column = self.get_cpm_vars([i, j])
+            value = self.get_cpm_var(condition.right_operand())
+            self.cpm_model += [row >= 0, row < rows, column >= 0, column < columns]
+            # The importer uses the row count as a stride; rectangular matrices need the column count.
+            selected = cp.Element(cells.flatten(), columns * row + column)
+            self.cpm_model += self.eval_cpm_comp(selected, condition.operator, value)
+
+    callbacks = RowMajorCallbacks()
+    callbacks.force_exit = True
+    CallbackerXCSP3(ParserXCSP3(path), callbacks).load_instance()
+    return callbacks.cpm_model
+
 
 def solve(path, time_limit, workers):
-    from cpmpy.tools.xcsp3 import read_xcsp3
-    model = read_xcsp3(path)
+    model = read_model(path)
     obj = getattr(model, "objective_", None)
     maximize = None if obj is None else not bool(getattr(model, "objective_is_min", True))
     # Pin cp-sat's own workers: the bench parallelizes across instances, so each container stays
@@ -30,6 +53,7 @@ def solve(path, time_limit, workers):
         except Exception:  # noqa: BLE001
             objective = None
     return {
+        "version": VERSION,
         "exit": exitstatus,
         "runtime": status.runtime,
         "objective": objective,
@@ -47,7 +71,7 @@ def main():
     try:
         result = solve(path, time_limit, workers)
     except Exception as e:  # noqa: BLE001 — a parse/solve failure is a per-instance verdict, not a crash
-        result = {"exit": "ERROR", "error": f"{type(e).__name__}: {e}"}
+        result = {"exit": "ERROR", "error": f"{type(e).__name__}: {e}", "version": VERSION}
     print(json.dumps(result), file=out)
 
 
