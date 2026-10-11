@@ -22,7 +22,6 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         var image: Set<Long>?,
         val guardTests: List<GuardEquality?>,
     ) {
-        var noArm: Int? = null
         val guardColumns = guardTests.mapNotNull { it?.variable }.toSet()
 
         fun excludesDefault(value: Long): Boolean {
@@ -268,7 +267,8 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         val operator = if (selectRight) key.operator else {
             if (key.operator == LinearOp.LE) LinearOp.GE else LinearOp.LE
         }
-        val alternatives = ArrayList<Int>()
+        val guards = ArrayList<Int>()
+        val comparisons = ArrayList<Int>()
         for (value in image) {
             if (++work > workLimit) return null
             val guard = expand(selected, value, builder, LinearOp.EQ) ?: return null
@@ -278,9 +278,12 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     IntComb.Narrow(LinComb(emptyMap(), value)),
                 )
             }
-            alternatives.add(builder.foldConditionalAnd(listOf(guard, comparison)))
+            guards.add(guard)
+            comparisons.add(comparison)
         }
-        return builder.foldConditionalOr(alternatives).also { pairEqualities[key] = it }
+        return reifyChoice(guards, comparisons, Lit.negate(builder.trueLit()), builder).also {
+            pairEqualities[key] = it
+        }
     }
 
     private fun expand(variable: Int, value: Long, builder: Compiler.Builder, operator: LinearOp): Int? {
@@ -335,21 +338,17 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     val default = literals.removeLast()
                     val arms = IntArray(definition.arms.size)
                     for (index in arms.indices.reversed()) arms[index] = literals.removeLast()
-                    val alternatives = ArrayList<Int>()
-                    for (index in arms.indices) {
-                        val guard = if (operator == LinearOp.EQ) definition.guardTests[index]?.truthWhen(
+                    val impliedArms = if (operator == LinearOp.EQ) arms.indices.filter { index ->
+                        definition.guardTests[index]?.truthWhen(
                             definition.arms[index].asSimpleVar(), value,
-                        ) else null
-                        alternatives += when (guard) {
-                            true -> arms[index]
-                            false -> Lit.negate(builder.trueLit())
-                            null -> builder.foldConditionalAnd(listOf(definition.guards[index], arms[index]))
-                        }
-                    }
-                    if (default != Lit.negate(builder.trueLit())) {
-                        alternatives += defaultAlternative(definition, default, value, builder, operator)
-                    }
-                    val literal = builder.foldConditionalOr(alternatives)
+                        ) == true
+                    }.map { arms[it] } else emptyList()
+                    val defaultGuards = if (operator == LinearOp.EQ) definition.guards.indices.filter { index ->
+                        definition.guardTests[index]?.truthWhen(definition.default.asSimpleVar(), value) != false
+                    }.map { definition.guards[it] } else definition.guards
+                    val literal = reifyChoice(
+                        definition.guards, arms.toList(), default, builder, impliedArms, defaultGuards,
+                    )
                     equalities[Key(frame.variable, value, operator)] = literal
                     literals.addLast(literal)
                 }
@@ -377,30 +376,52 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         }
     }
 
-    private fun defaultAlternative(
-        definition: Definition,
-        literal: Int,
-        value: Long,
+    private fun reifyChoice(
+        guards: List<Int>,
+        arms: List<Int>,
+        default: Int,
         builder: Compiler.Builder,
-        operator: LinearOp,
+        impliedArms: List<Int> = emptyList(),
+        defaultGuards: List<Int> = guards,
     ): Int {
-        val source = definition.default.asSimpleVar()
-        if (operator == LinearOp.EQ && source != null && source in definition.guardColumns) {
-            var simplified = false
-            val guards = ArrayList<Int>()
-            for (index in definition.guards.indices) {
-                when (definition.guardTests[index]?.truthWhen(source, value)) {
-                    true -> return Lit.negate(builder.trueLit())
-                    false -> simplified = true
-                    null -> guards.add(Lit.negate(definition.guards[index]))
-                }
+        val truth = builder.trueLit()
+        val falsehood = Lit.negate(truth)
+        val retained = guards.indices.mapNotNull { index ->
+            val guard = guards[index]
+            val arm = when (arms[index]) {
+                guard -> truth
+                Lit.negate(guard) -> falsehood
+                else -> arms[index]
             }
-            if (simplified) return builder.foldConditionalAnd(guards + literal)
+            if (guard == falsehood || arm == default) null else guard to arm
         }
-        val noArm = definition.noArm ?: builder.foldConditionalAnd(
-            definition.guards.map { Lit.negate(it) },
-        ).also { definition.noArm = it }
-        return builder.foldConditionalAnd(listOf(noArm, literal))
+        retained.firstOrNull { it.first == truth }?.let { return it.second }
+        if (retained.isEmpty()) return default
+        val activeGuards = retained.map { it.first }
+        val activeGuardSet = activeGuards.toHashSet()
+        val fallbackGuards = defaultGuards.filter { it in activeGuardSet }
+        if (retained.all { it.second == truth }) {
+            return builder.foldConditionalOr(activeGuards + default)
+        }
+        if (retained.all { it.second == falsehood }) {
+            return builder.foldConditionalAnd(fallbackGuards.map { Lit.negate(it) } + default)
+        }
+        // Mutually exclusive source guards let the selected branch determine the result directly.
+        val literal = Lit.make(builder.newBool(), true)
+        val clauses = ArrayList<Clause>()
+        fun post(literals: List<Int>) {
+            conditionalClause(literals, truth)?.let { clauses.add(it) }
+        }
+        for ((guard, arm) in retained) {
+            post(listOf(Lit.negate(guard), Lit.negate(arm), literal))
+            post(listOf(Lit.negate(guard), Lit.negate(literal), arm))
+        }
+        post(activeGuards + listOf(Lit.negate(literal), default))
+        post(fallbackGuards + listOf(literal, Lit.negate(default)))
+        for (arm in impliedArms) post(listOf(Lit.negate(arm), literal))
+        builder.factors.addAll(clauses)
+        definePredicate(Lit.variable(literal), clauses)
+        return literal
     }
 
     private fun imageTruth(variable: Int, value: Long, operator: LinearOp): Boolean? {
@@ -432,6 +453,16 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         const val IMAGE_LIMIT = 1_024
         const val PAIR_IMAGE_LIMIT = 64
     }
+}
+
+private fun conditionalClause(literals: List<Int>, truth: Int): Clause? {
+    val falsehood = Lit.negate(truth)
+    val terms = LinkedHashSet<Int>()
+    for (literal in literals) {
+        if (literal == truth || Lit.negate(literal) in terms) return null
+        if (literal != falsehood) terms.add(literal)
+    }
+    return Clause(if (terms.isEmpty()) intArrayOf(falsehood) else terms.toIntArray())
 }
 
 private fun Compiler.Builder.foldConditionalAnd(literals: List<Int>): Int {

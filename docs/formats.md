@@ -79,6 +79,9 @@ branch guards. Strict thresholds outside a signed word retain exact arithmetic.
 Non-strict order comparisons between conditional results can expand one operand's
 constant image when it has at most 64 values, comparing the other operand with each
 selected value. Open branch values retain their primitive arithmetic comparisons.
+Expanded comparisons use guarded clauses for the mutually exclusive branch tests,
+with the default selected when none holds. Constant branch truth values fold directly
+into conjunctions or disjunctions of the guards; intermediate per-branch gates are omitted.
 Image summaries finish iteratively after all assertion and objective chains close.
 Pair comparisons wait for those summaries; unavailable or oversized images retain
 their arithmetic encoding.

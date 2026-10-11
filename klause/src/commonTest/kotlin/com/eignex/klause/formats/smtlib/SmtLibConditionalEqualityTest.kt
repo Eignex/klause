@@ -23,6 +23,63 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `a conditional comparison propagates every selected branch and its default`() {
+        val assignments = listOf(false to false, false to true, true to false, true to true)
+        for (selector in 0..2) {
+            for ((p, q) in assignments) {
+                val pAssertion = if (p) "p" else "(not p)"
+                val qAssertion = if (q) "q" else "(not q)"
+                val firstGuard = if (selector == 0) "(= s 0)" else "(not (= s 0))"
+                val secondGuard = if (selector == 1) "(= s 1)" else "(not (= s 1))"
+                val parsed = SmtLib.parse(
+                    """
+                    (declare-const s Int) (declare-const x Int) (declare-const y Int)
+                    (declare-const p Bool) (declare-const q Bool) (declare-const r Bool)
+                    (assert (>= s 0)) (assert (<= s 2))
+                    (assert (= p (<= x 4))) (assert (= q (<= y 4)))
+                    (assert (= r (<= (ite (= s 0) x (ite (= s 1) y 9)) 4)))
+                    (assert $pAssertion) (assert $qAssertion)
+                    (assert $firstGuard) (assert $secondGuard)
+                    """.trimIndent(),
+                )
+                val session = SearchSession(
+                    listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                    atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+                )
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertIs<SearchResult.Satisfied>(
+                    session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
+                )
+
+                val expected = when (selector) {
+                    0 -> p
+                    1 -> q
+                    else -> false
+                }
+                assertEquals(expected, session.boolValue(parsed.boolVarNames.getValue("r")))
+            }
+        }
+    }
+
+    @Test
+    fun `a repeated selector guard preserves the outer branch priority`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const s Int)
+            (assert (>= s 0)) (assert (<= s 1))
+            (assert (not (<= (ite (= s 0) 1 (ite (= s 0) 9 3)) 4)))
+            """.trimIndent(),
+        )
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        assertIs<ComponentResult.Conflict>(session.initialize())
+    }
+
+    @Test
     fun `a parent comparison uses the constant image of a child chain closed after it`() {
         val parsed = SmtLib.parse(
             """
