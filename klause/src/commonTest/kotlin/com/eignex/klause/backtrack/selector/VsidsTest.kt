@@ -22,6 +22,34 @@ import kotlin.test.assertNull
 class VsidsTest {
 
     @Test
+    fun `finite search prioritizes a conflict implication after its backjump`() {
+        for (nativeSat in listOf(false, true)) {
+            val base = Vsids()
+            val picks = ArrayList<VarRef>()
+            val selector = object : VariableSelector by base {
+                override fun fresh(): VariableSelector = this
+
+                override fun pick(session: PropagationSession, rng: Random): VarRef? =
+                    base.pick(session, rng)?.also(picks::add)
+            }
+            val problem = Problem(
+                5, 0, emptyArray(), arrayOf(
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true))),
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(4, true))),
+                    Clause(intArrayOf(Lit.make(3, false), Lit.make(4, false), Lit.make(1, false))),
+                ),
+            )
+
+            val result = BacktrackSolver(problem.bake()).solve(
+                BacktrackParams(variableSelector = selector, valueSelector = IndomainMax, nativeSat = nativeSat),
+            )
+
+            assertIs<SolveResult.Sat>(result)
+            assertEquals(listOf(VarRef.Bool(0), VarRef.Bool(1), VarRef.Bool(4)), picks.take(3))
+        }
+    }
+
+    @Test
     fun `vsids prefers highest-activity variable after onConflict bumps`() {
         val problem = Problem(
             numBoolVars = 5,

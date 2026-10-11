@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -22,8 +23,35 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
+
+    @Test
+    fun `successful search propagation informs the finite selector`() {
+        for (nativeSat in listOf(false, true)) {
+            val deductions = ArrayList<PropagationResult.Implied>()
+            val base = com.eignex.klause.backtrack.selector.InputOrder
+            val selector = object : VariableSelector by base {
+                override fun fresh(): VariableSelector = this
+                override fun onPropagation(implied: PropagationResult.Implied) {
+                    deductions += implied
+                }
+            }
+            val problem = Problem(
+                2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+            )
+
+            val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(
+                variableSelector = selector, valueSelector = com.eignex.klause.backtrack.selector.IndomainMax,
+                nativeSat = nativeSat,
+            ))
+
+            assertIs<SolveResult.Sat>(result)
+            assertTrue(deductions.any { it.boolValueOrNull(1) == true })
+            assertEquals(1.0, result.stats.search.propagations.sum)
+        }
+    }
 
     @Test
     fun `learned conflicts retain the participating assumption core`() {

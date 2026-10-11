@@ -45,6 +45,22 @@ class ResumableSatisfactionTest {
     }
 
     @Test
+    fun `resuming preserves native learning and deduction counters`() {
+        val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+        val params = BacktrackParams(randomSeed = 1L)
+        val complete = solver.solve(params)
+
+        val resumed = solver.resumableSolve(params).use { runToVerdict(it, 1L) }
+
+        assertIs<SolveResult.Unsat>(complete)
+        assertIs<SolveResult.Unsat>(resumed)
+        assertTrue(complete.stats.search.learnedClauses.sum > 0.0)
+        assertTrue(complete.stats.search.propagations.sum > 0.0)
+        assertEquals(complete.stats.search.learnedClauses.sum, resumed.stats.search.learnedClauses.sum)
+        assertEquals(complete.stats.search.propagations.sum, resumed.stats.search.propagations.sum)
+    }
+
+    @Test
     fun `a work-budgeted slice pauses before the search finishes`() {
         val search = handle(pigeonhole(6, 5))
 

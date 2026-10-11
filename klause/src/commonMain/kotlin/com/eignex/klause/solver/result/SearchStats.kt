@@ -20,7 +20,7 @@ data class SearchStats(
     val fails: SumResult = ZERO_COUNT,
     /** Restarts performed (shared field — the LS engine folds its own restart count in here). */
     val restarts: SumResult = ZERO_COUNT,
-    /** Propagation events. */
+    /** Finite deductions reported by successful search fixpoints, excluding decision and root pins. */
     val propagations: SumResult = ZERO_COUNT,
     /** Clauses learned by conflict analysis. */
     val learnedClauses: SumResult = ZERO_COUNT,
