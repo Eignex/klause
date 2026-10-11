@@ -174,6 +174,7 @@ data class PortfolioScenario(
  * engine-specific switch: the two engines stay symmetric ("arms in one spot").
  */
 internal sealed interface WorkerConfig {
+    fun withNodeBudget(budget: NodeBudget): WorkerConfig
     fun withLsResiduals(): WorkerConfig = this
     fun withLsPhaseTimes(): WorkerConfig = this
 

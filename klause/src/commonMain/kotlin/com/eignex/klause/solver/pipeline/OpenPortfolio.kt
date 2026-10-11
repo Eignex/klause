@@ -287,6 +287,7 @@ internal class OpenPortfolio(
         // that finds no point in its slice of the budget leaves the arms to their own random starts.
         val start = model.lpSeed(searchModel.domains, cancellation or Cancellation.after(SEED_BUDGET))
         val profile = ProblemProfile.of(model, optimizing = objective != null)
+        val quotas = if (lanes > 1) theoryParams.nodeBudget?.quotas(localSearchArms) else null
         return LocalSearchCatalog.diverse(profile.kind, localSearchArms, profile.problemClass).mapIndexed { i, recipe ->
             val engine = LocalSearchEngine(
                 searchModel,
@@ -300,7 +301,7 @@ internal class OpenPortfolio(
                 maxInstructions = budget,
                 cancellation = slice,
                 initialAssignment = from,
-                nodeBudget = theoryParams.nodeBudget,
+                nodeBudget = quotas?.get(i) ?: theoryParams.nodeBudget,
             )
             val label = "ls/${recipe.label}"
             if (objective == null) {

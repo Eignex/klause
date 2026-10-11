@@ -44,9 +44,8 @@ interface SolverParams {
         return this
     }
 
-    /** Inject a cooperative cancellation token. Backends that support cancellation
-     *  override to return a copy with the token wired in; others (Brute)
-     *  default to no-op. */
+    /** Add a cooperative cancellation token to the parameters' lifetime scope. Backends that
+     *  support cancellation compose it with their existing token; others default to no-op. */
     fun withCancellation(@Suppress("UNUSED_PARAMETER") cancellation: Cancellation): SolverParams = this
 }
 

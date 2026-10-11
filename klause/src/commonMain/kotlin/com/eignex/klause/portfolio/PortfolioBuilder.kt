@@ -63,7 +63,11 @@ object PortfolioBuilder {
         // each lane's index as its per-worker seed offset, exactly as diverse() wraps past the pool onto
         // fresh seeds, so a replica of a config gets a distinct seed.
         val laneCount = maxOf(composed.size, scenario.cores)
-        val lanes = List(laneCount) { composed[it % composed.size] }
+        val quotas = if (scenario.cores > 1) scenario.nodeBudget?.quotas(laneCount) else null
+        val lanes = List(laneCount) { index ->
+            val config = composed[index % composed.size]
+            quotas?.let { config.withNodeBudget(it[index]) } ?: config
+        }
         // Lane i is a replica of composed arm i % composed.size, so that is its stable arm identity:
         // replicas of one config share an armId, distinct composed arms get distinct ones.
         val armIds = List(laneCount) { it % composed.size }

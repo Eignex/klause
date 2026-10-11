@@ -11,7 +11,8 @@ import kotlin.time.TimeSource
  * A work budget makes the pause point a property of the search rather than of machine load, which is what
  * lets two identical invocations report identical counters. A unit is one search node, and LP work is charged
  * against the same budget at [LP_WORK_PER_NODE] per node. Propagation dispatches and visits are charged at
- * [PROPAGATION_WORK_PER_NODE] per node. [nodeCount] is the search's own work in nodes, inprocessing included; see [searchWork].
+ * [PROPAGATION_WORK_PER_NODE] per node. [nodeCount] is the search's own work in nodes, inprocessing included;
+ * see [searchWork].
  */
 internal class SliceBudget(
     private val nodeCount: () -> Long,
@@ -29,9 +30,11 @@ internal class SliceBudget(
     var workBounded: Boolean = false
         private set
 
-    // Node count at which the slice pauses. A flag and not the sign of the end marks a work bound: LP charges can
-    // push the end below zero, and a negative end must still read as a spent budget.
-    private var nodeEnd = 0L
+    // Relative counters avoid overflowing an absolute node end for a large offered allowance.
+    private var nodeStart = 0L
+    private var nodeAllowance = 0L
+    private var auxiliaryNodes = 0L
+    private var settledOverspend = 0L
 
     // LP work already turned into slice nodes. It runs across slices, so work done between two slices, the root LP
     // included, is charged to the next one.
@@ -49,47 +52,54 @@ internal class SliceBudget(
     fun begin(sliceMillis: Long, sliceNodes: Long): Boolean {
         deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         workBounded = sliceNodes >= 0L
-        nodeEnd = nodeCount() + sliceNodes.coerceAtLeast(0L)
+        nodeStart = nodeCount()
+        nodeAllowance = sliceNodes.coerceAtLeast(0L)
+        auxiliaryNodes = 0L
+        settledOverspend = 0L
         if (!ownsWorkDebt) {
             lpWorkMark = lpWork()
             propagationWorkMark = propagationWork()
         }
         charge()
         if (!workBounded) return true
-        if (!ownsWorkDebt) return nodeEnd > nodeCount()
+        if (!ownsWorkDebt) return remainingNodes() > 0L
         val repaid = minOf(nodeDebt, sliceNodes)
         nodeDebt -= repaid
-        nodeEnd -= repaid
-        if (nodeEnd > nodeCount()) return true
-        nodeDebt += nodeCount() - nodeEnd
+        nodeAllowance -= repaid
+        if (remainingNodes() > 0L) return true
+        noteOverspend()
         return false
     }
 
     fun remainingNodes(): Long {
         charge()
-        return if (workBounded) (nodeEnd - nodeCount()).coerceAtLeast(0L) else -1L
+        return if (workBounded) (nodeAllowance - sliceSpent()).coerceAtLeast(0L) else -1L
     }
 
     /** Work spent so far: nodes plus LP and propagation work, charged or not. */
-    fun spent(): Long = nodeCount() + lpWork() / LP_WORK_PER_NODE + propagationWork() / PROPAGATION_WORK_PER_NODE
+    fun spent(): Long = addWork(
+        addWork(nodeCount(), lpWork() / LP_WORK_PER_NODE), propagationWork() / PROPAGATION_WORK_PER_NODE,
+    )
 
     /** Whether the armed slice has spent its allowance. */
     fun expired(): Boolean = workExpired() || deadline?.hasPassedNow() == true
 
-    fun workExpired(): Boolean = workBounded && nodeCount() >= nodeEnd
+    fun workExpired(): Boolean = workBounded && sliceSpent() >= nodeAllowance
+
+    private fun sliceSpent(): Long = addWork((nodeCount() - nodeStart).coerceAtLeast(0L), auxiliaryNodes)
 
     /**
      * Spend the LP and propagation work done since the last charge from the slice's budget. The charge lands at a
-     * node boundary and only moves the slice end, so the slice pauses at its next poll as if it had explored that many
-     * nodes; it stays a function of the search, and runs remain reproducible.
+     * node boundary and increases the completed work, so the slice pauses at its next poll as if it had explored
+     * that many nodes; it stays a function of the search, and runs remain reproducible.
      */
     fun charge() {
         if (!workBounded) return
         val nodes = (lpWork() - lpWorkMark) / LP_WORK_PER_NODE
-        nodeEnd -= nodes
+        auxiliaryNodes = addWork(auxiliaryNodes, nodes)
         lpWorkMark += nodes * LP_WORK_PER_NODE
         val propagationNodes = (propagationWork() - propagationWorkMark) / PROPAGATION_WORK_PER_NODE
-        nodeEnd -= propagationNodes
+        auxiliaryNodes = addWork(auxiliaryNodes, propagationNodes)
         propagationWorkMark += propagationNodes * PROPAGATION_WORK_PER_NODE
     }
 
@@ -97,9 +107,16 @@ internal class SliceBudget(
     fun noteOverspend() {
         if (!workBounded) return
         charge()
-        if (ownsWorkDebt) nodeDebt += (nodeCount() - nodeEnd).coerceAtLeast(0L)
+        if (ownsWorkDebt) {
+            val overspend = (sliceSpent() - nodeAllowance).coerceAtLeast(0L)
+            nodeDebt = addWork(nodeDebt, (overspend - settledOverspend).coerceAtLeast(0L))
+            settledOverspend = overspend
+        }
     }
 }
+
+private fun addWork(left: Long, right: Long): Long =
+    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right
 
 // LP work (simplex plus the node-LP overhead the engine charges) that costs about as much time as one CP search
 // node: the median ratio of LP work per second with the default LP arm to conflictDriven's nodes per second, over

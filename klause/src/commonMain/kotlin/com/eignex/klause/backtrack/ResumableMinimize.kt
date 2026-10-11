@@ -363,7 +363,7 @@ internal class ResumableMinimize(
     ): MinimizeResult? {
         done?.let { return it }
         check(!closed) { "search is closed" }
-        globalToken = global
+        globalToken = baseCancellation or global
         publishClausePrimalCandidate()?.let(onIncumbent)
         if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         // A counted budget only means something if the search polls on a counted cadence: the run stops
@@ -1132,7 +1132,10 @@ internal class ResumableMinimize(
     private inner class OptimizationTraversalPolicy :
         SearchTraversalPolicy,
         SearchRunLifecycle {
-        override val solveParams = SearchSolveParams(maxDecisions = Long.MAX_VALUE, restart = restart)
+        override val solveParams: SearchSolveParams
+            get() = SearchSolveParams(
+                maxDecisions = params.nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE, restart = restart,
+            )
         override val booleanBranching = BooleanBranching.None
 
         // Two allowances, and a decision is charged against both. [decisionLimit] bounds one slice and is

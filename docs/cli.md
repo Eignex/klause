@@ -150,6 +150,10 @@ Solver-control flags are common to **every** mode:
     inputs. The categories partition the total. These diagnostics do not claim a
     feasible witness; collecting them adds scans at strict improvements and should
     be separated from acceptance timing.
+  - resource work: `node-limit=auto|unlimited|N` and `presolve-work-limit=auto|unlimited|N`.
+    `N` is nonnegative; zero is exhausted. Presolve automatic derives work from its phase
+    time policy. Unlimited work keeps the separate phase clock. See
+    [resource allowances](solver/resources.md) for units and parallel quota behavior.
   - presolve effort (any engine): `presolve-abort-fraction` (finite number in `[0,1]`, default `0.001`),
     `presolve-max-rounds` (nonnegative, default `1` for conservative, `16` for default/aggressive),
     `presolve-probe-per-var` and `presolve-probe-total` (nonnegative propagation-call caps;
@@ -169,8 +173,9 @@ An open theory is selected by the model route and uses the shared complete theor
 independently of `-e`. SMT-LIB and source-exact MPS fragments/objectives that lack a complete
 theory route can use open local search for witnesses; its engine policy is described by
 [input semantics](formats.md#finite-and-open-models).
-`--param node-limit=N` is a deterministic solve-wide budget: it counts
-finite decision nodes on a finite route and open-theory decisions, checks, LIA row visits, and the
+`--param node-limit=N` is a solve-wide work budget. Finite routes charge decision nodes
+and counted local-search instructions at five quarters per instruction; parallel finite
+portfolios assign persistent worker quotas. Complete open routes charge native open-theory decisions, checks, LIA row visits, and the
 candidate hint's local-search moves on an open route. `--param open-hint-flips=N` spends up to N
 local-search flips, once per request, on an unverified first-branch order over the model's shared
 clauses; it is off unless asked for, changes only which side of a Boolean split is tried first, and

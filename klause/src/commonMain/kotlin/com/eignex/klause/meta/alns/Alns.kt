@@ -480,11 +480,11 @@ internal class Alns(
             check(!closed) { "the ALNS handle is closed" }
             require(sliceInstructions >= 0L) { "slice instructions must be non-negative" }
             val token = if (sliceMillis == Long.MAX_VALUE) {
-                global
+                params.cancellation or global
             } else {
-                global or Cancellation.after(sliceMillis.milliseconds)
+                params.cancellation or global or Cancellation.after(sliceMillis.milliseconds)
             }
-            if (sliceInstructions == 0L) return null
+            if (sliceInstructions == 0L || token()) return null
             // Finite LNS segments are charged their offered scheduling allowance, independently of inner work.
             if (sliceInstructions != Long.MAX_VALUE) charge(sliceInstructions)
             val before = telemetry.bootstrapLsMoves + telemetry.outerAllowance
@@ -537,7 +537,11 @@ internal class Alns(
                         .copy(maxDecisions = BOOTSTRAP_DECISIONS, cancellation = cpToken)
                     if (!cpAttempted) {
                         cpAttempted = true
-                        cpBootstrap = (engine as? ResumableOptimizer<BacktrackParams>)?.resumable(objective, bp)
+                        cpBootstrap = (engine as? ResumableOptimizer<BacktrackParams>)?.resumable(
+                            objective,
+                            bp.copy(cancellation = params.cancellation or
+                                (backtrackParams?.cancellation ?: Cancellation.Never)),
+                        )
                     }
                     val handle = cpBootstrap
                     val result = if (handle != null) {
@@ -561,8 +565,8 @@ internal class Alns(
                 val lp = params.copy(cancellation = lsToken)
                 if (!lsAttempted) {
                     lsAttempted = true
-                    lsBootstrap = session?.resumable(objective, lp)
-                        ?: (inner as? ResumableOptimizer<LocalSearchParams>)?.resumable(objective, lp)
+                    lsBootstrap = session?.resumable(objective, params)
+                        ?: (inner as? ResumableOptimizer<LocalSearchParams>)?.resumable(objective, params)
                 }
                 val handle = lsBootstrap
                 val result = when (handle) {

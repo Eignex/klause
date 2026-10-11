@@ -107,4 +107,19 @@ class ResumableSatisfactionTest {
         assertEquals(3L, budget.spent)
         assertEquals(3.0, result.stats.search.nodes.sum)
     }
+    @Test
+    fun `a resumed handle retains its opening cancellation scope`() {
+        var cancelled = false
+        val search = BacktrackSolver(pigeonhole(6, 5).bake()).resumableSolve(
+            BacktrackParams(cancellation = Cancellation { cancelled }),
+        )
+        assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+        cancelled = true
+
+        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+
+        assertIs<SolveResult.Unknown>(result)
+        assertTrue(search.isDone)
+    }
+
 }

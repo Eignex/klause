@@ -101,10 +101,9 @@ internal interface ReseedGuard {
  * [com.eignex.klause.backtrack.BacktrackSolver] and [com.eignex.klause.localsearch.LocalSearchSolver].
  */
 interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
-    /** Open a fresh [ResumableSearch] minimising [objective] under [params]. The returned handle owns
-     *  its own slice cancellation; any cancellation token already on [params] (see
-     *  [SolverParams.withCancellation]) is superseded per slice by [ResumableSearch.runSlice]'s `global`
-     *  token. The token on [params] bounds handle construction. */
+    /** Open a fresh [ResumableSearch] minimising [objective] under [params]. The token on [params]
+     *  bounds construction and the handle's lifetime. Each [ResumableSearch.runSlice] composes its
+     *  `global` token and slice allowance with that lifetime scope. */
     fun resumable(objective: LinearObjective, params: P): ResumableSearch
 }
 

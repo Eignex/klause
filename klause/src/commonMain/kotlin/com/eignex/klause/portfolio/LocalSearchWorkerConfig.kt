@@ -30,6 +30,9 @@ internal class LocalSearchWorkerConfig(
 ) :
     WorkerConfig {
 
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
+        LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes)
+
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
