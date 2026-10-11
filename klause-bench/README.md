@@ -143,6 +143,10 @@ outputs, including `cases/<index>/record.json` for the offline source verifier.
 `job.log`, `setup.log` or `cases/<index>/record.json`, over HTTP: reading a job needs no SSH.
 `lab ssh <id> [instance] [command]` reaches a running AWS job's instance. Measure as a lab
 experiment rather than directly on the lab Mac, where a run competes with the lab's cases.
+A measurement no experiment expresses, such as timing a component on captured inputs, runs as
+a script job: `lab script <file> <ref> <description>` runs the file once in a build of `<ref>`,
+on AWS by default, and keeps its output and whatever it writes to `$OUT` with the job. Script
+jobs are not for tests, lint or other gates; CI runs those.
 
 Cases disable result caching, alternate configurations across seeds/repetitions,
 and retain installed-build provenance when supported by the selected revision.
