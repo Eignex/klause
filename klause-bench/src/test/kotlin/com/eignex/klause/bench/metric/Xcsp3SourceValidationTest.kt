@@ -3,6 +3,8 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.encodeToString
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -30,13 +32,23 @@ class Xcsp3SourceValidationTest {
     }
 
     @Test
-    fun `a checker success requires its complete structured result and successful exit`() {
+    fun `a successful checker returns its complete structured result`() {
         val valid = Xcsp3SourceChecker.result("valid", "checked", "v <instantiation/>")
         val log = "OK\t10\n" + Xcsp3SourceValidation.RESULT_PREFIX + Reports.json.encodeToString(valid)
 
         assertEquals(valid, Xcsp3SourceValidation.checkerResult(0, log))
-        for ((exit, output) in listOf(1 to log, 0 to "OK\t10", 0 to "klause-source-check: {")) {
-            assertEquals("unknown", Xcsp3SourceValidation.checkerResult(exit, output).status)
+    }
+
+    @ParameterizedTest
+    @CsvSource("1,structured", "0,missing", "0,malformed")
+    fun `failed incomplete and malformed checker output remains unchecked`(exit: Int, form: String) {
+        val output = when (form) {
+            "structured" -> Xcsp3SourceValidation.RESULT_PREFIX +
+                Reports.json.encodeToString(Xcsp3SourceChecker.result("valid", "checked", "v <instantiation/>"))
+            "missing" -> "OK\t10"
+            else -> "klause-source-check: {"
         }
+
+        assertEquals("unknown", Xcsp3SourceValidation.checkerResult(exit, output).status)
     }
 }
