@@ -185,8 +185,7 @@ class OpbTest {
 
     @Test
     fun `rejects wide values where the target cannot be wide`() {
-        // Objective coefficients and WBO soft costs are Long; a wide one is still a clean range error, and a
-        // wide coefficient inside a soft constraint is unsupported rather than silently mis-parsed.
+        // Normalized objective coefficients and WBO soft costs must fit Long; wide soft rows are unsupported.
         assertTrue("64-bit range" in parseError("min: 99999999999999999999 x1 ;\n+1 x1 >= 0 ;\n"))
         assertTrue("64-bit range" in parseError("[99999999999999999999] +1 x1 >= 1 ;"))
         assertTrue("soft constraint" in parseError("soft: 5 ;\n[1] +18446744073709551616 x1 >= 1 ;"))
