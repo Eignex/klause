@@ -400,3 +400,28 @@ aggregation selects one whole observation at the lowest total; it never adds bre
 from different assignments. A zero residual does not establish domain, completion or
 source feasibility, and the observation does not replace an incumbent. Disabled
 reporting allocates no recorder and performs no factor scans.
+
+Residual factor details retain up to sixteen ordered ComparisonClause literals or
+linear terms, their omission count, comparison and bound. Integer Linear and
+ReifiedLinear activities come from the committed grader payload; unsupported
+constant or grader shapes are tagged explicitly. Captured coordinates also identify
+their maintained definition kind and up to sixteen direct input references with an
+omission count, without traversing dependency cones. These references are lowered
+model coordinates, not source identities. The existing `ls-residuals` opt-in emits
+these additive CLI details; disabled reporting leaves them absent.
+
+Detail keys use `literal.<position>=i<id>:<op>:<constant>` and
+`term.<position>=<signed-coefficient>:i<id>` in lowered factor order, with
+`omittedLiterals` or `omittedTerms`. Row `op` and `bound` retain canonical signs.
+`activity=unsupported-grader` marks exact or other graders without an authoritative
+Long sum; `row=unsupported-constants` marks wider or real constant shapes without
+substituting rounded constants. Each captured `i<id>` or `b<id>` has
+`<coordinate>.definition.kind`; `none` means the active network has no maintained
+definition, and does not imply writability. Maintained definitions add
+`.definition.inputs` (integer references followed by Boolean references, `-` when
+empty) and `.definition.omittedInputs`. Inputs are direct declared read sets, not
+recursive cones or an assertion that every input affects the current output.
+CLI pairs use `lsBestResidualFactorDetails.<factor-id>.<key>`; existing coordinate
+pairs retain their format. Captures own detached metadata and never grade or mutate
+the assignment. Coordinate-only construction and the legacy constructor/copy
+compatibility descriptors remain available; copies retain captured details.

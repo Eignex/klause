@@ -33,4 +33,32 @@ data class LocalSearchResidualFactor(
     val omittedBools: Int = 0,
     /** Number of distinct integer coordinates omitted from [ints]. */
     val omittedInts: Int = 0,
-)
+    /**
+     * Bounded comparison, row and maintained-definition metadata from the observed assignment.
+     * Coordinate references use lowered model ids, not source identities. Empty when not captured.
+     */
+    val details: Map<String, String>,
+) {
+    /** Construct a coordinate observation without semantic details. */
+    constructor(
+        id: Int,
+        kind: String,
+        degree: Long,
+        bools: Map<Int, Boolean>,
+        ints: Map<Int, Long>,
+        omittedBools: Int = 0,
+        omittedInts: Int = 0,
+    ) : this(id, kind, degree, bools, ints, omittedBools, omittedInts, emptyMap())
+
+    /** Copy coordinates while retaining [details], including through the legacy JVM copy descriptor. */
+    fun copy(
+        id: Int = this.id,
+        kind: String = this.kind,
+        degree: Long = this.degree,
+        bools: Map<Int, Boolean> = this.bools,
+        ints: Map<Int, Long> = this.ints,
+        omittedBools: Int = this.omittedBools,
+        omittedInts: Int = this.omittedInts,
+    ): LocalSearchResidualFactor =
+        LocalSearchResidualFactor(id, kind, degree, bools, ints, omittedBools, omittedInts, details)
+}
