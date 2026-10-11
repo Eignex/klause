@@ -194,11 +194,13 @@ def check(case, source_root):
                 cost = None
         if cost is not None:
             assert cost == integer_objective(r), 'source objective mismatch'
+        else:
+            assert r.get('exactObjective') is None and r.get('objective') is None, 'source has no objective'
         result['witness'] = 'source feasible'
         result['objective'] = cost
         if not r.get('proven'):
             return result
-        if not is_opb and (not weighted):
+        if cost is None:
             result['proof'] = 'source satisfaction'
             return result
     else:

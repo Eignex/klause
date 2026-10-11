@@ -65,8 +65,9 @@ it does not establish an nnz-based or online node-cost scaling rule.
 MiniZinc and XCSP3 final witnesses were checked against original source constraints
 and objectives using the recorded independent checker policies. Boolean witnesses
 were checked with exact source arithmetic, and MPS points with original rational
-rows, bounds, integrality and objectives. The comparison accepted 229 final witnesses and independently checked all 72
-completed native proof claims: source refutations or strictly better objective exclusion.
+rows, bounds, integrality and objectives. The comparison accepted 229 final
+witnesses and independently checked all 72 completed native proof claims: source
+refutations or strictly better objective exclusion.
 Witness acceptance and proof credit remain separate. Preparation statistics and
 LS violation reductions on IHTC do not earn witness credit; only its accepted
 source assignments do.
@@ -84,7 +85,7 @@ installed one-processor build fingerprint is
 `bc6493388cbee0429550eb7409002b29e86d0a19810db600fb8bb4209786069f`.
 The [review evidence](https://github.com/Eignex/klause-lab/releases/tag/active-evidence-resource-scopes-slice-policy)
 contains membership, specifications, raw records, build hashes, source checks and
-static analysis. The manifest SHA-256 is `f1be655ec5391d5f60cbaaeb34bfa9993136edfcbcd11f99adb32ad0881ca935`.
+static analysis. The manifest SHA-256 is `f5f9a48fccd58b6e5bb26068de2b5572e1d25481a6ddd82f8b3c1c069e7f576c`.
 Source inputs, installed binary bytes, profiles and original subprocess stdout
 are outside that snapshot; records retain final witnesses and available output
 hashes. The evidence establishes this selection and runtime only.
