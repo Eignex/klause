@@ -495,7 +495,9 @@ class LocalSearchStateTest {
 
             when (protection) {
                 "root-cell" -> state.moveSink.addChannelingCompound(state, listOf(Move.IntSet(0, 1), Move.IntSet(3, 0)))
-                "result-change" -> state.moveSink.addChannelingCompound(state, listOf(Move.IntSet(0, 1), Move.IntSet(1, 2)))
+                "result-change" -> state.moveSink.addChannelingCompound(
+                    state, listOf(Move.IntSet(0, 1), Move.IntSet(1, 2)),
+                )
                 "index" -> state.moveSink.addChannelingIntSet(state, 0, 2)
                 else -> state.moveSink.addChannelingIntSet(state, 0, 1)
             }
