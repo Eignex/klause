@@ -91,9 +91,12 @@ Boolean guards select active edges. With `n` graph vertices, scaling bounds by
 including zero-weight strict cycles. Feasible graphs supply rational potentials;
 witnesses still pass the complete source-row check. Infeasible graphs retain the
 shared LP route for conflict explanations and learning. Active source rows remain
-asserted in the shared LP scope even when a graph witness skips its solve. The
-root relaxation uses the shared LP solve to initialize its basis; graph shortcuts
-apply below the root. Fractional normalized bounds, unsafe Long magnitudes, disequalities,
+asserted in the shared LP scope. Floating LP solves maintain the basis on every
+checked state; their numerical output supplies no verdict. Graph feasibility
+replaces exact LP point certification below the root. The root relaxation and
+inconclusive floating updates retain the full shared LP solve. Graph admission
+is capped at 10,000 real variables and 100,000 edges. Larger models,
+fractional normalized bounds, unsafe Long magnitudes, disequalities,
 private disjunctions, Boolean arithmetic beyond shared clauses/cardinalities,
 and mixed integer/real models retain the exact LP route.
 Overridden LP certification policies retain the LP route because graph evidence

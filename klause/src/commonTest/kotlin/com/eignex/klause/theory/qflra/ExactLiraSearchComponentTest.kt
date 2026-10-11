@@ -53,6 +53,35 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `a guarded strict witness satisfies its source interval`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+
+            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            assertEquals(false, witness.bools.single())
+            assertTrue(witness.reals.single() > BigFraction.ZERO)
+            assertTrue(witness.reals.single() < BigFraction.ONE)
+        }
+    }
+
+    @Test
     fun `guarded real conflicts survive a feasible sibling`() {
         val model = Problem(
             numBoolVars = 2,
