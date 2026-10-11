@@ -103,4 +103,26 @@ class PreparingMinimizeTest {
             assertTrue(search.isDone)
         }
     }
+
+    @Test
+    fun `cancellation at installation handoff leaves search for a later slice`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        PreparingMinimize(BacktrackSolver(fixture.problem), fixture.objective, fixture.params).use { search ->
+            val samples = mutableListOf<MinimizeResult.WithSample>()
+            val token = Cancellation { !search.preparationPending }
+
+            val paused = search.runSlice(token, Long.MAX_VALUE, -1L, samples::add)
+
+            assertNull(paused)
+            assertFalse(search.preparationPending)
+            assertEquals(0.0, search.stats.search.nodes.sum)
+            assertEquals(0.0, search.stats.lp.solves.sum)
+            assertTrue(samples.isEmpty())
+            val result = assertIs<MinimizeResult.Optimal>(
+                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, samples::add),
+            )
+            assertEquals(-4.0, result.objective)
+        }
+    }
+
 }

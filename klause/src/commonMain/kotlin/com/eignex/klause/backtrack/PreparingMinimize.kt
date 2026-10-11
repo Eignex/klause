@@ -80,6 +80,7 @@ internal class PreparingMinimize(
                     retainedWork = preparing.work
                     retainedPropagationNanos = preparing.propagationNanos
                     preparation = null
+                    if (globalToken() || budget.expired()) return null
                     val millis = budget.deadline?.let {
                         (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
                     } ?: sliceMillis

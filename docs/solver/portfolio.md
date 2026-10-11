@@ -90,7 +90,9 @@ propagation, assumptions, LP planning and shared-search installation. Long const
 scans checkpoint every 256 entries or visits, including scans inside a wide factor's
 index lists. Runtime array allocation, one domain materialization, factor invocation,
 and payload snapshot remain atomic operations; the batch bound is
-not a hard elapsed-time guarantee. The packed native-SAT optimization path and public
+not a hard elapsed-time guarantee. A handoff that reaches cancellation or its segment
+deadline returns before entering search; the next segment starts traversal. The packed
+native-SAT optimization path and public
 satisfaction/repair constructors retain their eager lifecycle.
 
 A paused cursor cannot publish an assignment or an incomplete fixpoint as a refutation.
