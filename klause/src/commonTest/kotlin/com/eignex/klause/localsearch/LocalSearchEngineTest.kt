@@ -411,7 +411,8 @@ class LocalSearchEngineTest {
                 val policy = if (!custom) randomPolicy else object : RestartPolicy {
                     override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
                         randomPolicy.shouldRestart(stepsSinceLastRestart)
-                    override fun restart(state: LocalSearchState, bestSoFar: Sample?) = randomPolicy.restart(state, null)
+                    override fun restart(state: LocalSearchState, bestSoFar: Sample?) =
+                        randomPolicy.restart(state, null)
                     override fun reset() = randomPolicy.reset()
                 }
                 val trace = mutableListOf<Pair<Sample, Long>>()
