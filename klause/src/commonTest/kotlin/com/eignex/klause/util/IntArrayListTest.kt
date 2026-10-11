@@ -17,6 +17,16 @@ class IntArrayListTest {
     }
 
     @Test
+    fun `bulk append preserves the live prefix after truncation and growth`() {
+        val list = IntArrayList(initialCapacity = 2)
+        list.addAll(intArrayOf(1, 2, 3))
+        list.truncateTo(1)
+        list.addAll(intArrayOf())
+        list.addAll(intArrayOf(4, 5, 6, 7))
+        assertEquals(listOf(1, 4, 5, 6, 7), list.toIntArray().toList())
+    }
+
+    @Test
     fun `removeAt swap-removes the tail into the gap`() {
         val list = IntArrayList()
         for (v in intArrayOf(10, 20, 30, 40)) list.add(v)

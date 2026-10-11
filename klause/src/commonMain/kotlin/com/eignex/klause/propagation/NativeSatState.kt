@@ -151,8 +151,9 @@ internal class NativeSatState(private val state: PropagationState) {
 
     /** The clause's literals as a fresh array (the seed reason for conflict analysis). */
     private fun clauseLits(h: Int): IntArray {
-        val len = clauseLen(h)
-        return IntArray(len) { litOf(h, it) }
+        val lits = if (h < baseCount) arena.lits else learnedLits.backingData
+        val start = if (h < baseCount) arena.start(h) else learnedStarts[h - baseCount]
+        return lits.copyOfRange(start, start + clauseLen(h))
     }
 
     /** The clause's literals except index [skip] — the antecedent set recorded for a forced unit,
@@ -160,9 +161,11 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun antecedentsExcept(h: Int, skip: Int): IntArray? {
         val len = clauseLen(h)
         if (len <= 1) return null
+        val lits = if (h < baseCount) arena.lits else learnedLits.backingData
+        val start = if (h < baseCount) arena.start(h) else learnedStarts[h - baseCount]
         val out = IntArray(len - 1)
-        var w = 0
-        for (k in 0 until len) if (k != skip) out[w++] = litOf(h, k)
+        lits.copyInto(out, 0, start, start + skip)
+        lits.copyInto(out, skip, start + skip + 1, start + len)
         return out
     }
 
@@ -251,7 +254,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun appendLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int): Int {
         val i = learnedCount
         learnedStarts.add(learnedLits.size)
-        for (l in lits) learnedLits.add(l)
+        learnedLits.addAll(lits)
         learnedLbd.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
         learnedTier.add(ClauseTier.UNSET.ordinal)

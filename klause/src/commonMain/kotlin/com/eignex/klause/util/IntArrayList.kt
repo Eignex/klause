@@ -10,6 +10,13 @@ internal class IntArrayList(initialCapacity: Int = 8) {
         data[size++] = value
     }
 
+    fun addAll(values: IntArray) {
+        val newSize = size + values.size
+        if (newSize > data.size) data = data.copyOf(maxOf(data.size * 2, newSize))
+        values.copyInto(data, size)
+        size = newSize
+    }
+
     operator fun get(index: Int): Int = data[index]
 
     operator fun set(index: Int, value: Int) {
