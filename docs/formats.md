@@ -22,6 +22,20 @@ routing proof for MPS, SMT-LIB and exact FlatZinc, allowing a supported source t
 be measured through its open route. Unsupported syntax or a declined exact
 operation remains undecided.
 
+## FlatZinc Boolean channels
+
+FlatZinc retains `bool2int` channels and recognizes them independently of constraint
+order. Nonnegative weighted sums of channelled integers constrained to zero
+(`<= 0` or `= 0`) lower to Boolean conjunctions over the complemented input
+literals. Reified sums use the shared clause encoder; unreified sums pin those
+literals. Zero coefficients contribute no requirement. Negative bounds on these
+nonnegative sums encode false, leaving their input channels unrestricted in reified
+forms. Positive bounds and signed
+sums retain arithmetic propagation. Before emitting integer linear rows, lowering
+estimates the total clause expansion of eligible rows. If it exceeds 32,768
+clauses, all these rows retain arithmetic propagation. This model-wide limit
+bounds expansion without making constraint order select a partial encoding.
+
 ## FlatZinc floats
 
 FlatZinc first preserves finite float choices from constant-array selection and
@@ -91,6 +105,12 @@ not an unlimited completeness guarantee for every integer model.
 
 The MPS parser retains decimal source metadata, integer markers, bounds and
 objective sense. The lowered LP may restate continuous coefficients in binary64.
+An unconditional equality defining a free continuous column as an integral affine
+sum of bounded source integers gives that column a finite integer representation
+when the resulting rows and objective retain their source numbers. The proof uses
+exact source coefficients and bounds; fractional definitions and inexact integer
+lowerings remain continuous. Source column names, witness values and objective
+units are preserved.
 `sourceExact` records exact source correspondence; `toleranceDifference` identifies
 a lowering difference relevant to tolerance publication. Rounded or oversized
 pure-integer rows are rebuilt from source decimals; oversized objectives can use

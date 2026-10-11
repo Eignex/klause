@@ -45,7 +45,11 @@ internal object UniGen {
             ),
         )
         val count = estimate.estimate
-        if (count == 0L) return@sequence // UNSAT projection: no samples
+        if (count == 0L && estimate.exact) return@sequence
+        if (estimate.confidence == 0.0) {
+            yieldAll(cheapFallback())
+            return@sequence
+        }
 
         var seedCounter = config.seed ?: Random.Default.nextLong()
 
@@ -54,7 +58,7 @@ internal object UniGen {
         // truncation, so fall through to hashing rather than sample it.
         if (count <= hiThresh) {
             val all = cellCount(ctx, hashes = emptyList(), cap = hiThresh)
-            if (!all.capped) {
+            if (all.complete) {
                 if (all.representatives.isEmpty()) return@sequence
                 while (true) {
                     val rng = Random(seedCounter++)
@@ -91,7 +95,7 @@ internal object UniGen {
         val hi = (mStar + 1).coerceAtMost(n)
         for (m in lo..hi) {
             val cell = cellCount(ctx, allHashes.subList(0, m), cap = hiThresh)
-            if (!cell.capped && cell.count in loThresh..hiThresh) {
+            if (cell.complete && cell.count in loThresh..hiThresh) {
                 return cell.representatives[rng.nextInt(cell.representatives.size)]
             }
         }

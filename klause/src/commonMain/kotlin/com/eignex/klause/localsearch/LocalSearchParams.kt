@@ -41,7 +41,7 @@ data class LocalSearchParams(
     /** Variables to pin for the duration of this call. The solver initialises them to
      *  the requested values on every restart and ignores any move that would change
      *  them. Defaults to none. */
-    val assumptions: Assumptions = Assumptions.None,
+    override val assumptions: Assumptions = Assumptions.None,
     /** Cooperative cancellation predicate; see [Cancellation]. */
     val cancellation: Cancellation = Cancellation.Never,
     /**

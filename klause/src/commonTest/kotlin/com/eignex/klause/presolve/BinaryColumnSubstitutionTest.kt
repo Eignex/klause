@@ -1,7 +1,10 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
@@ -16,6 +19,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -34,6 +38,147 @@ class BinaryColumnSubstitutionTest {
         assertEquals(1, result.problem.factors.count { it is Clause })
         val sample = result.reconstruct(Sample(booleanArrayOf(true, false, false), longArrayOf(0, 0, 0)))
         assertTrue(satisfies(model, sample.bools, sample.ints))
+    }
+
+    @Test
+    fun `binary channel reconstruction preserves either indicator polarity`() {
+        for (bound in listOf(0, 1)) {
+            val model = Problem(
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = binary(1),
+                factors = listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, bound)),
+            )
+
+            val result = checkNotNull(substitute(model))
+            assertEquals(model.numBoolVars, result.problem.numBoolVars)
+            val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+                .map(result.reconstruct).map { it.bools.single() to it.ints.single() }.toSet()
+
+            assertEquals(setOf(true to bound.toLong(), false to (1L - bound)), assignments)
+        }
+    }
+
+    @Test
+    fun `unary binary inequalities and disequalities preserve their source assignments`() {
+        for ((op, coefficient, bound) in listOf(
+            Triple(LinearOp.LE, 2L, 0L),
+            Triple(LinearOp.LE, -2L, -1L),
+            Triple(LinearOp.GE, 2L, 1L),
+            Triple(LinearOp.GE, -2L, -1L),
+            Triple(LinearOp.NE, 2L, 0L),
+            Triple(LinearOp.NE, 2L, 2L),
+            Triple(LinearOp.EQ, Long.MIN_VALUE, Long.MIN_VALUE),
+        )) {
+            val model = Problem(
+                numBoolVars = 1,
+                numIntVars = 1,
+                intDomains = binary(1),
+                factors = listOf(ReifiedLinear(0, longArrayOf(coefficient), intArrayOf(0), op, bound)),
+            )
+            val result = checkNotNull(substitute(model))
+            val expected = buildSet {
+                for (indicator in listOf(false, true)) for (value in 0L..1L) {
+                    if (satisfies(model, booleanArrayOf(indicator), longArrayOf(value))) add(indicator to value)
+                }
+            }
+
+            val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+                .map(result.reconstruct).map { it.bools.single() to it.ints.single() }.toList()
+
+            assertEquals(expected, assignments.toSet())
+            assertEquals(expected.size, assignments.size)
+        }
+    }
+
+    @Test
+    fun `multiple binary indicators retain their shared integer meaning`() {
+        val model = Problem(
+            numBoolVars = 2,
+            numIntVars = 1,
+            intDomains = binary(1),
+            factors = listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+            ),
+        )
+
+        val result = checkNotNull(substitute(model))
+        val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+            .map(result.reconstruct).map { it.bools.toList() to it.ints.single() }.toSet()
+
+        assertEquals(setOf(listOf(true, false) to 1L, listOf(false, true) to 0L), assignments)
+    }
+
+    @Test
+    fun `signed binary rows preserve source assignments with reused and fresh literals`() {
+        for (bound in listOf(0, 1)) {
+            val model = Problem(
+                numBoolVars = 1,
+                numIntVars = 2,
+                intDomains = binary(2),
+                factors = listOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
+                    Linear(longArrayOf(3, -2), intArrayOf(0, 1), LinearOp.LE, 1L),
+                ),
+            )
+            val result = checkNotNull(substitute(model))
+            val expected = buildSet {
+                for (indicator in listOf(false, true)) {
+                    for (x in 0L..1L) for (y in 0L..1L) {
+                        if (satisfies(model, booleanArrayOf(indicator), longArrayOf(x, y))) {
+                            add(listOf(indicator) to listOf(x, y))
+                        }
+                    }
+                }
+            }
+
+            val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+                .map(result.reconstruct).map { it.bools.toList() to it.ints.toList() }.toList()
+
+            assertEquals(expected, assignments.toSet())
+            assertEquals(expected.size, assignments.size)
+        }
+    }
+
+    @Test
+    fun `columns sharing an indicator preserve cardinality multiplicity and source assignments`() {
+        for (bound in listOf(0, 1)) {
+            val model = Problem(
+                numBoolVars = 1,
+                numIntVars = 2,
+                intDomains = binary(2),
+                factors = listOf(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+                    Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1L),
+                ),
+            )
+            val result = checkNotNull(substitute(model))
+
+            val assignments = BacktrackSolver(result.problem).enumerate(BacktrackParams(randomSeed = 0L))
+                .map(result.reconstruct).map { it.bools.toList() to it.ints.toList() }.toList()
+
+            val expected = if (bound == 0) {
+                setOf(listOf(true) to listOf(1L, 0L), listOf(false) to listOf(0L, 1L))
+            } else {
+                emptySet()
+            }
+            assertEquals(expected, assignments.toSet())
+            assertEquals(expected.size, assignments.size)
+        }
+    }
+
+    @Test
+    fun `a binary indicator cannot replace an objective integer column`() {
+        val model = Problem(
+            numBoolVars = 1,
+            numIntVars = 1,
+            intDomains = binary(1),
+            factors = listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+
+        assertNull(substitute(model, objectiveIntVars = setOf(0)))
     }
 
     private fun binary(n: Int) = Array<IntDomain>(n) { IntDomain(0, 1) }
@@ -84,4 +229,28 @@ class BinaryColumnSubstitutionTest {
         assertNull(substitute(model))
     }
 
+    @Test
+    fun `composed preparation preserves source objective after Boolean zero extension`() {
+        val model = problem(
+            5,
+            listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            ),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 2), constant = 11)
+        val first = PresolvePipeline.run(model, objective, PresolveConfig.parse("binary-columns"), false)
+        val adjusted = checkNotNull(first.objective)
+        val second = PresolvePipeline.run(first.problem, adjusted, PresolveConfig.NONE, false)
+        val chain = first.mapping.then(second.mapping)
+
+        val values = BacktrackSolver(second.problem.bake()).enumerate().map { sample ->
+            chain.requireObjectivePreserved(objective, adjusted, sample)
+            objective.evaluateLong(chain.reconstructFrom(second.problem, sample))
+        }.toSet()
+
+        assertEquals(setOf(11L, 13L), values)
+        assertEquals(first.problem.numBoolVars, adjusted.boolWeights.size)
+        assertTrue(adjusted.boolWeights.all { it == 0L })
+    }
 }

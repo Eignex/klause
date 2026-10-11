@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectLinearLiftedAntecede
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.explainLinearBound
 import com.eignex.klause.factor.arithmetic.internals.integralQuotientOrNull
+import com.eignex.klause.factor.arithmetic.internals.linearLazyReason
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
@@ -110,6 +111,7 @@ internal class ReifiedLinearPropagator(
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        propagateBinaryEquality(state)?.let { return it }
         val range = linearSumRange(state, coeffs, vars)
         val sumLo = range[0]
         val sumHi = range[1]
@@ -140,7 +142,11 @@ internal class ReifiedLinearPropagator(
             // Pinning the indicator rests on the side of the sum that settles the body, lifted by its slack.
             pinAntecedent = {
                 settlingSide(sumLo, sumHi, holds = alwaysHolds)?.let {
-                    collectLinearLiftedAntecedents(state, coeffs, vars, useLo = it.useLo, slack = it.slack)
+                    if (state.undoLogging && factorId >= 0 && state.currentLevel > 0) {
+                        linearLazyReason(state, factorId, -1, it.useLo, it.slack, 0, false)
+                    } else {
+                        collectLinearLiftedAntecedents(state, coeffs, vars, useLo = it.useLo, slack = it.slack)
+                    }
                 } ?: state.composeIntVarAtomAntecedents(vars)
             },
             // Target absence decides EQ and NE even when the interval still straddles the target.
@@ -172,6 +178,27 @@ internal class ReifiedLinearPropagator(
                 }
             },
         )
+    }
+
+    private fun propagateBinaryEquality(state: PropagationState): Boolean? {
+        if (!singleEquality) return null
+        val target = equalityTarget?.takeIf { it in 0L..1L } ?: return null
+        val variable = vars[0]
+        val root = state.rootDomains[variable]
+        if (root.min < 0L || root.max > 1L) return null
+        state.work++
+        val domain = state.intDomains[variable]
+        if (domain.min == domain.max) {
+            val holds = (domain.min == target) == (op == LinearOp.EQ)
+            return state.boolValues[auxBoolVar] == holds ||
+                state.pinBool(auxBoolVar, holds, state.composeIntVarAtomAntecedents(vars))
+        }
+        val indicator = state.boolValues[auxBoolVar] ?: return true
+        val value = if (indicator == (op == LinearOp.EQ)) target else 1L - target
+        val reason = intArrayOf(Lit.make(auxBoolVar, !indicator))
+        return if (value == 1L) state.tightenIntMin(variable, value, reason) else {
+            state.tightenIntMax(variable, value, reason)
+        }
     }
 
     private fun eqTargetUnreachable(state: PropagationState): Boolean {

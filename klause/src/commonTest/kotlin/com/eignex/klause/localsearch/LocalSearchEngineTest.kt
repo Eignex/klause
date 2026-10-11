@@ -27,6 +27,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
@@ -155,10 +156,18 @@ class LocalSearchEngineTest {
         assertIs<SolveResult.Sat>(verdict)
         val optimization = solver.resumable(objective, params)
         assertEquals(verdict, satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))
-        assertTrue(optimization.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} != null)
+        val optimum = optimization.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
+        assertTrue(optimum != null)
         assertIs<SolveResult.Sat>(solver.solve(params))
         satisfaction.close()
         optimization.close()
+        val other = solver.resumableSolve(params)
+        assertSame(verdict, satisfaction.runSlice(Cancellation.Never, 0L, 0L))
+        assertSame(optimum, optimization.runSlice(Cancellation.Never, 0L, 0L) {})
+        satisfaction.close()
+        optimization.close()
+        assertFailsWith<IllegalStateException> { solver.resumable(objective, params) }
+        other.close()
     }
 
     @Test

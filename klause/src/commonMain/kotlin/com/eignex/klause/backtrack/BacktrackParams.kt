@@ -8,6 +8,7 @@ import com.eignex.klause.backtrack.selector.IndomainSet
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.RandomVariable
 import com.eignex.klause.backtrack.selector.SmallestDomain
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.backtrack.selector.Vsids
@@ -82,7 +83,7 @@ data class BacktrackParams(
      */
     val nodeBudget: NodeBudget? = null,
     val randomSeed: Long? = null,
-    val assumptions: Assumptions = Assumptions.None,
+    override val assumptions: Assumptions = Assumptions.None,
     val variableSelector: VariableSelector = Vsids(),
     val valueSelector: ValueSelector = IndomainRandom,
     val minHammingDistance: Int = 0,
@@ -266,7 +267,9 @@ data class BacktrackParams(
      * restart the engine adopts a not-yet-seen incumbent as solution-phasing hints (see [solutionPhasing]) so
      * its stable phase dives toward the globally-good assignment instead of only its own. Purely heuristic:
      * the assignment reorders value trials (out-of-domain integers are clamped), so a peer's solution can
-     * never make this search unsound. `null` (default) disables it; a no-op unless [solutionPhasing] is on.
+     * never make this search unsound. After its first admitted incumbent, [SolutionGuided] value selection
+     * adopts better pooled incumbents when optimization resumes, without restarting traversal.
+     * `null` (default) disables it.
      */
     val pooledIncumbents: IncumbentSource<Sample, Double>? = null,
     /**

@@ -11,12 +11,14 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Optimizer
+import com.eignex.klause.solver.PullSearchStream
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.incumbent.Candidate
@@ -311,6 +313,65 @@ class BacktrackSolver internal constructor(
         for (outcome in enumerationOutcomes(params)) {
             if (outcome is SearchOutcome.Found) yield(outcome.sample)
         }
+    }
+
+    override fun openEnumerate(params: BacktrackParams): SearchStream<Sample> {
+        var traversal: CpSatisfactionTraversal? = null
+        val window = ArrayDeque<Sample>()
+        return PullSearchStream(
+            pull = {
+                val cursor = traversal ?: CpSatisfactionTraversal(problem, params, null, lpSolveContext)
+                    .also { traversal = it }
+                var accepted: Sample? = null
+                var ended = false
+                while (accepted == null && !ended) {
+                    when (val outcome = cursor.next()) {
+                        is SearchOutcome.Found -> if (farEnough(outcome.sample, window, params.minHammingDistance)) {
+                            accepted = outcome.sample
+                            if (params.recentWindow > 0) {
+                                if (window.size >= params.recentWindow) window.removeFirst()
+                                window.addLast(outcome.sample)
+                            }
+                        }
+                        else -> ended = true
+                    }
+                }
+                accepted
+            },
+            release = {
+                val cursor = traversal
+                traversal = null
+                window.clear()
+                cursor?.close()
+            },
+        )
+    }
+
+    override fun openImprovements(objective: LinearObjective, params: BacktrackParams): SearchStream<MinimizeResult> {
+        var search: ResumableMinimize? = null
+        var finished = false
+        return PullSearchStream(
+            pull = {
+                val cursor = search ?: ResumableMinimize(this, objective, params, pausable = false).also { search = it }
+                when (val event = cursor.runUntilEvent()) {
+                    is StepEvent.Incumbent -> {
+                        cursor.releaseForSequenceYield()
+                        event.result
+                    }
+                    is StepEvent.Terminal -> {
+                        finished = true
+                        event.result
+                    }
+                    StepEvent.Paused -> null
+                }
+            },
+            release = {
+                val cursor = search
+                search = null
+                cursor?.close()
+            },
+            terminal = { finished },
+        )
     }
 
     /** Enumerate accepted samples while preserving the terminal search outcome for finite orchestration. */

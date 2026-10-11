@@ -18,6 +18,48 @@ Complete assignments use source-keyed values from each owner. CP-learned Boolean
 clauses remain natively owned by CP while their shared consequences reach theory
 peers. The shared store does not duplicate the CP pin.
 
+## Invocation scopes and stream ownership
+
+`Solver.session()` opens a single-threaded scope owner. Every operation captures the
+assumption stack when called, including lazy sequences. Later pushes override earlier
+pins and per-call parameters; popping restores the previous scope. The source model
+is unchanged. Solve, sample, enumerate and minimize require parameters that enforce
+assumptions; unsupported parameters reject non-empty pins or deductions explicitly.
+The default methods of custom sessions reject scoped operations they cannot implement.
+
+Counting builds an isolated conditioned model. Integer domains carry the scope's pins,
+holes and bounds; Boolean root pins become source unit clauses so hash extensions and
+rebuilds preserve them. Exact, approximate and hybrid counting use that same model.
+Accurate sampling also conditions on both call parameters and session scopes. Counting
+and accurate sampling use complete finite-model machinery independently of the session's
+sampling backend; local-search enumeration remains sampling with replacement.
+
+`openSamples`, `openEnumerate`, `openExactCount` and `openImprovements` return
+`SearchStream` cursors. A cursor has one consumer and releases its retained state on
+completion, failure or explicit close. Use `use` when stopping early. A terminal value
+can remain buffered after resources release; explicit close discards buffered values.
+Legacy `Sequence` APIs capture the same scope but require sequential consumption;
+built-in search paths release native LP solvers before each legacy yield.
+
+An open stream or resumable handle owns its session. Other operations, push/pop and
+local-search reset throw while that owner is active. Closing the session closes its
+active owner, clears scopes and retained local-search weights, and rejects later
+operations. Closing is idempotent.
+Terminal resumable verdicts remain readable without further work, including after
+close or subsequent scope changes; a closed pending handle rejects further slices.
+Counters and preparation progress remain owned by the delegated backend handle.
+
+Fresh calls build fresh traversals. Resumable slices retain their trail or assignment,
+RNG and restart progress. Local-search sessions retain learned weights between fresh
+calls, capturing them at every published sample or incumbent and at completion.
+Early stream close preserves the most recent capture. Open local-search streams and
+handles also exclude searches through other sessions of the same solver, because
+strategy and restart state belong to that solver.
+
+Repair handles are a separate internal contract. Their cutoff must be monotone
+non-increasing because retained objective-bound clauses survive fragment reseeding.
+General session push/pop starts a fresh search and does not reuse repair machinery.
+
 ## Finite propagation and explanations
 
 Fresh presolve rebuilds retain the originating cancellation token and accounting
@@ -43,6 +85,10 @@ publication checks; a zero heuristic score is not an exact certificate.
 Gaussian XOR and difference-system helpers deliberately omit local-search scoring:
 their retained source rows enforce the assignment. Symmetry helpers also omit
 scoring because source witnesses need not satisfy a chosen CP representative.
+The finite difference system is posted after presolve only when its fragment has
+a guarded edge and an edge between two unfixed root integer columns. Edges to zero
+or root-fixed columns act as unary bounds and retain their original propagators.
+An unconditional edge between unfixed columns can still join unary guarded bounds.
 Objective-bound overlays deliberately omit CP propagation. Every inert built-in
 role carries a reason. A sound LP family can decline emission under feature,
 resource or domain gates, and omitted rows weaken the relaxation.
@@ -66,10 +112,27 @@ and its heap belong to the solve, retain conflict bumps across restarts, and app
 received before the first selection once during initialization. Fresh selectors isolate
 solves that share a projection.
 
+Cumulative edge-finding runs in both time directions over fixed durations, demands
+and capacity. Reversed deductions tighten latest starts and cite the historical
+integer bounds and definitely-present task premises. Arithmetic ranges that cannot
+be represented safely decline the reversed pass.
+
 Propagators supply sound source
 reasons for deductions and conflicts. An assignment's undo lifetime can be deeper
 than the effective level of its reason: Boolean pins use the deeper of that level
 and the current decision depth so an asserting backjump retains its consequence.
+Reified arithmetic skips reason construction when a settled relation agrees with
+its assigned indicator. New indicator pins and opposing assignments retain the
+pin and conflict explanation protocol. Single-sided linear indicator deductions
+record the existing lazy linear payload during trailed search. Shared Boolean premise
+export resolves this payload into historical literals before traversing its proof graph. Conflict analysis
+resolves it against the bounds at the pin, rather than later domains; untrailed
+and two-sided deductions retain eager explanations. Linear bound propagation
+constructs a reason only when the proposed bound tightens the live domain;
+unchanged bounds skip eager explanations and lazy payload allocation. Single-variable equality and
+disequality indicators over root domains contained in `{0, 1}` propagate as direct
+channels: an indicator fixes its integer value, and a fixed integer pins the
+indicator. Wider domains retain the general linear propagator.
 
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump.
@@ -107,6 +170,15 @@ See [SearchSession](../klause/src/commonMain/kotlin/com/eignex/klause/solver/sea
 and [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ClauseDb.kt).
 
 ## Portfolio slices
+
+FlatZinc search hints select tiered variable and value heuristics without inheriting
+the free-search preset's phase saving or restart schedule. The source hint's
+solution-guided value wrapper remains available without saved phases taking
+precedence over it. Optimization updates guidance only after admitting a complete
+improving incumbent. Solution-guided selectors retain their first descent, then
+adopt better verified pooled incumbents when traversal resumes, without discarding
+their trail or learned state. Other
+pooled solution phasing retains its restart-boundary import policy.
 
 Open portfolios transport exact assignments in `Sample` rather than through a
 side registry. `exactInts` and `exactReals` carry immutable authoritative
@@ -192,17 +264,20 @@ An active local-search handle acquires exclusive ownership of its solver when op
 Overlapping handle creation and other search execution throw `IllegalStateException`,
 including searches through another session of that solver. Completion, failure and
 idempotent close release ownership; a cancelled slice remains paused and retains it.
-Keep the owning session's assumptions and warm state unchanged until release.
-Strategy and restart policy are shared by the solver, so streaming draws must also
-be consumed sequentially. Portfolio workers use separate solvers and close a handle
-before reseeding it.
+The owning session rejects assumption changes and warm-state reset until release.
+Strategy and restart policy are shared by the solver; legacy streaming draws must
+be consumed sequentially, while open streams hold exclusive ownership. Portfolio
+workers use separate solvers and close a handle before reseeding it.
 Optimization handles open through their session so its assumptions and state apply.
 Sessions that decline resumable optimization retain their one-shot improvement stream.
 
 The immutable local-search projection is prepared on demand and reused across draws.
 Mixed-pool arms over the same model share it, including ALNS's inner local search.
-Objective-bound overlays keep their own projections. Assignments, RNGs, weights and
-invariant payloads belong to each live state. Resumable handles initialize large
+Objective-bound overlays keep their own projections. Each Boolean, integer and real
+variable's occurrence index contains each active factor once, in factor order. A move
+updates that invariant once; the invariant accounts for all positions reading the
+coordinate, including positions with different presence literals. Assignments, RNGs,
+weights and invariant payloads belong to each live state. Resumable handles initialize large
 factor sets in batches, retaining the next factor and completed payloads when a
 slice expires. Partial costs, samples and warm state remain private until every
 factor has been scored. Initial scoring preserves factor order and does not charge
@@ -361,6 +436,10 @@ Disabled reporting allocates no recorder and performs no factor scans.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
+Complete-search arms without a restart schedule retain traversal because closing
+a proof gap need not produce a better incumbent. Imported incumbent cutoffs still
+apply. Observable search families and complete workers configured with a restart
+schedule retain their plateau reseeding policy under the same incumbent.
 Each arm retains completed-handle totals separately from its current cumulative
 snapshot. Repeated snapshots replace the live entry; closing captures the final
 counters and merges the handle once, including when reseeding or stopping the pool.
@@ -375,6 +454,29 @@ Reseeding preserves terminal verdicts. Arm policy, scheduling and available
 continuous-column capability determine which arms run; unsupported local-search
 arms are filtered from mixed pools while local-search-only requests retain their
 own behavior.
+
+Continuous-column optimization models rank the default LP backtrack arm after the
+SAT guard and conflict-driven core. A curated sequential mixed optimization pool
+with at least six configured slots appends an applicable default LP arm when its
+configured backtrack slots have not admitted it. The appended arm follows the
+configured workers and auxiliary ALNS arm, retaining their positions and seeds.
+When the objective has no continuous coefficient, the auxiliary LP arm joins after
+the first incumbent, retaining the incumbent workers' initial pool.
+LP ceilings that disable bounding omit the auxiliary LP arm and its reservation.
+Explicit arm pools control admission and techniques. Curated
+single-core mixed optimization reserves half the scheduled time for this LP arm
+when the objective has a continuous coefficient, until the first incumbent. Individual segments retain
+work charging and time caps; the remaining time follows the bandit. After the first
+incumbent, all scheduled time follows the bandit. Explicit backtrack pools and parallel
+lanes retain their requested scheduling.
+The auxiliary LP arm receives one base improving-phase probe if it has earned no
+progress credit. An unproductive probe retires the arm and closes its handle;
+retirement preserves the incumbent without claiming exhaustion. A witness,
+objective or bound improvement, root deductions, or used shared contributions
+retain the arm under normal bandit scheduling. Configured LP slots do not retire
+under the auxiliary probe policy.
+An unproductive auxiliary improving-phase probe does not decay the retained workers'
+bandit or family evidence, preserving their policy state when the probe is discarded.
 
 See [SliceBudget](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
 and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).

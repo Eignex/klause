@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.mark
+import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,6 +17,97 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ReifiedLinearPropagatorTest {
+    @Test
+    fun `a fixed binary integer implies its equality indicator with a valid bound reason`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            for (target in listOf(0L, 1L)) {
+                for (value in listOf(0L, 1L)) {
+                    val problem = Problem(1, 1, arrayOf(IntDomain(0L, 1L)),
+                        arrayOf(ReifiedLinear(0, longArrayOf(1L), intArrayOf(0), op, target)))
+
+                    PropagationReasonOracle.assertReasonsImply(problem, "$op fixed binary $target $value") { state ->
+                        if (value == 1L) state.tightenIntMin(0, value) else state.tightenIntMax(0, value)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `binary equality channels imply the integer value for either indicator polarity`() {
+        for (op in listOf(LinearOp.EQ, LinearOp.NE)) {
+            for (target in listOf(0L, 1L)) {
+                for (indicator in listOf(false, true)) {
+                    val problem = Problem(1, 1, arrayOf(IntDomain(0L, 1L)),
+                        arrayOf(ReifiedLinear(0, longArrayOf(-2L), intArrayOf(0), op, -2L * target)))
+
+                    PropagationReasonOracle.assertReasonsImply(problem, "$op binary $target $indicator") { state ->
+                        state.pinBool(0, indicator)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a negated equality over a wider domain retains values outside the binary interval`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0L, 2L)),
+            arrayOf(ReifiedLinear(0, longArrayOf(1L), intArrayOf(0), LinearOp.EQ, 1L)))
+        val state = PropagationState(problem, Assumptions.None)
+        assertTrue(state.pinBool(0, false))
+
+        assertNull(state.runToFixpoint(allFactors = true))
+
+        assertEquals(listOf(0L, 2L), (0L..2L).filter { it in state.intDomains[0] })
+    }
+
+    @Test
+    fun `single sided indicator reasons imply the pin for signed rows`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.EQ, LinearOp.NE)) {
+            for (coefficient in listOf(-1L, 1L)) {
+                val problem = Problem(1, 2, arrayOf(IntDomain(0L, 3L), IntDomain(0L, 3L)),
+                    arrayOf(ReifiedLinear(0, longArrayOf(coefficient, coefficient), intArrayOf(0, 1),
+                        op, 3L * coefficient)))
+
+                PropagationReasonOracle.assertReasonsImply(problem, "$op signed indicator $coefficient") { state ->
+                    state.tightenIntMin(0, 2L) && state.tightenIntMin(1, 2L)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `settled inequality indicator reasons cite the bounds at the pin through rollback`() {
+        for (value in listOf(false, true)) {
+            val problem = Problem(1, 1, arrayOf(IntDomain(0L, 10L)),
+                arrayOf(ReifiedLinear(0, longArrayOf(1L), intArrayOf(0), LinearOp.LE, 5L)))
+            val state = PropagationState(problem, Assumptions.None)
+            state.undoLogging = true
+            assertNull(state.runToFixpoint(allFactors = true))
+            val root = state.mark()
+            state.currentLevel = 1
+            if (value) assertTrue(state.tightenIntMax(0, 5L)) else assertTrue(state.tightenIntMin(0, 6L))
+            assertNull(state.runToFixpoint(allFactors = false))
+            val reason = state.boolAntecedents[0]
+            state.currentLevel = 2
+            if (value) assertTrue(state.tightenIntMax(0, 3L)) else assertTrue(state.tightenIntMin(0, 8L))
+
+            val explained = state.reasonOf(reason)
+
+            val atom = if (value) state.atomVarLe(0, 5L) else state.atomVarGe(0, 6L)
+            assertEquals(value, state.boolValues[0])
+            assertEquals(listOf(Lit.make(atom, false)), explained?.toList())
+            state.undoTo(root)
+            assertNull(state.boolValues[0])
+            state.currentLevel = 1
+            if (value) assertTrue(state.tightenIntMin(0, 6L)) else assertTrue(state.tightenIntMax(0, 5L))
+            assertNull(state.runToFixpoint(allFactors = false))
+            assertEquals(!value, state.boolValues[0])
+            val siblingAtom = if (value) state.atomVarGe(0, 6L) else state.atomVarLe(0, 5L)
+            assertEquals(listOf(Lit.make(siblingAtom, false)), state.reasonOf(state.boolAntecedents[0])?.toList())
+        }
+    }
+
     @Test
     fun `incremental reification follows interior target membership through rollback`() {
         for (op in listOf(LinearOp.EQ, LinearOp.NE)) {

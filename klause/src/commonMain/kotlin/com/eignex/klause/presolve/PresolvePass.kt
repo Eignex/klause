@@ -25,7 +25,7 @@ private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
  *  dual fixing) *or* by inflating the model count (e.g. affine elimination, which folds the defining
  *  equality away and leaves the eliminated variable unconstrained, so a complete enumerator branches
  *  over its whole domain and yields each real solution once per spurious value). The latter are
- *  auto-disabled for solution-set-sensitive queries (`-a` / `-n N>1`).
+ *  disabled for solution-set-sensitive queries (`-a` / `-n N>1`), including explicit overrides.
  * @property autoEligible whether emphasis may turn it on automatically; opt-in passes (value
  *  precedence, which interacts with variable-symmetry breaking) are `false` and need an explicit
  *  override.
@@ -533,6 +533,16 @@ enum class PresolvePass(
         autoEligible = true,
     ),
     ;
+
+    /** Independent semantic and multiplicity guarantees under the pass's protected objective. */
+    val guarantees: TransformationGuarantees
+        get() = when {
+            preservesSolutionSet -> TransformationGuarantees.IDENTITY
+            this == ELIMINATE_AFFINE_SINGLETONS || this == IMPLICATION_GRAPH ->
+                TransformationGuarantees(true, true, true, false, true)
+            this == FOLD_COMPARISON_CLAUSES -> TransformationGuarantees(true, true, false, false, false)
+            else -> TransformationGuarantees(true, true, true, false, false)
+        }
 
     /**
      * Transform the canonical source [problem] under [ctx], returning the change as a [SourceDelta]

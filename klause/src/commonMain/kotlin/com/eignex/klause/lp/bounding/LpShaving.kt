@@ -257,12 +257,12 @@ private fun LpEngine.safeMaxNoBake(coeffs: LongArray, token: Cancellation): Doub
  * points, so no feasible value is removed. Bounded by [OBBT_MAX_VARS] variables, spent on the widest
  * domains first — see [widestFirst].
  */
-internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound> {
+internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation, minimumSpan: Long = 0L): List<ShavedBound> {
     if (lpRelaxer == null || token()) return emptyList()
     val n = problem.numIntVars
     val out = ArrayList<ShavedBound>()
     var done = 0
-    for (v in widestFirst(n)) {
+    for (v in widestFirst(n, minimumSpan)) {
         if (done >= OBBT_MAX_VARS || token()) break
         val d = problem.rootDomainOf(v)
         if (d.min >= d.max) continue
@@ -285,13 +285,13 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound>
  * in index order and 8 and 7 bounds respectively in this one. A domain that overflows [Long] sorts
  * first — it is the most open there is.
  */
-private fun LpEngine.widestFirst(n: Int): List<Int> {
+private fun LpEngine.widestFirst(n: Int, minimumSpan: Long): List<Int> {
     val width = LongArray(n) { v ->
         val d = problem.rootDomainOf(v)
         val span = d.max - d.min
         if (span < 0L) Long.MAX_VALUE else span
     }
-    return (0 until n).filter { width[it] > 0L }.sortedByDescending { width[it] }
+    return (0 until n).filter { width[it] > minimumSpan }.sortedByDescending { width[it] }
 }
 
 /** Whether the root relaxation is provably infeasible — the LP relaxation has no real point at an

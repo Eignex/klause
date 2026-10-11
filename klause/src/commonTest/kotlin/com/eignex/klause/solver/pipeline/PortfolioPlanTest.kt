@@ -2,9 +2,15 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,6 +28,51 @@ class PortfolioPlanTest {
 
         assertTrue(scenario.reportLsResiduals)
         assertTrue(scenario.copy(phaseRetention = 0.5).reportLsResiduals)
+    }
+
+    @Test
+    fun `curated sequential continuous optimization reserves LP descent time`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
+
+        val shares = continuousLpShares(scenario, profile, listOf("bt/satOptimized", "bt/lp-default", "ls/cbls/fixed"),
+            LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+
+        assertEquals(listOf(0.0, 0.5, 0.0), shares.toList())
+    }
+
+    @Test
+    fun `explicit and inapplicable scenarios keep their requested scheduling`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
+        val labels = listOf("bt/satOptimized", "bt/lp-default")
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val scenarios = listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(kind = Kind.CSP),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(lpCeiling = LpConfig.OFF),
+            scenario.copy(lpCeiling = LpConfig(overrides = mapOf(LpTechnique.BOUNDING to false))),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("lp-default") }),
+        )
+
+        for (explicit in scenarios) assertTrue(continuousLpShares(explicit, profile, labels, objective).isEmpty())
+        assertTrue(continuousLpShares(scenario,
+            profile.copy(problemClass = ProblemClass.FiniteCp), labels, objective).isEmpty())
+        assertTrue(continuousLpShares(scenario, profile,
+            listOf("bt/satOptimized", "bt/conflictDriven"), objective).isEmpty())
+    }
+
+    @Test
+    fun `finite objectives keep unreserved scheduling with continuous constraints`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)
+        val labels = listOf("bt/satOptimized", "bt/lp-default")
+
+        for (objective in listOf(null, LinearObjective(intCoefficients = longArrayOf(1L)),
+            LinearObjective(realCoefficients = doubleArrayOf(0.0)))) {
+            assertTrue(continuousLpShares(scenario, profile, labels, objective).isEmpty())
+        }
     }
 
     @Test

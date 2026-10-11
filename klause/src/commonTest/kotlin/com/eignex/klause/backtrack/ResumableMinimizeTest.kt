@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
@@ -644,6 +645,22 @@ class ResumableMinimizeTest {
         )
         assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
         assertEquals(0.0, objective.evaluate(Sample(booleanArrayOf(), longArrayOf(0L))))
+    }
+
+    @Test
+    fun `optimization guidance receives complete admitted incumbents`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        val observed = ArrayList<Sample>()
+        val selector = object : ValueSelector by IndomainMin {
+            override fun fresh(): ValueSelector = this
+            override fun onSolution(snapshot: Sample) {
+                observed += snapshot
+            }
+        }
+
+        fixture.solver.minimize(fixture.objective, fixture.params.copy(valueSelector = selector))
+
+        fixture.assertIncumbent(observed.single())
     }
 
     @Test

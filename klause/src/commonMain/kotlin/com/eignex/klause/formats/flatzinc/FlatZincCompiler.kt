@@ -41,10 +41,12 @@ internal class FlatZincCompiler(
     internal val exactFloats: Boolean = false,
     private val settings: ProblemSettings = ProblemSettings(),
     internal val floatChoiceLimit: Int = DEFAULT_FLOAT_CHOICE_LIMIT,
+    internal val booleanZeroSumClauseLimit: Int = 32_768,
 ) : CnfLowering {
     init {
         require(floatBuckets > 0) { "floatBuckets must be positive" }
         require(floatScale > 0) { "floatScale must be positive" }
+        require(booleanZeroSumClauseLimit >= 0) { "booleanZeroSumClauseLimit must be nonnegative" }
         require(floatChoiceLimit > 0) { "floatChoiceLimit must be positive" }
         if (!exactFloats) {
             require(
@@ -56,6 +58,8 @@ internal class FlatZincCompiler(
     internal val params = HashMap<String, ParamValue>()
     internal val boolVars = HashMap<String, Int>()
     internal val intVars = HashMap<String, Int>()
+    internal val booleanIntegerChannels = HashMap<Int, Int>()
+    internal var lowerBooleanZeroSums: Boolean = true
     internal val floatVars = HashMap<String, FloatBucketing>()
     internal val arrays = HashMap<String, FlatZincArray>()
     internal val intDomains = ArrayList<IntDomain>()
@@ -111,6 +115,8 @@ internal class FlatZincCompiler(
     }
 
     private fun compileConstraints(onLowered: ((FlatZincCompiler, SolveDirective) -> Unit)?): FlatZincProgram {
+        collectBooleanIntegerChannels()
+        selectBooleanZeroSumLowering()
         val impliedFactorIds = IntArrayList()
         var hasSymmetryBreaking = false
         for (c in model.constraints) {

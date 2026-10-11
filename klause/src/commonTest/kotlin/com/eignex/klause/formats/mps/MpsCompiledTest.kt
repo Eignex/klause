@@ -15,6 +15,113 @@ import kotlin.test.assertTrue
 class MpsCompiledTest {
 
     @Test
+    fun `a free continuous integer definition preserves source values and objective`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -3\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1\nRHS\n RHS DEF 2\n" +
+                "BOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(longArrayOf(1L, 5L), null)
+
+        assertEquals(0, compiled.model.numRealVars)
+        assertEquals(2L, compiled.model.intBounds.lower(1))
+        assertEquals(5L, compiled.model.intBounds.upper(1))
+        assertTrue(compiled.sourceExact)
+        assertEquals("5", witness.objective.toString())
+        assertEquals(listOf("1", "5"), witness.values.map { it.toString() })
+    }
+
+    @Test
+    fun `a fractional continuous definition retains its continuous values`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -1\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 2\nBOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(2L).reciprocal()))
+
+        assertEquals(1, compiled.model.numRealVars)
+        assertEquals("1/2", witness.objective.toString())
+    }
+
+    @Test
+    fun `a guarded continuous definition does not restrict an inactive column`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -3\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1\nBOUNDS\n BV B X\n FR B Z\n" +
+                "INDICATORS\n IF DEF X 1\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(longArrayOf(0L), listOf(BigFraction.ofLong(2L).reciprocal()))
+
+        assertEquals(1, compiled.model.numRealVars)
+        assertEquals("1/2", witness.objective.toString())
+    }
+
+    @Test
+    fun `definition integrality uses the original decimal coefficients`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -1\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1.0000000000000001\n" +
+                "BOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        assertEquals(1, compiled.model.numRealVars)
+    }
+
+    @Test
+    fun `an integer definition uses exact source rows beyond binary64 integer precision`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -10000000000000001\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1\nBOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(longArrayOf(1L, 10_000_000_000_000_001L), null)
+
+        assertEquals(0, compiled.model.numRealVars)
+        assertTrue(compiled.sourceExact)
+        assertEquals("10000000000000001", witness.objective.toString())
+    }
+
+    @Test
+    fun `an integer definition retains continuous source decimal precision`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -2.0000000000000002\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1.0000000000000001\nBOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(2L)))
+
+        assertEquals(1, compiled.model.numRealVars)
+        assertEquals("2", witness.objective.toString())
+    }
+
+    @Test
+    fun `an integer definition retains continuous source objective precision`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -3\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 10000000000000001 DEF 1\nBOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        val witness = compiled.sourceWitness(longArrayOf(1L), listOf(BigFraction.ofLong(3L)))
+
+        assertEquals(1, compiled.model.numRealVars)
+        assertEquals("30000000000000003", witness.objective.toString())
+    }
+
+    @Test
+    fun `an infinity marker does not define a continuous column`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\n E DEF\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X DEF -1e30\n" +
+                " M1 'MARKER' 'INTEND'\n Z COST 1 DEF 1e30\nRHS\n RHS DEF 1e30\n" +
+                "BOUNDS\n BV B X\n FR B Z\nENDATA",
+        ).toProblem()
+
+        assertEquals(1, compiled.model.numRealVars)
+    }
+
+    @Test
     fun `source check rejects a marker integer above its implicit binary bound`() {
         val compiled = Mps.parse(
             "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n X COST 1\n" +

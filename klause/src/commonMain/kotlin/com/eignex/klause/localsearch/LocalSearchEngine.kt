@@ -22,7 +22,9 @@ import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.asSearchStream
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.LocalSearchStatsSink
@@ -267,6 +269,24 @@ internal class LocalSearchEngine(
         return guarded(streamImpl(params, eff, warm).filterNotNull())
     }
 
+    fun openSamples(
+        params: LocalSearchParams,
+        warm: WarmState?,
+        transform: (Sequence<Sample>) -> Sequence<Sample> = { it },
+    ): SearchStream<Sample> {
+        val ownership = acquireSearch()
+        return runCatching {
+            val supported = localSearchSupports(model, completion != null)
+            val effective = if (supported) model.pinsUnder(params.assumptions) else null
+            val sequence = if (effective == null) emptySequence()
+            else streamImpl(params, effective, warm).filterNotNull()
+            transform(sequence).asSearchStream(release = ownership::release)
+        }.getOrElse {
+            ownership.release()
+            throw it
+        }
+    }
+
     fun resumableSolve(params: LocalSearchParams, warm: WarmState? = null): ResumableSolve {
         val ownership = acquireSearch()
         return runCatching { openResumableSolve(params, warm, ownership) }.getOrElse {
@@ -331,8 +351,8 @@ internal class LocalSearchEngine(
             }
 
             private fun advance(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult? {
-                check(!closed) { "the local-search handle is closed" }
                 verdict?.let { return it }
+                check(!closed) { "the local-search handle is closed" }
                 if (!supported) return unknown(TerminationReason.Unsupported)
                 if (effective == null) {
                     return if (model.refutesModel) {
@@ -414,6 +434,21 @@ internal class LocalSearchEngine(
     ): Sequence<MinimizeResult> = guarded(
         minimizeStream(objective, params, warm, SolveStatsSink(backend = "ls")).filterNotNull(),
     )
+
+    fun openImprovements(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+        warm: WarmState?,
+    ): SearchStream<MinimizeResult> {
+        val ownership = acquireSearch()
+        val sink = SolveStatsSink(backend = "ls")
+        var finished = false
+        return minimizeStream(objective, params, warm, sink, onFinished = { finished = true })
+            .filterNotNull().asSearchStream(
+                release = { try { if (!finished) sink.stop() } finally { ownership.release() } },
+                terminal = { finished },
+            )
+    }
 
     @Suppress("LongParameterList")
     private fun minimizeStream(
@@ -527,8 +562,8 @@ internal class LocalSearchEngine(
                 sliceInstructions: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
             ): MinimizeResult? {
-                check(!closed) { "the local-search handle is closed" }
                 verdict?.let { return it }
+                check(!closed) { "the local-search handle is closed" }
                 token = if (sliceMillis == Long.MAX_VALUE) {
                     global
                 } else {

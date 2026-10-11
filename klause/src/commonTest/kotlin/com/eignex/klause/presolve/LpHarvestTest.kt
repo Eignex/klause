@@ -314,6 +314,31 @@ class LpHarvestTest {
         )
     }
 
+    @Test
+    fun `prebake bounds only probe domains wider than the span gate`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 1_000_000_000), IntDomain(0, 10)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 5),
+            ),
+        )
+
+        val result = lpRootBoundsReporting(
+            problem,
+            LinearObjective(),
+            LpPlan(bounding = true),
+            minimumSpan = 1_000_000,
+        )
+
+        assertEquals(5L, result.problem.finiteIntDomain(0).max)
+        assertEquals(10L, result.problem.finiteIntDomain(2).max)
+        assertEquals(4.0, result.stats.rootPasses.sum)
+    }
+
     /** Assert [original] and [harvested] admit exactly the same points of the declared box `[0, hi]^n` —
      *  membership is domains AND the [Linear] factors, so it catches a row dropped (or an equality added)
      *  without its effect surviving in the bounds. */

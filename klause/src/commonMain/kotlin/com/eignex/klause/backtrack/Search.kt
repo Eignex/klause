@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -490,7 +491,8 @@ internal class BacktrackBrancher(
         phase.onSolution(sample)
     }
 
-    fun importPooledSolution(sample: Sample) {
+    fun importPooledSolution(sample: Sample, guideValues: Boolean = false) {
+        if (guideValues && values is SolutionGuided) values.onSolution(sample)
         phase.onSolution(sample)
     }
 

@@ -2,6 +2,10 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
+import com.eignex.klause.count.SampleQuality
+import com.eignex.klause.count.SamplingConfig
+import com.eignex.klause.count.accurateSamples
+import com.eignex.klause.count.countingScope
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
@@ -15,6 +19,7 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.objective.LinearObjective
@@ -130,6 +135,32 @@ class LocalSearchSolver(
     override fun samples(params: LocalSearchParams): Sequence<Sample> = engine.samples(params, warm = null)
 
     override fun enumerate(params: LocalSearchParams): Sequence<Sample> = engine.samples(params, warm = null)
+
+    override fun openSamples(params: LocalSearchParams): SearchStream<Sample> = engine.openSamples(params, warm = null)
+
+    override fun openEnumerate(params: LocalSearchParams): SearchStream<Sample> =
+        engine.openSamples(params, warm = null)
+
+    override fun openSamples(config: SamplingConfig, params: LocalSearchParams): SearchStream<Sample> =
+        openSamples(config, params, warm = null)
+
+    internal fun openSamples(
+        config: SamplingConfig,
+        params: LocalSearchParams,
+        warm: WarmState?,
+    ): SearchStream<Sample> =
+        when (config.quality) {
+            SampleQuality.CHEAP -> engine.openSamples(params, warm)
+            SampleQuality.ACCURATE -> engine.openSamples(params, warm) { fallback ->
+                problem.countingScope(params.assumptions).accurateSamples(config) { fallback }
+            }
+        }
+
+    override fun openImprovements(
+        objective: LinearObjective,
+        params: LocalSearchParams,
+    ): SearchStream<MinimizeResult> =
+        engine.openImprovements(objective, params, warm = null)
 
     /** Return a [LocalSearchSession] that persists DDFW-style factor weights across
      *  calls and maintains an assumption stack. Backend-specific override of

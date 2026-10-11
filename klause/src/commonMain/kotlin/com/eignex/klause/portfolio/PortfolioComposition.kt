@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
@@ -44,7 +45,7 @@ enum class EngineMix {
  * A point in the portfolio configuration space. Its axes are **cores** (compute width) and **arms**
  * (pool size) — kept separate so they don't conflate — plus **kind** (COP vs CSP) and
  * **engine** (LS / backtrack / mixed). [PortfolioComposition.compose] turns a scenario into an ordered
- * arm list of size [arms], and [PortfolioBuilder.build] materialises it into runnable
+ * list of configured and applicable auxiliary arms, and [PortfolioBuilder.build] materialises it into runnable
  * [PortfolioWorker]s — so every scenario flows through one construction path.
  *
  * [cores] is the number of lanes a [Portfolio] schedules the [arms] arms on, one segment at a time per lane.
@@ -59,7 +60,7 @@ enum class EngineMix {
 data class PortfolioScenario(
     /** Compute width. `1` selects the single-core sequential executor; `> 1` the parallel one. */
     val cores: Int,
-    /** Pool size — how many distinct arms [PortfolioComposition.compose] produces. Independent of
+    /** Configured pool size, before applicable auxiliary arms. Independent of
      *  [cores]: when `arms < cores` a parallel track replicates the composed arms across the extra
      *  lanes (with distinct seeds); when `arms >= cores` every lane is a distinct composed arm. */
     val arms: Int,
@@ -117,7 +118,8 @@ data class PortfolioScenario(
     val sliceWork: Long = DEFAULT_SLICE_WORK,
     /** Share of the arm bandit's evidence kept across the first incumbent; see [Portfolio.DEFAULT_PHASE_RETENTION]. */
     val phaseRetention: Double = Portfolio.DEFAULT_PHASE_RETENTION,
-    /** Non-improving segments before a resumable optimization arm is reseeded; zero disables reseeding. */
+    /** Non-improving segments before an observable or restart-configured arm reseeds; zero disables it.
+     *  Complete search without a restart schedule retains its traversal across tighter incumbent cutoffs. */
     val reseedStaleThreshold: Int = 3,
     /** Optional solve-spanning decision-node allowance, applied here rather than by the caller so that
      *  every arm that runs a backtrack engine spends the one counter — including the ones that build
@@ -215,8 +217,8 @@ internal object PortfolioComposition {
     }
 
     /**
-     * The ordered arm list for [scenario]: [PortfolioScenario.arms] arms, and a hybrid-ALNS arm beside them in a
-     * scheduled mixed optimization pool. The curated pools keep only
+     * The ordered arm list for [scenario]: [PortfolioScenario.arms] arms, with applicable hybrid-ALNS and
+     * continuous-row LP arms beside a curated sequential mixed optimization pool. The curated pools keep only
      * the arms the model behind [facts] offers the needs of. A pool the caller chose outright — an injected one, or
      * a single-engine mix — is built as asked, so a model it cannot run is declined rather than replaced.
      */
@@ -232,12 +234,22 @@ internal object PortfolioComposition {
     internal fun plan(scenario: PortfolioScenario, facts: ProblemFacts): PortfolioArmPlan {
         val composed = compose(scenario, facts)
         if (scenario.cores != 1 || scenario.engine != EngineMix.MIXED || scenario.kind != Kind.COP ||
-            scenario.arms <= PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null || scenario.btPool != null
+            scenario.arms < PortfolioScenario.DEFAULT_ARMS || scenario.lsPool != null || scenario.btPool != null
         ) {
             return PortfolioArmPlan(composed, composed.size)
         }
+        if (scenario.arms == PortfolioScenario.DEFAULT_ARMS) {
+            val stagedLp = !facts.continuousObjective && composed.size > scenario.arms &&
+                composed.last().label == "lp-default"
+            return PortfolioArmPlan(composed, composed.size - if (stagedLp) 1 else 0)
+        }
         // Keep the small pool's positions: materialization derives each arm's seed from its position.
-        val small = compose(scenario.copy(arms = PortfolioScenario.DEFAULT_ARMS), facts)
+        val small = compose(scenario.copy(arms = PortfolioScenario.DEFAULT_ARMS), facts).let { arms ->
+            // A finite objective can seed through incumbent workers without reserving continuous descent.
+            if (!facts.continuousObjective && arms.size > PortfolioScenario.DEFAULT_ARMS &&
+                arms.last().label == "lp-default"
+            ) arms.dropLast(1) else arms
+        }
         val remaining = composed.toMutableList()
         val first = small.mapNotNull { arm ->
             val index = remaining.indexOfFirst { it::class == arm::class && it.label == arm.label }
@@ -341,6 +353,26 @@ internal object PortfolioComposition {
             arms += backtrack
         }
         if (alns) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
+        // Appending retains the incumbent cores and every existing worker's seed position.
+        continuousLpArm(scenario, facts, arms)?.let { arms += it }
         return arms
+    }
+
+    private fun continuousLpArm(
+        scenario: PortfolioScenario,
+        facts: ProblemFacts,
+        arms: List<WorkerConfig>,
+    ): BacktrackWorkerConfig? {
+        if (!LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return null
+        if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
+            scenario.lsPool != null || scenario.btPool != null || !facts.profile.realColumns ||
+            arms.any { it.label == "lp-default" }
+        ) return null
+        val recipe = BacktrackCatalog.ranked(scenario.kind, facts).firstOrNull { it.label == "lp-default" }
+            ?: return null
+        return BacktrackWorkerConfig(
+            recipe.editing(scenario.btEdit).capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+            scenario.zeroObjectivePricing,
+        )
     }
 }

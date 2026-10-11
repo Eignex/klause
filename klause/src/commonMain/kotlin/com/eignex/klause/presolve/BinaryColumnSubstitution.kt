@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -25,8 +26,9 @@ import com.eignex.klause.util.LongArrayList
  * ([com.eignex.klause.propagation.PbConflictResolvent]), so as [Linear] rows these models get no
  * division-based learning, no at-most-one clique merging and no coefficient strengthening over literals.
  *
- * The column is substituted **outright** — a fresh Boolean variable carries its value and no channelling
- * factor is posted. Channelling instead (a reified `x = 1 ⟺ b` per column) would trade the [Linear] rows
+ * The column is substituted **outright** — an existing unary indicator or a fresh Boolean carries its
+ * value without a channelling factor. Channelling instead (a reified `x = 1 ⟺ b` per column) would trade
+ * the [Linear] rows
  * for pseudo-Boolean rows *plus* a reified factor each, and reified single-variable indicators are
  * consumed by comparison-clause folding, which strands them.
  *
@@ -39,8 +41,10 @@ import com.eignex.klause.util.LongArrayList
  *    is a fixpoint — disqualifying one column disqualifies its rows, and those rows' other columns with
  *    them.
  *
- * Every other factor kind reads its integer variables value-wise (a global, a reified row, a product), so
- * a column it mentions stays an integer column.
+ * A single-variable reified relation whose truth differs at 0 and 1 becomes a Boolean
+ * literal carrying the integer value. Additional indicators become Boolean equivalences to that literal.
+ * Other factor kinds read their integer variables value-wise (a global, a general reified
+ * row, a product), so a column they mention stays an integer column.
  *
  * A column the objective reads is never substituted: the objective names integer variable ids directly
  * and the engine optimises over the presolved problem, so substituting one would silently rewrite it.
@@ -55,13 +59,13 @@ import com.eignex.klause.util.LongArrayList
  */
 internal object BinaryColumnSubstitution {
 
-    /** The result of a firing substitution: the transformed [problem] (its Boolean namespace extended by
-     *  one variable per substituted column), the [reconstruct] that lifts its solutions back to the input's
+    /** The result of a firing substitution: the transformed [problem] (its Boolean namespace extended for
+     *  columns without an existing indicator), the [reconstruct] that lifts its solutions back to the input's
      *  variable space, and the number of [columns] substituted. */
     class Substitution(val problem: BakedProblem, val reconstruct: (Sample) -> Sample, val columns: Int)
 
     /**
-     * Substitute every eligible `{0, 1}` column of [problem] for a fresh Boolean literal, or return `null`
+     * Substitute every eligible `{0, 1}` column of [problem] for a Boolean literal, or return `null`
      * when no column qualifies (the common case, and always for a model with no integer columns).
      * [objectiveIntVars] are held back. [bakeConfig] is threaded into the rebuild so the root-bake probing
      * policy is re-derived over the rewritten factor set.
@@ -82,22 +86,29 @@ internal object BinaryColumnSubstitution {
         // The `≥`-form right-hand side of each row after positive-weight normalisation, computed once here
         // and reused by the rewrite; `null` marks a factor that cannot become a pseudo-Boolean relation.
         val rows = Array(factors.size) { factors[it].equivalentLinear() }
+        val channels = IntArray(factors.size) { factors[it].binaryChannelLiteral() }
         val normalizedBound = arrayOfNulls<Long>(factors.size)
         for (i in factors.indices) {
             val row = rows[i]
             if (row != null) normalizedBound[i] = normalizedBound(row)
+            if (channels[i] != Lit.NONE) normalizedBound[i] = 0L
         }
         val occurrence = intOccurrence(problem)
         disqualifyToFixpoint(problem, substitutable, normalizedBound, occurrence)
 
         // A column no factor mentions gains nothing from a literal (and would leave the Boolean free), so
         // only the columns some surviving row still reads are substituted.
-        val boolOf = IntArray(numInts) { -1 }
+        val valueLiterals = IntArray(numInts) { Lit.NONE }
+        for (i in factors.indices) {
+            if (channels[i] == Lit.NONE) continue
+            val v = factors[i].intVars.single()
+            if (substitutable[v] && valueLiterals[v] == Lit.NONE) valueLiterals[v] = channels[i]
+        }
         val columns = IntArrayList()
         var nextBool = problem.numBoolVars
         for (v in 0 until numInts) {
             if (!substitutable[v] || occurrence.count(v) == 0) continue
-            boolOf[v] = nextBool++
+            if (valueLiterals[v] == Lit.NONE) valueLiterals[v] = Lit.make(nextBool++, true)
             columns.add(v)
         }
         if (columns.isEmpty()) return null
@@ -107,26 +118,57 @@ internal object BinaryColumnSubstitution {
             val f = factors[i]
             val bound = normalizedBound[i]
             val row = rows[i]
-            if (bound == null || row == null || !row.vars.all { boolOf[it] >= 0 }) {
+            if (bound == null || !f.intVars.all { valueLiterals[it] != Lit.NONE }) {
                 out.add(f)
                 continue
             }
-            out.addAll(lower(row, boolOf, bound))
+            val channel = channels[i]
+            if (channel != Lit.NONE) {
+                val value = valueLiterals[f.intVars.single()]
+                if (channel != value) {
+                    out.add(Clause(intArrayOf(Lit.negate(channel), value)))
+                    out.add(Clause(intArrayOf(channel, Lit.negate(value))))
+                }
+            } else if (row != null) {
+                out.addAll(lower(row, valueLiterals, bound))
+            } else {
+                out.add(f)
+            }
         }
         val domains = problem.rootIntDomains()
         for (k in 0 until columns.size) domains[columns[k]] = IntDomain(0, 0)
         val rebuilt = PresolveShared.rebuildProblem(problem, out, domains, bakeConfig, numBoolVars = nextBool)
         val substituted = columns.toIntArray()
+        val substitutedLiterals = IntArray(substituted.size) { valueLiterals[substituted[it]] }
         val firstBool = problem.numBoolVars
-        return Substitution(rebuilt, { sample -> restore(sample, substituted, firstBool) }, substituted.size)
+        return Substitution(rebuilt, { sample ->
+            restore(sample, substituted, substitutedLiterals, firstBool)
+        }, substituted.size)
+    }
+
+    private fun Factor.binaryChannelLiteral(): Int {
+        val channel = this as? ReifiedLinear ?: return Lit.NONE
+        val row = channel.integerConstants ?: return Lit.NONE
+        if (channel.vars.size != 1) return Lit.NONE
+        fun holds(value: Long): Boolean = when (channel.op) {
+            LinearOp.LE -> value <= row.bound
+            LinearOp.GE -> value >= row.bound
+            LinearOp.EQ -> value == row.bound
+            LinearOp.NE -> value != row.bound
+        }
+        val atZero = holds(0L)
+        val atOne = holds(row.coeff(0))
+        return if (atZero == atOne) Lit.NONE else Lit.make(channel.auxBoolVar, atOne)
     }
 
     /** Recover the substituted columns' integer values from their literals and drop the added Booleans, so
      *  the sample lands in the pre-substitution variable space. */
-    private fun restore(sample: Sample, substituted: IntArray, firstBool: Int): Sample {
+    private fun restore(sample: Sample, substituted: IntArray, literals: IntArray, firstBool: Int): Sample {
         val ints = sample.ints.copyOf()
         for (k in substituted.indices) {
-            ints[substituted[k]] = if (sample.bools.getOrElse(firstBool + k) { false }) 1L else 0L
+            val literal = literals[k]
+            val value = sample.bools.getOrElse(Lit.variable(literal)) { false }
+            ints[substituted[k]] = if (Lit.evaluate(literal, value)) 1L else 0L
         }
         val bools = if (sample.bools.size > firstBool) sample.bools.copyOf(firstBool) else sample.bools
         return sample.copy(bools = bools, ints = ints)
@@ -166,14 +208,14 @@ internal object BinaryColumnSubstitution {
     }
 
     /**
-     * The pseudo-Boolean form of row [f] over the literals [boolOf] assigns its columns, given its
+     * The pseudo-Boolean form of row [f] over the literals [valueLiterals] assigns its columns, given its
      * pre-computed normalised [bound]. Emits the tightest lane: a [Clause] for an at-least-one, a
      * [Cardinality] for unit weights, else a [PseudoBoolean]. A vacuous row drops; an infeasible one is
      * emitted as a [PseudoBoolean] whose bound propagation refutes. A row whose every coefficient is zero
      * has no literals to carry it, so it is kept as it came — its columns are pinned to 0, which reproduces
      * exactly the constant relation it already was.
      */
-    private fun lower(f: Linear, boolOf: IntArray, bound: Long): List<Factor> {
+    private fun lower(f: Linear, valueLiterals: IntArray, bound: Long): List<Factor> {
         val row = f.integerConstants ?: return listOf(f)
         val flip = f.op == LinearOp.LE // ≤ → ≥ negates both sides
         val weights = LongArrayList(f.vars.size)
@@ -183,7 +225,8 @@ internal object BinaryColumnSubstitution {
             val a = if (flip) -raw else raw
             if (a == 0L) continue
             weights.add(if (a < 0L) -a else a)
-            literals.add(Lit.make(boolOf[f.vars[i]], positive = a > 0L))
+            val value = valueLiterals[f.vars[i]]
+            literals.add(if (a > 0L) value else Lit.negate(value))
         }
         if (literals.isEmpty()) return listOf(f)
         val lits = literals.toIntArray()

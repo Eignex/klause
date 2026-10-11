@@ -368,4 +368,49 @@ class ProblemTest {
         assertSame(problem, route.problem)
         assertFalse(route.problem is BakedProblem)
     }
+
+    @Test
+    fun `component plans reject a different model with the same variable and factor counts`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), tighteningFactors())
+        val unrelated = source.withFactors(source.factors.copyOf())
+        val plan = source.componentPlan(preferFinite = true)
+
+        assertFailsWith<IllegalArgumentException> { plan.cpSourceDomains(unrelated) }
+        assertFailsWith<IllegalArgumentException> { plan.theoryFragment(unrelated) }
+    }
+
+    @Test
+    fun `dropping an appended objective row rejects an unrelated factor prefix`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), tighteningFactors())
+        val appended = source.withFactors(source.factors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2))
+        val unrelated = source.withFactors(arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)))
+        val plan = appended.componentPlan(preferFinite = true)
+
+        assertFailsWith<IllegalArgumentException> { plan.withoutAppendedFactor(unrelated) }
+    }
+
+    @Test
+    fun `replacing an objective row cannot change its selected coefficients`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), tighteningFactors())
+        val planned = source.withFactors(source.factors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2))
+        val changed = source.withFactors(source.factors + Linear(intArrayOf(2), intArrayOf(0), LinearOp.LE, 2))
+        val plan = planned.componentPlan(preferFinite = true)
+
+        assertFailsWith<IllegalArgumentException> { plan.forObjectiveRound(changed, appended = true) }
+    }
+
+    @Test
+    fun `objective round rebinding cannot introduce holes into an open declaration`() {
+        val source = Problem(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                LongArray(1), LongArray(1), Bits(1).also { it.set(0) }, Bits(1).also { it.set(0) },
+            ),
+            factors = tighteningFactors().toTypedArray(),
+        )
+        val holed = Problem(0, 1, arrayOf(IntDomain(0, 3).excludeValue(1)), source.factors)
+        val plan = source.componentPlan()
+
+        assertFailsWith<IllegalArgumentException> { plan.forObjectiveRound(holed, appended = false) }
+    }
 }

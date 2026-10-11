@@ -4,16 +4,19 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BigInt
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.div
+import com.eignex.klause.util.fitsLong
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.plus
 import com.eignex.klause.util.signum
 import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 
 /**
- * One step of recovering the Boolean columns a pass eliminated, stated as data rather than as a closure.
+ * One step of recovering the columns a pass eliminated, stated as data rather than as a closure.
  *
  * A reconstruction has to run on whichever witness the lane that solved the reduced model produced, and
  * those witnesses share no type: the finite lane yields a [com.eignex.klause.solver.Sample] over
@@ -97,12 +100,32 @@ internal sealed interface RebuildStep {
 }
 
 /**
- * The Boolean columns a pass eliminated, in the order they are recovered.
+ * The columns a pass eliminated, in the order they are recovered.
  *
  * Immutable and lane-neutral: [rebuildInto] is the whole evaluator, and a lane adapts its witness to a
  * `BooleanArray` rather than this knowing about the witness.
  */
-internal class SourceRebuilds(private val steps: List<RebuildStep>) {
+internal class SourceRebuilds(steps: List<RebuildStep>) {
+    internal val steps: List<RebuildStep> = steps.map { step ->
+        when (step) {
+            is RebuildStep.CopyLiteral -> RebuildStep.CopyLiteral(step.variable, step.source)
+            is RebuildStep.SatisfyClauses -> RebuildStep.SatisfyClauses(step.variable, step.clauses.map { it.copyOf() })
+            is RebuildStep.RepairClause -> RebuildStep.RepairClause(step.clause.copyOf(), step.literal)
+            is RebuildStep.AffineValue -> {
+                require(step.divisor != 0L && step.termVars.size == step.termCoeffs.size)
+                RebuildStep.AffineValue(
+                    step.variable, step.constTerm, step.termVars.copyOf(), step.termCoeffs.copyOf(), step.divisor,
+                )
+            }
+            is RebuildStep.QuotientValue -> {
+                require(step.divisor != 0L && step.termVars.size == step.termCoeffs.size)
+                RebuildStep.QuotientValue(
+                    step.variable, step.constTerm, step.termVars.copyOf(), step.termCoeffs.copyOf(),
+                    step.divisor, step.roundDown, step.clamp,
+                )
+            }
+        }
+    }
 
     /** Whether this recovers nothing, so a lane can skip adapting its witness at all. */
     val isEmpty: Boolean get() = steps.isEmpty()
@@ -119,9 +142,7 @@ internal class SourceRebuilds(private val steps: List<RebuildStep>) {
     fun rebuildInto(bools: BooleanArray, ints: LongArray) {
         for (step in steps) {
             if (step is RebuildStep.AffineValue) {
-                var v = step.constTerm
-                for (k in step.termVars.indices) v += step.termCoeffs[k] * ints[step.termVars[k]]
-                ints[step.variable] = if (step.divisor == 1L) v else v / step.divisor
+                ints[step.variable] = affineValue(step) { bigIntOf(ints[it]) }.toLongExact()
                 continue
             }
             if (step is RebuildStep.QuotientValue) {
@@ -150,11 +171,7 @@ internal class SourceRebuilds(private val steps: List<RebuildStep>) {
     fun rebuildInto(bools: BooleanArray, ints: Array<BigInt>) {
         for (step in steps) {
             if (step is RebuildStep.AffineValue) {
-                var v = bigIntOf(step.constTerm)
-                for (k in step.termVars.indices) {
-                    v += ints[step.termVars[k]] * bigIntOf(step.termCoeffs[k])
-                }
-                ints[step.variable] = if (step.divisor == 1L) v else v / bigIntOf(step.divisor)
+                ints[step.variable] = affineValue(step) { ints[it] }
                 continue
             }
             if (step is RebuildStep.QuotientValue) {
@@ -182,6 +199,15 @@ internal class SourceRebuilds(private val steps: List<RebuildStep>) {
             }
             rebuildBool(step, bools)
         }
+    }
+
+    private inline fun affineValue(step: RebuildStep.AffineValue, value: (Int) -> BigInt): BigInt {
+        var numerator = bigIntOf(step.constTerm)
+        for (k in step.termVars.indices) numerator += value(step.termVars[k]) * bigIntOf(step.termCoeffs[k])
+        val divisor = bigIntOf(step.divisor)
+        val result = numerator / divisor
+        require(result * divisor == numerator) { "affine reconstruction requires an integral source value" }
+        return result
     }
 
     /** Recover the Boolean columns alone, for a lane with no integer column to carry. */
@@ -269,8 +295,20 @@ internal fun SourceRebuilds.asSampleLift(): ((Sample) -> Sample)? = if (isEmpty)
 } else {
     { sample ->
         val bools = sample.bools.copyOf()
-        val ints = sample.ints.copyOf()
-        rebuildInto(bools, ints)
-        sample.copy(bools = bools, ints = ints)
+        val exact = sample.exactInts
+        if (exact == null) {
+            val ints = sample.ints.copyOf()
+            rebuildInto(bools, ints)
+            sample.copy(bools = bools, ints = ints)
+        } else {
+            val ints = exact.toTypedArray()
+            rebuildInto(bools, ints)
+            val finite = if (ints.all { it.fitsLong() }) {
+                LongArray(ints.size) { ints[it].toLongExact() }
+            } else {
+                EmptyLongArray
+            }
+            sample.copy(bools = bools, ints = finite, exactInts = ints.toList())
+        }
     }
 }

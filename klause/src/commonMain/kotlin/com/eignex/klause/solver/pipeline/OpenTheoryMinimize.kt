@@ -354,9 +354,11 @@ class OpenTheoryMinimizer internal constructor(
             // The opening round decides the model itself, so the row leaves plan and spec together until a
             // witness gives it a bound to state.
             val (spec, plan) = when {
-                terms.isEmpty() -> opened.base to opened.boundedPlan
+                terms.isEmpty() -> opened.base to opened.boundedPlan.forObjectiveRound(opened.base, appended = false)
                 bound == null -> opened.base to opened.boundedPlan.withoutAppendedFactor(opened.base)
-                else -> opened.base.boundedBy(bound - BIG_ONE) to opened.boundedPlan
+                else -> opened.base.boundedBy(bound - BIG_ONE).let { spec ->
+                    spec to opened.boundedPlan.forObjectiveRound(spec, appended = true)
+                }
             }
             val engine = OpenTheoryEngine(
                 OpenSourcePreparation.Planned(opened.prepared, spec, plan),

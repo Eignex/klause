@@ -7,8 +7,10 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class AmoCliqueMergeTest {
 
@@ -51,6 +53,21 @@ class AmoCliqueMergeTest {
 
     private fun clauses(p: Problem) = p.factors.filterIsInstance<Clause>().size
     private fun cardinalities(p: Problem) = p.factors.filterIsInstance<Cardinality>().size
+
+    @Test
+    fun `keeps clauses when cancellation follows clique analysis`() {
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(clause(pos(0), pos(1)), clause(pos(0), pos(2)), clause(pos(1), pos(2))),
+        )
+        var polls = 0
+
+        val delta = AmoCliqueMerge.mergeAmoCliques(problem, Cancellation { ++polls > 1 })
+
+        assertTrue(delta.isEmpty)
+    }
 
     @Test
     fun `merges a triangle of binary clauses into one at-most-one`() {

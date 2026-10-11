@@ -616,6 +616,8 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
         final fun <get-autoEligible>(): kotlin/Boolean // com.eignex.klause.presolve/PresolvePass.autoEligible.<get-autoEligible>|<get-autoEligible>(){}[0]
     final val entries // com.eignex.klause.presolve/PresolvePass.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.presolve/PresolvePass> // com.eignex.klause.presolve/PresolvePass.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val guarantees // com.eignex.klause.presolve/PresolvePass.guarantees|{}guarantees[0]
+        final fun <get-guarantees>(): com.eignex.klause.presolve/TransformationGuarantees // com.eignex.klause.presolve/PresolvePass.guarantees.<get-guarantees>|<get-guarantees>(){}[0]
     final val id // com.eignex.klause.presolve/PresolvePass.id|{}id[0]
         final fun <get-id>(): kotlin/String // com.eignex.klause.presolve/PresolvePass.id.<get-id>|<get-id>(){}[0]
     final val preservesSolutionSet // com.eignex.klause.presolve/PresolvePass.preservesSolutionSet|{}preservesSolutionSet[0]
@@ -763,6 +765,7 @@ abstract fun interface com.eignex.klause.util/WorkMeter { // com.eignex.klause.u
 abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/Optimizer : com.eignex.klause.solver/Solver<#A> { // com.eignex.klause.solver/Optimizer|null[0]
     abstract fun minimize(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.solver/Optimizer.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
     open fun improvements(com.eignex.klause.solver.objective/LinearObjective, #A): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.solver/Optimizer.improvements|improvements(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
+    open fun openImprovements(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.solver/Optimizer.openImprovements|openImprovements(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
 }
 
 abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/ResumableOptimizer : com.eignex.klause.solver/Optimizer<#A> { // com.eignex.klause.solver/ResumableOptimizer|null[0]
@@ -792,6 +795,11 @@ abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause
     open fun exactCount(com.eignex.klause.count/ExactCountConfig = ...): kotlin.sequences/Sequence<com.eignex.klause.count/Count> // com.eignex.klause.solver/Session.exactCount|exactCount(com.eignex.klause.count.ExactCountConfig){}[0]
     open fun improvements(com.eignex.klause.solver.objective/LinearObjective, #A): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.solver/Session.improvements|improvements(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
     open fun minimize(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.solver/Session.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
+    open fun openEnumerate(#A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Session.openEnumerate|openEnumerate(1:0){}[0]
+    open fun openExactCount(com.eignex.klause.count/ExactCountConfig = ...): com.eignex.klause.solver/SearchStream<com.eignex.klause.count/Count> // com.eignex.klause.solver/Session.openExactCount|openExactCount(com.eignex.klause.count.ExactCountConfig){}[0]
+    open fun openImprovements(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.solver/Session.openImprovements|openImprovements(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
+    open fun openSamples(#A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Session.openSamples|openSamples(1:0){}[0]
+    open fun openSamples(com.eignex.klause.count/SamplingConfig, #A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Session.openSamples|openSamples(com.eignex.klause.count.SamplingConfig;1:0){}[0]
     open fun resumable(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver/ResumableSearch? // com.eignex.klause.solver/Session.resumable|resumable(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
     open fun resumableSolve(#A): com.eignex.klause.solver/ResumableSolve? // com.eignex.klause.solver/Session.resumableSolve|resumableSolve(1:0){}[0]
     open fun sample(#A): com.eignex.klause.solver.result/SampleResult // com.eignex.klause.solver/Session.sample|sample(1:0){}[0]
@@ -809,6 +817,10 @@ abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause
     open fun count(com.eignex.klause.count/CountConfig = ...): com.eignex.klause.count/Count // com.eignex.klause.solver/Solver.count|count(com.eignex.klause.count.CountConfig){}[0]
     open fun describe(#A): kotlin/String // com.eignex.klause.solver/Solver.describe|describe(1:0){}[0]
     open fun exactCount(com.eignex.klause.count/ExactCountConfig = ...): kotlin.sequences/Sequence<com.eignex.klause.count/Count> // com.eignex.klause.solver/Solver.exactCount|exactCount(com.eignex.klause.count.ExactCountConfig){}[0]
+    open fun openEnumerate(#A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Solver.openEnumerate|openEnumerate(1:0){}[0]
+    open fun openExactCount(com.eignex.klause.count/ExactCountConfig = ...): com.eignex.klause.solver/SearchStream<com.eignex.klause.count/Count> // com.eignex.klause.solver/Solver.openExactCount|openExactCount(com.eignex.klause.count.ExactCountConfig){}[0]
+    open fun openSamples(#A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Solver.openSamples|openSamples(1:0){}[0]
+    open fun openSamples(com.eignex.klause.count/SamplingConfig, #A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Solver.openSamples|openSamples(com.eignex.klause.count.SamplingConfig;1:0){}[0]
     open fun sample(#A): com.eignex.klause.solver.result/SampleResult // com.eignex.klause.solver/Solver.sample|sample(1:0){}[0]
     open fun samples(com.eignex.klause.count/SamplingConfig, #A): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Solver.samples|samples(com.eignex.klause.count.SamplingConfig;1:0){}[0]
     open fun session(): com.eignex.klause.solver/Session<#A> // com.eignex.klause.solver/Solver.session|session(){}[0]
@@ -825,6 +837,13 @@ abstract interface <#A: kotlin/Any?> com.eignex.klause.solver.search/VariableBra
     open fun onConflict(com.eignex.klause.solver.search/VarRef?, com.eignex.klause.solver.search/BranchingConflict) // com.eignex.klause.solver.search/VariableBranching.onConflict|onConflict(com.eignex.klause.solver.search.VarRef?;com.eignex.klause.solver.search.BranchingConflict){}[0]
     open fun onRestart() // com.eignex.klause.solver.search/VariableBranching.onRestart|onRestart(){}[0]
     open fun onUnassign(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.solver.search/VariableBranching.onUnassign|onUnassign(com.eignex.klause.solver.search.VarRef){}[0]
+}
+
+abstract interface <#A: out kotlin/Any> com.eignex.klause.solver/SearchStream : kotlin.collections/Iterator<#A>, kotlin.sequences/Sequence<#A>, kotlin/AutoCloseable { // com.eignex.klause.solver/SearchStream|null[0]
+    abstract val isDone // com.eignex.klause.solver/SearchStream.isDone|{}isDone[0]
+        abstract fun <get-isDone>(): kotlin/Boolean // com.eignex.klause.solver/SearchStream.isDone.<get-isDone>|<get-isDone>(){}[0]
+
+    abstract fun close() // com.eignex.klause.solver/SearchStream.close|close(){}[0]
 }
 
 abstract interface <#A: out kotlin/Any?> com.eignex.klause.theory/Theory { // com.eignex.klause.theory/Theory|null[0]
@@ -1271,6 +1290,9 @@ abstract interface com.eignex.klause.solver/ResumableSolve : kotlin/AutoCloseabl
 }
 
 abstract interface com.eignex.klause.solver/SolverParams { // com.eignex.klause.solver/SolverParams|null[0]
+    open val assumptions // com.eignex.klause.solver/SolverParams.assumptions|{}assumptions[0]
+        open fun <get-assumptions>(): com.eignex.klause.propagation/Assumptions // com.eignex.klause.solver/SolverParams.assumptions.<get-assumptions>|<get-assumptions>(){}[0]
+
     open fun withAssumptions(com.eignex.klause.propagation/Assumptions): com.eignex.klause.solver/SolverParams // com.eignex.klause.solver/SolverParams.withAssumptions|withAssumptions(com.eignex.klause.propagation.Assumptions){}[0]
     open fun withCancellation(com.eignex.klause.util/Cancellation): com.eignex.klause.solver/SolverParams // com.eignex.klause.solver/SolverParams.withCancellation|withCancellation(com.eignex.klause.util.Cancellation){}[0]
 }
@@ -3747,6 +3769,8 @@ final class com.eignex.klause.backtrack/BacktrackSolver : com.eignex.klause.solv
     final fun improvements(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.backtrack/BacktrackParams): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.backtrack/BacktrackSolver.improvements|improvements(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun minimize(com.eignex.klause.solver.objective/LinearObjective): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.backtrack/BacktrackSolver.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective){}[0]
     final fun minimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.backtrack/BacktrackSolver.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.backtrack.BacktrackParams){}[0]
+    final fun openEnumerate(com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.backtrack/BacktrackSolver.openEnumerate|openEnumerate(com.eignex.klause.backtrack.BacktrackParams){}[0]
+    final fun openImprovements(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.backtrack/BacktrackSolver.openImprovements|openImprovements(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun resumable(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/ResumableSearch // com.eignex.klause.backtrack/BacktrackSolver.resumable|resumable(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun resumableSolve(com.eignex.klause.backtrack/BacktrackParams): com.eignex.klause.solver/ResumableSolve // com.eignex.klause.backtrack/BacktrackSolver.resumableSolve|resumableSolve(com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun sample(): com.eignex.klause.solver.result/SampleResult // com.eignex.klause.backtrack/BacktrackSolver.sample|sample(){}[0]
@@ -6732,22 +6756,21 @@ final class com.eignex.klause.localsearch/LocalSearchProblem { // com.eignex.kla
         final fun <get-realOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.localsearch/LocalSearchProblem.realOccurrences.<get-realOccurrences>|<get-realOccurrences>(){}[0]
 }
 
-final class com.eignex.klause.localsearch/LocalSearchSession : com.eignex.klause.solver/Session<com.eignex.klause.localsearch/LocalSearchParams> { // com.eignex.klause.localsearch/LocalSearchSession|null[0]
+final class com.eignex.klause.localsearch/LocalSearchSession : com.eignex.klause.solver/StatelessSession<com.eignex.klause.localsearch/LocalSearchParams> { // com.eignex.klause.localsearch/LocalSearchSession|null[0]
     constructor <init>(com.eignex.klause.localsearch/LocalSearchSolver) // com.eignex.klause.localsearch/LocalSearchSession.<init>|<init>(com.eignex.klause.localsearch.LocalSearchSolver){}[0]
 
-    final val depth // com.eignex.klause.localsearch/LocalSearchSession.depth|{}depth[0]
-        final fun <get-depth>(): kotlin/Int // com.eignex.klause.localsearch/LocalSearchSession.depth.<get-depth>|<get-depth>(){}[0]
     final val solver // com.eignex.klause.localsearch/LocalSearchSession.solver|{}solver[0]
         final fun <get-solver>(): com.eignex.klause.localsearch/LocalSearchSolver // com.eignex.klause.localsearch/LocalSearchSession.solver.<get-solver>|<get-solver>(){}[0]
 
+    final fun close() // com.eignex.klause.localsearch/LocalSearchSession.close|close(){}[0]
     final fun enumerate(com.eignex.klause.localsearch/LocalSearchParams): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.localsearch/LocalSearchSession.enumerate|enumerate(com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun improvements(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.localsearch/LocalSearchSession.improvements|improvements(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun minimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.localsearch/LocalSearchSession.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams){}[0]
-    final fun pop() // com.eignex.klause.localsearch/LocalSearchSession.pop|pop(){}[0]
-    final fun push(com.eignex.klause.propagation/Assumptions) // com.eignex.klause.localsearch/LocalSearchSession.push|push(com.eignex.klause.propagation.Assumptions){}[0]
     final fun reset() // com.eignex.klause.localsearch/LocalSearchSession.reset|reset(){}[0]
     final fun resumable(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/ResumableSearch // com.eignex.klause.localsearch/LocalSearchSession.resumable|resumable(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun resumableSolve(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/ResumableSolve // com.eignex.klause.localsearch/LocalSearchSession.resumableSolve|resumableSolve(com.eignex.klause.localsearch.LocalSearchParams){}[0]
+    final fun sample(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver.result/SampleResult // com.eignex.klause.localsearch/LocalSearchSession.sample|sample(com.eignex.klause.localsearch.LocalSearchParams){}[0]
+    final fun samples(com.eignex.klause.count/SamplingConfig, com.eignex.klause.localsearch/LocalSearchParams): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.localsearch/LocalSearchSession.samples|samples(com.eignex.klause.count.SamplingConfig;com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun samples(com.eignex.klause.localsearch/LocalSearchParams): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.localsearch/LocalSearchSession.samples|samples(com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun solve(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/SolveResult // com.eignex.klause.localsearch/LocalSearchSession.solve|solve(com.eignex.klause.localsearch.LocalSearchParams){}[0]
 }
@@ -6782,6 +6805,10 @@ final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.
     final fun improvements(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.localsearch/LocalSearchSolver.improvements|improvements(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun minimize(com.eignex.klause.solver.objective/LinearObjective): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.localsearch/LocalSearchSolver.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective){}[0]
     final fun minimize(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.localsearch/LocalSearchSolver.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams){}[0]
+    final fun openEnumerate(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.localsearch/LocalSearchSolver.openEnumerate|openEnumerate(com.eignex.klause.localsearch.LocalSearchParams){}[0]
+    final fun openImprovements(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.localsearch/LocalSearchSolver.openImprovements|openImprovements(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams){}[0]
+    final fun openSamples(com.eignex.klause.count/SamplingConfig, com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.localsearch/LocalSearchSolver.openSamples|openSamples(com.eignex.klause.count.SamplingConfig;com.eignex.klause.localsearch.LocalSearchParams){}[0]
+    final fun openSamples(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.localsearch/LocalSearchSolver.openSamples|openSamples(com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun resumable(com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/ResumableSearch // com.eignex.klause.localsearch/LocalSearchSolver.resumable|resumable(com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun resumableSolve(com.eignex.klause.localsearch/LocalSearchParams): com.eignex.klause.solver/ResumableSolve // com.eignex.klause.localsearch/LocalSearchSolver.resumableSolve|resumableSolve(com.eignex.klause.localsearch.LocalSearchParams){}[0]
     final fun sample(): com.eignex.klause.solver.result/SampleResult // com.eignex.klause.localsearch/LocalSearchSolver.sample|sample(){}[0]
@@ -9705,6 +9732,37 @@ final class com.eignex.klause.presolve/Presolved { // com.eignex.klause.presolve
 
 final class com.eignex.klause.presolve/SharedIntOccurrence // com.eignex.klause.presolve/SharedIntOccurrence|null[0]
 
+final class com.eignex.klause.presolve/TransformationGuarantees { // com.eignex.klause.presolve/TransformationGuarantees|null[0]
+    constructor <init>(kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean) // com.eignex.klause.presolve/TransformationGuarantees.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+
+    final val bijection // com.eignex.klause.presolve/TransformationGuarantees.bijection|{}bijection[0]
+        final fun <get-bijection>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.bijection.<get-bijection>|<get-bijection>(){}[0]
+    final val objective // com.eignex.klause.presolve/TransformationGuarantees.objective|{}objective[0]
+        final fun <get-objective>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.objective.<get-objective>|<get-objective>(){}[0]
+    final val projectedSolutions // com.eignex.klause.presolve/TransformationGuarantees.projectedSolutions|{}projectedSolutions[0]
+        final fun <get-projectedSolutions>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.projectedSolutions.<get-projectedSolutions>|<get-projectedSolutions>(){}[0]
+    final val reconstructability // com.eignex.klause.presolve/TransformationGuarantees.reconstructability|{}reconstructability[0]
+        final fun <get-reconstructability>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.reconstructability.<get-reconstructability>|<get-reconstructability>(){}[0]
+    final val satisfiability // com.eignex.klause.presolve/TransformationGuarantees.satisfiability|{}satisfiability[0]
+        final fun <get-satisfiability>(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.satisfiability.<get-satisfiability>|<get-satisfiability>(){}[0]
+
+    final fun component1(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.component5|component5(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.presolve/TransformationGuarantees // com.eignex.klause.presolve/TransformationGuarantees.copy|copy(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.presolve/TransformationGuarantees.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.presolve/TransformationGuarantees.hashCode|hashCode(){}[0]
+    final fun then(com.eignex.klause.presolve/TransformationGuarantees): com.eignex.klause.presolve/TransformationGuarantees // com.eignex.klause.presolve/TransformationGuarantees.then|then(com.eignex.klause.presolve.TransformationGuarantees){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.presolve/TransformationGuarantees.toString|toString(){}[0]
+
+    final object Companion { // com.eignex.klause.presolve/TransformationGuarantees.Companion|null[0]
+        final val IDENTITY // com.eignex.klause.presolve/TransformationGuarantees.Companion.IDENTITY|{}IDENTITY[0]
+            final fun <get-IDENTITY>(): com.eignex.klause.presolve/TransformationGuarantees // com.eignex.klause.presolve/TransformationGuarantees.Companion.IDENTITY.<get-IDENTITY>|<get-IDENTITY>(){}[0]
+    }
+}
+
 final class com.eignex.klause.propagation/Assumptions { // com.eignex.klause.propagation/Assumptions|null[0]
     final val boolKeys // com.eignex.klause.propagation/Assumptions.boolKeys|{}boolKeys[0]
         final fun <get-boolKeys>(): kotlin/IntArray // com.eignex.klause.propagation/Assumptions.boolKeys.<get-boolKeys>|<get-boolKeys>(){}[0]
@@ -12525,10 +12583,19 @@ open class <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/
         open fun <get-solver>(): com.eignex.klause.solver/Solver<#A> // com.eignex.klause.solver/StatelessSession.solver.<get-solver>|<get-solver>(){}[0]
 
     final fun applyStack(#A): #A // com.eignex.klause.solver/StatelessSession.applyStack|applyStack(1:0){}[0]
+    final fun ensureAvailable() // com.eignex.klause.solver/StatelessSession.ensureAvailable|ensureAvailable(){}[0]
     open fun approximateCount(com.eignex.klause.count/ApproxCountConfig): com.eignex.klause.count/Count // com.eignex.klause.solver/StatelessSession.approximateCount|approximateCount(com.eignex.klause.count.ApproxCountConfig){}[0]
+    open fun close() // com.eignex.klause.solver/StatelessSession.close|close(){}[0]
+    open fun count(com.eignex.klause.count/CountConfig): com.eignex.klause.count/Count // com.eignex.klause.solver/StatelessSession.count|count(com.eignex.klause.count.CountConfig){}[0]
     open fun enumerate(#A): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/StatelessSession.enumerate|enumerate(1:0){}[0]
+    open fun exactCount(com.eignex.klause.count/ExactCountConfig): kotlin.sequences/Sequence<com.eignex.klause.count/Count> // com.eignex.klause.solver/StatelessSession.exactCount|exactCount(com.eignex.klause.count.ExactCountConfig){}[0]
     open fun improvements(com.eignex.klause.solver.objective/LinearObjective, #A): kotlin.sequences/Sequence<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.solver/StatelessSession.improvements|improvements(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
     open fun minimize(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver.result/MinimizeResult // com.eignex.klause.solver/StatelessSession.minimize|minimize(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
+    open fun openEnumerate(#A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/StatelessSession.openEnumerate|openEnumerate(1:0){}[0]
+    open fun openExactCount(com.eignex.klause.count/ExactCountConfig): com.eignex.klause.solver/SearchStream<com.eignex.klause.count/Count> // com.eignex.klause.solver/StatelessSession.openExactCount|openExactCount(com.eignex.klause.count.ExactCountConfig){}[0]
+    open fun openImprovements(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver.result/MinimizeResult> // com.eignex.klause.solver/StatelessSession.openImprovements|openImprovements(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]
+    open fun openSamples(#A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/StatelessSession.openSamples|openSamples(1:0){}[0]
+    open fun openSamples(com.eignex.klause.count/SamplingConfig, #A): com.eignex.klause.solver/SearchStream<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/StatelessSession.openSamples|openSamples(com.eignex.klause.count.SamplingConfig;1:0){}[0]
     open fun pop() // com.eignex.klause.solver/StatelessSession.pop|pop(){}[0]
     open fun push(com.eignex.klause.propagation/Assumptions) // com.eignex.klause.solver/StatelessSession.push|push(com.eignex.klause.propagation.Assumptions){}[0]
     open fun resumable(com.eignex.klause.solver.objective/LinearObjective, #A): com.eignex.klause.solver/ResumableSearch? // com.eignex.klause.solver/StatelessSession.resumable|resumable(com.eignex.klause.solver.objective.LinearObjective;1:0){}[0]

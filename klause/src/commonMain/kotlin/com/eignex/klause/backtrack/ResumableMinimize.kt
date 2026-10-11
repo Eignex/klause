@@ -688,6 +688,7 @@ internal class ResumableMinimize(
         if (exact != null && !beatsExternalCutoff(exact, externalCutoff())) return null
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
+        brancher.onSolution(sample)
         if (singleObj != null) objVarBest = sample.ints[singleObj.varId]
         params.improvedSolutionSink?.invoke(sample, score.display)
         params.onEvent?.invoke(SearchEvent.Incumbent(score.display))
@@ -1030,7 +1031,6 @@ internal class ResumableMinimize(
                     "backtrack reached an optimization leaf its constraints refute: ${verdict.reason}",
                 )
             }
-            brancher.onSolution(sample)
             // What this leaf left open, apart from the run-wide record in sawIndeterminateLeaf.
             var unresolved = false
             var incomplete = false
@@ -1122,6 +1122,12 @@ internal class ResumableMinimize(
 
         override fun onResume(context: SearchContext): SearchRunDisposition {
             boundExchange.applySharedFloor()
+            val local = incumbents.current()
+            if (local != null && params.valueSelector is SolutionGuided) {
+                pooledIncumbents?.poll()?.takeIf { it.objective < local.objective.display }?.let {
+                    brancher.importPooledSolution(it.assignment, guideValues = true)
+                }
+            }
             return SearchRunDisposition.Continue
         }
 

@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.isClausal
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -134,7 +135,7 @@ object Presolver {
         context: PresolveContext = PresolveContext.EMPTY,
         cancellation: Cancellation = Cancellation.Never,
     ): SourcePresolved {
-        val passes = config.problemPasses(context, PresolvePass.Capability.SOURCE)
+        val passes = problemPasses(problem, config, context, PresolvePass.Capability.SOURCE)
         if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
         val ctx = context.withCancellation(cancellation)
             .withPresolveBudget(context.presolveBudget)
@@ -176,6 +177,21 @@ object Presolver {
         return SourcePresolved(host.current, rounds.fired, rounds.infeasible, SourceRebuilds.compose(host.rebuilds))
     }
 
+    private fun problemPasses(
+        problem: Problem,
+        config: PresolveConfig,
+        context: PresolveContext,
+        capability: PresolvePass.Capability,
+    ): List<PresolvePass> {
+        val passes = config.problemPasses(context, capability)
+        // Cardinality conversion displaces native clause propagation and learning. Keep clausal
+        // optimization in that lane unless the caller selects the stronger preparation policy.
+        val preserveClauses = problem.isClausal() && context.objectiveBoolVars.isNotEmpty() &&
+            config.emphasis != PresolveEmphasis.AGGRESSIVE &&
+            PresolvePass.MERGE_AMO_CLIQUES !in config.overrides
+        return if (preserveClauses) passes - PresolvePass.MERGE_AMO_CLIQUES else passes
+    }
+
     /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a
      *  reconstruct mapping its solutions back to the original. [cancellation] is polled between passes
      *  and rounds: a fired deadline returns the partial result so far — every pass is individually
@@ -186,7 +202,7 @@ object Presolver {
         context: PresolveContext = PresolveContext.EMPTY,
         cancellation: Cancellation = Cancellation.Never,
     ): Presolved {
-        val passes = config.problemPasses(context)
+        val passes = problemPasses(problem, config, context, PresolvePass.Capability.FINITE)
         val maxRounds = config.maxRounds
         if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
         // A gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible independent of the
@@ -219,6 +235,7 @@ object Presolver {
         val host = object : PresolveRoundEngine.RoundHost {
             var current = problem
             val reconstructs = ArrayList<(Sample) -> Sample>()
+            val rebuilds = ArrayList<SourceRebuilds>()
             var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
@@ -227,6 +244,7 @@ object Presolver {
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
                 delta.reconstruct?.let(reconstructs::add)
+                if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                 changed += changedUnitsOf(delta, current.rootIntDomainsInPlace)
                 current = current.withPassDelta(delta, ctx.bakeConfig)
                 return PassOutcome.CHANGED
@@ -241,12 +259,16 @@ object Presolver {
         val rounds = PresolveRoundEngine.run(
             passes, maxRounds, cancellation, ctx.presolveBudget, host, config.abortFraction,
         )
+        val mapping = SourceMapping(
+            problem, host.current, rounds.fired.transformationGuarantees(),
+            SourceRebuilds.compose(host.rebuilds), lift = composeReconstructs(host.reconstructs),
+        )
         return Presolved(
             host.current,
-            composeReconstructs(host.reconstructs),
+            { mapping.reconstructFrom(host.current, it) },
             rounds.fired,
             rounds.infeasible || host.current.baked is PropagationResult.Unsat,
-        )
+        ).also { it.mapping = mapping }
     }
 
     /**
@@ -284,6 +306,7 @@ object Presolver {
             var dupMark: PresolveSession.ChangeMark? = null
 
             val reconstructs = ArrayList<(Sample) -> Sample>()
+            val rebuilds = ArrayList<SourceRebuilds>()
             var changed = 0L
 
             override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
@@ -295,6 +318,7 @@ object Presolver {
                 if (delta.infeasible) return PassOutcome.INFEASIBLE
                 if (delta.isEmpty) return PassOutcome.UNCHANGED
                 delta.reconstruct?.let(reconstructs::add)
+                if (!delta.rebuild.isEmpty) rebuilds.add(delta.rebuild)
                 changed += changedUnitsOf(delta, input.rootIntDomainsInPlace)
                 session.applyDelta(delta)
                 return PassOutcome.CHANGED
@@ -345,12 +369,17 @@ object Presolver {
         // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
         if (rounds.fired.isEmpty()) return Presolved(problem, { it }, emptyList())
 
+        val transformed = session.materialize()
+        val mapping = SourceMapping(
+            problem, transformed, rounds.fired.transformationGuarantees(),
+            SourceRebuilds.compose(host.rebuilds), lift = composeReconstructs(host.reconstructs),
+        )
         return Presolved(
-            session.materialize(),
-            composeReconstructs(host.reconstructs),
+            transformed,
+            { mapping.reconstructFrom(transformed, it) },
             rounds.fired,
             rounds.infeasible || session.infeasible,
-        )
+        ).also { it.mapping = mapping }
     }
 
     /** Compose per-pass reconstructs (application order) into the single solution-mapping function,

@@ -215,7 +215,7 @@ class PortfolioTest {
         )
 
         val result = Portfolio.thompson(
-            listOf(trackingWorker("failed", 7, handle)),
+            listOf(trackingWorker("failed", 7, handle).also { it.family = ArmFamily.LocalSearch }),
             reseedStaleThreshold = 1,
         ).use { it.minimize() }
 
@@ -284,6 +284,7 @@ class PortfolioTest {
                     }
                 },
             ) { _, _, _, _ -> error("the retained handle must resume") }
+                .also { it.family = ArmFamily.LocalSearch }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
                 it.minimize(Cancellation { slices >= 14 })
@@ -1057,9 +1058,6 @@ class PortfolioTest {
 
     @Test
     fun `aggressive re-seeding does not disrupt proving the optimum`() {
-        // The re-seed guard (#3): even with reseedStaleThreshold = 1 (drop a resumable arm's handle the
-        // first non-improving segment), a fast optimality proof must still come back as Optimal at the
-        // true value — the terminal-verdict and incumbent-exists guards keep re-seed from corrupting it.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -1074,18 +1072,59 @@ class PortfolioTest {
     }
 
     @Test
-    fun `plateau reseeding is counted and the off control retains its handle`() {
-        for (threshold in listOf(0, 2, 3, 4)) {
+    fun `plateau reseeding counts observable and restart-configured searches`() {
+        for (restarting in listOf(false, true)) {
+            for (threshold in listOf(0, 2, 3, 4)) {
+                var slices = 0
+                val handle = ScriptedSearch({ it == 0 }) { slices++ }
+                val worker = trackingWorker("plateau", 0, handle).also {
+                    it.family = if (restarting) ArmFamily.Backtrack else ArmFamily.LocalSearch
+                    it.restartingSearch = restarting
+                }
+
+                val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
+                    it.minimize(Cancellation { slices >= 13 })
+                }
+
+                assertEquals(threshold, result.stats.portfolio.reseedStaleThreshold)
+                assertEquals(if (threshold == 0) 0L else 12L / threshold, result.stats.portfolio.arms.single().reseeds)
+            }
+        }
+    }
+
+    @Test
+    fun `non-restarting complete search reaches improvements beyond non-improving segments`() {
+        for (threshold in listOf(1, 3)) {
             var slices = 0
-            val handle = ScriptedSearch({ it == 0 }) { slices++ }
-            val worker = trackingWorker("plateau", 0, handle)
+            val worker = PortfolioWorker.ofMinimize(
+                "complete",
+                0,
+                resumable = { ScriptedSearch({ it == 0 || it == 5 }) { slices++ } },
+            ) { _, _, _, _ -> error("the retained handle must resume") }
+
+            val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
+                it.minimize(Cancellation { slices >= 10 })
+            }
+
+            assertEquals(998.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
+        }
+    }
+
+    @Test
+    fun `non-restarting complete search retains its handle after an incumbent tightens`() {
+        for (threshold in listOf(1, 3)) {
+            var slices = 0
+            val worker = PortfolioWorker.ofMinimize(
+                "complete",
+                0,
+                resumable = { ScriptedSearch({ it == 0 || it == 5 }) { slices++ } },
+            ) { _, _, _, _ -> error("the retained handle must resume") }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
                 it.minimize(Cancellation { slices >= 13 })
             }
 
-            assertEquals(threshold, result.stats.portfolio.reseedStaleThreshold)
-            assertEquals(if (threshold == 0) 0L else 12L / threshold, result.stats.portfolio.arms.single().reseeds)
+            assertEquals(0L, result.stats.portfolio.arms.single().reseeds)
         }
     }
 
@@ -1624,6 +1663,100 @@ class PortfolioTest {
         }
 
         assertEquals(listOf(0, 1, 0, 0, 0), reached)
+    }
+
+    @Test
+    fun `the first incumbent releases a feasibility only reservation`() {
+        for (feasibilityOnly in listOf(false, true)) {
+            val reached = ArrayList<Int>()
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+                trackingWorker("improver", 1, TrackingResumableSearch(null, onRun = { reached += 1 })),
+            )
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = 2
+                override val random = Random(0)
+                override fun choose() = 1
+                override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+                override fun reset() = Unit
+            }
+
+            Portfolio(workers, bandit, minShares = doubleArrayOf(1.0, 0.0)).use {
+                it.reserveBeforeIncumbentOnly = feasibilityOnly
+                it.minimize(Cancellation { reached.size >= 3 })
+            }
+
+            assertEquals(listOf(0, 1, if (feasibilityOnly) 1 else 0), reached)
+        }
+    }
+
+    @Test
+    fun `incumbent probes continue only after earning progress`() {
+        for (productive in listOf(false, true)) {
+            val reached = ArrayList<Int>()
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+                trackingWorker("probe", 1, ScriptedSearch({ productive && it == 0 }, start = 500.0) { reached += 1 }),
+            )
+            val bandit = object : UnivariateBandit {
+                override val nbrArms = 2
+                override val random = Random(0)
+                override fun choose() = 1
+                override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+                override fun reset() = Unit
+            }
+
+            val result = Portfolio(workers, bandit).use {
+                it.incumbentProbeArms = setOf(1)
+                it.minimize(Cancellation { reached.size >= 4 })
+            }
+
+            assertIs<MinimizeResult.BestFound>(result)
+            assertEquals(if (productive) listOf(0, 1, 1, 1) else listOf(0, 1, 0, 0), reached)
+        }
+    }
+
+    @Test
+    fun `an unproductive incumbent probe preserves retained worker choices`() {
+        for (seed in 0L..3L) {
+            val retained = ArrayList<List<Int>>()
+            for (auxiliary in listOf(false, true)) {
+                val reached = ArrayList<Int>()
+                val workers = mutableListOf(
+                    trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+                    trackingWorker("idle", 1, ScriptedSearch({ false }) { reached += 1 }).also {
+                        it.family = ArmFamily.LocalSearch
+                    },
+                )
+                if (auxiliary) workers += trackingWorker("probe", 2, ScriptedSearch({ false }) { reached += 2 })
+
+                Portfolio.thompson(workers, seed = seed, reseedStaleThreshold = 0).use {
+                    if (auxiliary) it.incumbentProbeArms = setOf(2)
+                    it.minimize(Cancellation { reached.count { arm -> arm < 2 } >= 30 })
+                }
+
+                retained += reached.filter { it < 2 }
+            }
+
+            assertEquals(retained[0], retained[1])
+        }
+    }
+
+    @Test
+    fun `incumbent probes retain feasibility work before a witness`() {
+        val slices = IntArray(2)
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ false }) { slices[0]++ }),
+            trackingWorker("probe", 1, ScriptedSearch({ it == 2 }) { slices[1]++ }),
+        )
+
+        val result = Portfolio.thompson(workers, minShares = doubleArrayOf(0.0, 1.0)).use {
+            it.incumbentProbeArms = setOf(1)
+            it.minimize(Cancellation { slices.sum() >= 5 })
+        }
+
+        assertIs<MinimizeResult.BestFound>(result)
+        assertEquals(4, slices[1])
     }
 
     @Test

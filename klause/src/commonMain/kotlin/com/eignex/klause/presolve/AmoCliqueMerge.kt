@@ -39,7 +39,7 @@ internal object AmoCliqueMerge {
         val factors = problem.factors
         val cliques = maximalPersistentAmoCliques(factors.asList(), cancellation)
             .filter { it.size >= MIN_CLIQUE_SIZE }
-        if (cliques.isEmpty()) return PassDelta()
+        if (cliques.isEmpty() || cancellation()) return PassDelta()
 
         // Index cliques by member literal so each factor is matched only against the cliques that could
         // contain its footprint, rather than all of them.
@@ -54,6 +54,7 @@ internal object AmoCliqueMerge {
         val materialisingAmo = IntArray(cliques.size) { -1 }
         val subsumed = Array(cliques.size) { IntArrayList() }
         for (i in factors.indices) {
+            if ((i and 0x3F) == 0 && cancellation()) return PassDelta()
             val f = factors[i]
             if (f is Clause && f.literals.size >= MIN_CLIQUE_SIZE) atLeastOne.getOrPut(f.literals.toHashSet()) { i }
             val fp = footprint(f) ?: continue
@@ -69,6 +70,7 @@ internal object AmoCliqueMerge {
         val dropped = IntHashSet()
         val added = ArrayList<Factor>()
         for (ci in cliques.indices) {
+            if ((ci and 0x3F) == 0 && cancellation()) return PassDelta()
             val c = cliques[ci]
             val amo = materialisingAmo[ci]
             val subs = subsumed[ci]
@@ -96,7 +98,7 @@ internal object AmoCliqueMerge {
             }
         }
 
-        if (dropped.isEmpty() && added.isEmpty()) return PassDelta()
+        if (cancellation() || (dropped.isEmpty() && added.isEmpty())) return PassDelta()
         return PassDelta(droppedIndices = dropped.toIntArray(), addedFactors = added)
     }
 

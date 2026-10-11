@@ -5,6 +5,7 @@ import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.klause.solver.Sample
@@ -109,6 +110,9 @@ sealed interface OpenTheoryAssignment {
         override fun realValue(id: Int): String = base.realValue(id)
     }
 }
+
+internal fun SourceMapping.lift(assignment: OpenTheoryAssignment): OpenTheoryAssignment =
+    rebuild.lift(assignment, source.numBoolVars, source.numIntVars)
 
 /**
  * [assignment] with the Boolean columns this rebuild recovers, over a model of [numBoolVars] columns.
@@ -291,7 +295,7 @@ class OpenTheoryEngine internal constructor(
 
             is OpenSourcePreparation.Planned -> source
         }
-        val plan = routed.plan
+        val selectedPlan = routed.plan
         val route = routed.route
         stats.backend = route.backendName()
         // Close the open sides before the theory sees them. A proved bound narrows the box the theory
@@ -313,6 +317,7 @@ class OpenTheoryEngine internal constructor(
                 is OpenPresolveResult.Tightened -> closed.spec
             }
         }
+        val plan = selectedPlan.forObjectiveRound(model, appended = false)
         val cpDomains = plan.cpSourceDomains(model)
         val planned = plan.search(
             model,
@@ -388,11 +393,7 @@ class OpenTheoryEngine internal constructor(
             // recovered before it leaves this route. Boolean ids are the source model's throughout —
             // a source pass leaves an eliminated column in place rather than renumbering.
             is SearchRunEvent.Satisfied -> OpenTheoryResult.Sat(
-                prepared.rebuild.lift(
-                    assignment(event.model, checkNotNull(planned.theory), route),
-                    prepared.source.numBoolVars,
-                    prepared.source.numIntVars,
-                ),
+                prepared.mapping.lift(assignment(event.model, checkNotNull(planned.theory), route)),
                 stats.finish(state, planned.session),
             )
 

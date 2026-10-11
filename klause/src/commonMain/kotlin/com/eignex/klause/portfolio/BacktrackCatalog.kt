@@ -195,8 +195,8 @@ object BacktrackCatalog {
     /**
      * [rankedArms] with [BacktrackArm.LpDefault] third when the model has continuous columns. A row that
      * touches a real column never propagates in CP, so on such a model node LP is the only propagation those
-     * rows get, and the first two arms run without it. They keep their slots, since they are what finds most
-     * incumbents there; [PortfolioComposition] gives such a model the backtrack slot for the LP arm.
+     * rows get. The two LP-free cores keep their slots for incumbent search; [PortfolioComposition]
+     * appends an applicable LP arm to a curated sequential mixed pool that has not admitted it.
      */
     private fun rankedArms(kind: Kind, realColumns: Boolean): List<BacktrackArm> {
         val order = rankedArms(kind)

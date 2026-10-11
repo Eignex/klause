@@ -21,8 +21,23 @@ class PortfolioCompositionTest {
             val expanded = PortfolioComposition.plan(small.copy(arms = 12), facts)
 
             assertEquals(baseline.arms.map { it.label }, expanded.arms.take(baseline.arms.size).map { it.label })
-            assertEquals(baseline.arms.size, expanded.firstSolutionCount)
+            assertEquals(baseline.firstSolutionCount, expanded.firstSolutionCount)
             assertEquals(13, expanded.arms.size)
+        }
+    }
+
+    @Test
+    fun `auxiliary LP joins finite objectives after the incumbent and continuous objectives before it`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP, ProblemClass.MixedInteger).profile
+
+        for (continuousObjective in listOf(false, true)) {
+            val facts = ProblemFacts(profile, continuousObjective = continuousObjective) { true }
+
+            val plan = PortfolioComposition.plan(scenario, facts)
+
+            assertEquals("lp-default", plan.arms.last().label)
+            assertEquals(plan.arms.size - if (continuousObjective) 0 else 1, plan.firstSolutionCount)
         }
     }
 

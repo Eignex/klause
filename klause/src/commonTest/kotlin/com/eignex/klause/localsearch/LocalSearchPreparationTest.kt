@@ -6,9 +6,11 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.Cancellation
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -45,6 +47,49 @@ class LocalSearchPreparationTest {
         assertContentEquals(IntArray(512) { it }, completed.boolOccurrences[0])
         assertTrue(visits.all { it == 2 })
         assertSame(completed, preparation.get(Cancellation { true }))
+    }
+
+    @Test
+    fun `repeated coordinates dispatch one invariant update per move`() {
+        val variants = listOf(Move.BoolFlip(0), Move.IntSet(0, 1L), Move.RealSet(0, 1.0))
+        for (move in variants) {
+            var updates = 0
+            val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+            val factor = object : Factor by clause, Invariant {
+                override val variables = MixedVars(
+                    spanInts = intArrayOf(0, 0), boundInts = intArrayOf(0),
+                    boolVars = intArrayOf(0, 0), reals = intArrayOf(0, 0),
+                )
+
+                override val boolVars: IntArray get() = variables.boolVars
+                override val intVars: IntArray get() = variables.ints
+
+                override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+                    updates++
+                    return 0
+                }
+
+                override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
+                    updates++
+                    return 0
+                }
+
+                override fun applyRealSet(state: LocalSearchState, factorId: Int, realVar: Int, oldValue: Double): Int {
+                    updates++
+                    return 0
+                }
+            }
+            val problem = Problem(
+                1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(factor),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+            state.recompute()
+
+            state.apply(move)
+
+            assertEquals(1, updates, "$move")
+        }
     }
 
     @Test

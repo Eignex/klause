@@ -29,11 +29,15 @@ internal object ApproxMC {
 
         // Cheap short-circuit: if the whole problem has ≤ thresh projected models, count exactly.
         val base = cellCount(ctx, hashes = emptyList(), cap = thresh)
-        if (!base.capped || ctx.hashDomain.isEmpty()) {
+        if (base.complete) {
             val c = base.count.toLong()
             return Count(estimate = c, lower = c, upper = c, exact = true, confidence = 1.0)
         }
 
+        if (!base.capped) {
+            val lo = base.count.toLong()
+            return Count(estimate = lo, lower = lo, upper = Long.MAX_VALUE, exact = false, confidence = 0.0)
+        }
         val t = iterationCount(config.delta)
         val baseSeed = config.seed ?: Random.Default.nextLong()
         val estimates = LongArrayList(t)
@@ -46,9 +50,9 @@ internal object ApproxMC {
                 prevM = res.mStar
             }
         }
-        if (estimates.isEmpty()) {
-            // No usable cell in any run (e.g. every run hit the per-cell decision budget). Surface
-            // "unknown" rather than fabricate base.count (≈thresh) as a point estimate.
+        if (estimates.size < t) {
+            // Dropping interrupted iterations changes both the sample size and its distribution, so
+            // the requested confidence does not follow from the surviving cells.
             val lo = base.count.toLong()
             return Count(estimate = lo, lower = lo, upper = Long.MAX_VALUE, exact = false, confidence = 0.0)
         }
@@ -79,7 +83,12 @@ internal object ApproxMC {
         fun cellAt(m: Int): CellResult = cache.getOrPut(m) { cellCount(ctx, allHashes.subList(0, m), cap = thresh) }
 
         // fits(m): the m-hash cell holds ≤ thresh projections; fits(0) is false (caller checked base).
-        fun fits(m: Int): Boolean = !cellAt(m).capped
+        var interrupted = false
+        fun fits(m: Int): Boolean {
+            val cell = cellAt(m)
+            if (!cell.complete && !cell.capped) interrupted = true
+            return cell.complete
+        }
 
         // Gallop out from the pivot to bracket lo (largest known non-fitting) < hi (smallest fitting).
         val pivot = startM.coerceIn(1, n)
@@ -114,6 +123,7 @@ internal object ApproxMC {
             val mid = low + (high - low) / 2
             if (fits(mid)) high = mid else low = mid
         }
+        if (interrupted) return null
         val mStar = high
 
         val cell = cellAt(mStar)
