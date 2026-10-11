@@ -16,7 +16,8 @@ internal class RationalPolynomial(coefficients: List<BigFraction>) {
         val ZERO = RationalPolynomial(emptyList())
         val ONE = RationalPolynomial(listOf(BigFraction.ONE))
         val X = RationalPolynomial(listOf(BigFraction.ZERO, BigFraction.ONE))
-        fun of(vararg coefficients: Long): RationalPolynomial = RationalPolynomial(coefficients.map(BigFraction::ofLong))
+        fun of(vararg coefficients: Long): RationalPolynomial =
+            RationalPolynomial(coefficients.map(BigFraction::ofLong))
     }
 }
 
@@ -29,7 +30,7 @@ internal data class SquareFreeFactor(val polynomial: RationalPolynomial, val mul
 
 internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic = PolynomialArithmetic()) {
     fun add(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial = RationalPolynomial(
-        List(maxOf(left.degree, right.degree) + 1) {
+        List(arithmetic.denseSize(maxOf(left.degree, right.degree))) {
             arithmetic.step()
             left[it] + right[it]
         },
@@ -45,8 +46,8 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
     fun multiply(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial {
         arithmetic.step()
         if (left.isZero || right.isZero) return RationalPolynomial.ZERO
-        require(left.degree <= Int.MAX_VALUE - right.degree - 1) { "polynomial degree overflow" }
-        val result = MutableList(left.degree + right.degree + 1) { BigFraction.ZERO }
+        if (left.degree > Int.MAX_VALUE - right.degree) throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+        val result = MutableList(arithmetic.denseSize(left.degree + right.degree)) { BigFraction.ZERO }
         for (i in 0..left.degree) for (j in 0..right.degree) {
             arithmetic.step()
             result[i + j] = result[i + j] + left[i] * right[j]
@@ -201,7 +202,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             pending.add(RationalInterval(midpoint, interval.upper))
             pending.add(RationalInterval(interval.lower, midpoint))
         }
-        return roots.sortedBy { it.lower }
+        return roots.sortedWith { left, right -> left.lower.compareTo(right.lower) }
     }
 
     fun refine(polynomial: RationalPolynomial, interval: RationalInterval): RationalInterval {

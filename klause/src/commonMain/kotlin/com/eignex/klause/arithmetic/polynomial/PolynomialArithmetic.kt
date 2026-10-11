@@ -5,7 +5,18 @@ import com.eignex.klause.util.Cancellation
 
 internal class PolynomialInterrupted : RuntimeException()
 
-internal class PolynomialArithmetic(private val cancellation: Cancellation = Cancellation.Never) {
+internal enum class PolynomialResource { DENSE_COEFFICIENTS, MATRIX_CELLS, DEGREE_OVERFLOW }
+
+internal class PolynomialResourceLimit(val resource: PolynomialResource) : RuntimeException()
+
+internal data class PolynomialLimits(val maxDenseCoefficients: Int = 65536, val maxMatrixCells: Long = 262144) {
+    init { require(maxDenseCoefficients > 0 && maxMatrixCells >= 0) }
+}
+
+internal class PolynomialArithmetic(
+    private val cancellation: Cancellation = Cancellation.Never,
+    private val limits: PolynomialLimits = PolynomialLimits(),
+) {
     fun step() {
         if (cancellation()) throw PolynomialInterrupted()
         cancellation.charge(1)
@@ -14,7 +25,12 @@ internal class PolynomialArithmetic(private val cancellation: Cancellation = Can
 
     fun add(left: Polynomial, right: Polynomial): Polynomial {
         step()
-        return Polynomial.of(left.terms + right.terms)
+        return Polynomial.of(buildList {
+            for (term in left.terms + right.terms) {
+                step()
+                add(term)
+            }
+        })
     }
 
     fun negate(value: Polynomial): Polynomial = scale(value, BigFraction.MINUS_ONE)
@@ -29,6 +45,11 @@ internal class PolynomialArithmetic(private val cancellation: Cancellation = Can
     fun multiply(left: Polynomial, right: Polynomial): Polynomial = Polynomial.of(buildList {
         for (a in left.terms) for (b in right.terms) {
             step()
+            for (variable in a.monomial.variables) {
+                if (b.monomial.exponent(variable) > Int.MAX_VALUE - a.monomial.exponent(variable)) {
+                    throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+                }
+            }
             add(PolynomialTerm(a.monomial.times(b.monomial), a.coefficient * b.coefficient))
         }
     })
@@ -59,7 +80,10 @@ internal class PolynomialArithmetic(private val cancellation: Cancellation = Can
 
     fun coefficients(value: Polynomial, variable: Int): List<Polynomial> {
         step()
-        val groups = List(value.degree(variable) + 1) { mutableListOf<PolynomialTerm>() }
+        val groups = List(denseSize(value.degree(variable))) {
+            step()
+            mutableListOf<PolynomialTerm>()
+        }
         for ((monomial, coefficient) in value.terms) {
             step()
             groups[monomial.exponent(variable)].add(PolynomialTerm(monomial.without(variable), coefficient))
@@ -100,10 +124,15 @@ internal class PolynomialArithmetic(private val cancellation: Cancellation = Can
         val n = b.lastIndex
         if (m == 0) return power(a[0], n)
         if (n == 0) return power(b[0], m)
-        require(m <= Int.MAX_VALUE - n) { "resultant dimension overflow" }
-        val matrix = Array(m + n) { Array(m + n) { Polynomial.ZERO } }
-        for (row in 0 until n) for (column in a.indices) matrix[row][row + column] = a[m - column]
-        for (row in 0 until m) for (column in b.indices) matrix[n + row][row + column] = b[n - column]
+        val matrix = matrix(m.toLong() + n)
+        for (row in 0 until n) for (column in a.indices) {
+            step()
+            matrix[row][row + column] = a[m - column]
+        }
+        for (row in 0 until m) for (column in b.indices) {
+            step()
+            matrix[n + row][row + column] = b[n - column]
+        }
         return determinant(matrix)
     }
 
@@ -114,8 +143,8 @@ internal class PolynomialArithmetic(private val cancellation: Cancellation = Can
         val m = a.lastIndex
         val n = b.lastIndex
         return (0 until minOf(m, n)).map { index ->
-            val size = m + n - 2 * index
-            val matrix = Array(size) { Array(size) { Polynomial.ZERO } }
+            val matrix = matrix(m.toLong() + n - 2L * index)
+            val size = matrix.size
             for (row in 0 until n - index) {
                 for (column in a.indices) {
                     step()
@@ -129,6 +158,23 @@ internal class PolynomialArithmetic(private val cancellation: Cancellation = Can
                 }
             }
             determinant(matrix)
+        }
+    }
+
+    fun denseSize(degree: Int): Int {
+        step()
+        if (degree >= limits.maxDenseCoefficients) throw PolynomialResourceLimit(PolynomialResource.DENSE_COEFFICIENTS)
+        return degree + 1
+    }
+
+    private fun matrix(size: Long): Array<Array<Polynomial>> {
+        step()
+        if (size > Int.MAX_VALUE || size * size > limits.maxMatrixCells) {
+            throw PolynomialResourceLimit(PolynomialResource.MATRIX_CELLS)
+        }
+        return Array(size.toInt()) {
+            step()
+            Array(size.toInt()) { Polynomial.ZERO }
         }
     }
 
