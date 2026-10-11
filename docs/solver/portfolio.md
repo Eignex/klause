@@ -196,6 +196,12 @@ pruning remain explicit plan options. Root cuts follow the resolved plan. Curate
 satisfaction workers require an explicit `lp-root-cuts=true` override to harvest root
 cuts; explicit pools retain their requested root-cut plans.
 
+The clausal complete-search recipes use clause learning, EMA restarts, a 2000-clause
+database and a true-first saved phase, without pseudo-Boolean learning or inprocessing.
+Their focused, balanced and stable variants use VSIDS decay 0.8, 0.9 and 0.99. Curated
+admission requires a clausal model; pseudo-Boolean models retain their cutting-plane
+palette.
+
 ## Incumbent guidance
 
 FlatZinc search hints select tiered variable and value heuristics without inheriting the

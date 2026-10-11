@@ -1,8 +1,10 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.solver.ProblemClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 
 /**
  * Coverage for the backtrack worker-config catalog — the backtrack counterpart of
@@ -10,6 +12,17 @@ import kotlin.test.assertFailsWith
  * stay in lockstep, so adding an arm to the enum without ranking it (or vice versa) fails here.
  */
 class BacktrackCatalogTest {
+
+    @Test
+    fun `non clausal models exclude clause only recipes`() {
+        for (problemClass in listOf(ProblemClass.PseudoBoolean, ProblemClass.FiniteCp, ProblemClass.Continuous)) {
+            val facts = ProblemFacts.assumed(Kind.CSP, problemClass)
+
+            val recipes = BacktrackCatalog.ranked(Kind.CSP, facts)
+
+            assertFalse(recipes.any { it.label.startsWith("clausal-") })
+        }
+    }
 
     @Test
     fun `each arm builds by label with a matching label`() {

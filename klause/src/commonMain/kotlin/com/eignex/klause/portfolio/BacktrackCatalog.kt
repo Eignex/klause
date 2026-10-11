@@ -8,6 +8,7 @@ import com.eignex.klause.backtrack.selector.ActivityBasedSearch
 import com.eignex.klause.backtrack.selector.ConflictOrdering
 import com.eignex.klause.backtrack.selector.DomWdeg
 import com.eignex.klause.backtrack.selector.Impact
+import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.backtrack.selector.SmallestDomain
@@ -36,6 +37,18 @@ object BacktrackCatalog {
      *  the pigeonhole guard. Kept at rank 0 for both kinds. */
     private fun satOptimized() = BacktrackRecipe("satOptimized") { seed, onEvent ->
         BacktrackPresets.satOptimized(randomSeed = seed, onEvent = onEvent)
+    }
+
+    private fun clausal(arm: BacktrackArm, decay: Double) = BacktrackRecipe(arm.label) { seed, onEvent ->
+        BacktrackPresets.satOptimized(randomSeed = seed, inprocess = false, onEvent = onEvent).copy(
+            variableSelector = Vsids(decay = decay),
+            valueSelector = IndomainMax,
+            targetPhasing = false,
+            adaptiveRestart = false,
+            emaRestart = true,
+            maxLearnedClauses = 2000,
+            pbLearning = false,
+        )
     }
 
     /** LastConflict + VSIDS + solution-guided values — the general-COP bound workhorse. */
@@ -144,6 +157,9 @@ object BacktrackCatalog {
      *  Keeps [BacktrackArm.label] and the produced recipe's [BacktrackRecipe.label] in lockstep. */
     private fun make(arm: BacktrackArm): BacktrackRecipe = when (arm) {
         BacktrackArm.SatOptimized -> satOptimized()
+        BacktrackArm.ClausalFocused -> clausal(arm, 0.8)
+        BacktrackArm.ClausalBalanced -> clausal(arm, 0.9)
+        BacktrackArm.ClausalStable -> clausal(arm, 0.99)
         BacktrackArm.ConflictDriven -> conflictDriven()
         BacktrackArm.LpAggressive -> lpArm(LpEmphasis.AGGRESSIVE)
         BacktrackArm.LpDefault -> lpArm(LpEmphasis.DEFAULT)
@@ -172,6 +188,9 @@ object BacktrackCatalog {
         BacktrackArm.FirstFail,
         BacktrackArm.Activity,
         BacktrackArm.ObjectiveGuided,
+        BacktrackArm.ClausalFocused,
+        BacktrackArm.ClausalBalanced,
+        BacktrackArm.ClausalStable,
     )
     private val cspOrder = listOf(
         BacktrackArm.SatOptimized,
@@ -186,6 +205,9 @@ object BacktrackCatalog {
         BacktrackArm.DomWdeg,
         BacktrackArm.FirstFail,
         BacktrackArm.Activity,
+        BacktrackArm.ClausalFocused,
+        BacktrackArm.ClausalBalanced,
+        BacktrackArm.ClausalStable,
     )
 
     private fun rankedArms(kind: Kind): List<BacktrackArm> = when (kind) {
@@ -252,6 +274,9 @@ object BacktrackCatalog {
  */
 internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = emptySet()) {
     SatOptimized("satOptimized"),
+    ClausalFocused("clausal-focused", setOf(ArmNeed.Clausal)),
+    ClausalBalanced("clausal-balanced", setOf(ArmNeed.Clausal)),
+    ClausalStable("clausal-stable", setOf(ArmNeed.Clausal)),
     ConflictDriven("conflictDriven"),
     LpAggressive("lp-aggressive", setOf(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE))),
     LpDefault("lp-default", setOf(ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
