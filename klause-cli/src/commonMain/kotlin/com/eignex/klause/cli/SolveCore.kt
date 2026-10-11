@@ -682,8 +682,15 @@ internal object SolveCore {
         cancel: Cancellation,
         nodeBudget: NodeBudget?,
     ) {
-        // Default arm-pool size: an env override, else auto-tuned from the core count.
-        val defaultArms = cliProp(CliKnobs.portfolioArms)?.toIntOrNull() ?: autoArms(cores)
+        val configuredArms = cliProp(CliKnobs.portfolioArms)?.toIntOrNull()
+        val defaultArms = configuredArms ?: autoArms(cores)
+        val engineParams = if (configuredArms != null &&
+            common.engineParams.none { it.substringBefore('=') in listOf("arms", "ls", "bt") }
+        ) {
+            common.engineParams + "arms=$configuredArms"
+        } else {
+            common.engineParams
+        }
         // `--lp CEILING` caps the portfolio's LP emphasis; the flag wins, then the `klause.lp`
         // env default, else AGGRESSIVE (uncapped — the pool spreads the LP intensity itself); `off`
         // disables LP across the pool.
@@ -699,7 +706,7 @@ internal object SolveCore {
                 solutionSetSensitive = solutionSetSensitive,
                 presolveBudget = presolveBudget,
                 cores = cores,
-                engineParams = common.engineParams,
+                engineParams = engineParams,
                 randomSeed = common.randomSeed,
                 defaultArms = defaultArms,
                 lpConfig = lpCeiling,

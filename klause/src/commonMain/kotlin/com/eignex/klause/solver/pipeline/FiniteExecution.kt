@@ -17,12 +17,16 @@ import com.eignex.klause.lp.relaxation.provesUnbounded
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
+import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.ProblemClass
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -684,7 +688,12 @@ private fun executePortfolio(
 
         is PortfolioPlan.Execute -> Unit
     }
-    val scenario = plan.scenario
+    val scenario = clausalDefaultScenario(
+        plan.scenario,
+        ProblemProfile.of(request.problem, request.optimize),
+        request.defaultArms,
+        explicitArms = request.engineParams.any { it.substringBefore('=') in listOf("arms", "ls", "bt") },
+    )
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,
         scenario,
@@ -707,6 +716,20 @@ private fun executePortfolio(
             executePortfolioSatisfy(it.solve(request.cancellation), !request.engine.pureLocalSearch, callbacks, start)
         }
     }
+}
+
+internal fun clausalDefaultScenario(
+    scenario: PortfolioScenario,
+    profile: ProblemProfile,
+    defaultArms: Int,
+    explicitArms: Boolean,
+): PortfolioScenario {
+    if (explicitArms || defaultArms != autoArms(1) || scenario.arms != defaultArms) return scenario
+    if (scenario.cores != 1 || scenario.kind != Kind.CSP || scenario.engine != EngineMix.MIXED) return scenario
+    if (profile.problemClass != ProblemClass.Sat || scenario.btPool != null || scenario.lsPool != null ||
+        scenario.btEdit != null || scenario.annotationArm != null
+    ) return scenario
+    return scenario.copy(arms = 2)
 }
 
 private fun executePortfolioSatisfy(
