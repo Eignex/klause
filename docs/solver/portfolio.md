@@ -190,17 +190,22 @@ and [portfolio](../../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/)
 ### Satisfaction pools
 
 The satisfaction backtrack palette includes conservative LP after default and aggressive
-LP. Applicability and LP ceilings filter the palette; the four backtrack slots of the
-default mixed satisfaction pool retain their ordering. Root variable shaving and hull
+LP. Applicability, model class and LP ceilings order and filter the palette. Root variable shaving and hull
 pruning remain explicit plan options. Root cuts follow the resolved plan. Curated
 satisfaction workers require an explicit `lp-root-cuts=true` override to harvest root
 cuts; explicit pools retain their requested root-cut plans.
 
 The clausal complete-search recipes use clause learning, EMA restarts, a 2000-clause
 database and a true-first saved phase, without pseudo-Boolean learning or inprocessing.
-Their focused, balanced and stable variants use VSIDS decay 0.8, 0.975 and 0.99. Curated
+Their balanced and stable variants use VSIDS decay 0.975 and 0.99. Curated
 admission requires a clausal model; pseudo-Boolean models retain their cutting-plane
 palette.
+
+Clausal satisfaction leads its complete-search slots with the balanced recipe. A
+curated sequential mixed pool reserves 85% of active time for that worker after the
+initial probes: a refutation emits no incumbent progress from which family rewards
+could predict the approaching proof. Explicit pools, parameter edits and search
+annotations retain unreserved scheduling. The configured arm count is preserved.
 
 Clausal satisfaction leads its curated local-search slots with fixed-break probSAT,
 using tabu tenure 10 and an improving aspiration rule without a strategy restart

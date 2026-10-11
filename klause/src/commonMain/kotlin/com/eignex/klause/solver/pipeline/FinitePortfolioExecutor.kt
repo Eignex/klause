@@ -14,6 +14,7 @@ import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.finiteWitnessVerifier
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -41,6 +42,7 @@ fun FinitePipeline.portfolioExecutor(
         onEvent = onEvent,
         profile = profile,
     )
+    val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
     return Portfolio.thompson(
         workers,
         lanes = scenario.cores,
@@ -50,7 +52,11 @@ fun FinitePipeline.portfolioExecutor(
         phaseRetention = scenario.phaseRetention,
         reseedStaleThreshold = scenario.reseedStaleThreshold,
         profile = profile,
-        minShares = continuousLpShares(scenario, profile, workers.map { it.label }, objective),
+        minShares = if (proofShares.isEmpty()) {
+            continuousLpShares(scenario, profile, workers.map { it.label }, objective)
+        } else {
+            proofShares
+        },
         onFault = onFault,
     ).also {
         it.reserveBeforeIncumbentOnly = true
@@ -70,6 +76,21 @@ fun FinitePipeline.portfolioExecutor(
 
 /** Creates the fixed finite-domain solver over [problem]. */
 fun FinitePipeline.backtrackSolver(problem: BakedProblem): BacktrackSolver = BacktrackSolver(problem)
+
+internal fun clausalProofShares(
+    scenario: PortfolioScenario,
+    profile: ProblemProfile,
+    labels: List<String>,
+): DoubleArray {
+    if (scenario.cores != 1 || scenario.kind != Kind.CSP || scenario.engine != EngineMix.MIXED ||
+        profile.problemClass != ProblemClass.Sat || scenario.btPool != null || scenario.lsPool != null ||
+        scenario.btEdit != null || scenario.annotationArm != null
+    ) return DoubleArray(0)
+    val proof = labels.indexOf("bt/clausal-balanced")
+    if (proof < 0) return DoubleArray(0)
+    // A refutation supplies no incumbent progress, so family rewards cannot identify its approaching proof.
+    return DoubleArray(labels.size).also { it[proof] = 0.85 }
+}
 
 internal fun continuousLpShares(
     scenario: PortfolioScenario,

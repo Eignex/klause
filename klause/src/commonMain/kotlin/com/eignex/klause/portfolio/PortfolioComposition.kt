@@ -96,7 +96,7 @@ data class PortfolioScenario(
     /** Optional model search-annotation arm: the [BacktrackParams] compiled from the model's
      *  `int_search(...)` annotations. When present (and the pool carries ≥ 2 backtrack arms), it takes
      *  the last backtrack slot so the free CP portfolio also follows the model's own search order,
-     *  while the `satOptimized` guard keeps slot 0. Ignored when [btPool] overrides the pool. */
+     *  while the class's leading complete recipe keeps slot 0. Ignored when [btPool] overrides the pool. */
     val annotationArm: BacktrackParams? = null,
     /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool], the
      *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
@@ -301,7 +301,7 @@ internal object PortfolioComposition {
     /** The [count] backtrack arms for [scenario]. [PortfolioScenario.btPool] (when set) overrides the pool
      *  with injected templates. Otherwise the curated pool the model behind [facts] offers the needs of, with
      *  the model's [PortfolioScenario.annotationArm] taking the last slot when present and there are ≥ 2 slots
-     *  (so the `satOptimized` guard keeps slot 0). Every resulting arm spends [PortfolioScenario.nodeBudget],
+     *  (so the class's leading complete recipe keeps slot 0). Every resulting arm spends [PortfolioScenario.nodeBudget],
      *  which is applied to the composed pool so that capping a run does not also change which pool it composes. */
     private fun btArms(scenario: PortfolioScenario, count: Int, facts: ProblemFacts): List<WorkerConfig> {
         val lpCeiling = scenario.lpCeiling
