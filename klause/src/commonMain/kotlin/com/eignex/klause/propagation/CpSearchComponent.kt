@@ -103,6 +103,7 @@ class CpSearchComponent(
         context: com.eignex.klause.solver.search.SearchContext,
     ): ComponentResult {
         sharedContext = context
+        lastResult = null
         if (decision is SearchDecision.Bool && Lit.variable(decision.literal) >= session.problem.numBoolVars) {
             return if (context.atomLiteral(decision) != null) {
                 ComponentResult.Consistent
