@@ -1,10 +1,15 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.SearchExactIntValue
+import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.Cancellation
@@ -24,7 +29,10 @@ internal fun ComponentPlan.theoryComponent(
         )
 
         ProblemPipeline.EXACT_LRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
-            assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
+            assignment.reals.forEachIndexed { variable, value ->
+                model.put(SearchRealValue(variable), value)
+                model.contribute(SearchExactRealValue(SourceRealId(variable)), value)
+            }
         }.also { component ->
             component.useSolveStop(theorySolveStop)
             smtStats?.let(component::observeWith)
@@ -34,9 +42,13 @@ internal fun ComponentPlan.theoryComponent(
             assignment.ints.forEachIndexed { variable, value ->
                 if (intOwner(variable) == IntVariableOwner.THEORY) {
                     model.put(SearchIntValue(variable), value)
+                    model.contribute(SearchExactIntValue(SourceIntId(variable)), value)
                 }
             }
-            assignment.reals.forEachIndexed { variable, value -> model.put(SearchRealValue(variable), value) }
+            assignment.reals.forEachIndexed { variable, value ->
+                model.put(SearchRealValue(variable), value)
+                model.contribute(SearchExactRealValue(SourceRealId(variable)), value)
+            }
         }.also { component ->
             component.useSolveStop(theorySolveStop)
             smtStats?.let(component::observeWith)

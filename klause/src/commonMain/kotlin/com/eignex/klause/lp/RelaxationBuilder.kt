@@ -2,6 +2,10 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.SourceBoolId
+import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.lp.engine.LpColumnId
+import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.util.EmptyIntArray
 
 /** An auxiliary source extension whose semantic role survives live-domain filtering. */
@@ -171,3 +175,15 @@ interface RelaxationBuilder {
      */
     fun bigMRow(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, global: Boolean, maxSide: Boolean)
 }
+
+/** LP handle for a projection-local finite integer, or null when this builder declines it. */
+fun RelaxationBuilder.intColumn(variable: CpIntId): LpColumnId? =
+    intColumn(variable.index).takeIf { it >= 0 }?.let(::LpColumnId)
+
+/** LP handle for a Boolean in the shared source namespace, or null when absent. */
+fun RelaxationBuilder.boolColumn(variable: SourceBoolId): LpColumnId? =
+    boolColumn(variable.index).takeIf { it >= 0 }?.let(::LpColumnId)
+
+/** LP handle for a source continuous variable, or null when this builder declines it. */
+fun RelaxationBuilder.realColumn(variable: SourceRealId): LpColumnId? =
+    realColumn(variable.index).takeIf { it >= 0 }?.let(::LpColumnId)

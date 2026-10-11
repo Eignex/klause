@@ -561,12 +561,14 @@ class SearchSession(
     fun model(): AssembledSearchModel {
         val values = LinkedHashMap<Any, Any>()
         val model = object : SearchModel {
+            @Suppress("OVERRIDE_DEPRECATION")
             override fun put(key: Any, value: Any) {
-                check(values.put(key, value) == null) { "duplicate model contribution for $key" }
+                check(key !in values) { "duplicate model contribution for $key" }
+                values[key] = if (key is TypedSearchValueKey<*>) key.capture(value) else value
             }
         }
         boolValues.forEach { variable, value ->
-            model.put(SearchBoolValue(variable), value == TRUE)
+            model.contribute(SearchBoolValue(variable), value == TRUE)
         }
         singleComponent?.contributeModel(model, this) ?: components.forEach { it.contributeModel(model, this) }
         return AssembledSearchModel(values)

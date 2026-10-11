@@ -6,8 +6,10 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.klause.theory.qflra.supportsExactLira
@@ -230,6 +232,13 @@ class CpProblemProjection internal constructor(
     private val sourceToCp: IntArray,
     private val cpToSource: IntArray,
 ) {
+    /** CP location for a source integer, or null when theory-owned. */
+    fun cpId(sourceIntVar: SourceIntId): CpIntId? =
+        cpId(sourceIntVar.index).takeIf { it >= 0 }?.let(::CpIntId)
+
+    /** Source location for an integer owned by this CP projection. */
+    fun sourceId(cpIntVar: CpIntId): SourceIntId = SourceIntId(sourceId(cpIntVar.index))
+
     /** CP-local id for [sourceIntVar], or `-1` when theory-owned. */
     fun cpId(sourceIntVar: Int): Int = sourceToCp[sourceIntVar]
 

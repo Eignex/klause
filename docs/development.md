@@ -61,6 +61,9 @@ schema construction, compilation, decoding and solving. Variables can be optiona
 constraints lower to reified or aggregation-aware forms. Sets and non-linear float
 wrappers compile to supported finite encodings.
 
+See [library API and ownership](api.md) for supported extension surfaces, experimental
+composition, typed identities and compatible migration.
+
 ## Result requirements
 
 Enumeration and sampling operate over compiled finite problems; counting and

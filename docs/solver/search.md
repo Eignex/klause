@@ -267,3 +267,13 @@ The CLI emits these counters together when a probe starts, including zero counts
 stages it did not reach. Outcome counters distinguish private refutations from
 incomplete stops without a model. These counters describe heuristic progress and carry
 no proof.
+
+## Contributed model ownership
+
+Components contribute immutable values through typed keys, with one owner per key.
+The assembled model captures its map and each typed key's ownership hook at publication;
+reads retain the associated value type without copying. Exact source integer and real
+keys preserve arbitrary-precision and rational coordinates alongside the compatibility
+keys. Opaque legacy values remain borrowed read-only. Extensions retain open keys for
+arrays, functions and native theory values; their captured payloads must be immutable.
+See [API migration and mappings](../api.md#typed-contributions-and-migration).

@@ -3,7 +3,20 @@ package com.eignex.klause.ir
 import com.eignex.klause.util.EmptyIntArray
 
 /** A renumbering of a problem's variables: `newId = map[oldId]`, one map per namespace. */
-class VarRemap(private val bools: IntArray, private val ints: IntArray, private val reals: IntArray = EmptyIntArray) {
+class VarRemap(bools: IntArray, ints: IntArray, reals: IntArray = EmptyIntArray) {
+    private val bools = bools.copyOf()
+    private val ints = ints.copyOf()
+    private val reals = reals.copyOf()
+
+    /** Renumber a source Boolean, or null when the variable is absent from the target. */
+    fun bool(id: SourceBoolId): SourceBoolId? = bool(id.index).takeIf { it >= 0 }?.let(::SourceBoolId)
+
+    /** Renumber a source integer, or null when the variable is absent from the target. */
+    fun int(id: SourceIntId): SourceIntId? = int(id.index).takeIf { it >= 0 }?.let(::SourceIntId)
+
+    /** Renumber a source real, retaining its identity when no real table is supplied. */
+    fun real(id: SourceRealId): SourceRealId? = real(id.index).takeIf { it >= 0 }?.let(::SourceRealId)
+
     /** Number of Boolean variables this remap covers. */
     val boolCount: Int get() = bools.size
 
