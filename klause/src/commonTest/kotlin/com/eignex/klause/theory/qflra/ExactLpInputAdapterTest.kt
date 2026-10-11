@@ -3,8 +3,6 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.formats.smtlib.exactLpModel
-import com.eignex.klause.formats.smtlib.toExactLpModel
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit

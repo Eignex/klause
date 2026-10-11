@@ -22,7 +22,7 @@ Packages below are under `com.eignex.klause` in
 | `ir` | Literals, variable descriptions, remapping, structural keys and `Problem` | Engine-neutral; no engines, compilation or input formats |
 | `model`, `schema`, `compile` | Model expressions, schema DSL and compilation | Use shared IR and lowering |
 | `lowering` | Generic Boolean and constraint encodings | Independent of schema compiler and format callers |
-| `formats` | Parsing and lowering source syntax | Uses shared lowering; no compiler dependency |
+| `formats` | Parsing and lowering source syntax | Uses shared lowering; no compiler or concrete theory dependency |
 | `factor` | Constraint semantics and factor operations | Supplies mechanisms used by propagation, relaxations and search |
 | `propagation` | Finite domains, explanations and incremental propagators | May use immutable arithmetic representations |
 | `arithmetic.difference` | Difference constraints, extraction and non-incremental graph operations | No propagation or search state |
@@ -42,8 +42,18 @@ Packages below are under `com.eignex.klause` in
 
 Dependencies point from policy to mechanism. In particular, enlarging the engine's
 closed dependency list couples reusable numerical work to model policy.
+[checkArchitecture](../scripts/check_architecture.py) checks production sources in every
+platform source set without compiling Kotlin. It enforces the closed numerical and
+IR lists, caller-independent lowering, frontend/compiler/theory separation, the
+pipeline's neutral metadata and the prohibition on finite-domain state in open
+theories. Imports, aliases, wildcard imports and qualified executable references
+are checked; comments and literal text are excluded. Compiler resolution and
+consumer behavior remain the responsibility of the JVM/native gates.
 [LpDeclineDisciplineTest](../klause/src/jvmTest/kotlin/com/eignex/klause/lp/LpDeclineDisciplineTest.kt)
-checks this structural boundary.
+checks proof-decline behavior at engine consumers.
+
+The exact LP projection of `QfLraRelaxation` belongs to the theory adapter, beside
+its source declarations. SMT syntax folding does not read theory or search state.
 
 ## Model and ownership
 

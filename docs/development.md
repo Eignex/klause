@@ -4,6 +4,16 @@ Start with [system architecture](architecture.md) before changing subsystem
 boundaries. This guide owns setup smoke commands and contribution workflows;
 the [CLI](cli.md) owns launcher and runtime details.
 
+## Package boundary check
+
+`python3 scripts/check_architecture.py` checks documented outbound dependencies across
+production Kotlin source sets. `python3 scripts/test_check_architecture.py` checks the
+checker itself. `./gradlew checkArchitecture` runs both without compiling Kotlin,
+and every module's `check` depends on it. Python 3 is required for this check.
+The checker is lexical; JVM/native compilation and consumer tests validate symbol
+resolution and module visibility. [System architecture](architecture.md) defines
+the enforced ownership rules.
+
 ## Getting started
 
 ```sh

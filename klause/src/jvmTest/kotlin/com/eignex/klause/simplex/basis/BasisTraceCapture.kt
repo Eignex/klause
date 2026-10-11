@@ -5,7 +5,6 @@ import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.formats.smtlib.toExactLpModel
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.RevisedSimplex
@@ -17,6 +16,7 @@ import com.eignex.klause.solver.objective.maximizeInt
 import com.eignex.klause.solver.objective.minimizeInt
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.theory.qflra.QfLraSystem
+import com.eignex.klause.theory.qflra.toExactLpModel
 import com.eignex.klause.util.Cancellation
 import com.eignex.koblas.SparseMatrix
 import java.nio.ByteBuffer
