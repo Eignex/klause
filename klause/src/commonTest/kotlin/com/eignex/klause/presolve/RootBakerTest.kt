@@ -237,6 +237,38 @@ class RootBakerTest {
     }
 
     @Test
+    fun `stopping Boolean probing retains incoming integer bounds`() {
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 3)), listOf(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+        ))
+        val reference = PresolveBudget(Long.MAX_VALUE)
+        val root = source.bake(reference.orSpent(Cancellation.Never))
+        root.propagate(Assumptions.None.withBool(0, true), root.cancellation)
+        val budget = PresolveBudget(reference.spent())
+        val problem = source.bake(budget.orSpent(Cancellation.Never))
+
+        val result = assertIs<PropagationResult.Implied>(RootBaker.bake(problem, BakeConfig(probeFailedLiterals = true)))
+
+        assertEquals(1L, result.intMinOrNullCompat(0))
+        assertEquals(null, result.boolValueOrNull(0))
+        assertEquals(1L, budget.probeCalls)
+    }
+
+    @Test
+    fun `native charges saturate an inherited phase without wrapping`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        budget.charge(Long.MAX_VALUE - 1L)
+
+        val root = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
+            .bake(budget.orSpent(Cancellation.Never))
+        RootBaker.bake(root, BakeConfig(probeIntHoles = true))
+
+        assertEquals(Long.MAX_VALUE, budget.spent())
+        assertEquals(0L, budget.remaining())
+        assertEquals(0L, budget.probeCalls)
+    }
+
+    @Test
     fun `outer cancellation after a failed probe retains the proven exclusion`() {
         val source = Problem(2, 0, emptyArray(), listOf(
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
