@@ -57,7 +57,8 @@ sealed interface OpenTheoryAssignment {
     ) : OpenTheoryAssignment {
         override fun boolValue(id: Int): Boolean = sample.boolValue(id)
         override fun intValue(id: Int): String = sample.exactIntValue(id).toString()
-        override fun realValue(id: Int): String = (if (id < sample.numRealVars) sample.approximateRealValue(id) else 0.0).toString()
+        override fun realValue(id: Int): String =
+            (if (id < sample.numRealVars) sample.approximateRealValue(id) else 0.0).toString()
     }
 
     /** An assignment carried by the open portfolio, preserving its exact integer and real coordinates. */

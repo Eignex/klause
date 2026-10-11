@@ -37,8 +37,12 @@ class ObjectiveSeed : MoveSource {
                     val d = state.rootDomains[v]
                     // Step toward smaller objective; channeling-aware so int-move + indicator
                     // updates stay atomic.
-                    if (obj.intCoefficientValues[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
-                    if (obj.intCoefficientValues[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, d.higher(cur))
+                    if (obj.intCoefficientValues[v] > 0 && cur > d.min) {
+                        sink.addChannelingIntSet(state, v, d.lower(cur))
+                    }
+                    if (obj.intCoefficientValues[v] < 0 && cur < d.max) {
+                        sink.addChannelingIntSet(state, v, d.higher(cur))
+                    }
                 }
             }
 

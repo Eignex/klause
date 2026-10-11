@@ -27,7 +27,8 @@ class LinearObjectiveTest {
         objective.boolWeights[0] = 0
         objective.intCoefficients[0] = 0
         objective.realCoefficients[0] = 0.0
-        val (booleanCoefficients, integerCoefficients, _, realCoefficients) = copied
+        val (booleanCoefficients, integerCoefficients) = copied
+        val realCoefficients = copied.component4()
         booleanCoefficients[0] = 0
         integerCoefficients[0] = 0
         realCoefficients[0] = 0.0
