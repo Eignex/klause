@@ -23,6 +23,29 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `a parent comparison uses the constant image of a child chain closed after it`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const b Bool) (declare-const p Bool) (declare-const s Int) (declare-const x Int)
+            (assert (>= s 0)) (assert (<= s 1)) (assert b) (assert p)
+            (assert (= p (<= x 1)))
+            (assert (<= x (ite b (ite (= s 0) 1 1) 1)))
+            """.trimIndent(),
+        )
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<SearchResult.Satisfied>(
+            session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
+        )
+
+        assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("p")))
+    }
+
+    @Test
     fun `an unused later conditional leaves the budget available for an asserted ordering`() {
         val builder = Compiler.Builder(
             Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),

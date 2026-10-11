@@ -79,6 +79,9 @@ branch guards. Strict thresholds outside a signed word retain exact arithmetic.
 Non-strict order comparisons between conditional results can expand one operand's
 constant image when it has at most 64 values, comparing the other operand with each
 selected value. Open branch values retain their primitive arithmetic comparisons.
+Image summaries finish iteratively after all assertion and objective chains close.
+Pair comparisons wait for those summaries; unavailable or oversized images retain
+their arithmetic encoding.
 Comparisons finish open decision lists before expanding their branch tests.
 Constant branch images of at most 1,024 distinct values can reject a comparison
 before visiting its definition tree; unknown or larger images retain exact fallback.

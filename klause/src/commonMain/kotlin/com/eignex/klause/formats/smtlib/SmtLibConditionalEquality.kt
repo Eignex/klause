@@ -19,7 +19,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         val arms: List<LinComb>,
         val default: LinComb,
         val factors: List<Factor>,
-        val image: Set<Long>?,
+        var image: Set<Long>?,
         val guardTests: List<GuardEquality?>,
     ) {
         var noArm: Int? = null
@@ -86,6 +86,30 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             if (values.size > IMAGE_LIMIT) return null
         }
         return values
+    }
+
+    private fun finishImages() {
+        val visited = HashSet<Int>()
+        val pending = ArrayDeque<Pair<Int, Boolean>>()
+        for (variable in definitions.keys) {
+            pending.addLast(variable to false)
+            while (pending.isNotEmpty()) {
+                val (current, finish) = pending.removeLast()
+                val definition = definitions.getValue(current)
+                if (definition.image != null) continue
+                val terms = definition.arms + definition.default
+                if (finish) {
+                    definition.image = constantImage(terms)
+                    continue
+                }
+                if (!visited.add(current)) continue
+                pending.addLast(current to true)
+                for (term in terms) {
+                    val source = term.asSimpleVar() ?: continue
+                    if (source in definitions) pending.addLast(source to false)
+                }
+            }
+        }
     }
 
     fun retainNeededDefinitions(
@@ -163,9 +187,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
 
     fun reifyPair(left: Int, right: Int, operator: LinearOp, builder: Compiler.Builder): Int? {
         if (operator != LinearOp.LE && operator != LinearOp.GE) return null
-        val leftImage = definitions[left]?.image?.takeIf { it.size <= PAIR_IMAGE_LIMIT }
-        val rightImage = definitions[right]?.image?.takeIf { it.size <= PAIR_IMAGE_LIMIT }
-        if (leftImage == null && rightImage == null) return null
+        if (left !in definitions && right !in definitions) return null
         val key = PairKey(left, right, operator)
         pairEqualities[key]?.let { return it }
         return pendingEqualities.getOrPut(key) {
@@ -175,6 +197,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
 
     fun expandPending(builder: Compiler.Builder, objective: LinearObjectiveSpec?) {
+        finishImages()
         val owned = ownedPredicateFactors(builder.factors)
         val queries = pendingEqualities.entries.associateBy { Lit.variable(it.value.literal) }
         val pending = ArrayDeque<Int>()
