@@ -21,10 +21,13 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.Objective
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
 /**
@@ -35,6 +38,89 @@ import kotlin.test.assertNotNull
  *  - the break/make vectors and cost match a fresh recompute (probes leave no residue).
  */
 class LocalSearchStateCompoundProbeTest {
+
+    @Test
+    fun `failed grading restores state before the next probe`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+            arrayOf<Factor>(Product(0, 1, 2), Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 0)),
+        )
+        val failures = listOf(IllegalArgumentException("grading failed"), CancellationException("grading cancelled"))
+        for (failure in failures) {
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem)).network(3, 0)
+            state.assignment.setInt(1, 3)
+            state.recompute()
+            state.weights.factorWeights.fill(2.5)
+            val before = state.assignment.snapshot()
+            val degrees = state.factorDegree.copyOf()
+            val payload = state.intPayload.copyOf()
+            val touches = state.tabu.touchCount.copyOf()
+            val configuration = state.intConfChange.copyOf()
+            val cost = state.cost
+            val best = state.bestCostSeen
+            val move = Move.IntSet(0, 1)
+            val expected = state.netDelta(move)
+            val objective = object : Objective {
+                override fun evaluate(sample: Sample): Double {
+                    if (sample.intValue(0) == 1L) throw failure
+                    return 0.0
+                }
+            }
+
+            assertFailsWith<RuntimeException> { state.objectiveDelta(objective, move) }
+
+            assertEquals(before, state.assignment.snapshot())
+            assertContentEquals(degrees, state.factorDegree)
+            assertContentEquals(payload, state.intPayload)
+            assertContentEquals(touches, state.tabu.touchCount)
+            assertContentEquals(configuration, state.intConfChange)
+            assertEquals(cost, state.cost)
+            assertEquals(best, state.bestCostSeen)
+            assertEquals(Random(7).nextLong(), state.rng.nextLong())
+            assertEquals(expected, state.netDelta(move))
+            assertEquals(expected * 2.5, state.weightedNetDelta(move))
+            state.apply(move)
+            assertEquals(3L, state.assignment.intValue(2))
+            assertEquals(cost + expected, state.cost)
+        }
+    }
+
+    @Test
+    fun `nested move operations are rejected throughout grading`() {
+        val problem = Problem(1, 2, Array(2) { IntDomain(0, 1) }, emptyArray())
+        for (applied in listOf(false, true)) {
+            for (operation in 0..3) {
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
+                val network = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.Bool2Int(0, 0)), 2, 1)
+                state.invariants = network
+                state.recompute()
+                val move = Move.BoolFlip(0)
+                val duplicate = Move.Compound(listOf(move, move))
+                val before = state.assignment.snapshot()
+                val objective = object : Objective {
+                    override fun evaluate(sample: Sample): Double {
+                        if (sample.boolValue(0) == applied) when (operation) {
+                            0 -> state.netDelta(duplicate)
+                            1 -> state.objectiveDelta(
+                                LinearObjective(boolWeights = longArrayOf(1)), duplicate,
+                            )
+                            2 -> state.apply(move)
+                            3 -> state.invariants = network
+                        }
+                        return 0.0
+                    }
+                }
+
+                assertFailsWith<IllegalStateException> { state.objectiveDelta(objective, move) }
+
+                assertEquals(before, state.assignment.snapshot())
+                assertEquals(0L, state.netDelta(move))
+                state.apply(move)
+                assertEquals(1L, state.assignment.intValue(0))
+            }
+        }
+    }
 
     @Test
     fun `native Element probes retain destination changes through a derived index`() {

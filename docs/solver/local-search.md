@@ -157,6 +157,21 @@ The one-way definition network contains immutable reader indexes; matching mixed
 arms share its retained construction while each state applies definitions to its own
 assignment.
 
+Each state owns reusable move-seed lists and a lazily allocated traversal workspace
+bound to its current network. The workspace marks each affected node once, visits its
+readers, then sorts its live node prefix into exact topological order. It retains no
+assignment-dependent cone between moves. Replacing a state's network discards its
+workspace. Public cone queries retain their sparse traversal and return independent arrays;
+internal live prefixes are
+borrowed only until the synchronous move or probe returns and never enter snapshots.
+Coordinate saving retains each touched Boolean, integer or real coordinate once,
+including defined outputs, and restores them through the incremental primitives.
+Reentrant move application, reversible probing, objective scoring or network replacement
+on the same state throws before mutating live scratch, including callbacks during the
+initial objective evaluation. Objective failures and cancellation
+unwind the ordinary probe restoration; subsequent calls reuse cleared traversal marks.
+These operations remain atomic within the existing cancellation boundaries.
+
 Native Element result cones skip writes to unselected cells. Direct and transitive
 index dependencies retain the result cone, including compounds that change the index
 and its destination cell together. Probe saving and propagation use the same cone.

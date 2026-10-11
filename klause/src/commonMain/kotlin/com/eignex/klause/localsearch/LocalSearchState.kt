@@ -231,6 +231,10 @@ class LocalSearchState private constructor(
     private val probeSlots = IntArrayList()
     private val probeSlotSet = IntHashSet()
     private var savedValuesScratch: LongArray = EmptyLongArray
+    private val moveIntSeeds = IntArrayList(2)
+    private val moveBoolSeeds = IntArrayList(2)
+    private var definitionTraversal: DefinitionTraversal? = null
+    private var moveActive = false
 
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
     // degree changes during a probe's forward apply, snapshotting its pre-probe violated status on
@@ -434,17 +438,25 @@ class LocalSearchState private constructor(
      */
     var invariants: InvariantNetwork? = null
         set(value) {
+            check(!probeActive && !moveActive) { "cannot replace definitions during a move" }
             field = value
+            definitionTraversal = null
             moveSink.setInvariants(value)
         }
 
     /** Apply [move], updating cost and payloads incrementally; when [invariants] is set, the
      *  affected definitional cone is propagated afterwards through the same primitives. */
     fun apply(move: Move) {
-        apply(move, null)
+        check(!probeActive && !moveActive) { "local-search moves cannot be nested" }
+        moveActive = true
+        try {
+            apply(move, null)
+        } finally {
+            moveActive = false
+        }
     }
 
-    private fun apply(move: Move, affected: IntArray?) {
+    private fun apply(move: Move, affected: IntArrayList?) {
         applyCore(move)
         val net = invariants ?: return
         propagateInvariants(net, move, affected)
@@ -462,24 +474,32 @@ class LocalSearchState private constructor(
         }
     }
 
-    /** Re-evaluate the definitional cone the [move]'s touched vars feed, in topological order,
-     *  writing changes through the incremental primitives (no full recompute). */
-    private fun propagateInvariants(net: InvariantNetwork, move: Move, affected: IntArray?) {
-        val nodes = affected ?: run {
-            val ints = IntArrayList(2)
-            val bools = IntArrayList(2)
-            fun collect(m: Move) {
-                when (m) {
-                    is Move.BoolFlip -> bools.add(m.varId)
-                    is Move.IntSet -> ints.add(m.varId)
-                    is Move.RealSet -> {}
-                    is Move.Compound -> for (p in m.parts) collect(p)
-                }
+    private fun affectedDefinitions(net: InvariantNetwork): IntArrayList {
+        val traversal = definitionTraversal ?: DefinitionTraversal(net).also { definitionTraversal = it }
+        return net.affectedNodes(moveIntSeeds, moveBoolSeeds, assignment, traversal)
+    }
+
+    private fun collectMoveSeeds(move: Move) {
+        moveIntSeeds.clear()
+        moveBoolSeeds.clear()
+        fun collect(part: Move) {
+            when (part) {
+                is Move.BoolFlip -> moveBoolSeeds.add(part.varId)
+                is Move.IntSet -> moveIntSeeds.add(part.varId)
+                is Move.RealSet -> {}
+                is Move.Compound -> for (p in part.parts) collect(p)
             }
-            collect(move)
-            net.affectedNodes(ints.toIntArray(), bools.toIntArray(), assignment)
         }
-        for (idx in nodes) {
+        collect(move)
+    }
+
+    private fun propagateInvariants(net: InvariantNetwork, move: Move, affected: IntArrayList?) {
+        val nodes = affected ?: run {
+            collectMoveSeeds(move)
+            affectedDefinitions(net)
+        }
+        for (position in 0 until nodes.size) {
+            val idx = nodes[position]
             val n = net.node(idx)
             if (if (n.outIsBool) assumptions.isFrozenBool(n.out) else !moveSink.allowsDefinedInt(n.out)) continue
             val v = n.eval(assignment, rootDomains)
@@ -579,6 +599,7 @@ class LocalSearchState private constructor(
      * candidates by, paired with [netDelta] for the feasibility/cost side.
      */
     fun objectiveDelta(obj: Objective, move: Move): Double? {
+        check(!probeActive && !moveActive) { "local-search scoring cannot be nested in a move" }
         if (feedsDefinitions(move)) return evaluateMove(move, obj).objectiveDelta
         return when (obj) {
             is LinearObjective -> linearObjectiveDelta(move, obj)
@@ -1071,19 +1092,19 @@ class LocalSearchState private constructor(
         }
     }
 
-    private fun saveProbeCoordinates(move: Move): IntArray {
+    private fun saveProbeCoordinates(move: Move): IntArrayList? {
         probeSlots.clear()
         probeSlotSet.clear()
         fun saveSlot(slot: Int) {
             if (probeSlotSet.add(slot)) probeSlots.add(slot)
         }
-        val ints = IntArrayList(2)
-        val bools = IntArrayList(2)
+        moveIntSeeds.clear()
+        moveBoolSeeds.clear()
         fun collect(part: Move) {
             when (part) {
-                is Move.BoolFlip -> bools.add(part.varId)
+                is Move.BoolFlip -> moveBoolSeeds.add(part.varId)
 
-                is Move.IntSet -> ints.add(part.varId)
+                is Move.IntSet -> moveIntSeeds.add(part.varId)
 
                 is Move.RealSet -> {}
 
@@ -1096,10 +1117,10 @@ class LocalSearchState private constructor(
         }
         collect(move)
         val net = invariants
-        val affected = net?.affectedNodes(ints.toIntArray(), bools.toIntArray(), assignment) ?: EmptyIntArray
-        if (net != null) {
-            for (idx in affected) {
-                val node = net.node(idx)
+        val affected = net?.let { affectedDefinitions(it) }
+        if (net != null && affected != null) {
+            for (position in 0 until affected.size) {
+                val node = net.node(affected[position])
                 saveSlot(if (node.outIsBool) node.out else problem.numBoolVars + node.out)
             }
         }
@@ -1134,6 +1155,22 @@ class LocalSearchState private constructor(
         refineCumulative: Boolean = false,
         weightedResidual: Boolean = false,
         elementEligibility: MoveSink? = null,
+    ): MoveEval {
+        check(!probeActive && !moveActive) { "local-search probes cannot be nested" }
+        moveActive = true
+        try {
+            return probeMove(move, objective, refineCumulative, weightedResidual, elementEligibility)
+        } finally {
+            moveActive = false
+        }
+    }
+
+    private fun probeMove(
+        move: Move,
+        objective: Objective?,
+        refineCumulative: Boolean,
+        weightedResidual: Boolean,
+        elementEligibility: MoveSink?,
     ): MoveEval {
         val oldCost = cost
         val oldBestCost = bestCostSeen

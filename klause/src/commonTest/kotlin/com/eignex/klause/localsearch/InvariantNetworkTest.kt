@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -64,6 +65,9 @@ class InvariantNetworkTest {
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
             val network = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(4))).network(7, 0)
 
+            val traversal = DefinitionTraversal(network)
+            val ints = IntArrayList()
+            val bools = IntArrayList()
             for (position in 0..3) {
                 state.assignment.setInt(0, offset.toLong() + position)
 
@@ -71,6 +75,16 @@ class InvariantNetworkTest {
                 val indexCone = network.affectedNodes(intArrayOf(0), intArrayOf(), state.assignment)
                 val structuralCone = network.affectedNodes(intArrayOf(1), intArrayOf())
 
+                ints.clear()
+                ints.add(1)
+                ints.add(1)
+                val liveCellCone = network.affectedNodes(ints, bools, state.assignment, traversal).toIntArray()
+                ints.clear()
+                ints.add(0)
+                val liveIndexCone = network.affectedNodes(ints, bools, state.assignment, traversal).toIntArray()
+
+                assertContentEquals(cellCone, liveCellCone)
+                assertContentEquals(indexCone, liveIndexCone)
                 assertEquals(if (position == 0) listOf(4, 5) else emptyList(), cellCone.map { network.node(it).out })
                 assertEquals(listOf(4, 5), indexCone.map { network.node(it).out })
                 assertEquals(listOf(4, 5), structuralCone.map { network.node(it).out })
@@ -101,6 +115,46 @@ class InvariantNetworkTest {
         val cost = state.cost
         state.recompute()
         assertEquals(cost, state.cost)
+    }
+
+    @Test
+    fun `definition traversal clears a larger cone before visiting an empty cone`() {
+        val network = InvariantNetwork(
+            List(40) { DefinitionalSweep.SweepNode.Bool2Int(it, 0) }, 41, 1,
+        )
+        val problem = Problem(1, 41, Array(41) { IntDomain(0, 1) }, emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        val ints = IntArrayList()
+        val bools = IntArrayList().also { it.add(0) }
+        val traversal = DefinitionTraversal(network)
+        val snapshot = network.affectedNodes(intArrayOf(), intArrayOf(0))
+
+        assertContentEquals(snapshot, network.affectedNodes(ints, bools, state.assignment, traversal).toIntArray())
+        bools.clear()
+        ints.add(40)
+        assertEquals(0, network.affectedNodes(ints, bools, state.assignment, traversal).size)
+        bools.add(0)
+        assertContentEquals(IntArray(40) { it },
+            network.affectedNodes(ints, bools, state.assignment, traversal).toIntArray())
+        assertContentEquals(IntArray(40) { it }, snapshot)
+    }
+
+    @Test
+    fun `replacing a network uses its own definition cone`() {
+        val problem = Problem(1, 2, Array(2) { IntDomain(0, 1) }, emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        val first = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.Bool2Int(0, 0)), 2, 1)
+        val second = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.Bool2Int(1, 0)), 2, 1)
+        state.invariants = first
+        state.recompute()
+        state.apply(Move.BoolFlip(0))
+
+        state.invariants = second
+        state.netDelta(Move.BoolFlip(0))
+        state.apply(Move.BoolFlip(0))
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(0L, state.assignment.intValue(1))
     }
 
     private val src = """
