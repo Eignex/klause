@@ -49,6 +49,24 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private val pendingEqualities = LinkedHashMap<ComparisonKey, PendingEquality>()
     private val pairEqualities = HashMap<PairKey, Int>()
     private var work = 0
+    private var diagnosticPending = emptyMap<String, Int>()
+    private val diagnosticCompleted = HashMap<String, Int>()
+
+    private fun diagnosticName(key: ComparisonKey): String = when (key) {
+        is Key -> key.operator.name
+        is PairKey -> "PAIR_${key.operator.name}"
+    }
+
+    fun printDiagnosticCounters(unused: UnusedColumns, factors: Int) {
+        for (operator in listOf("EQ", "LE", "GE", "PAIR_LE", "PAIR_GE")) {
+            println("; conditionalPending_$operator=${diagnosticPending[operator] ?: 0}")
+            println("; conditionalCompleted_$operator=${diagnosticCompleted[operator] ?: 0}")
+        }
+        println("; conditionalExpansionVisits=$work")
+        println("; conditionalDefinedInts=${definitions.size}")
+        println("; conditionalRetainedIntDefinitions=${definitions.size - unused.ints.size}")
+        println("; conditionalFactors=$factors")
+    }
 
     fun define(
         variable: Int,
@@ -175,6 +193,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
 
     fun expandPending(builder: Compiler.Builder) {
+        diagnosticPending = pendingEqualities.keys.groupingBy(::diagnosticName).eachCount()
         val replaced = HashSet<Factor>()
         for ((key, equality) in pendingEqualities.entries.toList().asReversed()) {
             val expanded = when (key) {
@@ -189,6 +208,8 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
             builder.factors.addAll(clauses)
             definePredicate(Lit.variable(equality.literal), clauses)
             replaced.add(equality.factor)
+            val name = diagnosticName(key)
+            diagnosticCompleted[name] = (diagnosticCompleted[name] ?: 0) + 1
         }
         builder.factors.removeAll { it in replaced }
         pendingEqualities.clear()
