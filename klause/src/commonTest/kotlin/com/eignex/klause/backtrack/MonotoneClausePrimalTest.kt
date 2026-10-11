@@ -95,6 +95,26 @@ class MonotoneClausePrimalTest {
     }
 
     @Test
+    fun `a feasible decision model supplies an incumbent`() {
+        val solver = BacktrackSolver(Problem(
+            3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
+            ),
+        ).bake())
+        val objective = LinearObjective(boolWeights = longArrayOf(1L))
+        val primal = assertNotNull(MonotoneClausePrimal.create(
+            solver, objective, BacktrackParams(), Cancellation.Never,
+        ))
+        primal.use {
+            val sample = assertNotNull(it.advance())
+            assertEquals(0L, objective.evaluateLong(sample))
+            assertTrue(sample.bools[1] != sample.bools[2])
+        }
+    }
+
+    @Test
     fun `negative occurrence of a costly variable disables the probe`() {
         val solver = BacktrackSolver(Problem(
             1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false)))),

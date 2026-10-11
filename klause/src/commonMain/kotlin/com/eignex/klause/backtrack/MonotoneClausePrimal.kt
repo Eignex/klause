@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
 
@@ -18,6 +19,8 @@ internal class MonotoneClausePrimal private constructor(
     private val occurrences: Array<List<Clause>>,
     private val clauses: List<Clause>,
     private var literalWork: Long,
+    private val activeBudgetMillis: Long,
+    private var activeMillis: Long,
 ) : AutoCloseable {
     private var accepted = variables.fold(params.assumptions) { pins, variable -> pins.withBool(variable, true) }
     private var index = 0
@@ -26,6 +29,12 @@ internal class MonotoneClausePrimal private constructor(
     private var pure: List<Int> = emptyList()
     private var trialSample: Sample? = null
     private var bestValue = Double.POSITIVE_INFINITY
+    private var activeStart: TimeSource.Monotonic.ValueTimeMark? = null
+    private val phaseToken = object : Cancellation {
+        override fun isCancelled(): Boolean = lifetime() || work >= 100_000L ||
+            activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis
+        override fun deadline() = lifetime.deadline()
+    }
     private var closed = false
     private var polishing: Sample? = null
     private var polishingVariables: List<Int> = emptyList()
@@ -34,9 +43,20 @@ internal class MonotoneClausePrimal private constructor(
 
     val work: Long get() = (repair?.work ?: 0L) + literalWork / PROPAGATION_WORK_PER_NODE
     val isDone: Boolean
-        get() = closed || (polishing == null && (index == variables.size || lifetime() || work >= 100_000L))
+        get() = closed || (polishing == null && (index == variables.size || phaseToken()))
 
     fun advance(sliceMillis: Long = 2_500L, sliceNodes: Long = -1L): Sample? {
+        val start = TimeSource.Monotonic.markNow()
+        activeStart = start
+        try {
+            return advanceBody(sliceMillis, sliceNodes)
+        } finally {
+            activeMillis += start.elapsedNow().inWholeMilliseconds
+            activeStart = null
+        }
+    }
+
+    private fun advanceBody(sliceMillis: Long, sliceNodes: Long): Sample? {
         if (params.cancellation()) return null
         if (polishing != null) {
             finishPolishing()?.let { return it }
@@ -48,7 +68,7 @@ internal class MonotoneClausePrimal private constructor(
         val search = repair ?: try {
             ResumableMinimize(
                 solver, LinearObjective(),
-                BacktrackPresets.conflictDriven(params.randomSeed, cancellation = lifetime).copy(
+                BacktrackPresets.conflictDriven(params.randomSeed, cancellation = phaseToken).copy(
                     assumptions = params.assumptions, nativeSat = params.nativeSat, phaseSaving = false,
                     pbLearning = false,
                 ),
@@ -69,12 +89,12 @@ internal class MonotoneClausePrimal private constructor(
             }
             val nodes = if (sliceNodes < 0L) -1L else (sliceNodes - (work - startWork)).coerceAtLeast(0L)
             val millis = (sliceMillis - start.elapsedNow().inWholeMilliseconds).coerceAtLeast(0L)
-            val terminal = search.runSlice(lifetime, millis, nodes) { trialSample = it.sample }
+            val terminal = search.runSlice(phaseToken, millis, nodes) { trialSample = it.sample }
             if (terminal == null && trialSample == null) return null
             index++
             val completedTrial = checkNotNull(trial)
             trial = null
-            val sample = trialSample
+            val sample = trialSample ?: (terminal as? MinimizeResult.WithSample)?.sample
             trialSample = null
             if (sample == null) continue
             accepted = completedTrial
@@ -91,7 +111,7 @@ internal class MonotoneClausePrimal private constructor(
     private fun purePins(trial: Assumptions): Pair<Assumptions, List<Int>> {
         val pins = trial.bools.toMutableMap()
         val pure = mutableListOf<Int>()
-        while (!params.cancellation() && !lifetime()) {
+        while (!params.cancellation() && !phaseToken()) {
             val polarity = residualPolarity(pins) ?: break
             val next = polarity.indices.filter { polarity[it] == 1 || polarity[it] == 2 }
             if (next.isEmpty()) break
@@ -104,7 +124,7 @@ internal class MonotoneClausePrimal private constructor(
     private fun residualPolarity(pins: Map<Int, Boolean>): IntArray? {
         val polarity = IntArray(solver.problem.numBoolVars)
         for (clause in clauses) {
-            if (params.cancellation() || lifetime()) return null
+            if (params.cancellation() || phaseToken()) return null
             literalWork += clause.literals.size
             if (clause.literals.any { literal ->
                     pins[Lit.variable(literal)]?.let { Lit.evaluate(literal, it) } == true
@@ -156,7 +176,9 @@ internal class MonotoneClausePrimal private constructor(
             objective: LinearObjective,
             params: BacktrackParams,
             lifetime: Cancellation,
+            activeBudgetMillis: Long = 5_000L,
         ): MonotoneClausePrimal? {
+            val start = TimeSource.Monotonic.markNow()
             val problem = solver.problem
             if (problem.numIntVars != 0 || problem.numRealVars != 0 ||
                 objective.boolWeights.any { it < 0L } || objective.intCoefficients.any { it != 0L }
@@ -172,7 +194,7 @@ internal class MonotoneClausePrimal private constructor(
             var literalWork = 0L
             val clauses = mutableListOf<Clause>()
             for (factor in problem.factors) {
-                if (params.cancellation()) return null
+                if (lifetime() || start.elapsedNow().inWholeMilliseconds >= activeBudgetMillis) return null
                 val clause = factor as? Clause ?: return null
                 clauses.add(clause)
                 for (literal in clause.literals) {
@@ -187,6 +209,7 @@ internal class MonotoneClausePrimal private constructor(
             return MonotoneClausePrimal(
                 solver, objective, params, lifetime, variables,
                 Array(occurrences.size) { occurrences[it] }, clauses, literalWork,
+                activeBudgetMillis, start.elapsedNow().inWholeMilliseconds,
             )
         }
     }
