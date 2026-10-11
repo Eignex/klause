@@ -58,7 +58,7 @@ class DefinitionalSweep internal constructor(
     /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
     companion object {
         /** Infer definitions using the source domains to recognize hinted binary literal channels.
-         * Unique unary equality predicates used only by those channels are maintained with them.
+         * Unique unit unary predicates used only by those channels are maintained with them.
          * Hinted native [com.eignex.klause.factor.table.Element] results follow their indexes and selected cells.
          * Competing definitions and cyclic cones remain searched. */
         fun infer(
@@ -219,8 +219,7 @@ class DefinitionalSweep internal constructor(
      * Build a [FunctionalObjective] `Σ termCoeffs·terms + Σ boolTermCoeffs·[boolTerm holds] + constant`
      * (already "lower is better") over this sweep's int and bool cones, so local search descends the
      * objective on the decision (leaf) vars rather than the functionally-defined ones. Returns null
-     * when no term is defined here or the cone crosses a literal-to-integer channel (a
-     * [com.eignex.klause.solver.objective.LinearObjective] already suffices).
+     * when no term is defined here or a reachable definition has no exact objective evaluator.
      */
     fun functionalObjective(
         terms: IntArray,
@@ -230,61 +229,57 @@ class DefinitionalSweep internal constructor(
         boolTerms: IntArray = EmptyIntArray,
         boolTermCoeffs: LongArray = EmptyLongArray,
     ): IncrementalObjective? {
-        val defByOut = MutableIntObjectMap<SweepNode.IntDef>()
-        for (n in nodes) if (n is SweepNode.IntDef) defByOut.put(n.out, n)
-        val literalOutputs = IntHashSet()
-        for (n in nodes) if (n is LiteralIntDefinition) literalOutputs.add(n.out)
-        val boolDefByOut = MutableIntObjectMap<SweepNode.BoolFold>()
-        for (n in nodes) if (n is SweepNode.BoolFold) boolDefByOut.put(n.out, n)
-        val anyIntDef = terms.any { defByOut.containsKey(it) }
-        val anyBoolDef = boolTerms.any { boolDefByOut.containsKey(it) }
-        if (!anyIntDef && !anyBoolDef) return null
-
-        val reachable = IntHashSet()
-        fun mark(id: Int) {
-            val d = defByOut[id] ?: return
-            if (id in reachable) return
-            reachable.add(id)
-            for (inId in d.intInputs) mark(inId)
+        val intDefinitions = MutableIntObjectMap<SweepNode>()
+        val boolDefinitions = MutableIntObjectMap<SweepNode>()
+        for (node in nodes) {
+            (if (node.outIsBool) boolDefinitions else intDefinitions).put(node.out, node)
         }
-        for (t in terms) mark(t)
-        val readsLiteral = nodes.any {
-            it is SweepNode.IntDef && it.out in reachable && it.intInputs.any { v -> v in literalOutputs }
-        }
-        if (readsLiteral) {
+        if (terms.none { intDefinitions.containsKey(it) } && boolTerms.none { boolDefinitions.containsKey(it) }) {
             return null
         }
-        // `nodes` is topological, so filtering preserves the inputs-before-outputs order the cone eval needs.
-        val coneNodes = ArrayList<FunctionalObjective.Node>(reachable.size)
+        val reachableInts = IntHashSet()
+        val reachableBools = IntHashSet()
         val leaves = LinkedHashSet<Int>()
-        for (n in nodes) {
-            if (n !is SweepNode.IntDef || n.out !in reachable) continue
-            coneNodes.add(n.node)
-            for (inId in n.intInputs) if (inId !in reachable) leaves.add(inId)
-        }
-
-        val boolReachable = IntHashSet()
-        fun markBool(id: Int) {
-            val d = boolDefByOut[id] ?: return
-            if (id in boolReachable) return
-            boolReachable.add(id)
-            for (lit in d.ins) markBool(Lit.variable(lit))
-        }
-        for (t in boolTerms) markBool(t)
-        val boolConeNodes = ArrayList<FunctionalObjective.BoolFold>(boolReachable.size)
         val boolLeaves = LinkedHashSet<Int>()
-        for (n in nodes) {
-            if (n !is SweepNode.BoolFold || n.out !in boolReachable) continue
-            boolConeNodes.add(FunctionalObjective.BoolFold(n.out, n.ins, n.isAnd))
-            for (lit in n.ins) {
-                val v = Lit.variable(lit)
-                if (v !in boolReachable) boolLeaves.add(v)
+        val work = ArrayDeque<Pair<Int, Boolean>>()
+        for (term in terms) work.addLast(term to false)
+        for (term in boolTerms) work.addLast(term to true)
+        while (work.isNotEmpty()) {
+            val (id, isBool) = work.removeLast()
+            val definition = (if (isBool) boolDefinitions else intDefinitions)[id]
+            if (definition == null) {
+                (if (isBool) boolLeaves else leaves).add(id)
+                continue
             }
+            if (!(if (isBool) reachableBools else reachableInts).add(id)) continue
+            if (definition !is SweepNode.IntDef && definition !is SweepNode.BoolFold &&
+                definition !is LiteralIntDefinition && definition !is UnaryPredicateDefinition
+            ) return null
+            for (input in definition.intInputs) work.addLast(input to false)
+            for (input in definition.boolInputs) work.addLast(input to true)
         }
-
+        val cone = ArrayList<FunctionalObjective.Definition>()
+        for (node in nodes) {
+            if (node.out !in (if (node.outIsBool) reachableBools else reachableInts)) continue
+            val compute: ((Int) -> Long, (Int) -> Boolean) -> Long = when (node) {
+                is SweepNode.IntDef -> { intOf, _ -> node.node.compute(intOf) }
+                is SweepNode.BoolFold -> {
+                    val fold = FunctionalObjective.BoolFold(node.out, node.ins, node.isAnd)
+                    val evaluator: ((Int) -> Long, (Int) -> Boolean) -> Long =
+                        { _, boolOf -> if (fold.compute(boolOf)) 1L else 0L }
+                    evaluator
+                }
+                is LiteralIntDefinition -> { _, boolOf ->
+                    if (boolOf(Lit.variable(node.literal)) == Lit.isPositive(node.literal)) 1L else 0L
+                }
+                is UnaryPredicateDefinition -> { intOf, _ -> if (node.holds(intOf(node.input))) 1L else 0L }
+                else -> return null
+            }
+            cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, compute))
+        }
         return FunctionalObjective(
-            terms, termCoeffs, constant, minimize, coneNodes, leaves.toIntArray(),
-            boolTerms, boolTermCoeffs, boolConeNodes, boolLeaves.toIntArray(),
+            terms, termCoeffs, constant, minimize, emptyList(), leaves.toIntArray(),
+            boolTerms, boolTermCoeffs, emptyList(), boolLeaves.toIntArray(), cone,
         )
     }
 
@@ -555,7 +550,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
     private val definedBool: BooleanArray = data.definedBool
     private val intDefinitions: MutableIntObjectMap<FunctionalObjective.Node> = data.intDefinitions
     private val literalChannels: MutableIntObjectMap<LiteralIntDefinition> = data.literalChannels
-    private val equalityPredicates: MutableIntObjectMap<EqualityPredicateDefinition> = data.equalityPredicates
+    private val unaryPredicates: MutableIntObjectMap<UnaryPredicateDefinition> = data.unaryPredicates
     private val elementResults: MutableIntObjectMap<ElementResultDefinition> = data.elementResults
     private val extremumRepairs: BooleanArray = data.extremumRepairs
     private val intReaders: Array<IntArray> = data.intReaders
@@ -585,7 +580,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             yield(null)
             val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
             val literalChannels = MutableIntObjectMap<LiteralIntDefinition>()
-            val equalityPredicates = MutableIntObjectMap<EqualityPredicateDefinition>()
+            val unaryPredicates = MutableIntObjectMap<UnaryPredicateDefinition>()
             val elementResults = MutableIntObjectMap<ElementResultDefinition>()
             for (i in nodeArr.indices) {
                 if (i % INITIALIZATION_BATCH == 0) yield(null)
@@ -597,7 +592,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
                     extremumRepairs[n.out] = intDef.inverseRepair
                 }
                 if (n is LiteralIntDefinition) literalChannels.put(n.out, n)
-                if (n is EqualityPredicateDefinition) equalityPredicates.put(n.out, n)
+                if (n is UnaryPredicateDefinition) unaryPredicates.put(n.out, n)
                 if (n is ElementResultDefinition) elementResults.put(n.out, n)
             }
             var intReaders: Array<IntArray>? = null
@@ -611,7 +606,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             }
             yield(DefinitionIndex(
                 nodeArr, definedInt, definedBool, intDefinitions, literalChannels,
-                equalityPredicates, elementResults, extremumRepairs,
+                unaryPredicates, elementResults, extremumRepairs,
                 checkNotNull(intReaders), checkNotNull(boolReaders),
             ))
         }
@@ -663,7 +658,9 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
 
     internal fun literalChannel(v: Int): LiteralIntDefinition? = literalChannels[v]
 
-    internal fun equalityPredicate(v: Int): EqualityPredicateDefinition? = equalityPredicates[v]
+    internal fun equalityPredicate(v: Int): EqualityPredicateDefinition? = unaryPredicates[v] as? EqualityPredicateDefinition
+
+    internal fun unaryPredicate(v: Int): UnaryPredicateDefinition? = unaryPredicates[v]
 
     internal fun elementResultDefinition(v: Int): ElementResultDefinition? = elementResults[v]
 
@@ -763,7 +760,7 @@ private class DefinitionIndex(
     val definedBool: BooleanArray,
     val intDefinitions: MutableIntObjectMap<FunctionalObjective.Node>,
     val literalChannels: MutableIntObjectMap<LiteralIntDefinition>,
-    val equalityPredicates: MutableIntObjectMap<EqualityPredicateDefinition>,
+    val unaryPredicates: MutableIntObjectMap<UnaryPredicateDefinition>,
     val elementResults: MutableIntObjectMap<ElementResultDefinition>,
     val extremumRepairs: BooleanArray,
     val intReaders: Array<IntArray>,

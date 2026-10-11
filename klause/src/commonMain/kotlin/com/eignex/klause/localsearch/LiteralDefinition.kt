@@ -21,17 +21,32 @@ internal class LiteralIntDefinition(override val out: Int, val literal: Int) : S
     }
 }
 
-internal class EqualityPredicateDefinition(
+internal sealed class UnaryPredicateDefinition(
     override val out: Int,
     val input: Int,
     val value: Long,
+    val op: LinearOp,
 ) : SweepNode {
     override val outIsBool: Boolean get() = true
     override val intInputs: IntArray = intArrayOf(input)
     override val boolInputs: IntArray get() = EmptyIntArray
+
+    fun holds(inputValue: Long): Boolean = when (op) {
+        LinearOp.EQ -> inputValue == value
+        LinearOp.NE -> inputValue != value
+        LinearOp.LE -> inputValue <= value
+        LinearOp.GE -> inputValue >= value
+    }
+
     override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long =
-        if (assignment.intValue(input) == value) 1L else 0L
+        if (holds(assignment.intValue(input))) 1L else 0L
 }
+
+internal class EqualityPredicateDefinition(out: Int, input: Int, value: Long) :
+    UnaryPredicateDefinition(out, input, value, LinearOp.EQ)
+
+internal class ComparisonPredicateDefinition(out: Int, input: Int, value: Long, op: LinearOp) :
+    UnaryPredicateDefinition(out, input, value, op)
 
 internal fun literalDefinitions(problem: Problem, hints: IntArray, nodes: List<SweepNode>): List<SweepNode> {
     val hinted = BooleanArray(problem.numIntVars)
@@ -63,16 +78,30 @@ internal fun literalDefinitions(problem: Problem, hints: IntArray, nodes: List<S
         val factor = problem.factors[i]
         for (b in factor.boolVars) counts[b]++
         val row = factor as? ReifiedLinear ?: continue
-        if (row.op != LinearOp.EQ || row.vars.size != 1 || row.integerConstants?.coeff(0) != 1L) continue
+        if (row.vars.size != 1) continue
+        val constants = row.integerConstants ?: continue
+        if (constants.coeff(0) != 1L && constants.coeff(0) != -1L) continue
+        if (constants.coeff(0) == -1L && (constants.bound == Long.MIN_VALUE ||
+                !problem.intBounds.hasLower(row.vars[0]) || problem.intBounds.lower(row.vars[0]) == Long.MIN_VALUE)
+        ) continue
         sources[row.auxBoolVar] = row
     }
-    val predicates = ArrayList<EqualityPredicateDefinition>()
+    val predicates = ArrayList<UnaryPredicateDefinition>()
     val claimed = BooleanArray(problem.numBoolVars)
     for (channel in channels) {
         val b = Lit.variable(channel.literal)
         val row = sources[b] ?: continue
         if (counts[b] != 1 || claimed[b]) continue
-        predicates.add(EqualityPredicateDefinition(b, row.vars[0], checkNotNull(row.integerConstants).bound))
+        val constants = checkNotNull(row.integerConstants)
+        val reversed = constants.coeff(0) == -1L
+        val value = if (reversed) -constants.bound else constants.bound
+        val op = if (reversed) when (row.op) {
+            LinearOp.LE -> LinearOp.GE
+            LinearOp.GE -> LinearOp.LE
+            else -> row.op
+        } else row.op
+        predicates.add(if (op == LinearOp.EQ) EqualityPredicateDefinition(b, row.vars[0], value)
+        else ComparisonPredicateDefinition(b, row.vars[0], value, op))
         claimed[b] = true
     }
     return orderedDefinitions(problem, nodes + predicates + channels)
