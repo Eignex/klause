@@ -1,7 +1,6 @@
 package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.bigIntOf
