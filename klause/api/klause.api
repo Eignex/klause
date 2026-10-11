@@ -8612,6 +8612,33 @@ public class com/eignex/klause/schema/VariableSchema : com/eignex/skema/Schema {
 	protected final fun setVar (Lkotlin/ranges/IntRange;)Lkotlin/properties/PropertyDelegateProvider;
 }
 
+public final class com/eignex/klause/simplex/exact/BigFraction {
+	public static final field Companion Lcom/eignex/klause/simplex/exact/BigFraction$Companion;
+	public final fun compareTo (Lcom/eignex/klause/simplex/exact/BigFraction;)I
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDen ()Ljava/math/BigInteger;
+	public final fun getNum ()Ljava/math/BigInteger;
+	public fun hashCode ()I
+	public final fun isZero ()Z
+	public final fun minus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun negated ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun plus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun reciprocal ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun signum ()I
+	public final fun times (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun toDouble ()D
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/simplex/exact/BigFraction$Companion {
+	public final fun getMINUS_ONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getZERO ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun of (Ljava/math/BigInteger;Ljava/math/BigInteger;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun ofDouble (D)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun ofLong (J)Lcom/eignex/klause/simplex/exact/BigFraction;
+}
+
 public final class com/eignex/klause/solver/Assignment {
 	public fun <init> (III)V
 	public synthetic fun <init> (IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -12492,6 +12519,42 @@ public final class com/eignex/klause/theory/qflra/SourceBoundTerm {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/util/BigIntKt {
+	public static final fun maxOf (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun minOf (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+}
+
+public final class com/eignex/klause/util/BigInt_jvmKt {
+	public static final fun abs (Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun bigIntOf (I)Ljava/math/BigInteger;
+	public static final fun bigIntOf (J)Ljava/math/BigInteger;
+	public static final fun bigIntOf-VKZWuLQ (J)Ljava/math/BigInteger;
+	public static final fun compareTo (Ljava/math/BigInteger;Ljava/math/BigInteger;)I
+	public static final fun div (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun fitsLong (Ljava/math/BigInteger;)Z
+	public static final fun floorBigInt (D)Ljava/math/BigInteger;
+	public static final fun gcd (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun getBIG_ONE ()Ljava/math/BigInteger;
+	public static final fun getBIG_TEN ()Ljava/math/BigInteger;
+	public static final fun getBIG_TWO ()Ljava/math/BigInteger;
+	public static final fun getBIG_ZERO ()Ljava/math/BigInteger;
+	public static final fun isZero (Ljava/math/BigInteger;)Z
+	public static final fun magnitudeBitLength (Ljava/math/BigInteger;)I
+	public static final fun minus (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun negate (Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun parseBigInt (Ljava/lang/String;)Ljava/math/BigInteger;
+	public static final fun plus (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun rem (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun shl (Ljava/math/BigInteger;I)Ljava/math/BigInteger;
+	public static final fun shr (Ljava/math/BigInteger;I)Ljava/math/BigInteger;
+	public static final fun signum (Ljava/math/BigInteger;)I
+	public static final fun times (Ljava/math/BigInteger;Ljava/math/BigInteger;)Ljava/math/BigInteger;
+	public static final fun toDouble (Ljava/math/BigInteger;)D
+	public static final fun toLong (Ljava/math/BigInteger;)J
+	public static final fun toLongExact (Ljava/math/BigInteger;)J
+	public static final fun unaryMinus (Ljava/math/BigInteger;)Ljava/math/BigInteger;
+}
+
 public final class com/eignex/klause/util/Bits {
 	public static final field Companion Lcom/eignex/klause/util/Bits$Companion;
 	public fun <init> (I)V
@@ -12528,6 +12591,34 @@ public final class com/eignex/klause/util/Bits$Companion {
 	public final fun popcount ([J)I
 	public final fun set ([JI)V
 	public final fun xorInto ([J[J)V
+}
+
+public abstract interface class com/eignex/klause/util/Cancellation {
+	public static final field Companion Lcom/eignex/klause/util/Cancellation$Companion;
+	public fun and (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public fun charge (J)V
+	public fun deadline ()Lkotlin/time/ComparableTimeMark;
+	public fun invoke ()Z
+	public abstract fun isCancelled ()Z
+	public fun or (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public fun shorten (D)Lcom/eignex/klause/util/Cancellation;
+	public fun workMeter ()Lcom/eignex/klause/util/WorkMeter;
+}
+
+public final class com/eignex/klause/util/Cancellation$Companion {
+	public final fun after-LRDsOJo (J)Lcom/eignex/klause/util/Cancellation;
+	public final fun getNever ()Lcom/eignex/klause/util/Cancellation;
+	public final fun until (Lkotlin/time/ComparableTimeMark;)Lcom/eignex/klause/util/Cancellation;
+}
+
+public final class com/eignex/klause/util/Cancellation$DefaultImpls {
+	public static fun and (Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public static fun charge (Lcom/eignex/klause/util/Cancellation;J)V
+	public static fun deadline (Lcom/eignex/klause/util/Cancellation;)Lkotlin/time/ComparableTimeMark;
+	public static fun invoke (Lcom/eignex/klause/util/Cancellation;)Z
+	public static fun or (Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/Cancellation;
+	public static fun shorten (Lcom/eignex/klause/util/Cancellation;D)Lcom/eignex/klause/util/Cancellation;
+	public static fun workMeter (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/util/WorkMeter;
 }
 
 public final class com/eignex/klause/util/CharReader {
@@ -12599,5 +12690,9 @@ public final class com/eignex/klause/util/PermutationGroup {
 public final class com/eignex/klause/util/StringCharSource : com/eignex/klause/util/CharSource {
 	public fun <init> (Ljava/lang/String;)V
 	public fun next ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/util/WorkMeter {
+	public abstract fun charge (J)V
 }
 

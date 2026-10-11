@@ -19,13 +19,7 @@ import com.eignex.klause.util.unaryMinus
  *
  * [index] is strictly ascending and [value] is index-aligned; no stored value is zero.
  */
-@LatticeApi
-class SparseIntRow(
-    /** Borrowed strictly ascending column indexes; the caller must not mutate them during a reduction. */
-    val index: IntArray,
-    /** Borrowed nonzero coefficients aligned with [index]; the caller must not mutate them during a reduction. */
-    val value: Array<BigInt>,
-) {
+internal class SparseIntRow(val index: IntArray, val value: Array<BigInt>) {
 
     /** The lowest column the row mentions, or [Int.MAX_VALUE] when the row is zero. */
     val lead: Int get() = if (index.isEmpty()) Int.MAX_VALUE else index[0]
@@ -33,10 +27,8 @@ class SparseIntRow(
     /** The highest column the row mentions — its pivot in a lower-triangular form — or -1 when zero. */
     val trail: Int get() = if (index.isEmpty()) -1 else index[index.size - 1]
 
-    /** Whether this row has no nonzero entries. */
     val isZero: Boolean get() = index.isEmpty()
 
-    /** The coefficient of [column], or zero when absent. */
     operator fun get(column: Int): BigInt {
         var lo = 0
         var hi = index.size - 1
@@ -52,15 +44,13 @@ class SparseIntRow(
         return BIG_ZERO
     }
 
-    /** Canonical empty row used by reduction kernels. */
     companion object {
-        internal val Zero = SparseIntRow(IntArray(0), emptyArray())
+        val Zero = SparseIntRow(IntArray(0), emptyArray())
     }
 }
 
 /** The row over [entries] `column -> coefficient`, dropping the zeros and sorting what is left. */
-@LatticeApi
-fun sparseIntRow(entries: Map<Int, BigInt>): SparseIntRow {
+internal fun sparseIntRow(entries: Map<Int, BigInt>): SparseIntRow {
     val kept = entries.entries.filter { !it.value.isZero() }.sortedBy { it.key }
     if (kept.isEmpty()) return SparseIntRow.Zero
     return SparseIntRow(IntArray(kept.size) { kept[it].key }, Array(kept.size) { kept[it].value })
@@ -75,11 +65,7 @@ fun sparseIntRow(entries: Map<Int, BigInt>): SparseIntRow {
  * down the whole matrix. An untouched column is left null and materialised on first access, so a
  * transform over a hundred thousand columns of which a few thousand move costs only what moved.
  */
-@LatticeApi
-class UnimodularTransform internal constructor(
-    /** Number of source and transformed integer columns. */
-    val size: Int,
-) {
+internal class UnimodularTransform(val size: Int) {
     private val columns = arrayOfNulls<MutableMap<Int, BigInt>>(size)
     private val operations = ArrayList<UnimodularColumnOperation>()
 
@@ -92,7 +78,7 @@ class UnimodularTransform internal constructor(
     /** Entry `V(i, j)`. */
     operator fun get(i: Int, j: Int): BigInt = column(j)[i] ?: BIG_ZERO
 
-    internal fun swap(x: Int, y: Int) {
+    fun swap(x: Int, y: Int) {
         if (x == y) return
         val cx = column(x)
         val cy = column(y)
@@ -101,14 +87,14 @@ class UnimodularTransform internal constructor(
         operations.add(UnimodularColumnOperation.Swap(x, y))
     }
 
-    internal fun negate(j: Int) {
+    fun negate(j: Int) {
         val c = column(j)
         for (row in c.keys.toList()) c[row] = -c.getValue(row)
         operations.add(UnimodularColumnOperation.Negate(j))
     }
 
     /** `column(target) += factor · column(source)`. */
-    internal fun addMultiple(target: Int, source: Int, factor: BigInt) {
+    fun addMultiple(target: Int, source: Int, factor: BigInt) {
         if (target == source || factor.isZero()) return
         val src = column(source)
         val dst = column(target)
@@ -149,7 +135,7 @@ class UnimodularTransform internal constructor(
     internal fun columnOrNull(j: Int): Map<Int, BigInt>? = columns[j]
 
     /** Stored non-zeros, counting an untouched identity column as the one entry it stands for. */
-    internal val nonZeroCount: Int get() = (0 until size).sumOf { columns[it]?.size ?: 1 }
+    val nonZeroCount: Int get() = (0 until size).sumOf { columns[it]?.size ?: 1 }
 }
 
 private sealed interface UnimodularColumnOperation {

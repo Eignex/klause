@@ -29,7 +29,6 @@ val fullTargets = providers.gradleProperty("targets.full").isPresent
 kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
-        optIn.add("com.eignex.klause.lp.lattice.LatticeApi")
     }
     jvm()
     linuxX64()
@@ -40,8 +39,6 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api(project(":klause-numerics"))
-            implementation(project(":klause-lattice"))
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")
@@ -50,6 +47,10 @@ kotlin {
             }
             implementation("com.eignex:kumulant:0.3.4-20260922.073440-66")
             implementation("com.eignex:kpermute:1.2.0")
+        }
+        // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
+        nativeMain.dependencies {
+            api("com.ionspin.kotlin:bignum:0.3.10")
         }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")

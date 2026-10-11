@@ -34,8 +34,7 @@ class BigFraction private constructor(
     /** Returns the additive inverse of this fraction. */
     fun negated(): BigFraction = if (isZero) this else BigFraction(-num, den)
 
-    /** The smallest integer greater than or equal to this fraction. */
-    fun ceilInteger(): BigInt {
+    internal fun ceilInteger(): BigInt {
         if (den.isOne) return num
         val quotient = num / den
         return if (num.signum() > 0 && !(num % den).isZero()) quotient + BIG_ONE else quotient

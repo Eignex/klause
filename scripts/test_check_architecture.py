@@ -69,40 +69,12 @@ import com.eignex.klause.utilPolicy.P
     def test_platform_main_sources_are_checked_in_every_module(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for module, source_set in (("klause", "jvmMain"), ("klause-numerics", "nativeMain")):
+            for module, source_set in (("klause", "jvmMain"), ("klause-cli", "nativeMain")):
                 path = root / module / "src" / source_set / "kotlin" / "Bad.kt"
                 path.parent.mkdir(parents=True)
-                path.write_text("package com.eignex.klause.simplex.exact\n"
+                path.write_text("package com.eignex.klause.lp.engine\n"
                                 "import com.eignex.klause.ir.Problem\n")
             self.assertEqual(2, len(check(root)))
-
-    def test_numerical_module_rejects_solver_project_dependency(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            module = root / "klause-numerics"
-            source = module / "src/commonMain/kotlin/Good.kt"
-            source.parent.mkdir(parents=True)
-            source.write_text("package com.eignex.klause.util\n")
-            (module / "build.gradle.kts").write_text('api(project(":klause"))')
-            self.assertIn("forbidden numerical module dependency", check(root)[0])
-
-    def test_lattice_module_accepts_only_numeric_substrate(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            module = root / "klause-lattice"
-            source = module / "src/commonMain/kotlin/Good.kt"
-            source.parent.mkdir(parents=True)
-            source.write_text("package com.eignex.klause.lp.lattice\n")
-            (module / "build.gradle.kts").write_text('api(project(":klause-numerics"))')
-            self.assertEqual([], check(root))
-
-    def test_numerical_module_rejects_solver_package_ownership(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            source = root / "klause-numerics/src/commonMain/kotlin/Bad.kt"
-            source.parent.mkdir(parents=True)
-            source.write_text("package com.eignex.klause.lp.engine\n")
-            self.assertIn("package does not belong", check(root)[0])
 
     def test_missing_source_tree_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:

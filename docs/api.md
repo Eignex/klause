@@ -21,7 +21,7 @@ migration rather than an immediate visibility or signature break.
 | `theory` protocols | `Theory`, its context/check contract and authoritative exact assignment values; custom theories retain their native representations |
 | `lp` projection protocols | `RelaxationBuilder`, factor relaxation/hull interfaces and typed source/CP/LP mapping handles |
 | Format entry points | Public parsing, compilation and solution-writing facades; source/result meaning follows [input semantics](formats.md) |
-| Exported numerical contracts | `BigInt`, `BigFraction`, `Cancellation` and `WorkMeter` retain their JVM/native ownership and representation contracts in `klause-numerics` |
+| Exported numerical contracts | `BigInt`, `BigFraction`, `Cancellation` and `WorkMeter` retain their JVM/native ownership and representation contracts in `klause` |
 
 Supported extensions supply the behavior their interfaces document. A custom factor
 keeps borrowed arrays and structural keys stable; a custom component supplies complete
@@ -43,9 +43,9 @@ state are implementation APIs unless the supported table names their contract.
 Consumers retain compatibility descriptors while migrating to a supported entry point;
 implementation visibility is not a promise of stable lifecycle or extension behavior.
 
-`klause-lattice` exports the numerical seam required by the solver with `LatticeApi`
-opt-in. It is an implementation interface versioned with Klause, with read-only borrowed
-result buffers and caller-owned input rows. It is not a general solver plugin surface.
+The `lp.lattice` package is an internal implementation mechanism within `klause`.
+Its reductions borrow caller-owned input rows and expose read-only result buffers
+to solver consumers.
 The engine's closed dependency list remains in [architecture](architecture.md#package-boundaries).
 
 ## Typed contributions and migration

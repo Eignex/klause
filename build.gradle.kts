@@ -21,9 +21,7 @@ val checkArchitecture = tasks.register<Exec>("checkArchitecture") {
     workingDir(rootDir)
     commandLine("python3", "scripts/check_architecture.py")
     inputs.file("scripts/check_architecture.py")
-    inputs.files(fileTree(rootDir) {
-        include("klause*/src/*Main/kotlin/**/*.kt", "klause*/build.gradle.kts")
-    })
+    inputs.files(fileTree(rootDir) { include("klause*/src/*Main/kotlin/**/*.kt") })
 }
 
 val koblasJvmArgs = buildList {

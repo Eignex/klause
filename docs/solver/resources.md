@@ -78,7 +78,7 @@ whole-run cap before another worker spends its quota. Low-level callers sharing 
 budget directly receive synchronized cooperative accounting, rather than reservations.
 Parallel scheduling and stopping order are not reproducible.
 
-`Cancellation` and `WorkMeter` live in the neutral numerical module. Their units come
+`Cancellation` and `WorkMeter` live in the neutral `util` package within `klause`. Their units come
 from the caller's adapter; they contain no portfolio pricing. Composing tokens carries
 one available meter, rather than charging all possible ancestors. Presolve's adapter
 explicitly owns native root-work conversion. Numerical kernels consume native controls;
