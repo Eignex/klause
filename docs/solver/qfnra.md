@@ -155,8 +155,8 @@ continuous products before finite or linear routing. Open integer domains and
 continuous objectives decline this route; they are not boxed or discretized.
 
 Backtracking checks interval relaxations and fixed finite branches. Local search
-generates candidates from finite factors, then pins their complete finite values in
-a theory query before publication. ALNS uses that same completion in bootstrap,
+generates candidates from finite factors, rechecks their pinned finite fixpoint, then
+pins their complete finite values in a theory query before publication. ALNS uses that same completion in bootstrap,
 finite CP repair and its inner local search. Pure-real sources use an empty finite
 projection, so the local-search arm still runs and obtains an exact completion.
 Rejected heuristic candidates never establish a global refutation.

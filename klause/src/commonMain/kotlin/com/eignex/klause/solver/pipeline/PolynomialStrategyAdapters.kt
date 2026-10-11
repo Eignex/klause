@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.composedFixpoint
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -17,6 +18,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
@@ -89,6 +91,11 @@ internal class PolynomialStrategyAdapters(
     private var refutedCondition: PolynomialCondition? = null
 
     private val completion = CandidateCompletion { candidate, stop ->
+        when (composedFixpoint(finite, Candidate(candidate, Unit), cancellation or stop, params.assumptions)) {
+            is Verification.Rejected -> return@CandidateCompletion Completion.Refuted(work = 1)
+            is Verification.Indeterminate -> return@CandidateCompletion Completion.Undecided(work = 1)
+            is Verification.Accepted -> Unit
+        }
         val pins = model.integerColumns.map { (id, column) -> column to BigFraction.ofLong(candidate.intValue(id)) }
             .toMap()
         val condition = PolynomialCondition(

@@ -1275,10 +1275,15 @@ internal class ResumableMinimize(
     private fun applyObjectiveBound(): SearchRunDisposition {
         session.installObjectiveBoolBound(objective.boolWeightValues)
         if (rebindable) return SearchRunDisposition.Continue
-        return if (assertObjectiveBoundAtRoot() || tightenOpenColumnsAtRoot()) {
-            SearchRunDisposition.Exhausted
-        } else {
-            SearchRunDisposition.Continue
+        if (assertObjectiveBoundAtRoot() || tightenOpenColumnsAtRoot()) return SearchRunDisposition.Exhausted
+        if (params.componentFactory == null) return SearchRunDisposition.Continue
+        // Objective cutoffs alter native CP bounds at the root; peers must see the tightened facts.
+        val initialized = cp.initialize(searchSession)
+        val result = if (initialized == ComponentResult.Consistent) searchSession.propagate() else initialized
+        return when (result) {
+            ComponentResult.Consistent -> SearchRunDisposition.Continue
+            is ComponentResult.Conflict -> SearchRunDisposition.Exhausted
+            ComponentResult.Indeterminate -> SearchRunDisposition.Indeterminate
         }
     }
 }
