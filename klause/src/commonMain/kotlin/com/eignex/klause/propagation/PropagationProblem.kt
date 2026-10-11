@@ -20,7 +20,7 @@ class PropagationProblem private constructor(
     constructor(problem: Problem) : this(problem, null)
 
     /** Whether this projection can use the packed native-SAT propagation lane. */
-    val isNativeSatEligible: Boolean = problem.isClausal()
+    val isNativeSatEligible: Boolean = preparedIndexes?.nativeEligible ?: problem.isClausal()
 
     /** One propagator per model factor, materialized only by consumers of the general CP lane. */
     val propagators: Array<out Propagator> by lazy {

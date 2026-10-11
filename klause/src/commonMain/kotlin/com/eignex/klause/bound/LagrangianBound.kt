@@ -82,13 +82,10 @@ internal class LagrangianBound(
     internal fun preparation(): Iterator<Unit> = sequence {
         var visits = 0
         val numInt = problem.numIntVars
-        val blocks = if (objective == null) emptyList() else run {
-            var chosen: List<IntArray> = emptyList()
-            for (next in chooseBlocks(problem)) {
-                if (next != null) chosen = next
-                yield(Unit)
-            }
-            chosen
+        var blocks: List<IntArray> = emptyList()
+        if (objective != null) for (next in chooseBlocks(problem)) {
+            if (next != null) blocks = next
+            yield(Unit)
         }
         if (blocks.isEmpty()) {
             vars = EmptyIntArray

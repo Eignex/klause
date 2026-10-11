@@ -47,6 +47,7 @@ class PropagationSession private constructor(
     preparedState: PropagationState? = null,
     rootConflict: IntArray? = null,
     preparedBuffers: PropagationSessionBuffers? = null,
+    preparedMark: PropagationState.LevelMark? = null,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -194,7 +195,7 @@ class PropagationSession private constructor(
         // logging now, before the first push; the level-0 mark therefore has undoSize 0,
         // and undoing to it rewinds every search mutation back to this post-bake baseline.
         state.undoLogging = true
-        levelPush(state.mark())
+        levelPush(preparedMark ?: state.mark())
     }
 
     internal companion object {
@@ -208,9 +209,15 @@ class PropagationSession private constructor(
                 if (next != null) buffers = next
                 yield(null)
             }
+            var mark: PropagationState.LevelMark? = null
+            val marks = state.prepareMark()
+            while (mark == null) {
+                mark = marks.next()
+                if (mark == null) yield(null)
+            }
             yield(PropagationSession(
                 state.problem, cancellation, state.cancelFloor, state.nativeSat, state.pbLearning,
-                state.projection, state, conflict, checkNotNull(buffers),
+                state.projection, state, conflict, checkNotNull(buffers), mark,
             ))
         }.iterator()
 
@@ -275,7 +282,13 @@ class PropagationSession private constructor(
             intPinnedVal[v] = value
             trail.add(encInt(v))
         }
-        levelPush(state.mark())
+        var mark: PropagationState.LevelMark? = null
+        val marks = state.prepareMark()
+        while (mark == null) {
+            mark = marks.next()
+            if (mark == null) yield(null)
+        }
+        levelPush(mark)
     }
 
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
