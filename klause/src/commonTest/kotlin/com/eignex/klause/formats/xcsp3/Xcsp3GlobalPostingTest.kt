@@ -570,10 +570,9 @@ class Xcsp3GlobalPostingTest {
         state.assignment.setInt(day, 0)
         state.assignment.setInt(element.idx, 1)
         state.assignment.setInt(element.result, 9)
-        for (v in parsed.definedVars) state.assignment.setInt(v, 1)
-        state.invariants = assertNotNull(
-            DefinitionalSweep.infer(problem.factors, problem.numIntVars, parsed.definedVars),
-        ).network(problem.numIntVars, problem.numBoolVars)
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+        state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+        sweep.sweep(state.assignment, state.rootDomains, problem.factors)
         state.recompute()
 
         state.factors[elementId].proposeRepairMoves(state, elementId, state.moveSink)

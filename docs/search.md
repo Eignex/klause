@@ -148,6 +148,12 @@ of a ground column are covered, while every tuple is still checked for feasibili
 The reversible live prefix is committed once per completed sweep, including
 empty-prefix conflicts; sibling branches restore filtering from trailed state.
 
+Construction-time root propagation folds unary Table restrictions whose expanded
+supports total at most 4096 values. It intersects a sorted survivor set with the
+current domain without walking that domain's span, so local search samples from
+the same unconditional restrictions. Larger unary relations and multi-column
+tables retain deferred preparation. Search-time filtering retains STR2 explanations.
+
 LP explanations cite selected source bound witnesses and recursively expanded
 row, fixing and cutoff premises. Current CP propagation and source LP conflicts
 do not include an optional exact-theory row-propagation scanner or explanation
