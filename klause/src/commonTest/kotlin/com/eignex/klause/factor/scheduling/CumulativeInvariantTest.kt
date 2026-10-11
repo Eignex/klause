@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.scheduling
 
+import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
@@ -8,6 +9,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
@@ -22,6 +24,131 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CumulativeInvariantTest {
+    @Test
+    fun `shared starts preserve simultaneous overload after a shift`() {
+        for (remapped in listOf(false, true)) {
+            for (unary in listOf(false, true)) {
+                val starts = if (remapped) intArrayOf(0, 1) else intArrayOf(0, 0)
+                val source = if (unary) {
+                    Cumulative.unary(starts, longArrayOf(1, 1))
+                } else {
+                    Cumulative(starts, longArrayOf(1, 1), longArrayOf(2, 2), 3)
+                }
+                val factor = if (remapped) source.remap(VarRemap(intArrayOf(), intArrayOf(0, 0))) else source
+                val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf<Factor>(factor))
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+                state.assignment.setInt(0, 0)
+                state.recompute()
+                state.weights.factorWeights[0] = 3.5
+                assertEquals(1L, state.cost)
+
+                for (target in listOf(1L, 3L, 0L)) {
+                    val move = IntSet(0, target)
+                    val snapshot = state.assignment.snapshot()
+                    assertEquals(0L, state.netDelta(move))
+                    assertEquals(0.0, state.weightedNetDelta(move))
+                    assertEquals(snapshot, state.assignment.snapshot())
+                    assertEquals(1L, state.cost)
+                    state.apply(move)
+                    assertEquals(1L, state.cost)
+                    assertEquals(1, state.intPayload[0])
+                    state.recompute()
+                    assertEquals(1L, state.cost)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `aliased integer and presence moves agree with independent overloads`() {
+        val positive = Lit.make(0, true)
+        val negative = Lit.make(0, false)
+        val factors = listOf(
+            Cumulative(intArrayOf(0, 0), longArrayOf(1, 2), longArrayOf(2, 1), 2),
+            Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(2, 2), 2, durationVars = intArrayOf(1, 1)),
+            Cumulative(intArrayOf(0, 1), longArrayOf(2, 1), longArrayOf(2, 2), 1, resourceVars = intArrayOf(1, 1)),
+            Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(2, 1), 2, durationVars = intArrayOf(0, 1)),
+            Cumulative(intArrayOf(0, 1), longArrayOf(2, 1), longArrayOf(2, 2), 1, resourceVars = intArrayOf(0, 1)),
+            Cumulative(intArrayOf(0, 0), longArrayOf(2, 2), longArrayOf(2, 2), 2,
+                durationVars = intArrayOf(1, 1), resourceVars = intArrayOf(1, 1), capacityVar = 1),
+            Cumulative(intArrayOf(0, 1), longArrayOf(1, 2), longArrayOf(2, 1), 2, capacityVar = 0),
+            Cumulative(intArrayOf(0, 0), longArrayOf(2, 1), longArrayOf(2, 2), 2,
+                presents = intArrayOf(positive, positive)),
+            Cumulative(intArrayOf(0, 0), longArrayOf(2, 1), longArrayOf(2, 2), 2,
+                presents = intArrayOf(positive, negative), durationVars = intArrayOf(1, 1)),
+        )
+        for ((index, factor) in factors.withIndex()) {
+            val problem = Problem(1, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(factor))
+            FactorPropagationOracle.assertMoveScoring(problem, "aliases/$index") { sample ->
+                var overage = 0L
+                val cap = if (factor.capacityVar < 0) factor.capacity else sample.ints[factor.capacityVar]
+                for (time in 0L..3L) {
+                    var usage = 0L
+                    for (task in factor.starts.indices) {
+                        val present = factor.presents.isEmpty() ||
+                            sample.bools[Lit.variable(factor.presents[task])] == Lit.isPositive(factor.presents[task])
+                        val start = sample.ints[factor.starts[task]]
+                        val duration = if (factor.durationVars.isEmpty()) factor.durations[task]
+                            else sample.ints[factor.durationVars[task]]
+                        val resource = if (factor.resourceVars.isEmpty()) factor.resources[task]
+                            else sample.ints[factor.resourceVars[task]]
+                        if (present && time >= start && time < start + duration) usage += resource
+                    }
+                    overage += maxOf(0L, usage - cap)
+                }
+                overage.toInt()
+            }
+        }
+    }
+
+    @Test
+    fun `mixed moves preserve aliased overloads through probes and recomputation`() {
+        val factor = Cumulative(
+            intArrayOf(0, 0, 1), longArrayOf(2, 2, 2), longArrayOf(2, 2, 2), 3,
+            presents = intArrayOf(Lit.make(0, true), Lit.make(0, true), Lit.make(0, false)),
+            durationVars = intArrayOf(2, 2, 2), resourceVars = intArrayOf(3, 3, 3), capacityVar = 4,
+        )
+        val problem = Problem(1, 5, Array(5) { IntDomain(0, 3) }, arrayOf<Factor>(factor))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        for ((variable, value) in longArrayOf(0, 1, 1, 2, 3).withIndex()) state.assignment.setInt(variable, value)
+        state.assignment.setBool(0, true)
+        state.recompute()
+        state.weights.factorWeights[0] = 3.5
+        val moves = listOf(
+            Move.Compound(listOf(IntSet(0, 1), IntSet(2, 2), IntSet(3, 3))),
+            Move.Compound(listOf(Move.BoolFlip(0), IntSet(0, 2), IntSet(1, 0), IntSet(4, 1))),
+            Move.Compound(listOf(IntSet(2, 0), Move.BoolFlip(0), IntSet(2, 3), IntSet(0, 0))),
+            Move.Compound(listOf(IntSet(3, 0), IntSet(4, 0), Move.BoolFlip(0))),
+        )
+        for (move in moves) {
+            val before = state.cost
+            val snapshot = state.assignment.snapshot()
+            val predicted = state.netDelta(move)
+            assertEquals(3.5 * predicted, state.weightedNetDelta(move))
+            assertEquals(snapshot, state.assignment.snapshot())
+            assertEquals(before, state.cost)
+
+            state.apply(move)
+
+            var expected = 0L
+            for (time in 0L..5L) {
+                var usage = 0L
+                for (task in factor.starts.indices) {
+                    val present = state.assignment.boolValue(0) == Lit.isPositive(factor.presents[task])
+                    val start = state.assignment.intValue(factor.starts[task])
+                    val duration = state.assignment.intValue(2)
+                    if (present && time >= start && time < start + duration) usage += state.assignment.intValue(3)
+                }
+                expected += maxOf(0L, usage - state.assignment.intValue(4))
+            }
+            assertEquals(expected - before, predicted)
+            assertEquals(expected, state.cost)
+            assertEquals(expected.toInt(), state.intPayload[0])
+            state.recompute()
+            assertEquals(expected, state.cost)
+        }
+    }
+
     @Test
     fun `primitive deltas match committed grades across payload saturation`() {
         val demand = Int.MAX_VALUE.toLong()

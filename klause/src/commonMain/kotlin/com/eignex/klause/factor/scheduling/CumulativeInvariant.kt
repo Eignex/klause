@@ -25,6 +25,7 @@ import com.eignex.klause.localsearch.OptionalPresence
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.argsortBy
 import kotlin.math.max
 import kotlin.math.min
@@ -47,6 +48,24 @@ internal class CumulativeInvariant(
     private val durPosOf: (Int) -> Int,
     private val resPosOf: (Int) -> Int,
 ) : Invariant {
+
+    private val aliasPositionsByVariable = run {
+        val positions = mutableMapOf<Int, MutableList<Int>>()
+        for (role in arrayOf(starts, durationVars, resourceVars)) {
+            for ((task, variable) in role.withIndex()) positions.getOrPut(variable) { ArrayList() }.add(task)
+        }
+        if (capacityVar >= 0) positions.getOrPut(capacityVar) { ArrayList() }.add(-1)
+        positions.filterValues { it.size > 1 }.mapValues { (_, tasks) ->
+            tasks.filter { it >= 0 }.distinct().toIntArray()
+        }
+    }
+    private val aliasVariables = aliasPositionsByVariable.keys.toIntArray()
+    private val aliasIndex = IntIntMap.build(aliasVariables, IntArray(aliasVariables.size) { it }, absent = -1)
+    private val aliasPositions = Array(aliasVariables.size) { aliasPositionsByVariable.getValue(aliasVariables[it]) }
+    private val repeatedPresence = presents.map { Lit.variable(it) }.groupingBy { it }.eachCount()
+        .filterValues { it > 1 }.keys.toIntArray().let { variables ->
+            IntIntMap.build(variables, IntArray(variables.size) { 1 })
+        }
 
     private fun curDur(state: LocalSearchState, i: Int): Long =
         if (durationVars.isEmpty()) durations[i] else state.assignment.intValue(durationVars[i])
@@ -105,7 +124,13 @@ internal class CumulativeInvariant(
         val ls = state.refPayload[factorId] as CumulativeLsState
         val oldVal = state.assignment.intValue(intVar)
         if (oldVal == newValue) return 0
+        val alias = aliasIndex[intVar]
         val delta: Long = when {
+            alias >= 0 -> {
+                val simulated = CumulativeLsState(ls.tLow, ls.usage.copyOf(), ls.overage, ls.cap)
+                applyAliasedIntSet(state, simulated, intVar, oldVal, newValue, aliasPositions[alias])
+                simulated.overage - ls.overage
+            }
             intVar == capacityVar -> cumulativeCapacityDelta(ls, newValue)
 
             else -> {
@@ -165,7 +190,9 @@ internal class CumulativeInvariant(
         val newValue = state.assignment.intValue(intVar)
         val before = ls.overage
         if (oldValue == newValue) return 0
+        val alias = aliasIndex[intVar]
         when {
+            alias >= 0 -> applyAliasedIntSet(state, ls, intVar, oldValue, newValue, aliasPositions[alias])
             intVar == capacityVar -> applyCumulativeCapacityDelta(ls, newValue)
 
             else -> {
@@ -200,10 +227,47 @@ internal class CumulativeInvariant(
         return overageDegree(state, ls.overage) - overageDegree(state, before)
     }
 
+    private fun applyAliasedIntSet(
+        state: LocalSearchState,
+        ls: CumulativeLsState,
+        intVar: Int,
+        oldValue: Long,
+        newValue: Long,
+        tasks: IntArray,
+    ) {
+        // Substitute every role from the same before/after assignment; role precedence would strand aliases.
+        for (task in tasks) {
+            if (!OptionalPresence.isPresentInAssignment(presents, task, state)) continue
+            val start = state.assignment.intValue(starts[task])
+            val duration = curDur(state, task)
+            val resource = curRes(state, task)
+            val oldStart = if (starts[task] == intVar) oldValue else start
+            val newStart = if (starts[task] == intVar) newValue else start
+            val changesDuration = durationVars.isNotEmpty() && durationVars[task] == intVar
+            val oldDuration = if (changesDuration) oldValue else duration
+            val newDuration = if (changesDuration) newValue else duration
+            val changesResource = resourceVars.isNotEmpty() && resourceVars[task] == intVar
+            val oldResource = if (changesResource) oldValue else resource
+            val newResource = if (changesResource) newValue else resource
+            if (oldDuration == newDuration && oldResource == newResource) {
+                if (oldDuration > 0 && oldResource > 0) {
+                    applyCumulativeStartDelta(ls, oldStart, newStart, oldDuration, oldResource)
+                }
+            } else {
+                if (oldResource > 0) applyCumulativeResDelta(ls, oldStart, oldDuration, oldResource, 0)
+                if (newResource > 0) applyCumulativeResDelta(ls, newStart, newDuration, 0, newResource)
+            }
+        }
+        if (intVar == capacityVar) applyCumulativeCapacityDelta(ls, newValue)
+    }
+
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
         if (presents.isEmpty()) return 0
         val ls = state.refPayload[factorId] as CumulativeLsState
         val cap = ls.cap
+        // Shared presence footprints must see the load changes of earlier tasks in the same flip.
+        val simulatedUsage = if (repeatedPresence[boolVar] != 0) ls.usage.copyOf() else null
+        val usage = simulatedUsage ?: ls.usage
         var deltaOv = 0L
         for (i in presents.indices) {
             if (Lit.variable(presents[i]) != boolVar) continue
@@ -216,8 +280,9 @@ internal class CumulativeInvariant(
             val from = max(0L, s - ls.tLow).toInt()
             val to = min(ls.usage.size.toLong(), s + d - ls.tLow).toInt()
             for (t in from until to) {
-                val u = ls.usage[t]
+                val u = usage[t]
                 val nu = u + sign * r
+                if (simulatedUsage != null) simulatedUsage[t] = nu
                 deltaOv += max(0L, nu - cap) - max(0L, u - cap)
             }
         }

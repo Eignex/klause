@@ -140,6 +140,12 @@ assignment.
 
 ## Cumulative neighborhoods
 
+Cumulative integer moves update every task reading the coordinate as a start,
+duration or demand, including aliases introduced by remapping and coordinates shared
+with capacity. Shared presence flips grade the combined footprint change. Predicted
+deltas and committed grades use the final combined load rather than summing independent
+scores against the original timeline.
+
 Cumulative overload repair can remove a maintained product duration through a unit
 binary equality channel and a unary equality choice predicate. It checks zero in the
 channel and duration domains, pins and implicit owners before proposing a complete
