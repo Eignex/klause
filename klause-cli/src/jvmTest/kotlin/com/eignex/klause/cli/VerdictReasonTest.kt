@@ -18,6 +18,31 @@ import kotlin.test.assertTrue
 
 class VerdictReasonTest {
     @Test
+    fun `grid completion cannot publish source refutation or unboundedness`() {
+        for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED)) {
+            val out = capture { MiniZincOutput(floatApproximation = true).onComplete(verdict) }
+
+            assertTrue("=====UNKNOWN=====" in out, out)
+            assertTrue("no source proof" in out, out)
+            assertTrue("=====UNSATISFIABLE=====" !in out && "=====UNBOUNDED=====" !in out, out)
+        }
+    }
+
+    @Test
+    fun `grid incumbent cannot publish a source optimum marker`() {
+        val out = capture {
+            MiniZincOutput(floatApproximation = true).apply {
+                onSolution("x = 0.5;\n----------\n", 1L, null)
+                onComplete(Verdict.OPTIMAL)
+            }
+        }
+
+        assertTrue("x = 0.5;\n----------" in out, out)
+        assertTrue("==========" !in out, out)
+        assertTrue("source witness check required" in out, out)
+    }
+
+    @Test
     fun `SMT output preserves arbitrary integers and rational objectives`() {
         for ((numerator, denominator) in listOf(
             "9223372036854775808" to 1,
