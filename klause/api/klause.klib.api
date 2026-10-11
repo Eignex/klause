@@ -2293,6 +2293,75 @@ sealed interface com.eignex.klause.model/BoolExpr : com.eignex.klause.model/Bool
     }
 }
 
+sealed interface com.eignex.klause.model/ContinuousRealExpr { // com.eignex.klause.model/ContinuousRealExpr|null[0]
+    final class Affine : com.eignex.klause.model/ContinuousRealExpr { // com.eignex.klause.model/ContinuousRealExpr.Affine|null[0]
+        constructor <init>(kotlin.collections/Map<kotlin/String, kotlin/Double>, kotlin/Double = ...) // com.eignex.klause.model/ContinuousRealExpr.Affine.<init>|<init>(kotlin.collections.Map<kotlin.String,kotlin.Double>;kotlin.Double){}[0]
+
+        final val coefficients // com.eignex.klause.model/ContinuousRealExpr.Affine.coefficients|{}coefficients[0]
+            final fun <get-coefficients>(): kotlin.collections/Map<kotlin/String, kotlin/Double> // com.eignex.klause.model/ContinuousRealExpr.Affine.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+        final val constant // com.eignex.klause.model/ContinuousRealExpr.Affine.constant|{}constant[0]
+            final fun <get-constant>(): kotlin/Double // com.eignex.klause.model/ContinuousRealExpr.Affine.constant.<get-constant>|<get-constant>(){}[0]
+
+        final fun component1(): kotlin.collections/Map<kotlin/String, kotlin/Double> // com.eignex.klause.model/ContinuousRealExpr.Affine.component1|component1(){}[0]
+        final fun component2(): kotlin/Double // com.eignex.klause.model/ContinuousRealExpr.Affine.component2|component2(){}[0]
+        final fun copy(kotlin.collections/Map<kotlin/String, kotlin/Double> = ..., kotlin/Double = ...): com.eignex.klause.model/ContinuousRealExpr.Affine // com.eignex.klause.model/ContinuousRealExpr.Affine.copy|copy(kotlin.collections.Map<kotlin.String,kotlin.Double>;kotlin.Double){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.model/ContinuousRealExpr.Affine.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.model/ContinuousRealExpr.Affine.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.model/ContinuousRealExpr.Affine.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.eignex.klause.model/ContinuousRealExpr.Affine> { // com.eignex.klause.model/ContinuousRealExpr.Affine.$serializer|null[0]
+            final val descriptor // com.eignex.klause.model/ContinuousRealExpr.Affine.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.eignex.klause.model/ContinuousRealExpr.Affine.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.eignex.klause.model/ContinuousRealExpr.Affine.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.eignex.klause.model/ContinuousRealExpr.Affine // com.eignex.klause.model/ContinuousRealExpr.Affine.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.eignex.klause.model/ContinuousRealExpr.Affine) // com.eignex.klause.model/ContinuousRealExpr.Affine.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.eignex.klause.model.ContinuousRealExpr.Affine){}[0]
+        }
+
+        final object Companion { // com.eignex.klause.model/ContinuousRealExpr.Affine.Companion|null[0]
+            final val $childSerializers // com.eignex.klause.model/ContinuousRealExpr.Affine.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/ContinuousRealExpr.Affine> // com.eignex.klause.model/ContinuousRealExpr.Affine.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final class Multiply : com.eignex.klause.model/ContinuousRealExpr { // com.eignex.klause.model/ContinuousRealExpr.Multiply|null[0]
+        constructor <init>(com.eignex.klause.model/ContinuousRealExpr, com.eignex.klause.model/ContinuousRealExpr) // com.eignex.klause.model/ContinuousRealExpr.Multiply.<init>|<init>(com.eignex.klause.model.ContinuousRealExpr;com.eignex.klause.model.ContinuousRealExpr){}[0]
+
+        final val left // com.eignex.klause.model/ContinuousRealExpr.Multiply.left|{}left[0]
+            final fun <get-left>(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.model/ContinuousRealExpr.Multiply.left.<get-left>|<get-left>(){}[0]
+        final val right // com.eignex.klause.model/ContinuousRealExpr.Multiply.right|{}right[0]
+            final fun <get-right>(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.model/ContinuousRealExpr.Multiply.right.<get-right>|<get-right>(){}[0]
+
+        final fun component1(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.model/ContinuousRealExpr.Multiply.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.model/ContinuousRealExpr.Multiply.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.model/ContinuousRealExpr = ..., com.eignex.klause.model/ContinuousRealExpr = ...): com.eignex.klause.model/ContinuousRealExpr.Multiply // com.eignex.klause.model/ContinuousRealExpr.Multiply.copy|copy(com.eignex.klause.model.ContinuousRealExpr;com.eignex.klause.model.ContinuousRealExpr){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.model/ContinuousRealExpr.Multiply.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.model/ContinuousRealExpr.Multiply.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.model/ContinuousRealExpr.Multiply.toString|toString(){}[0]
+
+        final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.eignex.klause.model/ContinuousRealExpr.Multiply> { // com.eignex.klause.model/ContinuousRealExpr.Multiply.$serializer|null[0]
+            final val descriptor // com.eignex.klause.model/ContinuousRealExpr.Multiply.$serializer.descriptor|{}descriptor[0]
+                final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.eignex.klause.model/ContinuousRealExpr.Multiply.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+            final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.eignex.klause.model/ContinuousRealExpr.Multiply.$serializer.childSerializers|childSerializers(){}[0]
+            final fun deserialize(kotlinx.serialization.encoding/Decoder): com.eignex.klause.model/ContinuousRealExpr.Multiply // com.eignex.klause.model/ContinuousRealExpr.Multiply.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+            final fun serialize(kotlinx.serialization.encoding/Encoder, com.eignex.klause.model/ContinuousRealExpr.Multiply) // com.eignex.klause.model/ContinuousRealExpr.Multiply.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.eignex.klause.model.ContinuousRealExpr.Multiply){}[0]
+        }
+
+        final object Companion { // com.eignex.klause.model/ContinuousRealExpr.Multiply.Companion|null[0]
+            final val $childSerializers // com.eignex.klause.model/ContinuousRealExpr.Multiply.Companion.$childSerializers|{}$childSerializers[0]
+
+            final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/ContinuousRealExpr.Multiply> // com.eignex.klause.model/ContinuousRealExpr.Multiply.Companion.serializer|serializer(){}[0]
+        }
+    }
+
+    final object Companion : kotlinx.serialization.internal/SerializerFactory { // com.eignex.klause.model/ContinuousRealExpr.Companion|null[0]
+        final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/ContinuousRealExpr> // com.eignex.klause.model/ContinuousRealExpr.Companion.serializer|serializer(){}[0]
+        final fun serializer(kotlin/Array<out kotlinx.serialization/KSerializer<*>>...): kotlinx.serialization/KSerializer<*> // com.eignex.klause.model/ContinuousRealExpr.Companion.serializer|serializer(kotlin.Array<out|kotlinx.serialization.KSerializer<*>>...){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.model/IntExpr : com.eignex.klause.model/IntTerm { // com.eignex.klause.model/IntExpr|null[0]
     open fun toIntExpr(): com.eignex.klause.model/IntExpr // com.eignex.klause.model/IntExpr.toIntExpr|toIntExpr(){}[0]
 
@@ -4441,6 +4510,24 @@ final class com.eignex.klause.factor.arithmetic/ComparisonClause : com.eignex.kl
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/ComparisonClause.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ComparisonClause.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ComparisonClause.structuralKey|structuralKey(){}[0]
+}
+
+final class com.eignex.klause.factor.arithmetic/ContinuousProduct : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/ContinuousProduct|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int) // com.eignex.klause.factor.arithmetic/ContinuousProduct.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+
+    final val a // com.eignex.klause.factor.arithmetic/ContinuousProduct.a|{}a[0]
+        final fun <get-a>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ContinuousProduct.a.<get-a>|<get-a>(){}[0]
+    final val b // com.eignex.klause.factor.arithmetic/ContinuousProduct.b|{}b[0]
+        final fun <get-b>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ContinuousProduct.b.<get-b>|<get-b>(){}[0]
+    final val result // com.eignex.klause.factor.arithmetic/ContinuousProduct.result|{}result[0]
+        final fun <get-result>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ContinuousProduct.result.<get-result>|<get-result>(){}[0]
+    final val structuralKeyWeight // com.eignex.klause.factor.arithmetic/ContinuousProduct.structuralKeyWeight|{}structuralKeyWeight[0]
+        final fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ContinuousProduct.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
+    final val variables // com.eignex.klause.factor.arithmetic/ContinuousProduct.variables|{}variables[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ContinuousProduct.variables.<get-variables>|<get-variables>(){}[0]
+
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/ContinuousProduct.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ContinuousProduct.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.ir/Factor, com.eignex.klause.ir/LinearRow { // com.eignex.klause.factor.arithmetic/Linear|null[0]
@@ -7769,6 +7856,37 @@ final class com.eignex.klause.model/CircuitExpr : com.eignex.klause.model/BoolEx
         final val $childSerializers // com.eignex.klause.model/CircuitExpr.Companion.$childSerializers|{}$childSerializers[0]
 
         final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/CircuitExpr> // com.eignex.klause.model/CircuitExpr.Companion.serializer|serializer(){}[0]
+    }
+}
+
+final class com.eignex.klause.model/ContinuousRealEquality : com.eignex.klause.model/BoolExpr { // com.eignex.klause.model/ContinuousRealEquality|null[0]
+    constructor <init>(com.eignex.klause.model/ContinuousRealExpr, com.eignex.klause.model/ContinuousRealExpr) // com.eignex.klause.model/ContinuousRealEquality.<init>|<init>(com.eignex.klause.model.ContinuousRealExpr;com.eignex.klause.model.ContinuousRealExpr){}[0]
+
+    final val left // com.eignex.klause.model/ContinuousRealEquality.left|{}left[0]
+        final fun <get-left>(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.model/ContinuousRealEquality.left.<get-left>|<get-left>(){}[0]
+    final val right // com.eignex.klause.model/ContinuousRealEquality.right|{}right[0]
+        final fun <get-right>(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.model/ContinuousRealEquality.right.<get-right>|<get-right>(){}[0]
+
+    final fun component1(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.model/ContinuousRealEquality.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.model/ContinuousRealEquality.component2|component2(){}[0]
+    final fun copy(com.eignex.klause.model/ContinuousRealExpr = ..., com.eignex.klause.model/ContinuousRealExpr = ...): com.eignex.klause.model/ContinuousRealEquality // com.eignex.klause.model/ContinuousRealEquality.copy|copy(com.eignex.klause.model.ContinuousRealExpr;com.eignex.klause.model.ContinuousRealExpr){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.model/ContinuousRealEquality.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.model/ContinuousRealEquality.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.model/ContinuousRealEquality.toString|toString(){}[0]
+
+    final object $serializer : kotlinx.serialization.internal/GeneratedSerializer<com.eignex.klause.model/ContinuousRealEquality> { // com.eignex.klause.model/ContinuousRealEquality.$serializer|null[0]
+        final val descriptor // com.eignex.klause.model/ContinuousRealEquality.$serializer.descriptor|{}descriptor[0]
+            final fun <get-descriptor>(): kotlinx.serialization.descriptors/SerialDescriptor // com.eignex.klause.model/ContinuousRealEquality.$serializer.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
+
+        final fun childSerializers(): kotlin/Array<kotlinx.serialization/KSerializer<*>> // com.eignex.klause.model/ContinuousRealEquality.$serializer.childSerializers|childSerializers(){}[0]
+        final fun deserialize(kotlinx.serialization.encoding/Decoder): com.eignex.klause.model/ContinuousRealEquality // com.eignex.klause.model/ContinuousRealEquality.$serializer.deserialize|deserialize(kotlinx.serialization.encoding.Decoder){}[0]
+        final fun serialize(kotlinx.serialization.encoding/Encoder, com.eignex.klause.model/ContinuousRealEquality) // com.eignex.klause.model/ContinuousRealEquality.$serializer.serialize|serialize(kotlinx.serialization.encoding.Encoder;com.eignex.klause.model.ContinuousRealEquality){}[0]
+    }
+
+    final object Companion { // com.eignex.klause.model/ContinuousRealEquality.Companion|null[0]
+        final val $childSerializers // com.eignex.klause.model/ContinuousRealEquality.Companion.$childSerializers|{}$childSerializers[0]
+
+        final fun serializer(): kotlinx.serialization/KSerializer<com.eignex.klause.model/ContinuousRealEquality> // com.eignex.klause.model/ContinuousRealEquality.Companion.serializer|serializer(){}[0]
     }
 }
 
@@ -13609,6 +13727,12 @@ final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/iff(com.ei
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/implies(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/implies|implies@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/not(): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/not|not@com.eignex.klause.model.BoolTerm(){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/or(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/or|or@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
+final fun (com.eignex.klause.model/ContinuousRealExpr).com.eignex.klause.schema/eq(com.eignex.klause.model/ContinuousRealExpr): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.model.ContinuousRealExpr(com.eignex.klause.model.ContinuousRealExpr){}[0]
+final fun (com.eignex.klause.model/ContinuousRealExpr).com.eignex.klause.schema/eq(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.model.ContinuousRealExpr(com.eignex.klause.schema.FloatTerm){}[0]
+final fun (com.eignex.klause.model/ContinuousRealExpr).com.eignex.klause.schema/eq(kotlin/Double): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.model.ContinuousRealExpr(kotlin.Double){}[0]
+final fun (com.eignex.klause.model/ContinuousRealExpr).com.eignex.klause.schema/times(com.eignex.klause.model/ContinuousRealExpr): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.schema/times|times@com.eignex.klause.model.ContinuousRealExpr(com.eignex.klause.model.ContinuousRealExpr){}[0]
+final fun (com.eignex.klause.model/ContinuousRealExpr).com.eignex.klause.schema/times(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.schema/times|times@com.eignex.klause.model.ContinuousRealExpr(com.eignex.klause.schema.FloatTerm){}[0]
+final fun (com.eignex.klause.model/ContinuousRealExpr).com.eignex.klause.schema/times(kotlin/Double): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.schema/times|times@com.eignex.klause.model.ContinuousRealExpr(kotlin.Double){}[0]
 final fun (com.eignex.klause.model/IntTerm).com.eignex.klause.schema/div(com.eignex.klause.model/IntTerm): com.eignex.klause.model/IntExpr // com.eignex.klause.schema/div|div@com.eignex.klause.model.IntTerm(com.eignex.klause.model.IntTerm){}[0]
 final fun (com.eignex.klause.model/IntTerm).com.eignex.klause.schema/eq(com.eignex.klause.model/IntTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.model.IntTerm(com.eignex.klause.model.IntTerm){}[0]
 final fun (com.eignex.klause.model/IntTerm).com.eignex.klause.schema/eq(kotlin/Int): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.model.IntTerm(kotlin.Int){}[0]
@@ -13638,6 +13762,7 @@ final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/intersect(c
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/ne(com.eignex.klause.model/SetTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/ne|ne@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/subsetOf(com.eignex.klause.model/SetTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/subsetOf|subsetOf@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
 final fun (com.eignex.klause.model/SetTerm).com.eignex.klause.schema/union(com.eignex.klause.model/SetTerm): com.eignex.klause.model/SetExpr // com.eignex.klause.schema/union|union@com.eignex.klause.model.SetTerm(com.eignex.klause.model.SetTerm){}[0]
+final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/eq(com.eignex.klause.model/ContinuousRealExpr): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.schema.FloatTerm(com.eignex.klause.model.ContinuousRealExpr){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/eq(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.schema.FloatTerm(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/eq(kotlin/Double): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@com.eignex.klause.schema.FloatTerm(kotlin.Double){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/ge(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/ge|ge@com.eignex.klause.schema.FloatTerm(com.eignex.klause.schema.FloatTerm){}[0]
@@ -13654,8 +13779,11 @@ final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/ne(com.e
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/ne(kotlin/Double): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/ne|ne@com.eignex.klause.schema.FloatTerm(kotlin.Double){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/plus(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/plus|plus@com.eignex.klause.schema.FloatTerm(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/plus(kotlin/Double): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/plus|plus@com.eignex.klause.schema.FloatTerm(kotlin.Double){}[0]
+final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(com.eignex.klause.model/ContinuousRealExpr): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.schema/times|times@com.eignex.klause.schema.FloatTerm(com.eignex.klause.model.ContinuousRealExpr){}[0]
+final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.schema/times|times@com.eignex.klause.schema.FloatTerm(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(kotlin/Double): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/times|times@com.eignex.klause.schema.FloatTerm(kotlin.Double){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(kotlin/Int): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/times|times@com.eignex.klause.schema.FloatTerm(kotlin.Int){}[0]
+final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/toContinuousRealExpr(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.schema/toContinuousRealExpr|toContinuousRealExpr@com.eignex.klause.schema.FloatTerm(){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/unaryMinus(): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/unaryMinus|unaryMinus@com.eignex.klause.schema.FloatTerm(){}[0]
 final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.klause.schema.VariableSchema(com.eignex.klause.config.KlauseConfig){}[0]
 final fun (com.eignex.klause.solver.incumbent/IncumbentSource<*, kotlin/Double>).com.eignex.klause.solver.incumbent/bound(): kotlin/Double // com.eignex.klause.solver.incumbent/bound|bound@com.eignex.klause.solver.incumbent.IncumbentSource<*,kotlin.Double>(){}[0]
