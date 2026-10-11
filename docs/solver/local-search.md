@@ -273,8 +273,16 @@ including repeated variables, and retain the minimum saturated comparison shortf
 Violated comparison clauses offer admissible literal bounds in addition to neighboring
 values. Inequalities round toward the satisfying side of domain holes; unreachable
 equalities are declined. Targets use coordinated channeling and inverse repairs, with
-pinned and implicitly owned source coordinates protected before synthesis. Candidate
-`deltaIf*` methods return the exact degree change. Ordinary `apply*` methods update
+pinned and implicitly owned source coordinates protected before synthesis.
+
+When zero satisfies a violated literal on a maintained conditional product, the clause
+can add at most two coordinated product repairs through binary equality channels and
+admissible source choices. Ordinary bounds and neighbor candidates remain available.
+Output and input domains, pins, ownership and definitions continue to filter these
+repairs; all affected constraints contribute to compound grading. False equality choices
+can sample the RNG, and existing Element-preserving variants share their collection allowance.
+
+Candidate `deltaIf*` methods return the exact degree change. Ordinary `apply*` methods update
 payloads after the assignment changes; their return values are implementation-specific
 and callers must read the post-move degree for scoring. Reified linear invariants offer
 an internal fused payload-update and exact-degree path. Other invariants update payloads
@@ -317,8 +325,12 @@ one input bounded to 0..1 (`binary`), another single input (`unary`), or multipl
 (`multi`). Binary input bounds do not establish channel semantics. Each observation
 includes up to eight highest-degree representative factors, one per kind. Each
 representative retains its degree and up to sixteen distinct Boolean and sixteen
-distinct integer values from that committed assignment, with omission counts. Factor and
-variable ids belong to the local-search model after lowering and presolve. Worker
+distinct integer values from that committed assignment, with exact distinct-coordinate
+omission counts. Element representatives prioritize the index, result and selected
+variable-array cell, using the lowered factor's index offset. Invalid indexes retain
+the index and result without a selected cell; constant arrays contribute no cell
+coordinate. Factor and variable ids belong to the local-search model after lowering
+and presolve. Worker
 aggregation selects one whole observation at the lowest total; it never adds breakdowns
 from different assignments. A zero residual does not establish domain, completion or
 source feasibility, and the observation does not replace an incumbent. Disabled

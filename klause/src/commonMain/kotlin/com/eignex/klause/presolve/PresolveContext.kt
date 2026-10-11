@@ -89,13 +89,13 @@ data class PresolveContext(
                 )
             }
             val intCoeffs = HashMap<Int, Long>()
-            for (i in objective.intCoefficients.indices) {
-                val c = objective.intCoefficients[i]
+            for (i in objective.intCoefficientValues.indices) {
+                val c = objective.intCoefficientValues[i]
                 if (c != 0L) intCoeffs[i] = c
             }
             val boolCoeffs = HashMap<Int, Long>()
-            for (b in objective.boolWeights.indices) {
-                val w = objective.boolWeights[b]
+            for (b in objective.boolWeightValues.indices) {
+                val w = objective.boolWeightValues[b]
                 if (w != 0L) boolCoeffs[b] = w
             }
             return PresolveContext(solutionSetSensitive, intCoeffs, boolCoeffs, modelBreaksSymmetry)

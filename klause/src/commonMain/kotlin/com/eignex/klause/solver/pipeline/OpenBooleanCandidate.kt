@@ -183,7 +183,7 @@ internal fun ComponentPlan.openBooleanDraw(
     val sample = (drawn as? SolveResult.Sat)?.assignment ?: return OpenBooleanDraw(null, moves)
     val vars = skeleton.boolVars
     return OpenBooleanDraw(
-        OpenBooleanCandidate(vars, BooleanArray(vars.size) { sample.bools[vars[it]] }),
+        OpenBooleanCandidate(vars, BooleanArray(vars.size) { sample.boolValue(vars[it]) }),
         moves,
     )
 }

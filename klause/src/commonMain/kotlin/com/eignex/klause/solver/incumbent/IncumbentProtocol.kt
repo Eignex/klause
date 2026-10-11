@@ -2,7 +2,9 @@ package com.eignex.klause.solver.incumbent
 
 /**
  * An **untrusted** proposal for a new incumbent: an [assignment] with the [objective] value its producer
- * claims for it. A candidate carries no guarantee — it may come from a heuristic engine, a peer arm
+ * claims for it. Assignment and objective payloads must be immutable through verification and
+ * publication; custom verifiers capture borrowed producer state before accepting it. A candidate carries
+ * no guarantee — it may come from a heuristic engine, a peer arm
  * running a different objective representation, or an engine whose feasibility test is weaker than the
  * consumer's. Nothing reads a candidate as a solution until a [CandidateVerifier] has accepted it.
  *

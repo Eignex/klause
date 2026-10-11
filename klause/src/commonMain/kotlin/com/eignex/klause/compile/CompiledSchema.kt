@@ -70,14 +70,14 @@ class CompiledSchema internal constructor(
     fun decode(handle: BoolHandle, sample: Sample): Boolean {
         val id = boolVarIdByName[handle.name]
             ?: error("No Boolean variable named '${handle.name}'")
-        return sample.bools[id]
+        return sample.boolValue(id)
     }
 
     /** Decode [handle]'s label from [sample]. */
     fun decode(handle: NominalHandle, sample: Sample): String {
         val map = nominalIndicators[handle.name]
             ?: error("No nominal variable named '${handle.name}'")
-        return map.entries.firstOrNull { sample.bools[it.value] }?.key
+        return map.entries.firstOrNull { sample.boolValue(it.value) }?.key
             ?: error("Nominal '${handle.name}' has no label set in assignment")
     }
 
@@ -85,7 +85,7 @@ class CompiledSchema internal constructor(
     fun decode(handle: IntHandle, sample: Sample): Long {
         val id = intVarIdByName[handle.name]
             ?: error("No integer variable named '${handle.name}'")
-        return sample.ints[id]
+        return sample.intValue(id)
     }
 
     /** Decodes an optional integer: `null` when the presence bit is false, the value otherwise. */
@@ -121,7 +121,7 @@ class CompiledSchema internal constructor(
             ?: error("No set variable named '${handle.name}'")
         val out = LinkedHashSet<Int>()
         for (i in 0 until layout.size) {
-            if (sample.bools[layout.indicatorBoolIds[i]]) out.add(layout.universe[i])
+            if (sample.boolValue(layout.indicatorBoolIds[i])) out.add(layout.universe[i])
         }
         return out
     }
@@ -135,7 +135,7 @@ class CompiledSchema internal constructor(
             ?: error("set '${handle.name}' is not a nominal-set var; use `decode(IntSetHandle, ...)` instead")
         val out = LinkedHashSet<String>()
         for (i in 0 until layout.size) {
-            if (sample.bools[layout.indicatorBoolIds[i]]) out.add(labels[i])
+            if (sample.boolValue(layout.indicatorBoolIds[i])) out.add(labels[i])
         }
         return out
     }
@@ -148,7 +148,7 @@ class CompiledSchema internal constructor(
             ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
-        return spec.realValue(sample.ints[id].toInt())
+        return spec.realValue(sample.intValue(id).toInt())
     }
 
     /**

@@ -27,7 +27,7 @@ internal fun finiteWitnessVerifier(
     ) {
         return@CandidateVerifier Verification.Rejected("witness certificate belongs to a different model")
     }
-    if (sample.bools.size != problem.numBoolVars || sample.numIntVars != problem.numIntVars) {
+    if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) {
         return@CandidateVerifier Verification.Rejected("assignment does not cover the model's discrete variables")
     }
     if (sample.exactInts != null && sample.exactInts.any { !it.fitsLong() }) {

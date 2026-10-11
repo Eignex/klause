@@ -22,8 +22,8 @@ internal fun BacktrackSolver.projectedOutcomes(
                 is SearchOutcome.Found -> {
                     val sample = mapping?.reconstructFrom(problem, outcome.sample) ?: outcome.sample
                     val key = ArrayList<Long>(boolVars.size + intVars.size)
-                    for (v in boolVars) key.add(if (sample.bools[v]) 1L else 0L)
-                    for (v in intVars) key.add(sample.ints[v])
+                    for (v in boolVars) key.add(if (sample.boolValue(v)) 1L else 0L)
+                    for (v in intVars) key.add(sample.intValue(v))
                     if (seen.add(key)) yield(SearchOutcome.Found(sample))
                     if (boolVars.isEmpty() && intVars.isEmpty()) {
                         yield(SearchOutcome.Exhausted())

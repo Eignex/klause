@@ -169,15 +169,15 @@ class OpenTheoryMinimizer internal constructor(
         // A continuous column may exist — a mixed model keeps its reals — but the descent steps by one,
         // which only bounds an objective whose value is integral. A continuous term has no next value
         // below the incumbent, and its greatest lower bound need not be attained at all.
-        require(objective.realCoefficients.none { it != 0.0 }) {
+        require(objective.realCoefficientValues.none { it != 0.0 }) {
             "the integral descent cannot minimize an objective weighting a continuous column"
         }
-        require(objective.boolWeights.all { it == 0L }) {
+        require(objective.boolWeightValues.all { it == 0L }) {
             "an open integer route cannot minimize an objective weighting Boolean columns"
         }
-        val present = objective.intCoefficients.indices.filter { objective.intCoefficients[it] != 0L }
+        val present = objective.intCoefficientValues.indices.filter { objective.intCoefficientValues[it] != 0L }
         terms = present.toIntArray()
-        coefficients = LongArray(present.size) { objective.intCoefficients[present[it]] }
+        coefficients = LongArray(present.size) { objective.intCoefficientValues[present[it]] }
         source = model
     }
 
@@ -546,17 +546,17 @@ class OpenTheoryMinimizer internal constructor(
         var total = bigIntOf(constant)
         when (assignment) {
             is OpenTheoryAssignment.Difference -> for (i in terms.indices) {
-                total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.ints[terms[i]])
+                total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.intValue(terms[i]))
             }
 
             is OpenTheoryAssignment.Sampled -> for (i in terms.indices) {
-                total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.ints[terms[i]])
+                total += bigIntOf(coefficients[i]) * bigIntOf(assignment.sample.intValue(terms[i]))
             }
 
             // A mixed model carries continuous columns the objective does not weight, so its value is
             // still the integer sum; the reals are decided alongside and contribute nothing to it.
             is OpenTheoryAssignment.ExactLira -> for (i in terms.indices) {
-                total += bigIntOf(coefficients[i]) * assignment.assignment.ints[terms[i]]
+                total += bigIntOf(coefficients[i]) * assignment.assignment.intValue(terms[i])
             }
 
             // A real-only route has no integer column to read, which only a constant objective may ask of
@@ -619,30 +619,30 @@ private fun Problem.sameDeclaredIntegerRanges(other: Problem): Boolean {
 private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = when (this) {
     is OpenTheoryAssignment.Difference -> RouteWitness(
         realColumns,
-        { sample.bools[it] },
-        { sample.reals.getOrElse(it) { 0.0 }.asFraction() },
-        { BigFraction.ofLong(sample.ints[it]) },
+        { sample.boolValue(it) },
+        { (if (it < sample.numRealVars) sample.approximateRealValue(it) else 0.0).asFraction() },
+        { BigFraction.ofLong(sample.intValue(it)) },
     )
 
     is OpenTheoryAssignment.Sampled -> RouteWitness(
         realColumns,
-        { sample.bools[it] },
+        { sample.boolValue(it) },
         { requireNotNull(sample.exactReals)[it] },
-        { BigFraction.ofLong(sample.ints[it]) },
+        { BigFraction.ofLong(sample.intValue(it)) },
     )
 
     is OpenTheoryAssignment.ExactLira -> RouteWitness(
         realColumns,
-        { assignment.bools[it] },
+        { assignment.boolValue(it) },
         { assignment.reals[it] },
-        { assignment.ints[it].asFraction() },
+        { assignment.intValue(it).asFraction() },
     )
 
     // A real-only route has no integer column to read, which only a constant objective may ask of it —
     // and a constant objective descends along nothing, so no certificate is taken over this witness.
     is OpenTheoryAssignment.ExactLra -> RouteWitness(
         realColumns,
-        { assignment.bools[it] },
+        { assignment.boolValue(it) },
         { assignment.reals[it] },
         { error("a route with no integer column cannot value an objective weighting one") },
     )

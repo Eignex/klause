@@ -119,18 +119,18 @@ internal class ObjectiveBoundFactor(
         /** The objective-bound factor for [objective] sharing [bound], or `null` when the objective has
          *  no variable terms (nothing to bound). Keeps only the nonzero-weight/coefficient variables. */
         fun of(objective: LinearObjective, bound: MutableObjectiveBound): ObjectiveBoundFactor? {
-            val boolVars = objective.boolWeights.indices.filter { objective.boolWeights[it] != 0L }
-            val intVars = objective.intCoefficients.indices.filter { objective.intCoefficients[it] != 0L }
-            val realVars = objective.realCoefficients.indices.filter { objective.realCoefficients[it] != 0.0 }
+            val boolVars = objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] != 0L }
+            val intVars = objective.intCoefficientValues.indices.filter { objective.intCoefficientValues[it] != 0L }
+            val realVars = objective.realCoefficientValues.indices.filter { objective.realCoefficientValues[it] != 0.0 }
             if (boolVars.isEmpty() && intVars.isEmpty() && realVars.isEmpty()) return null
             return ObjectiveBoundFactor(
                 boolVars.toIntArray(),
-                LongArray(boolVars.size) { objective.boolWeights[boolVars[it]] },
+                LongArray(boolVars.size) { objective.boolWeightValues[boolVars[it]] },
                 intVars.toIntArray(),
-                LongArray(intVars.size) { objective.intCoefficients[intVars[it]] },
+                LongArray(intVars.size) { objective.intCoefficientValues[intVars[it]] },
                 bound,
                 realVars.toIntArray(),
-                DoubleArray(realVars.size) { objective.realCoefficients[realVars[it]] },
+                DoubleArray(realVars.size) { objective.realCoefficientValues[realVars[it]] },
             )
         }
     }

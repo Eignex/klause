@@ -45,7 +45,7 @@ internal object Xcsp3Mode : CliMode {
  *  as `id[i]`) in declaration order paired with their solution values. */
 internal fun renderInstantiation(names: Map<String, Int>, s: Sample): String {
     val list = names.keys.joinToString(" ")
-    val values = names.values.joinToString(" ") { s.ints[it].toString() }
+    val values = names.values.joinToString(" ") { s.intValue(it).toString() }
     return "v <instantiation> <list> $list </list> <values> $values </values> </instantiation>"
 }
 

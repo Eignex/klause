@@ -159,10 +159,10 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         }
         sourceIntegers.forEach { need(integerOwners[it]) }
         sourceBooleans.forEach { need(booleanOwners[it]) }
-        objective?.intCoefficients?.forEachIndexed { variable, coefficient ->
+        objective?.intCoefficientValues?.forEachIndexed { variable, coefficient ->
             if (coefficient != 0L) need(integerOwners[variable])
         }
-        objective?.boolWeights?.forEachIndexed { variable, weight ->
+        objective?.boolWeightValues?.forEachIndexed { variable, weight ->
             if (weight != 0L) need(booleanOwners[variable])
         }
         for (factor in factors) if (factor !in owners) read(factor)

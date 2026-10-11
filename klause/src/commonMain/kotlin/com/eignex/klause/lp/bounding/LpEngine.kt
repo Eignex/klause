@@ -235,7 +235,7 @@ internal class LpEngine(
                 add(AggregationMirSeparator())
                 if (params.lpPlan.impliedBoundCuts) add(ImpliedBoundSeparator())
                 if (params.lpPlan.flowCoverCuts) add(FlowCoverSeparator())
-                val coef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
+                val coef = LongArray(problem.numIntVars) { objective.intCoefficientValues.getOrElse(it) { 0L } }
                 add(AssignmentObjectiveCut(coef))
             }
             if (params.lpPlan.circuit) add(CircuitSeparator())
@@ -725,15 +725,15 @@ internal class LpEngine(
 
         // Long-to-Double rounding at wide cutoffs can turn a strict improvement into equality.
         var lower = BigFraction.ofLong(objective.constant)
-        for (b in 0 until minOf(session.problem.numBoolVars, objective.boolWeights.size)) {
-            val weight = objective.boolWeights[b]
+        for (b in 0 until minOf(session.problem.numBoolVars, objective.boolWeightValues.size)) {
+            val weight = objective.boolWeightValues[b]
             val value = session.boolValue(b)
             if (value == true || (value == null && weight < 0L)) {
                 lower += BigFraction.ofLong(weight)
             }
         }
-        for (i in 0 until minOf(session.problem.numIntVars, objective.intCoefficients.size)) {
-            val coefficient = objective.intCoefficients[i]
+        for (i in 0 until minOf(session.problem.numIntVars, objective.intCoefficientValues.size)) {
+            val coefficient = objective.intCoefficientValues[i]
             if (coefficient == 0L) continue
             val domain = session.intDomain(i)
             val endpoint = if (coefficient > 0L) domain.min else domain.max
@@ -744,7 +744,7 @@ internal class LpEngine(
 
     /** Discrete objective lower-bound dominance against the incumbent. */
     private inner class LinearBound : RelaxationBound {
-        override val applicable: Boolean = objective.realCoefficients.all { it == 0.0 }
+        override val applicable: Boolean = objective.realCoefficientValues.all { it == 0.0 }
 
         override fun prune(
             session: PropagationSession,

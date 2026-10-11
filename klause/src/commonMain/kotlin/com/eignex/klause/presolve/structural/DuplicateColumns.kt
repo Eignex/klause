@@ -386,7 +386,7 @@ internal class DuplicateColumnMerge(private val merges: List<ColumnMerge>) {
      *  is immaterial. */
     fun reconstruct(sample: Sample): Sample {
         if (merges.isEmpty()) return sample
-        val ints = sample.ints.copyOf()
+        val ints = sample.ints
         for (m in merges) {
             val z = ints[m.keep]
             val x = maxOf(m.keepDomain.min, z - m.dropDomain.max)

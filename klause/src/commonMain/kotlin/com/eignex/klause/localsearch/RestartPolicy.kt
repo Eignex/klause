@@ -74,8 +74,8 @@ internal fun anchorAndPerturb(
     kind: PerturbationKind = PerturbationKind.Uniform,
 ) {
     val problem = state.problem
-    for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, anchor.bools[b])
-    for (i in 0 until problem.numIntVars) state.assignment.setInt(i, anchor.ints[i])
+    for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, anchor.boolValue(b))
+    for (i in 0 until problem.numIntVars) state.assignment.setInt(i, anchor.intValue(i))
     val totalVars = problem.numBoolVars + problem.numIntVars
     if (totalVars > 0) {
         when (kind) {

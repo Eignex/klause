@@ -326,8 +326,8 @@ object PresolvePipeline {
 /** [objective] zero-extended to cover [problem]'s Boolean namespace, or `null` when it already does (so the
  *  caller keeps its own). See [PresolveOutcome.objective]. */
 private fun refit(objective: LinearObjective?, problem: Problem): LinearObjective? {
-    if (objective == null || objective.boolWeights.size >= problem.numBoolVars) return null
-    return objective.copy(boolWeights = objective.boolWeights.copyOf(problem.numBoolVars))
+    if (objective == null || objective.boolWeightValues.size >= problem.numBoolVars) return null
+    return objective.copy(boolWeights = objective.boolWeightValues.copyOf(problem.numBoolVars))
 }
 
 /**

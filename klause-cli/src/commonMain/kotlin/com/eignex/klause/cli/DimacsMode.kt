@@ -37,7 +37,7 @@ internal object DimacsMode : CliMode {
  *  false, terminated by `0`. */
 internal fun renderDimacsModel(numVars: Int, s: Sample): String = buildString {
     append("v")
-    for (v in 0 until numVars) append(" ${if (s.bools[v]) v + 1 else -(v + 1)}")
+    for (v in 0 until numVars) append(" ${if (s.boolValue(v)) v + 1 else -(v + 1)}")
     append(" 0")
 }
 

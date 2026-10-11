@@ -117,7 +117,7 @@ internal class MonotoneClausePrimal private constructor(
                 models++
                 val sample = walker.sample()
                 accepted = variables.fold(params.assumptions) { pins, variable ->
-                    pins.withBool(variable, sample.bools[variable])
+                    pins.withBool(variable, sample.boolValue(variable))
                 }
                 preparePolishing(sample, emptyList())
                 finishPolishing()?.let { return it }
@@ -174,7 +174,7 @@ internal class MonotoneClausePrimal private constructor(
             if (bootstrap) {
                 bootstrap = false
                 walk = ClausePrimalWalk(
-                    sample, clauses, objective.boolWeights.indices.filter { objective.boolWeights[it] > 0L },
+                    sample, clauses, objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] > 0L },
                     params.assumptions, params.randomSeed, params.nodeBudget, phaseToken,
                 )
                 continue
@@ -214,7 +214,7 @@ internal class MonotoneClausePrimal private constructor(
     }
 
     private fun preparePolishing(sample: Sample, pureVariables: List<Int>) {
-        polishing = Sample(sample.bools.copyOf(), sample.ints)
+        polishing = Sample(sample.bools, sample.ints)
         polishingVariables = pureVariables + variables
         polishingIndex = 0
         polishingPureCount = pureVariables.size
@@ -295,12 +295,12 @@ internal class MonotoneClausePrimal private constructor(
             val start = TimeSource.Monotonic.markNow()
             val problem = solver.problem
             if (problem.numIntVars != 0 || problem.numRealVars != 0 ||
-                objective.boolWeights.any { it < 0L } || objective.intCoefficients.any { it != 0L }
+                objective.boolWeightValues.any { it < 0L } || objective.intCoefficientValues.any { it != 0L }
             ) return null
             val rootPins = (problem.rootDeductions as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None
             val scopedParams = params.copy(assumptions = rootPins.mergedWith(params.assumptions))
-            val costVariables = objective.boolWeights.indices.filter { objective.boolWeights[it] > 0L }
-                .sortedWith(compareByDescending<Int> { objective.boolWeights[it] }.thenByDescending { it })
+            val costVariables = objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] > 0L }
+                .sortedWith(compareByDescending<Int> { objective.boolWeightValues[it] }.thenByDescending { it })
             if (costVariables.isEmpty() || costVariables.size > 64) return null
             if (costVariables.any { variable ->
                     variable >= problem.numBoolVars || params.assumptions.boolValueOrNull(variable) != null
@@ -321,7 +321,7 @@ internal class MonotoneClausePrimal private constructor(
                     if (variable >= problem.numBoolVars) return null
                     occurrences[variable].add(clause)
                     if (!Lit.isPositive(literal) &&
-                        (objective.boolWeights.getOrNull(Lit.variable(literal)) ?: 0L) > 0L
+                        (objective.boolWeightValues.getOrNull(Lit.variable(literal)) ?: 0L) > 0L
                     ) return null
                 }
             }

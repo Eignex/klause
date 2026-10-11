@@ -146,17 +146,17 @@ internal fun LpEngine.lbTreeSearch(
                 emptyList()
             }
             var value = BigFraction.ofLong(objective.constant)
-            for (variable in objective.intCoefficients.indices) {
+            for (variable in objective.intCoefficientValues.indices) {
                 value += BigFraction.ofLong(
-                    objective.intCoefficients[variable],
-                ) * BigFraction.ofLong(sample.ints[variable])
+                    objective.intCoefficientValues[variable],
+                ) * BigFraction.ofLong(sample.intValue(variable))
             }
-            for (variable in objective.boolWeights.indices) {
-                if (sample.bools[variable]) value += BigFraction.ofLong(objective.boolWeights[variable])
+            for (variable in objective.boolWeightValues.indices) {
+                if (sample.boolValue(variable)) value += BigFraction.ofLong(objective.boolWeightValues[variable])
             }
-            for (variable in objective.realCoefficients.indices) {
+            for (variable in objective.realCoefficientValues.indices) {
                 value += requireNotNull(
-                    BigFraction.ofDouble(objective.realCoefficients[variable]),
+                    BigFraction.ofDouble(objective.realCoefficientValues[variable]),
                 ) * exactReals[variable]
             }
             if (bestExact?.let { value < it } != false) {

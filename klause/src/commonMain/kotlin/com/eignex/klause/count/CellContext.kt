@@ -34,18 +34,18 @@ internal class CellContext private constructor(
     /** Projection key of an enumerated [model]: chosen Boolean values (0/1) then integer values. */
     fun projectionKey(model: Sample): List<Long> {
         val key = ArrayList<Long>(boolSet.size + intSet.size)
-        for (v in boolSet) key.add(if (model.bools[v]) 1L else 0L)
-        for (v in intSet) key.add(model.ints[v])
+        for (v in boolSet) key.add(if (model.boolValue(v)) 1L else 0L)
+        for (v in intSet) key.add(model.intValue(v))
         return key
     }
 
     /** Decode an enumerated [model] back to an assignment over the original problem's variables. */
     fun decode(model: Sample): Sample {
-        if (model.bools.size == baseNumBoolVars && model.ints.size == baseNumIntVars) return model
+        if (model.numBoolVars == baseNumBoolVars && model.numIntVars == baseNumIntVars) return model
         // The channel appends its vars after the originals, so the originals are the leading slice.
-        return Sample(
-            bools = model.bools.copyOf(baseNumBoolVars),
-            ints = model.ints.copyOf(baseNumIntVars),
+        return Sample.fromOwned(
+            bools = BooleanArray(baseNumBoolVars) { model.boolValue(it) },
+            ints = LongArray(baseNumIntVars) { model.intValue(it) },
         )
     }
 

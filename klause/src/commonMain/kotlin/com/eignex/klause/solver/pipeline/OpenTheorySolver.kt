@@ -57,7 +57,8 @@ sealed interface OpenTheoryAssignment {
     ) : OpenTheoryAssignment {
         override fun boolValue(id: Int): Boolean = sample.boolValue(id)
         override fun intValue(id: Int): String = sample.exactIntValue(id).toString()
-        override fun realValue(id: Int): String = sample.reals.getOrElse(id) { 0.0 }.toString()
+        override fun realValue(id: Int): String =
+            (if (id < sample.numRealVars) sample.approximateRealValue(id) else 0.0).toString()
     }
 
     /** An assignment carried by the open portfolio, preserving its exact integer and real coordinates. */
@@ -76,7 +77,7 @@ sealed interface OpenTheoryAssignment {
         /** Exact QF_LRA witness. */
         val assignment: ExactLraAssignment,
     ) : OpenTheoryAssignment {
-        override fun boolValue(id: Int): Boolean = assignment.bools[id]
+        override fun boolValue(id: Int): Boolean = assignment.boolValue(id)
         override fun intValue(id: Int): String = error("exact LRA has no integer variables: $id")
         override fun realValue(id: Int): String = assignment.reals[id].toString()
     }
@@ -86,8 +87,8 @@ sealed interface OpenTheoryAssignment {
         /** Exact QF_LIRA witness. */
         val assignment: ExactLiraAssignment,
     ) : OpenTheoryAssignment {
-        override fun boolValue(id: Int): Boolean = assignment.bools[id]
-        override fun intValue(id: Int): String = assignment.ints[id].toString()
+        override fun boolValue(id: Int): Boolean = assignment.boolValue(id)
+        override fun intValue(id: Int): String = assignment.intValue(id).toString()
         override fun realValue(id: Int): String = assignment.reals[id].toString()
     }
 
@@ -101,12 +102,21 @@ sealed interface OpenTheoryAssignment {
         /** Witness of the model the eliminating pass produced. */
         val base: OpenTheoryAssignment,
         /** Boolean values of the model before the elimination. */
-        val bools: BooleanArray,
+        bools: BooleanArray,
         /** Integer values of the model before the elimination, or null when no column was eliminated. */
-        val ints: Array<BigInt>?,
+        ints: Array<BigInt>?,
     ) : OpenTheoryAssignment {
-        override fun boolValue(id: Int): Boolean = bools[id]
-        override fun intValue(id: Int): String = ints?.get(id)?.toString() ?: base.intValue(id)
+        private val booleanValues = bools.copyOf()
+        private val integerValues = ints?.copyOf()
+
+        /** Independent copy of recovered Boolean coordinates. */
+        val bools: BooleanArray get() = booleanValues.copyOf()
+
+        /** Independent copy of recovered integer coordinates, when present. */
+        val ints: Array<BigInt>? get() = integerValues?.copyOf()
+
+        override fun boolValue(id: Int): Boolean = booleanValues[id]
+        override fun intValue(id: Int): String = integerValues?.get(id)?.toString() ?: base.intValue(id)
         override fun realValue(id: Int): String = base.realValue(id)
     }
 }
