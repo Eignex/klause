@@ -13,8 +13,10 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.TimeSource
@@ -37,7 +39,10 @@ internal object MpsMode : CliMode {
         private var objectiveScale = 1L
         private var toleranceDifference: String? = null
         private var sourceExact = true
+        private var sourceDifference: String? = null
         private var latestSourceObjective: BigFraction? = null
+        private var sourceWitnessAccepted = true
+        private var witnessOnly = false
 
         override fun flags(): List<FlagSpec> = emptyList()
 
@@ -47,7 +52,10 @@ internal object MpsMode : CliMode {
             objectiveScale = compiled.objectiveScale
             toleranceDifference = compiled.toleranceDifference
             sourceExact = compiled.sourceExact
+            sourceDifference = compiled.sourceDifference
             latestSourceObjective = null
+            sourceWitnessAccepted = true
+            witnessOnly = false
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
@@ -63,6 +71,21 @@ internal object MpsMode : CliMode {
                     latestSourceObjective = witness.objective
                     renderMpsWitness(compiled, witness)
                 }
+            }
+            val renderOpen: (OpenTheoryAssignment) -> String = { assignment ->
+                if (witnessOnly) {
+                    val witness = try {
+                        compiled.sourceWitness(compiled.columns.map { column ->
+                            val value = if (column.real) assignment.realValue(column.id) else assignment.intValue(column.id)
+                            parseOpenMpsNumber(value)
+                        })
+                    } catch (_: MpsLoweringException) {
+                        null
+                    }
+                    sourceWitnessAccepted = witness != null
+                    latestSourceObjective = witness?.objective
+                }
+                renderMpsOpenModel(compiled, assignment)
             }
             val objective = compiled.objective?.toLinearObjective()
             var routingLpStats = LpStats()
@@ -91,22 +114,19 @@ internal object MpsMode : CliMode {
                 )
 
                 is SourceProblemRoute.OpenTheory -> {
-                    if (compiled.model.numIntVars == 0 && compiled.model.numRealVars != 0) {
-                        unsupportedOpenMpsModel()
-                    }
-                    requireOpenMpsSource(compiled)
+                    witnessOnly = !compiled.sourceExact
                     // An objective whose bound row leaves the theory is left to local search.
-                    if (route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request)) {
+                    if (!witnessOnly && (route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request))) {
                         openTheorySolvable(
                             route.request,
-                            { assignment -> renderMpsOpenModel(compiled, assignment) },
+                            renderOpen,
                             routingLpStats,
                             routingElapsedMs,
                         )
                     } else {
                         openLocalSearchSolvable(
                             route.request.model,
-                            { assignment -> renderMpsOpenModel(compiled, assignment) },
+                            renderOpen,
                             routingLpStats,
                             routingElapsedMs,
                             objective = if (compiled.maximize) objective?.negated() else objective,
@@ -117,11 +137,10 @@ internal object MpsMode : CliMode {
 
                 // No theory decides it, so local search looks for incumbents alone.
                 is SourceProblemRoute.UnsupportedOpen -> {
-                    if (compiled.model.numIntVars == 0 && compiled.model.numBoolVars == 0) unsupportedOpenMpsModel()
-                    requireOpenMpsSource(compiled)
+                    witnessOnly = !compiled.sourceExact
                     openLocalSearchSolvable(
                         route.problem,
-                        { assignment -> renderMpsOpenModel(compiled, assignment) },
+                        renderOpen,
                         routingLpStats,
                         routingElapsedMs,
                         objective = if (compiled.maximize) objective?.negated() else objective,
@@ -135,22 +154,18 @@ internal object MpsMode : CliMode {
 
         override fun output(common: CommonOptions): OutputProtocol = MpsOutput(
             objectiveScale,
-            toleranceDifference == null,
-            toleranceDifference,
+            toleranceDifference == null && !witnessOnly,
+            toleranceDifference ?: sourceDifference,
             { latestSourceObjective },
-            sourceExact,
+            sourceExact && !witnessOnly,
+            { sourceWitnessAccepted },
         )
     }
 }
 
-private fun unsupportedOpenMpsModel(): Nothing =
-    throw MpsLoweringException("open MPS models require a supported theory pipeline")
-
-// An open route reads the lowered model exactly.
-private fun requireOpenMpsSource(compiled: MpsCompiled) {
-    if (!compiled.sourceExact) {
-        throw MpsLoweringException("open MPS source differs from the lowered model at ${compiled.sourceDifference}")
-    }
+private fun parseOpenMpsNumber(value: String): BigFraction {
+    val parts = value.split('/')
+    return BigFraction.of(parseBigInt(parts[0]), if (parts.size == 1) BIG_ONE else parseBigInt(parts[1]))
 }
 
 // MPS results use tolerance semantics: a float leaf stands when the source rows hold within MPS_TOLERANCE.
@@ -205,8 +220,11 @@ internal class MpsOutput(
     private val sourceObjective: () -> BigFraction? = { null },
     // An infeasibility or unboundedness proof covers the lowered model only, so it needs the source exactly.
     private val proofExact: Boolean = sourceExact,
+    private val sourceWitnessAccepted: () -> Boolean = { true },
 ) : BufferedBestOutput() {
     private var bestObjective: Long? = null
+
+    override fun acceptsSourceWitness(): Boolean = sourceWitnessAccepted()
 
     override fun onSolutionObjective(objective: Long?) {
         if (objective != null) bestObjective = objective

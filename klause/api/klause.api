@@ -2320,6 +2320,7 @@ public final class com/eignex/klause/formats/mps/MpsCompiled {
 	public final fun getToleranceDifference ()Ljava/lang/String;
 	public fun hashCode ()I
 	public final fun sourceObjective ([J[D)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun sourceWitness (Ljava/util/List;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
 	public final fun sourceWitness ([JLjava/util/List;)Lcom/eignex/klause/formats/mps/MpsSourceWitness;
 	public fun toString ()Ljava/lang/String;
 	public final fun withinTolerance ([J[D)Z
