@@ -12,4 +12,4 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-include(":klause", ":klause-bench", ":klause-cli")
+include(":klause-numerics", ":klause-lattice", ":klause", ":klause-bench", ":klause-cli")

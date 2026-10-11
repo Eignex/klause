@@ -4,18 +4,23 @@
 
 | Location | Responsibility |
 |---|---|
+| `klause-numerics` | Exact big integers and rational values, cancellation and work-meter contracts |
+| `klause-lattice` | Exact integer matrix reductions, unimodular transforms and triangular bounds |
 | `klause` | Kotlin Multiplatform model, DSL, compilation, formats and solving |
 | `klause-cli` | Shared command-line driver, format dispatch, output protocols and platform seams |
 | `klause-bench` | JVM catalog, corpus management, campaign runner and offline measurement tools |
 | `klause-mzn-lib` | MiniZinc solver configurations, FlatZinc wrappers, predicate declarations and smoke models |
 
-The Gradle settings include `:klause`, `:klause-cli` and `:klause-bench`.
+The Gradle settings include `:klause-numerics`, `:klause-lattice`, `:klause`,
+`:klause-cli` and `:klause-bench`.
 `klause-mzn-lib` is integration data and scripts, rather than a Gradle module.
 
 ## Package boundaries
 
-Packages below are under `com.eignex.klause` in
-[commonMain](../klause/src/commonMain/kotlin/com/eignex/klause/).
+Packages below retain the `com.eignex.klause` namespace across modules.
+`klause-numerics` owns `BigInt`, `BigFraction`, `Cancellation` and `WorkMeter`;
+`klause-lattice` owns `lp.lattice`. The remaining packages and exact-simplex
+consumer contracts live in [klause commonMain](../klause/src/commonMain/kotlin/com/eignex/klause/).
 
 | Package | Owns | Dependency rule |
 |---|---|---|
@@ -48,12 +53,36 @@ IR lists, caller-independent lowering, frontend/compiler/theory separation, the
 pipeline's neutral metadata and the prohibition on finite-domain state in open
 theories. Imports, aliases, wildcard imports and qualified executable references
 are checked; comments and literal text are excluded. Compiler resolution and
-consumer behavior remain the responsibility of the JVM/native gates.
+consumer behavior remain the responsibility of the JVM/native gates. The checker
+also restricts numerical module package ownership and Gradle project dependencies.
 [LpDeclineDisciplineTest](../klause/src/jvmTest/kotlin/com/eignex/klause/lp/LpDeclineDisciplineTest.kt)
 checks proof-decline behavior at engine consumers.
 
 The exact LP projection of `QfLraRelaxation` belongs to the theory adapter, beside
 its source declarations. SMT syntax folding does not read theory or search state.
+
+## Numerical module interfaces
+
+`klause-numerics` has no Klause project dependency. It owns the JVM `BigInteger`
+and Native bignum actuals behind the unchanged `BigInt` contract, canonical rational
+values and cooperative work controls. `klause` exports it with `api`, so existing
+library and CLI consumers keep the same numeric names and platform types.
+
+`klause-lattice` depends only on `klause-numerics`; it cannot read model or solver
+state. Its cross-module seam comprises sparse input rows, echelon/Hermite results,
+read-only unimodular transforms and triangular bounds. These public declarations
+require `LatticeApi` opt-in and are implementation interfaces versioned with Klause.
+`klause` uses an `implementation` dependency and opts in within its own compilations.
+Mutable column indexes, transform mutations and double-bounded reduction internals
+remain `internal` to the lattice module. Result constructors remain internal;
+`SparseIntRow` borrows caller arrays for the duration of a reduction, and result
+arrays are borrowed read-only by consumers. No hot-loop buffer copies are added.
+
+Exact simplex continuation, rational basis workspaces and LP certificates stay
+with their current solver owner. Module extraction does not widen `lp.engine`'s
+closed list. Leaf tests run in the owning module; existing model/LP/theory tests
+and the CLI validate consumption across JVM and Native module boundaries.
+No build-time or solving-speed improvement is implied by this module graph.
 
 ## Model and ownership
 

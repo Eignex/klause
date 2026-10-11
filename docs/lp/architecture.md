@@ -26,7 +26,11 @@ scaling disabled. `ComponentLpSolver` composes it for component-wise OBBT.
 Among Klause packages, `lp.engine` depends only on `util`, `simplex.exact`,
 `lp.lattice` and `simplex.basis`. Model assembly, factors, propagation, presolve
 and search stay outside it. `lp.lattice` depends only on `util`.
-Consumers use interfaces and factories. See [system boundaries](../architecture.md).
+`lp.lattice` is compiled in `klause-lattice`, depending only on the `util` primitives
+provided by `klause-numerics`. Its opt-in seam exposes borrowed sparse rows and
+read-only reduction results; mutable elimination state remains internal to the leaf.
+`BigFraction` and platform `BigInt` primitives are compiled in `klause-numerics`.
+Consumers use interfaces and factories. See [system boundaries](../architecture.md#numerical-module-interfaces).
 
 ## Numerical authority
 

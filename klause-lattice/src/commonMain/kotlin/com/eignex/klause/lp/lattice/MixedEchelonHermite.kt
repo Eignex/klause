@@ -19,7 +19,8 @@ import com.eignex.klause.util.times
  * the integer points `x` does. A solution of the rewritten system therefore maps back to a solution of
  * the original by [recover], and an unsatisfiability proof needs no conversion at all.
  */
-internal class MixedEchelonHermite(
+@LatticeApi
+class MixedEchelonHermite internal constructor(
     /** The equality rows in the new variables, in echelon form. */
     val equalities: List<SparseIntRow>,
     /** The inequality rows in the new variables, in the same column order. */
@@ -60,7 +61,8 @@ internal class MixedEchelonHermite(
  * expensive half. A reduction cut short by [cancellation] comes back with no equalities and the identity
  * transform, which is the honest "the structure implied nothing here".
  */
-internal fun mixedEchelonHermite(
+@LatticeApi
+fun mixedEchelonHermite(
     equalities: List<SparseIntRow>,
     inequalities: List<SparseIntRow>,
     cols: Int,
@@ -112,7 +114,8 @@ private fun applyTransform(row: SparseIntRow, v: UnimodularTransform): SparseInt
  * A side stays `null` when any term feeding it is open — an unbounded `y` makes `x` unbounded in the
  * direction its coefficient points, and claiming otherwise would invent exactly the box this avoids.
  */
-internal fun MixedEchelonHermite.originalBounds(yLo: Array<BigInt?>, yHi: Array<BigInt?>): TriangularBounds {
+@LatticeApi
+fun MixedEchelonHermite.originalBounds(yLo: Array<BigInt?>, yHi: Array<BigInt?>): TriangularBounds {
     val n = transform.size
     val lo = arrayOfNulls<BigInt>(n)
     val hi = arrayOfNulls<BigInt>(n)
