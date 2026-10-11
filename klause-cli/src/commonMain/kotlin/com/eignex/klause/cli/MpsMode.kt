@@ -25,7 +25,7 @@ import kotlin.time.TimeSource
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
  * klause's hybrid model (see [com.eignex.klause.formats.mps.toProblem]: integer columns become CP search
  * variables, float columns become LP-only continuous variables the simplex resolves). An open integer
- * model is routed to a complete supported theory pipeline or rejected at load.
+ * model uses a supported theory pipeline or searches for source-checked incumbents.
  * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
  * `s UNBOUNDED` / `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c`
  * comment lines.
