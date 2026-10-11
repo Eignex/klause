@@ -200,11 +200,11 @@ class AlgebraicArithmeticTest {
     }
 
     @Test
-    fun `owned algebraic metadata survives mutation of returned coefficients`() {
-        val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
-        val copy = value.definingCoefficients.toMutableList()
+    fun `owned algebraic metadata survives mutation of producer coefficients`() {
+        val coefficients = mutableListOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE)
+        val value = arithmetic.roots(RationalPolynomial(coefficients)).last()
 
-        copy[0] = BigFraction.ZERO
+        coefficients[0] = BigFraction.ZERO
 
         assertEquals(BigFraction.ofLong(-2), value.definingCoefficients[0])
         assertEquals(2, value.rootIndex)

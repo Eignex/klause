@@ -230,7 +230,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     }
 
     fun specialize(polynomial: Polynomial, variable: Int, coordinates: Map<Int, AlgebraicReal>): AlgebraicPolynomial =
-        polynomial(arithmetic.coefficients(polynomial, variable).map { evaluate(it, coordinates) })
+        this.polynomial(arithmetic.coefficients(polynomial, variable).map { evaluate(it, coordinates) })
 
     fun polynomial(coefficients: List<AlgebraicReal>): AlgebraicPolynomial {
         arithmetic.step()
