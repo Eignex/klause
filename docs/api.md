@@ -28,6 +28,30 @@ keeps borrowed arrays and structural keys stable; a custom component supplies co
 checks and sound explanations; a custom objective agrees at feasible assignments.
 The type system does not certify any of those semantic obligations.
 
+## Continuous product representation
+
+`factor.arithmetic.ContinuousProduct(a, b, result)` describes the exact real equality
+`result = a * b`. All three IDs belong to the real namespace. Repeated operands
+express squares; results can feed other products. Membership deduplicates real IDs,
+while fields and structural keys retain operand multiplicity and the result role.
+Keys treat operand order as commutative. Remapping applies the real mapping to every
+role and preserves aliases, including aliases introduced by a noninjective map.
+`Product` and `RealProduct` retain their integer and mixed semantics.
+
+`ContinuousRealExpr` stores affine terms and product trees in the model AST.
+The schema DSL supports `(x * x * y) eq z` for `FloatTerm` operands and
+continuous expression chains. Scalar `FloatTerm * Double` retains its affine DSL
+semantics; multiplying a continuous expression by a constant retains a product node.
+[Source lowering](formats.md#schema-continuous-products) defines exact constants,
+auxiliary columns and refused contexts.
+
+Continuous products have no finite propagator, local-search score or assignment
+checker. Finite execution projections explicitly reject them. An LP completion
+cannot certify their nonlinear equalities. Exact execution through the model solver
+entry points is unsupported; the separate [polynomial theory](solver/qfnra.md)
+retains authority over exact rational/algebraic witnesses for admitted polynomial
+source formulas.
+
 ## Experimental and implementation surfaces
 
 Experimental composition includes `ComponentPlan`, CP projection planning, shared

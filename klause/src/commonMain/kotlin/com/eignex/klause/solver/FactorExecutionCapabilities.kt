@@ -106,6 +106,13 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     -> filteringRelaxation
     is ComparisonClause, is Xor, is LexLess, is Sort -> finiteFiltering
     is RealProduct, is ReifiedRealLinear -> realArithmetic
+    is ContinuousProduct -> FactorExecutionCapabilities(
+        PropagationCapability.UNSUPPORTED,
+        AssignmentCheckCapability.UNSUPPORTED,
+        AssignmentCheckCapability.UNSUPPORTED,
+        ScoringCapability.UNSUPPORTED,
+        RelaxationCapability.NONE,
+    )
     is ObjectiveBoundFactor -> objectiveOverlay
     is GaussianXor, is DifferenceSystem -> redundantRows
     is SymmetryHandling -> symmetryRestriction

@@ -95,6 +95,7 @@ internal enum class FactorKind {
     OBJECTIVE_BOUND,
     COMPARISON_CLAUSE,
     DIFFERENCE_SYSTEM,
+    CONTINUOUS_PRODUCT,
 }
 
 // Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a

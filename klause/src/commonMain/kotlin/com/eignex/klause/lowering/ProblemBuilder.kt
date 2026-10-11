@@ -1,5 +1,6 @@
 package com.eignex.klause.lowering
 
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -76,6 +77,13 @@ internal class ProblemBuilder(private val settings: ProblemSettings = ProblemSet
         require(id in realLowerBounds.indices) { "real variable $id has not been allocated" }
         realVarIdByName[name] = id
         return id
+    }
+
+    fun continuousProduct(a: Int, b: Int, result: Int) {
+        require(listOf(a, b, result).all { it in 0 until numRealVars }) {
+            "Continuous product references an unallocated real variable"
+        }
+        factors += ContinuousProduct(a, b, result)
     }
 
     fun build(): Problem = Problem(
