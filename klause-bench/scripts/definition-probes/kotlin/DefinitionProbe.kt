@@ -40,7 +40,7 @@ fun main(args: Array<String>) {
         boolWeights = LongArray(problem.numBoolVars) { (it % 7).toLong() },
         intCoefficients = LongArray(problem.numIntVars) { (it % 7).toLong() },
     )
-    val searched = (0 until problem.numIntVars).filter { !network.isDefinedInt(it) && model.domains[it].size > 1 }
+    val searched = (0 until problem.numIntVars).filter { !network.isDefinedInt(it) && model.domains[it].min != model.domains[it].max }
     check(searched.isNotEmpty())
     val allocation = ManagementFactory.getThreadMXBean() as com.sun.management.ThreadMXBean
     for (round in 0..6) {
@@ -65,6 +65,10 @@ fun main(args: Array<String>) {
             val best = state.bestCostSeen
             val touches = state.tabu.touchCount.copyOf()
             val configuration = state.intConfChange.copyOf()
+            val boolConfiguration = state.boolConfChange.copyOf()
+            val breaks = state.boolBreakCount.copyOf()
+            val makes = state.boolMakeCount.copyOf()
+            val active = BooleanArray(problem.numFactors) { state.violated.contains(it) }
             state.netDelta(move)
             state.weightedNetDelta(move)
             state.objectiveDelta(objectives, move)
@@ -73,6 +77,9 @@ fun main(args: Array<String>) {
             check(payload.contentEquals(state.longPayload))
             check(touches.contentEquals(state.tabu.touchCount))
             check(configuration.contentEquals(state.intConfChange))
+            check(boolConfiguration.contentEquals(state.boolConfChange))
+            check(breaks.contentEquals(state.boolBreakCount) && makes.contentEquals(state.boolMakeCount))
+            check(active.contentEquals(BooleanArray(problem.numFactors) { state.violated.contains(it) }))
             check(cost == state.cost && best == state.bestCostSeen)
         }
         var digest = 1L
@@ -97,6 +104,15 @@ fun main(args: Array<String>) {
         for (i in 0 until problem.numIntVars) mix(state.assignment.intValue(i))
         for (b in 0 until problem.numBoolVars) mix(if (state.assignment.boolValue(b)) 1 else 0)
         for (d in degrees) mix(d.toLong())
+        for (i in 0 until problem.numFactors) mix(if (state.violated.contains(i)) 1 else 0)
+        for (value in state.longPayload) mix(value)
+        for (value in state.intPayload) mix(value.toLong())
+        for (value in state.doublePayload) mix(value.toRawBits())
+        for (value in state.boolBreakCount) mix(value.toLong())
+        for (value in state.boolMakeCount) mix(value.toLong())
+        for (value in state.intConfChange) mix(if (value) 1 else 0)
+        for (value in state.boolConfChange) mix(if (value) 1 else 0)
+        for (value in state.tabu.lastTouched) mix(value)
         for (weight in state.weights.factorWeights) mix(weight.toRawBits())
         for (touch in state.tabu.touchCount) mix(touch.toLong())
         mix(state.cost)
