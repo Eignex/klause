@@ -198,9 +198,14 @@ cuts; explicit pools retain their requested root-cut plans.
 
 The clausal complete-search recipes use clause learning, EMA restarts, a 2000-clause
 database and a true-first saved phase, without pseudo-Boolean learning or inprocessing.
-Their focused, balanced and stable variants use VSIDS decay 0.8, 0.9 and 0.99. Curated
+Their focused, balanced and stable variants use VSIDS decay 0.8, 0.975 and 0.99. Curated
 admission requires a clausal model; pseudo-Boolean models retain their cutting-plane
 palette.
+
+Clausal satisfaction leads its curated local-search slots with fixed-break probSAT,
+using tabu tenure 10 and an improving aspiration rule without a strategy restart
+schedule. Optimizing clausal models retain the general local-search order. Explicit
+local-search pools retain their selected recipes.
 
 ## Incumbent guidance
 
