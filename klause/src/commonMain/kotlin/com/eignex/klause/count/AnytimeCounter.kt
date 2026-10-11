@@ -5,9 +5,18 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_TWO
+import com.eignex.klause.util.BIG_ZERO
+import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.EmptyIntArray
-import kotlin.math.ceil
-import kotlin.math.min
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.isZero
+import com.eignex.klause.util.minus
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
+import com.eignex.klause.util.toLongExact
 
 /**
  * Anytime exact (projected) model counting by depth-first feasibility search over the projection
@@ -25,8 +34,10 @@ import kotlin.math.min
  * The reported interval is `lower = proven models`, `upper = lower + Σ (open + undecided subtree
  * sizes)`, where a subtree at depth `d` has at most `Π domain-sizes[d..]` projected completions.
  * `lower` only rises and `upper` only falls; when the frontier empties (and nothing was undecided)
- * the interval collapses to the exact count. The returned [Count]s are emitted roughly every
- * [ExactCountConfig.reportEvery] checks, so iterating the sequence tightens on demand.
+ * the interval collapses to the exact count. Mass accounting uses exact integers; an upper bound
+ * beyond the [Long] range is reported as the unbounded sentinel [Long.MAX_VALUE]. The returned
+ * [Count]s are emitted roughly every [ExactCountConfig.reportEvery] checks, so iterating the
+ * sequence tightens on demand.
  */
 internal object AnytimeCounter {
 
@@ -40,15 +51,13 @@ internal object AnytimeCounter {
         val depth = boolVars.size + intVars.size
 
         // suffix[d] = number of possible value combinations of projection vars d..depth-1.
-        val suffix = DoubleArray(depth + 1)
-        suffix[depth] = 1.0
+        val suffix = Array(depth + 1) { BIG_ONE }
         for (d in depth - 1 downTo 0) {
-            val sizeAtD = if (d <
-                boolVars.size
-            ) {
-                2.0
+            val sizeAtD = if (d < boolVars.size) {
+                BIG_TWO
             } else {
-                problem.rootIntDomain(intVars[d - boolVars.size]).valueCount.toDouble()
+                val domain = problem.rootIntDomain(intVars[d - boolVars.size])
+                bigIntOf(domain.max) - bigIntOf(domain.min) + BIG_ONE - bigIntOf(domain.holeCount)
             }
             suffix[d] = sizeAtD * suffix[d + 1]
         }
@@ -56,13 +65,13 @@ internal object AnytimeCounter {
         val solver = BacktrackSolver(problem)
         var checks = 0L
         var lower = 0L
-        var openMass = 0.0 // Σ suffix[node.depth] over feasible-but-unexpanded nodes
-        var undecidedMass = 0.0 // Σ suffix over subtrees we couldn't decide (keeps result inexact)
+        var openMass = BIG_ZERO // Includes unchecked children of a partially expanded node.
+        var undecidedMass = BIG_ZERO
 
         fun snapshot(): Count {
-            val upperD = lower.toDouble() + openMass + undecidedMass
-            val exact = openMass == 0.0 && undecidedMass == 0.0
-            val upper = if (exact) lower else clampToLong(ceil(upperD))
+            val upperMass = bigIntOf(lower) + openMass + undecidedMass
+            val exact = openMass.isZero() && undecidedMass.isZero()
+            val upper = clampToLong(upperMass)
             val estimate = if (exact) lower else lower + (upper - lower) / 2
             return Count(estimate = estimate, lower = lower, upper = upper, exact = exact, confidence = 1.0)
         }
@@ -82,13 +91,12 @@ internal object AnytimeCounter {
         }
 
         val stack = ArrayDeque<Node>()
-        if (depth > 0 && openMass > 0.0) stack.addLast(Node(0, emptyMap(), emptyMap()))
+        if (depth > 0 && !openMass.isZero()) stack.addLast(Node(0, emptyMap(), emptyMap()))
         yield(snapshot())
 
         var sinceReport = 0L
         while (stack.isNotEmpty() && checks < config.maxChecks) {
             val node = stack.removeLast()
-            openMass -= suffix[node.depth]
             val d = node.depth
             val isBool = d < boolVars.size
             val varId = if (isBool) boolVars[d] else intVars[d - boolVars.size]
@@ -101,6 +109,8 @@ internal object AnytimeCounter {
                 checks++
                 sinceReport++
                 val res = solver.solve(checkParams(config, Assumptions(bools = childBools, ints = childInts)))
+                // A check replaces only this child's share; unchecked siblings retain their mass.
+                openMass -= suffix[d + 1]
                 when (res) {
                     is SolveResult.Sat ->
                         if (d + 1 == depth) {
@@ -134,6 +144,6 @@ internal object AnytimeCounter {
         return List(span.size) { span.valueAt(it) }
     }
 
-    private fun clampToLong(x: Double): Long =
-        if (x >= Long.MAX_VALUE.toDouble()) Long.MAX_VALUE else min(x, Long.MAX_VALUE.toDouble()).toLong()
+    private fun clampToLong(mass: BigInt): Long =
+        if (mass.fitsLong()) mass.toLongExact() else Long.MAX_VALUE
 }
