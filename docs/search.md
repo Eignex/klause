@@ -142,35 +142,13 @@ are installed once along a branch; retraction clears publication markers before
 restored assertions and sibling substitutions are installed against the LP trail.
 Incomplete passes publish no markers.
 
-The complete integer theory checks source equality paths before invoking the LP.
-Equalities with one coefficient or two coefficients of equal magnitude form a
-weighted forest, including declared fixed columns. Its links retain offsets and
-sign reversals, representing `x - y = c` and `x + y = c`.
-Exact signed offsets decide comparisons even when no individual column has a
-bound. Explanation paths cite the selected source guards, including complemented
-disequalities. Comparisons whose root does not cancel also cite its fixing path.
-Active disequalities exclude matching comparisons after their sides are
-canonicalized to forest components, citing both paths and the disequality guard.
-Signed paths leaving twice one open integer root reject incompatible parity;
-the root stays open and compatible parity remains undecided.
-
-Larger expressions can be constant when their signed coefficients cancel within
-each component. Active larger equalities and sign-changing cycles reduce against
-the forest for at most four passes. Supported residuals add integer offset facts;
-nonintegral or inconsistent residuals refute their active guards. Each batch
-captures immutable source and offset premises before adding its facts.
-Unsupported residuals remain with the complete theory; the pass limit establishes
-no verdict. The forest is rebuilt from current assertions, so retraction drops
-their effects. Wide offsets remain with the full theory. The scan does not
-materialize finite CP domains or publish feasibility. Ordinary cancellation is
-polled within 64 visits and before publishing each implication or conflict;
-metered tokens retain immediate checks at every scan visit.
-
-Unit-coefficient integer equalities also feed a sparse exact affine basis. It
+The complete integer theory checks unit-coefficient source equalities in a sparse
+exact affine basis before invoking the LP. It
 substitutes larger definitions across open columns, decides constant comparisons
 and rejects inconsistent equations or nonintegral constant fixings. Each basis
 row retains a flat set of source guard literals. New active equalities extend the
 basis; a retracted supporting guard clears it before any further publication.
+Processed active equalities need no additional query reduction.
 Declared fixed columns supply unconditional facts. Boolean coefficients and
 disjunction alternatives remain with the complete theory.
 

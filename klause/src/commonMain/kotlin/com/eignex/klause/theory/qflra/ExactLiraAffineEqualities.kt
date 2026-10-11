@@ -45,7 +45,6 @@ internal class ExactLiraAffineEqualities(
         if (value != model.intBounds.upperAsBigInteger(column)) return@mapNotNull null
         BigFraction.of(value, BIG_ONE).takeIf { it.withinLimit() }?.let { column to it }
     }
-    private val processed = BooleanArray(facts.size)
     private val basis = HashMap<Int, Equation>()
     private var foundationReady = false
     private var remaining = 0
@@ -63,11 +62,11 @@ internal class ExactLiraAffineEqualities(
         val stride = PollStride()
         val metered = stop.workMeter() != null
         progressStop = Cancellation { (metered || stride.due()) && stop() }
-        for (index in facts.indices) {
+        for (source in facts) {
             if (progressStop()) return ComponentResult.Indeterminate
-            if (processed[index] && !facts[index].active(context)) {
+            if (source.processed && !source.active(context)) {
                 basis.clear()
-                processed.fill(false)
+                facts.forEach { it.processed = false }
                 foundationReady = false
                 break
             }
@@ -79,11 +78,10 @@ internal class ExactLiraAffineEqualities(
             }
             foundationReady = true
         }
-        for (index in facts.indices) {
+        for (source in facts) {
             if (progressStop()) return ComponentResult.Indeterminate
             if (remaining == 0) break
-            val source = facts[index]
-            if (processed[index] || !source.active(context)) continue
+            if (source.processed || !source.active(context)) continue
             val reduced = reduce(source.comparison)
             if (reduced == null) {
                 if (interrupted) return ComponentResult.Indeterminate
@@ -92,7 +90,7 @@ internal class ExactLiraAffineEqualities(
             val literal = source.literal(context)
             if (reduced.terms.isEmpty()) {
                 if (!reduced.bound.isZero) return conflict(context, reduced.guards, literal, stop)
-                processed[index] = true
+                source.processed = true
                 continue
             }
             val guards = reduced.guards.toMutableSet()
@@ -123,11 +121,12 @@ internal class ExactLiraAffineEqualities(
                 return conflict(context, reduced.guards, literal, stop)
             }
             basis[pivot] = Equation(terms, bound, guards.toSet())
-            processed[index] = true
+            source.processed = true
         }
         if (interrupted) return ComponentResult.Indeterminate
         for (source in rows) {
             if (progressStop()) return ComponentResult.Indeterminate
+            if (source.processed) continue
             if (remaining == 0) break
             val reduced = reduce(source.comparison)
             if (reduced == null) {
@@ -218,7 +217,9 @@ internal class ExactLiraAffineEqualities(
         LinearOp.GE -> if (strict) BigFraction.ZERO > residual else BigFraction.ZERO >= residual
     }
 
-    private data class Source(val comparison: ExactComparison, val activator: Int) {
+    private class Source(val comparison: ExactComparison, val activator: Int) {
+        var processed = false
+
         fun active(context: SearchContext): Boolean {
             val truth = if (activator == ALWAYS) true else context.boolValue(activator)
             return (comparison.op == LinearOp.EQ && truth == true) ||
