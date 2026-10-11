@@ -1,69 +1,94 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.stream.lock
+
 /**
- * A cap on decision nodes that spans a whole solve, for holding two builds to identical work.
+ * A solve-wide decision and local-search allowance, retained across resumes, reseeds and repairs.
  *
- * [BacktrackParams.maxDecisions] bounds one *slice*: a driver that re-enters the engine — a restart, a
- * portfolio arm resuming, an ALNS repair — starts a fresh allowance each time, so the nodes a solve
- * visits are not a function of it. Measured on one instance at a fixed deadline, a cap of 200 visited
- * 5186 nodes and a cap of 1000 visited 3597: not a bound on the solve, and not even monotone in the cap.
- * That makes it useless for comparing two builds, which is the one thing a shared machine's wall clock
- * cannot do either.
+ * Decision nodes cost one unit. Local-search instructions cost five quarters of a unit;
+ * fractional charges carry across segments. Native engine statistics retain their own units.
+ * Zero is an exhausted allowance; a missing budget leaves this currency unlimited.
  *
- * The counter is shared by every engine reading the same [BacktrackParams], so the allowance is spent
- * once across the solve rather than once per arm. Reaching every engine is the caller's job and the easy
- * half to get wrong: an arm that builds its own [BacktrackParams] — the hybrid-ALNS repair — is invisible
- * to anything that edits a recipe pool, and a driver that reads only [BacktrackParams.maxDecisions]
- * spends nothing. Both leave a cap that looks set and bounds nothing.
- *
- * Charged at the event the node statistic counts, so a run stops on the node that exhausts the allowance
- * and `-s` reports exactly the cap: 500, 2000 and 8000 nodes for those three caps, and one cap repeated
- * four times gave one number. That is what a comparison needs, and what a wall-clock budget cannot give —
- * the same pair of builds measured 622 against 2371 nodes on a loaded box and neutral in a lull.
- *
- * Local search has no nodes, so it charges its moves at the rate a portfolio prices them against a node
- * ([LS_INSTRUCTIONS_PER_WORK]), and stops its run at the move that would pass the allowance. A local-search run
- * under the cap is therefore as reproducible as a backtrack one.
- *
- * Deliberately **not** synchronised. Under a parallel pool the arms race on the counter, so the cap stays
- * a bound but stops being reproducible; single-worker runs are what it is for.
+ * Built-in parallel portfolios partition the remaining allowance into persistent worker quotas.
+ * Unused quota is not transferred to another worker. Completed atomic work can overshoot a quota;
+ * that work remains charged and cancellation stops later operations at their polling boundaries.
+ * Aggregation is synchronized, but concurrent scheduling is not reproducible.
  */
-class NodeBudget(
-    /** Decision nodes the solve may visit — the same figure `-s` reports as `nodes`. */
+class NodeBudget private constructor(
+    /** Decision-node equivalents available to this solve or worker quota. */
     val limit: Long,
+    private val ledger: Ledger,
+    private val parent: NodeBudget?,
 ) {
+    /** Create a solve allowance, including an already exhausted zero allowance. */
+    constructor(limit: Long) : this(limit, Ledger(), null)
+
     init {
-        require(limit > 0) { "node budget must be positive, got $limit" }
+        require(limit >= 0L) { "node budget must be nonnegative, got $limit" }
     }
 
-    private var used: Long = 0L
-    private var moves: Long = 0L
+    private var used = 0L
+    private var moves = 0L
+    private var children: List<NodeBudget>? = null
 
-    /** Node equivalents spent against this allowance: nodes visited, and local-search moves at their price. */
-    val spent: Long get() = used + (moves / LS_INSTRUCTIONS_PER_WORK).toLong()
+    /** Completed decision-node equivalents, including cooperative overspend. */
+    val spent: Long get() = ledger.lock.withLock { spentUnlocked() }
 
-    /** Record one visited decision node against the allowance. */
-    internal fun spend() {
-        used++
+    internal fun spend() = ledger.lock.withLock {
+        record(nodes = 1L, instructions = 0L)
     }
 
-    /** Record [count] local-search moves against the allowance. */
-    internal fun spendMoves(count: Long) {
-        moves += count
+    internal fun spendMoves(count: Long) = ledger.lock.withLock {
+        if (count > 0L) record(nodes = 0L, instructions = count)
     }
 
-    /** Local-search moves the allowance still covers. */
-    internal fun movesLeft(): Long = ((limit - used) * LS_INSTRUCTIONS_PER_WORK).toLong().minus(moves).coerceAtLeast(0L)
+    internal fun decisionsLeft(): Long = ledger.lock.withLock { (limit - spentUnlocked()).coerceAtLeast(0L) }
 
-    /** Whether the allowance is gone. A driver's cancellation token reads this to stop re-entering. */
-    fun exhausted(): Boolean = spent >= limit
+    internal fun movesLeft(): Long = ledger.lock.withLock {
+        val capacity = instructionsFor((limit - used).coerceAtLeast(0L))
+        (capacity - moves).coerceAtLeast(0L)
+    }
+
+    /** Whether completed work has consumed this allowance. */
+    fun exhausted(): Boolean = ledger.lock.withLock { spentUnlocked() >= limit }
+
+    internal fun quotas(count: Int): List<NodeBudget> = ledger.lock.withLock {
+        require(count > 0)
+        children?.let {
+            require(it.size == count) { "a solve allowance cannot be repartitioned for another worker count" }
+            return@withLock it
+        }
+        val remaining = (limit - spentUnlocked()).coerceAtLeast(0L)
+        val share = remaining / count
+        val remainder = remaining % count
+        List(count) { index -> NodeBudget(share + if (index < remainder) 1L else 0L, ledger, this) }
+            .also { children = it }
+    }
+
+    private fun spentUnlocked(): Long = saturatedSum(used, pricedInstructions(moves))
+
+    private fun record(nodes: Long, instructions: Long) {
+        used = saturatedSum(used, nodes)
+        moves = saturatedSum(moves, instructions)
+        parent?.record(nodes, instructions)
+    }
+
+    private class Ledger {
+        val lock = Concurrency.Strict.lock()
+    }
 }
 
-/**
- * Local-search instructions that cost as much as one unit of backtrack work, propagation and LP work included: the
- * median, over 618 portfolio runs of the status sweep set where both engines ran a sizeable segment, of local-search
- * instructions per millisecond to backtrack work per millisecond (quartiles 0.26 and 2.5). Clausal models price
- * local search higher than this and pseudo-Boolean ones lower; one rate keeps a segment of either engine about as
- * long as the other.
- */
+private fun pricedInstructions(instructions: Long): Long =
+    saturatedSum(saturatedProduct(instructions / 4L, 5L), instructions % 4L * 5L / 4L)
+
+private fun instructionsFor(work: Long): Long = work / 5L * 4L + work % 5L * 4L / 5L
+
+private fun saturatedProduct(value: Long, weight: Long): Long =
+    if (value > Long.MAX_VALUE / weight) Long.MAX_VALUE else value * weight
+
+private fun saturatedSum(left: Long, right: Long): Long =
+    if (right > Long.MAX_VALUE - left) Long.MAX_VALUE else left + right
+
+// Portfolio policy converts native local-search instructions at four instructions per five work units.
 internal const val LS_INSTRUCTIONS_PER_WORK: Double = 0.8

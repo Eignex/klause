@@ -35,6 +35,9 @@ internal class BacktrackWorkerConfig(
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, check)
 
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
+        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck)
+
     override val label: String get() = recipe.label
 
     /** Build a backtrack worker: fresh [BacktrackSolver] session + params from the recipe, bound-pruning

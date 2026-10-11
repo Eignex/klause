@@ -405,7 +405,8 @@ data class BacktrackParams(
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
 
-    override fun withCancellation(cancellation: Cancellation): BacktrackParams = copy(cancellation = cancellation)
+    override fun withCancellation(cancellation: Cancellation): BacktrackParams =
+        copy(cancellation = this.cancellation or cancellation)
 
     /** The LP-bounding runtime's slice of these params (see [LpParams]) — what `LpEngine` consumes. */
     fun lpParams(): LpParams =

@@ -115,7 +115,8 @@ data class LocalSearchParams(
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
 
-    override fun withCancellation(cancellation: Cancellation): LocalSearchParams = copy(cancellation = cancellation)
+    override fun withCancellation(cancellation: Cancellation): LocalSearchParams =
+        copy(cancellation = this.cancellation or cancellation)
 
     private companion object {
         fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)

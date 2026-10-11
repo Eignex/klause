@@ -374,9 +374,10 @@ internal class LocalSearchEngine(
                 val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE
                 if (available == 0L) return unknown(TerminationReason.BudgetExhausted)
                 token = if (sliceMillis == Long.MAX_VALUE) {
-                    global
+                    params.cancellation or global
                 } else {
-                    global or Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
+                    params.cancellation or global or
+                        Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
                 }
                 limit = instructions + minOf(sliceInstructions, available, Long.MAX_VALUE - instructions)
                 if (instructions >= limit || token()) return null
@@ -571,9 +572,10 @@ internal class LocalSearchEngine(
                 verdict?.let { return it }
                 check(!closed) { "the local-search handle is closed" }
                 token = if (sliceMillis == Long.MAX_VALUE) {
-                    global
+                    params.cancellation or global
                 } else {
-                    global or Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
+                    params.cancellation or global or
+                        Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
                 }
                 val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE
                 limit = instructions + minOf(sliceInstructions, available, Long.MAX_VALUE - instructions)

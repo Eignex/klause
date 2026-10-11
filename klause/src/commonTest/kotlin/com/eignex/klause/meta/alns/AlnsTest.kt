@@ -2,6 +2,7 @@ package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -791,4 +792,35 @@ class AlnsTest {
          *  optimum (those four false) cannot satisfy. */
         val SELECT_DEAREST = listOf(8, 10, 11, 3)
     }
+    @Test
+    fun `retained repairs spend one outer solve allowance across slices`() {
+        val problem = selectProblem()
+        val sample = selectOptimum()
+        val budget = NodeBudget(100L)
+        val inner = object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
+            override fun minimize(objective: LinearObjective, params: LocalSearchParams) =
+                MinimizeResult.BestFound(sample, objective.evaluate(sample), TerminationReason.BudgetExhausted)
+        }
+        val alns = Alns(
+            inner = inner,
+            destroyOperators = listOf(DestroyOperator.Random),
+            repairOperators = listOf(RepairOperator { it.incumbent }),
+            minDestroyFraction = 1.0,
+            maxDestroyFraction = 1.0,
+            maxIterations = 8,
+            flipsPerIteration = 50,
+        )
+        val handle = assertIs<InstructionSlicedSearch>(
+            alns.resumable(selectObjective, LocalSearchParams(nodeBudget = budget)),
+        )
+
+        val result = handle.use {
+            assertNull(it.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+            assertNotNull(it.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 50) {})
+        }
+
+        assertEquals(80L, result.stats.alns.outerAllowance)
+        assertEquals(100L, budget.spent)
+    }
+
 }

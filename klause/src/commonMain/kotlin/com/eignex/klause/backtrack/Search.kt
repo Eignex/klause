@@ -390,7 +390,10 @@ private class CpSatisfactionTraversalPolicy(
     val brancher = BacktrackBrancher(session, params, sink, restart, seedDecisionLevels = seedDecisionLevels)
 
     override val solveParams = SearchSolveParams(
-        maxDecisions = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE),
+        maxDecisions = minOf(
+            params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE,
+            params.nodeBudget?.decisionsLeft() ?: Long.MAX_VALUE,
+        ),
         restart = restart,
     )
     override val booleanBranching = BooleanBranching.None

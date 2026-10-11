@@ -46,6 +46,8 @@ import kotlin.math.ln
  */
 internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, val nodeBudget: NodeBudget? = null) :
     WorkerConfig {
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = AlnsWorkerConfig(profile, budget)
+
     override val label: String get() = "alns-${profile.label}"
 
     override fun materialize(

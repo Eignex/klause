@@ -59,8 +59,8 @@ comparisons, and reports all three effective settings in portfolio statistics.
 Resumable backtrack arms charge decisions, propagation visits and completed LP work to
 their scheduler. The current conversion is one slice node per 4000 propagation visits
 and per 600 LP work units. Construction is charged once; fractional charges carry
-forward and overspending is repaid by later slices. Decision/move limits still count
-their original events.
+forward and overspending is repaid by later slices. The solve-wide decision/move cap retains its separate currency; see
+[resource allowances](resources.md) for persistent parallel quotas and scope composition.
 
 ### Private CP preparation
 

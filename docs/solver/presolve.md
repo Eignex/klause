@@ -102,8 +102,9 @@ trail entries); a single fire, native BCP trail entry or construction can exceed
 remaining allowance. Final counter flushing can also exhaust the allowance after a
 short fixpoint completes. These weights and polling intervals are not a hard time bound.
 `PresolveBudget(0)` stops optional probing; a phase without a budget adapter has no native
-charges and retains outer cancellation. The CLI's nonpositive budget selects that
-unlimited-work policy. Counters and converted charges saturate at `Long.MAX_VALUE`.
+charges and retains outer cancellation. The legacy nonpositive millisecond budget
+selects that unlimited-work policy; an explicit `presolve-work-limit=0` instead supplies
+an exhausted phase allowance. Counters and converted charges saturate at `Long.MAX_VALUE`.
 
 [RootBakerTest](../../klause/src/commonTest/kotlin/com/eignex/klause/presolve/RootBakerTest.kt)
 covers work exhaustion across probing tiers, retained exclusions, repair/reseed billing,
@@ -125,7 +126,9 @@ it. Either limit can stop optional passes; partial reductions remain sound, but 
 cancellation can change the deductions and selected route with host speed. The
 solve-wide deadline still applies, and mandatory construction and work between
 cancellation polls can overrun the preparation ceiling. An explicit nonpositive presolve
-budget disables both phase limits.
+millisecond budget disables both derived phase limits. `presolve-work-limit=unlimited`
+removes only the work cap; an explicit finite or zero work allowance remains independent
+of that clock. See [resource allowances](resources.md).
 
 At-most-one clique replacement is published only after clique analysis and factor
 matching finish within their cancellation scope. A cancelled replacement leaves the

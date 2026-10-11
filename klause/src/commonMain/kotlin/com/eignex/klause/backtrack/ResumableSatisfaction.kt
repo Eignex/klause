@@ -19,7 +19,8 @@ import com.eignex.klause.util.cancelledWhen
  */
 @Suppress("TooGenericExceptionCaught") // ownership boundaries preserve arbitrary primary and cleanup failures
 internal class ResumableSatisfaction(private val solver: BacktrackSolver, params0: BacktrackParams) : ResumableSolve {
-    private var globalToken: Cancellation = params0.cancellation
+    private val lifetimeToken = params0.cancellation
+    private var globalToken: Cancellation = lifetimeToken
     private val sink = SolveStatsSink(backend = "backtrack").also { it.start() }
 
     // Its LP reading waits for the traversal below; nothing arms the slice before the first [runSlice].
@@ -70,7 +71,7 @@ internal class ResumableSatisfaction(private val solver: BacktrackSolver, params
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
         done?.let { return it }
         check(!closed) { "search is closed" }
-        globalToken = global
+        globalToken = lifetimeToken or global
         if (!traversal.hasRootOutcome && !slice.begin(sliceMillis, sliceNodes)) return null
         traversal.fixedCancellationCadence = slice.workBounded
         try {

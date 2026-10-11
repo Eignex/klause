@@ -301,15 +301,7 @@ internal object SolveCore {
      * and [EngineParams] consumes keys per instance, so leaving it in place would both build a second
      * budget downstream and, where it did not, fail validation as an unknown key.
      */
-    private fun takeNodeBudget(common: CommonOptions): NodeBudget? {
-        val entry = common.engineParams.firstOrNull { it.startsWith("$NODE_LIMIT_KEY=") } ?: return null
-        common.engineParams.remove(entry)
-        val raw = entry.substringAfter('=')
-        val limit = raw.toLongOrNull()
-            ?: usageError("engine param `$NODE_LIMIT_KEY` expects an integer, got `$raw`")
-        if (limit <= 0) usageError("engine param `$NODE_LIMIT_KEY` expects a positive node count, got $limit")
-        return NodeBudget(limit)
-    }
+    private fun takeNodeBudget(common: CommonOptions): NodeBudget? = takeOpenNodeLimit(common)?.let(::NodeBudget)
 
     // The engine params only the open-theory route reads. A sweep that sets them for its open models also runs its
     // finite ones, where they mean nothing, so they are dropped there rather than failing the run as unknown keys.
@@ -320,15 +312,11 @@ internal object SolveCore {
     }
 
     /** Consume the route-local fixed-work limit for an open-theory solve. */
-    private fun takeOpenNodeLimit(common: CommonOptions): Long? {
-        val entry = common.engineParams.firstOrNull { it.startsWith("$NODE_LIMIT_KEY=") } ?: return null
-        common.engineParams.remove(entry)
-        val raw = entry.substringAfter('=')
-        val limit = raw.toLongOrNull()
-            ?: usageError("engine param `$NODE_LIMIT_KEY` expects a non-negative integer, got `$raw`")
-        if (limit < 0) usageError("engine param `$NODE_LIMIT_KEY` expects a non-negative integer, got $limit")
-        return limit
-    }
+    private fun takeOpenNodeLimit(common: CommonOptions): Long? =
+        when (val setting = takeAllowanceSetting(common.engineParams, NODE_LIMIT_KEY)) {
+            AllowanceSetting.Automatic, AllowanceSetting.Unlimited -> null
+            is AllowanceSetting.Remaining -> setting.units
+        }
 
     private fun takeOpenLongParam(common: CommonOptions, key: String, nonNegative: Boolean): Long? {
         val entry = common.engineParams.firstOrNull { it.startsWith("$key=") } ?: return null
@@ -409,8 +397,9 @@ internal object SolveCore {
         common: CommonOptions,
         solveCancel: Cancellation,
     ): Pair<Cancellation, PresolveBudget?> {
-        val budget = common.sharedPresolveBudget() ?: return solveCancel to null
-        return budget.orSpent(common.presolveTimeCancellation or solveCancel) to budget
+        val budget = common.sharedPresolveBudget()
+        val phaseStop = common.presolveTimeCancellation or solveCancel
+        return (budget?.orSpent(phaseStop) ?: phaseStop) to budget
     }
 
     /** Naked single backtrack solve for the `fixed`/FD engine. A model annotation selects its heuristic;

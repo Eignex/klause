@@ -823,4 +823,29 @@ class LocalSearchEngineTest {
         assertEquals(2.0, ls.completions.sum)
         assertEquals(1.0, ls.completionsRefuted.sum)
     }
+    @Test
+    fun `a resumed local search retains its opening cancellation scope`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 3)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+        )
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+        var cancelled = false
+        val params = LocalSearchParams(
+            randomSeed = 3L, cancellation = Cancellation { cancelled },
+            initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
+        )
+
+        search.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { handle ->
+            val counted = assertIs<InstructionSlicedSearch>(handle)
+            assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {})
+            val before = handle.stats.ls.moves.sum
+            cancelled = true
+
+            assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {})
+
+            assertEquals(before, handle.stats.ls.moves.sum)
+        }
+    }
+
 }

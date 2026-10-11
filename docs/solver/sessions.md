@@ -36,6 +36,10 @@ further work, including after close or subsequent scope changes; a closed pendin
 rejects further slices. Counters and preparation progress remain owned by the delegated
 backend handle.
 
+Resumable handles retain their parameter lifetime cancellation scope. Each slice adds
+its invocation token and deadline; it cannot replace or renew the lifetime allowance.
+See [resource allowances](resources.md) for work units and nested scopes.
+
 ## Retained state and repair
 
 Fresh calls build fresh traversals. Resumable slices retain their trail or assignment,

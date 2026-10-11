@@ -58,7 +58,9 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
     routingToken?.let { return it }
     if (!takeOpenBoundProof()) return Cancellation { true }.also { routingToken = it }
     val solveStop = Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
-    val token = sharedPresolveBudget()?.let { routingSlice(it, presolveTimeCancellation or solveStop) } ?: solveStop
+    val budget = sharedPresolveBudget()
+    val phaseStop = presolveTimeCancellation or solveStop
+    val token = budget?.let { routingSlice(it, phaseStop) } ?: phaseStop
     routingToken = token
     return token
 }
@@ -95,7 +97,11 @@ internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
         val fraction = cliProp(CliKnobs.presolveBudgetFraction)?.toDoubleOrNull()
             ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION
         val budgetMs = explicit ?: SolveCore.derivedPresolveBudgetMs(timeLimitMs, fraction)
-        presolveBudget = if (budgetMs <= 0L) null else PresolveBudget(presolveWorkFor(budgetMs))
+        presolveBudget = when (val setting = takeAllowanceSetting(engineParams, "presolve-work-limit")) {
+            AllowanceSetting.Automatic -> if (budgetMs <= 0L) null else PresolveBudget(presolveWorkFor(budgetMs))
+            AllowanceSetting.Unlimited -> null
+            is AllowanceSetting.Remaining -> PresolveBudget(setting.units)
+        }
         presolveTimeCancellation = if (budgetMs <= 0L) Cancellation.Never else Cancellation.after(budgetMs.milliseconds)
         presolveAllowanceInitialized = true
     }

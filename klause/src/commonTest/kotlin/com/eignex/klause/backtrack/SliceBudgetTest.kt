@@ -161,4 +161,31 @@ class SliceBudgetTest {
         assertTrue(owner.expired())
     }
 
+    @Test
+    fun `settling the same overspend twice repays it only once`() {
+        var nodes = 0L
+        val slice = SliceBudget({ nodes }, { 0L })
+        slice.begin(Long.MAX_VALUE, 2L)
+        nodes = 5L
+
+        slice.noteOverspend()
+        slice.noteOverspend()
+
+        assertFalse(slice.begin(Long.MAX_VALUE, 2L))
+        assertTrue(slice.begin(Long.MAX_VALUE, 2L))
+        assertEquals(1L, slice.remainingNodes())
+    }
+
+    @Test
+    fun `a large offered slice cannot wrap its end`() {
+        var nodes = Long.MAX_VALUE - 10L
+        val slice = SliceBudget({ nodes }, { 0L })
+
+        assertTrue(slice.begin(Long.MAX_VALUE, Long.MAX_VALUE))
+        nodes++
+
+        assertFalse(slice.expired())
+        assertEquals(Long.MAX_VALUE - 1L, slice.remainingNodes())
+    }
+
 }

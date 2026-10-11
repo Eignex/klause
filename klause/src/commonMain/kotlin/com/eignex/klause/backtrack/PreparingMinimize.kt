@@ -53,7 +53,7 @@ internal class PreparingMinimize(
     ): MinimizeResult? {
         search?.let { if (it.isDone) return it.runSlice(global, sliceMillis, sliceNodes, onIncumbent) }
         check(!closed) { "search is closed" }
-        globalToken = global
+        globalToken = params.cancellation or global
         search?.let { return it.runSlice(global, sliceMillis, sliceNodes, onIncumbent) }
         if (!budget.begin(sliceMillis, sliceNodes)) return null
         val before = work
