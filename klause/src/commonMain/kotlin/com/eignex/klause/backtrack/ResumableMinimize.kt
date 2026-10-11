@@ -154,7 +154,7 @@ internal class ResumableMinimize(
         }
 
     private fun objectiveHasWeight(): Boolean =
-        objective.boolWeights.any { it != 0L } || objective.intCoefficients.any { it != 0L }
+        objective.boolWeightValues.any { it != 0L } || objective.intCoefficientValues.any { it != 0L }
 
     // Slice control without a coroutine: a re-armable deadline plus the current global token.
     private var globalToken: Cancellation = params0.cancellation
@@ -211,7 +211,7 @@ internal class ResumableMinimize(
     private var incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
     private val bestObj: Double get() = incumbents.current()?.objective?.pruningBound ?: Double.POSITIVE_INFINITY
     private val singleObj = objective.singleIntObjective()
-    private val discreteObjective = objective.realCoefficients.all { it == 0.0 }
+    private val discreteObjective = objective.realCoefficientValues.all { it == 0.0 }
     private var objVarBest: Long? = null
     private val externalShared = params.objectiveBoundSupplier != null
     private var lastExternalCutoff = Double.POSITIVE_INFINITY
@@ -395,7 +395,7 @@ internal class ResumableMinimize(
     internal fun replacingObjective(next: LinearObjective, freshParams: BacktrackParams): ResumableMinimize {
         check(!replaced) { "search has been replaced" }
         val sample = incumbents.current()?.assignment?.let {
-            Sample(it.bools.copyOf(), it.ints.copyOf())
+            it.copy()
         }
         val root = solver.problem.conditionedRoot(freshParams.assumptions, freshParams.cancellation)
         val rootPins = (root.baked as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None
@@ -695,7 +695,7 @@ internal class ResumableMinimize(
         val cutoffRhs = bestLong - objective.constant - 1 // Σ w_b·x_b must be ≤ this to beat the incumbent
         if (cutoffRhs == lastBoolCutoffRhs) return false
         lastBoolCutoffRhs = cutoffRhs
-        val weights = objective.boolWeights
+        val weights = objective.boolWeightValues
         val nb = minOf(problem.numBoolVars, weights.size)
         var posSum = 0L
         var nnz = 0
@@ -734,7 +734,7 @@ internal class ResumableMinimize(
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
         brancher.onSolution(sample)
-        if (singleObj != null) objVarBest = sample.ints[singleObj.varId]
+        if (singleObj != null) objVarBest = sample.intValue(singleObj.varId)
         params.improvedSolutionSink?.invoke(sample, score.display)
         params.onEvent?.invoke(SearchEvent.Incumbent(score.display))
         // Carry the counters as they stand. A caller that consumes the improvement stream and stops when
@@ -795,14 +795,14 @@ internal class ResumableMinimize(
         val sample = initialCandidate ?: return null
         initialCandidate = null
         val token = params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
-        if (token() || sample.bools.size != problem.numBoolVars || sample.ints.size != problem.numIntVars) return null
+        if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
         val validation = PropagationSession(problem, token)
         if (validation.seed(params.assumptions) is PropagationResult.Unsat || validation.isUnsatAtRoot) return null
-        for (variable in sample.bools.indices) {
-            if (validation.pinBool(variable, sample.bools[variable]) is PropagationResult.Unsat) return null
+        for (variable in (0 until sample.numBoolVars)) {
+            if (validation.pinBool(variable, sample.boolValue(variable)) is PropagationResult.Unsat) return null
         }
-        for (variable in sample.ints.indices) {
-            if (validation.pinInt(variable, sample.ints[variable]) is PropagationResult.Unsat) return null
+        for (variable in (0 until sample.numIntVars)) {
+            if (validation.pinInt(variable, sample.intValue(variable)) is PropagationResult.Unsat) return null
         }
         if (validation.fixpointCancelled || token()) return null
         val accepted = if (problem.numRealVars == 0) {
@@ -1195,7 +1195,7 @@ internal class ResumableMinimize(
     }
 
     private fun applyObjectiveBound(): SearchRunDisposition {
-        session.installObjectiveBoolBound(objective.boolWeights)
+        session.installObjectiveBoolBound(objective.boolWeightValues)
         if (rebindable) return SearchRunDisposition.Continue
         return if (assertObjectiveBoundAtRoot() || tightenOpenColumnsAtRoot()) {
             SearchRunDisposition.Exhausted

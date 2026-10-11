@@ -105,7 +105,7 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
     val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
     // Schema-layer float bookkeeping. `floatDecoders` records bucket parameters per float-var
-    // name (so the schema can decode `sample.ints[id]` back to a Double). `floatMetaIntervals` /
+    // name (so the schema can decode `sample.intValue(id)` back to a Double). `floatMetaIntervals` /
     // `floatMetaIntVarIds` / `floatMetaBuckets` are the parallel per-float-var arrays the
     // float-linear lowering reads to build the scaled-integer factor.
     val floatDecoders = mutableMapOf<String, FloatSpec>()

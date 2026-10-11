@@ -529,8 +529,8 @@ class LocalSearchState(
         return when (move) {
             is Move.BoolFlip -> {
                 val v = move.varId
-                if (v < obj.boolWeights.size) {
-                    val w = obj.boolWeights[v]
+                if (v < obj.boolWeightValues.size) {
+                    val w = obj.boolWeightValues[v]
                     (if (assignment.boolValue(v)) -w else w).toDouble()
                 } else {
                     0.0
@@ -539,8 +539,8 @@ class LocalSearchState(
 
             is Move.IntSet -> {
                 val v = move.varId
-                if (v < obj.intCoefficients.size) {
-                    (obj.intCoefficients[v] * (move.newValue - assignment.intValue(v))).toDouble()
+                if (v < obj.intCoefficientValues.size) {
+                    (obj.intCoefficientValues[v] * (move.newValue - assignment.intValue(v))).toDouble()
                 } else {
                     0.0
                 }
@@ -548,8 +548,8 @@ class LocalSearchState(
 
             is Move.RealSet -> {
                 val v = move.varId
-                if (v < obj.realCoefficients.size) {
-                    obj.realCoefficients[v] * (
+                if (v < obj.realCoefficientValues.size) {
+                    obj.realCoefficientValues[v] * (
                         move.newValue - assignment.realValue(
                             v,
                         )
@@ -1126,14 +1126,14 @@ class LocalSearchState(
             val slot = probeSlots[i]
             val old = savedValuesScratch[i]
             if (slot < problem.numBoolVars) {
-                val coefficient = objective.boolWeights.getOrElse(slot) { 0L }
+                val coefficient = objective.boolWeightValues.getOrElse(slot) { 0L }
                 delta += (coefficient * (probeValue(slot) - old)).toDouble()
             } else if (slot < problem.numBoolVars + problem.numIntVars) {
-                val coefficient = objective.intCoefficients.getOrElse(slot - problem.numBoolVars) { 0L }
+                val coefficient = objective.intCoefficientValues.getOrElse(slot - problem.numBoolVars) { 0L }
                 delta += (coefficient * (probeValue(slot) - old)).toDouble()
             } else {
                 val real = slot - problem.numBoolVars - problem.numIntVars
-                val coefficient = objective.realCoefficients.getOrElse(real) { 0.0 }
+                val coefficient = objective.realCoefficientValues.getOrElse(real) { 0.0 }
                 delta += coefficient * (assignment.realValue(real) - Double.fromBits(old))
             }
         }

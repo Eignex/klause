@@ -92,6 +92,26 @@ No build-time or solving-speed improvement is implied by this module graph.
 `BakedProblem` and the propagation session. A source declaration does not assign
 ownership to an engine.
 
+Source `Problem` arrays and `Factor` payloads are borrowed read-only. Their producer
+keeps them unchanged while any model, ownership plan, lazy operation or proof uses
+them. A rewrite creates a fresh source scope; mutating an existing model is outside
+the library contract. Custom factors keep their membership and structural keys stable.
+Finite propagation and assignment workspaces are mutable and owned by their session.
+
+`Sample`, exact theory assignments and reconstructed witnesses own immutable
+coordinates. Public array getters and destructuring return independent buffers;
+scalar reads retain exact integer/rational authority without copying arrays.
+`Assignment.snapshot()` transfers newly allocated publication buffers once. An
+unchanged sample copy can share its private immutable buffers and certificate;
+replacement coordinates are captured and require a fresh witness check.
+
+Lowered and solver linear objectives capture their coefficient arrays at construction.
+Their getters, copies and destructuring cannot mutate the captured objective. Solver
+consumers borrow those private coefficients read-only inside the module. Generic
+incumbent extensions supply immutable assignment/objective payloads, or capture
+producer state in their verifier before acceptance. Built-in finite and open witnesses
+meet that contract without a copy at every incumbent read.
+
 `ProblemSettings` carries immutable resource metadata through source rewrites,
 counting extensions and finite projections. Its domain-storage threshold, pre-bake
 span gate and automatic LP size limits do not alter the declared solution set.

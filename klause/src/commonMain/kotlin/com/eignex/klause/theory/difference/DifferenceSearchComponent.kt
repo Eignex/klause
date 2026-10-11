@@ -99,7 +99,7 @@ class DifferenceSearchComponent private constructor(
 
     override fun contributeModel(model: SearchModel, context: SearchContext) {
         assignment?.let { assignment ->
-            for (variable in modelIntVars) model.put(SearchIntValue(variable), assignment.ints[variable])
+            for (variable in modelIntVars) model.put(SearchIntValue(variable), assignment.intValue(variable))
             model.put(this, assignment)
         }
     }

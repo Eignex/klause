@@ -24,7 +24,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 internal fun Problem.provesUnbounded(objective: LinearObjective, point: Sample, direction: List<BigFraction>): Boolean {
     val reals = point.exactReals ?: return false
     if (reals.size != numRealVars || direction.size != numRealVars) return false
-    if (point.ints.size != numIntVars || point.bools.size != numBoolVars) return false
+    if (point.numIntVars != numIntVars || point.numBoolVars != numBoolVars) return false
     if (direction.all { it.isZero }) return false
     for (r in 0 until numRealVars) {
         if (!within(reals[r], realLower[r], realUpper[r])) return false
@@ -32,8 +32,8 @@ internal fun Problem.provesUnbounded(objective: LinearObjective, point: Sample, 
         if (direction[r].signum() > 0 && realUpper[r] != Double.POSITIVE_INFINITY) return false
     }
     var descent = BigFraction.ZERO
-    for (r in 0 until minOf(objective.realCoefficients.size, numRealVars)) {
-        val coefficient = BigFraction.ofDouble(objective.realCoefficients[r]) ?: return false
+    for (r in 0 until minOf(objective.realCoefficientValues.size, numRealVars)) {
+        val coefficient = BigFraction.ofDouble(objective.realCoefficientValues[r]) ?: return false
         descent += coefficient * direction[r]
     }
     if (descent.signum() >= 0) return false
@@ -61,7 +61,7 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
 
         // The Boolean's pin selects the atom or its exact complement, which flips the side and the strictness.
         is ReifiedRealLinear -> {
-            val holds = point.bools[factor.aux]
+            val holds = point.boolValue(factor.aux)
             val op = when {
                 holds -> factor.op
                 factor.op == LinearOp.LE -> LinearOp.GE
@@ -75,7 +75,7 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
 
         // With the integer operand fixed at k, the product is the row `result − k·operand = 0`.
         is RealProduct -> {
-            val k = BigFraction.ofLong(point.ints[factor.intOperand])
+            val k = BigFraction.ofLong(point.intValue(factor.intOperand))
             reals[factor.result] == k * reals[factor.realOperand] &&
                 direction[factor.result] == k * direction[factor.realOperand]
         }

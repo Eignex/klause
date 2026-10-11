@@ -16,7 +16,7 @@ internal class ClausePrimalWalk(
     private val nodeBudget: NodeBudget?,
     cancellation: Cancellation = Cancellation.Never,
 ) {
-    private val values = sample.bools.copyOf()
+    private val values = sample.bools
     private val occurrences = Array(values.size) { mutableSetOf<Int>() }
     private val counts = IntArray(clauses.size)
     private val weights = LongArray(clauses.size) { 1L }

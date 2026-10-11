@@ -48,12 +48,12 @@ internal fun interface DestroyOperator {
             // A coefficient array need not cover the whole namespace: presolve can extend it (a `{0, 1}`
             // column substituted for a literal), leaving the tail weightless.
             for (b in 0 until problem.numBoolVars) {
-                val w = objective.boolWeights.getOrElse(b) { 0L }
-                contribs[b] = abs(w.toDouble()) * (if (incumbent.bools[b]) 1.0 else 0.0)
+                val w = objective.boolWeightValues.getOrElse(b) { 0L }
+                contribs[b] = abs(w.toDouble()) * (if (incumbent.boolValue(b)) 1.0 else 0.0)
             }
             for (i in 0 until problem.numIntVars) {
                 contribs[problem.numBoolVars + i] = abs(
-                    (objective.intCoefficients.getOrElse(i) { 0L } * incumbent.ints[i]).toDouble(),
+                    (objective.intCoefficientValues.getOrElse(i) { 0L } * incumbent.intValue(i)).toDouble(),
                 )
             }
             val indexed = (0 until totalVars).sortedByDescending { contribs[it] }
@@ -120,8 +120,8 @@ internal fun interface DestroyOperator {
             // Build a scratch state seeded with the incumbent; ask each factor whether it
             // is violated under that assignment.
             val scratch = LocalSearchState(problem, rng)
-            for (b in 0 until problem.numBoolVars) scratch.assignment.setBool(b, incumbent.bools[b])
-            for (i in 0 until problem.numIntVars) scratch.assignment.setInt(i, incumbent.ints[i])
+            for (b in 0 until problem.numBoolVars) scratch.assignment.setBool(b, incumbent.boolValue(b))
+            for (i in 0 until problem.numIntVars) scratch.assignment.setInt(i, incumbent.intValue(i))
             scratch.recompute()
             val violatedFactors = scratch.violated.toIntArray()
             if (violatedFactors.isEmpty()) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
@@ -202,7 +202,7 @@ internal fun interface DestroyOperator {
             val end = start + windowSize // exclusive
             val inWindow = IntArrayList()
             for (i in 0 until n) {
-                val v = incumbent.ints[i]
+                val v = incumbent.intValue(i)
                 if (v in start until end) inWindow.add(i)
             }
             // If the window picked an empty slice, fall back to a uniform random pick over

@@ -340,8 +340,8 @@ internal object Compiler {
             nextInt = retained.size
             nextBool = retainedBooleans
             return objective?.copy(
-                intCoefficients = compactCoefficients(objective.intCoefficients, mapping, nextInt),
-                boolWeights = compactCoefficients(objective.boolWeights, boolMapping, nextBool),
+                intCoefficients = compactCoefficients(objective.intCoefficientValues, mapping, nextInt),
+                boolWeights = compactCoefficients(objective.boolWeightValues, boolMapping, nextBool),
             )
         }
 

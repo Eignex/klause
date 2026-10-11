@@ -8,6 +8,7 @@ import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +21,23 @@ import kotlin.test.assertTrue
  * the difference that kept column-eliminating passes off the source lane.
  */
 class OpenTheoryRebuildTest {
+    @Test
+    fun `recovered witness coordinates resist external mutation`() {
+        val base = OpenTheoryAssignment.Difference(Sample(booleanArrayOf(false), longArrayOf(1)))
+        val bools = booleanArrayOf(true)
+        val ints = arrayOf(parseBigInt("9223372036854775808"))
+        val rebuilt = OpenTheoryAssignment.Rebuilt(base, bools, ints)
+
+        bools[0] = false
+        ints[0] = BIG_ZERO
+        rebuilt.bools[0] = false
+        checkNotNull(rebuilt.ints)[0] = BIG_ZERO
+
+        assertEquals(true, rebuilt.boolValue(0))
+        assertEquals("9223372036854775808", rebuilt.intValue(0))
+    }
+
+
 
     private fun pos(v: Int) = Lit.make(v, true)
 

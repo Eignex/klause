@@ -23,16 +23,16 @@ internal class IndomainBest(private val objective: LinearObjective) : ValueSelec
     override fun fresh() = this
     override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> = when (varRef) {
         is VarRef.Bool -> {
-            val w = if (varRef.varId < objective.boolWeights.size) objective.boolWeights[varRef.varId] else 0L
+            val w = if (varRef.varId < objective.boolWeightValues.size) objective.boolWeightValues[varRef.varId] else 0L
             // false contributes 0; true contributes w. Lower-contribution-first.
             if (w >= 0L) sequenceOf(0L, 1L) else sequenceOf(1L, 0L)
         }
 
         is VarRef.IntVar -> {
             val c = if (varRef.varId <
-                objective.intCoefficients.size
+                objective.intCoefficientValues.size
             ) {
-                objective.intCoefficients[varRef.varId]
+                objective.intCoefficientValues[varRef.varId]
             } else {
                 0L
             }

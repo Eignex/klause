@@ -57,9 +57,9 @@ internal class TheoryCompletion(private val model: Problem, private val params: 
     // The model with every Boolean and integer column fixed to the candidate's value.
     private fun pinnedModel(candidate: Sample): Problem {
         val pins = ArrayList<Factor>(model.numBoolVars + model.numIntVars)
-        for (b in 0 until model.numBoolVars) pins += Clause(intArrayOf(Lit.make(b, candidate.bools[b])))
+        for (b in 0 until model.numBoolVars) pins += Clause(intArrayOf(Lit.make(b, candidate.boolValue(b))))
         for (v in 0 until model.numIntVars) {
-            pins += Linear(longArrayOf(1L), intArrayOf(v), LinearOp.EQ, candidate.ints[v])
+            pins += Linear(longArrayOf(1L), intArrayOf(v), LinearOp.EQ, candidate.intValue(v))
         }
         val mask = model.impliedFactorMask?.let { it + BooleanArray(pins.size) }
         return model.withFactors(model.factors + pins, mask)

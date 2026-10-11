@@ -37,7 +37,7 @@ internal fun objectiveCutoffBounds(
     objective: LinearObjective,
     incumbent: Long,
 ): List<CutoffBound> {
-    val coefficients = objective.intCoefficients
+    val coefficients = objective.intCoefficientValues
     val n = minOf(problem.numIntVars, coefficients.size)
     if ((0 until n).none {
             coefficients[it] > 0L && problem.intBounds.isOpenUpper(
@@ -57,8 +57,8 @@ internal fun objectiveCutoffBounds(
         val d = problem.rootIntDomain(i)
         floor.addProduct(c, if (c > 0L) d.min else d.max)
     }
-    for (b in 0 until minOf(problem.numBoolVars, objective.boolWeights.size)) {
-        val w = objective.boolWeights[b]
+    for (b in 0 until minOf(problem.numBoolVars, objective.boolWeightValues.size)) {
+        val w = objective.boolWeightValues[b]
         if (w < 0L) floor.addLong(w)
     }
     if (floor.overflow) return emptyList()

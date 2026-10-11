@@ -66,18 +66,18 @@ internal fun exactSourceObjective(
 ): BigFraction? {
     // Under tolerance semantics the float reals are the values, so the score is their exact sum.
     val floatReals = if (toleranceCheck == null) null else sample.reals.map { BigFraction.ofDouble(it) }
-    val exactReals = sample.exactReals ?: floatReals?.filterNotNull()?.takeIf { it.size == sample.reals.size }
-    if (objective.realCoefficients.any { it != 0.0 } && exactReals == null) return null
+    val exactReals = sample.exactReals ?: floatReals?.filterNotNull()?.takeIf { it.size == sample.numRealVars }
+    if (objective.realCoefficientValues.any { it != 0.0 } && exactReals == null) return null
     var exact = BigFraction.ofLong(objective.constant)
-    for (i in 0 until minOf(objective.boolWeights.size, sample.bools.size)) {
-        if (sample.bools[i]) exact += BigFraction.ofLong(objective.boolWeights[i])
+    for (i in 0 until minOf(objective.boolWeightValues.size, sample.numBoolVars)) {
+        if (sample.boolValue(i)) exact += BigFraction.ofLong(objective.boolWeightValues[i])
     }
-    for (i in 0 until minOf(objective.intCoefficients.size, sample.ints.size)) {
-        exact += BigFraction.ofLong(objective.intCoefficients[i]) * BigFraction.ofLong(sample.ints[i])
+    for (i in 0 until minOf(objective.intCoefficientValues.size, sample.numIntVars)) {
+        exact += BigFraction.ofLong(objective.intCoefficientValues[i]) * BigFraction.ofLong(sample.intValue(i))
     }
     if (exactReals != null) {
-        for (i in 0 until minOf(objective.realCoefficients.size, exactReals.size)) {
-            val coefficient = BigFraction.ofDouble(objective.realCoefficients[i]) ?: return null
+        for (i in 0 until minOf(objective.realCoefficientValues.size, exactReals.size)) {
+            val coefficient = BigFraction.ofDouble(objective.realCoefficientValues[i]) ?: return null
             exact += coefficient * exactReals[i]
         }
     }
@@ -101,7 +101,7 @@ internal fun sampleAdmission(
     val certified = candidate.assignment.exactReals?.size ?: 0
 
     // Tolerance semantics admit float reals the front end's source check accepts; certified reals need no check.
-    fun tolerated() = toleranceCheck != null && candidate.assignment.reals.size == problem.numRealVars &&
+    fun tolerated() = toleranceCheck != null && candidate.assignment.numRealVars == problem.numRealVars &&
         toleranceCheck(candidate.assignment)
     when {
         !candidate.objective.isFinite() -> Verification.Rejected("non-finite objective ${candidate.objective}")
@@ -167,9 +167,9 @@ internal class ComposedSampleVerifier(
         val admitted = admission.verify(candidate)
         if (admitted !is Verification.Accepted) return admitted
         val sample = candidate.assignment
-        if (sample.bools.size != problem.numBoolVars || sample.ints.size != problem.numIntVars) {
+        if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) {
             return Verification.Rejected(
-                "assignment covers ${sample.bools.size}/${sample.ints.size} of the " +
+                "assignment covers ${sample.numBoolVars}/${sample.numIntVars} of the " +
                     "${problem.numBoolVars}/${problem.numIntVars} discrete variables",
             )
         }
@@ -198,13 +198,13 @@ internal fun <V> composedFixpoint(
         return Verification.Rejected("the assumptions refute the assignment")
     }
     for (b in 0 until problem.numBoolVars) {
-        if (session.pinBool(b, sample.bools[b]) is PropagationResult.Unsat) {
-            return Verification.Rejected("bool $b = ${sample.bools[b]} conflicts")
+        if (session.pinBool(b, sample.boolValue(b)) is PropagationResult.Unsat) {
+            return Verification.Rejected("bool $b = ${sample.boolValue(b)} conflicts")
         }
     }
     for (v in 0 until problem.numIntVars) {
-        if (session.pinInt(v, sample.ints[v]) is PropagationResult.Unsat) {
-            return Verification.Rejected("int $v = ${sample.ints[v]} conflicts")
+        if (session.pinInt(v, sample.intValue(v)) is PropagationResult.Unsat) {
+            return Verification.Rejected("int $v = ${sample.intValue(v)} conflicts")
         }
     }
     // Sticky across every fixpoint above: a cut one leaves the state under-propagated, so a

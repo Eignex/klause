@@ -260,7 +260,7 @@ object OpenTheoryPipeline {
      */
     fun canMinimize(request: OpenTheoryRequest): Boolean {
         val objective = request.minimizedObjective ?: return false
-        if (objective.realCoefficients.any { it != 0.0 } || objective.boolWeights.any { it != 0L }) return false
+        if (objective.realCoefficientValues.any { it != 0.0 } || objective.boolWeightValues.any { it != 0L }) return false
         return minimizerFor(request, objective).decidesEveryRound
     }
 
