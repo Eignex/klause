@@ -127,6 +127,38 @@ class ExactLiraAffineEqualitiesTest {
     }
 
     @Test
+    fun `bounded affine passes eventually imply comparisons beyond unresolved prefixes`() {
+        val open = Bits(33).also { bits -> repeat(32, bits::set) }
+        val source = Problem(
+            601,
+            intBounds = IntBounds.fromModelBounds(
+                LongArray(33) { if (it == 32) 7 else 0 },
+                LongArray(33) { if (it == 32) 7 else 0 },
+                open,
+                open,
+            ),
+            factors = Array(601) { guard ->
+                if (guard == 600) {
+                    ReifiedLinear(guard, intArrayOf(1), intArrayOf(32), LinearOp.EQ, 7)
+                } else {
+                    ReifiedLinear(guard, IntArray(32) { 1 }, IntArray(32) { it }, LinearOp.LE, 0)
+                }
+            },
+        )
+        val propagation = ExactLiraAffineEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+
+        repeat(4) {
+            assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+        }
+
+        assertEquals(true, session.boolValue(600))
+        assertContentEquals(intArrayOf(Lit.make(600, true)), assertNotNull(session.reasonFor(600)).literals)
+    }
+
+    @Test
     fun `cancellation during an affine explanation withholds the implication`() {
         for (metered in listOf(false, true)) {
             val open = Bits(3).also { bits -> repeat(3, bits::set) }

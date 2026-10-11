@@ -149,6 +149,10 @@ and rejects inconsistent equations or nonintegral constant fixings. Each basis
 row retains a flat set of source guard literals. New active equalities extend the
 basis; a retracted supporting guard clears it before any further publication.
 Processed active equalities need no additional query reduction.
+Comparison queries retain a circular cursor across bounded passes, so an
+unresolved prefix cannot consume every pass before later comparisons are visited.
+The cursor carries no proof state; every pass validates cached source guards
+before querying the basis.
 Declared fixed columns supply unconditional facts. Boolean coefficients and
 disjunction alternatives remain with the complete theory.
 

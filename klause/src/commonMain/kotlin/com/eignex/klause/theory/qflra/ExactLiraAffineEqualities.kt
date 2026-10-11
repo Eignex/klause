@@ -50,6 +50,7 @@ internal class ExactLiraAffineEqualities(
     }
     private val basis = HashMap<Int, Equation>()
     private var foundationReady = false
+    private var queryCursor = 0
     private var remaining = 0
     private var interrupted = false
     private var progressStop: Cancellation = Cancellation.Never
@@ -164,10 +165,14 @@ internal class ExactLiraAffineEqualities(
             factsAdded++
         }
         if (interrupted) return ComponentResult.Indeterminate
-        for (source in rows) {
+        var scanned = 0
+        while (scanned < rows.size && remaining > 0) {
             if (progressStop()) return ComponentResult.Indeterminate
+            val source = rows[queryCursor]
+            queryCursor++
+            if (queryCursor == rows.size) queryCursor = 0
+            scanned++
             if (source.processed) continue
-            if (remaining == 0) break
             queryReductions++
             val reduced = reduce(source.comparison)
             if (reduced == null) {
