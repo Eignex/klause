@@ -147,19 +147,25 @@ private fun hasIntegerSyntax(command: SExpr, cancellation: Cancellation): Boolea
     return false
 }
 
-private inline fun <T> withSource(
+private fun <T> withSource(
     openSource: () -> CharSource,
     cancellation: Cancellation,
     read: (CharSource) -> T,
 ): T {
     val source = openSource()
-    return try {
-        read(source)
+    var interrupted = false
+    val outcome = try {
+        runCatching { read(source) }
     } finally {
         if (source is AutoCloseable) source.close()
         else while (true) {
-            if (cancellation()) throw PolynomialSourceInterrupted()
+            if (cancellation()) {
+                interrupted = true
+                break
+            }
             if (source.next() == null) break
         }
     }
+    if (interrupted) throw PolynomialSourceInterrupted()
+    return outcome.getOrThrow()
 }
