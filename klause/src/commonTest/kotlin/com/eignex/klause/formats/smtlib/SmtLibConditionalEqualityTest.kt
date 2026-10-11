@@ -23,6 +23,36 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `equivalent image thresholds refute contradictory comparisons within one expansion budget`() {
+        for ((operator, first, second) in listOf(
+            Triple("<=", "3", "4"), Triple(">=", "3", "4"),
+            Triple("<=", "-9223372036854775807", "9223372036854775806"),
+            Triple(">=", "-9223372036854775807", "9223372036854775806"),
+        )) {
+            val builder = Compiler.Builder(
+                Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
+            )
+            val reader = SExprReader(
+                StringCharSource(
+                    """
+                    (declare-const b Bool)
+                    (assert (let ((v (ite b -9223372036854775808 9223372036854775807)))
+                      (and ($operator v $first) (not ($operator v $second)))))
+                    """.trimIndent(),
+                ),
+            )
+            while (true) builder.command(reader.readCommandOrNull() ?: break)
+            val parsed = builder.build()
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+
+            assertIs<ComponentResult.Conflict>(session.initialize())
+        }
+    }
+
+    @Test
     fun `a conditional comparison propagates every selected branch and its default`() {
         val assignments = listOf(false to false, false to true, true to false, true to true)
         for (selector in 0..2) {

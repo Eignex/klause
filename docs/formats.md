@@ -83,6 +83,8 @@ Expanded comparisons use guarded clauses for the mutually exclusive branch tests
 with the default selected when none holds. Constant branch truth values fold directly
 into conjunctions or disjunctions of the guards; intermediate per-branch gates are omitted.
 Image summaries finish iteratively after all assertion and objective chains close.
+Order thresholds selecting the same values from a constant image share their
+comparison literal, including when used inside another conditional definition.
 Pair comparisons wait for those summaries; unavailable or oversized images retain
 their arithmetic encoding.
 Comparisons finish open decision lists before expanding their branch tests.

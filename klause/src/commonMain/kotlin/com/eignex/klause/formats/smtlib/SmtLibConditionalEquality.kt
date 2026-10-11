@@ -47,6 +47,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private val equalities = HashMap<Key, Int>()
     private val pendingEqualities = LinkedHashMap<ComparisonKey, PendingEquality>()
     private val pairEqualities = HashMap<PairKey, Int>()
+    private val orderedImages = HashMap<Int, LongArray>()
     private var work = 0
 
     fun define(
@@ -172,7 +173,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
 
     fun reify(variable: Int, value: Long, builder: Compiler.Builder, operator: LinearOp = LinearOp.EQ): Int? {
-        val key = Key(variable, value, operator)
+        val key = comparisonKey(variable, value, operator)
         equalities[key]?.let { return it }
         imageTruth(variable, value, operator)?.let { truth ->
             return truthLiteral(truth, builder).also { equalities[key] = it }
@@ -287,7 +288,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     }
 
     private fun expand(variable: Int, value: Long, builder: Compiler.Builder, operator: LinearOp): Int? {
-        val key = Key(variable, value, operator)
+        val key = comparisonKey(variable, value, operator)
         equalities[key]?.let { return it }
         imageTruth(variable, value, operator)?.let { truth ->
             return truthLiteral(truth, builder).also { equalities[key] = it }
@@ -306,7 +307,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     if (++work > workLimit) return null
                     val term = frame.term
                     val source = term.asSimpleVar()
-                    val cached = source?.let { equalities[Key(it, value, operator)] }
+                    val cached = source?.let { equalities[comparisonKey(it, value, operator)] }
                     val definition = source?.let { definitions[it] }
                     val imageTruth = source?.let { imageTruth(it, value, operator) }
                     when {
@@ -316,7 +317,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                         )
                         source != null && imageTruth != null -> {
                             val literal = truthLiteral(imageTruth, builder)
-                            equalities[Key(source, value, operator)] = literal
+                            equalities[comparisonKey(source, value, operator)] = literal
                             literals.addLast(literal)
                         }
                         source != null && definition != null -> {
@@ -329,7 +330,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                                 IntComb.Narrow(LinComb(emptyMap(), value)),
                             )
                             literals.addLast(literal)
-                            if (source != null) equalities[Key(source, value, operator)] = literal
+                            if (source != null) equalities[comparisonKey(source, value, operator)] = literal
                         }
                     }
                 }
@@ -349,7 +350,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                     val literal = reifyChoice(
                         definition.guards, arms.toList(), default, builder, impliedArms, defaultGuards,
                     )
-                    equalities[Key(frame.variable, value, operator)] = literal
+                    equalities[comparisonKey(frame.variable, value, operator)] = literal
                     literals.addLast(literal)
                 }
             }
@@ -422,6 +423,18 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         builder.factors.addAll(clauses)
         definePredicate(Lit.variable(literal), clauses)
         return literal
+    }
+
+    private fun comparisonKey(variable: Int, value: Long, operator: LinearOp): Key {
+        if (operator != LinearOp.LE && operator != LinearOp.GE) return Key(variable, value, operator)
+        val image = definitions[variable]?.image ?: return Key(variable, value, operator)
+        val ordered = orderedImages.getOrPut(variable) { image.sorted().toLongArray() }
+        val found = ordered.binarySearch(value)
+        val index = if (found >= 0) found else when (operator) {
+            LinearOp.LE -> -found - 2
+            else -> -found - 1
+        }
+        return Key(variable, ordered.getOrNull(index) ?: value, operator)
     }
 
     private fun imageTruth(variable: Int, value: Long, operator: LinearOp): Boolean? {
