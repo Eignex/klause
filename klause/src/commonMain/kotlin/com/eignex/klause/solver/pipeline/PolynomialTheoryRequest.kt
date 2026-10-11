@@ -5,10 +5,13 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.util.Cancellation
@@ -97,6 +100,67 @@ data class PolynomialTheoryExecution(
     val resource: PolynomialTheoryResource? = null,
 )
 
+/** Finite-objective optimization with exact polynomial witnesses and separately scoped theory work. */
+data class PolynomialOptimizationExecution(
+    /** The strategy's incumbent or proof verdict. */
+    val result: MinimizeResult,
+    /** Native polynomial counters over every conditioned check. */
+    val stats: PolynomialTheoryStats,
+)
+
+/**
+ * Optimize a finite objective while completing continuous coordinates exactly.
+ * Continuous objective coefficients are unsupported; heuristic strategies publish incumbents only.
+ */
+fun OpenTheoryPipeline.minimize(
+    request: PolynomialTheoryRequest,
+    objective: LinearObjective,
+    params: PolynomialTheoryParams = PolynomialTheoryParams(),
+    engine: FiniteEngine = FiniteEngine.MIXED,
+): PolynomialOptimizationExecution {
+    val stop = params.timeout or params.cancellation
+    val shared = request.resolvedModel()
+    val invocation = shared.service.invocation(QfNraParams(
+        stop, params.maximumWork,
+        PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
+    ))
+    val completed = invocation.use {
+        PolynomialStrategyAdapters(shared, it, params.strategy, stop).minimize(objective, engine)
+    }
+    val result = when (completed) {
+        is MinimizeResult.Optimal -> completed.copy(sample = request.capture(completed.sample))
+        is MinimizeResult.BestFound -> completed.copy(sample = request.capture(completed.sample))
+        is MinimizeResult.Unbounded -> completed.copy(sample = request.capture(completed.sample))
+        else -> completed
+    }
+    val reason = if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled
+    val published = if (!stop()) result else when (result) {
+        is MinimizeResult.WithSample -> MinimizeResult.BestFound(result.sample, result.objective, reason, result.stats)
+        else -> MinimizeResult.Unknown(reason, result.stats)
+    }
+    val native = invocation.stats
+    return PolynomialOptimizationExecution(published, PolynomialTheoryStats(
+        native.projectedPolynomials, native.liftedCells, native.workSpent,
+    ))
+}
+
+private fun PolynomialTheoryRequest.capture(sample: Sample): Sample = Sample(
+    BooleanArray(problem.sourceBoolCount) { sample.boolValue(it) }, sample.ints,
+    DoubleArray(problem.sourceRealCount) { sample.approximateRealValue(it) },
+    algebraicReals = requireNotNull(sample.algebraicReals).take(problem.sourceRealCount),
+)
+
+private fun PolynomialTheoryRequest.resolvedModel(): SharedPolynomialModel = sharedModel
+    ?: requireNotNull(SharedPolynomialModel.assemble(
+        Problem(
+            numBoolVars = problem.totalBoolCount, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray(),
+            numRealVars = problem.totalRealCount,
+            realLower = DoubleArray(problem.totalRealCount) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(problem.totalRealCount) { Double.POSITIVE_INFINITY },
+        ),
+        problem.formula,
+    ))
+
 /**
  * Execute a pipeline-selected polynomial source as one complete exact invocation.
  * Only original declared coordinates leave the pipeline; lowering auxiliaries remain private.
@@ -117,15 +181,7 @@ fun OpenTheoryPipeline.execute(
             stats,
         )
     val source = request.problem
-    val shared = request.sharedModel ?: requireNotNull(SharedPolynomialModel.assemble(
-        Problem(
-            numBoolVars = source.totalBoolCount, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray(),
-            numRealVars = source.totalRealCount,
-            realLower = DoubleArray(source.totalRealCount) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(source.totalRealCount) { Double.POSITIVE_INFINITY },
-        ),
-        source.formula,
-    ))
+    val shared = request.resolvedModel()
     val invocation = shared.service.invocation(QfNraParams(
         stop, params.maximumWork,
         PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),

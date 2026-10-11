@@ -23,6 +23,7 @@ import com.eignex.klause.solver.incumbent.EvidenceKind
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
@@ -109,10 +110,33 @@ internal class PolynomialStrategyAdapters(
         FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> BacktrackSolver(finite).solve(backtrackParams())
         FiniteEngine.LOCAL_SEARCH -> heuristic(localSearch().solve(localParams()))
         FiniteEngine.ALNS -> alns(cancellation)
-        FiniteEngine.MIXED -> mixed()
+        FiniteEngine.MIXED -> portfolio().use { it.solve(cancellation) }
+    }
+
+    fun minimize(objective: LinearObjective, engine: FiniteEngine): MinimizeResult {
+        require(objective.realCoefficientValues.none { it != 0.0 }) {
+            "polynomial optimization requires a finite objective"
+        }
+        return when (engine) {
+            FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> BacktrackSolver(finite).minimize(objective, backtrackParams())
+            FiniteEngine.LOCAL_SEARCH -> heuristic(localSearch().minimize(objective, localParams()))
+            FiniteEngine.ALNS -> heuristic(alnsMinimize(objective, cancellation))
+            FiniteEngine.MIXED -> portfolio(objective).use { it.minimize(cancellation) }
+        }
     }
 
     private fun alns(stop: Cancellation, instructions: Long? = null): SolveResult {
+        val objective = LinearObjective(intCoefficients = LongArray(finite.numIntVars) { 1L })
+        val result = alnsMinimize(objective, stop, instructions)
+        return result.assignment?.let { SolveResult.Sat(it, result.stats) }
+            ?: SolveResult.Unknown(TerminationReason.BudgetExhausted, result.stats)
+    }
+
+    private fun alnsMinimize(
+        objective: LinearObjective,
+        stop: Cancellation,
+        instructions: Long? = null,
+    ): MinimizeResult {
         val inner = localSearch()
         return inner.session().use { session ->
             val alns = Alns(
@@ -120,24 +144,27 @@ internal class PolynomialStrategyAdapters(
                 backtrack = BacktrackSolver(finite), backtrackParams = backtrackParams(),
                 repairOperators = BacktrackRepair.Defaults, maxIterations = params.alnsIterations,
             )
-            val objective = LinearObjective(intCoefficients = LongArray(finite.numIntVars) { 1L })
             val local = localParams().copy(cancellation = cancellation or stop,
                 maxInstructions = instructions ?: params.localSearch.maxInstructions)
-            val result = alns.minimize(objective, local)
-            result.assignment?.let { SolveResult.Sat(it, result.stats) }
-                ?: SolveResult.Unknown(TerminationReason.BudgetExhausted, result.stats)
+            alns.minimize(objective, local)
         }
     }
 
-    private fun mixed(): SolveResult {
-        val bt = PortfolioWorker.of("bt+exact-nra", 0, BacktrackSolver(finite).session(), backtrackParams())
+    private fun portfolio(objective: LinearObjective? = null): Portfolio {
+        val bt = PortfolioWorker.of("bt+exact-nra", 0, BacktrackSolver(finite).session(), backtrackParams(), objective)
             .bindEvidence(identity)
-        val ls = PortfolioWorker.of("ls+exact-nra", 1, localSearch().session(), localParams(),
+        val ls = PortfolioWorker.of("ls+exact-nra", 1, localSearch().session(), localParams(), objective,
             withInstructionBudget = { p, units -> p.copy(maxInstructions = units) })
             .bindEvidence(identity, provesResults = false)
-        val alns = PortfolioWorker.ofSolve("alns+exact-nra", 2, countsInstructions = true,
-            solve = { stop, instructions -> alns(stop, instructions) })
-            .bindEvidence(identity, provesResults = false)
+        val alns = if (objective == null) {
+            PortfolioWorker.ofSolve("alns+exact-nra", 2, countsInstructions = true,
+                solve = { stop, instructions -> alns(stop, instructions) })
+        } else {
+            PortfolioWorker.ofMinimize("alns+exact-nra", 2, countsInstructions = true,
+                improvements = { _, _, stop, instructions ->
+                    sequenceOf(heuristic(alnsMinimize(objective, stop, instructions)))
+                })
+        }.bindEvidence(identity, provesResults = false)
         val portfolio = Portfolio.thompson(listOf(bt, ls, alns))
         portfolio.evidenceVerification = PortfolioEvidence(identity, CandidateVerifier { candidate ->
             val certificate = candidate.assignment.witnessCertificate
@@ -147,11 +174,19 @@ internal class PolynomialStrategyAdapters(
                 Verification.Indeterminate("polynomial source witness has no matching exact certificate")
             }
         })
-        return portfolio.use { it.solve(cancellation) }
+        return portfolio
     }
 
     private fun heuristic(result: SolveResult): SolveResult = when (result) {
         is SolveResult.Unsat -> SolveResult.Unknown(TerminationReason.BudgetExhausted, result.stats)
+        else -> result
+    }
+
+    private fun heuristic(result: MinimizeResult): MinimizeResult = when (result) {
+        is MinimizeResult.Optimal -> MinimizeResult.BestFound(
+            result.sample, result.objective, TerminationReason.BudgetExhausted, result.stats,
+        )
+        is MinimizeResult.Infeasible -> MinimizeResult.Unknown(TerminationReason.BudgetExhausted, result.stats)
         else -> result
     }
 }
