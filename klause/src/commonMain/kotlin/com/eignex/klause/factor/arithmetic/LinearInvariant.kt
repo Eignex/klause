@@ -83,11 +83,8 @@ internal class LinearInvariant(
             if (c != 0L) {
                 val cur = state.assignment.intValue(v)
                 val sumWithout = sum - c * cur
-                val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true)
-                if (target != null) {
-                    val clamped = state.rootDomains[v].clamp(target)
-                    if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
-                }
+                val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true, domain = state.rootDomains[v])
+                if (target != null && target != cur) sink.addChannelingIntSet(state, v, target)
             }
         }
     }

@@ -609,6 +609,90 @@ class LocalSearchStateTest {
     }
 
     @Test
+    fun `reified inequality repairs cross holes with pinned indicators`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
+            for (coefficient in listOf(-1, 1)) {
+                for (indicator in listOf(false, true)) {
+                    val decreasing = ((op == LinearOp.LE) == (coefficient > 0)) == indicator
+                    val target = if (decreasing) 0L else 3L
+                    val threshold = if (indicator) {
+                        if (decreasing) 2 else 1
+                    } else {
+                        if (decreasing) 3 else 0
+                    }
+                    val problem = Problem(
+                        1, 1, arrayOf(IntDomain(0, 3).excludeValue(1).excludeValue(2)),
+                        arrayOf<Factor>(
+                            ReifiedLinear(0, intArrayOf(coefficient), intArrayOf(0), op, coefficient * threshold),
+                        ),
+                    )
+                    val assumptions = Assumptions.None.withBool(0, indicator)
+                    val state = LocalSearchState(LocalSearchModel.open(problem), Random(0), assumptions)
+                    state.assignment.setInt(0, 3L - target)
+                    state.assignment.setBool(0, indicator)
+                    state.recompute()
+                    val before = state.cost
+
+                    state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+                    val move = state.moveSink.list.single() as Move.IntSet
+                    val predicted = state.netDelta(move)
+                    state.apply(move)
+
+                    assertEquals(target, move.newValue, "$op $coefficient $indicator")
+                    assertEquals(indicator, state.assignment.boolValue(0))
+                    assertEquals(-before, predicted)
+                    assertEquals(0L, state.cost)
+                    state.recompute()
+                    assertEquals(0L, state.cost)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `reified toggle repairs round holes toward the flipped predicate`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
+            for (coefficient in listOf(-1, 1)) {
+                for (indicator in listOf(false, true)) {
+                    val desiredTruth = !indicator
+                    val decreasing = ((op == LinearOp.LE) == (coefficient > 0)) == desiredTruth
+                    val target = if (decreasing) 3L else 9L
+                    val threshold = if (desiredTruth) {
+                        if (decreasing) 7 else 5
+                    } else {
+                        if (decreasing) 8 else 4
+                    }
+                    val domain = assertNotNull(IntDomain(0, 12).excludeValues(longArrayOf(1, 2, 4, 5, 6, 7, 8, 10, 11)))
+                    val problem = Problem(
+                        1, 1, arrayOf(domain),
+                        arrayOf<Factor>(
+                            ReifiedLinear(0, intArrayOf(coefficient), intArrayOf(0), op, coefficient * threshold),
+                        ),
+                    )
+                    val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+                    state.assignment.setInt(0, if (decreasing) 0L else 12L)
+                    state.assignment.setBool(0, indicator)
+                    state.recompute()
+                    val before = state.cost
+
+                    state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+                    val move = state.moveSink.list.filterIsInstance<Move.Compound>().single()
+                    val coordinate = move.parts.filterIsInstance<Move.IntSet>().single()
+                    val predicted = state.netDelta(move)
+                    state.apply(move)
+
+                    assertEquals(target, coordinate.newValue, "$op $coefficient $indicator")
+                    assertEquals(desiredTruth, state.assignment.boolValue(0))
+                    assertEquals(-before, predicted)
+                    assertEquals(0L, state.cost)
+                    state.recompute()
+                    assertEquals(0L, state.cost)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `reified degree updates and scores agree with recompute across moves`() {
         for (op in LinearOp.entries) {
             val problem = Problem(

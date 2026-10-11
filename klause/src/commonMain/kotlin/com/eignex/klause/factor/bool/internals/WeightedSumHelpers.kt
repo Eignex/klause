@@ -4,8 +4,11 @@ import com.eignex.klause.factor.CoeffLookup
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.ceilingOrNull
+import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationState
@@ -161,6 +164,23 @@ internal fun snapLinearTarget(op: LinearOp, bound: Long, coeff: Long, sumWithout
             else -> null
         }
     }
+}
+
+internal fun snapLinearTarget(
+    op: LinearOp,
+    bound: Long,
+    coeff: Long,
+    sumWithout: Long,
+    wantHolds: Boolean,
+    domain: IntDomain,
+): Long? {
+    val target = snapLinearTarget(op, bound, coeff, sumWithout, wantHolds) ?: return null
+    val roundDown = when (op) {
+        LinearOp.LE -> (coeff > 0L) == wantHolds
+        LinearOp.GE -> (coeff < 0L) == wantHolds
+        LinearOp.EQ, LinearOp.NE -> return domain.clamp(target)
+    }
+    return (if (roundDown) domain.floorOrNull(target) else domain.ceilingOrNull(target)) ?: domain.clamp(target)
 }
 
 internal fun pbDegree(sum: Long, op: PbOp, bound: Long, softCap: Int): Int {
