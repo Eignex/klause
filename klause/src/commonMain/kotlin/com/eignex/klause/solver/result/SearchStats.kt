@@ -60,6 +60,13 @@ data class SearchStats(
     val clausalPrimalProposals: SumResult = ZERO_COUNT,
     /** Clausal primal proposals verified and installed as arm incumbents. */
     val clausalPrimalAccepted: SumResult = ZERO_COUNT,
+    /** Clausal trials rejected by an empty residual clause. */
+    val clausalPrimalRejected: SumResult = ZERO_COUNT,
+    /** Private clausal trials exhausted without a feasible model. */
+    val clausalPrimalInfeasible: SumResult = ZERO_COUNT,
+    /** Private clausal trials stopped incompletely without a feasible model. */
+    val clausalPrimalIncomplete: SumResult = ZERO_COUNT,
+
 ) {
     /** Combine two workers' search stats: counters add, peak depth maxes, depth means weight-combine. */
     fun mergedWith(o: SearchStats): SearchStats = SearchStats(
@@ -86,6 +93,10 @@ data class SearchStats(
         clausalPrimalModels = SumResult(clausalPrimalModels.sum + o.clausalPrimalModels.sum),
         clausalPrimalProposals = SumResult(clausalPrimalProposals.sum + o.clausalPrimalProposals.sum),
         clausalPrimalAccepted = SumResult(clausalPrimalAccepted.sum + o.clausalPrimalAccepted.sum),
+        clausalPrimalRejected = SumResult(clausalPrimalRejected.sum + o.clausalPrimalRejected.sum),
+        clausalPrimalInfeasible = SumResult(clausalPrimalInfeasible.sum + o.clausalPrimalInfeasible.sum),
+        clausalPrimalIncomplete = SumResult(clausalPrimalIncomplete.sum + o.clausalPrimalIncomplete.sum),
+
 
     )
 }
@@ -97,6 +108,10 @@ internal class SearchStatsSink {
     var clausalPrimalModels: Long = 0L
     var clausalPrimalProposals: Long = 0L
     var clausalPrimalAccepted: Long = 0L
+    var clausalPrimalRejected: Long = 0L
+    var clausalPrimalInfeasible: Long = 0L
+    var clausalPrimalIncomplete: Long = 0L
+
 
     var propagationWork: () -> Long = { 0L }
     var rootPropagationWork: () -> Long = { 0L }
@@ -188,6 +203,10 @@ internal class SearchStatsSink {
         clausalPrimalModels = SumResult(clausalPrimalModels.toDouble()),
         clausalPrimalProposals = SumResult(clausalPrimalProposals.toDouble()),
         clausalPrimalAccepted = SumResult(clausalPrimalAccepted.toDouble()),
+        clausalPrimalRejected = SumResult(clausalPrimalRejected.toDouble()),
+        clausalPrimalInfeasible = SumResult(clausalPrimalInfeasible.toDouble()),
+        clausalPrimalIncomplete = SumResult(clausalPrimalIncomplete.toDouble()),
+
 
     )
 }

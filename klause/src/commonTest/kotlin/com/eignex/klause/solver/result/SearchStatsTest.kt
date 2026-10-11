@@ -36,10 +36,16 @@ class SearchStatsTest {
             clausalPrimalModels = 2L
             clausalPrimalProposals = 1L
             clausalPrimalAccepted = 1L
+            clausalPrimalRejected = 1L
+            clausalPrimalInfeasible = 2L
+            clausalPrimalIncomplete = 3L
         }.snapshot()
         val second = SearchStatsSink().apply {
             clausalPrimalStarts = 2L
             clausalPrimalTrials = 4L
+            clausalPrimalRejected = 2L
+            clausalPrimalInfeasible = 3L
+            clausalPrimalIncomplete = 4L
             clausalPrimalModels = 1L
             clausalPrimalProposals = 1L
         }.snapshot()
@@ -47,10 +53,12 @@ class SearchStatsTest {
         val combined = first.mergedWith(second)
 
         assertEquals(
-            listOf(3.0, 7.0, 3.0, 2.0, 1.0),
+            listOf(3.0, 7.0, 3.0, 2.0, 1.0, 3.0, 5.0, 7.0),
             listOf(
                 combined.clausalPrimalStarts.sum, combined.clausalPrimalTrials.sum, combined.clausalPrimalModels.sum,
                 combined.clausalPrimalProposals.sum, combined.clausalPrimalAccepted.sum,
+                combined.clausalPrimalRejected.sum, combined.clausalPrimalInfeasible.sum,
+                combined.clausalPrimalIncomplete.sum,
             ),
         )
     }

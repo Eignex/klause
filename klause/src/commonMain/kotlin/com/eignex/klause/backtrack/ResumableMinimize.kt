@@ -527,6 +527,9 @@ internal class ResumableMinimize(
                     sink.search.clausalPrimalTrials = primal.trials
                     sink.search.clausalPrimalModels = primal.models
                     sink.search.clausalPrimalProposals = primal.proposals
+                    sink.search.clausalPrimalRejected = primal.rejected
+                    sink.search.clausalPrimalInfeasible = primal.infeasible
+                    sink.search.clausalPrimalIncomplete = primal.incomplete
                 }
                 clausePrimalCandidate?.let { sample ->
                     if (pausable && sliceCancelled()) return StepEvent.Paused

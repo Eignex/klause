@@ -56,6 +56,15 @@ internal class MonotoneClausePrimal private constructor(
     var proposals: Long = 0L
         private set
 
+    var rejected: Long = 0L
+        private set
+
+    var infeasible: Long = 0L
+        private set
+
+    var incomplete: Long = 0L
+        private set
+
     val work: Long get() = completedWork + (repair?.work ?: 0L) + literalWork / PROPAGATION_WORK_PER_NODE
     val isDone: Boolean
         get() = closed || (polishing == null && (index == variables.size || phaseToken()))
@@ -125,7 +134,10 @@ internal class MonotoneClausePrimal private constructor(
             val lifted = sample?.let { checkNotNull(reduced).lift(it, solver.problem.numBoolVars) }
             retireRepair()
             reduced = null
-            if (lifted == null) continue
+            if (lifted == null) {
+                if (terminal is MinimizeResult.Infeasible) infeasible++ else incomplete++
+                continue
+            }
             models++
             accepted = completedTrial
             polishing = lifted
@@ -187,7 +199,10 @@ internal class MonotoneClausePrimal private constructor(
                 if (variable in fixed) continue
                 literals.add(Lit.make(mapping[variable], Lit.isPositive(literal)))
             }
-            if (literals.size == 0) return null
+            if (literals.size == 0) {
+                rejected++
+                return null
+            }
             residual.add(Clause(literals.toIntArray()))
         }
         val problem = Problem(

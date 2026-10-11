@@ -316,6 +316,10 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "clausalPrimalModels" to "${stats.search.clausalPrimalModels.sum.toLong()}"
         out += "clausalPrimalProposals" to "${stats.search.clausalPrimalProposals.sum.toLong()}"
         out += "clausalPrimalAccepted" to "${stats.search.clausalPrimalAccepted.sum.toLong()}"
+        out += "clausalPrimalRejected" to "${stats.search.clausalPrimalRejected.sum.toLong()}"
+        out += "clausalPrimalInfeasible" to "${stats.search.clausalPrimalInfeasible.sum.toLong()}"
+        out += "clausalPrimalIncomplete" to "${stats.search.clausalPrimalIncomplete.sum.toLong()}"
+
     }
     return out
 }
