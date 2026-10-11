@@ -44,15 +44,15 @@ class AnytimeCounterTest {
     @Test
     fun `sparse integer values across a wide span have their exact projected mass`() {
         val clamp = 1L shl 62
-        val domain = intDomainFromSurvivors(longArrayOf(-clamp, clamp))
+        val domain = intDomainFromSurvivors(longArrayOf(-clamp, 0L, clamp))
         val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
 
-        for (budget in 1L..3L) {
+        for (budget in 1L..4L) {
             val result = solver.exactCount(ExactCountConfig(maxChecks = budget)).last()
 
             assertEquals(budget - 1L, result.lower, "budget=$budget")
-            assertEquals(2L, result.upper, "budget=$budget")
-            assertEquals(budget == 3L, result.exact, "budget=$budget")
+            assertEquals(3L, result.upper, "budget=$budget")
+            assertEquals(budget == 4L, result.exact, "budget=$budget")
         }
     }
 
@@ -164,7 +164,7 @@ class AnytimeCounterTest {
     fun `integer subtree products beyond Double precision are exact`() {
         val solver = BacktrackSolver(Problem(0, 34, Array(34) { IntDomain(0, 2) }, emptyArray()).bake())
 
-        val result = solver.exactCount(ExactCountConfig(maxChecks = 1L)).last()
+        val result = solver.exactCount(ExactCountConfig(maxChecks = 1L, maxDecisionsPerCheck = 0L)).last()
 
         assertEquals(0L, result.lower)
         assertEquals(16_677_181_699_666_569L, result.upper)
@@ -196,7 +196,9 @@ class AnytimeCounterTest {
         )
         val solver = BacktrackSolver(problem.bake())
 
-        val reports = solver.exactCount(ExactCountConfig(reportEvery = 1L)).toList()
+        val reports = solver.exactCount(
+            ExactCountConfig(maxChecks = 219L, maxDecisionsPerCheck = 128L, reportEvery = 1L),
+        ).toList()
 
         for (report in reports) {
             assertTrue(report.lower <= 2L && report.upper >= 2L, "$report")
