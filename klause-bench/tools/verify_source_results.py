@@ -277,9 +277,13 @@ def mps_objective_matches(objective, variables, values, reported, exact_mode, ex
     return False
 
 
-def source(case, archive):
+def source(case, archive, source_root=None):
     suite, name = case["problem"]["suite"], case["record"]["problem"]
-    if suite in ("mps-core", "smtlib-core"):
+    if source_root is not None:
+        digest = case["record"]["sourceHashes"]["model"]
+        assert re.fullmatch(r"[0-9a-f]{64}", digest), "invalid source hash"
+        data = (source_root / (digest + ".txt")).read_bytes()
+    elif suite in ("mps-core", "smtlib-core"):
         format_name, extension = ("mps", "mps") if suite == "mps-core" else ("smtlib", "smt2")
         path = f"klause-bench/smoke-corpus/{format_name}/{name}.{extension}"
         revision = case["record"]["gitSha"]
@@ -298,7 +302,7 @@ def source(case, archive):
     return data.decode("latin-1")
 
 
-def check(cases):
+def check(cases, source_root=None):
     archive, results, cache, sources = [], [], {}, {}
     for case in cases:
         assert case["status"] == "DONE" and case.get("record"), "incomplete case"
@@ -308,7 +312,7 @@ def check(cases):
             reported_objective = record.get("objective")
         source_key = (case["problem"]["suite"], record["problem"], record["gitSha"], record["sourceHashes"]["model"])
         if source_key not in sources:
-            sources[source_key] = source(case, archive)
+            sources[source_key] = source(case, archive, source_root)
         text = sources[source_key]
         key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(reported_objective),
                record["proven"], record.get("maximize"), record.get("finalWitness"), case["arm"].endswith("-exact"))
@@ -402,6 +406,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Check lab verdicts, models and finite optimum claims against exact source constraints.')
     parser.add_argument('cases', type=pathlib.Path)
     parser.add_argument('--records-root', type=pathlib.Path, help='Directory containing cases/<index>/record.json; use these raw records as authority.')
+    parser.add_argument('--source-root', type=pathlib.Path, help='Original uncompressed sources named <record sourceHashes.model>.txt; otherwise fetch the canonical source.')
     parser.add_argument('--output', type=pathlib.Path)
     args = parser.parse_args()
     opener = gzip.open if args.cases.suffix == '.gz' else lzma.open if args.cases.suffix == '.xz' else open
@@ -412,7 +417,7 @@ if __name__ == '__main__':
             record_path = args.records_root / 'cases' / str(case['index']) / 'record.json'
             case['record'] = json.loads(record_path.read_text())
             assert case['problem']['problem'] == case['record']['problem']
-    result = json.dumps(check(cases), indent=2, sort_keys=True) + '\n'
+    result = json.dumps(check(cases, args.source_root), indent=2, sort_keys=True) + '\n'
     if args.output:
         args.output.write_text(result)
     else:

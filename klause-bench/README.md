@@ -337,7 +337,9 @@ identity and the checked XCSP assignment when accepted, without solving again.
 [verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
 `smtlib-core` and `miplib3` records against original sources using exact arithmetic.
 Vendored inputs are retrieved at the recorded revision; original MIPLIB3 inputs
-are retrieved separately. All source hashes must match.
+are retrieved separately. All source hashes must match. `--source-root` instead
+reads original uncompressed inputs named `<sourceHashes.model>.txt` from a supplied
+directory, allowing the same checks without network retrieval.
 
 ```sh
 python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
@@ -366,6 +368,25 @@ records make no proof claim. Unbounded claims and unsupported constructs decline
 Unsupported MPS sections/bounds, distinct RHS/range/bound vectors and SMT
 function/sort declarations are rejected rather than guessed. The verifier is
 independent of paired timing analysis and Klause's internal certificates.
+
+[verify_boolean_source_results.py](tools/verify_boolean_source_results.py) checks
+`DIMACS`, `WCNF` and linear `OPB` records against original source bytes in that same
+hash-named directory. It accepts complete signed-literal assignments, OPB variable
+names and WCNF bitstrings. Clauses, hard weights, Boolean integrality and integer
+objectives use exact arithmetic. Nonlinear or unsupported syntax is declined.
+
+```sh
+python3 klause-bench/tools/verify_boolean_source_results.py /path/to/cases.json \
+  --source-root /path/to/original-sources --records-root /path/to/raw-job \
+  --output /path/to/boolean-source-checks.json
+```
+
+The checker independently excludes better source objectives or refutes source
+constraints using the pinned Z3 dependency with a ten-second limit. A recognized
+pigeonhole subformula can establish a refutation directly. Timeout leaves proof
+checking unknown; a feasible point receives no optimum credit without that check.
+Errors are recorded per case and make the command exit unsuccessfully. The checker
+supports JSON, gzip and xz inputs and preserves cases with no claimed verdict.
 
 ## Comparing configurations
 
