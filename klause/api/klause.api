@@ -114,6 +114,8 @@ public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klau
 	public synthetic fun withAssumptions (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public fun withCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/backtrack/BacktrackParams;
 	public synthetic fun withCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
+	public fun withLifetimeCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/backtrack/BacktrackParams;
+	public synthetic fun withLifetimeCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
 
 public final class com/eignex/klause/backtrack/BacktrackPresets {
@@ -578,6 +580,7 @@ public final class com/eignex/klause/brute/BruteForceParams : com/eignex/klause/
 	public fun toString ()Ljava/lang/String;
 	public fun withAssumptions (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public fun withCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
+	public fun withLifetimeCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
 
 public final class com/eignex/klause/brute/BruteForceSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/Solver {
@@ -3784,6 +3787,8 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public synthetic fun withAssumptions (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public fun withCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/localsearch/LocalSearchParams;
 	public synthetic fun withCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
+	public fun withLifetimeCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/localsearch/LocalSearchParams;
+	public synthetic fun withLifetimeCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchProblem {
@@ -8850,12 +8855,14 @@ public abstract interface class com/eignex/klause/solver/SolverParams {
 	public fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
 	public fun withAssumptions (Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public fun withCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
+	public fun withLifetimeCancellation (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
 
 public final class com/eignex/klause/solver/SolverParams$DefaultImpls {
 	public static fun getAssumptions (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/propagation/Assumptions;
 	public static fun withAssumptions (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/propagation/Assumptions;)Lcom/eignex/klause/solver/SolverParams;
 	public static fun withCancellation (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
+	public static fun withLifetimeCancellation (Lcom/eignex/klause/solver/SolverParams;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
 
 public class com/eignex/klause/solver/StatelessSession : com/eignex/klause/solver/Session {

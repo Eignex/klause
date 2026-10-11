@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.propagation.PropagationPreparation
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.objective.LinearObjective
@@ -53,7 +54,7 @@ internal class PreparingMinimize(
     ): MinimizeResult? {
         search?.let { if (it.isDone) return it.runSlice(global, sliceMillis, sliceNodes, onIncumbent) }
         check(!closed) { "search is closed" }
-        globalToken = params.cancellation or global
+        globalToken = params.cancellation.lifetimeCancellation() or global
         search?.let { return it.runSlice(global, sliceMillis, sliceNodes, onIncumbent) }
         if (!budget.begin(sliceMillis, sliceNodes)) return null
         val before = work
@@ -66,7 +67,7 @@ internal class PreparingMinimize(
                     budget.noteOverspend()
                     val preparedWork = work
                     val prepared = ResumableMinimize(
-                        solver, objective, params.copy(cancellation = propagationToken),
+                        solver, objective, params.withCancellation(propagationToken),
                         preparedSession = session, preparationBudget = budget, sink = sink,
                     )
                     search = prepared

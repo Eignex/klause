@@ -17,13 +17,14 @@ clock and whole-solve deadline still apply. The legacy nonpositive
 `klause.presolve.budget.ms` disables the derived preparation work cap and its clock;
 an explicit work setting can still supply an exhausted or finite work allowance.
 
-Built-in `withCancellation` adapters add a token to the existing parameter lifetime
-scope. Retained handles compose that lifetime token with each invocation's token and
-slice deadline, keeping the earliest deadline. A previous slice deadline does not
-become the next slice's lifetime token. Portfolio handle construction uses the
-whole-run token; construction and individual factor calls remain atomic with respect
-to slice scheduling. ALNS bootstrap handles use the ALNS lifetime token, while their
-shortened bootstrap clocks belong to individual invocations.
+Built-in `withCancellation` adapters replace the invocation token while retaining any
+separately bound lifetime scope. `withLifetimeCancellation` composes a persistent token
+that bounds construction and every later invocation or retained slice. Ordinary
+parameter cancellation bounds handle construction only; each slice supplies its own
+invocation token. These scopes keep their earliest deadline without retaining an old
+slice deadline. Portfolio construction and the first search segment share the offered
+segment deadline. ALNS bootstrap construction uses its shortened phase token; later
+bootstrap slices retain the containing lifetime scope and rearm their invocation clock.
 
 ## Units and boundaries
 

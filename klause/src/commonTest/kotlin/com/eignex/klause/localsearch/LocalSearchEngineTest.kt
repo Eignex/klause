@@ -832,9 +832,9 @@ class LocalSearchEngineTest {
         val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
         var cancelled = false
         val params = LocalSearchParams(
-            randomSeed = 3L, cancellation = Cancellation { cancelled },
+            randomSeed = 3L,
             initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
-        )
+        ).withLifetimeCancellation(Cancellation { cancelled })
 
         search.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { handle ->
             val counted = assertIs<InstructionSlicedSearch>(handle)

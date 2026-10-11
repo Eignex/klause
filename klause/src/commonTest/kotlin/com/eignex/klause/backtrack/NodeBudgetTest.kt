@@ -224,4 +224,24 @@ class NodeBudgetTest {
         assertEquals(0.0, result.stats.search.nodes.sum)
     }
 
+    @Test
+    fun `a cancelled worker leaves its quota unused by another worker`() {
+        val budget = NodeBudget(6L)
+        val scenario = PortfolioScenario(
+            cores = 2, arms = 2, kind = Kind.CSP, engine = EngineMix.BACKTRACK, nodeBudget = budget,
+            btPool = listOf({ BacktrackRecipe("bounded") { _, _ -> params(budget) } }),
+        )
+        val workers = PortfolioBuilder.build(php(5, 4).bake(), scenario)
+
+        val result = try {
+            assertIs<SolveResult.Unknown>(workers[0].solve(Cancellation { true }))
+            workers[1].solve(Cancellation.Never)
+        } finally {
+            workers.forEach { it.close() }
+        }
+
+        assertEquals(3.0, result.stats.search.nodes.sum)
+        assertEquals(3L, budget.spent)
+    }
+
 }

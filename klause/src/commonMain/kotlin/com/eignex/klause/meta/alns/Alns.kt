@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.PooledIncumbents
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
@@ -480,9 +481,9 @@ internal class Alns(
             check(!closed) { "the ALNS handle is closed" }
             require(sliceInstructions >= 0L) { "slice instructions must be non-negative" }
             val token = if (sliceMillis == Long.MAX_VALUE) {
-                params.cancellation or global
+                params.cancellation.lifetimeCancellation() or global
             } else {
-                params.cancellation or global or Cancellation.after(sliceMillis.milliseconds)
+                params.cancellation.lifetimeCancellation() or global or Cancellation.after(sliceMillis.milliseconds)
             }
             if (sliceInstructions == 0L || token()) return null
             // Finite LNS segments are charged their offered scheduling allowance, independently of inner work.
@@ -534,14 +535,10 @@ internal class Alns(
                 try {
                     val engine = checkNotNull(backtrack)
                     val bp = (backtrackParams ?: BacktrackParams()).withAssumptions(params.assumptions)
-                        .copy(maxDecisions = BOOTSTRAP_DECISIONS, cancellation = cpToken)
+                        .copy(maxDecisions = BOOTSTRAP_DECISIONS).withCancellation(cpToken)
                     if (!cpAttempted) {
                         cpAttempted = true
-                        cpBootstrap = (engine as? ResumableOptimizer<BacktrackParams>)?.resumable(
-                            objective,
-                            bp.copy(cancellation = params.cancellation or
-                                (backtrackParams?.cancellation ?: Cancellation.Never)),
-                        )
+                        cpBootstrap = (engine as? ResumableOptimizer<BacktrackParams>)?.resumable(objective, bp)
                     }
                     val handle = cpBootstrap
                     val result = if (handle != null) {
@@ -562,11 +559,11 @@ internal class Alns(
             val lsToken = token or Cancellation { neighborhood != null }
             val started = TimeSource.Monotonic.markNow()
             try {
-                val lp = params.copy(cancellation = lsToken)
+                val lp = params.withCancellation(lsToken)
                 if (!lsAttempted) {
                     lsAttempted = true
-                    lsBootstrap = session?.resumable(objective, params)
-                        ?: (inner as? ResumableOptimizer<LocalSearchParams>)?.resumable(objective, params)
+                    lsBootstrap = session?.resumable(objective, lp)
+                        ?: (inner as? ResumableOptimizer<LocalSearchParams>)?.resumable(objective, lp)
                 }
                 val handle = lsBootstrap
                 val result = when (handle) {

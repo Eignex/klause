@@ -96,7 +96,7 @@ class BacktrackSolver internal constructor(
     /** Open an explicit-state, pausable branch-and-bound over [objective]. See [ResumableSearch].
      *  The handle reuses this solver's search primitives; [params] should carry the
      *  [BacktrackParams.objectiveBoundSupplier] for external bound sharing (its [BacktrackParams.cancellation]
-     *  remains the handle lifetime scope). */
+     *  bounds construction, while a separately bound lifetime token persists). */
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
         if ((params.nativeSat ?: true) && problem.isClausal()) {
             ResumableMinimize(this, objective, params)

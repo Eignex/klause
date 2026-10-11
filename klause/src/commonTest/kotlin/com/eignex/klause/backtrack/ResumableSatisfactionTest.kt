@@ -111,7 +111,7 @@ class ResumableSatisfactionTest {
     fun `a resumed handle retains its opening cancellation scope`() {
         var cancelled = false
         val search = BacktrackSolver(pigeonhole(6, 5).bake()).resumableSolve(
-            BacktrackParams(cancellation = Cancellation { cancelled }),
+            BacktrackParams().withLifetimeCancellation(Cancellation { cancelled }),
         )
         assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
         cancelled = true

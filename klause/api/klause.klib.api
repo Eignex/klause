@@ -1304,6 +1304,7 @@ abstract interface com.eignex.klause.solver/SolverParams { // com.eignex.klause.
 
     open fun withAssumptions(com.eignex.klause.propagation/Assumptions): com.eignex.klause.solver/SolverParams // com.eignex.klause.solver/SolverParams.withAssumptions|withAssumptions(com.eignex.klause.propagation.Assumptions){}[0]
     open fun withCancellation(com.eignex.klause.util/Cancellation): com.eignex.klause.solver/SolverParams // com.eignex.klause.solver/SolverParams.withCancellation|withCancellation(com.eignex.klause.util.Cancellation){}[0]
+    open fun withLifetimeCancellation(com.eignex.klause.util/Cancellation): com.eignex.klause.solver/SolverParams // com.eignex.klause.solver/SolverParams.withLifetimeCancellation|withLifetimeCancellation(com.eignex.klause.util.Cancellation){}[0]
 }
 
 abstract interface com.eignex.klause.theory/TheoryContext { // com.eignex.klause.theory/TheoryContext|null[0]
@@ -3753,6 +3754,7 @@ final class com.eignex.klause.backtrack/BacktrackParams : com.eignex.klause.solv
     final fun toString(): kotlin/String // com.eignex.klause.backtrack/BacktrackParams.toString|toString(){}[0]
     final fun withAssumptions(com.eignex.klause.propagation/Assumptions): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.backtrack/BacktrackParams.withAssumptions|withAssumptions(com.eignex.klause.propagation.Assumptions){}[0]
     final fun withCancellation(com.eignex.klause.util/Cancellation): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.backtrack/BacktrackParams.withCancellation|withCancellation(com.eignex.klause.util.Cancellation){}[0]
+    final fun withLifetimeCancellation(com.eignex.klause.util/Cancellation): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.backtrack/BacktrackParams.withLifetimeCancellation|withLifetimeCancellation(com.eignex.klause.util.Cancellation){}[0]
 }
 
 final class com.eignex.klause.backtrack/BacktrackRecipe { // com.eignex.klause.backtrack/BacktrackRecipe|null[0]
@@ -6827,6 +6829,7 @@ final class com.eignex.klause.localsearch/LocalSearchParams : com.eignex.klause.
     final fun toString(): kotlin/String // com.eignex.klause.localsearch/LocalSearchParams.toString|toString(){}[0]
     final fun withAssumptions(com.eignex.klause.propagation/Assumptions): com.eignex.klause.localsearch/LocalSearchParams // com.eignex.klause.localsearch/LocalSearchParams.withAssumptions|withAssumptions(com.eignex.klause.propagation.Assumptions){}[0]
     final fun withCancellation(com.eignex.klause.util/Cancellation): com.eignex.klause.localsearch/LocalSearchParams // com.eignex.klause.localsearch/LocalSearchParams.withCancellation|withCancellation(com.eignex.klause.util.Cancellation){}[0]
+    final fun withLifetimeCancellation(com.eignex.klause.util/Cancellation): com.eignex.klause.localsearch/LocalSearchParams // com.eignex.klause.localsearch/LocalSearchParams.withLifetimeCancellation|withLifetimeCancellation(com.eignex.klause.util.Cancellation){}[0]
 }
 
 final class com.eignex.klause.localsearch/LocalSearchProblem { // com.eignex.klause.localsearch/LocalSearchProblem|null[0]

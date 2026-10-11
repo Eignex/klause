@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
@@ -19,8 +20,8 @@ import com.eignex.klause.util.cancelledWhen
  */
 @Suppress("TooGenericExceptionCaught") // ownership boundaries preserve arbitrary primary and cleanup failures
 internal class ResumableSatisfaction(private val solver: BacktrackSolver, params0: BacktrackParams) : ResumableSolve {
-    private val lifetimeToken = params0.cancellation
-    private var globalToken: Cancellation = lifetimeToken
+    private val lifetimeToken = params0.cancellation.lifetimeCancellation()
+    private var globalToken: Cancellation = params0.cancellation
     private val sink = SolveStatsSink(backend = "backtrack").also { it.start() }
 
     // Its LP reading waits for the traversal below; nothing arms the slice before the first [runSlice].
