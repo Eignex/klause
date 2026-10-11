@@ -120,7 +120,6 @@ class PlannedSearchTest {
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(1, 1, 0), null, openUpper),
             factors = arrayOf(
                 AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 Linear(intArrayOf(1, 2), intArrayOf(0, 2), LinearOp.EQ, 1),
             ),
         )
@@ -129,9 +128,9 @@ class PlannedSearchTest {
 
         assertEquals(FactorOwner.CP, plan.factorOwner(0))
         assertEquals(FactorOwner.THEORY, plan.factorOwner(1))
-        assertEquals(FactorOwner.THEORY, plan.factorOwner(2))
 
         assertIs<ComponentResult.Consistent>(planned.session.initialize())
+        planned.session.push(SearchDecision.IntEqual(0, 0))
 
         assertIs<SearchResult.Exhausted>(planned.session.solve(0))
     }
