@@ -322,7 +322,14 @@ def exact_mode(case):
     return "--exact" in arguments
 
 
-def check(cases, source_root=None):
+def require_verdict(solver, expected, problem, purpose):
+    actual = solver.check()
+    if actual != expected:
+        reason = f'; reason: {solver.reason_unknown()}' if actual == z3.unknown else ''
+        raise AssertionError(f'{problem}: {purpose} expected {expected}, got {actual}{reason}')
+
+
+def check(cases, source_root=None, progress=None):
     archive, results, cache, sources = [], [], {}, {}
     for case in cases:
         assert case["status"] == "DONE" and case.get("record"), "incomplete case"
@@ -340,6 +347,8 @@ def check(cases, source_root=None):
                record.get("finalWitness"), exact)
         if key in cache:
             results.append({"index": case["index"], "check": cache[key]})
+            if progress is not None:
+                progress(results[-1])
             continue
         result = {"sourceHashVerified": True, "reportedFeasible": record["feasible"],
                   "reportedProven": record["proven"], "witness": "absent"}
@@ -367,23 +376,24 @@ def check(cases, source_root=None):
             solver.add(*constraints)
             if record["feasible"] is False:
                 assert record["proven"]
-                assert solver.check() == z3.unsat, record["problem"]
+                require_verdict(solver, z3.unsat, record["problem"], 'source infeasibility')
                 result["verdictCheck"] = "source unsat"
             else:
-                assert solver.check() == z3.sat, record["problem"]
-                result["verdictCheck"] = "source sat"
                 witness = record.get("finalWitness")
                 if witness is not None and is_smt:
                     solver.push()
                     solver.add(*smt_pins(witness, variables))
-                    assert solver.check() == z3.sat, record["problem"]
+                    require_verdict(solver, z3.sat, record["problem"], 'complete source witness feasibility')
                     if reported_objective is not None:
                         assert objective is not None
                         value = rational(reported_objective)
                         solver.add(objective != (-value if maximize else value))
-                        assert solver.check() == z3.unsat, "model objective differs from reported objective"
+                        require_verdict(solver, z3.unsat, record["problem"], 'model objective differs from reported objective')
                     solver.pop()
                     result["witness"] = "exact source feasible"
+                else:
+                    require_verdict(solver, z3.sat, record["problem"], 'source feasibility')
+                result["verdictCheck"] = "source sat"
                 if witness is not None and not is_smt:
                     values = mps_values(witness, variables)
                     exact_feasible = all(z3.is_true(mps_point(row, variables, values)) for row in constraints)
@@ -408,15 +418,17 @@ def check(cases, source_root=None):
                         value = -value
                     solver.push()
                     solver.add(objective == value)
-                    assert solver.check() == z3.sat, record["problem"]
+                    require_verdict(solver, z3.sat, record["problem"], 'claimed source objective feasibility')
                     solver.pop()
                     solver.push()
                     solver.add(objective < value)
-                    assert solver.check() == z3.unsat, record["problem"]
+                    require_verdict(solver, z3.unsat, record["problem"], 'strictly better source objective exclusion')
                     solver.pop()
                     result["optimalityCheck"] = "strictly better source objective unsat"
         cache[key] = result
         results.append({"index": case["index"], "check": result})
+        if progress is not None:
+            progress(results[-1])
     return results
 
 
@@ -430,6 +442,7 @@ if __name__ == '__main__':
     parser.add_argument('--records-root', type=pathlib.Path, help='Directory containing cases/<index>/record.json; use these raw records as authority.')
     parser.add_argument('--source-root', type=pathlib.Path, help='Original uncompressed sources named <record sourceHashes.model>.txt; required for SMT corpus suites, otherwise fetch the canonical core or MIPLIB source.')
     parser.add_argument('--output', type=pathlib.Path)
+    parser.add_argument('--progress', type=pathlib.Path, help='Flush completed per-record checks as JSON lines, preserving the checked prefix if a later record fails.')
     args = parser.parse_args()
     opener = gzip.open if args.cases.suffix == '.gz' else lzma.open if args.cases.suffix == '.xz' else open
     with opener(args.cases, 'rt') as stream:
@@ -439,7 +452,15 @@ if __name__ == '__main__':
             record_path = args.records_root / 'cases' / str(case['index']) / 'record.json'
             case['record'] = json.loads(record_path.read_text())
             assert case['problem']['problem'] == case['record']['problem']
-    result = json.dumps(check(cases, args.source_root), indent=2, sort_keys=True) + '\n'
+    if args.progress:
+        with args.progress.open('w') as stream:
+            def progress(entry):
+                stream.write(json.dumps(entry, sort_keys=True) + '\n')
+                stream.flush()
+            checks = check(cases, args.source_root, progress)
+    else:
+        checks = check(cases, args.source_root)
+    result = json.dumps(checks, indent=2, sort_keys=True) + '\n'
     if args.output:
         args.output.write_text(result)
     else:
