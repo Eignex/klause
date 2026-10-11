@@ -261,8 +261,16 @@ including repeated variables, and retain the minimum saturated comparison shortf
 Violated comparison clauses offer admissible literal bounds in addition to neighboring
 values. Inequalities round toward the satisfying side of domain holes; unreachable
 equalities are declined. Targets use coordinated channeling and inverse repairs, with
-pinned and implicitly owned source coordinates protected before synthesis. Candidate
-`deltaIf*` methods return the exact degree change. Ordinary `apply*` methods update
+pinned and implicitly owned source coordinates protected before synthesis.
+
+When zero satisfies a violated literal on a maintained conditional product, the clause
+can add at most two coordinated product repairs through binary equality channels and
+admissible source choices. Ordinary bounds and neighbor candidates remain available.
+Output and input domains, pins, ownership and definitions continue to filter these
+repairs; all affected constraints contribute to compound grading. False equality choices
+can sample the RNG, and existing Element-preserving variants share their collection allowance.
+
+Candidate `deltaIf*` methods return the exact degree change. Ordinary `apply*` methods update
 payloads after the assignment changes; their return values are implementation-specific
 and callers must read the post-move degree for scoring. Reified linear invariants offer
 an internal fused payload-update and exact-degree path. Other invariants update payloads

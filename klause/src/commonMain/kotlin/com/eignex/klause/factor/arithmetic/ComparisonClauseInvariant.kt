@@ -5,9 +5,11 @@ import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.ir.floorOrNull
+import com.eignex.klause.localsearch.ConditionalProductRepair
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.util.IntHashSet
 
 /**
  * Local-search invariant for [ComparisonClause]: violated iff no literal holds under the current
@@ -54,6 +56,17 @@ internal class ComparisonClauseInvariant(
             if (current < domain.max) sink.addChannelingIntSet(state, variable, domain.higher(current))
             if (current > domain.min) sink.addChannelingIntSet(state, variable, domain.lower(current))
         }
+        proposeConditionalProductRepairs(state, sink)
+    }
+
+    private fun proposeConditionalProductRepairs(state: LocalSearchState, sink: MoveSink) {
+        val considered = IntHashSet()
+        var added = 0
+        for (i in vars.indices) {
+            if (added >= MAX_CONDITIONAL_PRODUCT_REPAIRS) break
+            if (literalShortfall(i, 0L) != 0L || !considered.add(vars[i])) continue
+            added += ConditionalProductRepair(state, sink, vars[i], MAX_CONDITIONAL_PRODUCT_REPAIRS - added).propose()
+        }
     }
 
     private fun degreeAt(state: LocalSearchState, intVar: Int, newValue: Long): Int {
@@ -76,5 +89,9 @@ internal class ComparisonClauseInvariant(
             LinearOp.EQ -> distance(x, c)
             LinearOp.NE -> if (x != c) 0L else 1L
         }
+    }
+
+    private companion object {
+        const val MAX_CONDITIONAL_PRODUCT_REPAIRS = 2
     }
 }
