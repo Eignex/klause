@@ -1,7 +1,10 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
+import com.eignex.klause.solver.result.LocalSearchResidual
+import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpBasisVerificationStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
@@ -27,6 +30,48 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CliStatsTest {
+
+    @Test
+    fun `ALNS inner work is printed separately from its outer allowance`() {
+        val stats = SolveStats(alns = AlnsStats(
+            bootstrapCpNodes = 13, bootstrapLsMoves = 7, repairCpNodes = 17, repairLsMoves = 5,
+            outerAllowance = 120, bootstrapCpMillis = 9, bootstrapLsMillis = 8, repairMillis = 3,
+        ))
+
+        val pairs = portfolioStatPairs(stats).toMap()
+
+        assertEquals("13", pairs["alnsBootstrapCpNodes"])
+        assertEquals("7", pairs["alnsBootstrapLsMoves"])
+        assertEquals("17", pairs["alnsRepairCpNodes"])
+        assertEquals("5", pairs["alnsRepairLsMoves"])
+        assertEquals("120", pairs["alnsOuterAllowance"])
+        assertEquals("9", pairs["alnsBootstrapCpMillis"])
+        assertEquals("8", pairs["alnsBootstrapLsMillis"])
+        assertEquals("3", pairs["alnsRepairMillis"])
+        assertTrue(portfolioStatPairs(SolveStats.EMPTY).isEmpty())
+    }
+
+    @Test
+    fun `a residual observation prints its cost and kind totals before any move`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "mixed"),
+            ls = LocalSearchStats(bestResidual = LocalSearchResidual(
+                9, mapOf("Linear" to 7L, "Clause" to 2L),
+                listOf(LocalSearchResidualFactor(3, "Linear", 7, mapOf(2 to false), mapOf(4 to 3L), 1, 5)),
+            )),
+        )
+
+        val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
+
+        assertEquals("9", pairs["lsBestResidualViolation"])
+        assertEquals("7", pairs["lsBestResidual.Linear"])
+        assertEquals("2", pairs["lsBestResidual.Clause"])
+        assertEquals(
+            "kind=Linear degree=7 bools=b2:false ints=i4:3 omittedBools=1 omittedInts=5",
+            pairs["lsBestResidualFactor.3"],
+        )
+        assertTrue("lsIncumbentObjective" !in pairs)
+    }
     @Test
     fun `refused float phase costs are emitted without a node solve`() {
         val stats = SolveStats(lp = LpStats(phases = mapOf("CLEANUP_STANDALONE" to

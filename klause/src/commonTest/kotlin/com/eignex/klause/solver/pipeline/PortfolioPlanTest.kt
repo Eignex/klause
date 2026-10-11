@@ -22,6 +22,16 @@ import kotlin.test.assertTrue
 class PortfolioPlanTest {
 
     @Test
+    fun `portfolio residual reporting accepts an explicit opt in`() {
+        val scenario = buildPortfolioScenario(
+            EngineParams(listOf("ls-residuals=true")), 1L, 1, Kind.COP, EngineMix.MIXED, 6,
+        )
+
+        assertTrue(scenario.reportLsResiduals)
+        assertTrue(scenario.copy(phaseRetention = 0.5).reportLsResiduals)
+    }
+
+    @Test
     fun `curated sequential continuous optimization reserves LP descent time`() {
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile(ProblemClass.MixedInteger, optimizing = true, wide = false, scheduling = false)

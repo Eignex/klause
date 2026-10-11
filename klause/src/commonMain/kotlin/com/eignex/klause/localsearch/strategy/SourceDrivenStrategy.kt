@@ -131,10 +131,15 @@ class SourceDrivenStrategy(
 
     /** Pick the next move to apply, or `null` when no candidate is available (the engine restarts). */
     fun pickMove(state: LocalSearchState): Move? {
+        val stall = schedule.noise as? StallSchedule
+        val fraction = if ((schedule.weights != null || stall != null) && scoring != MoveScoring.Break) {
+            state.cumulativeRepairFraction()
+        } else {
+            0.0
+        }
         // Weight maintenance first, so the bumped gradient scores this pick's candidates.
-        schedule.weights?.maintain(
-            state.step,
-            state.cost,
+        schedule.weights?.observeStep(state.step, state.cost, fraction)
+        schedule.weights?.applyTo(
             state.weights.factorWeights,
             state.weights.baseFactorWeights,
             state.violated.toIntArray(),
@@ -142,8 +147,7 @@ class SourceDrivenStrategy(
         )
         // The stall signal: advance the no-progress window, then gate the plateau-escape sources and
         // the effective noise on it. A StallSchedule is the noise member and the gate at once.
-        val stall = schedule.noise as? StallSchedule
-        stall?.update(state.step, state.cost)
+        stall?.update(state.step, state.cost, fraction)
         val stalled = stall?.stalled ?: false
         // A triggered kick pre-empts the normal pick.
         perturbation?.invoke(state)?.let { return it }
@@ -228,8 +232,8 @@ class SourceDrivenStrategy(
         }
         return when (scoring) {
             MoveScoring.Break -> state.shapedBreakScore(move)
-            MoveScoring.Weighted -> state.weightedNetDelta(move) + feasibleObjectiveDelta(state, move)
-            MoveScoring.Raw -> state.netDelta(move).toDouble() + feasibleObjectiveDelta(state, move)
+            MoveScoring.Weighted -> state.repairNetDelta(move, weighted = true) + feasibleObjectiveDelta(state, move)
+            MoveScoring.Raw -> state.repairNetDelta(move, weighted = false) + feasibleObjectiveDelta(state, move)
         }
     }
 

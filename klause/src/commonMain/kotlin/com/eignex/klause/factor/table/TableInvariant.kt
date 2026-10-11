@@ -4,6 +4,7 @@ import com.eignex.klause.factor.table.internals.TableLsState
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.ir.randomValue
+import com.eignex.klause.localsearch.ChannelingSink
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -68,6 +69,8 @@ internal class TableInvariant(
                     sink.addChannelingIntSet(state, xs[col], target)
                 }
             }
+            val parts = tableBuildTupleMove(state, xs, tuples, arity, hi, row) ?: continue
+            if (parts.size > 1) queueTupleMove(state, parts, sink)
         }
     }
 
@@ -84,9 +87,29 @@ internal class TableInvariant(
             val row = state.rng.nextInt(numTuples)
             val parts = tableBuildTupleMove(state, xs, tuples, arity, hi, row, randomize = true) ?: continue
             if (parts.isEmpty()) continue
-            sink.addCompound(parts)
-            emitted++
+            if (queueTupleMove(state, parts, sink)) emitted++
         }
+    }
+
+    private fun queueTupleMove(state: LocalSearchState, parts: List<Move.IntSet>, sink: MoveSink): Boolean {
+        if (parts.isEmpty() || parts.any { !sink.allowsInt(it.varId) }) return false
+        val first = parts[0]
+        val coordinated = ChannelingSink(first.varId, first.newValue)
+        for (variable in xs) coordinated.pin(variable)
+        for (i in 1 until parts.size) coordinated.add(parts[i])
+        for (coordinate in parts) {
+            val channeling = state.synthesizeChannelingMove(coordinate.varId, coordinate.newValue)
+            if (channeling is Move.Compound) {
+                for (part in channeling.parts) {
+                    if (part is Move.BoolFlip) coordinated.addIndicatorFlip(part.varId)
+                }
+            }
+        }
+        coordinated.carryBinaryChannels(state, sink)
+        val move = coordinated.toMove()
+        val before = sink.size
+        sink.addCompound(if (move is Move.Compound) move.parts else listOf(move))
+        return sink.size > before
     }
 
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {

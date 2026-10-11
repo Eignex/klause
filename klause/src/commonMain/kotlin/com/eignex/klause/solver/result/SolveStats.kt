@@ -78,6 +78,8 @@ data class SolveStats(
     val presolve: PresolveStats? = null,
     /** What a sequential portfolio scheduled, arm by arm; empty for any other solve. */
     val portfolio: PortfolioStats = PortfolioStats(),
+    /** Measured ALNS bootstrap and repair work, separate from its outer allowance. */
+    val alns: AlnsStats = AlnsStats(),
 ) {
     /**
      * Combine two run snapshots by delegating to each record's own merge — counters add, maxes max,
@@ -107,6 +109,7 @@ data class SolveStats(
             openHints = openHints.mergedWith(other.openHints),
             presolve = presolve ?: other.presolve,
             portfolio = portfolio.mergedWith(other.portfolio),
+            alns = alns.mergedWith(other.alns),
         )
     }
 

@@ -1,10 +1,13 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
@@ -18,6 +21,88 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TableInvariantTest {
+
+    @Test
+    fun `tuple moves coordinate indicators and their channel product outputs`() {
+        for (structured in listOf(false, true)) {
+            for (bound in listOf(0, 1)) {
+                val problem = Problem(
+                    1, 6,
+                    arrayOf(
+                        IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1),
+                        IntDomain(3, 3), IntDomain(0, 3),
+                    ),
+                    arrayOf<Factor>(
+                        Table(intArrayOf(0, 1, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
+                        ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                        ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, bound),
+                        Product(3, 4, 5),
+                    ),
+                )
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+                state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, 6)).network(6, 1)
+                state.assignment.setInt(0, 0)
+                state.assignment.setInt(1, 0)
+                state.assignment.setInt(2, if (structured) 0L else 1L)
+                state.assignment.setInt(3, 1L - bound)
+                state.assignment.setInt(4, 3)
+                state.assignment.setInt(5, 3L * (1L - bound))
+                state.assignment.setBool(0, false)
+                state.recompute()
+                state.weights.factorWeights[0] = 3.0
+                val before = state.assignment.snapshot()
+                val cost = state.cost
+                state.moveSink.proposer = 0
+
+                if (structured) {
+                    state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+                } else {
+                    state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+                }
+                val move = state.moveSink.list.filterIsInstance<Move.Compound>().first {
+                    Move.IntSet(0, 1) in it.parts && Move.IntSet(1, 1) in it.parts
+                }
+                val predicted = state.netDelta(move)
+                val weighted = state.weightedNetDelta(move)
+                assertEquals(before, state.assignment.snapshot())
+                state.apply(move)
+
+                assertEquals(listOf(1L, 1L, 1L), (0..2).map(state.assignment::intValue))
+                assertTrue(state.assignment.boolValue(0))
+                assertEquals(bound.toLong(), state.assignment.intValue(3))
+                assertEquals(3L * bound, state.assignment.intValue(5))
+                assertEquals(state.cost - cost, predicted)
+                assertEquals(3.0 * (state.cost - cost), weighted)
+                assertEquals(0L, state.cost)
+                state.recompute()
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
+    fun `structured tuple moves preserve protected coordinates atomically`() {
+        for (protection in listOf("pin", "owner")) {
+            val problem = Problem(
+                0, 2, Array(2) { IntDomain(0, 1) },
+                arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))),
+            )
+            val assumptions = if (protection == "pin") Assumptions.None.withInt(0, 0) else Assumptions.None
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0), assumptions)
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(1, 0)
+            state.recompute()
+            if (protection == "owner") state.moveSink.setOwners(intArrayOf(7, -1))
+            state.moveSink.proposer = 0
+            val before = state.assignment.snapshot()
+
+            state.factors[0].proposeStructuredMoves(state, 0, state.moveSink)
+
+            assertTrue(state.moveSink.list.isEmpty())
+            assertEquals(before, state.assignment.snapshot())
+            assertFalse(state.factors[0].isViolated(state, 0))
+        }
+    }
 
     @Test
     fun `an implicitly owned table can enter an interval support`() {

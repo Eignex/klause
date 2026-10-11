@@ -159,7 +159,7 @@ internal class ClauseInvariant private constructor(private val clause: Clause? =
         val clause = clause(state, factorId)
         if (clause.tautological) return
         if (!isViolated(state, factorId)) return
-        for (v in clause.boolVars) sink.addBoolFlip(v)
+        for (v in clause.boolVars) sink.addChannelingBoolFlip(state, v)
     }
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true

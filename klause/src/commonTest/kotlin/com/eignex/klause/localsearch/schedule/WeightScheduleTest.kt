@@ -62,6 +62,35 @@ class WeightScheduleTest {
     }
 
     @Test
+    fun `integer cost drops take precedence over fractional increases`() {
+        val ws = WeightSchedule(bumpAfter = 1)
+        val w = doubleArrayOf(1.0)
+        val cost = 9007199254740993L
+        ws.observeStep(0L, cost, 0.0)
+
+        ws.observeStep(1L, cost - 1, 0.9)
+        ws.applyTo(w, doubleArrayOf(1.0), intArrayOf(0), Random(0))
+
+        assertEquals(1.0, w[0])
+    }
+
+    @Test
+    fun `fractional feedback re-anchors on restart and reset`() {
+        for (reset in listOf(false, true)) {
+            val ws = WeightSchedule(bumpAfter = 1)
+            val w = doubleArrayOf(1.0)
+            ws.observeStep(4L, 23L, 0.1)
+            if (reset) ws.reset()
+            ws.observeStep(0L, 23L, 0.9)
+
+            ws.observeStep(1L, 23L, 0.8)
+            ws.applyTo(w, doubleArrayOf(1.0), intArrayOf(0), Random(0))
+
+            assertEquals(1.0, w[0], "reset=$reset")
+        }
+    }
+
+    @Test
     fun `a rewound step re-anchors the trackers without bumping`() {
         val ws = WeightSchedule(bumpAfter = 1, increment = 1.0)
         val w = doubleArrayOf(0.0)

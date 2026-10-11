@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
@@ -49,8 +50,27 @@ class DefinitionalSweep internal constructor(
     /** Defining nodes in topological order — every node's inputs are free vars or earlier nodes. */
     private val nodes: List<SweepNode>,
 ) {
+    private val maintainedBools = IntHashSet().also { defined ->
+        for (node in nodes) if (node.outIsBool) defined.add(node.out)
+    }
+
     /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
     companion object {
+        /** Infer definitions using the source domains to recognize hinted binary literal channels.
+         * Unique unary equality predicates used only by those channels are maintained with them.
+         * Hinted native [com.eignex.klause.factor.table.Element] results follow their indexes and selected cells.
+         * Competing definitions and cyclic cones remain searched. */
+        fun infer(
+            problem: Problem,
+            definedHints: IntArray = IntArray(0),
+            boolFolds: List<BoolFoldDefinition> = emptyList(),
+        ): DefinitionalSweep? {
+            val base = infer(problem.factors, problem.numIntVars, definedHints, boolFolds)
+            val nodes = base?.nodes.orEmpty() + elementResultDefinitions(problem, definedHints)
+            val ordered = literalDefinitions(problem, definedHints, nodes)
+            return if (ordered.isEmpty()) null else DefinitionalSweep(ordered)
+        }
+
         /** Infer a sweep from the factor IR, so local search derives functionally-defined vars from the
          *  decision vars instead of searching them. Supported sources:
          *  - every `Product(a, b, out)` defines `out = a·b` (a product always determines its output);
@@ -59,6 +79,7 @@ class DefinitionalSweep internal constructor(
          *    hint could pick a decision var as the output and derive it to an infeasible value, so it is
          *    never done unhinted.
          *  - hinted min/max expression cones and their affine operands and aliases.
+         *  - hinted affine indexes read by Elements or unit unary equality predicates.
          *  A var claimed by more than one definition, or transitively by itself, is left searched. Nodes
          *  come out in topological order; returns null when nothing is definable. */
         fun infer(
@@ -99,9 +120,9 @@ class DefinitionalSweep internal constructor(
                 //    feasibility-critical decision variables whose exclusion from search stalls repair).
                 val nonProductOcc = IntArray(numIntVars)
                 for (f in factors) {
-                    if (f !is Product) {
-                        for (v in f.intVars) {
-                            if (v in 0 until numIntVars) nonProductOcc[v]++
+                    for (v in f.intVars) {
+                        if (v in 0 until numIntVars) {
+                            if (f !is Product) nonProductOcc[v]++
                         }
                     }
                 }
@@ -114,6 +135,9 @@ class DefinitionalSweep internal constructor(
                             f.vars.indices.all { k -> k == it || isProductResult[f.vars[k]] }
                     }
                     if (j != null) claim(f.vars[j], f, j)
+                }
+                for (definition in affineIndexDefinitions(factors, numIntVars, definedHints)) {
+                    claim(definition.variable, definition.factor, definition.outputIndex)
                 }
             }
             val extrema = extremumDefinitions(factors, numIntVars, definedHints)
@@ -194,7 +218,7 @@ class DefinitionalSweep internal constructor(
      * Build a [FunctionalObjective] `Σ termCoeffs·terms + Σ boolTermCoeffs·[boolTerm holds] + constant`
      * (already "lower is better") over this sweep's int and bool cones, so local search descends the
      * objective on the decision (leaf) vars rather than the functionally-defined ones. Returns null
-     * when no term is defined here (a bare linear objective — a
+     * when no term is defined here or the cone crosses a literal-to-integer channel (a
      * [com.eignex.klause.solver.objective.LinearObjective] already suffices).
      */
     fun functionalObjective(
@@ -207,6 +231,8 @@ class DefinitionalSweep internal constructor(
     ): IncrementalObjective? {
         val defByOut = MutableIntObjectMap<SweepNode.IntDef>()
         for (n in nodes) if (n is SweepNode.IntDef) defByOut.put(n.out, n)
+        val literalOutputs = IntHashSet()
+        for (n in nodes) if (n is LiteralIntDefinition) literalOutputs.add(n.out)
         val boolDefByOut = MutableIntObjectMap<SweepNode.BoolFold>()
         for (n in nodes) if (n is SweepNode.BoolFold) boolDefByOut.put(n.out, n)
         val anyIntDef = terms.any { defByOut.containsKey(it) }
@@ -221,6 +247,12 @@ class DefinitionalSweep internal constructor(
             for (inId in d.intInputs) mark(inId)
         }
         for (t in terms) mark(t)
+        val readsLiteral = nodes.any {
+            it is SweepNode.IntDef && it.out in reachable && it.intInputs.any { v -> v in literalOutputs }
+        }
+        if (readsLiteral) {
+            return null
+        }
         // `nodes` is topological, so filtering preserves the inputs-before-outputs order the cone eval needs.
         val coneNodes = ArrayList<FunctionalObjective.Node>(reachable.size)
         val leaves = LinkedHashSet<Int>()
@@ -462,6 +494,7 @@ class DefinitionalSweep internal constructor(
         }
         for (f in factors) {
             if (f !is ReifiedLinear) continue
+            if (f.auxBoolVar in maintainedBools) continue
             if (frozenBool(f.auxBoolVar)) continue
             val row = f.integerConstants ?: continue
             var sum = 0L
@@ -494,6 +527,9 @@ class InvariantNetwork internal constructor(
     private val definedInt = BooleanArray(numIntVars)
     private val definedBool = BooleanArray(numBoolVars)
     private val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
+    private val literalChannels = MutableIntObjectMap<LiteralIntDefinition>()
+    private val equalityPredicates = MutableIntObjectMap<EqualityPredicateDefinition>()
+    private val elementResults = MutableIntObjectMap<ElementResultDefinition>()
     private val extremumRepairs = BooleanArray(numIntVars)
 
     /** Node indexes reading each int var. */
@@ -511,6 +547,9 @@ class InvariantNetwork internal constructor(
                 intDefinitions.put(n.out, intDef.node)
                 extremumRepairs[n.out] = intDef.inverseRepair
             }
+            if (n is LiteralIntDefinition) literalChannels.put(n.out, n)
+            if (n is EqualityPredicateDefinition) equalityPredicates.put(n.out, n)
+            if (n is ElementResultDefinition) elementResults.put(n.out, n)
         }
         intReaders = readers(numIntVars) { it.intInputs }
         boolReaders = readers(numBoolVars) { it.boolInputs }
@@ -536,11 +575,19 @@ class InvariantNetwork internal constructor(
 
     internal fun intDefinition(v: Int): FunctionalObjective.Node? = intDefinitions[v]
 
+    internal fun literalChannel(v: Int): LiteralIntDefinition? = literalChannels[v]
+
+    internal fun equalityPredicate(v: Int): EqualityPredicateDefinition? = equalityPredicates[v]
+
+    internal fun elementResultDefinition(v: Int): ElementResultDefinition? = elementResults[v]
+
     internal fun hasExtremumRepair(v: Int): Boolean = extremumRepairs[v]
 
     internal fun readsInt(v: Int): Boolean = intReaders[v].isNotEmpty()
 
     internal fun readsBool(v: Int): Boolean = boolReaders[v].isNotEmpty()
+
+    internal fun linearDefinition(v: Int): FunctionalObjective.Lin? = intDefinitions[v] as? FunctionalObjective.Lin
 
     /** The node at [index] (indexes ascend in topological order). */
     fun node(index: Int): DefinitionalSweep.SweepNode = nodeArr[index]

@@ -629,6 +629,7 @@ internal class LocalSearchEngine(
         val maxFlips = moveCap(params)
         return sequence {
             val state = newSatisfyState(params, effectiveAssumptions, warm, seed, checkpoint)
+            val residuals = if (params.reportResiduals) LocalSearchResidualRecorder() else null
             var flipsSinceRestart = 0
             // Best-cost-so-far snapshot (even while infeasible): an IteratedLocalSearchRestart
             // perturbs from this instead of full-randomising, accumulating progress across restarts.
@@ -646,6 +647,8 @@ internal class LocalSearchEngine(
             val roundFeedback = RoundFeedback.of(strategy, configuredRestart)
 
             fun reportProgress() {
+                residuals?.observe(state)
+                if (sink != null) sink.ls.bestResidual = residuals?.best
                 params.nodeBudget?.spendMoves(moves - charged)
                 charged = moves
                 if (!everFeasible) {
@@ -667,6 +670,7 @@ internal class LocalSearchEngine(
 
             try {
                 while (flipsSinceYield < maxFlips) {
+                    residuals?.observe(state)
                     if (cancelCountdown-- <= 0) {
                         while (params.cancellation()) {
                             if (checkpoint == null) return@sequence
@@ -704,6 +708,7 @@ internal class LocalSearchEngine(
                         val solution = decided.sample
                         if (!everFeasible) {
                             everFeasible = true
+                            if (sink != null) sink.ls.bestResidual = residuals?.best
                             // Record at first feasibility, not in `finally`: the `firstOrNull` consumer
                             // suspends this coroutine at the `yield` below and never resumes it, so
                             // `finally` would not fire on the success path.
@@ -792,6 +797,7 @@ internal class LocalSearchEngine(
         onFinished: () -> Unit = {},
     ) {
         val state = newMinimizeState(guide, params, effectiveAssumptions, warm, checkpoint)
+        val residuals = if (params.reportResiduals) LocalSearchResidualRecorder() else null
         // An objective whose sum can pass the 64-bit range is scored from snapshots, which sum it exactly; the live
         // assignment's Long evaluation would wrap.
         val wideObjective = objective is LinearObjective && objective.isWideOver(state.rootDomains)
@@ -854,6 +860,8 @@ internal class LocalSearchEngine(
         var lastCheckMs = 0L
 
         fun reportProgress() {
+            residuals?.observe(state)
+            sink.ls.bestResidual = residuals?.best
             checkpoint?.shouldPause(totalFlips)
             sink.ls.recordWork(moves = totalFlips, restarts = restartCount, stalls = stallCount)
             params.nodeBudget?.spendMoves(totalFlips - charged)
@@ -867,6 +875,7 @@ internal class LocalSearchEngine(
         }
 
         while (totalFlips < maxFlips) {
+            residuals?.observe(state)
             while (checkpoint?.shouldPause(totalFlips) == true) {
                 reportProgress()
                 yield(null)

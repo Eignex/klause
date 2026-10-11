@@ -127,6 +127,8 @@ data class PortfolioScenario(
      *  from outside reaches only the latter, which both leaves the hybrid-ALNS arm's repair unbounded and
      *  substitutes a pool, so the capped run measures a different arm set than the uncapped one. */
     val nodeBudget: NodeBudget? = null,
+    /** Collect the ordinary local-search arms' best committed residuals by factor kind. Disabled by default. */
+    val reportLsResiduals: Boolean = false,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
@@ -164,6 +166,8 @@ data class PortfolioScenario(
  * engine-specific switch: the two engines stay symmetric ("arms in one spot").
  */
 internal sealed interface WorkerConfig {
+    fun withLsResiduals(): WorkerConfig = this
+
     /** Telemetry id (the catalog label, before the engine prefix is added in [materialize]). */
     val label: String
 

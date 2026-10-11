@@ -9,6 +9,40 @@ import kotlin.test.assertTrue
 class SliceBudgetTest {
 
     @Test
+    fun `search inherits preparation charges and overspend`() {
+        var work = 0L
+        val preparation = SliceBudget({ 0L }, { 0L }, { work })
+        preparation.begin(Long.MAX_VALUE, 2L)
+        work = 5L * PROPAGATION_WORK_PER_NODE
+        preparation.noteOverspend()
+        val search = SliceBudget({ 0L }, { 0L }, { work }, preparation)
+
+        assertFalse(search.begin(Long.MAX_VALUE, 2L))
+        assertTrue(search.begin(Long.MAX_VALUE, 2L))
+        assertFalse(search.expired())
+        work += PROPAGATION_WORK_PER_NODE
+        search.charge()
+
+        assertTrue(search.expired())
+        assertEquals(6L, search.spent())
+    }
+
+    @Test
+    fun `search inherits fractional preparation charges`() {
+        var work = PROPAGATION_WORK_PER_NODE - 1L
+        val preparation = SliceBudget({ 0L }, { 0L }, { work })
+        preparation.begin(Long.MAX_VALUE, 1L)
+        preparation.noteOverspend()
+        val search = SliceBudget({ 0L }, { 0L }, { work }, preparation)
+        search.begin(Long.MAX_VALUE, 1L)
+
+        work++
+        search.charge()
+
+        assertTrue(search.expired())
+    }
+
+    @Test
     fun `vivification probes spend the slice at their own rate`() {
         val search = SearchStatsSink()
         val slice = SliceBudget({ search.searchWork }, { 0L })

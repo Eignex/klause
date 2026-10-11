@@ -88,6 +88,7 @@ internal class ContiguousDomain(
         var v = min
         while (v <= max) {
             action.accept(v)
+            if (v == max) break
             v++
         }
     }

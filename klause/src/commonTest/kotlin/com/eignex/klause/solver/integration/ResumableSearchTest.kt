@@ -63,7 +63,11 @@ class ResumableSearchTest {
             // false on this slice's first poll, true thereafter → ~one cancel-check interval per slice.
             var checks = 0
             val pauseAfterOnePoll = Cancellation { checks++ > 0 }
-            terminal = handle.runSlice(pauseAfterOnePoll, sliceMillis = 60_000, onIncumbent = onIncumbent)
+            terminal = if (handle.preparationPending) {
+                handle.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 1L, onIncumbent = onIncumbent)
+            } else {
+                handle.runSlice(pauseAfterOnePoll, sliceMillis = 60_000, onIncumbent = onIncumbent)
+            }
             slices++
         }
         assertNotNull(terminal, "the sliced search must terminate")

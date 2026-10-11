@@ -25,6 +25,8 @@ data class LocalSearchStats(
     val completionsRefuted: SumResult = ZERO_COUNT,
     /** Of [completions], those it could not decide within its budget. */
     val completionsUndecided: SumResult = ZERO_COUNT,
+    /** Optional best committed assignment's graded violations; not a witness or a completion verdict. */
+    val bestResidual: LocalSearchResidual? = null,
 ) {
     /** Combine two workers: moves/stalls add, earliest time-to-best wins, incumbent from the lower violation. */
     fun mergedWith(o: LocalSearchStats): LocalSearchStats = LocalSearchStats(
@@ -47,6 +49,12 @@ data class LocalSearchStats(
         completions = SumResult(completions.sum + o.completions.sum),
         completionsRefuted = SumResult(completionsRefuted.sum + o.completionsRefuted.sum),
         completionsUndecided = SumResult(completionsUndecided.sum + o.completionsUndecided.sum),
+        bestResidual = when {
+            bestResidual == null -> o.bestResidual
+            o.bestResidual == null -> bestResidual
+            o.bestResidual.cost < bestResidual.cost -> o.bestResidual
+            else -> bestResidual
+        },
     )
 }
 
@@ -66,6 +74,7 @@ internal class LocalSearchStatsSink {
     private var completions: Long = 0L
     private var completionsRefuted: Long = 0L
     private var completionsUndecided: Long = 0L
+    var bestResidual: LocalSearchResidual? = null
 
     /** Count one decided candidate: [refuted] or [undecided] when it was not accepted. */
     fun recordCompletion(refuted: Boolean, undecided: Boolean) {
@@ -98,5 +107,6 @@ internal class LocalSearchStatsSink {
         completions = SumResult(completions.toDouble()),
         completionsRefuted = SumResult(completionsRefuted.toDouble()),
         completionsUndecided = SumResult(completionsUndecided.toDouble()),
+        bestResidual = bestResidual,
     )
 }

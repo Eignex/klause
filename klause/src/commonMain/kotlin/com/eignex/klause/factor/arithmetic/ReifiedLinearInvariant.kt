@@ -133,7 +133,7 @@ internal class ReifiedLinearInvariant(
         if (vars.size != 1 || op != LinearOp.EQ) return
         if (state.assumptions.isFrozenBool(auxBoolVar)) return
         val shouldHold = coeffs[0] * newValue == bound
-        if (state.assignment.boolValue(auxBoolVar) != shouldHold) sink.add(BoolFlip(auxBoolVar))
+        if (state.assignment.boolValue(auxBoolVar) != shouldHold) sink.addIndicatorFlip(auxBoolVar)
     }
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true

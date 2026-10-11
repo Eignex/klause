@@ -13,11 +13,16 @@ import com.eignex.klause.factor.scheduling.internals.simulateCumulativeResDelta
 import com.eignex.klause.factor.scheduling.internals.simulateCumulativeStartDelta
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.randomValue
+import com.eignex.klause.localsearch.ChannelingSink
+import com.eignex.klause.localsearch.ConditionalProductRepair
 import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.localsearch.LiteralIntDefinition
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.OptionalPresence
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
@@ -88,6 +93,9 @@ internal class CumulativeInvariant(
     // non-negative, so `> 0` / `== 0` are preserved exactly.
     private fun clampOverage(ov: Long): Int = ov.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
+    private fun overageDegree(state: LocalSearchState, overage: Long): Int =
+        compressViolation(clampOverage(overage).toLong(), state.violationSoftCap)
+
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = state.intPayload[factorId] > 0
 
     override fun violationDegree(state: LocalSearchState, factorId: Int): Int =
@@ -149,8 +157,7 @@ internal class CumulativeInvariant(
                 }
             }
         }
-        return compressViolation(ls.overage + delta, state.violationSoftCap) -
-            compressViolation(ls.overage, state.violationSoftCap)
+        return overageDegree(state, ls.overage + delta) - overageDegree(state, ls.overage)
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
@@ -190,8 +197,7 @@ internal class CumulativeInvariant(
             }
         }
         state.intPayload[factorId] = clampOverage(ls.overage)
-        return compressViolation(ls.overage, state.violationSoftCap) -
-            compressViolation(before, state.violationSoftCap)
+        return overageDegree(state, ls.overage) - overageDegree(state, before)
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -215,8 +221,7 @@ internal class CumulativeInvariant(
                 deltaOv += max(0L, nu - cap) - max(0L, u - cap)
             }
         }
-        return compressViolation(ls.overage + deltaOv, state.violationSoftCap) -
-            compressViolation(ls.overage, state.violationSoftCap)
+        return overageDegree(state, ls.overage + deltaOv) - overageDegree(state, ls.overage)
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
@@ -244,8 +249,7 @@ internal class CumulativeInvariant(
         }
         ls.overage += deltaOv
         state.intPayload[factorId] = clampOverage(ls.overage)
-        return compressViolation(ls.overage, state.violationSoftCap) -
-            compressViolation(before, state.violationSoftCap)
+        return overageDegree(state, ls.overage) - overageDegree(state, before)
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
@@ -263,14 +267,17 @@ internal class CumulativeInvariant(
         val tLow = ls.tLow
         val absT = if (peakT >= 0) peakT + tLow else 0L
         val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else EmptyIntArray
+        emitConditionalDurationRepairs(state, ls, peakTasks, sink)
         val maxTargets = 4
         for (i in 0 until n) {
+            if (!OptionalPresence.isPresentInAssignment(presents, i, state)) continue
             val v = starts[i]
             val cur = state.assignment.intValue(v)
             val d = curDur(state, i)
             val r = curRes(state, i)
+            if (d <= 0 || r <= 0) continue
             val dom = state.rootDomains[v]
-            val runsAtPeak = (peakT >= 0 && r > 0 && d > 0 && cur <= absT && absT < cur + d)
+            val runsAtPeak = (peakT >= 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
                 val afterPeak = absT + 1
                 if (afterPeak in dom && afterPeak != cur) sink.addChannelingIntSet(state, v, afterPeak)
@@ -289,7 +296,31 @@ internal class CumulativeInvariant(
                 }
             }
         }
-        if (peakTasks.isNotEmpty()) emitFeasibleSwaps(state, ls, peakTasks, sink)
+        if (peakTasks.isNotEmpty()) {
+            emitFeasibleSwaps(state, ls, peakTasks, sink)
+            emitConditionalChoiceSwaps(state, ls, peakTasks, sink)
+        }
+    }
+
+    private fun emitConditionalDurationRepairs(
+        state: LocalSearchState,
+        ls: CumulativeLsState,
+        peakTasks: IntArray,
+        sink: MoveSink,
+    ) {
+        if (durationVars.isEmpty() || peakTasks.isEmpty()) return
+        var first = 0
+        while (first < peakTasks.size && peakTasks[first] < ls.durationRepairCursor) first++
+        if (first == peakTasks.size) first = 0
+        var added = 0
+        for (offset in peakTasks.indices) {
+            if (added >= CUMULATIVE_MAX_DURATION_REPAIRS) break
+            val i = peakTasks[(first + offset) % peakTasks.size]
+            ls.durationRepairCursor = if (i + 1 == n) 0 else i + 1
+            added += ConditionalProductRepair(
+                state, sink, durationVars[i], CUMULATIVE_MAX_DURATION_REPAIRS - added,
+            ).propose()
+        }
     }
 
     private fun collectPeakTasks(state: LocalSearchState, absT: Long): IntArray {
@@ -335,6 +366,78 @@ internal class CumulativeInvariant(
                 swapsAdded++
             }
         }
+    }
+
+    private fun emitConditionalChoiceSwaps(
+        state: LocalSearchState,
+        ls: CumulativeLsState,
+        peakTasks: IntArray,
+        sink: MoveSink,
+    ) {
+        if (durationVars.isEmpty()) return
+        val net = state.invariants ?: return
+        var added = 0
+        repeat(CUMULATIVE_MAX_SWAPS * CUMULATIVE_SWAP_ATTEMPT_STRIDE) {
+            if (added >= CUMULATIVE_MAX_SWAPS) return
+            val i = peakTasks.firstOrNull { it >= ls.choiceRepairCursor } ?: peakTasks[0]
+            val j = ls.choicePartnerCursor
+            ls.choicePartnerCursor = if (j + 1 == n) 0 else j + 1
+            if (ls.choicePartnerCursor == 0) ls.choiceRepairCursor = if (i + 1 == n) 0 else i + 1
+            if (i == j || curDur(state, j) != 0L || curRes(state, j) <= 0L ||
+                !OptionalPresence.isPresentInAssignment(presents, j, state)
+            ) return@repeat
+            val iChannel = conditionalDurationChannel(state, i, sink) ?: return@repeat
+            val jChannel = conditionalDurationChannel(state, j, sink) ?: return@repeat
+            if (Lit.isPositive(iChannel.literal) != Lit.isPositive(jChannel.literal)) return@repeat
+            val iChoice = net.equalityPredicate(Lit.variable(iChannel.literal)) ?: return@repeat
+            val jChoice = net.equalityPredicate(Lit.variable(jChannel.literal)) ?: return@repeat
+            if (iChoice.value != jChoice.value || iChoice.input == jChoice.input ||
+                !sink.allowsInt(iChoice.input) || !sink.allowsInt(jChoice.input)
+            ) return@repeat
+            val iValue = state.assignment.intValue(iChoice.input)
+            val jValue = state.assignment.intValue(jChoice.input)
+            if (iValue == jValue || jValue !in state.rootDomains[iChoice.input] ||
+                iValue !in state.rootDomains[jChoice.input]
+            ) return@repeat
+            val coordinated = ChannelingSink(iChoice.input, jValue)
+            coordinated.pin(jChoice.input)
+            coordinated.add(IntSet(jChoice.input, iValue))
+            for ((variable, value) in listOf(iChoice.input to jValue, jChoice.input to iValue)) {
+                val channeling = state.synthesizeChannelingMove(variable, value)
+                if (channeling is Move.Compound) {
+                    for (part in channeling.parts) {
+                        if (part is Move.BoolFlip) coordinated.addIndicatorFlip(part.varId)
+                    }
+                }
+            }
+            coordinated.carryBinaryChannels(state, sink)
+            val move = coordinated.toMove() as Move.Compound
+            val before = sink.size
+            sink.addCompound(move.parts)
+            if (sink.size > before) added++
+        }
+    }
+
+    private fun conditionalDurationChannel(state: LocalSearchState, task: Int, sink: MoveSink): LiteralIntDefinition? {
+        val output = durationVars[task]
+        if (!sink.allowsDefinedInt(output) || 0L !in state.rootDomains[output]) return null
+        val net = state.invariants ?: return null
+        val product = net.intDefinition(output) as? FunctionalObjective.Times ?: return null
+        val a = product.a.varId
+        val b = product.b.varId
+        if (a < 0 || b < 0 || a == b) return null
+        for ((flag, length) in listOf(a to b, b to a)) {
+            val duration = state.assignment.intValue(length)
+            if (duration <= 0L || duration !in state.rootDomains[output]) continue
+            val domain = state.rootDomains[flag]
+            if (domain.min < 0L || domain.max > 1L || 0L !in domain || 1L !in domain ||
+                !sink.allowsDefinedInt(flag)
+            ) continue
+            val channel = net.literalChannel(flag) ?: continue
+            if (state.assumptions.isFrozenBool(Lit.variable(channel.literal))) continue
+            return channel
+        }
+        return null
     }
 
     override val providesImplicitNeighbourhood: Boolean get() = true
@@ -420,5 +523,6 @@ internal class CumulativeInvariant(
 }
 
 private const val CUMULATIVE_MAX_SWAPS: Int = 4
+private const val CUMULATIVE_MAX_DURATION_REPAIRS: Int = 16
 private const val CUMULATIVE_STRUCTURED_SWAP_CAP: Int = 4
 private const val CUMULATIVE_SWAP_ATTEMPT_STRIDE: Int = 8

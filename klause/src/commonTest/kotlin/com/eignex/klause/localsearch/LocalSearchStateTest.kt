@@ -1,16 +1,20 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -20,6 +24,277 @@ import kotlin.test.assertTrue
  * [strategy.CblsStallSwapTest] fixture (GE/LE only) deliberately avoids.
  */
 class LocalSearchStateTest {
+    @Test
+    fun `cumulative repair scores distinguish overload reductions within a degree bucket`() {
+        for (coordinate in listOf("start", "duration", "resource", "capacity")) {
+            val duration = coordinate == "duration"
+            val resource = coordinate == "resource"
+            val capacity = coordinate == "capacity"
+            val secondAux = if (duration) 84L else if (resource) 42L else 0L
+            val domains = arrayOf(
+                IntDomain(0, if (coordinate == "start") 1 else 0), IntDomain(0, 0),
+                when (coordinate) {
+                    "duration" -> IntDomain(83, 84)
+                    "resource" -> IntDomain(41, 42)
+                    "capacity" -> IntDomain(1, 2)
+                    else -> IntDomain(0, 0)
+                },
+                IntDomain(secondAux, secondAux),
+            )
+            val problem = Problem(
+                0, 4, domains, arrayOf<Factor>(Cumulative(
+                    intArrayOf(0, 1), LongArray(2) { if (duration) 84 else 1 },
+                    LongArray(2) { if (duration) 1 else 42 }, 1,
+                    durationVars = if (duration) intArrayOf(2, 3) else intArrayOf(),
+                    resourceVars = if (resource) intArrayOf(2, 3) else intArrayOf(),
+                    capacityVar = if (capacity) 2 else -1,
+                )),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(2, domains[2].max)
+            if (capacity) state.assignment.setInt(2, 1)
+            state.assignment.setInt(3, domains[3].min)
+            state.recompute()
+            state.weights.factorWeights[0] = 3.5
+            val before = state.assignment.snapshot()
+            val cost = state.cost
+            val overload = state.intPayload[0]
+            val move = when (coordinate) {
+                "start" -> Move.IntSet(0, 1)
+                "duration" -> Move.IntSet(2, 83)
+                "resource" -> Move.IntSet(2, 41)
+                else -> Move.IntSet(2, 2)
+            }
+
+            repeat(2) {
+                assertEquals(0L, state.netDelta(move), coordinate)
+                assertEquals(0.0, state.weightedNetDelta(move), coordinate)
+                assertEquals(-1.0 / 64.0, state.repairNetDelta(move, weighted = false), coordinate)
+                assertEquals(-3.5 / 64.0, state.repairNetDelta(move, weighted = true), coordinate)
+                assertEquals(before, state.assignment.snapshot(), coordinate)
+                assertEquals(cost, state.cost, coordinate)
+                assertEquals(overload, state.intPayload[0], coordinate)
+            }
+            state.apply(move)
+
+            assertEquals(cost, state.cost, coordinate)
+            assertEquals(overload - 1, state.intPayload[0], coordinate)
+            state.recompute()
+            assertEquals(cost, state.cost, coordinate)
+            assertEquals(overload - 1, state.intPayload[0], coordinate)
+        }
+    }
+
+    @Test
+    fun `cumulative repair scores grade the complete propagated compound`() {
+        val problem = Problem(
+            0, 7, arrayOf(
+                IntDomain(83, 84), IntDomain(83, 84), IntDomain(83, 84), IntDomain(83, 84),
+                IntDomain(0, 0), IntDomain(0, 0), IntDomain(1, 1),
+            ), arrayOf<Factor>(
+                Product(0, 6, 2),
+                Product(1, 6, 3),
+                Cumulative(
+                    intArrayOf(4, 5), longArrayOf(84, 84), longArrayOf(1, 1), 1,
+                    durationVars = intArrayOf(2, 3),
+                ),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem)).network(7, 0)
+        for ((variable, value) in longArrayOf(84, 84, 84, 84, 0, 0, 1).withIndex()) {
+            state.assignment.setInt(variable, value)
+        }
+        state.recompute()
+        state.weights.factorWeights[2] = 3.5
+        val before = state.assignment.snapshot()
+        val cost = state.cost
+        val compound = Move.Compound(listOf(Move.IntSet(0, 83), Move.IntSet(1, 83)))
+
+        for (move in listOf(Move.IntSet(0, 83), compound)) {
+            assertEquals(0L, state.netDelta(move))
+            assertEquals(-1.0 / 64.0, state.repairNetDelta(move, weighted = false))
+            assertEquals(-3.5 / 64.0, state.repairNetDelta(move, weighted = true))
+            assertEquals(before, state.assignment.snapshot())
+            assertEquals(cost, state.cost)
+            assertEquals(84, state.intPayload[2])
+        }
+        state.apply(compound)
+
+        assertEquals(83L, state.assignment.intValue(2))
+        assertEquals(83L, state.assignment.intValue(3))
+        assertEquals(83, state.intPayload[2])
+        assertEquals(cost, state.cost)
+        state.recompute()
+        assertEquals(83, state.intPayload[2])
+        assertEquals(cost, state.cost)
+    }
+
+    @Test
+    fun `cumulative repair scores do not reward crossing payload saturation`() {
+        val demand = Int.MAX_VALUE.toLong()
+        val problem = Problem(
+            0, 2, arrayOf(IntDomain(0, 0), IntDomain(demand, demand + 32)),
+            arrayOf<Factor>(Cumulative(
+                intArrayOf(0), longArrayOf(1), longArrayOf(demand), 1, resourceVars = intArrayOf(1),
+            )),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(1, demand)
+        state.recompute()
+        val before = state.assignment.snapshot()
+        val cost = state.cost
+        val move = Move.IntSet(1, demand + 20)
+
+        val score = state.repairNetDelta(move, weighted = false)
+
+        assertEquals(0L, state.netDelta(move))
+        assertTrue(score > 0.0)
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(cost, state.cost)
+    }
+
+    @Test
+    fun `duplicate equality rows maintain the indicator and its binary channel`() {
+        val problem = Problem(
+            1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 1)),
+            arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setBool(0, false)
+        state.recompute()
+
+        state.apply(state.synthesizeChannelingMove(0, 1))
+
+        assertTrue(state.assignment.boolValue(0))
+        assertEquals(1L, state.assignment.intValue(1))
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `indicator channels and their product outputs follow coordinate moves`() {
+        for (bound in listOf(0, 1)) {
+            val problem = Problem(
+                1, 6, arrayOf(
+                    IntDomain(0, 2), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3),
+                    IntDomain(0, 1), IntDomain(0, 3),
+                ),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+                    Product(1, 2, 3),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(4), LinearOp.EQ, 1 - bound),
+                    Product(4, 2, 5),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, 0)
+            state.assignment.setBool(0, false)
+            state.assignment.setInt(1, 1L - bound)
+            state.assignment.setInt(2, 3)
+            state.assignment.setInt(3, 3L * (1L - bound))
+            state.assignment.setInt(4, bound.toLong())
+            state.assignment.setInt(5, 3L * bound)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, 6)).network(6, 1)
+            state.recompute()
+
+            for (coordinate in listOf(1L, 2L, 1L)) {
+                val move = state.synthesizeChannelingMove(0, coordinate)
+                val predicted = state.netDelta(move)
+                state.apply(move)
+                val cost = state.cost
+                val expected = if (coordinate == 1L) bound.toLong() else 1L - bound
+
+                assertEquals(expected, state.assignment.intValue(1))
+                assertEquals(3L * expected, state.assignment.intValue(3))
+                assertEquals(1L - expected, state.assignment.intValue(4))
+                assertEquals(3L * (1L - expected), state.assignment.intValue(5))
+                assertEquals(0L, predicted)
+                assertEquals(0L, cost)
+                state.recompute()
+                assertEquals(cost, state.cost)
+            }
+        }
+    }
+
+    @Test
+    fun `indicator moves retain protected channel coordinates`() {
+        for (protection in listOf("pin", "owner", "definition")) {
+            val problem = Problem(
+                1, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 0)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                    Product(2, 2, 1),
+                ),
+            )
+            val assumptions = if (protection == "pin") Assumptions.None.withInt(1, 0) else Assumptions.None
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+            if (protection == "owner") state.moveSink.setOwners(intArrayOf(-1, 1, -1))
+            if (protection == "definition") {
+                state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, 3)).network(3, 1)
+            }
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(1, 0)
+            state.assignment.setInt(2, 0)
+            state.assignment.setBool(0, false)
+            state.recompute()
+
+            state.apply(state.synthesizeChannelingMove(0, 1))
+
+            assertEquals(0L, state.assignment.intValue(1))
+            assertEquals(1L, state.cost)
+        }
+    }
+
+    @Test
+    fun `nonbinary equality inputs retain their independent value`() {
+        val problem = Problem(
+            1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 2)
+        state.assignment.setBool(0, false)
+        state.recompute()
+
+        state.apply(state.synthesizeChannelingMove(0, 1))
+
+        assertEquals(2L, state.assignment.intValue(1))
+        assertEquals(1L, state.cost)
+    }
+
+    @Test
+    fun `indicator moves cannot set a channel outside its root domain`() {
+        val problem = Problem(
+            1, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 0)),
+            arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setBool(0, false)
+        state.recompute()
+
+        state.apply(state.synthesizeChannelingMove(0, 1))
+
+        assertEquals(0L, state.assignment.intValue(1))
+        assertTrue(state.intValuesInDomain())
+        assertEquals(1L, state.cost)
+    }
 
     @Test
     fun `reified degree updates and scores agree with recompute across moves`() {
