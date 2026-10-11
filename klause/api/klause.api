@@ -10093,8 +10093,8 @@ public final class com/eignex/klause/solver/result/LocalSearchResidual {
 
 public final class com/eignex/klause/solver/result/LocalSearchResidualFactor {
 	public fun <init> (ILjava/lang/String;JLjava/util/Map;Ljava/util/Map;II)V
-	public fun <init> (ILjava/lang/String;JLjava/util/Map;Ljava/util/Map;IILjava/util/Map;)V
 	public synthetic fun <init> (ILjava/lang/String;JLjava/util/Map;Ljava/util/Map;IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ILjava/lang/String;JLjava/util/Map;Ljava/util/Map;IILjava/util/Map;)V
 	public synthetic fun <init> (ILjava/lang/String;JLjava/util/Map;Ljava/util/Map;IILjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
 	public final fun component2 ()Ljava/lang/String;
