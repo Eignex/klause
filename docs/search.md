@@ -427,8 +427,9 @@ factor degrees and objective coordinates. Compounds without definition readers r
 additive linear objective scoring for distinct coordinates and the objective's own
 incremental delta; repeated-coordinate linear deltas use a probe of the final values.
 Probes apply compound inputs together before
-one definition pass, save affected input/output values, and restore those values directly;
-an inverse definition that cannot write does not strand a derived output. Probe activity
+one definition pass, save affected input/output values, and restore those values directly.
+Each probe reuses its definition cone for saving and propagation.
+An inverse definition that cannot write does not strand a derived output. Probe activity
 is suppressed and its best-cost observation is discarded. Real moves in probes and
 restoration do not advance the committed row-refresh cadence. Weighted probes snapshot and
 scan only factors whose degrees change, in factor-id order to retain the full-scan

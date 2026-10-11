@@ -8,6 +8,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -85,6 +86,44 @@ class InvariantNetworkTest {
 
         assertEquals(5, first.assignment.intValue(iv.getValue("s")))
         assertEquals(0, second.assignment.intValue(iv.getValue("s")))
+    }
+
+    @Test
+    fun `nested definition scores agree with committed moves`() {
+        val execution = parseFlatZincExecution(src)
+        val problem = execution.program.problem.bake()
+        val state = LocalSearchState(problem, Random(5))
+        state.invariants = assertNotNull(execution.definitionalSweep)
+            .network(problem.numIntVars, problem.numBoolVars)
+        val x = execution.program.intVarsByName.getValue("x")
+        val y = execution.program.intVarsByName.getValue("y")
+        state.recompute()
+        state.apply(Move.IntSet(x, 7))
+        state.apply(Move.IntSet(y, 0))
+        val before = LongArray(problem.numIntVars) { state.assignment.intValue(it) }
+        val beforeCost = state.cost
+        val beforeDegrees = state.factorDegree.copyOf()
+        val weights = state.weights.factorWeights
+        for (i in weights.indices) weights[i] = (i + 1).toDouble()
+
+        for (move in listOf(
+            Move.IntSet(x, 10), Move.IntSet(y, 7), Move.Compound(listOf(Move.IntSet(x, 10), Move.IntSet(y, 7))),
+        )) {
+            val predicted = state.netDelta(move)
+            val weighted = state.weightedNetDelta(move)
+            assertEquals(weighted, state.weightedNetDelta(move))
+            assertContentEquals(before, LongArray(problem.numIntVars) { state.assignment.intValue(it) })
+            assertContentEquals(beforeDegrees, state.factorDegree)
+            assertEquals(beforeCost, state.cost)
+            state.apply(move)
+            state.recompute()
+
+            assertEquals(state.cost - beforeCost, predicted)
+            assertEquals(weights.indices.sumOf { weights[it] * (state.factorDegree[it] - beforeDegrees[it]) }, weighted)
+
+            state.apply(Move.IntSet(x, 7))
+            state.apply(Move.IntSet(y, 0))
+        }
     }
 
     @Test
