@@ -37,10 +37,14 @@ class RealDifferenceSystemTest {
         val system = assertNotNull(RealDifferenceSystem.prepare(model,
             model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }))
 
-        val point = assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(), Cancellation.Never)).point
+        for (guide in listOf(null, doubleArrayOf(0.0), doubleArrayOf(1.0), doubleArrayOf(-1000.0),
+            doubleArrayOf(Double.MAX_VALUE), doubleArrayOf(Double.NaN))) {
+            val point = assertIs<RealDifferenceSystem.Result.Feasible>(
+                system.check(intArrayOf(), Cancellation.Never, guide)).point
 
-        assertTrue(point.single() > BigFraction.ZERO)
-        assertTrue(point.single() < BigFraction.ONE)
+            assertTrue(point.single() > BigFraction.ZERO)
+            assertTrue(point.single() < BigFraction.ONE)
+        }
     }
 
     @Test

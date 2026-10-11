@@ -26,12 +26,12 @@ internal class RealDifferenceSystem private constructor(
     private val guards: IntArray,
     private val scale: Long,
 ) {
-    fun check(bools: IntArray, stop: Cancellation): Result {
+    fun check(bools: IntArray, stop: Cancellation, point: DoubleArray? = null): Result {
         val active = BooleanArray(guards.size) { index ->
             val guard = guards[index]
             guard == ALWAYS || bools[Lit.variable(guard)] == if (Lit.isPositive(guard)) 1 else 0
         }
-        return when (val result = graph.potentials(active, stop::invoke)) {
+        return when (val result = graph.potentials(active, stop::invoke, initialPotentials(point))) {
             Potentials.Abandoned -> Result.Interrupted
             Potentials.Infeasible -> if (stop()) Result.Interrupted else Result.Infeasible
             is Potentials.Found -> {
@@ -42,6 +42,18 @@ internal class RealDifferenceSystem private constructor(
                 } }
             }
         }
+    }
+
+    private fun initialPotentials(point: DoubleArray?): LongArray? {
+        if (point == null || point.size < graph.numVars - 1) return null
+        val values = LongArray(graph.numVars)
+        val limit = Long.MAX_VALUE.toDouble() / 8.0
+        for (column in 0 until graph.numVars - 1) {
+            val value = point[column] * scale
+            if (!value.isFinite() || value < -limit || value > limit) return null
+            values[column] = value.toLong()
+        }
+        return values
     }
 
     sealed interface Result {
