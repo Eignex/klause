@@ -120,7 +120,7 @@ private class Consumer(val owners: Owners) : AutoCloseable {
     fun observe(): Observed {
         val x = cp.session.intDomain(0)
         val y = cp.session.intDomain(1)
-        val relaxation = engine.nodeRelaxation(requireNotNull(engine.lpRelaxer), cp.session)
+        val relaxation = checkNotNull(engine.nodeRelaxation(requireNotNull(engine.lpRelaxer), cp.session))
         check(relaxation.objectiveConstant == 5L)
         return Observed(x.min, x.max, y.min, y.max, relaxation.model)
     }
