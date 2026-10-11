@@ -1,8 +1,11 @@
 package com.eignex.klause.count
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
@@ -48,6 +51,46 @@ class ApproxMCTest {
         val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 0L))
         assertEquals(0L, r.estimate)
         assertTrue(r.exact)
+    }
+
+    @Test
+    fun `unconstrained reals are existential in public projected counting`() {
+        for (max in listOf(1L, 2L)) {
+            val model = Problem(
+                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
+                factors = emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(3.0),
+            )
+
+            val count = BacktrackSolver(model.bake()).approximateCount(ApproxCountConfig(seed = 0L))
+
+            assertTrue(count.exact)
+            assertEquals(2 * max, count.estimate)
+        }
+    }
+
+    @Test
+    fun `real constraints exclude infeasible integer projections in public counting`() {
+        for (max in listOf(1L, 2L)) {
+            val model = Problem(
+                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
+                factors = arrayOf(
+                    Clause(intArrayOf(Lit.make(0, true))),
+                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
+                        doubleArrayOf(3.0), LinearOp.LE, 0.0),
+                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
+                        doubleArrayOf(3.0), LinearOp.GE, 0.0),
+                ),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.5),
+            )
+
+            val count = BacktrackSolver(model.bake()).approximateCount(
+                ApproxCountConfig(samplingSet = intArrayOf(), intSamplingSet = intArrayOf(0), seed = 0L),
+            )
+
+            assertTrue(count.exact)
+            assertEquals(1L, count.estimate)
+        }
     }
 
     private fun assertWithinBand(exact: Long, estimate: Long, eps: Double) {
