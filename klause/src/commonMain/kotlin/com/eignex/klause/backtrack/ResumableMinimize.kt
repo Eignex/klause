@@ -515,6 +515,7 @@ internal class ResumableMinimize(
                     clausePrimal = MonotoneClausePrimal.create(
                         solver, objective, params, runEndToken(), minOf(remaining / 2L, 5_000L).coerceAtLeast(0L),
                     )
+                    if (clausePrimal != null) sink.search.clausalPrimalStarts++
                 }
             }
             clausePrimal?.let { primal ->
@@ -523,12 +524,18 @@ internal class ResumableMinimize(
                         (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
                     } ?: 5_000L
                     clausePrimalCandidate = primal.advance(millis, if (pausable) slice.remainingNodes() else -1L)
+                    sink.search.clausalPrimalTrials = primal.trials
+                    sink.search.clausalPrimalModels = primal.models
+                    sink.search.clausalPrimalProposals = primal.proposals
                 }
                 clausePrimalCandidate?.let { sample ->
                     if (pausable && sliceCancelled()) return StepEvent.Paused
                     val published = publishLpProposal(sample)
                     clausePrimalCandidate = null
-                    if (published != null) return StepEvent.Incumbent(published)
+                    if (published != null) {
+                        sink.search.clausalPrimalAccepted++
+                        return StepEvent.Incumbent(published)
+                    }
                 }
                 if (!primal.isDone && pausable && sliceCancelled()) return StepEvent.Paused
                 if (primal.isDone) primal.close()

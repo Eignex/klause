@@ -310,6 +310,13 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     stats.search.inprocessProbes.sum.toLong().takeIf { it > 0L }?.let { out += "inprocessProbes" to "$it" }
     stats.search.inprocessVisits.sum.toLong().takeIf { it > 0L }?.let { out += "inprocessVisits" to "$it" }
     stats.search.glueClauses.sum.toLong().takeIf { it > 0L }?.let { out += "glueClauses" to "$it" }
+    if (stats.search.clausalPrimalStarts.sum > 0.0) {
+        out += "clausalPrimalStarts" to "${stats.search.clausalPrimalStarts.sum.toLong()}"
+        out += "clausalPrimalTrials" to "${stats.search.clausalPrimalTrials.sum.toLong()}"
+        out += "clausalPrimalModels" to "${stats.search.clausalPrimalModels.sum.toLong()}"
+        out += "clausalPrimalProposals" to "${stats.search.clausalPrimalProposals.sum.toLong()}"
+        out += "clausalPrimalAccepted" to "${stats.search.clausalPrimalAccepted.sum.toLong()}"
+    }
     return out
 }
 
