@@ -112,3 +112,11 @@ internal suspend fun SequenceScope<Unit>.prepareStatesBothBounds(boxes: RootBoxe
     }
     return true
 }
+
+internal suspend fun SequenceScope<Unit>.prepareStatesBothBounds(problem: Problem, vars: IntArray): Boolean {
+    for ((position, v) in vars.withIndex()) {
+        if (!problem.statesBothBounds(v)) return false
+        if ((position + 1) % 256 == 0) yield(Unit)
+    }
+    return true
+}

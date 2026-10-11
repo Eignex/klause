@@ -126,7 +126,15 @@ internal class LagrangianBound(
                     LinearOp.EQ -> 0
                     LinearOp.NE -> continue // not a linear relaxation
                 }
-                if (f.vars.any { !inV[it] }) continue // only constraints over the chosen blocks are dualized
+                var contained = true
+                for (v in f.vars) {
+                    if (!inV[v]) {
+                        contained = false
+                        break
+                    }
+                    if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+                }
+                if (!contained) continue
                 lv.add(f.vars.copyOf())
                 lc.add(row.coeffs)
                 lr.add(row.bound)

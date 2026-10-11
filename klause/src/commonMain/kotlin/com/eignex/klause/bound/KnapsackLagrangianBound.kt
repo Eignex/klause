@@ -113,7 +113,8 @@ internal class KnapsackLagrangianBound(
         } else {
             // Local index space: every bool var that appears in the kept knapsack, a linking row, or the
             // objective. A variable absent from all three contributes nothing and is left out.
-            val index = MutableIntIntMap()
+            val index = MutableIntIntMap(problem.numBoolVars)
+            yield(Unit)
             val ids = IntArrayList()
             fun local(v: Int): Int {
                 if (index.containsKey(v)) return index.getOrDefault(v, -1)
@@ -122,7 +123,10 @@ internal class KnapsackLagrangianBound(
                 index.put(v, idx)
                 return idx
             }
-            for (k in subProblem.literals.indices) local(Lit.variable(subProblem.literals[k]))
+            for (k in subProblem.literals.indices) {
+                local(Lit.variable(subProblem.literals[k]))
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
             val others = ArrayList<PseudoBoolean>()
             for (factor in pbs) {
                 if (factor !== subProblem) others.add(factor)
@@ -137,11 +141,6 @@ internal class KnapsackLagrangianBound(
                 if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             }
             varIds = ids.toIntArray()
-            index.clear()
-            for (i in varIds.indices) {
-                index.put(varIds[i], i)
-                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-            }
 
             cost = constructionLongArray(varIds.size) { objective.boolWeightValues.getOrElse(varIds[it]) { 0L } }
 
