@@ -12,21 +12,19 @@ internal sealed interface PolynomialRealFormula {
     ) : PolynomialRealFormula {
         private val hash = (31 * left.hashCode() + relation.hashCode()) * 31 + right.hashCode()
         override fun hashCode(): Int = hash
-        override fun equals(other: Any?): Boolean = this === other || (
-            other is Atom && relation == other.relation && left == other.left && right == other.right
-            )
+        override fun equals(other: Any?): Boolean = other is Atom && polynomialFormulasEqual(this, other)
     }
 
     class Not(val operand: PolynomialRealFormula) : PolynomialRealFormula {
         private val hash = 31 * operand.hashCode() + 3
         override fun hashCode(): Int = hash
-        override fun equals(other: Any?): Boolean = this === other || (other is Not && operand == other.operand)
+        override fun equals(other: Any?): Boolean = other is Not && polynomialFormulasEqual(this, other)
     }
 
     class And(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
         val operands: List<PolynomialRealFormula> get() = values.toList()
-        override fun equals(other: Any?): Boolean = this === other || (other is And && values.contentEquals(other.values))
+        override fun equals(other: Any?): Boolean = other is And && polynomialFormulasEqual(this, other)
         private val hash = 31 * values.contentHashCode() + 1
         override fun hashCode(): Int = hash
     }
@@ -34,7 +32,7 @@ internal sealed interface PolynomialRealFormula {
     class Or(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
         val operands: List<PolynomialRealFormula> get() = values.toList()
-        override fun equals(other: Any?): Boolean = this === other || (other is Or && values.contentEquals(other.values))
+        override fun equals(other: Any?): Boolean = other is Or && polynomialFormulasEqual(this, other)
         private val hash = 31 * values.contentHashCode() + 2
         override fun hashCode(): Int = hash
     }
@@ -128,4 +126,46 @@ internal fun PolynomialRealFormula.requireVariableCounts(boolCount: Int, realCou
             is PolynomialExpression.Power -> expressions.addLast(node.base)
         }
     }
+}
+
+private fun polynomialFormulasEqual(left: PolynomialRealFormula, right: PolynomialRealFormula): Boolean {
+    val work = ArrayDeque<Pair<PolynomialRealFormula, PolynomialRealFormula>>()
+    work.addLast(left to right)
+    while (work.isNotEmpty()) {
+        val (first, second) = work.removeLast()
+        if (first === second) continue
+        when (first) {
+            is PolynomialRealFormula.Constant -> if (second !is PolynomialRealFormula.Constant || first.value != second.value) return false
+            is PolynomialRealFormula.BooleanVariable -> if (second !is PolynomialRealFormula.BooleanVariable || first.id != second.id) return false
+            is PolynomialRealFormula.Atom -> {
+                if (second !is PolynomialRealFormula.Atom || first.relation != second.relation ||
+                    !polynomialExpressionsEqual(first.left, second.left) || !polynomialExpressionsEqual(first.right, second.right)
+                ) return false
+            }
+            is PolynomialRealFormula.Not -> {
+                if (second !is PolynomialRealFormula.Not) return false
+                work.addLast(first.operand to second.operand)
+            }
+            is PolynomialRealFormula.And, is PolynomialRealFormula.Or -> {
+                val firstOperands: List<PolynomialRealFormula>
+                val secondOperands: List<PolynomialRealFormula>
+                when (first) {
+                    is PolynomialRealFormula.And -> {
+                        if (second !is PolynomialRealFormula.And) return false
+                        firstOperands = first.operands
+                        secondOperands = second.operands
+                    }
+                    is PolynomialRealFormula.Or -> {
+                        if (second !is PolynomialRealFormula.Or) return false
+                        firstOperands = first.operands
+                        secondOperands = second.operands
+                    }
+                    else -> error("unreachable")
+                }
+                if (firstOperands.size != secondOperands.size) return false
+                for (index in firstOperands.indices) work.addLast(firstOperands[index] to secondOperands[index])
+            }
+        }
+    }
+    return true
 }
