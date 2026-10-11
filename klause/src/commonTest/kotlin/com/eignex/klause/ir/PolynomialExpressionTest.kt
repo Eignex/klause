@@ -8,6 +8,19 @@ import kotlin.test.assertFailsWith
 
 class PolynomialExpressionTest {
     @Test
+    fun `separately built deep equal structures compare without call stack recursion`() {
+        var first: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
+        var second: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
+        repeat(1000) {
+            first = PolynomialExpression.Sum(listOf(first))
+            second = PolynomialExpression.Sum(listOf(second))
+        }
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
+
+    @Test
     fun `rational coefficient identity uses reduced values and a positive denominator`() {
         val reduced = PolynomialExpression.Constant.of(parseBigInt("123456789012345678901234567890"), bigIntOf(8))
         val equivalent = PolynomialExpression.Constant.of(parseBigInt("-246913578024691357802469135780"), bigIntOf(-16))

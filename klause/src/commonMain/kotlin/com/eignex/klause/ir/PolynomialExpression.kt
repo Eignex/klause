@@ -30,7 +30,7 @@ internal sealed interface PolynomialExpression {
     class Sum(operands: List<PolynomialExpression>) : PolynomialExpression {
         private val values = operands.toTypedArray()
         val operands: List<PolynomialExpression> get() = values.toList()
-        override fun equals(other: Any?): Boolean = this === other || (other is Sum && values.contentEquals(other.values))
+        override fun equals(other: Any?): Boolean = other is Sum && polynomialExpressionsEqual(this, other)
         private val hash = 31 * values.contentHashCode() + 1
         override fun hashCode(): Int = hash
     }
@@ -38,7 +38,7 @@ internal sealed interface PolynomialExpression {
     class Product(operands: List<PolynomialExpression>) : PolynomialExpression {
         private val values = operands.toTypedArray()
         val operands: List<PolynomialExpression> get() = values.toList()
-        override fun equals(other: Any?): Boolean = this === other || (other is Product && values.contentEquals(other.values))
+        override fun equals(other: Any?): Boolean = other is Product && polynomialExpressionsEqual(this, other)
         private val hash = 31 * values.contentHashCode() + 2
         override fun hashCode(): Int = hash
     }
@@ -47,7 +47,7 @@ internal sealed interface PolynomialExpression {
         private val hash = 31 * base.hashCode() + exponent
         override fun hashCode(): Int = hash
         override fun equals(other: Any?): Boolean =
-            this === other || (other is Power && exponent == other.exponent && base == other.base)
+            other is Power && polynomialExpressionsEqual(this, other)
         init {
             require(exponent >= 0) { "negative polynomial exponent" }
         }
@@ -100,4 +100,41 @@ internal fun PolynomialExpression.remap(remap: VarRemap): PolynomialExpression {
         }
     }
     return values.single()
+}
+
+internal fun polynomialExpressionsEqual(left: PolynomialExpression, right: PolynomialExpression): Boolean {
+    val work = ArrayDeque<Pair<PolynomialExpression, PolynomialExpression>>()
+    work.addLast(left to right)
+    while (work.isNotEmpty()) {
+        val (first, second) = work.removeLast()
+        if (first === second) continue
+        when (first) {
+            is PolynomialExpression.Constant -> if (second !is PolynomialExpression.Constant || first != second) return false
+            is PolynomialExpression.Variable -> if (second !is PolynomialExpression.Variable || first.id != second.id) return false
+            is PolynomialExpression.Power -> {
+                if (second !is PolynomialExpression.Power || first.exponent != second.exponent) return false
+                work.addLast(first.base to second.base)
+            }
+            is PolynomialExpression.Sum, is PolynomialExpression.Product -> {
+                val firstOperands: List<PolynomialExpression>
+                val secondOperands: List<PolynomialExpression>
+                when (first) {
+                    is PolynomialExpression.Sum -> {
+                        if (second !is PolynomialExpression.Sum) return false
+                        firstOperands = first.operands
+                        secondOperands = second.operands
+                    }
+                    is PolynomialExpression.Product -> {
+                        if (second !is PolynomialExpression.Product) return false
+                        firstOperands = first.operands
+                        secondOperands = second.operands
+                    }
+                    else -> error("unreachable")
+                }
+                if (firstOperands.size != secondOperands.size) return false
+                for (index in firstOperands.indices) work.addLast(firstOperands[index] to secondOperands[index])
+            }
+        }
+    }
+    return true
 }

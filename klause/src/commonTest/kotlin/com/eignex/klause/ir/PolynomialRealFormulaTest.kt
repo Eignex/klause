@@ -7,6 +7,19 @@ import kotlin.test.assertFailsWith
 
 class PolynomialRealFormulaTest {
     @Test
+    fun `separately built deep equal structures compare without call stack recursion`() {
+        var first: PolynomialRealFormula = PolynomialRealFormula.BooleanVariable(SourceBoolId(0))
+        var second: PolynomialRealFormula = PolynomialRealFormula.BooleanVariable(SourceBoolId(0))
+        repeat(1000) {
+            first = PolynomialRealFormula.And(listOf(first))
+            second = PolynomialRealFormula.And(listOf(second))
+        }
+
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
+
+    @Test
     fun `formula remaps preserve Boolean polarity and strict real relations`() {
         val input = PolynomialRealFormula.Or(
             listOf(
