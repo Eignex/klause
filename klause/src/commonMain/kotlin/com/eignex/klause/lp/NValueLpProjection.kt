@@ -93,10 +93,22 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
 }
 
 internal fun NValue.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
+    var result: LpSizeEstimate? = null
+    sequence<Unit> { result = prepareLpHull(this@estimateLpHull, boxes) }.forEach { }
+    return result
+}
+
+internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: NValue, boxes: RootBoxes): LpSizeEstimate? {
+    val presents = factor.presents
+    val xs = factor.xs
+
     if (presents.isNotEmpty()) return null
-    if (!boxes.statesBothBounds(xs)) return null
+    if (!prepareStatesBothBounds(boxes, xs)) return null
     var cells = 0L
-    for (x in xs) cells += boxes.domain(x).values.size.toLong()
+    for ((position, x) in xs.withIndex()) {
+        cells += boxes.domain(x).values.size.toLong()
+        if ((position + 1) % 256 == 0) yield(Unit)
+    }
     if (cells == 0L || cells > MAX_NVALUE_CELLS) return null
     // z (per var×value) + y (≤ distinct values ≤ cells) columns; y≥z rows + (Σz=1, channel) per
     // var + the count row.

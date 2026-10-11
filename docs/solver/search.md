@@ -110,6 +110,16 @@ An immediately conflicting learned clause watches its two deepest premises. Retr
 therefore opens a watched premise before an unwatched premise can require a fresh unit
 deduction.
 
+General CP optimization builds its private state in retained batches before traversal.
+The projection owns completed occurrence indexes; the state owns domains, literal/event
+watchers, payload slots and its root queue. Assumption installation retains each pending
+decision and fixpoint until it commits its trail mark. Shared component publication is
+batched after those assumptions reach a complete fixpoint. Publication into the private
+shared session does not publish a solver result. Closing or failing installation releases
+that cursor without exposing partial state. Eager propagation/session constructors keep
+their public behavior. The [portfolio contract](portfolio.md#private-cp-preparation)
+defines handoff and [resources](resources.md) define the accounting boundary.
+
 Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights and
 its heap belong to the solve, retain conflict bumps across restarts, and apply bumps
 received before the first selection once during initialization. Fresh selectors isolate

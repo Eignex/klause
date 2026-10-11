@@ -174,7 +174,9 @@ class PropagationState private constructor(
     // pin. A factor is queued iff `propStamp[fid] == propGen`; dequeuing writes `propGen - 1`
     // (any value ≠ propGen) so a factor can still re-enqueue itself within the same run.
     internal val propQueue: IntArrayDeque =
-        prepared?.propQueue ?: (IntArrayDeque(initialCapacity = if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8)))
+        prepared?.propQueue ?: IntArrayDeque(
+            initialCapacity = if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8),
+        )
     private var propStamp: IntArray =
         prepared?.propStamp ?: (IntArray(if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8)))
     private var propGen: Int = 0
@@ -414,7 +416,9 @@ class PropagationState private constructor(
     /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
      *  alongside the learned-clause registry without copying the full array. */
     internal val refPayloadStore: ArrayList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
-        prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply { repeat(problem.numFactors) { add(null) } }
+        prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
+            repeat(problem.numFactors) { add(null) }
+        }
     }
 
     /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every

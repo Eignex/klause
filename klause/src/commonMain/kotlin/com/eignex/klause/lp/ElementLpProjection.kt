@@ -30,6 +30,18 @@ internal fun Element.emitLpRelaxation(builder: RelaxationBuilder) {
 }
 
 internal fun Element.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
+    var result: LpSizeEstimate? = null
+    sequence<Unit> { result = prepareLpHull(this@estimateLpHull, boxes) }.forEach { }
+    return result
+}
+
+internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Element, boxes: RootBoxes): LpSizeEstimate? {
+    val arr = factor.arr
+    val idx = factor.idx
+    val result = factor.result
+    val arrIsVars = factor.arrIsVars
+    val indexOffset = factor.indexOffset
+
     if (arr.size > MAX_ELEM) return null
     if (!boxes.statesBothBounds(idx)) return null
     val box = boxes.domain(idx)

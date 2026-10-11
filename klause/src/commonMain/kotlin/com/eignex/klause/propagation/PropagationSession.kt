@@ -289,6 +289,7 @@ class PropagationSession private constructor(
             if (mark == null) yield(null)
         }
         levelPush(mark)
+        yield(null)
     }
 
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */

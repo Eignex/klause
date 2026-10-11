@@ -52,6 +52,14 @@ expiry leaves private preparation paused; closing discards its cursor. Individua
 runtime allocations and factor calls remain atomic and may overrun the deadline; see
 [initialization boundaries](local-search.md#projections-and-preparation).
 
+General CP optimization construction retains the same private cursor across invocation
+expiry. Index construction, state fills, assumption propagation and model-facing LP/search
+installation checkpoint in fixed batches. Construction scans and primitive allocations
+spend wall time without decision/move charges. Completed propagation visits retain their
+existing slice pricing; final installation transfers fractional marks and debt once.
+Individual runtime allocations and primitive/factor calls can still overrun a checkpoint;
+see [private CP preparation](portfolio.md#private-cp-preparation).
+
 The solve-wide decision/move currency excludes propagation and LP work. Ordinary LS
 instructions and CP repair decisions charge the same containing `NodeBudget`. The
 private clausal primal search and walk also charge that ledger. Their decisions and
