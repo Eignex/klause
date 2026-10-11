@@ -114,13 +114,14 @@ class ComponentPlan internal constructor(
             }
         }
         val boolMap = IntArray(spec.numBoolVars) { it }
+        val mapping = VarRemap(boolMap, sourceToCp)
         val factorIds = factorOwners.indices.filter { factorOwners[it] == FactorOwner.CP }
         val factors = factorIds.map { factor ->
             val sourceFactor = spec.factors[factor]
             require(sourceFactor.intVars.all { sourceToCp[it] >= 0 }) {
                 "CP factor $factor mentions a theory-owned integer column"
             }
-            sourceFactor.remap(VarRemap(boolMap, sourceToCp))
+            sourceFactor.remap(mapping)
         }
             .toTypedArray()
         return CpProblemProjection(

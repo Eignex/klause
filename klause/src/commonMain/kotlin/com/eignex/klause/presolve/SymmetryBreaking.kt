@@ -1045,8 +1045,9 @@ internal object SymmetryBreaking {
         base: Map<StructuralKey, Int>,
         boolMap: IntArray,
         intMap: IntArray,
-    ): Boolean = PresolveShared.matchesMultiset(problem.factors.asList(), base) {
-        it.remap(VarRemap(boolMap, intMap))
+    ): Boolean {
+        val mapping = VarRemap.borrowed(boolMap, intMap)
+        return PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remap(mapping) }
     }
 
     /** Test every unordered pair within [scope] with [verify] (skipping pairs already connected) and
