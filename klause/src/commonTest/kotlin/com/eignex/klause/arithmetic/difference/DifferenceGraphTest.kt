@@ -41,7 +41,7 @@ class DifferenceGraphTest {
             val g = graph(4, Triple(3, 2, -4L), Triple(2, 0, -3L),
                 Triple(0, 1, -2L), Triple(1, 0, returnWeight))
 
-            val values = assertIs<Potentials.Found>(g.potentials()).values
+            val values = assertIs<Potentials.Found>(g.potentials(initial = longArrayOf(100, 0, 500, -100))).values
 
             assertTrue(values[2] <= values[3] - 4L)
             assertTrue(values[0] <= values[2] - 3L)
@@ -54,9 +54,18 @@ class DifferenceGraphTest {
     fun `potentials detect a negative cycle beside an acyclic component`() {
         val g = graph(4, Triple(3, 2, -4L), Triple(0, 1, -2L), Triple(1, 0, 1L))
 
-        val result = g.potentials()
+        val result = g.potentials(initial = longArrayOf(25, 0, 300, -70))
 
         assertEquals(Potentials.Infeasible, result)
+    }
+
+    @Test
+    fun `an overflowing initial potential supplies no witness`() {
+        val g = graph(2, Triple(0, 1, -1L))
+
+        val result = g.potentials(initial = longArrayOf(Long.MIN_VALUE, 0L))
+
+        assertEquals(Potentials.Abandoned, result)
     }
 
     @Test
