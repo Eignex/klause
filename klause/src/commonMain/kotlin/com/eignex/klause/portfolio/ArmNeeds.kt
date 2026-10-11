@@ -58,10 +58,7 @@ internal class ProblemFacts(
             objective: LinearObjective? = null,
         ): ProblemFacts = ProblemFacts(
             profile,
-            binaryIntegers = (0 until problem.numIntVars).all {
-                problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) &&
-                    problem.intBounds.lower(it) >= 0L && problem.intBounds.upper(it) <= 1L
-            },
+            binaryIntegers = problem.binaryIntegers,
             continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
@@ -77,3 +74,12 @@ internal class ProblemFacts(
 
 /** The [Kind] a solve with this profile runs as. */
 internal val ProblemProfile.kind: Kind get() = if (optimizing) Kind.COP else Kind.CSP
+
+internal val BakedProblem.continuousMajority: Boolean
+    get() = numRealVars.toLong() > numBoolVars.toLong() + numIntVars
+
+internal val BakedProblem.binaryIntegers: Boolean
+    get() = (0 until numIntVars).all {
+        intBounds.hasLower(it) && intBounds.hasUpper(it) &&
+            intBounds.lower(it) >= 0L && intBounds.upper(it) <= 1L
+    }

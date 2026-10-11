@@ -167,11 +167,17 @@ guard and conflict-driven core. A curated sequential mixed optimization pool wit
 least six configured slots appends an applicable default LP arm when its configured
 backtrack slots have not admitted it. The appended arm follows the configured workers
 and auxiliary ALNS arm, retaining their positions and seeds. When the objective has no
-continuous coefficient, the auxiliary LP arm joins after the first incumbent, retaining
-the incumbent workers' initial pool. LP ceilings that disable bounding omit the
-auxiliary LP arm and its reservation. Explicit arm pools control admission and
-techniques. Curated single-core mixed optimization reserves half the scheduled time for
-this LP arm when the objective has a continuous coefficient, until the first incumbent.
+continuous coefficient, the auxiliary LP arm joins after the first incumbent.
+Continuous objectives admit it before the first incumbent. LP ceilings that disable
+bounding omit the auxiliary LP arm and its reservation. Explicit arm pools control
+admission and techniques. Curated single-core mixed optimization reserves half the
+scheduled time for this LP arm until the first incumbent when the objective has a
+continuous coefficient and the prepared model has at least as many Boolean and integer
+coordinates combined as real coordinates, or every prepared integer coordinate is bounded
+within zero and one. Continuous-majority models with general integer coordinates retain
+initial LP admission under ordinary family scheduling, allowing incumbent workers to
+compete for initial time while LP can earn progress credit before the improving-phase
+probe. Binary models retain reserved LP descent for their continuous objective.
 Individual segments retain work charging and time caps; the remaining time follows the
 bandit. After the first incumbent, all scheduled time follows the bandit. Explicit
 backtrack pools and parallel lanes retain their requested scheduling. The auxiliary LP
