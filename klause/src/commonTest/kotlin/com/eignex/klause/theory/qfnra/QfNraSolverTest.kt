@@ -133,7 +133,7 @@ class QfNraSolverTest {
         val source = SmtLibPolynomial.parse("""
             (declare-const x Real)
             (declare-const y Real)
-            (assert (and (= x 0) (= (+ (* x y y) y -1) 0)))
+            (assert (and (= x 0) (= (+ (* x y y) y (- 1)) 0)))
             (check-sat)
         """.trimIndent())
 
