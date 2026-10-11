@@ -260,7 +260,8 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                         }
                         else -> {
                             val literal = builder.reifyRelation(
-                                operatorText(operator), IntComb.Narrow(term), IntComb.Narrow(LinComb(emptyMap(), value)),
+                                operatorText(operator), IntComb.Narrow(term),
+                                IntComb.Narrow(LinComb(emptyMap(), value)),
                             )
                             literals.addLast(literal)
                             if (source != null) equalities[Key(source, value, operator)] = literal

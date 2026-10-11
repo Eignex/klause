@@ -57,7 +57,9 @@ class SmtLibConditionalEqualityTest {
             )
             assertIs<ComponentResult.Consistent>(session.initialize())
 
-            assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)))
+            assertIs<SearchResult.Satisfied>(
+                session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
+            )
 
             assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b")))
         }
@@ -79,7 +81,9 @@ class SmtLibConditionalEqualityTest {
             )
             assertIs<ComponentResult.Consistent>(session.initialize())
 
-            assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)))
+            assertIs<SearchResult.Satisfied>(
+                session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
+            )
 
             assertEquals(false, session.boolValue(parsed.boolVarNames.getValue("c")))
         }
