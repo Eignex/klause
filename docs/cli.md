@@ -89,19 +89,19 @@ Solver-control flags are common to **every** mode:
 - `-a` / `--all-solutions`, `-n <count>` — enumeration controls (satisfy).
 - `-i` — accepted as a no-op (improving incumbents already stream on the optimize path).
 - `-f` / `--free-search` — ignore the model's search annotations. Alias for `-e cp` (the free
-  backtrack portfolio); with no `-f` and no `-e`, the default engine is `fixed`.
+  backtrack portfolio); with no `-f` and no `-e`, the default engine is `mixed`.
 - `-t <ms>` time limit, `-r <seed>`, `-s` statistics, `-v` verbose.
 - `-p <n>` — MiniZinc-standard parallelism (core count). The portfolio engines (`backtrack`/`mixed`/`localsearch`)
   run sequentially at `n=1` and as an `n`-worker parallel pool at `n>1`; the naked engine
   (`fixed`) is single-core. Pool size auto-tunes from `n`, overridable with
   `--param arms=N` (or the `ls=N`/`bt=N` split).
 - `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.engine` property):
-  - `fixed` *(default)* — a single naked backtrack. It follows a FlatZinc `int_search` annotation;
+  - `fixed` — a single naked backtrack. It follows a FlatZinc `int_search` annotation;
     for a finite model with no annotation (DIMACS, OPB, and unannotated FlatZinc/XCSP3/MPS), it uses
     the standard conflict-driven heuristic. In that unannotated case, `var-selector` and `val-selector`
     are accepted as the heuristic for the one fixed run. They remain rejected when an annotation is
     present; use `-e cp` for a free-search portfolio.
-  - `backtrack` (alias `bt`, `cp`) — backtrack-only portfolio (free). `mixed` — bt+ls portfolio.
+  - `backtrack` (alias `bt`, `cp`) — backtrack-only portfolio (free). `mixed` *(default)* — bt+ls portfolio.
     `localsearch` (alias `ls`) — local-search portfolio.
   - `backtrack` also accepts the per-solver `var-selector`/`val-selector` (and `luby`/`phase-saving`/…)
     `--param`s: they edit the arm pool across its arms (so `-p8` stays a full pool with the override
@@ -134,6 +134,10 @@ Solver-control flags are common to **every** mode:
   - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
     `smooth-factor`; recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
     (`greedy|walksat|probsat|skew|sa`), `cb`, `skew-alpha`, `cooling-rate`, `initial-temp`, `min-temp`
+  - portfolio slices: `slice-work` (positive, default `5000`), `slice-max-work` (at least
+    `slice-work`, default `150000`) and `slice-growth` (finite and at least `1`, default `1.5`).
+    Under `-s`, `portfolioBaseSliceWork`, `portfolioMaxSliceWork` and `portfolioSliceGrowth`
+    report the effective policy, including omitted defaults.
   - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`, `ls-residuals` (boolean,
     default `false`). Residual reporting observes ordinary LS arms without changing
     their recipes; ALNS bootstrap is excluded. Under `-s`, `lsBestResidualViolation`

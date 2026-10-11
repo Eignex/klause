@@ -122,10 +122,10 @@ class LpPropagatorTest {
         ))
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
-            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            assertTrue(lp.editSources(assertNotNull(sources.prepare(assertNotNull(lp.state), domains))))
             val before = assertNotNull(lp.state)
-            val first = sources.prepare(before, domains)
-            val stale = sources.prepare(before, domains)
+            val first = assertNotNull(sources.prepare(before, domains))
+            val stale = assertNotNull(sources.prepare(before, domains))
             assertTrue(lp.editSources(first))
 
             assertFalse(lp.editSources(stale))
@@ -173,14 +173,14 @@ class LpPropagatorTest {
         )
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             assertTrue(lp.install(sources, LpRetainedSources.emptyModel()))
-            val root = sources.prepare(assertNotNull(lp.state), domains)
+            val root = assertNotNull(sources.prepare(assertNotNull(lp.state), domains))
             assertTrue(lp.editSources(root) { _, _ -> SearchAtomPremise.All(emptyList()) })
             assertEquals(BigFraction.ofLong(4L), assertNotNull(lp.solve()).lowerBound)
             assertEquals(1L, lp.metrics?.preparationAttempts)
             assertTrue(assertIs<SearchAtomPremise.All>(lp.activeBoundPremise(0, false)).premises.isEmpty())
             assertTrue(lp.atLevel(1))
             live = live.withMinAtLeast(6L)
-            val child = sources.prepare(assertNotNull(lp.state), domains)
+            val child = assertNotNull(sources.prepare(assertNotNull(lp.state), domains))
 
             assertTrue(lp.editSources(child))
 
@@ -194,7 +194,7 @@ class LpPropagatorTest {
             assertEquals(2L, lp.metrics?.createdOwners)
             assertTrue(assertIs<SearchAtomPremise.All>(lp.activeBoundPremise(0, false)).premises.isEmpty())
             live = problem.finiteIntDomain(0)
-            assertTrue(lp.editSources(sources.prepare(assertNotNull(lp.state), domains)))
+            assertTrue(lp.editSources(assertNotNull(sources.prepare(assertNotNull(lp.state), domains))))
             assertEquals(BigFraction.ofLong(3L), assertNotNull(lp.solve()).lowerBound)
             assertEquals(3L, lp.metrics?.createdOwners)
         }

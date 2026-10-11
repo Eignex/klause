@@ -131,12 +131,18 @@ data class PortfolioScenario(
     val reportLsResiduals: Boolean = false,
     /** Record the ordinary local-search arms' active phase times. Disabled by default. */
     val reportLsPhaseTimes: Boolean = false,
+    /** Maximum node-equivalent allowance of a counted segment. */
+    val maxSliceWork: Long = 150_000L,
+    /** Geometric growth after an ordinary scheduled segment; preparation revisits keep the base allowance. */
+    val sliceGrowth: Double = 1.5,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
         require(arms >= 1) { "arms must be ≥ 1" }
         require(clauseShareMaxLbd >= 0 && clauseShareMaxLen >= 0) { "clause-share filter bounds must be ≥ 0" }
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be >= 0" }
+        require(sliceWork > 0L && maxSliceWork >= sliceWork) { "invalid work slice bounds" }
+        require(sliceGrowth.isFinite() && sliceGrowth >= 1.0) { "sliceGrowth must be finite and >= 1" }
         require(phaseRetention in 0.0..1.0) { "phaseRetention must be in [0, 1]" }
     }
 

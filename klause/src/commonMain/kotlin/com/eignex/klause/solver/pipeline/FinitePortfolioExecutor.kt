@@ -45,6 +45,8 @@ fun FinitePipeline.portfolioExecutor(
         workers,
         lanes = scenario.cores,
         baseSliceWork = scenario.sliceWork,
+        maxSliceWork = scenario.maxSliceWork,
+        sliceGrowth = scenario.sliceGrowth,
         phaseRetention = scenario.phaseRetention,
         reseedStaleThreshold = scenario.reseedStaleThreshold,
         profile = profile,

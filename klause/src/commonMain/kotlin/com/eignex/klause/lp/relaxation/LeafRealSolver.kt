@@ -65,7 +65,7 @@ internal class LeafRealSolver(
             override fun boolValue(varId: Int): Boolean = sample.bools[varId]
         }
         val staged = LpBoundTrail(trail.state)
-        var edit = sources.prepare(staged.state, domains, cancellation)
+        var edit = sources.prepare(staged.state, domains, cancellation) ?: return null
         val weakens = (0 until staged.state.model.n).any { column ->
             val previous = staged.state.model.column(column).bounds
             val requested = edit.bounds[column]
@@ -74,7 +74,7 @@ internal class LeafRealSolver(
         }
         if (weakens) {
             if (!staged.resetRoot(cancellation)) return null
-            edit = sources.prepare(staged.state, domains, cancellation)
+            edit = sources.prepare(staged.state, domains, cancellation) ?: return null
         }
         val assertions = edit.boundAssertions(nextWitness, cancellation) ?: return null
         val before = staged.state.assertions.size

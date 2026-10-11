@@ -93,6 +93,12 @@ file in the stack can be flakes; rerun before investigating. A finding naming a
 file and rule needs investigation. Check the named symbol for Dokka translation
 failures.
 
+All library modules and the CLI use the same JVM and Linux x64 default targets.
+`klause-numerics` and `klause-lattice` publish alongside `klause`, with their own
+ABI snapshots and numerical tests. The JVM CI job runs each module's `check`; the
+Native job tests both numerical leaves and the solver, then links and starts the
+release CLI executable. The JVM job installs and starts the CLI distribution,
+checking that its runtime dependencies are packaged.
 The default build targets JVM and Linux x64. Releases opt into Linux arm64 and
 macOS arm64 with `-Ptargets.full`. Native tests and documentation checks run in
 CI. Benchmarks, capture and timing tools are opt-in; see [benchmarking](../klause-bench/README.md).

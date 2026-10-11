@@ -583,6 +583,8 @@ fun buildPortfolioScenario(
     val clauseShareLbd = p.int("clause-share-lbd")
     val clauseShareLen = p.int("clause-share-len")
     val sliceWork = p.long("slice-work")
+    val maxSliceWork = p.long("slice-max-work")
+    val sliceGrowth = p.double("slice-growth")
     val phaseRetention = p.double("phase-retention")
     val reseedStaleThreshold = p.int("reseed-stale-threshold")
     val reportLsResiduals = p.bool("ls-residuals") ?: false
@@ -590,7 +592,14 @@ fun buildPortfolioScenario(
     if (reseedStaleThreshold != null && reseedStaleThreshold < 0) {
         pipelineConfigError("reseed-stale-threshold must be >= 0")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    if (sliceWork != null && sliceWork <= 0L) pipelineConfigError("slice-work must be > 0")
+    val effectiveSliceWork = sliceWork ?: PortfolioScenario.DEFAULT_SLICE_WORK
+    val effectiveMaxSliceWork = maxSliceWork ?: 150_000L
+    if (effectiveMaxSliceWork < effectiveSliceWork) pipelineConfigError("slice-max-work must be >= slice-work")
+    if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
+        pipelineConfigError("slice-growth must be finite and >= 1")
+    }
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -624,10 +633,12 @@ fun buildPortfolioScenario(
         nodeBudget = nodeBudget,
         reportLsResiduals = reportLsResiduals,
         reportLsPhaseTimes = reportLsPhaseTimes,
+        sliceWork = effectiveSliceWork,
+        maxSliceWork = effectiveMaxSliceWork,
+        sliceGrowth = sliceGrowth ?: 1.5,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
-    sliceWork?.let { scenario = scenario.copy(sliceWork = it) }
     phaseRetention?.let { scenario = scenario.copy(phaseRetention = it) }
     reseedStaleThreshold?.let { scenario = scenario.copy(reseedStaleThreshold = it) }
     return scenario

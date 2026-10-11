@@ -353,6 +353,11 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "profile" to "${it.problemClass} optimizing=${it.optimizing} wide=${it.wide} scheduling=${it.scheduling}"
     }
     val reseeding = stats.portfolio.reseedStaleThreshold?.let { "portfolioReseedStaleThreshold" to "$it" }
+    val slices = listOfNotNull(
+        stats.portfolio.baseSliceWork?.let { "portfolioBaseSliceWork" to "$it" },
+        stats.portfolio.maxSliceWork?.let { "portfolioMaxSliceWork" to "$it" },
+        stats.portfolio.sliceGrowth?.let { "portfolioSliceGrowth" to "$it" },
+    )
     val schedule = stats.portfolio.arms.map { arm ->
         val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
         val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
@@ -384,7 +389,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
         "alnsRepairMillis" to "${alns.repairMillis}",
     )
-    return listOfNotNull(profile, reseeding) + schedule + failures + inner
+    return listOfNotNull(profile, reseeding) + slices + schedule + failures + inner
 }
 
 private fun diagnosticString(value: String): String = buildString {
@@ -542,6 +547,8 @@ internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
         e.allowance?.let { out += "presolveWorkAllowance" to "$it" }
         e.rounds?.let { out += "presolveRoundEntries" to "$it" }
         e.probeCalls?.let { out += "presolveProbeCalls" to "$it" }
+        e.rootConstructionEntries?.let { out += "presolveRootConstructionEntries" to "$it" }
+        e.rootPropagationWork?.let { out += "presolveRootPropagationWork" to "$it" }
         for ((id, calls) in e.passCalls.entries.sortedBy { it.key }) out += "presolveCalls_$id" to "$calls"
     }
     if (p.passes.isNotEmpty()) out += "presolvePasses" to p.passes.joinToString(",")

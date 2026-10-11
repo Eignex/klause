@@ -49,6 +49,13 @@ portfolios install the scoped verification contract.
 
 ## Slice accounting and coverage
 
+The counted schedule starts at 5000 node equivalents, grows by 1.5 after an ordinary
+scheduled segment, and caps at 150000. Growth belongs to the shared schedule, rather
+than to each arm. Initial probes and private-preparation revisits use the base allowance;
+revisits do not grow the schedule. Counted segments also retain their elapsed-time cap.
+The finite CLI exposes `slice-work`, `slice-max-work` and `slice-growth` for controlled
+comparisons, and reports all three effective settings in portfolio statistics.
+
 Resumable backtrack arms charge decisions, propagation visits and completed LP work to
 their scheduler. The current conversion is one slice node per 4000 propagation visits
 and per 600 LP work units. Construction is charged once; fractional charges carry

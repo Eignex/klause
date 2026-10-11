@@ -25,6 +25,24 @@ import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
     @Test
+    fun `a mixed leaf with an unrepresentable integer cost remains indeterminate`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0L, 1L)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+        )
+        val objective = LinearObjective(
+            intCoefficients = longArrayOf(9007199254740993L), realCoefficients = doubleArrayOf(1.0),
+        )
+        val sample = Sample(booleanArrayOf(), longArrayOf(0L))
+
+        LeafRealSolver(problem, objective).use { owner ->
+            val result = owner.solve(sample)
+
+            assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        }
+    }
+
+    @Test
     fun `finite fractional product leaves preserve fresh exact refutations`() {
         val problem = Problem(
             0, 0, emptyArray(),
