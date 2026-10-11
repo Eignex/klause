@@ -156,8 +156,11 @@ internal class ResumableMinimize(
     private val startMark = TimeSource.Monotonic.markNow()
 
     // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
+    private var clausePrimal: MonotoneClausePrimal? = null
+    private var clausePrimalStarted = false
+    private var clausePrimalCandidate: Sample? = null
     private val slice = SliceBudget(
-        { sink.search.searchWork },
+        { sink.search.searchWork + (clausePrimal?.work ?: 0L) },
         { lpEngine.totalSolveWork() + sink.lp.standaloneWork },
         { session.work },
     )
@@ -409,9 +412,14 @@ internal class ResumableMinimize(
         closed = true
         var failure: Throwable? = null
         try {
-            lpEngine.close()
+            clausePrimal?.close()
         } catch (closeFailure: Throwable) {
             failure = closeFailure
+        }
+        try {
+            lpEngine.close()
+        } catch (closeFailure: Throwable) {
+            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
         }
         try {
             leafSolver?.close()
@@ -498,6 +506,24 @@ internal class ResumableMinimize(
             done?.let { return StepEvent.Terminal(it) }
             check(!closed) { "search is closed" }
             if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
+            if (!clausePrimalStarted) {
+                clausePrimalStarted = true
+                if (!rebindable && initialCandidate == null && externalCutoff() == Double.POSITIVE_INFINITY) {
+                    val lifetime = runEndToken().shorten(0.25) or Cancellation.after(2_500.milliseconds)
+                    clausePrimal = MonotoneClausePrimal.create(solver, objective, params, lifetime)
+                }
+            }
+            clausePrimal?.let { primal ->
+                if (clausePrimalCandidate == null) clausePrimalCandidate = primal.advance()
+                clausePrimalCandidate?.let { sample ->
+                    if (pausable && sliceCancelled()) return StepEvent.Paused
+                    val published = publishLpProposal(sample)
+                    clausePrimalCandidate = null
+                    if (published != null) return StepEvent.Incumbent(published)
+                }
+                if (!primal.isDone && pausable && sliceCancelled()) return StepEvent.Paused
+                if (primal.isDone) primal.close()
+            }
             if (firstRun) {
                 firstRun = false
                 firstRunWork()?.let { return StepEvent.Incumbent(it) }
