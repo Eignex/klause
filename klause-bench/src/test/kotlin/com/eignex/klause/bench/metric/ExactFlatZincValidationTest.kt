@@ -27,6 +27,30 @@ class ExactFlatZincValidationTest {
     """.trimIndent()
 
     @Test
+    fun `rounded cylinder bound cannot accept an exact binary64 product`() {
+        val source = "var 50..200: n; var 50.0..200.0: raw; var 0.5..2.0: scaled; constraint int2float(n, raw); constraint float_lin_eq([0.01, -1.0], [raw, scaled], 0.0); solve satisfy;"
+        val exact = "n = 200; raw = 200; scaled = 144115188075855875/72057594037927936;"
+        val rounded = "n = 200; raw = 200; scaled = 2;"
+        val interior = "n = 199; raw = 199; scaled = 1147156897083812765/576460752303423488;"
+
+        assertEquals("invalid", ExactFlatZincValidation.inspect(source, exact, null).status)
+        assertEquals("invalid", ExactFlatZincValidation.inspect(source, rounded, null).status)
+        val valid = ExactFlatZincValidation.inspect(source, interior, null)
+        assertEquals("valid", valid.status, valid.reason)
+        assertEquals("flatzinc-binary64", valid.scope)
+    }
+
+    @Test
+    fun `mixed components are checked together against original predicates`() {
+        val source = "var 0.0..1.0: exact; var 0.0..1.0: grid; constraint float_lin_eq([3.0], [exact], 1.0); constraint float_le(grid, 0.5); solve satisfy;"
+        val coordinates = "exact = 1/3; grid = 1/2;"
+
+        assertEquals("valid", ExactFlatZincValidation.inspect(source, coordinates, null).status)
+        assertEquals("invalid", ExactFlatZincValidation.inspect(source, coordinates.replace("grid = 1/2", "grid = 3/4"), null).status)
+        assertEquals("invalid", ExactFlatZincValidation.inspect(source, coordinates.replace("exact = 1/3", "exact = 0.3333333333333333"), null).status)
+    }
+
+    @Test
     fun `original voltage divider predicates and bounds accept exact coordinates`() {
         val result = ExactFlatZincValidation.inspect(voltage, coordinates, null)
 

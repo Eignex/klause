@@ -18,6 +18,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.FloatBucketing
+import com.eignex.klause.lowering.FloatRepresentation
 import com.eignex.klause.util.CharReader
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
@@ -60,6 +61,7 @@ internal class FlatZincCompiler(
     internal val intVars = HashMap<String, Int>()
     internal val booleanIntegerChannels = HashMap<Int, Int>()
     internal var lowerBooleanZeroSums: Boolean = true
+    internal var floatRepresentations: Map<String, FloatRepresentation> = emptyMap()
     internal val floatVars = HashMap<String, FloatBucketing>()
     internal val arrays = HashMap<String, FlatZincArray>()
     internal val intDomains = ArrayList<IntDomain>()
@@ -88,7 +90,8 @@ internal class FlatZincCompiler(
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
     internal fun compile(onLowered: ((FlatZincCompiler, SolveDirective) -> Unit)? = null): FlatZincProgram {
-        lpOnlyFloats = selectFloatNames()
+        floatRepresentations = selectFloatRepresentations()
+        lpOnlyFloats = floatRepresentations.filterValues { !it.approximate }.keys
         processDeclarations()
         integerFloatImages.putAll(collectIntegerFloatImages(onlyRealColumns = true))
         collectAffineFloatImages()
@@ -162,6 +165,7 @@ internal class FlatZincCompiler(
             searchHints = compileSearchAnnotation(),
             enumLabelsByVar = enumLabelsByVar.toMap(),
             setVarsByName = setVarsByName.toMap(),
+            floatRepresentations = floatRepresentations,
         )
     }
 

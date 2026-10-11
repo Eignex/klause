@@ -1,11 +1,11 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

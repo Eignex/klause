@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.lowering.FloatRepresentation
 import com.eignex.klause.util.IntDisjointSet
 
 internal const val DEFAULT_FLOAT_CHOICE_LIMIT = 4096
@@ -12,10 +13,10 @@ private val FLOAT_LINEAR_NAMES = setOf(
     "float_abs", "float_min", "float_max", "array_float_element",
 )
 
-internal fun FlatZincCompiler.selectFloatNames(): Set<String> {
+internal fun FlatZincCompiler.selectFloatRepresentations(): Map<String, FloatRepresentation> {
     val hasFloatColumns = model.varDecls.any { it.isVar && it.type.hasFloats() }
     val hasExactSelection = exactFloats && model.constraints.any { it.name == "array_float_element" }
-    if (!hasFloatColumns && !hasExactSelection) return emptySet()
+    if (!hasFloatColumns && !hasExactSelection) return emptyMap()
     // Resolve aliases before assigning real and integer ids, whose namespaces overlap.
     val declarations = FlatZincCompiler(
         model,
@@ -55,9 +56,9 @@ private class FloatChoicePlanner(
         declarations.needsRoundedFloatBounds(variable, image, limit)
     }.keys
     private val costs = HashMap<Int, Long>()
-    private val blocked = HashSet<Int>()
+    private val blocked = HashMap<Int, String>()
 
-    fun select(): Set<String> {
+    fun select(): Map<String, FloatRepresentation> {
         for (ids in references) for (id in ids.drop(1)) components.union(ids.first(), id)
         for (domain in domains.values) recordChoices(domain)
         for ((i, c) in model.constraints.withIndex()) {
@@ -74,7 +75,7 @@ private class FloatChoicePlanner(
             val root = components.find(ids.first())
             declarations.locateConstraint(c)
             if (ids.any { it in roundedBounds }) {
-                decline(root, c, "finite float bounds require rounded arithmetic")
+                decline(root, c, "finite float bounds require rounded arithmetic; exact FlatZinc uses binary64 rational literals and preserves declared bounds")
                 continue
             }
             val alternatives = domains[i]?.values?.size ?: alternatives(c)
@@ -92,15 +93,20 @@ private class FloatChoicePlanner(
             is FznSolve.Maximize -> variables(solve.obj)
             else -> emptyList()
         }.mapTo(HashSet()) { components.find(it) }
-        return declarations.floatVars.filterValues {
-            val root = components.find(it.varId)
-            root !in blocked && (exact || root in finite || (root !in costs && root !in objective))
-        }.keys
+        return declarations.floatVars.mapValues { (_, variable) ->
+            val root = components.find(variable.varId)
+            val reason = blocked[root] ?: if (exact || root in finite || (root !in costs && root !in objective)) {
+                null
+            } else {
+                "continuous component without finite choices"
+            }
+            FloatRepresentation(root, reason)
+        }
     }
 
     private fun decline(root: Int, c: FznConstraint, reason: String) {
         if (exact) throw UnsupportedFlatZincException(reason, c.line, c.col)
-        blocked.add(root)
+        blocked.putIfAbsent(root, reason)
     }
 
     private fun recordChoices(domain: FiniteFloatDomain) {

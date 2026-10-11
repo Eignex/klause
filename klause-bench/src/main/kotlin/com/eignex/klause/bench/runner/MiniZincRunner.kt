@@ -5,8 +5,8 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.formats.flatzinc.SolveDirective
-import com.eignex.klause.solver.pipeline.linearObjective
-import com.eignex.klause.solver.pipeline.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption

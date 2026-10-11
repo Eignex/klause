@@ -7,7 +7,6 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

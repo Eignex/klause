@@ -1,6 +1,11 @@
 package com.eignex.klause.formats.flatzinc
 
-/** Neutral search-annotation metadata extracted from `solve :: ..._search(...)` clauses. */
+import com.eignex.klause.ir.SearchGroup
+import com.eignex.klause.ir.SearchHints
+import com.eignex.klause.ir.ValueSelection
+import com.eignex.klause.ir.VariableSelection
+
+/** FlatZinc search-annotation metadata extracted from `solve :: ..._search(...)` clauses. */
 data class FlatZincSearchHints(
     /** Parsed per-tier variable sets and heuristics. */
     val tiers: List<FlatZincSearchTier>,
@@ -70,4 +75,37 @@ enum class FlatZincSearchValueSelector {
 
     /** Parse `indomain_random` as a value selection heuristic. */
     IndomainRandom,
+}
+
+/** Translate parsed FlatZinc annotation policy into finite execution intent. */
+fun FlatZincSearchHints.toSearchHints(): SearchHints = SearchHints(
+    tiers = tiers.map { tier ->
+        SearchGroup(
+            tier.boolVars.copyOf(), tier.intVars.copyOf(),
+            tier.varSelector.toSelection(), tier.valueSelector.toSelection(),
+        )
+    },
+    fallbackVarSelector = fallbackVarSelector.toSelection(),
+    fallbackValueSelector = fallbackValueSelector.toSelection(),
+    solutionGuided = solutionGuided,
+)
+
+private fun FlatZincSearchVarSelector.toSelection(): VariableSelection = when (this) {
+    FlatZincSearchVarSelector.InputOrder -> VariableSelection.InputOrder
+    FlatZincSearchVarSelector.SmallestDomain -> VariableSelection.SmallestDomain
+    FlatZincSearchVarSelector.LargestDomain -> VariableSelection.LargestDomain
+    FlatZincSearchVarSelector.DomWdeg -> VariableSelection.DomWdeg
+    FlatZincSearchVarSelector.SmallestLowerBound -> VariableSelection.SmallestLowerBound
+    FlatZincSearchVarSelector.LargestUpperBound -> VariableSelection.LargestUpperBound
+    FlatZincSearchVarSelector.MaxRegret -> VariableSelection.MaxRegret
+    FlatZincSearchVarSelector.RandomOrder -> VariableSelection.RandomOrder
+}
+
+private fun FlatZincSearchValueSelector.toSelection(): ValueSelection = when (this) {
+    FlatZincSearchValueSelector.IndomainMin -> ValueSelection.Minimum
+    FlatZincSearchValueSelector.IndomainMax -> ValueSelection.Maximum
+    FlatZincSearchValueSelector.IndomainMiddle -> ValueSelection.Middle
+    FlatZincSearchValueSelector.IndomainMedian -> ValueSelection.Median
+    FlatZincSearchValueSelector.IndomainSplit -> ValueSelection.Split
+    FlatZincSearchValueSelector.IndomainRandom -> ValueSelection.Random
 }

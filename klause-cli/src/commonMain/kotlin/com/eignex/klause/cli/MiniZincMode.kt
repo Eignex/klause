@@ -1,15 +1,16 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.flatzinc.OznApplier
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
+import com.eignex.klause.formats.flatzinc.linearObjective
+import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.toSearchHints
+import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.pipeline.OznApplier
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.solver.pipeline.linearObjective
-import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import com.eignex.klause.solver.pipeline.pipelineRoute
-import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import com.eignex.klause.solver.result.SolveStats
 
 /**
@@ -139,7 +140,7 @@ internal object MiniZincMode : CliMode {
                     definitionalSweep = executionProgram.definitionalSweep,
                     render = render,
                     objectiveValue = null,
-                    searchHints = program.searchHints,
+                    searchHints = program.searchHints?.toSearchHints(),
                 )
 
                 is SolveDirective.Minimize, is SolveDirective.Maximize -> {
@@ -169,7 +170,7 @@ internal object MiniZincMode : CliMode {
                         } else {
                             null
                         },
-                        searchHints = program.searchHints,
+                        searchHints = program.searchHints?.toSearchHints(),
                     )
                 }
             }

@@ -1,13 +1,27 @@
-package com.eignex.klause.solver.pipeline
+package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.util.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class FlatZincSolutionWriterTest {
+    @Test
+    fun `mixed components preserve exact coordinates and grid provenance`() {
+        val program = parseFlatZinc("var 0.0..1.0: exact; var 0.0..1.0: grid; constraint float_le(grid, 0.5); solve satisfy;", floatBuckets = 3)
+        val third = BigFraction.of(bigIntOf(1), bigIntOf(3))
+        val sample = Sample(BooleanArray(program.problem.numBoolVars), longArrayOf(1), doubleArrayOf(third.toDouble()), listOf(third))
+
+        val output = writeFlatZincSolution(program, sample)
+
+        assertTrue("% klause-exact: exact = 1/3;" in output)
+        assertTrue("% klause-exact: grid = 1/2;" in output)
+        assertTrue("% klause-float-component: grid = grid" in output)
+        assertTrue("reason=continuous component without finite choices" in output)
+    }
+
     @Test
     fun `certified rational coordinates accompany standard decimal assignments`() {
         val program = parseFlatZinc("var float: x; solve minimize x;", exactFloats = true)

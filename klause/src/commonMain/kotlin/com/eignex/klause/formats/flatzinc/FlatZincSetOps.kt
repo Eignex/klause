@@ -43,7 +43,7 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
             for (zi in z.elements.indices) {
                 val k = z.elements[zi]
                 val zBit = z.indicatorBoolIds[zi]
-                val yIdxInSet = ySet.elements.binarySearchInt(k)
+                val yIdxInSet = ySet.layout.indexOf(k)
                 if (yIdxInSet < 0) {
                     factors.add(
                         Clause(
@@ -149,7 +149,7 @@ internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
             val a = sets[i]
             val b = sets[j]
             for (ai in a.elements.indices) {
-                val bi = b.elements.binarySearchInt(a.elements[ai])
+                val bi = b.layout.indexOf(a.elements[ai])
                 if (bi >= 0) {
                     factors.add(
                         Clause(
@@ -178,7 +178,7 @@ internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
             val uBit = u.indicatorBoolIds[i]
             val parts = IntArrayList()
             for (s in sets) {
-                val si = s.elements.binarySearchInt(e)
+                val si = s.layout.indexOf(e)
                 if (si >= 0) parts.add(Lit.make(s.indicatorBoolIds[si], true))
             }
             if (parts.isEmpty()) {
@@ -194,7 +194,7 @@ internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
         for (e in uniq) {
             val parts = IntArrayList()
             for (s in sets) {
-                val si = s.elements.binarySearchInt(e)
+                val si = s.layout.indexOf(e)
                 if (si >= 0) parts.add(Lit.make(s.indicatorBoolIds[si], true))
             }
             if (parts.isEmpty()) {
@@ -224,7 +224,7 @@ internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout,
     }
     for (i in s.elements.indices) {
         val sBit = s.indicatorBoolIds[i]
-        val tIdx = t.elements.binarySearchInt(s.elements[i])
+        val tIdx = t.layout.indexOf(s.elements[i])
         val aux = allocBool("__eq_aux_${s.name}_${t.name}_${s.elements[i]}")
         auxes.add(Lit.make(aux, true))
         if (tIdx < 0) {
@@ -235,7 +235,7 @@ internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout,
         }
     }
     for (i in t.elements.indices) {
-        if (s.elements.binarySearchInt(t.elements[i]) < 0) {
+        if (s.layout.indexOf(t.elements[i]) < 0) {
             val tBit = t.indicatorBoolIds[i]
             val aux = allocBool("__eq_aux_${s.name}_${t.name}_only_t_${t.elements[i]}")
             auxes.add(Lit.make(aux, true))
@@ -287,8 +287,8 @@ internal fun FlatZincCompiler.emitSetUnion(c: FznConstraint) {
     for (i in u.elements.indices) {
         val e = u.elements[i]
         val uBit = u.indicatorBoolIds[i]
-        val sIdx = s.elements.binarySearchInt(e)
-        val tIdx = t.elements.binarySearchInt(e)
+        val sIdx = s.layout.indexOf(e)
+        val tIdx = t.layout.indexOf(e)
         when {
             sIdx >= 0 && tIdx >= 0 -> {
                 val sBit = s.indicatorBoolIds[sIdx]
@@ -316,12 +316,12 @@ internal fun FlatZincCompiler.emitSetUnion(c: FznConstraint) {
         }
     }
     for (i in s.elements.indices) {
-        if (u.elements.binarySearchInt(s.elements[i]) < 0) {
+        if (u.layout.indexOf(s.elements[i]) < 0) {
             factors.add(Clause(intArrayOf(Lit.make(s.indicatorBoolIds[i], false))))
         }
     }
     for (i in t.elements.indices) {
-        if (u.elements.binarySearchInt(t.elements[i]) < 0) {
+        if (u.layout.indexOf(t.elements[i]) < 0) {
             factors.add(Clause(intArrayOf(Lit.make(t.indicatorBoolIds[i], false))))
         }
     }
@@ -335,8 +335,8 @@ internal fun FlatZincCompiler.emitSetIntersect(c: FznConstraint) {
     for (i in u.elements.indices) {
         val e = u.elements[i]
         val uBit = u.indicatorBoolIds[i]
-        val sIdx = s.elements.binarySearchInt(e)
-        val tIdx = t.elements.binarySearchInt(e)
+        val sIdx = s.layout.indexOf(e)
+        val tIdx = t.layout.indexOf(e)
         if (sIdx >= 0 && tIdx >= 0) {
             val sBit = s.indicatorBoolIds[sIdx]
             val tBit = t.indicatorBoolIds[tIdx]
@@ -361,13 +361,13 @@ internal fun FlatZincCompiler.emitSetDiff(c: FznConstraint) {
     for (i in u.elements.indices) {
         val e = u.elements[i]
         val uBit = u.indicatorBoolIds[i]
-        val sIdx = s.elements.binarySearchInt(e)
+        val sIdx = s.layout.indexOf(e)
         if (sIdx < 0) {
             factors.add(Clause(intArrayOf(Lit.make(uBit, false))))
             continue
         }
         val sBit = s.indicatorBoolIds[sIdx]
-        val tIdx = t.elements.binarySearchInt(e)
+        val tIdx = t.layout.indexOf(e)
         if (tIdx < 0) {
             factors.add(Clause(intArrayOf(Lit.make(sBit, false), Lit.make(uBit, true))))
             factors.add(Clause(intArrayOf(Lit.make(sBit, true), Lit.make(uBit, false))))

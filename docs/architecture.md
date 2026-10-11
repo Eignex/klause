@@ -97,6 +97,11 @@ theory decisions. Components can maintain private residual state through
 `SearchIntValue` and `SearchRealValue` assignments let each component contribute
 only the values it owns.
 
+Frontend-owned execution adapters translate search annotations into `ir.SearchHints`
+and retain source rendering and protocol behavior. Float representation provenance
+is shared lowering data; source planners choose each connected component
+independently. See [input semantics](formats.md#execution-metadata-and-schema-floats).
+
 Frontends call the [pipeline](../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/)
 and render its result. They do not invoke concrete theories directly. Open routing
 can prove missing bounds before selecting the finite lane; it retains the source

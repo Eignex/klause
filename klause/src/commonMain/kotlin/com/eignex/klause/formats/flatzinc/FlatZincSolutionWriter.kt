@@ -1,14 +1,9 @@
-package com.eignex.klause.solver.pipeline
+package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.formats.flatzinc.*
-import com.eignex.klause.formats.flatzinc.FlatZincArray
-import com.eignex.klause.formats.flatzinc.FlatZincProgram
-import com.eignex.klause.formats.flatzinc.OutputItem
-import com.eignex.klause.formats.flatzinc.SetVarLayout
-import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.parseBigInt
 
@@ -96,8 +91,19 @@ internal fun writeFlatZincExactCoordinates(
     outputObjective: Boolean = false,
 ): String {
     val sb = StringBuilder()
-    if (program.floatVarsByName.values.any { it.lpOnly } &&
-        program.floatVarsByName.values.all { it.lpOnly && sample.exactRealValue(it.varId) != null }
+    if (program.floatVarsByName.isNotEmpty()) {
+        sb.append("% klause-float-semantics: flatzinc-binary64\n")
+        for ((name, b) in program.floatVarsByName.toSortedMap()) {
+            val representation = program.floatRepresentations[name]
+            val kind = if (b.lpOnly) "exact" else "grid"
+            sb.append("% klause-float-component: $name = $kind")
+            representation?.let { sb.append(" component=${it.component}") }
+            if (!b.lpOnly) sb.append(" reason=${representation?.approximation ?: "finite grid"}")
+            sb.append('\n')
+        }
+    }
+    if (program.floatVarsByName.isNotEmpty() &&
+        program.floatVarsByName.values.all { !it.lpOnly || sample.exactRealValue(it.varId) != null }
     ) {
         for ((name, id) in program.boolVarsByName) {
             sb.append("% klause-exact: $name = ${sample.boolValue(id)};\n")
@@ -108,7 +114,8 @@ internal fun writeFlatZincExactCoordinates(
             }
         }
         for ((name, b) in program.floatVarsByName) {
-            val value = sample.exactRealValue(b.varId)
+            val value = if (b.lpOnly) sample.exactRealValue(b.varId) else
+                BigFraction.ofDouble(sample.floatValue(b))?.toString()
             sb.append("% klause-exact: $name = $value;\n")
         }
         if (outputObjective) {
@@ -117,7 +124,8 @@ internal fun writeFlatZincExactCoordinates(
                 val value = if (b?.lpOnly == true) {
                     sample.exactRealValue(b.varId)
                 } else {
-                    renderScalar(program, sample, name)
+                    if (b != null) BigFraction.ofDouble(sample.floatValue(b))?.toString() else
+                        renderScalar(program, sample, name)
                 }
                 sb.append("% klause-exact: _objective = $value;\n")
             }

@@ -2,6 +2,8 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.FloatBucketing
+import com.eignex.klause.lowering.FloatRepresentation
+import com.eignex.klause.lowering.SetLayout
 
 /** Compiled FlatZinc model plus metadata used by solution writing and search configuration. */
 data class FlatZincProgram(
@@ -25,6 +27,8 @@ data class FlatZincProgram(
     val enumLabelsByVar: Map<String, List<String>> = emptyMap(),
     /** Set variable layouts by name. */
     val setVarsByName: Map<String, SetVarLayout> = emptyMap(),
+    /** Source float component identities and approximation reasons. */
+    val floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
 )
 
 /** Bool-indicator layout of one FlatZinc set variable. */
@@ -36,9 +40,7 @@ data class SetVarLayout(
     /** Indicator bool ids parallel to [elements]. */
     val indicatorBoolIds: IntArray,
 ) {
-    init {
-        require(elements.size == indicatorBoolIds.size) { "SetVarLayout: parallel arrays of unequal length" }
-    }
+    internal val layout = SetLayout(elements, indicatorBoolIds)
 
     override fun equals(other: Any?): Boolean {
         if (other !is SetVarLayout) return false

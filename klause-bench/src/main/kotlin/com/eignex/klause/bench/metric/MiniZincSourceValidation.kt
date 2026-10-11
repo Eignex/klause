@@ -10,10 +10,10 @@ import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.Lit
-import kotlinx.serialization.Serializable
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
+import kotlinx.serialization.Serializable
 
 internal const val PINNED_SOURCE_POLICY = "minizinc-source-witness-v2"
 internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
@@ -130,7 +130,9 @@ internal object MiniZincSourceValidation {
         if (exact == null) {
             candidate
         } else {
-            candidate + "\n" + exact.lineSequence().joinToString("\n") { "% klause-exact: $it" }
+            val provenance = rawOutput.split("----------").dropLast(1).lastOrNull()
+                ?.lineSequence()?.filter { it.startsWith("% klause-float-") }?.joinToString("\n").orEmpty()
+            candidate + "\n" + provenance + "\n" + exact.lineSequence().joinToString("\n") { "% klause-exact: $it" }
         }
     }
 

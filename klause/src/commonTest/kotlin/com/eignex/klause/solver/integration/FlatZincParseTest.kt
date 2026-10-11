@@ -5,9 +5,9 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.flatzinc.FlatZincParseException
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
