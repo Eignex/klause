@@ -27,7 +27,8 @@ class QfNraSuitesTest {
     @Test
     fun `fixture bytes match the complete versioned manifest`() {
         val root = CorpusFetcher.workspaceRoot()
-        val manifest = Json.parseToJsonElement(File(root, "klause-bench/smoke-corpus/qfnra-v1/manifest.json").readText())
+        val file = File(root, "klause-bench/smoke-corpus/qfnra-v1/manifest.json")
+        val manifest = Json.parseToJsonElement(file.readText())
         val cases = manifest.jsonObject.getValue("cases").jsonArray
         val expected = QfNraSuites.all.flatMap { suite -> suite.problems.map { "${suite.id}/${it.name}" } }
 

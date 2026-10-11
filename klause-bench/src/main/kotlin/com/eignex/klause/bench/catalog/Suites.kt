@@ -947,7 +947,8 @@ internal object ExternalCollections {
         id = "smtlib-qf_nra",
         url = smtlibLogic("QF_NRA"),
         license = "SMT-LIB (per-family licenses; preserve source attribution)",
-        reason = "210801606-byte compressed archive; fetched, not redistributed; logic tag does not certify polynomial membership",
+        reason = "210801606-byte compressed archive; fetched, not redistributed; " +
+            "logic tag does not certify polynomial membership",
         fetch = FetchMethod.TarballZst,
     )
 
