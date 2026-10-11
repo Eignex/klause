@@ -200,7 +200,7 @@ internal class LpRetainedSources(
         state: LpExactState,
         domains: RelaxationDomains,
         cancellation: Cancellation = Cancellation.Never,
-    ): LpSourceEdit {
+    ): LpSourceEdit? {
         require(state.depth >= depth && state.model.n == columns.size)
         check(generation < Long.MAX_VALUE)
         val expectedGeneration = generation
@@ -237,7 +237,7 @@ internal class LpRetainedSources(
             val fragment = emission.relaxation
             emittedExtent += fragment.model.n.toLong() + fragment.model.m +
                 (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
-            val source = requireNotNull(fragment.model.authoritativeModel())
+            val source = fragment.model.authoritativeModel() ?: return null
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
             val mapped = IntArray(source.n)
             for (local in mapped.indices) {
