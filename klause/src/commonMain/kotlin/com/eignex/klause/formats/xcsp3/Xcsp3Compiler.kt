@@ -648,7 +648,11 @@ internal object Compiler {
                 it is FExpr.Call && (it.fn in REL || it.fn in BOOL_FNS || it.fn == "in" || it.fn == "notin")
             }
             if (boolean < 0) return null
-            val other = plainVar(mulSide.args[1 - boolean]) ?: return null
+            val other = when (val operand = mulSide.args[1 - boolean]) {
+                is FExpr.Ref -> ref(operand.name)
+                is FExpr.Num -> if (operand.value > 0) constVar(operand.value.toLong()) else return null
+                else -> return null
+            }
             val channel = litTo01(compileBool(mulSide.args[boolean]))
             return if (boolean == 0) Product(channel, other, v) else Product(other, channel, v)
         }

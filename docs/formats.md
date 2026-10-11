@@ -267,8 +267,11 @@ cells and aliases retain their source variable identities. Unsupported construct
 decline through the common solve surface. Boolean-valued XCSP arithmetic terms
 use fresh 0/1 integers tied directly to their source literal by a reified equality,
 including negated literals; products, sum terms and bin-packing indicators share this encoding.
-Products of a Boolean expression and a declared integer use their declared equality
-output directly, so local search maintains the source product output during moves.
+Direct binary products of a Boolean expression and a declared integer or positive
+numeric literal use their declared equality output directly. Literals use shared fixed
+integer columns, so existing Product admission maintains the source output during moves.
+Either operand and equality orientation and negated Boolean literals retain this encoding;
+zero, negative literals and general arithmetic expressions retain ordinary arithmetic lowering.
 The compiler marks the fresh binary channels as deterministic outputs. Domain-aware
 definition inference maintains those literal values and their unique unary equality
 predicates when the predicates have no other Boolean factor occurrences.
