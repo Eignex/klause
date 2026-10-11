@@ -114,6 +114,8 @@ internal class ElementInvariant(
         if (network?.isDefinedInt(idx) == true &&
             network.linearDefinition(idx) == null && !network.hasExtremumRepair(idx)
         ) return
+        val alternatives = sink.alternativeRepairs ?: sink
+        alternatives.proposer = sink.proposer
         val idxVal = state.assignment.intValue(idx)
         val resultVal = state.assignment.intValue(result)
         var attempts = 0
@@ -125,7 +127,7 @@ internal class ElementInvariant(
             val value = if (arrIsVars) state.assignment.intValue(entry.toInt()) else entry
             val target = indexOffset.toLong() + position
             if (value != resultVal || target == idxVal || target !in state.rootDomains[idx]) continue
-            sink.addElementIndexSet(state, idx, target)
+            alternatives.addElementIndexSet(state, idx, target)
             attempts++
             if (attempts >= MAX_EXTRA_REPAIRS) return
         }

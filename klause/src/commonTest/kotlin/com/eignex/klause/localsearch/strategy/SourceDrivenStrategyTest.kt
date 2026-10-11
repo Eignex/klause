@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch.strategy
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -13,6 +14,7 @@ import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.movesource.StallSwaps
+import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.StallSchedule
 import com.eignex.klause.localsearch.schedule.WeightSchedule
@@ -23,6 +25,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -32,6 +35,66 @@ import kotlin.test.assertTrue
  * by listing them, so adding a source in one place makes it available to every strategy.
  */
 class SourceDrivenStrategyTest {
+
+    @Test
+    fun `equal Element alternatives preserve primary choices and random draws`() {
+        for (noise in listOf(0.0, 1.0)) {
+            val states = listOf(1L, 3L).map { maximum ->
+                val problem = Problem(
+                    0, 2, arrayOf(IntDomain(0, maximum), IntDomain(1, 1)),
+                    arrayOf<Factor>(Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0)),
+                )
+                LocalSearchState(LocalSearchModel.open(problem), Random(3)).also {
+                    it.assignment.setInt(0, 0)
+                    it.assignment.setInt(1, 1)
+                    it.recompute()
+                }
+            }
+            val strategies = states.map {
+                SourceDrivenStrategy(
+                    sources = listOf(ConfiguredSource(ViolatedRepairs.SINGLE)),
+                    acceptance = AcceptanceRule.WalkSatNoise(noise),
+                    feasibleDescent = FeasibleDescent.RatchetAsConstraint,
+                )
+            }
+
+            repeat(8) {
+                val primary = strategies[0].pickMove(states[0])
+                val expanded = strategies[1].pickMove(states[1])
+
+                assertEquals(Move.IntSet(0, 1), primary)
+                assertEquals(primary, expanded, "noise=$noise")
+                assertEquals(states[0].rng.nextLong(), states[1].rng.nextLong(), "noise=$noise")
+            }
+        }
+    }
+
+    @Test
+    fun `a better Element alternative repairs the complete assignment`() {
+        val problem = Problem(
+            0, 2, arrayOf(IntDomain(0, 3).excludeValue(2), IntDomain(1, 1)),
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0),
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.NE, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.recompute()
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ViolatedRepairs.SINGLE)),
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
+        )
+
+        val move = strategy.pickMove(state)
+        state.apply(assertNotNull(move))
+
+        assertEquals(Move.IntSet(0, 3), move)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
 
     @Test
     fun `refined overload reductions postpone weight bumps and plateau noise`() {
