@@ -38,7 +38,7 @@ internal object WcnfMode : CliMode {
 /** Render a MaxSAT-Evaluation `v` line: `v` followed by one `0`/`1` bit per original variable (1-based). */
 internal fun renderWcnfModel(numOriginalVars: Int, s: Sample): String = buildString {
     append("v ")
-    for (v in 0 until numOriginalVars) append(if (s.bools[v]) '1' else '0')
+    for (v in 0 until numOriginalVars) append(if (s.boolValue(v)) '1' else '0')
 }
 
 /** MaxSAT-Evaluation output protocol. Incumbent `o` costs stream live; the final `s` status and `v`

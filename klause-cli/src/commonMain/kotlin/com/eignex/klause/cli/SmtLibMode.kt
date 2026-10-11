@@ -168,8 +168,8 @@ private fun openLocalSearchSmt(
 internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals: Map<String, Int>, s: Sample): String =
     buildString {
         append("(\n")
-        for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(s.ints[id].toString())})\n")
-        for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
+        for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(s.intValue(id).toString())})\n")
+        for ((name, id) in bools) append("  (define-fun $name () Bool ${s.boolValue(id)})\n")
         val exactReals = if (reals.isEmpty()) {
             emptyList()
         } else {
