@@ -26,10 +26,9 @@ class BenchCacheTest {
             )) {
                 assertNotEquals(baseline, BenchCache.keyFor(model, null, "klause", budget, changed))
             }
-            assertNotEquals(
-                baseline,
-                BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = PINNED_SOURCE_POLICY),
-            )
+            for (policy in listOf(PINNED_SOURCE_POLICY, XCSP_SOURCE_POLICY)) {
+                assertNotEquals(baseline, BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = policy))
+            }
         } finally {
             root.deleteRecursively()
         }

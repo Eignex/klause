@@ -24,6 +24,8 @@ internal data class SourceValidation(
     val reason: String,
     val sourceHashes: Map<String, String> = emptyMap(),
     val scope: String = "minizinc-source",
+    val checkedWitness: String? = null,
+    val checker: String? = null,
 )
 
 internal object MiniZincSourceValidation {
@@ -223,7 +225,7 @@ internal object MiniZincSourceValidation {
 internal fun SolveRecord.sourceChecked(validation: SourceValidation, approximation: Boolean): SolveRecord {
     val reject = validation.status == "invalid" ||
         (approximation && (feasible == false || (feasible == true && validation.status != "valid")))
-    val verifiedStats = stats + mapOf(
+    val verifiedStats = stats + listOfNotNull(validation.checker?.let { "sourceValidationChecker" to it }).toMap() + mapOf(
         "sourceValidation" to validation.status,
         "sourceValidationReason" to validation.reason,
         "sourceValidationScope" to validation.scope,
@@ -255,5 +257,6 @@ internal fun SolveRecord.sourceChecked(validation: SourceValidation, approximati
             }
         },
         stats = verifiedStats,
+        checkedWitness = validation.checkedWitness.takeIf { validation.status == "valid" },
     )
 }

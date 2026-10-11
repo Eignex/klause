@@ -42,7 +42,7 @@ forwarded to the bench JVM. Keep the CLI distribution and runtime fixed during a
 | `select [filters]` | Emit instance identities as JSON lines; `features=true` adds structural features |
 | `solve [filters]` | Run one configuration over the selection |
 | `solve-one suite=<id> problem=<name> [filters] [out=<dir>]` | Run one selected identity and save a case record |
-| `validate-solution suite=<id> problem=<name> output=<path>` | Check saved MiniZinc output without solving again |
+| `validate-solution suite=<id> problem=<name> output=<path>` | Check saved MiniZinc or XCSP3 output without solving again |
 | `provenance out=<path>` | Capture installed-build and runtime identities |
 | `corpus status`, `corpus gc`, `corpus compress [path]` | Inspect, evict or compress fetched collections |
 | `mine [by=config\|suite\|family\|format\|category\|kind] <cases.json> ...` | Report portfolio holder share, set cover, work and rewards; retain quarantined cases |
@@ -75,7 +75,8 @@ new names so results under one name stay comparable.
 
 Settings, budgets, non-default solver seeds, parameters and labels distinguish
 configuration directories. Run configurations separately to compare them.
-`param=source-validation=true` is consumed by the bench before CLI launch.
+`param=source-validation=true` opts MiniZinc integer and XCSP3 runs into independent
+source-witness checking and is consumed by the bench before CLI launch.
 
 ## Klause-lab
 
@@ -269,9 +270,36 @@ not a source optimum/refutation. `reportedFeasible`, `reportedObjective` and
 SHA-256 as `sourceOutputSha256`; unknown checking retains the reported witness.
 Earlier incumbents are unchecked, so attribution is limited to the final objective.
 
+XCSP3 integer runs opt in with `param=source-validation=true`. The installed bench
+includes the independent `org.xcsp:xcsp3-tools:2.5` `SolutionChecker`, also used by
+the ACE distribution. It checks a copied original XML source against the final
+complete named integer instantiation and its exact reported objective. Every
+source variable must appear once, including unconstrained variables and expanded
+array cells. Duplicate, unknown, missing, malformed and out-of-domain coordinates,
+violated constraints and incorrect objectives are rejected. Compact variable/value
+forms are outside this checking surface. Reified/soft constraints, multiple
+objectives, unsupported checker callbacks, oversized integer coordinates and the
+ten-second/512 MiB checker subprocess limit leave checking `unknown`.
+
+XCSP records use `validationPolicy=xcsp3-source-witness-v1` and
+`sourceValidationScope=xcsp3-source`; `sourceValidationChecker` identifies the
+pinned checker. `sourceHashes` binds the original plain source before solving
+and is checked for stability during validation. `finalWitness` and
+`sourceOutputSha256` retain the reported assignment and output identity;
+`checkedWitness` retains only a source-valid assignment, with the checked objective
+as its `cost` attribute. Invalid candidates earn no feasibility, objective or proof
+credit. Unknown checks retain reported claims without a checked witness.
+`reported-result-v1` records have no independent checking. Witness checking
+establishes feasibility and objective equality; any optimum or infeasibility claim
+remains the solver's proof claim, recorded separately as `reportedProven`.
+
 ```sh
 ./gradlew :klause-bench:bench --args="validate-solution suite=hakank problem=arbitrage_loops/arbitrage_loops output=/path/to/solver.out"
+./gradlew :klause-bench:bench --args="validate-solution suite=xcsp3-core problem=sum-opt-tiny output=/path/to/solver.out"
 ```
+
+`validate-solution` prints a structured validation result, source hashes, checker
+identity and the checked XCSP assignment when accepted, without solving again.
 
 ### Offline source verifier
 

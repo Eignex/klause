@@ -22,6 +22,7 @@ import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.Xcsp3CpSatReference
+import com.eignex.klause.bench.metric.Xcsp3SourceValidation
 import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
@@ -299,7 +300,11 @@ object BenchCli {
         val output = File(requireNotNull(fields["output"]) { "validate-solution needs output=<file>" }).readText()
         val ref = Catalog.uncapped(suite).problems.singleOrNull { it.name == name }
             ?: error("no problem '$name' in suite '$suite'")
-        require(ref.format == Format.MINIZINC) { "source validation requires a MiniZinc model" }
+        if (ref.format == Format.XCSP3) {
+            println(Reports.json.encodeToString(Xcsp3SourceValidation.validate(ref, output)))
+            return
+        }
+        require(ref.format == Format.MINIZINC) { "source validation requires a MiniZinc or XCSP3 model" }
         val candidate = MiniZincSourceValidation.candidate(output).orEmpty()
         val objective = Regex("(?m)^\\s*_objective\\s*=\\s*([^;]+);")
             .find(MiniZincSourceValidation.exactCoordinates(output) ?: candidate)

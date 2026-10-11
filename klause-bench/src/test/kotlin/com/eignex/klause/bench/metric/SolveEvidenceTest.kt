@@ -17,7 +17,7 @@ class SolveEvidenceTest {
 
     @Test
     fun `competition records retain the final rendered witness`() {
-        for (format in listOf(Format.OPB, Format.XCSP3, Format.DIMACS, Format.WCNF, Format.MPS)) {
+        for (format in listOf(Format.OPB, Format.DIMACS, Format.WCNF, Format.MPS)) {
             val witness = SolveEvidence.finalWitness(format, "v x1\no 2\nv -x1 x2\nc solveTime=1\n")
 
             assertEquals("v -x1 x2", witness)
