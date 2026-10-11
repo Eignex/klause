@@ -35,7 +35,7 @@ import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 
-/** Finite strategy controls for composed polynomial satisfaction. */
+/** Finite strategy controls for polynomial satisfaction and finite-objective optimization. */
 data class PolynomialStrategyParams(
     /** Complete finite traversal parameters; theory components are supplied by the pipeline. */
     val backtrack: BacktrackParams = BacktrackParams(),

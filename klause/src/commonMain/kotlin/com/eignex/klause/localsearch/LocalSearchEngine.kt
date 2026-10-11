@@ -100,8 +100,7 @@ internal class LocalSearchEngine(
         definitionalSweep, problem.numIntVars, problem.numBoolVars,
     )
 
-    // Decides each candidate of a model with continuous columns, whose rows are only scored within a tolerance.
-    // Null on a model without them, which scores every row exactly and needs no decision.
+    // A finite projection may require theory-owned completion before publication.
     private val completion: CandidateCompletion? = completion
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
