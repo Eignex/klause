@@ -29,6 +29,10 @@ internal class RootWorkAccounting(
     override fun deadline() = outer.deadline()
     override fun workMeter() = outer.workMeter()
 
+    fun construction(entries: Long) {
+        meter?.construction(entries)
+    }
+
     fun flush() {
         val current = state.work
         meter?.propagation(current - reported)

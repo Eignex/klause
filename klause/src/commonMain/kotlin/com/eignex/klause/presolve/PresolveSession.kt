@@ -7,7 +7,9 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.RootWorkAccounting
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -55,7 +57,11 @@ class SharedIntOccurrence internal constructor(internal val offsets: IntArray, i
  * would — no per-pass `computeBaked`. [materialize] builds the heavyweight solver `Problem` once at
  * the end, with the single renumber/remap.
  */
-internal class PresolveSession(private val base: BakedProblem, private val bakeConfig: BakeConfig = BakeConfig.NONE) {
+internal class PresolveSession(
+    private val base: BakedProblem,
+    private val bakeConfig: BakeConfig = BakeConfig.NONE,
+    private val cancellation: Cancellation = base.cancellation,
+) {
 
     // Working factor set indexed by stable id: `[0, base.factors.size)` are the originals, appended
     // ids are pass-added factors. `null` marks a tombstoned (dropped) id; ids are never renumbered.
@@ -76,6 +82,17 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
         (base.baked as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None,
         incremental = true,
     )
+
+    private var accounting = RootWorkAccounting(cancellation, state)
+
+    private fun propagate(allFactors: Boolean, initialFactors: IntArray = EmptyIntArray): IntArray? {
+        state.cancelFloor = 0
+        try {
+            return state.runToFixpoint(allFactors, initialFactors = initialFactors, cancellation = accounting)
+        } finally {
+            accounting.flush()
+        }
+    }
 
     /** Set once the base bake or a delta re-propagation derives a root contradiction. */
     var infeasible: Boolean = false
@@ -126,7 +143,7 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
         // incremental re-propagation (the base's folded domains are copied in, so it settles there).
         if (base.baked is PropagationResult.Unsat) {
             infeasible = true
-        } else if (state.runToFixpoint(allFactors = false) != null) {
+        } else if (propagate(allFactors = false) != null) {
             infeasible = true
         }
     }
@@ -246,6 +263,7 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
         }
         val addedIds = IntArrayList(delta.addedFactors.size)
         for (f in delta.addedFactors) {
+            accounting.construction(1L + f.structuralKeyWeight)
             val fid = state.addMidlifeFactor(f) // fid == factors.size at this point
             addedIds.add(fid)
             factors.add(f)
@@ -259,10 +277,12 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
         // next, and keeping domain-pinning passes (dual fixing) converging on an infeasible problem.
         if (infeasible) {
             delta.domains?.let { d -> lastFeasibleDomains = Array(base.numIntVars) { d[it] } }
+            accounting.flush()
             return false
         }
         var ok = pushDomainNarrowings(delta.domains)
-        if (ok && state.runToFixpoint(allFactors = false, initialFactors = addedIds.toIntArray()) != null) ok = false
+        if (ok && propagate(allFactors = false, initialFactors = addedIds.toIntArray()) != null) ok = false
+        accounting.flush()
         if (!ok) infeasible = true
         return ok
     }
@@ -325,6 +345,7 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
             factors = live,
             seedDeductions = boolFixings(),
             alreadyFolded = true,
+            cancellation = cancellation,
             numRealVars = base.numRealVars,
             realLower = base.realLower,
             realUpper = base.realUpper,
@@ -434,6 +455,7 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
             Array(base.numIntVars) { domains[it] },
             bakeConfig,
             seedDeductions = fixings,
+            cancellation = cancellation,
         )
         stateProblem = eager
         factors.clear()
@@ -446,12 +468,14 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
         droppedFactorLog.clear()
         reseedEpoch++
         occDirty = true
+        accounting.flush()
         state = PropagationState(
             PropagationProblem(eager),
             (fixings as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None,
             incremental = true,
         )
-        if (state.runToFixpoint(allFactors = true) != null) {
+        accounting = RootWorkAccounting(cancellation, state)
+        if (propagate(allFactors = true) != null) {
             infeasible = true
             return false
         }
@@ -483,6 +507,7 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
                 domains,
                 bakeConfig,
                 seedDeductions = boolFixings(),
+                cancellation = cancellation,
             )
         }
         return BakedProblem(
@@ -493,6 +518,7 @@ internal class PresolveSession(private val base: BakedProblem, private val bakeC
             factors = liveFactors(),
             seedDeductions = boolFixings(),
             alreadyFolded = true,
+            cancellation = cancellation,
             numRealVars = base.numRealVars,
             realLower = base.realLower,
             realUpper = base.realUpper,
