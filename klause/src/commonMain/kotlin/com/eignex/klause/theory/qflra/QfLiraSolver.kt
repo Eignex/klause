@@ -539,6 +539,10 @@ class ExactLiraSearchComponent(
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
+        // Root publications precede their delivery to components during shared initialization.
+        if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
+            bools.indices.all { context.boolValue(it) != null }
+        ) return ComponentResult.Consistent
         val enforced = enforceDisjunctions(context)
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
