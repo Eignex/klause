@@ -150,7 +150,7 @@ internal object ExactFlatZincValidation {
                 val index = numeric(args[0])
                 require(index.integral) { "non-integer array index" }
                 val values = array(args[1])
-                val selected = values.indices.firstOrNull { index == number((it + 1).toString()) } ?: return false
+                val selected = values.indices.firstOrNull { index.compareTo(number((it + 1).toString())) == 0 } ?: return false
                 return equal(values[selected], args[2])
             }
             val base = name.removeSuffix("_reif").removeSuffix("_imp")
