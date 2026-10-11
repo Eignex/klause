@@ -27,6 +27,7 @@ internal class LocalSearchWorkerConfig(
     val nodeBudget: NodeBudget? = null,
     private val reportResiduals: Boolean = false,
     private val reportPhaseTimes: Boolean = false,
+    private val seedOffset: Int = 0,
 ) :
     WorkerConfig {
 
@@ -36,10 +37,10 @@ internal class LocalSearchWorkerConfig(
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes)
+        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset)
 
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true)
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset)
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the
@@ -88,7 +89,7 @@ internal class LocalSearchWorkerConfig(
         }.session()
         val workerLabel = "ls/$label"
         val params = LocalSearchParams(
-            randomSeed = seed + index,
+            randomSeed = seed + index + seedOffset,
             costShaping = CostShaping.Linear(lambda = lsLambda),
             // The per-move gradient view of the objective, when the model provides one.
             lsObjective = lsObjective,

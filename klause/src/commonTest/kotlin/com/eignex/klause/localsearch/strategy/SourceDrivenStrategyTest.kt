@@ -37,15 +37,12 @@ import kotlin.test.assertTrue
 class SourceDrivenStrategyTest {
 
     @Test
-    fun `nonimproving Element alternatives preserve primary greedy choices and random draws`() {
-        for (bound in listOf(1L, 3L)) {
+    fun `equal Element alternatives preserve primary choices and random draws`() {
+        for (noise in listOf(0.0, 1.0)) {
             val states = listOf(1L, 3L).map { maximum ->
                 val problem = Problem(
                     0, 2, arrayOf(IntDomain(0, maximum), IntDomain(1, 1)),
-                    arrayOf<Factor>(
-                        Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0),
-                        Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, bound),
-                    ),
+                    arrayOf<Factor>(Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0)),
                 )
                 LocalSearchState(LocalSearchModel.open(problem), Random(3)).also {
                     it.assignment.setInt(0, 0)
@@ -56,9 +53,9 @@ class SourceDrivenStrategyTest {
             val strategies = states.map {
                 SourceDrivenStrategy(
                     sources = listOf(ConfiguredSource(ViolatedRepairs.SINGLE)),
-                    acceptance = AcceptanceRule.WalkSatNoise(0.0),
+                    acceptance = AcceptanceRule.WalkSatNoise(noise),
                     feasibleDescent = FeasibleDescent.RatchetAsConstraint,
-                )
+                ).also { it.prioritizePrimaryRepairs = true }
             }
 
             repeat(8) {
@@ -66,38 +63,36 @@ class SourceDrivenStrategyTest {
                 val expanded = strategies[1].pickMove(states[1])
 
                 assertEquals(Move.IntSet(0, 1), primary)
-                assertEquals(primary, expanded, "bound=$bound")
-                assertEquals(states[0].rng.nextLong(), states[1].rng.nextLong(), "bound=$bound")
+                assertEquals(primary, expanded, "noise=$noise")
+                assertEquals(states[0].rng.nextLong(), states[1].rng.nextLong(), "noise=$noise")
             }
         }
     }
 
     @Test
-    fun `Element alternatives retain the complete WalkSAT noise neighborhood`() {
+    fun `productive primary Element repairs retain priority across strategy copies`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 3), IntDomain(1, 1)),
-            arrayOf<Factor>(Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0)),
+            0, 2, arrayOf(IntDomain(0, 3).excludeValue(2), IntDomain(9, 9)),
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(0, 9, 0, 9), false, 0),
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.NE, 1),
+            ),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 1)
+        state.assignment.setInt(1, 9)
         state.recompute()
-        val acceptance = AcceptanceRule.WalkSatNoise(1.0)
+        val before = state.cost
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ViolatedRepairs.SINGLE)),
-            acceptance = acceptance,
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
-        )
-        val expected = Random(3)
-        val repairs = listOf(Move.IntSet(0, 1), Move.IntSet(0, 2), Move.IntSet(0, 3))
+        ).also { it.prioritizePrimaryRepairs = true }
 
-        repeat(16) {
-            expected.nextInt(1)
-            val move = acceptance.choose(expected, repairs, emptyList(), 1.0) { -1.0 }
+        val move = strategy.copy().pickMove(state)
+        state.apply(assertNotNull(move))
 
-            assertEquals(move, strategy.pickMove(state))
-            assertEquals(expected.nextLong(), state.rng.nextLong())
-        }
+        assertEquals(Move.IntSet(0, 1), move)
+        assertTrue(state.cost < before)
     }
 
     @Test
@@ -116,7 +111,7 @@ class SourceDrivenStrategyTest {
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ViolatedRepairs.SINGLE)),
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
-        )
+        ).also { it.prioritizePrimaryRepairs = true }
 
         val move = strategy.pickMove(state)
         state.apply(assertNotNull(move))

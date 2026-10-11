@@ -80,6 +80,10 @@ object LocalSearchCatalog {
         LocalSearchArm.AdaptiveProbsatFixed ->
             LocalSearchRecipe(arm.label, ProbSat.adaptive(tabu = cblsTabu()).withRestart(FixedCadenceRestart()))
 
+        LocalSearchArm.CblsPrimaryPlateauIlsBasin -> cblsRecipe(arm.label, ilsBasin()) {
+            Cbls(stallSwapCap = 16, tabu = cblsTabu()).also { it.prioritizePrimaryRepairs = true }
+        }
+
         LocalSearchArm.CblsPlateauIlsBasin ->
             cblsRecipe(arm.label, ilsBasin()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
 
@@ -205,6 +209,7 @@ object LocalSearchCatalog {
         LocalSearchArm.CblsExtendedFixed,
         LocalSearchArm.SaReheatFixed,
         LocalSearchArm.SaPhasedFixed,
+        LocalSearchArm.CblsPrimaryPlateauIlsBasin,
     )
 
     private val cspOrder: List<LocalSearchArm> = copOrder.filter { it != LocalSearchArm.CblsHotpairFixed }
@@ -262,6 +267,7 @@ internal enum class LocalSearchArm(val label: String) {
     CblsFixed("cbls/fixed"),
     AdaptiveProbsatFixed("adaptive-probsat/fixed"),
     CblsPlateauIlsBasin("cbls-plateau/ils-basin"),
+    CblsPrimaryPlateauIlsBasin("cbls-primary-plateau/ils-basin"),
     CblsChainNoinvFixed("cbls-chain-noinv/fixed"),
     CblsChainIlsBasin("cbls-chain/ils-basin"),
     CblsPlateauSmoothFixed("cbls-plateau-smooth/fixed"),

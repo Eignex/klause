@@ -50,6 +50,16 @@ direct engine publications. The low-level public portfolio API continues to supp
 caller-trusted unbound workers and its explicit witness checker; source pipeline
 portfolios install the scoped verification contract.
 
+## Scheduling neighborhood diversity
+
+A curated sequential mixed optimization pool over a scheduling model pairs the original
+plateau local-search arm with a primary-repair plateau variant in the preceding generic
+CBLS slot. Both start from the original plateau arm's seed; the original arm and every
+remaining worker retain their positions and seeds. The variant defers supplemental
+Element repairs to complete improving fallback selection. The original arm retains
+its full repair neighborhood. Explicit local-search pools, local-search-only execution,
+parallel pools and non-scheduling models retain their selected recipes.
+
 ## Slice accounting and coverage
 
 The counted schedule starts at 5000 node equivalents, grows by 1.5 after an ordinary
