@@ -79,6 +79,17 @@ not certified as polynomial by its logic tag. See the benchmark README for
 [named selection](../../klause-bench/README.md#selection-and-named-sets) and
 [reference authority](../../klause-bench/README.md#smt-reference-records).
 
+[Canonical source variants](../../klause-bench/smoke-corpus/qfnra-source-canonical-v1/manifest.json)
+retain degree-drop and equal-degree common-root cases with canonical `(- 1)`
+constants. Their manifest fixes each variant's source hash, original identity/hash
+and exact syntactic transformation under the original Apache-2.0 attribution.
+Bare `-1` in the two frozen originals is accepted by recorded Z3 but is a source
+name under the dedicated polynomial parser; source loading declines explicitly.
+Variants have a separate suite/set; original bytes, identities and memberships
+remain frozen. Auditing all 66 originals for unquoted negative numeric atoms found
+only these two sources; that narrow audit does not prove every other source form
+is admitted or decided.
+
 ## XCSP3 reference importer
 
 [`test_solve.py`](../../klause-bench/xcsp3-cpsat/test_solve.py) contains self-authored
