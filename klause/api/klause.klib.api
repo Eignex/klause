@@ -507,6 +507,18 @@ final enum class com.eignex.klause.solver.pipeline/OpenBranching : kotlin/Enum<c
     }
 }
 
+final enum class com.eignex.klause.solver.pipeline/PolynomialTheoryResource : kotlin/Enum<com.eignex.klause.solver.pipeline/PolynomialTheoryResource> { // com.eignex.klause.solver.pipeline/PolynomialTheoryResource|null[0]
+    enum entry DegreeOverflow // com.eignex.klause.solver.pipeline/PolynomialTheoryResource.DegreeOverflow|null[0]
+    enum entry DenseCoefficients // com.eignex.klause.solver.pipeline/PolynomialTheoryResource.DenseCoefficients|null[0]
+    enum entry MatrixCells // com.eignex.klause.solver.pipeline/PolynomialTheoryResource.MatrixCells|null[0]
+
+    final val entries // com.eignex.klause.solver.pipeline/PolynomialTheoryResource.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/PolynomialTheoryResource> // com.eignex.klause.solver.pipeline/PolynomialTheoryResource.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/PolynomialTheoryResource // com.eignex.klause.solver.pipeline/PolynomialTheoryResource.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/PolynomialTheoryResource> // com.eignex.klause.solver.pipeline/PolynomialTheoryResource.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.solver.pipeline/ProblemPipeline : kotlin/Enum<com.eignex.klause.solver.pipeline/ProblemPipeline> { // com.eignex.klause.solver.pipeline/ProblemPipeline|null[0]
     enum entry DIFFERENCE_THEORY // com.eignex.klause.solver.pipeline/ProblemPipeline.DIFFERENCE_THEORY|null[0]
     enum entry EXACT_LIRA // com.eignex.klause.solver.pipeline/ProblemPipeline.EXACT_LIRA|null[0]
@@ -1775,6 +1787,40 @@ sealed interface com.eignex.klause.formats.smtlib/SExpr { // com.eignex.klause.f
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SExpr.SList.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SExpr.SList.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SExpr.SList.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput|null[0]
+    final class Linear : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Linear|null[0]
+        constructor <init>(com.eignex.klause.formats.smtlib/SmtLibProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.<init>|<init>(com.eignex.klause.formats.smtlib.SmtLibProblem){}[0]
+
+        final val problem // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.problem|{}problem[0]
+            final fun <get-problem>(): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.problem.<get-problem>|<get-problem>(){}[0]
+
+        final fun component1(): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.formats.smtlib/SmtLibProblem = ...): com.eignex.klause.formats.smtlib/SmtLibInput.Linear // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.copy|copy(com.eignex.klause.formats.smtlib.SmtLibProblem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Linear.toString|toString(){}[0]
+    }
+
+    final class Polynomial : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial|null[0]
+        constructor <init>(com.eignex.klause.ir/PolynomialRealProblem) // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.<init>|<init>(com.eignex.klause.ir.PolynomialRealProblem){}[0]
+
+        final val problem // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.problem|{}problem[0]
+            final fun <get-problem>(): com.eignex.klause.ir/PolynomialRealProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.problem.<get-problem>|<get-problem>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/PolynomialRealProblem // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/PolynomialRealProblem = ...): com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.copy|copy(com.eignex.klause.ir.PolynomialRealProblem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Polynomial.toString|toString(){}[0]
+    }
+
+    final object Interrupted : com.eignex.klause.formats.smtlib/SmtLibInput { // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibInput.Interrupted.toString|toString(){}[0]
     }
 }
 
@@ -5853,6 +5899,17 @@ final class com.eignex.klause.ir/MixedVars : com.eignex.klause.ir/VarList { // c
         final fun <get-reals>(): kotlin/IntArray // com.eignex.klause.ir/MixedVars.reals.<get-reals>|<get-reals>(){}[0]
     final val spanInts // com.eignex.klause.ir/MixedVars.spanInts|{}spanInts[0]
         final fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.ir/MixedVars.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
+}
+
+final class com.eignex.klause.ir/PolynomialRealProblem { // com.eignex.klause.ir/PolynomialRealProblem|null[0]
+    final val boolVarNames // com.eignex.klause.ir/PolynomialRealProblem.boolVarNames|{}boolVarNames[0]
+        final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/PolynomialRealProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
+    final val realVarNames // com.eignex.klause.ir/PolynomialRealProblem.realVarNames|{}realVarNames[0]
+        final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.ir/PolynomialRealProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
+    final val sourceBoolCount // com.eignex.klause.ir/PolynomialRealProblem.sourceBoolCount|{}sourceBoolCount[0]
+        final fun <get-sourceBoolCount>(): kotlin/Int // com.eignex.klause.ir/PolynomialRealProblem.sourceBoolCount.<get-sourceBoolCount>|<get-sourceBoolCount>(){}[0]
+    final val sourceRealCount // com.eignex.klause.ir/PolynomialRealProblem.sourceRealCount|{}sourceRealCount[0]
+        final fun <get-sourceRealCount>(): kotlin/Int // com.eignex.klause.ir/PolynomialRealProblem.sourceRealCount.<get-sourceRealCount>|<get-sourceRealCount>(){}[0]
 }
 
 final class com.eignex.klause.ir/ProblemSettings { // com.eignex.klause.ir/ProblemSettings|null[0]
@@ -10844,6 +10901,74 @@ final class com.eignex.klause.solver.pipeline/PlannedSearch : kotlin/AutoCloseab
     final fun close() // com.eignex.klause.solver.pipeline/PlannedSearch.close|close(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/PolynomialTheoryExecution { // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution|null[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryResult, com.eignex.klause.solver.pipeline/PolynomialTheoryStats, com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...) // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+
+    final val resource // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.resource|{}resource[0]
+        final fun <get-resource>(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.resource.<get-resource>|<get-resource>(){}[0]
+    final val result // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.result|{}result[0]
+        final fun <get-result>(): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.result.<get-result>|<get-result>(){}[0]
+    final val stats // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.stats|{}stats[0]
+        final fun <get-stats>(): com.eignex.klause.solver.pipeline/PolynomialTheoryStats // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.stats.<get-stats>|<get-stats>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver.pipeline/PolynomialTheoryStats // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.solver.pipeline/PolynomialTheoryResource? // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.component3|component3(){}[0]
+    final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryResult = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryStats = ..., com.eignex.klause.solver.pipeline/PolynomialTheoryResource? = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryResult;com.eignex.klause.solver.pipeline.PolynomialTheoryStats;com.eignex.klause.solver.pipeline.PolynomialTheoryResource?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/PolynomialTheoryExecution.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/PolynomialTheoryParams { // com.eignex.klause.solver.pipeline/PolynomialTheoryParams|null[0]
+    constructor <init>(kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Long? = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.<init>|<init>(kotlin.Long?;kotlin.Int?;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+
+    final val cancellation // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.cancellation|{}cancellation[0]
+        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val maximumDenseCoefficients // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.maximumDenseCoefficients|{}maximumDenseCoefficients[0]
+        final fun <get-maximumDenseCoefficients>(): kotlin/Int? // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.maximumDenseCoefficients.<get-maximumDenseCoefficients>|<get-maximumDenseCoefficients>(){}[0]
+    final val maximumMatrixCells // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.maximumMatrixCells|{}maximumMatrixCells[0]
+        final fun <get-maximumMatrixCells>(): kotlin/Long? // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.maximumMatrixCells.<get-maximumMatrixCells>|<get-maximumMatrixCells>(){}[0]
+    final val maximumWork // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.maximumWork|{}maximumWork[0]
+        final fun <get-maximumWork>(): kotlin/Long? // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.maximumWork.<get-maximumWork>|<get-maximumWork>(){}[0]
+    final val timeout // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.timeout|{}timeout[0]
+        final fun <get-timeout>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.timeout.<get-timeout>|<get-timeout>(){}[0]
+
+    final fun component1(): kotlin/Long? // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.component1|component1(){}[0]
+    final fun component2(): kotlin/Int? // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.component2|component2(){}[0]
+    final fun component3(): kotlin/Long? // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.component4|component4(){}[0]
+    final fun component5(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.component5|component5(){}[0]
+    final fun copy(kotlin/Long? = ..., kotlin/Int? = ..., kotlin/Long? = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryParams // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.copy|copy(kotlin.Long?;kotlin.Int?;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/PolynomialTheoryParams.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/PolynomialTheoryRequest { // com.eignex.klause.solver.pipeline/PolynomialTheoryRequest|null[0]
+    final val problem // com.eignex.klause.solver.pipeline/PolynomialTheoryRequest.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.ir/PolynomialRealProblem // com.eignex.klause.solver.pipeline/PolynomialTheoryRequest.problem.<get-problem>|<get-problem>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/PolynomialTheoryStats { // com.eignex.klause.solver.pipeline/PolynomialTheoryStats|null[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+
+    final val liftedCells // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.liftedCells|{}liftedCells[0]
+        final fun <get-liftedCells>(): kotlin/Long // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.liftedCells.<get-liftedCells>|<get-liftedCells>(){}[0]
+    final val projectedPolynomials // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.projectedPolynomials|{}projectedPolynomials[0]
+        final fun <get-projectedPolynomials>(): kotlin/Long // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.projectedPolynomials.<get-projectedPolynomials>|<get-projectedPolynomials>(){}[0]
+    final val workSpent // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.workSpent|{}workSpent[0]
+        final fun <get-workSpent>(): kotlin/Long // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.workSpent.<get-workSpent>|<get-workSpent>(){}[0]
+
+    final fun component1(): kotlin/Long // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.component3|component3(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryStats // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/PolynomialTheoryStats.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/PortfolioPlanRequest { // com.eignex.klause.solver.pipeline/PortfolioPlanRequest|null[0]
     constructor <init>(com.eignex.klause.solver.pipeline/FiniteEngine, kotlin/Boolean, kotlin/Int, kotlin.collections/List<kotlin/String>, kotlin/Long?, kotlin/Int, com.eignex.klause.lp.bounding/LpConfig, com.eignex.klause.lp.engine/LpZeroObjectivePricing, com.eignex.klause.backtrack/NodeBudget?, com.eignex.klause.backtrack/BacktrackParams?, kotlin/Function1<com.eignex.klause.solver/Sample, kotlin/Boolean>? = ...) // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteEngine;kotlin.Boolean;kotlin.Int;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.Int;com.eignex.klause.lp.bounding.LpConfig;com.eignex.klause.lp.engine.LpZeroObjectivePricing;com.eignex.klause.backtrack.NodeBudget?;com.eignex.klause.backtrack.BacktrackParams?;kotlin.Function1<com.eignex.klause.solver.Sample,kotlin.Boolean>?){}[0]
 
@@ -13221,6 +13346,11 @@ final object com.eignex.klause.formats.smtlib/SmtLib { // com.eignex.klause.form
     final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
 }
 
+final object com.eignex.klause.formats.smtlib/SmtLibAdmission { // com.eignex.klause.formats.smtlib/SmtLibAdmission|null[0]
+    final fun parse(kotlin/Function0<com.eignex.klause.util/CharSource>, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibAdmission.parse|parse(kotlin.Function0<com.eignex.klause.util.CharSource>;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation){}[0]
+    final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.formats.smtlib/SmtLibInput // com.eignex.klause.formats.smtlib/SmtLibAdmission.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;com.eignex.klause.ir.ProblemSettings;com.eignex.klause.util.Cancellation){}[0]
+}
+
 final object com.eignex.klause.formats.xcsp3/Xcsp3 { // com.eignex.klause.formats.xcsp3/Xcsp3|null[0]
     final fun parse(com.eignex.klause.util/CharSource, com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3.parse|parse(com.eignex.klause.util.CharSource;com.eignex.klause.ir.ProblemSettings){}[0]
     final fun parse(kotlin/String, com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3.parse|parse(kotlin.String;com.eignex.klause.ir.ProblemSettings){}[0]
@@ -13434,7 +13564,8 @@ final val com.eignex.klause.ir/linearRows // com.eignex.klause.ir/linearRows|@co
 final val com.eignex.klause.ir/values // com.eignex.klause.ir/values|@com.eignex.klause.ir.IntDomain{}values[0]
     final fun (com.eignex.klause.ir/IntDomain).<get-values>(): com.eignex.klause.ir/IntSpan // com.eignex.klause.ir/values.<get-values>|<get-values>@com.eignex.klause.ir.IntDomain(){}[0]
 final val com.eignex.klause.propagation/baked // com.eignex.klause.propagation/baked|@com.eignex.klause.ir.Problem{}baked[0]
-    final fun (com.eignex.klause.ir/Problem).<get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/baked.<get-baked>|<get-baked>@com.eignex.klause.ir.Problem(){}[0]
+    final fun (com.eignex.klause.ir/PolynomialRealProblem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.PolynomialRealProblem(){}[0]
+final fun (com.eignex.klause.ir/Problem).<get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/baked.<get-baked>|<get-baked>@com.eignex.klause.ir.Problem(){}[0]
 final val com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS|{}BACKTRACK_OVERRIDE_KEYS[0]
     final fun <get-BACKTRACK_OVERRIDE_KEYS>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS.<get-BACKTRACK_OVERRIDE_KEYS>|<get-BACKTRACK_OVERRIDE_KEYS>(){}[0]
 final val com.eignex.klause.util/BIG_ONE // com.eignex.klause.util/BIG_ONE|{}BIG_ONE[0]
@@ -13535,6 +13666,7 @@ final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.s
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function1<com.eignex.klause.portfolio/ArmFault, kotlin/Unit>? = ...): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function1<com.eignex.klause.portfolio.ArmFault,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryAssignment).com.eignex.klause.solver.pipeline/algebraicRealValue(kotlin/Int): com.eignex.klause.arithmetic.polynomial/AlgebraicReal? // com.eignex.klause.solver.pipeline/algebraicRealValue|algebraicRealValue@com.eignex.klause.solver.pipeline.OpenTheoryAssignment(kotlin.Int){}[0]
+final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ...): com.eignex.klause.solver.pipeline/PolynomialTheoryExecution // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
 final fun (com.eignex.klause.solver.search/SearchContext).com.eignex.klause.solver.search/explainAtoms(com.eignex.klause.solver.search/SearchAtomPremise, com.eignex.klause.solver.search/SearchDecision? = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.solver.search/explainAtoms|explainAtoms@com.eignex.klause.solver.search.SearchContext(com.eignex.klause.solver.search.SearchAtomPremise;com.eignex.klause.solver.search.SearchDecision?;kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.search/VariableBranching<com.eignex.klause.solver.search/BranchingState>).com.eignex.klause.backtrack.selector/asSelector(): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.backtrack.selector/asSelector|asSelector@com.eignex.klause.solver.search.VariableBranching<com.eignex.klause.solver.search.BranchingState>(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]

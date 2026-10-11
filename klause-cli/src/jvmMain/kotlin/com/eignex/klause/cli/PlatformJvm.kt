@@ -21,15 +21,25 @@ internal actual fun openFileSource(path: String): CharSource {
     if (ext == "gz") return ReaderCharSource(GZIPInputStream(File(path).inputStream()).bufferedReader())
     val cmd = DECOMPRESSORS.getValue(ext) + path
     val proc = ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD).start()
-    return ReaderCharSource(proc.inputStream.bufferedReader()) {
-        val code = proc.waitFor()
-        require(code == 0) { "decompressing '$path' via '${cmd[0]}' failed (exit $code); is '${cmd[0]}' installed?" }
-    }
+    return ReaderCharSource(
+        proc.inputStream.bufferedReader(),
+        onEof = {
+            val code = proc.waitFor()
+            require(code == 0) {
+                "decompressing '$path' via '${cmd[0]}' failed (exit $code); is '${cmd[0]}' installed?"
+            }
+        },
+        onClose = { proc.destroyForcibly().waitFor() },
+    )
 }
 
 /** Streams a [Reader] in fixed char chunks; runs [onEof] once the reader is drained (the decompressor
  *  exit-code check). The [Reader] already decodes bytes → chars, so a chunk never splits a code point. */
-private class ReaderCharSource(private val reader: Reader, private val onEof: () -> Unit = {}) : CharSource {
+private class ReaderCharSource(
+    private val reader: Reader,
+    private val onEof: () -> Unit = {},
+    private val onClose: () -> Unit = {},
+) : CharSource, AutoCloseable {
     private val buffer = CharArray(size = 64 * 1024)
     private var done = false
 
@@ -43,6 +53,16 @@ private class ReaderCharSource(private val reader: Reader, private val onEof: ()
             return null
         }
         return String(buffer, 0, n)
+    }
+
+    override fun close() {
+        if (done) return
+        done = true
+        try {
+            reader.close()
+        } finally {
+            onClose()
+        }
     }
 }
 

@@ -16,6 +16,7 @@ import com.eignex.klause.util.Cancellation
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
+import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -68,6 +69,78 @@ class CliModeTest {
         assertFailsWith<IllegalArgumentException> {
             renderModel(emptyMap(), emptyMap(), mapOf("x" to 0), sample)
         }
+    }
+
+    @Test
+    fun `SMT polynomial witnesses render exact irrational roots under source names`() {
+        val source = File.createTempFile("nra-root", ".smt2").apply {
+            writeText(
+                "(declare-const |source x| Real) (assert (= (* |source x| |source x|) 2)) " +
+                    "(assert (> |source x| 0)) (check-sat) (get-model)",
+            )
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+
+        assertTrue("sat\n" in output, output)
+        assertTrue("(define-fun |source x| () Real (root-obj (+ (- 2) (* 1 (^ x 2))) 2))" in output, output)
+    }
+
+    @Test
+    fun `compressed polynomial sources reopen after rejected linear admission`() {
+        val source = File.createTempFile("nra-compressed", ".smt2.gz").apply {
+            GZIPOutputStream(outputStream()).writer().use {
+                it.write("(declare-const x Real) (assert (= (* x x) 2)) (check-sat)")
+            }
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+
+        assertTrue(output.startsWith("sat\n"), output)
+    }
+
+    @Test
+    fun `SMT polynomial strict boundaries can be proved unsatisfiable`() {
+        val source = File.createTempFile("nra-strict", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 2)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+
+        assertEquals("unsat", output.trim())
+    }
+
+    @Test
+    fun `SMT polynomial native work exhaustion reports unknown without a witness`() {
+        val source = File.createTempFile("nra-work", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (* x x) 2)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nra-work-limit=0", source.absolutePath)))
+        }
+
+        assertTrue(output.startsWith("unknown\n"), output)
+        assertTrue("; nraWork=0" in output, output)
+        assertFalse("define-fun" in output, output)
+    }
+
+    @Test
+    fun `disabling linear bound proof does not interrupt polynomial source admission`() {
+        val source = File.createTempFile("nra-bound", ".smt2").apply {
+            writeText("(declare-const x Real) (assert (= (* x x) 2)) (check-sat)")
+            deleteOnExit()
+        }
+
+        val output = capture {
+            assertEquals(0, runCli(arrayOf("--param", "open-bound-proof=false", source.absolutePath)))
+        }
+
+        assertTrue(output.startsWith("sat\n"), output)
     }
 
     @Test
