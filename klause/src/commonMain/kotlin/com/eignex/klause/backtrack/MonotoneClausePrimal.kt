@@ -70,7 +70,7 @@ internal class MonotoneClausePrimal private constructor(
                 solver, LinearObjective(),
                 BacktrackPresets.satOptimized(params.randomSeed, inprocess = false, cancellation = phaseToken).copy(
                     assumptions = params.assumptions, nativeSat = params.nativeSat,
-                    pbLearning = false, nodeBudget = params.nodeBudget,
+                    pbLearning = false, nodeBudget = params.nodeBudget, targetPhasing = false,
                 ),
                 rebindable = true,
             ).also { repair = it }
