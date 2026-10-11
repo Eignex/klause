@@ -50,6 +50,11 @@ direct engine publications. The low-level public portfolio API continues to supp
 caller-trusted unbound workers and its explicit witness checker; source pipeline
 portfolios install the scoped verification contract.
 
+Learned-clause exchange requires at least two materialized backtrack workers, including
+replicas on parallel lanes. A lone complete worker keeps its learned database locally
+without exporting portable clauses. Shared preparation and incumbent channels retain
+their own lifetimes even when there is no clause peer.
+
 ## Scheduling neighborhood diversity
 
 A curated sequential mixed optimization pool over a scheduling model pairs the original

@@ -82,7 +82,10 @@ object PortfolioBuilder {
             lsObjective,
             definitionalSweep,
             onEvent,
-            pools = poolsFor(scenario, problem, definitionalSweep, objective),
+            pools = poolsFor(
+                scenario, problem, definitionalSweep, objective,
+                clausePeers = lanes.count { it is BacktrackWorkerConfig } > 1,
+            ),
         ).onEach { it.improvementOnly = it.armId >= plan.firstSolutionCount }
     }
 
@@ -153,13 +156,15 @@ object PortfolioBuilder {
      * ignores both). Created once per build and handed to every backtrack arm. The lock is derived
      * from the executor's concurrency: a no-op on one lane (`Concurrency.None`, zero overhead — the clause pool
      * is just cross-segment memory there) and a platform mutex for several lanes' concurrent writers. The clause
-     * pool is always present; the cut pool only when [PortfolioScenario.shareCuts] opts in.
+     * pool is present when multiple backtrack workers can exchange clauses; the cut pool only when
+     * [PortfolioScenario.shareCuts] opts in.
      */
     private fun poolsFor(
         scenario: PortfolioScenario,
         problem: BakedProblem,
         definitionalSweep: DefinitionalSweep?,
         objective: LinearObjective?,
+        clausePeers: Boolean,
     ): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val identity = ModelIdentity.of(problem, objective)
@@ -169,11 +174,11 @@ object PortfolioBuilder {
         // The bound managers are the dual of the shared incumbent: harmless for a CSP pool (no arm
         // publishes), so they are always present and only an optimising arm feeds them.
         return SharedPools(
-            SharedClausePool(
+            if (clausePeers) SharedClausePool(
                 concurrency.lock(),
                 shareMaxLbd = scenario.clauseShareMaxLbd,
                 shareMaxLen = scenario.clauseShareMaxLen,
-            ),
+            ) else null,
             cuts,
             SharedObjectiveBound(concurrency.lock(), identity),
             SharedVarBounds(problem.numIntVars, concurrency.lock(), identity.forObjective(null)),

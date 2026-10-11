@@ -40,6 +40,22 @@ class PortfolioBuilderTest {
     }
 
     @Test
+    fun `clause sharing requires another backtrack worker including replicas`() {
+        val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
+        for (cores in listOf(1, 2)) {
+            val scenario = PortfolioScenario(cores, 1, Kind.CSP, EngineMix.BACKTRACK)
+
+            val workers = PortfolioBuilder.build(problem, scenario)
+
+            try {
+                for (worker in workers) assertEquals(cores > 1, Signal.ClauseUses in worker.signals)
+            } finally {
+                workers.forEach { it.close() }
+            }
+        }
+    }
+
+    @Test
     fun `a portfolio local-search arm reports its committed residual when requested`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray()).bake()
         val scenario = PortfolioScenario(
