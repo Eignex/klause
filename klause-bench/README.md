@@ -310,6 +310,14 @@ with `-Dklause.bench.z3.memoryMb`. The solver timeout uses whole seconds, rounde
 down with a one-second minimum; a watchdog kills after twice the requested budget
 plus twenty seconds. Keep integer-second budgets for matched reference runs.
 
+Z3 case `buildProvenance` also binds the installed bench launcher/libraries in
+`harness`, the JVM runtime and options, host OS/architecture, and the installed
+CLI tree from setup. The CLI is rebuilt by lab setup but is not invoked by a
+reference case; Z3's own executable remains identified by `referenceVersion`.
+Capture hashes before solving, outside subprocess timing. Reference runs therefore
+require the installed bench and CLI distributions, using the same provenance
+manifest mechanism as Klause cases.
+
 These are solver-reported reference verdicts (`referenceValidation`), separate
 from independently checked source witnesses or refutation certificates. The lab
 persists the solver/version rows through its ordinary reference backend; raw models
