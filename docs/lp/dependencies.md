@@ -1,4 +1,4 @@
-# Koblas integration
+# Numerical dependencies
 
 Klause owns sparse and small dense LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic and scratch
 lifetime. Koblas supplies validated CSC containers, indexed/vector Level 1 kernels and generic sparse
@@ -6,6 +6,8 @@ primitives. There is one floating simplex with exact certification; vendor selec
 numerical authority or create another solver.
 
 ## Dependency provenance
+
+### Koblas
 
 The [build](../../klause/build.gradle.kts) pins immutable timestamps for both the KMP root and every platform module. A root timestamp
 alone is insufficient because its Gradle metadata redirects to mutable platform snapshots. Strict

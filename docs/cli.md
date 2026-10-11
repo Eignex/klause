@@ -28,7 +28,7 @@ SMT-LIB optimization streams `; objective=<value>` for each incumbent in the sou
 objective's direction and emits `; optimizationStatus=<status>` at completion.
 These comments appear without `-s`; `sat` alone does not establish optimality.
 See [SMT-LIB result semantics](formats.md#smt-lib) for the status contract and
-[saved benchmark results](benchmarking.md#saved-results) for proof credit and
+[saved benchmark results](../klause-bench/README.md#saved-results) for proof credit and
 the interpretation of interrupted incumbents and unbounded witness objectives.
 
 ## Build and run
@@ -59,12 +59,9 @@ installed BLAS libraries. Gradle test and Java execution tasks use the same opti
 portable JVM reductions, use `-Pkoblas.noSimd=true`; a distribution built with that property also
 omits the Vector API option.
 
-The LP basis uses koblas containers, Level 1 kernels and sparse primitives, which work without a
-vendor library. Koblas packages no BLAS binaries. Dense Level 2/3 operations require an installed
-LP64 vendor: Linux selects oneMKL/AOCL on x64 or ArmPL on arm64, falling back to OpenBLAS; macOS
-uses system Accelerate. Selection is immutable and each vendor call uses one compute thread.
-There is no solver backend setting for this. See [dependency integration](lp/koblas.md)
-for reproducible builds and artifact provenance.
+Koblas supplies portable numerical kernels and can select an installed host BLAS
+library for eligible dense calls. It packages no vendor binaries. Runtime selection,
+threading and dependency pins are defined by [numerical integration](lp/dependencies.md#runtime-support).
 
 Standalone native executable (no JVM, instant startup, no JDK needed):
 
@@ -185,12 +182,9 @@ for one.
 `source-order` (the default) walks the variables in model order, `activity` follows conflict activity
 over the shared session. Only the Boolean skeleton is branched either way — the theory decides the
 arithmetic residual at each leaf. Activity order is opt-in.
-`-s` reports `openAssertingConflicts` and `openNonAssertingConflicts` for the shared first-UIP analyzer.
-The latter counts sound learned conflicts that retain chronological fallback because resolution cannot
-make the clause asserting. A nonzero count is the trigger to inspect missing component reasons. Native
-CP analysis, root refutations, and conflicts without a usable clause are outside these two counters.
-`openReductionNs` reports the shared learned store's total wall time selecting clauses and rebuilding
-watch lists at restart boundaries. It is zero when the cap is off or no reduction pass is needed.
+`-s` reports `openAssertingConflicts`, `openNonAssertingConflicts` and
+`openReductionNs`. The [search statistics contract](solver/search.md#statistics)
+defines their scopes and the distinction from native CP analysis.
 `--param open-bound-proof=false` declines the routing bound proof, so a model whose open sides the
 relaxation would have closed goes to the open theory instead of the finite lane. That is what runs one
 instance down both lanes; shrinking `-t` does not substitute, since it starves the solve along with the
@@ -235,7 +229,7 @@ Presolve is *not* an env knob — set it per run with `--presolve`.
 
 The CLI depends on `:klause` for parsers and engines, and kotlinx-coroutines to bridge
 the suspend portfolio API. Corpus selection and campaign execution belong to
-[benchmarking](benchmarking.md). [Input semantics](formats.md) describes exact and
+[benchmarking](../klause-bench/README.md). [Input semantics](formats.md) describes exact and
 approximate lowering and the limits of each result.
 
 ## Portfolio diagnostics
@@ -245,4 +239,4 @@ an ordinary caught arm exception. It contains `armId`, `phase`, `segment`, `work
 `type`, `message` and `trace`; control characters are escaped. Labels distinguish
 replicas, while arm IDs remain stable across reseeds. These records are separate
 from quarantine warnings and their `faults` count. A sibling's accepted result can
-still be the run's verdict. See [search accounting](search.md#portfolio-slices).
+still be the run's verdict. See [portfolio failures](solver/portfolio.md#reseeding-and-arm-failures).

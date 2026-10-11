@@ -1,5 +1,66 @@
 # Development
 
+Start with [system architecture](architecture.md) before changing subsystem
+boundaries. This guide owns setup smoke commands and contribution workflows;
+the [CLI](cli.md) owns launcher and runtime details.
+
+## Getting started
+
+```sh
+./gradlew :klause-cli:installJvmDist
+klause-cli/build/install/klause-cli-jvm/bin/klause-cli --help
+```
+
+The launcher requires JDK 25 or newer. Gradle provisions its compilation toolchain;
+the shell that invokes the installed launcher must also select a suitable JDK.
+See [CLI setup](cli.md#build-and-run) for runtime options and native builds.
+
+Solve a committed instance:
+
+```sh
+klause-cli/build/install/klause-cli-jvm/bin/klause-cli \
+  -e cp -t 10000 -s klause-bench/smoke-corpus/smtlib/lia-wide-span.smt2
+```
+
+Use the [MiniZinc integration](minizinc.md) for `.mzn` source models. The CLI reads
+FlatZinc, XCSP3, SMT-LIB, MPS, DIMACS, OPB/WBO and WCNF directly.
+[Input semantics](formats.md) explains the result guarantees and exact mode.
+
+## Kotlin DSL
+
+Declare a schema, compile it and decode solutions:
+
+```kotlin
+class Order : VariableSchema() {
+    val a by intVar(min = 1, max = 3)
+    val b by intVar(min = 1, max = 3)
+    val c by intVar(min = 1, max = 3)
+    val unique by constraint { allDifferent(a, b, c) }
+}
+
+val schema = Order()
+val compiled = schema.compile()
+for (sample in BacktrackSolver(compiled).enumerate().take(5)) {
+    println(compiled.decode(schema.a, sample))
+}
+```
+
+The [schema DSL](../klause/src/commonMain/kotlin/com/eignex/klause/schema/) and
+[solver APIs](../klause/src/commonMain/kotlin/com/eignex/klause/solver/) provide
+schema construction, compilation, decoding and solving. Variables can be optional;
+constraints lower to reified or aggregation-aware forms. Sets and non-linear float
+wrappers compile to supported finite encodings.
+
+## Result requirements
+
+Enumeration and sampling operate over compiled finite problems; counting and
+near-uniform sampling mechanisms live under
+[count](../klause/src/commonMain/kotlin/com/eignex/klause/count/).
+Select the API and engine for the required result. A local-search witness does
+not establish exhaustive search or optimality; an interrupted complete search
+can remain undecided. LP result strength and source reconstruction follow the
+[certification contract](lp/certification.md#proof-packages).
+
 ## Validation
 
 Opening or pushing a PR does not require a local `./gradlew check lintDocs` gate.
@@ -24,15 +85,16 @@ failures.
 
 The default build targets JVM and Linux x64. Releases opt into Linux arm64 and
 macOS arm64 with `-Ptargets.full`. Native tests and documentation checks run in
-CI. Benchmarks, capture and timing tools are opt-in; see [benchmarking](benchmarking.md).
+CI. Benchmarks, capture and timing tools are opt-in; see [benchmarking](../klause-bench/README.md).
 
 ## Tests
 
 Unit tests define focused behavior and subsystem contracts: parsing and lowering,
 state ownership, rollback, explanations, exact arithmetic, result publication and
 resource limits. Keep a small set of representative examples for each contract.
-Klause-lab owns solver regression coverage, corpus validation and broad scenario
-sweeps. Avoid duplicating those runs in unit tests or adding a separate toy solve
+[Klause-lab](../klause-bench/README.md#klause-lab) owns solver regression coverage,
+corpus validation and broad scenario sweeps. Avoid duplicating those runs in unit
+tests or adding a separate toy solve
 for every DSL operator, search policy or frontend feature. Add a unit test when
 it clarifies a distinct contract; extend an existing case for a variant of the
 same behavior.
@@ -66,7 +128,13 @@ pasting long excerpts.
 ## Documentation
 
 System guides live under `docs/` and are indexed by its [README](README.md).
-Module and artifact READMEs are short entry points. Public API details belong
+`solver/` owns search-state and scheduling contracts; `lp/` owns numerical
+authority, certification and dependency integration. `testing/` owns fixture
+provenance, and `evidence/` contains short summaries supporting current decisions.
+Root guides provide development, architecture and frontend entry points.
+Benchmark usage, records, independent source checks and diagnostics live in
+[klause-bench/README.md](../klause-bench/README.md). Other module and artifact
+READMEs are short entry points. Public API details belong
 in KDoc. Keep fixture identities/licenses in [provenance](testing/fixtures.md)
 and immutable capture manifests. Repository agent instructions and GitHub
 templates retain their functional locations.
@@ -105,8 +173,11 @@ Read the relevant architecture and contract pages before changing a subsystem.
 Maintain them in the same change as code affecting ownership, dependencies,
 invariants, result/proof semantics, resource policy or developer workflows.
 Architecture rules constrain implementation; document deliberate changes together
-with their callers and validation. Do not create standalone documentation outside
-`docs/`. Remove competing descriptions and superseded files.
+with their callers and validation. Keep standalone system documentation under
+`docs/` and benchmark workflows in `klause-bench/README.md`.
+Extend the page that owns a contract and link to it from related guides;
+split a page only when it combines distinct responsibilities. Remove competing
+descriptions and superseded files.
 
 Document implemented behavior and its limits. Verify claims against the current
 source rather than importing old plans, removed APIs, historical benchmark

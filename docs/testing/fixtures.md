@@ -37,7 +37,7 @@ See [capture commands and checks](../lp/replay.md).
 [smoke-corpus](../../klause-bench/smoke-corpus/) contains small parser and solve
 fixtures grouped by format. Larger or non-redistributable collections are fetched
 through the catalog, with their license and exclusion policy in the collection
-declaration. See [corpus management](../benchmarking.md#catalog-and-corpus).
+declaration. See [corpus management](../../klause-bench/README.md#catalog-and-corpus).
 
 | Directory | Contents and origin |
 |---|---|

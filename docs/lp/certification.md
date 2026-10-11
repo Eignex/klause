@@ -21,7 +21,7 @@ A bound does not imply feasibility or attainment. A point does not imply
 unboundedness. Ceiling an objective bound requires a proved integral objective
 lattice. Combine packages only when authority, scope and objective units match.
 Exact rejection of one candidate is not a refutation of the model. Cross-arm
-publication also requires the [portfolio model and objective scope](../search.md#portfolio-slices);
+publication also requires the [portfolio model and objective scope](../solver/portfolio.md#witnesses-and-proof-scope);
 its adapter certificate does not replace these numerical checks.
 
 ## Certification mechanisms
@@ -57,7 +57,7 @@ Finite-double conversion removes trailing powers of two from the significand,
 so its odd numerator is coprime to the remaining power-of-two denominator.
 These factory paths preserve exact values and normalization while avoiding
 redundant arithmetic. Their measured scope is recorded in
-[rational normalization evidence](../evidence/rational-normalization.md).
+[rational normalization evidence](../evidence/numerical-kernels.md#rational-normalization).
 
 A verification attempt makes at most one factor-factory call, charging its
 internal reorder/precision restarts. Owner-local exact factors require the same
@@ -166,7 +166,7 @@ earliest deadline and first work meter at construction. Adjacent library deadlin
 tokens backed by the monotonic clock use one earliest deadline check. Predicates
 between clocks, dynamic adapters and other time sources retain their ordered
 checks. The
-[dispatch evidence](../evidence/cancellation-polling.md) supports retaining the
+[dispatch evidence](../evidence/numerical-kernels.md#cancellation-polling) supports retaining the
 current polling contract without a dispatch performance claim.
 
 Continuous leaf solves use solve-wide cancellation rather than a portfolio node

@@ -121,5 +121,9 @@ assemble relaxations and reconstruct source results; the engine does not impleme
 a second problem presolver. Source maps, fixed substitutions, scoped premises and
 objective units must survive preparation and reconstruction.
 
-[Search and propagation](search.md) describes learning and scheduling.
-[LP architecture](lp/architecture.md) describes numerical ownership and consumers.
+[Search and propagation](solver/search.md) defines shared traversal and reasons.
+[Sessions](solver/sessions.md) define caller scopes and stream ownership;
+[local search](solver/local-search.md) defines assignment state and moves;
+[portfolios](solver/portfolio.md) define scheduling and result admission.
+[Presolve](solver/presolve.md) defines source reconstruction and phase accounting.
+[LP architecture](lp/architecture.md) defines numerical ownership and consumers.
