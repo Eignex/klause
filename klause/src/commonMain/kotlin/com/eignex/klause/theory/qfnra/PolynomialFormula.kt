@@ -61,8 +61,12 @@ internal class PolynomialFormula private constructor(
         const val FALSE: Int = 0
         const val TRUE: Int = 1
 
-        fun normalize(formula: PolynomialRealFormula, arithmetic: PolynomialArithmetic): PolynomialFormula {
-            val expressions = PolynomialNormalizer(arithmetic)
+        fun normalize(
+            formula: PolynomialRealFormula,
+            arithmetic: PolynomialArithmetic,
+            fixed: Map<Int, BigFraction> = emptyMap(),
+        ): PolynomialFormula {
+            val expressions = PolynomialNormalizer(arithmetic, fixed)
             val indices = HashMap<PolynomialRealFormula, Int>()
             val nodes = mutableListOf<FormulaNode>()
             val atoms = mutableListOf<PolynomialAtom>()
@@ -131,7 +135,10 @@ private sealed interface FormulaNode {
     class Junction(val children: IntArray, val conjunction: Boolean) : FormulaNode
 }
 
-private class PolynomialNormalizer(private val arithmetic: PolynomialArithmetic) {
+private class PolynomialNormalizer(
+    private val arithmetic: PolynomialArithmetic,
+    private val fixed: Map<Int, BigFraction>,
+) {
     private val normalized = HashMap<PolynomialExpression, Polynomial>()
 
     fun normalize(expression: PolynomialExpression): Polynomial {
@@ -160,7 +167,8 @@ private class PolynomialNormalizer(private val arithmetic: PolynomialArithmetic)
                 is PolynomialExpression.Constant -> Polynomial.constant(
                     BigFraction.of(node.numerator, node.denominator),
                 )
-                is PolynomialExpression.Variable -> Polynomial.variable(node.id.index)
+                is PolynomialExpression.Variable -> fixed[node.id.index]?.let(Polynomial::constant)
+                    ?: Polynomial.variable(node.id.index)
                 is PolynomialExpression.Power -> arithmetic.power(normalized.getValue(node.base), node.exponent)
                 is PolynomialExpression.Sum -> {
                     var value = Polynomial.ZERO

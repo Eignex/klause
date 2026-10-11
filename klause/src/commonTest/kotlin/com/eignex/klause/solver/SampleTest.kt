@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
@@ -16,6 +17,34 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SampleTest {
+    @Test
+    fun `algebraic coordinates survive captured buffers and unchanged copies`() {
+        val exact = AlgebraicArithmetic().rational(BigFraction.ofLong(2))
+        val values = mutableListOf(exact)
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(2.0), algebraicReals = values)
+        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
+        values.clear()
+
+        val copied = sample.copy()
+
+        assertEquals(listOf(exact), copied.algebraicReals)
+        assertNotNull(copied.witnessCertificate)
+        assertEquals(sample, copied)
+        assertEquals(sample.hashCode(), copied.hashCode())
+    }
+
+    @Test
+    fun `replacing approximate coordinates discards algebraic authority`() {
+        val exact = AlgebraicArithmetic().rational(BigFraction.ofLong(2))
+        val sample = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(2.0), algebraicReals = listOf(exact))
+        sample.witnessCertificate = EvidenceCertificate.verified(ModelIdentity.of(Any()), EvidenceKind.Witness)
+
+        val changed = sample.copy(reals = doubleArrayOf(3.0))
+
+        assertNull(changed.algebraicReals)
+        assertNull(changed.witnessCertificate)
+    }
+
     @Test
     fun `finite samples capture constructor buffers`() {
         val bools = booleanArrayOf(true)

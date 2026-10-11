@@ -1,9 +1,23 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
+import com.eignex.klause.solver.pipeline.PolynomialStrategyParams
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.theory.qfnra.ExactNraAssignment
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
+import com.eignex.klause.util.times
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
@@ -13,8 +27,44 @@ internal fun polynomialSolvable(
     admissionElapsedMs: Long,
 ): Solvable = sourceSolvable(SolvablePipeline.PolynomialTheory(request, render), admissionElapsedMs)
 
+internal fun polynomialSolvable(
+    route: SourceProblemRoute.PolynomialTheory,
+    render: (OpenTheoryAssignment) -> String,
+    routingElapsedMs: Long = 0,
+): Solvable = sourceSolvable(
+    SolvablePipeline.PolynomialTheory(route.request, render, route.objective, route.maximize), routingElapsedMs,
+)
+
 internal fun interruptedSolvable(reason: TerminationReason, admissionElapsedMs: Long): Solvable =
     sourceSolvable(SolvablePipeline.Interrupted(reason), admissionElapsedMs)
+
+internal fun polynomialOptimum(result: MinimizeResult, objective: LinearObjective): OpenTheoryOptimum {
+    fun witness(sample: Sample): OpenTheoryAssignment = OpenTheoryAssignment.Rebuilt(
+        OpenTheoryAssignment.ExactNra(ExactNraAssignment(sample.bools, requireNotNull(sample.algebraicReals))),
+        sample.bools, Array(sample.numIntVars) { sample.exactIntValue(it) },
+    )
+    fun value(sample: Sample): BigFraction {
+        var sum = bigIntOf(objective.constant)
+        objective.boolWeights.forEachIndexed { id, weight -> if (sample.boolValue(id)) sum += bigIntOf(weight) }
+        objective.intCoefficients.forEachIndexed { id, coefficient ->
+            sum += bigIntOf(coefficient) * sample.exactIntValue(id)
+        }
+        return BigFraction.of(sum, BIG_ONE)
+    }
+    return when (result) {
+        is MinimizeResult.Optimal -> OpenTheoryOptimum.Optimal(
+            witness(result.sample), value(result.sample), result.stats,
+        )
+        is MinimizeResult.BestFound -> OpenTheoryOptimum.Bounded(
+            witness(result.sample), value(result.sample), result.reason, result.stats,
+        )
+        is MinimizeResult.Infeasible -> OpenTheoryOptimum.Infeasible(result.stats)
+        is MinimizeResult.Unknown -> OpenTheoryOptimum.Bounded(null, null, result.reason, result.stats)
+        is MinimizeResult.Unbounded -> OpenTheoryOptimum.Bounded(
+            witness(result.sample), value(result.sample), TerminationReason.Unsupported, result.stats,
+        )
+    }
+}
 
 private fun sourceSolvable(pipeline: SolvablePipeline, admissionElapsedMs: Long): Solvable = Solvable(
     finite = null,
@@ -31,11 +81,26 @@ internal fun polynomialParams(common: CommonOptions, timeout: Cancellation): Pol
         usageError("engine param `nra-dense-coefficients` expects a positive Int or unlimited")
     }
     val matrix = polynomialAllowance(common, "nra-matrix-cells", default = 262144)
-    EngineParams(common.engineParams).finish(
+    val knobs = EngineParams(common.engineParams)
+    val seed = knobs.long("seed") ?: common.randomSeed
+    val decisions = knobs.long("max-decisions") ?: Long.MAX_VALUE
+    val flips = knobs.long("max-flips") ?: Long.MAX_VALUE
+    val instructions = knobs.long("max-instructions")
+    val iterations = knobs.int("alns-iterations") ?: 50
+    if (decisions < 0 || flips < 0 || instructions?.let { it < 0 } == true || iterations < 0) {
+        usageError("polynomial strategy limits must be nonnegative")
+    }
+    knobs.finish(
         "polynomial-real",
-        "nra-work-limit, nra-dense-coefficients, nra-matrix-cells",
+        "nra-work-limit, nra-dense-coefficients, nra-matrix-cells, seed, max-decisions, max-flips, " +
+            "max-instructions, alns-iterations",
     )
-    return PolynomialTheoryParams(work, dense?.toInt(), matrix, timeout = timeout)
+    return PolynomialTheoryParams(work, dense?.toInt(), matrix, timeout = timeout,
+        strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(randomSeed = seed, maxDecisions = decisions, maxInstructions = instructions),
+            localSearch = LocalSearchParams(randomSeed = seed, maxFlips = flips, maxInstructions = instructions),
+            alnsIterations = iterations,
+        ))
 }
 
 private fun polynomialAllowance(common: CommonOptions, key: String, default: Long?): Long? =

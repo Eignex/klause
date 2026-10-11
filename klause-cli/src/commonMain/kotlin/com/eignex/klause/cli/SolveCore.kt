@@ -27,6 +27,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.minimize
 import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.solver.result.LpStats
@@ -84,10 +85,9 @@ internal object SolveCore {
         // poll, which burns the whole deadline and overshoots the cap several times over.
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
-        // The open routes run what `-e` asks for, and ALNS has no open counterpart.
+        // Linear open routes have no ALNS counterpart.
         val open = rawSolvable.pipeline.let {
-            it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch ||
-                it is SolvablePipeline.PolynomialTheory
+            it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch
         }
         if (open && engine == FiniteEngine.ALNS) usageError("engine `${engine.id}` has no open-model route")
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
@@ -97,17 +97,34 @@ internal object SolveCore {
                 if (solutionSetSensitive) {
                     usageError("all-solution enumeration is unavailable for polynomial real models")
                 }
+                val polynomialParams = polynomialParams(common, deadlineCancel)
+                pipeline.objective?.let { sourceObjective ->
+                    output.begin(optimize = true, maximize = pipeline.maximize)
+                    val objective = if (pipeline.maximize) sourceObjective.negated() else sourceObjective
+                    val execution = OpenTheoryPipeline.minimize(pipeline.request, objective, polynomialParams, engine)
+                    reportOpenTheoryOptimum(
+                        polynomialOptimum(execution.result, objective), pipeline.maximize, pipeline.render,
+                        common.statistics, output, rawSolvable.routingLpStats, rawSolvable.routingElapsedMs,
+                        completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
+                    ) { budgetSpent(common, it) }
+                    if (common.statistics) output.onAllowanceStatistics(listOf(
+                        "nraWork" to execution.stats.workSpent.toString(),
+                        "nraProjectedPolynomials" to execution.stats.projectedPolynomials.toString(),
+                        "nraLiftedCells" to execution.stats.liftedCells.toString(),
+                    ))
+                    return
+                }
                 output.begin(optimize = false, maximize = false)
                 val execution = OpenTheoryPipeline.execute(
                     pipeline.request,
-                    polynomialParams(common, deadlineCancel),
+                    polynomialParams,
                     engine,
                 )
                 val result = execution.result
                 output.onVerdictContext(
                     VerdictContext(
                         terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
-                        completePool = engine != FiniteEngine.LOCAL_SEARCH,
+                        completePool = engine != FiniteEngine.LOCAL_SEARCH && engine != FiniteEngine.ALNS,
                     ),
                 )
                 when (result) {
@@ -959,6 +976,7 @@ private fun reportOpenTheoryOptimum(
     output: OutputProtocol,
     routingLpStats: LpStats,
     routingElapsedMs: Long,
+    completePool: Boolean = true,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
     val resultStats = result.stats.copy(lp = result.stats.lp.mergedWith(routingLpStats))
@@ -971,6 +989,7 @@ private fun reportOpenTheoryOptimum(
         VerdictContext(
             budgetExhausted = budgetExhausted(resultStats.run.timedOut),
             terminationReason = (result as? OpenTheoryOptimum.Bounded)?.reason,
+            completePool = completePool,
         ),
     )
     when (result) {

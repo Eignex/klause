@@ -10,14 +10,11 @@ The complete fragment is polynomial real satisfaction with rational coefficients
 and Boolean structure. It does not include transcendental functions or integer
 integrality. Completeness does not guarantee completion within invocation limits.
 The [support policy](../architecture.md#solver-identity-and-support-policy) permits
-sound incomplete mechanisms alongside complete fragment procedures. This theory's
-pipeline route is a separate invocation over `PolynomialRealProblem`, rather than
-a component composing arbitrary factors from `Problem` in shared search.
-Shared composition is active work in
-[#2621](https://github.com/Eignex/klause/issues/2621); the separate invocation boundary
-describes implemented coverage rather than the intended limit of polynomial support.
-In particular, rejecting local-search execution violates the required availability
-of a complete-search/local-search portfolio over the same source problem.
+sound incomplete mechanisms alongside complete fragment procedures. The pipeline accepts both neutral polynomial sources and shared `Problem` models.
+Finite factors and polynomial equations compose through one invocation and the same
+source objective across backtracking, local search, ALNS and mixed portfolios.
+Continuous coordinates belong to the polynomial theory; finite propagation retains
+only Boolean and integer variables.
 
 ## Projection families
 
@@ -114,12 +111,59 @@ contract are defined in the [API contract](../api.md).
 
 ## Pipeline and frontend publication
 
-The pipeline accepts opaque `ir.PolynomialRealProblem` through `pipelineRequest()`.
-`OpenTheoryPipeline.execute` invokes the complete engine once and returns the common
-SAT/UNSAT/UNKNOWN result with `PolynomialTheoryStats` and an optional native resource
-cause. Source declaration prefixes trim numeric conditional auxiliaries at capture.
+The pipeline accepts opaque `ir.PolynomialRealProblem` and shared `ir.Problem`
+models through `pipelineRequest()`. `OpenTheoryPipeline.execute` selects a finite
+strategy with exact polynomial completion and returns the common SAT/UNSAT/UNKNOWN
+result with `PolynomialTheoryStats` and an optional native resource cause. Source declaration prefixes trim numeric conditional auxiliaries at capture.
 Both verdicts receive a final stop check, and SAT capture receives another check
 before publication. Timeout, external cancellation and budget/resource exhaustion
 retain distinct common termination reasons. Exact source scalars survive invocation
 cleanup. [Input semantics](../formats.md#polynomial-source-lowering) owns admission
 and model rendering; [resources](resources.md) owns the public caps and native units.
+
+## Conditioned theory service
+
+`PolynomialTheoryService` captures one immutable neutral formula and its coordinate
+counts. Each `PolynomialTheoryInvocation` owns a cumulative native work allowance
+across fresh conditioned checks. Boolean pins and rational lower/upper bounds are
+conjoined within the counted arithmetic scope. Query construction, normalization,
+CAD, exact witness capture and the final verdict poll share cancellation and allocation
+limits. Closing the invocation rejects further queries; captured scalar witnesses
+remain readable. Invocations share no mutable traversal or refinement state.
+
+`PolynomialSearchComponent` consumes shared Boolean facts and semantic integer bounds.
+Integer columns map to theory coordinates without creating continuous CP domains.
+A query over an unfixed integer interval is a real relaxation: its exact refutation
+can reject the finite branch, while its witness cannot accept that branch. Complete
+checks require every mapped integer and Boolean to be fixed. Conflicts without a
+clause explanation remain chronological and cannot enter learned-clause exchange.
+Retraction invalidates query results; the containing invocation allowance persists.
+
+## Shared model composition
+
+`SharedPolynomialModel` separates exactly encodable continuous factors from finite
+factors. Integer columns appearing in the continuous equations receive symbolic
+real coordinates for conditioned queries; their source finite domains and global
+constraints remain in CP. Exact linear rows, Boolean reification, real bounds and
+integer/real products and `ContinuousProduct` become neutral polynomial formulas. AllDifferent, scheduling
+and other finite factors remain intact in the finite projection. Linear relaxation
+rows cannot stand in for a factor's semantics. Binary64 constants denote their exact
+binary rational values. Equal finite real bounds remain source equations and are
+substituted before projection, retaining their exact coordinate in captured models.
+`Problem.pipelineRoute()` selects `SourceProblemRoute.PolynomialTheory` for shared
+continuous products before finite or linear routing. Open integer domains and
+continuous objectives decline this route; they are not boxed or discretized.
+
+Backtracking checks interval relaxations and fixed finite branches. Local search
+generates candidates from finite factors, rechecks their pinned finite fixpoint, then
+pins their complete finite values in a theory query before publication. ALNS uses that same completion in bootstrap,
+finite CP repair and its inner local search. Pure-real sources use an empty finite
+projection, so the local-search arm still runs and obtains an exact completion.
+Rejected heuristic candidates never establish a global refutation.
+
+`OpenTheoryPipeline.minimize` supports objectives over the finite columns using the
+same projection, theory and objective in every worker. Complete traversal can prove
+an optimum or infeasibility; local search and ALNS retain exact incumbents without
+proof admission. Continuous objectives and all-solution enumeration remain outside
+this interface. [Search](search.md), [local search](local-search.md),
+[portfolio](portfolio.md) and [sessions](sessions.md) own their execution lifecycles.

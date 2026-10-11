@@ -33,6 +33,7 @@ internal fun interface DestroyOperator {
          *  diversifying baseline; every destroy palette includes it. */
         val Random: DestroyOperator = DestroyOperator { rng, problem, _, _, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
+            if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             val ids = (0 until totalVars).shuffled(rng).take(k)
             split(ids, problem.numBoolVars)
@@ -43,6 +44,7 @@ internal fun interface DestroyOperator {
          *  objective if re-optimised. */
         val WorstObjective: DestroyOperator = DestroyOperator { _, problem, incumbent, objective, fraction ->
             val totalVars = problem.numBoolVars + problem.numIntVars
+            if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             val contribs = DoubleArray(totalVars)
             // A coefficient array need not cover the whole namespace: presolve can extend it (a `{0, 1}`
@@ -73,8 +75,8 @@ internal fun interface DestroyOperator {
         val AdjacencyRelated: DestroyOperator = DestroyOperator { rng, problem, _, _, fraction ->
             val projection = LocalSearchProblem(problem)
             val totalVars = problem.numBoolVars + problem.numIntVars
-            val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
+            val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             val freed = BooleanArray(totalVars)
             var freedCount = 0
             val queue = IntArrayDeque()

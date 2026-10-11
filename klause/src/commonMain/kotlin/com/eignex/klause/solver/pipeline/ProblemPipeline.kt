@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
@@ -40,6 +41,16 @@ enum class ProblemPipeline {
 
 /** A source model prepared for the finite or complete open-theory pipeline. */
 sealed interface SourceProblemRoute {
+    /** Exact polynomial completion beside a finite projection of the shared source model. */
+    data class PolynomialTheory(
+        /** Source decomposition and exact continuous constraints. */
+        val request: PolynomialTheoryRequest,
+        /** Finite objective, or null for satisfaction. */
+        val objective: LinearObjective? = null,
+        /** Whether [objective] is maximized. */
+        val maximize: Boolean = false,
+    ) : SourceProblemRoute
+
     /** A fully bounded source model selected for deferred finite-domain preparation. */
     data class Finite(
         /** Canonical logical model retained until deferred finite preparation. */
@@ -124,6 +135,14 @@ private fun Problem.pipelineRouteObserved(
     onLpStats: ((LpStats) -> Unit)?,
     routeLinearToTheory: Boolean,
 ): SourceProblemRoute {
+    if (factors.any { it is ContinuousProduct }) {
+        val shared = SharedPolynomialModel.assemble(this)
+        return if (shared != null && objective?.realCoefficientValues?.any { it != 0.0 } != true) {
+            SourceProblemRoute.PolynomialTheory(shared.request(), objective, maximize)
+        } else {
+            SourceProblemRoute.UnsupportedOpen(null, this)
+        }
+    }
     val lpStats = onLpStats?.let { LpStatsSink(LpRoute.STANDALONE) }
     val bounded = proveBounded(boundCancellation, lpStats)
     if (lpStats != null) onLpStats(lpStats.snapshot())
@@ -190,7 +209,7 @@ private sealed interface BoundedRouting {
 }
 
 /**
- * The route a frontend hands to the solver for one source model.
+ * Legacy finite and linear route classification. Use [pipelineRoute] for polynomial composition.
  *
  * A fully bounded model stays on the finite route: that is a frontend policy about which engine owns a
  * finite domain, not a statement that no theory could decide it. Anything with an open integer side is

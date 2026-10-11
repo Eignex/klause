@@ -89,3 +89,9 @@ search and CAD traversal. It exposes no resumable handle, scoped mutation or ret
 refinement state. Complete exact scalar metadata remains readable after subsequent
 executions or cancellation; published witnesses own only original source coordinates.
 See [polynomial theory](qfnra.md) and [resource allowances](resources.md).
+
+A conditioned polynomial service invocation retains its native allowance across
+queries. Each query captures its own Boolean pins and exact rational bounds and owns
+fresh traversal state. Retraction discards the adapter's current result; it does not
+refund work. The scope owner closes the invocation after search, while published
+algebraic scalars remain independent of that lifecycle.

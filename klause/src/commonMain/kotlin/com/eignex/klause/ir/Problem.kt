@@ -51,11 +51,9 @@ open class Problem(
      */
     val hasSymmetryBreaking: Boolean = false,
     /**
-     * Number of LP-only continuous (real) variables; ids occupy `[0, numRealVars)` in a namespace
-     * separate from the integer and Boolean ones. A real variable is present in the LP relaxation as a
-     * continuous column but absent from CP search — it has no declared integer domain, no trail, and is
-     * never branched. The simplex resolves it at nodes and leaves (the LP-only-columns hybrid engine).
-     * Zero for the pure integer/Boolean core, which every existing consumer builds.
+     * Number of continuous real variables; ids occupy `[0, numRealVars)` in a namespace separate from
+     * the integer and Boolean ones. Continuous state belongs to the selected arithmetic theory or
+     * linear completion mechanism. These columns have no finite CP domain or propagation trail.
      */
     val numRealVars: Int = 0,
     /** Lower bound of each real variable (length [numRealVars]); `Double.NEGATIVE_INFINITY` for open. */

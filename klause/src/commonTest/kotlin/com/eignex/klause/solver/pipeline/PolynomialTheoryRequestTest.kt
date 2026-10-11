@@ -1,8 +1,12 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -11,8 +15,70 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PolynomialTheoryRequestTest {
+    @Test
+    fun `constant polynomial truth has a runnable empty ALNS projection`() {
+        val source = PolynomialRealProblem(
+            PolynomialRealFormula.Constant(true), 1, 0, 1, 0, mapOf("x" to 0), emptyMap(),
+        )
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(alnsIterations = 2))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, FiniteEngine.ALNS)
+
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+        assertNotNull(witness.algebraicRealValue(0))
+    }
+
+    @Test
+    fun `constant polynomial refutation stays unknown in a heuristic strategy`() {
+        val source = PolynomialRealProblem(
+            PolynomialRealFormula.Constant(false), 1, 0, 1, 0, mapOf("x" to 0), emptyMap(),
+        )
+
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 2),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, FiniteEngine.ALNS)
+
+        assertIs<OpenTheoryResult.Unknown>(execution.result)
+    }
+
+    @Test
+    fun `a mixed polynomial portfolio finds a witness after complete search is capped`() {
+        val input = assertIs<SmtLibInput.Polynomial>(
+            SmtLibAdmission.parse("(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))"),
+        )
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(maxInstructions = 0),
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 10),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest(), params, FiniteEngine.MIXED)
+
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result)
+        assertNotNull(witness.assignment.algebraicRealValue(0))
+        assertTrue(witness.stats.ls.moves.sum > 0)
+    }
+
+    @Test
+    fun `native exhaustion stops every polynomial strategy before entry`() {
+        val input = assertIs<SmtLibInput.Polynomial>(
+            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
+        )
+
+        for (engine in FiniteEngine.entries) {
+            val execution = OpenTheoryPipeline.execute(
+                input.problem.pipelineRequest(), PolynomialTheoryParams(maximumWork = 0), engine,
+            )
+
+            assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
+            assertEquals(0L, execution.stats.workSpent)
+        }
+    }
+
     @Test
     fun `source assumptions publish original coordinates without numeric ite auxiliaries`() {
         val input = assertIs<SmtLibInput.Polynomial>(
@@ -150,15 +216,16 @@ class PolynomialTheoryRequestTest {
     }
 
     @Test
-    fun `a local search request receives no polynomial proof authority`() {
+    fun `a local search candidate receives an exact polynomial witness`() {
         val input = assertIs<SmtLibInput.Polynomial>(
             SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
         )
 
         val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest(), engine = FiniteEngine.LOCAL_SEARCH)
 
-        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
-        assertEquals(PolynomialTheoryStats(), execution.stats)
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+        assertNotNull(witness.algebraicRealValue(0))
+        assertTrue(execution.stats.workSpent > 0)
         assertNull(execution.resource)
     }
 }

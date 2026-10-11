@@ -48,6 +48,7 @@ import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchContext
@@ -338,6 +339,7 @@ internal class ResumableMinimize(
         searchSession = SearchComponentSet(
             buildList {
                 add(cp)
+                addAll(params.componentFactory?.invoke().orEmpty())
                 if (lpEngine.lpRelaxer != null) {
                     lpEngine.cpAdapter.attach(session, feasibility = false)
                     add(lpEngine.propagator)
@@ -844,6 +846,7 @@ internal class ResumableMinimize(
         proposal: Sample,
         cancellation: Cancellation = params.cancellation,
     ): Candidate<Sample, Double>? {
+        if (params.componentFactory != null) return null
         val budget = cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         val verifier = ComposedSampleVerifier(problem, objective, budget)
         val verdict = verifier.verify(Candidate(proposal, objective.evaluate(proposal)))
@@ -865,6 +868,7 @@ internal class ResumableMinimize(
     private fun revalidateInitialCandidate(): MinimizeResult.WithSample? {
         val sample = initialCandidate ?: return null
         initialCandidate = null
+        if (params.componentFactory != null) return null
         val token = params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         if (token() || sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return null
         val validation = PropagationSession(problem, token)
@@ -1132,7 +1136,7 @@ internal class ResumableMinimize(
             model: com.eignex.klause.solver.search.AssembledSearchModel,
             context: SearchContext,
         ): SearchModelDisposition {
-            val sample = checkNotNull(model.valueOf<Sample>(cp))
+            val sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf<Sample>(cp))
             // The leaf is the engine's own claim, re-derived here from every factor before it can become an
             // incumbent: an assignment the composed fixpoint refutes is an engine defect, never a solution. A check
             // the deadline cut short refutes nothing, so the leaf stands.
@@ -1271,10 +1275,15 @@ internal class ResumableMinimize(
     private fun applyObjectiveBound(): SearchRunDisposition {
         session.installObjectiveBoolBound(objective.boolWeightValues)
         if (rebindable) return SearchRunDisposition.Continue
-        return if (assertObjectiveBoundAtRoot() || tightenOpenColumnsAtRoot()) {
-            SearchRunDisposition.Exhausted
-        } else {
-            SearchRunDisposition.Continue
+        if (assertObjectiveBoundAtRoot() || tightenOpenColumnsAtRoot()) return SearchRunDisposition.Exhausted
+        if (params.componentFactory == null) return SearchRunDisposition.Continue
+        // Objective cutoffs alter native CP bounds at the root; peers must see the tightened facts.
+        val initialized = cp.initialize(searchSession)
+        val result = if (initialized == ComponentResult.Consistent) searchSession.propagate() else initialized
+        return when (result) {
+            ComponentResult.Consistent -> SearchRunDisposition.Continue
+            is ComponentResult.Conflict -> SearchRunDisposition.Exhausted
+            ComponentResult.Indeterminate -> SearchRunDisposition.Indeterminate
         }
     }
 }

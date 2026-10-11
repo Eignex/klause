@@ -121,3 +121,14 @@ the polynomial limits; `node-limit` and legacy open-work settings do not price t
 See [sessions](sessions.md) for handle ownership, [presolve](presolve.md) for phase
 telemetry, [portfolio scheduling](portfolio.md) for coverage and
 [LP certification](../lp/certification.md) for partial numerical evidence.
+
+A `PolynomialTheoryInvocation` shares one cumulative native allowance across its
+conditioned checks. Every check receives only the remaining allowance and forwards
+its observed arithmetic work once to the containing caller meter. Query condition
+assembly belongs to that work scope. New finite branches and retractions do not renew
+it. Independent invocations receive independent ledgers.
+
+Polynomial strategy composition stops its containing search when the cumulative
+native work allowance is exhausted or a representation resource declines. Workers
+cannot restart the allowance or spin on completion queries after that stop. Native
+resource causes and finite search telemetry remain visible in the pipeline result.
