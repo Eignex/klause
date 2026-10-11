@@ -111,7 +111,7 @@ internal class MonotoneClausePrimal private constructor(
                         ).copy(
                             nativeSat = params.nativeSat, pbLearning = false, nodeBudget = params.nodeBudget,
                             targetPhasing = false, valueSelector = IndomainMin,
-                            maxDecisions = maxOf(20_000L, solver.problem.numBoolVars.toLong() * 2L),
+                            maxDecisions = Long.MAX_VALUE,
                         ),
                         rebindable = true,
                     )

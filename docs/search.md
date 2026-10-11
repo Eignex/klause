@@ -445,8 +445,9 @@ The feasibility repair uses the SAT preset with inprocessing and target capture 
 starts fresh Boolean decisions with false, and retains each trial session across portfolio slices. Its cumulative
 work is charged to the owning arm, including initialization, and slice cancellation
 pauses the current traversal without restarting it. Feasibility search receives at most one half of the remaining
-solve allowance in active execution time, capped at 5 seconds; each trial also has a
-decision cap of at least 20,000 or twice the Boolean variable count. The whole-solve cancellation also bounds every activation. It runs once before ordinary optimization
+solve allowance in active execution time, capped at 5 seconds. Trials retain the
+caller's solve-wide node budget and rely on the phase allowance instead of a separate
+trial decision cap. The whole-solve cancellation also bounds every activation. It runs once before ordinary optimization
 and is skipped behind an existing shared incumbent or within repair fragments.
 
 The search counters distinguish eligible clausal probe starts, feasibility trial starts,
