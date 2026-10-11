@@ -91,6 +91,9 @@ Primitive equality literals are shared across source uses and branch expansion.
 Comparisons finish open decision lists before expanding their branch tests.
 Constant branch images of at most 1,024 distinct values can reject a comparison
 before visiting its definition tree; unknown or larger images retain exact fallback.
+Immutable guard meanings exclude unreachable arms from those images. A default
+omits selector values covered by its guards, and a fully covered selector image
+excludes the default even when that default is open arithmetic.
 An integer conditional with a constant guard returns its selected branch directly.
 Conditional definitions retain immutable equality meanings for their guards.
 When a branch compares a simple integer variable with a constant, these meanings
