@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.solver.ProblemClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,6 +11,74 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioCompositionTest {
+
+    @Test
+    fun `finite mixed optimization admits selector diversity without a relaxation`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val facts = ProblemFacts(profile) { false }
+
+        val plan = PortfolioComposition.plan(scenario, facts)
+
+        assertEquals(listOf("satOptimized", "selector-switch"),
+            plan.arms.filterIsInstance<BacktrackWorkerConfig>().map { it.label })
+        assertEquals(4, plan.arms.count { it is LocalSearchWorkerConfig })
+    }
+
+    @Test
+    fun `explicit continuous and relaxation pools retain their leading recipes`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val profile = ProblemFacts.assumed(Kind.COP).profile
+        val finite = ProblemFacts(profile) { false }
+        val controls = listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(kind = Kind.CSP),
+            scenario.copy(arms = 5),
+            scenario.copy(btEdit = { it }),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("cbls/fixed") }),
+            scenario.copy(annotationArm = BacktrackParams()),
+        )
+
+        for (control in controls) {
+            assertTrue(PortfolioComposition.compose(control, finite).filterIsInstance<BacktrackWorkerConfig>()
+                .take(2).none { it.label == "selector-switch" })
+        }
+        for (problemClass in listOf(ProblemClass.MixedInteger, ProblemClass.Sat, ProblemClass.PseudoBoolean)) {
+            val facts = ProblemFacts(profile.copy(problemClass = problemClass)) { false }
+            assertTrue(PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+                .take(2).none { it.label == "selector-switch" })
+        }
+        val relaxation = ProblemFacts(profile) { true }
+        assertEquals(listOf("satOptimized", "lp-default"),
+            PortfolioComposition.compose(scenario, relaxation).take(2).map { it.label })
+    }
+
+    @Test
+    fun `expanded finite pools keep the admitted selector position without duplicating it`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { false }
+        val small = PortfolioComposition.plan(scenario, facts)
+
+        val expanded = PortfolioComposition.plan(scenario.copy(arms = 18), facts)
+
+        assertEquals(small.arms.map { it.label }, expanded.arms.take(small.arms.size).map { it.label })
+        assertEquals(1, expanded.arms.count { it.label == "selector-switch" })
+        assertEquals(1, expanded.arms.count { it.label == "conflictDriven" })
+    }
+
+    @Test
+    fun `expanded pools retain the initial selector beside later relaxation recipes`() {
+        val scenario = PortfolioScenario.sequential(Kind.COP)
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile) { it == LpEmphasis.CONSERVATIVE }
+        val small = PortfolioComposition.plan(scenario, facts)
+
+        val expanded = PortfolioComposition.plan(scenario.copy(arms = 12), facts)
+
+        assertEquals(small.arms.map { it.label }, expanded.arms.take(small.arms.size).map { it.label })
+        assertTrue(expanded.arms.any { it.label == "lp-conservative" })
+    }
 
     @Test
     fun `scheduled mixed optimization pairs primary and full plateau neighborhoods`() {
