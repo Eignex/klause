@@ -45,6 +45,14 @@ class CheckArchitectureTest(unittest.TestCase):
             with self.subTest(source=source):
                 self.assertEqual(2, violations("package com.eignex.klause.lp.engine\n" + source)[0][0])
 
+    def test_wildcard_imports_cannot_hide_a_forbidden_symbol(self):
+        self.assertTrue(violations("""package com.eignex.klause.theory.qflra
+import com.eignex.klause.ir.*
+"""))
+        self.assertEqual([], violations("""package com.eignex.klause.theory.qflra
+import com.eignex.klause.ir.Lit
+"""))
+
     def test_comments_and_literal_text_are_not_dependencies(self):
         self.assertEqual([], violations('''package com.eignex.klause.lp.engine
 // com.eignex.klause.propagation.Session
