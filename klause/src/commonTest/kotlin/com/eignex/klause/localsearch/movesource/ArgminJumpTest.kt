@@ -195,21 +195,23 @@ class ArgminJumpTest {
 
     @Test
     fun `integer jumps grade the emitted channel compound`() {
-        val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 2)),
-            arrayOf<Factor>(
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
-                Clause(intArrayOf(Lit.make(0, true))),
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 2),
-            ),
-        )
-        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
-        state.assignment.setBool(0, true)
-        state.recompute()
-        state.weights.factorWeights[1] = 10.0
-        state.weights.factorWeights[2] = 2.0
+        for (upper in listOf(2, 32)) {
+            val problem = Problem(
+                1, 1, arrayOf(IntDomain(0, upper.toLong())),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                    Clause(intArrayOf(Lit.make(0, true))),
+                    Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, upper),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setBool(0, true)
+            state.recompute()
+            state.weights.factorWeights[1] = 100.0
+            state.weights.factorWeights[2] = 2.0
 
-        assertTrue(jumps(state, candidateVars = 1).isEmpty())
+            assertTrue(jumps(state, candidateVars = 1).isEmpty())
+        }
     }
 
     @Test
