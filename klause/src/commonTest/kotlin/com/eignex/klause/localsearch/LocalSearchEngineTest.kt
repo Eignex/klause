@@ -143,7 +143,7 @@ class LocalSearchEngineTest {
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
         )
         val params = LocalSearchParams(maxFlips = 1L, randomSeed = 3L)
-        for (stopAt in listOf(1, 10, 20, 30, 40)) {
+        for (stopAt in listOf(1, 10, 20, 30, 40, 60, 70)) {
             val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
             val warm = WarmState()
             var polls = 0
