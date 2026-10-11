@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
@@ -71,6 +72,7 @@ internal class MonotoneClausePrimal private constructor(
                 BacktrackPresets.satOptimized(params.randomSeed, inprocess = false, cancellation = phaseToken).copy(
                     assumptions = params.assumptions, nativeSat = params.nativeSat,
                     pbLearning = false, nodeBudget = params.nodeBudget, targetPhasing = false,
+                    valueSelector = IndomainMin,
                 ),
                 rebindable = true,
             ).also { repair = it }
