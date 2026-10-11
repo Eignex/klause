@@ -8,6 +8,18 @@ import kotlin.test.assertFailsWith
 
 class PolynomialExpressionTest {
     @Test
+    fun `structural equality retains shared repeated subexpressions`() {
+        var first: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
+        var second: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
+        repeat(30) {
+            first = PolynomialExpression.Product(listOf(first, first))
+            second = PolynomialExpression.Product(listOf(second, second))
+        }
+
+        assertEquals(first, second)
+    }
+
+    @Test
     fun `separately built deep equal structures compare without call stack recursion`() {
         var first: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
         var second: PolynomialExpression = PolynomialExpression.Variable(SourceRealId(0))
