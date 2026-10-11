@@ -299,18 +299,24 @@ class ExactLiraSearchComponentTest {
     fun `overridden certification can decline negative difference cycles at root and below`() {
         for (atRoot in listOf(false, true)) {
             val model = Problem(
-                numBoolVars = if (atRoot) 0 else 2,
+                numBoolVars = if (atRoot) 0 else 1,
                 intBounds = openBounds(0),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
-                factors = if (atRoot) {
-                    arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                        doubleArrayOf(1.0), LinearOp.LE, 0.0, true))
-                } else {
-                    arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
-                        doubleArrayOf(1.0), LinearOp.LE, 0.0, true))
-                },
+                numRealVars = 3,
+                realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
+                factors = arrayOf(
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                        doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0),
+                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1, 2),
+                        doubleArrayOf(1.0, -1.0), LinearOp.LE, 0.0),
+                    if (atRoot) {
+                        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(2, 0),
+                            doubleArrayOf(1.0, -1.0), LinearOp.LE, -1.0)
+                    } else {
+                        ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(2, 0),
+                            doubleArrayOf(1.0, -1.0), LinearOp.LE, -1.0)
+                    },
+                ),
             )
             ExactLiraSearchComponent(model).use { component ->
                 component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
@@ -325,7 +331,8 @@ class ExactLiraSearchComponentTest {
                     session.push(SearchDecision.Bool(Lit.make(0, true)))
                 }
 
-                assertIs<ComponentResult.Indeterminate>(result)
+                assertIs<ComponentResult.Consistent>(result)
+                assertIs<SearchResult.Indeterminate>(session.solve(model.numBoolVars))
             }
         }
     }
