@@ -165,8 +165,10 @@ class SourceDrivenStrategy(
         alternativeSink.setAssumptions(state.assumptions)
         alternativeSink.setInvariants(state.invariants)
         alternativeSink.setOwners(state.seeding.ownerInt)
-        noiseSink.alternativeRepairs = alternativeSink
-        scoreSink.alternativeRepairs = alternativeSink
+        if (!stalled) {
+            noiseSink.alternativeRepairs = alternativeSink
+            scoreSink.alternativeRepairs = alternativeSink
+        }
         for (cs in sources) {
             if (!cs.enabled) continue
             if (cs.stallGated && !stalled) continue
@@ -183,7 +185,7 @@ class SourceDrivenStrategy(
         val noiseMoves = if (noiseFiltered.isEmpty() && stalled) ccNoise else noiseFiltered
         val primaryScoreMoves = tabu.filter(state, ccFilter(state, scoreSink.list))
         val alternatives = tabu.filter(state, ccFilter(state, alternativeSink.list))
-        val scoreMoves = if (alternatives.isEmpty()) {
+        val scoreMoves = if (alternatives.isEmpty() || stall != null) {
             primaryScoreMoves
         } else {
             val bestPrimary = minOf(
