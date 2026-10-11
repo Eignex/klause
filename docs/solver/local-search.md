@@ -143,6 +143,11 @@ better supplemental candidates enter its score-only pool. Other recipes and dire
 repair consumers retain the complete bounded neighborhood. Recipe copies preserve the
 primary-repair policy.
 
+The source-driven strategy generates candidates into its retained pools before its
+selection helper applies configuration and tabu filters, supplemental scoring and
+acceptance. Generation and selection keep their existing candidate order and RNG
+cadence; this boundary adds no pool copies or scratch owners.
+
 ### Element results
 
 Hinted native Element results are maintained from their indexes and selected cells.
