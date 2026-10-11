@@ -129,7 +129,6 @@ class ImplicitSeeding(
         preparedSeedFactors = selected
     }
 
-    /** Implicit-solving feasible init; costs are reconciled by the caller. */
     internal fun seedImplicitFeasible(state: LocalSearchState) {
         seedSteps(state).forEach { }
     }

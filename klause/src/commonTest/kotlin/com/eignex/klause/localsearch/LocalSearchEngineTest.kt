@@ -119,6 +119,8 @@ class LocalSearchEngineTest {
                 val strategy = SourceDrivenStrategy(
                     sources = emptyList(),
                     perturbation = {
+                        assertEquals(3.0, it.weights.factorWeights[0])
+                        assertEquals(2, it.tabu.touchCount.last())
                         trace += it.assignment.snapshot() to it.rng.nextLong()
                         Move.IntSet(0, (it.assignment.intValue(0) + 1L) % 10L)
                     },
@@ -130,7 +132,10 @@ class LocalSearchEngineTest {
                     seedImplicitOnRestart = true,
                 )
                 val budget = NodeBudget(10L)
-                val warm = WarmState()
+                val warm = WarmState().also {
+                    it.factorWeights = doubleArrayOf(3.0, 4.0)
+                    it.activityTouches = IntArray(130) { 2 }
+                }
                 val params = LocalSearchParams(
                     maxFlips = 4L, randomSeed = 7L, nodeBudget = budget,
                     assumptions = Assumptions(bools = mapOf(64 to true), ints = mapOf(1 to 1L)),

@@ -53,11 +53,6 @@ class FactorWeightBook(private val problem: Problem) {
      *  probe without forcing the lazy allocation. */
     val allocated: Boolean get() = _factorWeights != null
 
-    /** Build the initial per-factor weight vector. Non-implied factors start at 1.0, optionally
-     *  class-normalised ([normalizeWeightsByClass]): an over-represented factor class (population
-     *  above the mean over non-implied classes) is scaled so its aggregate weight is capped at that
-     *  mean, never amplifying a smaller class above 1.0. Implied factors are pinned to
-     *  [IMPLIED_FACTOR_INITIAL_WEIGHT] and excluded from the class tally. */
     internal fun preparation(): Sequence<Unit> = sequence {
         if (_factorWeights != null) return@sequence
         val n = problem.numFactors
@@ -74,7 +69,11 @@ class FactorWeightBook(private val problem: Problem) {
             }
         }
         var total = 0L
-        for (count in counts.values) total += count
+        var classes = 0
+        for (count in counts.values) {
+            total += count
+            if (++classes % INITIALIZATION_BATCH == 0) yield(Unit)
+        }
         val meanClassSize = if (counts.isEmpty()) 0.0 else total.toDouble() / counts.size
         for (i in 0 until n) {
             if (i % INITIALIZATION_BATCH == 0) yield(Unit)
