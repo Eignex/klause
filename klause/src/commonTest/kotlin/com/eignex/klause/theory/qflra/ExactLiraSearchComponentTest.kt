@@ -55,6 +55,105 @@ import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
     @Test
+    fun `partial difference checks and complete source witnesses need no LP owner`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, -2.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertNull(component.lpMetrics)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertNull(component.lpMetrics)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertTrue(witness.reals.single() >= BigFraction.ofLong(-2L))
+            assertTrue(witness.reals.single() <= BigFraction.ZERO)
+            assertNull(component.lpMetrics)
+        }
+    }
+
+    @Test
+    fun `late source validation fallback drops guarded rows in its sibling scope`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                Clause(intArrayOf(Lit.make(1, true))),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertNull(component.lpMetrics)
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertContentEquals(intArrayOf(Lit.make(1, true)), assertNotNull(conflict.explanation).literals)
+            assertNotNull(component.lpMetrics)
+            session.popTo(0)
+
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            val siblingConflict = assertIs<ComponentResult.Conflict>(
+                session.push(SearchDecision.Bool(Lit.make(1, false))),
+            )
+            assertContentEquals(intArrayOf(Lit.make(1, true)), assertNotNull(siblingConflict.explanation).literals)
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val witness = assertNotNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertTrue(witness.reals.single() > BigFraction.ZERO)
+            assertEquals(true, witness.bools[1])
+            assertIs<ComponentResult.Consistent>(session.restart())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `interrupted difference preparation leaves the component indeterminate`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            component.useOperationAllowance { Cancellation { true } }
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+            assertIs<ComponentResult.Indeterminate>(session.initialize())
+
+            assertIs<ComponentCheck.Indeterminate>(component.check(session))
+            assertNull(session.model().valueOf<ExactLraAssignment>(component))
+            assertNull(component.lpMetrics)
+        }
+    }
+
+    @Test
     fun `guarded rows support conflicts after deeper scope rollback`() {
         val model = Problem(
             numBoolVars = 4,
