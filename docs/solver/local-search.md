@@ -260,6 +260,15 @@ violation improvements contribute telemetry without becoming restart anchors. Pu
 samples and samples retained by custom restart policies remain independent of subsequent
 updates.
 
+Satisfaction draws, sample/enumeration streams and resumable satisfaction share the same
+restart-anchor lifecycle. Fixed-cadence and Luby policies ignore the anchor and retain no
+assignment copy. Anchoring and custom policies retain the exact best assignment in private
+packed storage, copying only on strict cost improvement and resetting after a published
+sample. Each consuming restart receives a fresh expanded sample so policy mutation cannot
+alter the retained anchor or live assignment. Initialization and the restart immediately
+after publication receive null. Anchor capture and expansion consume no RNG draws or
+search instructions.
+
 ## Phase timing
 
 Opt-in `ls-phase-times=true` portfolio diagnostics report active local-search nanoseconds

@@ -25,7 +25,8 @@ interface RestartPolicy {
     /** Carry out the restart. Default behaviour is a fresh random assignment via
      *  [LocalSearchState.restart]; policies that anchor to good regions override using
      *  `bestSoFar`. The optimiser path supplies the running best feasible sample;
-     *  streaming paths (sample / enumerate) pass null. */
+     *  satisfaction streams supply the best assignment since their last published sample,
+     *  including infeasible improvements. Initialization and post-publication restarts pass null. */
     fun restart(state: LocalSearchState, bestSoFar: Sample?)
 
     /** Clear per-solve mutable state (tracked incumbents, perturbation strength, cadence position)

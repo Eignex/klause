@@ -16,6 +16,7 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableSearch
@@ -638,10 +639,15 @@ internal class LocalSearchEngine(
             val state = newSatisfyState(params, effectiveAssumptions, warm, seed, checkpoint, timing)
             val residuals = if (params.reportResiduals) LocalSearchResidualRecorder() else null
             var flipsSinceRestart = 0
-            // Best-cost-so-far snapshot (even while infeasible): an IteratedLocalSearchRestart
-            // perturbs from this instead of full-randomising, accumulating progress across restarts.
             var bestCost = state.cost
-            var bestSnap: Sample? = state.assignment.snapshot()
+            // Only the final built-in random policies ignore anchors; custom policies retain their protocol.
+            val bestAnchor = if (configuredRestart is FixedCadenceRestart || configuredRestart is LubyRestart) {
+                null
+            } else {
+                Assignment(problem.numBoolVars, problem.numIntVars, problem.numRealVars).also {
+                    state.assignment.copyInto(it)
+                }
+            }
             // Bounded per yield, not per session: maxFlips elapsing without a fresh sample means the
             // search neighbourhood is effectively exhausted, so end the sequence.
             var flipsSinceYield = 0L
@@ -667,8 +673,10 @@ internal class LocalSearchEngine(
 
             // A restart transition consumes one unit of the maxFlips/maxInstructions allowance, same as
             // an applied move (see [LocalSearchParams.maxInstructions]).
-            fun countedRestart(anchor: Sample?) {
-                timing.inPhase("seeding") { restarts.restart(state, bestSoFar = anchor) }
+            fun countedRestart(useAnchor: Boolean = true) {
+                timing.inPhase("seeding") {
+                    restarts.restart(state, bestSoFar = if (useAnchor) bestAnchor?.snapshot() else null)
+                }
                 moves++
                 flipsSinceYield++
                 restartCount++
@@ -705,7 +713,7 @@ internal class LocalSearchEngine(
                                 yield(null)
                                 continue
                             }
-                            countedRestart(bestSnap)
+                            countedRestart()
                             if (checkpoint?.shouldPause(moves) == true) {
                                 reportProgress()
                                 yield(null)
@@ -734,13 +742,13 @@ internal class LocalSearchEngine(
                         checkpoint?.shouldPause(moves)
                         yield(solution)
                         flipsSinceYield = 0
-                        countedRestart(null)
+                        countedRestart(useAnchor = false)
                         bestCost = state.cost
-                        bestSnap = state.assignment.snapshot()
+                        bestAnchor?.let { state.assignment.copyInto(it) }
                         continue
                     }
                     if (restarts.shouldRestart(flipsSinceRestart)) {
-                        countedRestart(bestSnap)
+                        countedRestart()
                         roundFeedback?.endRound()
                         if (checkpoint?.shouldPause(moves) == true) {
                             reportProgress()
@@ -751,7 +759,7 @@ internal class LocalSearchEngine(
                     val costBefore = state.cost
                     val move = timing.inPhase("selection") { strategy.pickMove(state) }
                     if (move == null) {
-                        countedRestart(bestSnap)
+                        countedRestart()
                         roundFeedback?.endRound()
                         if (checkpoint?.shouldPause(moves) == true) {
                             reportProgress()
@@ -763,7 +771,7 @@ internal class LocalSearchEngine(
                     moves++
                     if (state.cost < bestCost) {
                         bestCost = state.cost
-                        bestSnap = state.assignment.snapshot()
+                        bestAnchor?.let { state.assignment.copyInto(it) }
                     }
                     flipsSinceRestart++
                     flipsSinceYield++
@@ -1189,9 +1197,6 @@ internal class LocalSearchEngine(
         // the `restarts` wrapper (whose reset is the interface no-op).
         configuredRestart.reset()
         // A caller-supplied starting point stands in for the first random restart; later restarts are the policy's.
-        // Streaming has no notion of "best so far" to anchor an adaptive restart
-        // around — pass null so policies that need a sample fall back to a fresh
-        // random restart.
         val sliced = slicedInitialization(checkpoint)
         val seeded = params.initialAssignment?.let { seedFrom(state, it, recompute = !sliced) } ?: false
         if (!seeded) {
