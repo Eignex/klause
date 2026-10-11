@@ -381,7 +381,9 @@ def check(cases, source_root=None, progress=None):
             else:
                 witness = record.get("finalWitness")
                 if witness is not None and is_smt:
-                    solver.push()
+                    witness_scope = record["proven"] and record["kind"] == "optimize"
+                    if witness_scope:
+                        solver.push()
                     solver.add(*smt_pins(witness, variables))
                     require_verdict(solver, z3.sat, record["problem"], 'complete source witness feasibility')
                     if reported_objective is not None:
@@ -389,7 +391,8 @@ def check(cases, source_root=None, progress=None):
                         value = rational(reported_objective)
                         solver.add(objective != (-value if maximize else value))
                         require_verdict(solver, z3.unsat, record["problem"], 'model objective differs from reported objective')
-                    solver.pop()
+                    if witness_scope:
+                        solver.pop()
                     result["witness"] = "exact source feasible"
                 else:
                     require_verdict(solver, z3.sat, record["problem"], 'source feasibility')
