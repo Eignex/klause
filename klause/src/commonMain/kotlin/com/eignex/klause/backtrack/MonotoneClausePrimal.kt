@@ -68,8 +68,8 @@ internal class MonotoneClausePrimal private constructor(
         val search = repair ?: try {
             ResumableMinimize(
                 solver, LinearObjective(),
-                BacktrackPresets.conflictDriven(params.randomSeed, cancellation = phaseToken).copy(
-                    assumptions = params.assumptions, nativeSat = params.nativeSat, phaseSaving = false,
+                BacktrackPresets.satOptimized(params.randomSeed, inprocess = false, cancellation = phaseToken).copy(
+                    assumptions = params.assumptions, nativeSat = params.nativeSat,
                     pbLearning = false, nodeBudget = params.nodeBudget,
                 ),
                 rebindable = true,
