@@ -100,6 +100,12 @@ authority. It publishes no partial source layout or numerical owner. Node boundi
 withholds deductions; continuous leaf completion returns indeterminate and preserves
 the search's incomplete flag. A projection decline does not retire a search worker.
 
+Backtrack continuous leaf completion retains only factors that touch real columns,
+plus the complete objective. Its discrete assignment has already passed the composed
+fixpoint, so purely discrete rows cannot restrict the remaining real completion.
+Local-search candidate completion retains the full relaxation because zero heuristic
+violation does not establish discrete feasibility.
+
 ## Floating simplex and basis factors
 
 Dual leaving selection uses verified Devex: correct and reselect a maintained

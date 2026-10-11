@@ -25,6 +25,32 @@ import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
     @Test
+    fun `satisfied integer rows preserve the completed real optimum across siblings`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 2L),
+                Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.EQ, 3L),
+            ),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(3.0),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(4), realCoefficients = doubleArrayOf(1.0))
+
+        LeafRealSolver(problem, objective).use { owner ->
+            for (value in listOf(0L, 2L, 1L, 0L)) {
+                val sample = Sample(booleanArrayOf(), longArrayOf(value))
+                val result = owner.solve(sample)
+                val fresh = leafRealFeasibility(problem, objective, sample)
+
+                assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+                assertEquals(fresh.verdict, result.verdict)
+                assertEquals(fresh.exactReals, result.exactReals)
+                assertEquals(listOf(BigFraction.ofLong(3L - value)), result.exactReals)
+            }
+        }
+    }
+
+    @Test
     fun `a mixed leaf with an unrepresentable integer cost remains indeterminate`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0L, 1L)), emptyArray(),

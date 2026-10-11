@@ -23,7 +23,7 @@ internal class LeafRealSolver(
     context: LpSolveContext = LpSolveContext.Production,
     pricing: LpPricingOptions = LpPricingOptions(),
 ) : AutoCloseable {
-    private val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, objective))
+    private val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, objective, realResidual = true))
     private var trail = LpBoundTrail(LpRetainedSources.emptyModel())
     private val solvers = LpSolveSession(context, pricing, componentSplit)
     private var integers = arrayOfNulls<IntDomain>(problem.numIntVars)
