@@ -668,9 +668,23 @@ class LocalSearchState(
         if (cost == 0L || cumulativeFactors.isEmpty()) {
             return if (weighted) weightedNetDelta(move) else netDelta(move).toDouble()
         }
+        if (canScoreWithoutCumulativeProbe(move)) {
+            return if (weighted && weights.allocated) weightedNetDelta(move) else netDelta(move).toDouble()
+        }
         val result = evaluateMove(move, refineCumulative = true, weightedResidual = weighted)
         val primary = if (weighted) result.weightedNetDelta else result.netDelta.toDouble()
         return primary + result.cumulativeDelta
+    }
+
+    private fun canScoreWithoutCumulativeProbe(move: Move): Boolean {
+        val occurrences = when (move) {
+            is Move.BoolFlip -> projection.boolOccurrences[move.varId]
+            is Move.IntSet -> projection.intOccurrences[move.varId]
+            is Move.RealSet -> projection.realOccurrences[move.varId]
+            is Move.Compound -> return false
+        }
+        if (feedsDefinitions(move)) return false
+        return occurrences.none { problem.factors[it] is Cumulative }
     }
 
     internal fun cumulativeRepairFraction(): Double {
