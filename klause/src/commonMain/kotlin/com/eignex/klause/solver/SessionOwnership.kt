@@ -37,7 +37,10 @@ private class HandleOwnership<T : Any>(private val source: AutoCloseable, privat
     }
 }
 
-private open class OwnedSearch(protected val source: ResumableSearch, release: () -> Unit) : ResumableSearch by source {
+private open class OwnedSearch(protected val source: ResumableSearch, release: () -> Unit) :
+    ResumableSearch by source, ReseedGuard {
+    override val canReseed: Boolean get() = (source as? ReseedGuard)?.canReseed != false
+    override val canContinuePreparation: Boolean get() = (source as? ReseedGuard)?.canContinuePreparation == true
     private val ownership = HandleOwnership<MinimizeResult>(source, release)
 
     protected fun advance(action: () -> MinimizeResult?): MinimizeResult? = ownership.advance(action)

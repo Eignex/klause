@@ -155,32 +155,56 @@ internal fun PropagationState.extractConflictInts(levels: IntArray): IntArray {
  */
 internal fun PropagationState.extractConflictFactors(): IntArray {
     if (conflictSeedFactors.isEmpty()) return EmptyIntArray
-    // Primitive BFS over the propagation graph: [out] dedups reached factor ids, [frontier]
-    // is a grow-only worklist walked by a head index (no boxing, no per-step dequeue alloc).
-    val out = IntHashSet(conflictSeedFactors.size * 2)
-    val frontier = IntArrayList(conflictSeedFactors.size)
+    val scratch = conflictFactorScratch
+    scratch.clear()
+    val frontier = scratch.frontier
     conflictSeedFactors.forEach { fid ->
-        out.add(fid)
-        frontier.add(fid)
+        scratch.add(fid)
     }
     var head = 0
     while (head < frontier.size) {
         // factorAt routes learned-clause ids (≥ problem.numFactors) to the session's clause
         // registry — conflicts can name a learned clause as their failing factor.
         val fid = frontier.get(head++)
-        for (v in factorBoolVars(fid)) {
-            // Skip atom-encoded literal ids (≥ numBoolVars) — their causation is captured
-            // through intMinReason / intMaxReason on the underlying int var, expanded below.
-            if (v >= problem.numBoolVars) continue
-            val r = boolReason[v]
-            if (r >= 0 && out.add(r)) frontier.add(r)
+        val native = nativeEngine
+        if (fid >= baseFactorCount && !incremental && native != null) {
+            val index = fid - baseFactorCount
+            for (i in 0 until native.literalCountOf(index)) {
+                val r = boolReason[native.variableOf(index, i)]
+                if (r >= 0) scratch.add(r)
+            }
+        } else {
+            for (v in factorBoolVars(fid)) {
+                // Atom causation is captured by the underlying integer endpoint reasons.
+                if (v >= problem.numBoolVars) continue
+                val r = boolReason[v]
+                if (r >= 0) scratch.add(r)
+            }
         }
         for (v in factorIntVars(fid)) {
             val rMin = intMinReason[v]
-            if (rMin >= 0 && out.add(rMin)) frontier.add(rMin)
+            if (rMin >= 0) scratch.add(rMin)
             val rMax = intMaxReason[v]
-            if (rMax >= 0 && out.add(rMax)) frontier.add(rMax)
+            if (rMax >= 0) scratch.add(rMax)
         }
     }
-    return out.toIntArray()
+    return frontier.toIntArray()
+}
+
+internal class ConflictFactorScratch {
+    private var seen = BooleanArray(0)
+    val frontier = IntArrayList()
+
+    fun clear() {
+        for (i in 0 until frontier.size) seen[frontier[i]] = false
+        frontier.clear()
+    }
+
+    fun add(fid: Int) {
+        if (fid >= seen.size) seen = seen.copyOf(maxOf(fid + 1, seen.size * 2))
+        if (!seen[fid]) {
+            seen[fid] = true
+            frontier.add(fid)
+        }
+    }
 }

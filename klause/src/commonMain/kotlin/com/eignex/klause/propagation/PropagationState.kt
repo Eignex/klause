@@ -367,6 +367,8 @@ class PropagationState(
     /** Reused dedup scratch for [collectLevelsForVars] — avoids a per-conflict HashSet alloc. */
     internal val levelScratch: IntHashSet = IntHashSet()
 
+    internal val conflictFactorScratch = ConflictFactorScratch()
+
     /** Reused scratch for [com.eignex.klause.factor.bool.internals.pbFalseFormAntecedents] — a single
      *  wide pseudo-Boolean factor pins many literals per sweep, each rebuilding the same assigned-literal
      *  antecedent set, so a per-call [IntHashSet] alloc and its regrowth dominated wide-WBO root bake. */

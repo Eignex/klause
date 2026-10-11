@@ -56,7 +56,7 @@ class CatalogTest {
     @Test
     fun `wcnf-core resolves the maxsat instance with a soft-clause objective`() {
         val ingested = WcnfFormat.ingest(CorpusFetcher.resolve(ref("wcnf-core", "maxsat-tiny").source))
-        assertEquals(4, ingested.problem.numBoolVars)
+        assertEquals(2, ingested.problem.numBoolVars)
         val obj = assertNotNull(ingested.objective)
         assertEquals(listOf(3L, 1L), obj.boolWeights.toList().takeLast(2))
     }

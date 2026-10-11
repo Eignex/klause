@@ -134,6 +134,11 @@ disequality indicators over root domains contained in `{0, 1}` propagate as dire
 channels: an indicator fixes its integer value, and a fixed integer pins the
 indicator. Wider domains retain the general linear propagator.
 
+Factor cores traverse the full reason graph with session-owned dense-id scratch.
+The traversal clears visited ids between extractions and reads learned native clause
+variables directly, retaining the same factor-core membership across restarts and
+learned-clause compaction.
+
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump.
 Sound resolvents that cannot assert retain chronological fallback. Root
@@ -485,7 +490,16 @@ completion or source feasibility, and the observation does not replace an incumb
 Disabled reporting allocates no recorder and performs no factor scans.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
-`reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
+`reseed-stale-threshold` defaults to 3 non-improving segments with fresh charged
+work, with 0 disabling it. Debt-only pauses do not advance plateau counters.
+Backends can defer reseeding while bounded preparation owns pending work;
+session ownership wrappers forward that guard. A bounded preparation that earns
+an accepted incumbent improvement can continue across ordinary slices before
+the adaptive policy chooses again. Explicit minimum shares remain first, and
+normal family selection resumes when preparation finishes or expires. The
+containing arm retains its work charges, slice limits and whole-solve deadline.
+A pending clausal primal repair retains its private state until its existing
+phase allowance finishes.
 Complete-search arms without a restart schedule retain traversal because closing
 a proof gap need not produce a better incumbent. Imported incumbent cutoffs still
 apply. Observable search families and complete workers configured with a restart
@@ -560,3 +574,61 @@ their scopes differ.
 
 `initMs` measures opening the handle. Preparation deferred into slices contributes to
 segment time and live propagation counters; it is not included in opening time.
+
+## Monotone clausal primal probe
+
+Pure Boolean clausal optimization with at most 64 positive-cost variables can
+seed incumbents through greedy feasibility repairs when those variables occur
+only positively in hard clauses. A private satisfaction repair first obtains a
+feasible assignment with unaccepted cost variables true. Caller and baked-root
+pins form its stable verification scope; temporary cost and pure-literal pins
+apply through trial rebinding.
+
+Before trial repair, free true values become false when that single change
+preserves every hard clause. A retained clause walk tries cheap cost values in
+descending weight order. Unit closure fixes caller, root and cost assumptions;
+focused moves change only free variables. Clause penalties increase when no
+candidate move improves the weighted violation and survive between trials.
+Each trial permits at most one move per source variable, retains its assignment
+and random state across slices, and restores the previous feasible assignment
+on failure. Moves spend the caller's shared node budget at the existing
+local-search rate; clause and assignment visits charge the owning arm's work.
+
+Remaining costly values receive private projected satisfaction repairs. Unit
+propagation removes fixed literals and satisfied clauses. Two bounded Boolean
+elimination passes reuse the presolve mechanism and its source reconstruction
+records, then surviving variables receive dense private coordinates. Each
+projected trial owns a fresh satisfaction session that resumes across slices.
+Lifting restores fixed source values, expands surviving coordinates and applies
+elimination records in reverse order. Projection, construction and search work
+remain charged to the arm. The containing arm owns overspend debt; private
+sessions enforce their current slice allowance without repaying the same debt
+again. Work before a private slice is included in the containing arm's cumulative
+charge. The original model and its ordinary search remain intact. Private infeasible verdicts contribute no outer proof.
+
+Only feasible trials retain their cheaper cost assumptions. Clause-local
+polishing removes unnecessary costly values. Each polishing activation has a
+100 ms cap and retains the whole-solve deadline; it can finish a feasible model
+after its search slice expires. The composed verifier checks the full original
+proposal before publication. A completed proposal can be verified and delivered
+while the arm repays work debt, which continues to block further search.
+Verification retains its 100 ms cap and the whole-solve deadline.
+
+Private satisfaction uses the SAT preset with inprocessing and target capture
+disabled and starts fresh Boolean decisions with false. Initialization and
+cumulative work are charged to the owning arm. The private clausal walk prices
+literal scans, clause bookkeeping and assignment visits at the propagation work
+rate. Each move still spends the solve-wide move allowance; its literal work is
+not also priced as a generic constraint local-search instruction. The complete
+probe receives at most half the remaining solve allowance in active execution
+time, capped at
+5 seconds. Trials retain the caller's solve-wide node budget and the whole-solve
+cancellation. The probe runs once before ordinary optimization and is skipped
+behind an existing shared incumbent or within repair fragments.
+
+Search counters distinguish eligible probe starts, trial starts, returned
+models, completed improving proposals, and proposals verified and installed as
+arm incumbents. The CLI emits these counters together when a probe starts,
+including zero counts for stages it did not reach. Outcome counters distinguish
+private refutations from incomplete stops without a model. These counters
+describe heuristic progress and carry no proof.

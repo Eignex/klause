@@ -7,6 +7,7 @@ import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -481,6 +482,9 @@ class Portfolio(
                     return@locked
                 }
                 if (claim.foundFirst) run.startImprovementPhase()
+                if (claim.improved && (handle as? ReseedGuard)?.canContinuePreparation == true) {
+                    run.continuePreparation(arm)
+                }
                 if (handle != null && terminal == null && !failed &&
                     (handle.preparationPending ||
                         (worker.family == ArmFamily.LocalSearch && stats?.ls?.moves?.sum == 0.0))
@@ -493,7 +497,8 @@ class Portfolio(
                 ) {
                     if (claim.improved) {
                         staleSegments[arm] = 0
-                    } else if (reseedStaleThreshold > 0 &&
+                    } else if (work > 0L && (handle as? ReseedGuard)?.canReseed != false &&
+                        reseedStaleThreshold > 0 &&
                         ++staleSegments[arm] >= reseedStaleThreshold
                     ) {
                         val closed = runCatching { run.closeHandle(arm) }
@@ -588,7 +593,7 @@ class Portfolio(
     /**
      * The state one `solve` or `minimize` call shares across its lanes: the ledger, the arms' [handles] and stats,
      * which arms are busy or retired, and the slice sizes. Everything but the handles is touched under [locked]; a
-     * handle is touched only by the lane holding its arm.
+     * handle is advanced only by the lane holding its arm; preparation hints are read only while the arm is idle.
      */
     @Suppress("TooGenericExceptionCaught")
     private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
@@ -610,6 +615,7 @@ class Portfolio(
         private val probed = BooleanArray(workers.size)
         private val productive = BooleanArray(workers.size)
         private val preparationRevisits = BooleanArray(workers.size)
+        private var continuingPreparation = -1
         private var nextPreparationArm = 0
 
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
@@ -623,6 +629,10 @@ class Portfolio(
 
         /** Whether every arm has retired. */
         val allRetired: Boolean get() = remaining == 0
+
+        fun continuePreparation(arm: Int) {
+            continuingPreparation = arm
+        }
 
         fun revisitPreparation(arm: Int) {
             if (!improving) preparationRevisits[arm] = true
@@ -724,6 +734,13 @@ class Portfolio(
         // within local search's feasibility share; a neighborhood needs an incumbent unless it is all that is left.
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
+            val preparing = continuingPreparation
+            if (preparing >= 0 && !busy[preparing]) {
+                if (!retired[preparing] && preparing in eligibleArms &&
+                    (handles[preparing] as? ReseedGuard)?.canContinuePreparation == true
+                ) return preparing
+                continuingPreparation = -1
+            }
             val free = eligibleArms.filter { !busy[it] && !retired[it] }
             if (free.isEmpty()) return -1
             val present = free.mapTo(LinkedHashSet()) { policyFamily(it) }

@@ -4,10 +4,12 @@ import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
@@ -172,6 +174,28 @@ internal object FiniteCutoffKnapsackFixture {
 }
 
 class ResumableMinimizeTest {
+    @Test
+    fun `a completed clausal proposal is delivered while work debt blocks search`() {
+        val solver = BacktrackSolver(Problem(
+            2, 0, emptyArray(),
+            Array(2_000) { Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))) },
+        ).bake())
+        val objective = LinearObjective(boolWeights = longArrayOf(1L))
+        val samples = mutableListOf<MinimizeResult.WithSample>()
+
+        ResumableMinimize(solver, objective, BacktrackParams()).use { search ->
+            repeat(100) {
+                if (search.stats.search.clausalPrimalProposals.sum == 0.0) {
+                    search.runSlice(Cancellation.Never, 60_000L, 1L) { samples.add(it) }
+                }
+            }
+            search.runSlice(Cancellation.Never, 60_000L, 0L) { samples.add(it) }
+
+            assertEquals(0L, objective.evaluateLong(samples.single().sample))
+            assertTrue(samples.single().sample.bools[1])
+        }
+    }
+
     @Test
     fun `rebind can prove the same optimum after an exhausted fragment`() {
         val objective = LinearObjective(boolWeights = longArrayOf(-1L))
