@@ -123,3 +123,21 @@ before publication. Timeout, external cancellation and budget/resource exhaustio
 retain distinct common termination reasons. Exact source scalars survive invocation
 cleanup. [Input semantics](../formats.md#polynomial-source-lowering) owns admission
 and model rendering; [resources](resources.md) owns the public caps and native units.
+
+## Conditioned theory service
+
+`PolynomialTheoryService` captures one immutable neutral formula and its coordinate
+counts. Each `PolynomialTheoryInvocation` owns a cumulative native work allowance
+across fresh conditioned checks. Boolean pins and rational lower/upper bounds are
+conjoined within the counted arithmetic scope. Query construction, normalization,
+CAD, exact witness capture and the final verdict poll share cancellation and allocation
+limits. Closing the invocation rejects further queries; captured scalar witnesses
+remain readable. Invocations share no mutable traversal or refinement state.
+
+`PolynomialSearchComponent` consumes shared Boolean facts and semantic integer bounds.
+Integer columns map to theory coordinates without creating continuous CP domains.
+A query over an unfixed integer interval is a real relaxation: its exact refutation
+can reject the finite branch, while its witness cannot accept that branch. Complete
+checks require every mapped integer and Boolean to be fixed. Conflicts without a
+clause explanation remain chronological and cannot enter learned-clause exchange.
+Retraction invalidates query results; the containing invocation allowance persists.
