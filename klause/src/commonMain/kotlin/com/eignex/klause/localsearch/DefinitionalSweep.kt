@@ -16,9 +16,11 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.toSortedIntArray
 
 /**
  * A local-search acceleration structure (consumed by [LocalSearchSolver]): the topologically-
@@ -687,10 +689,29 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
     internal fun affectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment): IntArray =
         findAffectedNodes(seedInts, seedBools, assignment)
 
-    private fun findAffectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment?): IntArray =
-        findAffectedNodes(
-            seedInts, seedInts.size, seedBools, seedBools.size, assignment, DefinitionTraversal(this),
-        ).toIntArray()
+    private fun findAffectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment?): IntArray {
+        val marked = IntHashSet()
+        val work = IntArrayDeque()
+        fun seedInt(v: Int) {
+            if (v < 0) return
+            for (i in intReaders[v]) {
+                val node = nodeArr[i]
+                if (assignment != null && node is ElementResultDefinition && !node.reads(v, assignment)) continue
+                if (marked.add(i)) work.addLast(i)
+            }
+        }
+        fun seedBool(v: Int) {
+            if (v >= 0) for (i in boolReaders[v]) if (marked.add(i)) work.addLast(i)
+        }
+        for (v in seedInts) seedInt(v)
+        for (v in seedBools) seedBool(v)
+        while (work.isNotEmpty()) {
+            val i = work.removeFirst()
+            val n = nodeArr[i]
+            if (n.outIsBool) seedBool(n.out) else seedInt(n.out)
+        }
+        return marked.toSortedIntArray()
+    }
 
     internal fun affectedNodes(
         seedInts: IntArrayList,

@@ -161,7 +161,8 @@ Each state owns reusable move-seed lists and a lazily allocated traversal worksp
 bound to its current network. The workspace marks each affected node once, visits its
 readers, then sorts its live node prefix into exact topological order. It retains no
 assignment-dependent cone between moves. Replacing a state's network discards its
-workspace. Public cone queries return independent arrays; internal live prefixes are
+workspace. Public cone queries retain their sparse traversal and return independent arrays;
+internal live prefixes are
 borrowed only until the synchronous move or probe returns and never enter snapshots.
 Coordinate saving retains each touched Boolean, integer or real coordinate once,
 including defined outputs, and restores them through the incremental primitives.
