@@ -246,6 +246,14 @@ is emitted without regenerating repair alternatives. Small integer domains are e
 and wider domains retain their sampled-target cap. Inverse repairs and Element destination
 variants retain the move sink's existing bounds.
 
+### Linear repairs
+
+Linear inequality targets round domain holes toward the requested predicate truth,
+using the coefficient sign to select the rounding direction. If that side has no
+present value, ordinary Linear repairs retain a clamped endpoint as a partial repair.
+Reified repairs require the rounded body to match the retained or flipped indicator.
+Equality and disequality target clamping retains its nearest-value behavior.
+
 ### Comparison clauses
 
 Comparison-clause integer scores substitute the target in every matching literal,
