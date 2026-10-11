@@ -33,9 +33,16 @@ internal class RealDifferenceSystem private constructor(
             val guard = guards[index]
             guard == ALWAYS || bools[Lit.variable(guard)] == if (Lit.isPositive(guard)) 1 else 0
         }
-        return when (val result = graph.potentials(active, stop::invoke, potentials)) {
+        var cycle: IntArray? = null
+        return when (val result = graph.potentials(active, stop::invoke, potentials) { cycle = it }) {
             Potentials.Abandoned -> Result.Interrupted
-            Potentials.Infeasible -> if (stop()) Result.Interrupted else Result.Infeasible
+            Potentials.Infeasible -> {
+                // ALWAYS edges are immutable source rows and declared bounds, not scoped LP assertions.
+                val clause = cycle?.takeIf { edges -> edges.all { active[it] } }?.asSequence()
+                    ?.map { guards[it] }?.filter { it != ALWAYS }?.map(Lit::negate)
+                    ?.distinct()?.sorted()?.toList()?.toIntArray()
+                if (stop()) Result.Interrupted else Result.Infeasible(clause)
+            }
             is Potentials.Found -> {
                 if (stop()) return Result.Interrupted
                 val zero = result.values.last()
@@ -54,7 +61,7 @@ internal class RealDifferenceSystem private constructor(
         class Feasible(point: () -> List<BigFraction>) : Result {
             val point by lazy(point)
         }
-        data object Infeasible : Result
+        class Infeasible(val clause: IntArray?) : Result
         data object Interrupted : Result
     }
 

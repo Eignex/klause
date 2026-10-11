@@ -54,9 +54,23 @@ class DifferenceGraphTest {
     fun `potentials detect a negative cycle beside an acyclic component`() {
         val g = graph(4, Triple(3, 2, -4L), Triple(0, 1, -2L), Triple(1, 0, 1L))
 
-        val result = g.potentials(initial = longArrayOf(25, 0, 300, -70))
+        var cycle: IntArray? = null
+
+        val result = g.potentials(initial = longArrayOf(25, 0, 300, -70), onNegativeCycle = { cycle = it })
 
         assertEquals(Potentials.Infeasible, result)
+        assertEquals(setOf(1, 2), assertNotNull(cycle).toSet())
+    }
+
+    @Test
+    fun `potential cycle capture excludes inactive predecessor edges`() {
+        val g = graph(3, Triple(0, 1, -2L), Triple(1, 0, 1L), Triple(1, 2, -5L))
+        var cycle: IntArray? = null
+
+        val result = g.potentials(booleanArrayOf(true, false, true), onNegativeCycle = { cycle = it })
+
+        assertIs<Potentials.Found>(result)
+        assertNull(cycle)
     }
 
     @Test

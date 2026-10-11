@@ -610,6 +610,28 @@ class ExactLiraSearchComponent(
         operationStop = parentStop
     }
 
+    private fun differenceConflict(
+        result: RealDifferenceSystem.Result.Infeasible,
+        context: SearchContext,
+    ): ComponentResult? {
+        if (node.sourceBranches.isNotEmpty() ||
+            solveContext.certificationPolicy !== ProductionLpCertificationPolicy
+        ) return null
+        val clause = result.clause ?: return null
+        if (clause.any { literal ->
+                context.boolValue(Lit.variable(literal))?.let { Lit.evaluate(literal, it) } != false
+            }
+        ) return null
+        if (operationStop()) return ComponentResult.Indeterminate
+        val explanation = SearchExplanation(clause)
+        dirty = false
+        candidate = null
+        assignment = null
+        smtStats?.observeConflict(explanation)
+        outcome = ComponentCheck.Infeasible(explanation)
+        return ComponentResult.Conflict(explanation)
+    }
+
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
@@ -634,6 +656,9 @@ class ExactLiraSearchComponent(
             checked = true
             when (val result = realDifference?.check(bools, operationStop)) {
                 RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
+                is RealDifferenceSystem.Result.Infeasible -> {
+                    differenceConflict(result, context)?.let { return it }
+                }
                 is RealDifferenceSystem.Result.Feasible -> {
                     candidate = result.point
                     acceptWitness(result.point)?.let {
@@ -660,8 +685,9 @@ class ExactLiraSearchComponent(
                 checked = true
                 when (val result = graph.check(bools, operationStop)) {
                     RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
-                    // Shared LP explanations keep conflict learning on the same source proof surface.
-                    RealDifferenceSystem.Result.Infeasible -> Unit
+                    is RealDifferenceSystem.Result.Infeasible -> {
+                        differenceConflict(result, context)?.let { return it }
+                    }
                     is RealDifferenceSystem.Result.Feasible -> {
                         if (completeBooleans) {
                             candidate = result.point

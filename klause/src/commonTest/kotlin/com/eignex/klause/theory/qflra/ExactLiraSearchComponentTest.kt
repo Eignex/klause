@@ -21,6 +21,7 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -207,6 +208,125 @@ class ExactLiraSearchComponentTest {
             val result = session.push(SearchDecision.Bool(Lit.make(1, true)))
 
             assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
+    fun `strict difference conflicts retain false guard premises across siblings`() {
+        val model = Problem(
+            numBoolVars = 3,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+
+            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)), conflict.explanation?.literals)
+            session.popTo(1)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(2, true))))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `difference learning retains a root guard and asserts its feasible sibling`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val rootClause = ClauseSearchComponent(listOf(Clause(intArrayOf(Lit.make(0, false)))))
+            val session = SearchSession(listOf(rootClause, component))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertEquals(false, session.boolValue(0))
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)), conflict.explanation?.literals)
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(2))
+
+            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+            assertEquals(false, witness.bools[0])
+            assertEquals(false, witness.bools[1])
+            assertTrue(witness.reals.single() > BigFraction.ZERO)
+            assertEquals(1L, session.learnedClauseStats().assertingConflicts)
+        }
+    }
+
+    @Test
+    fun `unconditional strict difference contradiction has an empty root explanation`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0, true)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.initialize())
+
+            assertContentEquals(intArrayOf(), conflict.explanation?.literals)
+            assertIs<ComponentCheck.Infeasible>(component.check(session))
+        }
+    }
+
+    @Test
+    fun `overridden certification can decline negative difference cycles at root and below`() {
+        for (atRoot in listOf(false, true)) {
+            val model = Problem(
+                numBoolVars = if (atRoot) 0 else 2,
+                intBounds = openBounds(0),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+                factors = if (atRoot) {
+                    arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0, true))
+                } else {
+                    arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                        doubleArrayOf(1.0), LinearOp.LE, 0.0, true))
+                },
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                component.solveWith(LpSolveContext(certificationPolicy = LpCertificationPolicy { certifier, success ->
+                    success && certifier != LpCertifier.EXACT_FARKAS && certifier != LpCertifier.RATIONAL
+                }))
+                val session = SearchSession(listOf(component))
+
+                val result = if (atRoot) {
+                    session.initialize()
+                } else {
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    session.push(SearchDecision.Bool(Lit.make(0, true)))
+                }
+
+                assertIs<ComponentResult.Indeterminate>(result)
+            }
         }
     }
 
