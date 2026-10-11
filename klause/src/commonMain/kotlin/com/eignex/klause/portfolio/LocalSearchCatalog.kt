@@ -83,6 +83,7 @@ object LocalSearchCatalog {
         LocalSearchArm.CblsPrimaryPlateauIlsBasin -> cblsRecipe(arm.label, ilsBasin()) {
             Cbls(stallSwapCap = 16, tabu = cblsTabu()).also { it.prioritizePrimaryRepairs = true }
         }
+
         LocalSearchArm.ProbsatPlain -> LocalSearchRecipe(arm.label, ProbSat(tabu = cblsTabu()))
 
         LocalSearchArm.CblsPlateauIlsBasin ->
