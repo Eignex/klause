@@ -37,7 +37,11 @@ class PolynomialTheoryRequestTest {
             PolynomialRealFormula.Constant(false), 1, 0, 1, 0, mapOf("x" to 0), emptyMap(),
         )
 
-        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.ALNS)
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 2),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, FiniteEngine.ALNS)
 
         assertIs<OpenTheoryResult.Unknown>(execution.result)
     }
