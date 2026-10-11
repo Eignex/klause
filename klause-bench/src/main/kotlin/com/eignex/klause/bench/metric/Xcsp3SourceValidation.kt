@@ -9,7 +9,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 
-internal const val XCSP_SOURCE_POLICY = "xcsp3-source-witness-v1"
+internal const val XCSP_SOURCE_POLICY = "xcsp3-source-witness-v2"
 
 internal object Xcsp3SourceValidation {
     private const val TIMEOUT_SECONDS = 10L
