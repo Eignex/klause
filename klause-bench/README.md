@@ -633,6 +633,33 @@ records and missing elapsed time, and separates proofs/incumbent time from proce
 duration. Optional split counters omitted at zero are read as zero. Noise analysis
 requires balanced `off/on/on/off` pairs and matching outcomes. Save raw cases externally.
 
+### CP preparation probe
+
+[scripts/cp-preparation](scripts/cp-preparation/) measures retained general-CP projection,
+state and root batches, then the full assumption/LP/search installation. Parsing and
+baking are outside measurement. Use `synthetic` for independent integer rows with
+512 assumption pins, or an uncompressed XCSP3 optimization input. A zero solve-wide
+decision allowance prevents decisions; a token fires at installation handoff before
+the first search dispatch. LP solves and work are reported separately and must stay
+zero throughout this construction measurement. Round zero warms
+the JVM; later rounds repeat the same construction. Root-domain hashes, propagation
+work and charged work must match before comparing timings or allocation totals.
+
+```sh
+./gradlew -I klause-bench/scripts/cp-preparation/cp-preparation.init.gradle \
+  :klause:cpPreparationProbe --args="synthetic 8192 4"
+```
+
+`-PpreparationProbeCli=/absolute/path/to/klause-cli-jvm` selects a pinned installed
+runtime; rebuild it with `:klause-cli:installJvmDist` first and retain source, probe,
+input, installed-build and runtime hashes. Per-batch and one-millisecond segment
+measurements include polling and dispatch. Primitive allocations, one propagator
+operation and payload copies can overshoot a cooperative boundary. These timings
+characterize that residual latency; they do not establish a hard wall-clock bound.
+The probe also records uncapped installation for comparison and exact JVM-thread
+allocation bytes. Pair it with uninstrumented source-checked whole-CLI controls;
+construction completion and root hashes alone do not certify source results.
+
 ### Coordinator lifecycle probe
 
 [scripts/coordinator-lifecycle](scripts/coordinator-lifecycle/) compares fresh and

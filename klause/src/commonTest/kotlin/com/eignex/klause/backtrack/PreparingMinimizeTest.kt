@@ -5,13 +5,16 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -65,4 +68,61 @@ class PreparingMinimizeTest {
             assertEquals(whole.stats.search.propagationWork, search.stats.search.propagationWork)
         }
     }
+
+    @Test
+    fun `an installation failure closes the retained handle`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        val search = PreparingMinimize(
+            BacktrackSolver(fixture.problem), fixture.objective,
+            fixture.params.copy(assumptions = Assumptions.None.withInt(Int.MAX_VALUE, 1)),
+        )
+
+        assertFailsWith<IndexOutOfBoundsException> {
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+        }
+
+        assertFalse(search.preparationPending)
+        assertFailsWith<IllegalStateException> {
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+        }
+        search.close()
+    }
+
+    @Test
+    fun `a construction refutation preserves shared cutoff result semantics`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, -1)),
+        ).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(objectiveBoundSupplier = { 0.0 })
+        PreparingMinimize(BacktrackSolver(problem), objective, params).use { search ->
+            val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+
+            assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
+            assertTrue(search.isDone)
+        }
+    }
+
+    @Test
+    fun `cancellation at installation handoff leaves search for a later slice`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        PreparingMinimize(BacktrackSolver(fixture.problem), fixture.objective, fixture.params).use { search ->
+            val samples = mutableListOf<MinimizeResult.WithSample>()
+            val token = Cancellation { !search.preparationPending }
+
+            val paused = search.runSlice(token, Long.MAX_VALUE, -1L, samples::add)
+
+            assertNull(paused)
+            assertFalse(search.preparationPending)
+            assertEquals(0.0, search.stats.search.nodes.sum)
+            assertEquals(0.0, search.stats.lp.solves.sum)
+            assertTrue(samples.isEmpty())
+            val result = assertIs<MinimizeResult.Optimal>(
+                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, samples::add),
+            )
+            assertEquals(-4.0, result.objective)
+        }
+    }
+
 }

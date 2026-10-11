@@ -14,8 +14,15 @@ internal class PropagationPreparation(
     private val projections = PropagationProblem.preparation(problem)
     private var projection: PropagationProblem? = null
     private var state: PropagationState? = null
-    private var rootStarted = false
+    private var states: Iterator<PropagationState?>? = null
+    private var rootQueue: Iterator<Unit>? = null
+    internal var rootStarted = false
+        private set
+    private var sessions: Iterator<PropagationSession?>? = null
     private var result: PropagationSession? = null
+
+    var isUnsat: Boolean = false
+        private set
 
     val work: Long get() = state?.work ?: 0L
     val propagationNanos: Long get() = state?.propagationNanos ?: 0L
@@ -28,18 +35,30 @@ internal class PropagationPreparation(
             return null
         }
         val live = state ?: run {
-            state = PropagationState(projected, Assumptions.None, pbLearning = pbLearning).also {
+            val builder = states ?: PropagationState.preparation(projected, pbLearning).also { states = it }
+            state = builder.next()?.also {
                 it.cancelFloor = propagationCancelFloor
+                states = null
             }
             return null
         }
         if (!rootStarted) {
-            live.beginRootFixpoint()
-            rootStarted = true
+            val queue = rootQueue ?: live.beginRootFixpoint().also { rootQueue = it }
+            if (queue.hasNext()) queue.next() else {
+                rootStarted = true
+                rootQueue = null
+            }
             return null
         }
-        val conflict = live.advanceRootFixpoint(cancellation)
-        if (conflict == null && live.rootFixpointPending) return null
-        return PropagationSession.prepared(live, cancellation, conflict).also { result = it }
+        val builder = sessions ?: run {
+            val conflict = live.advanceRootFixpoint(cancellation)
+            if (conflict == null && live.rootFixpointPending) return null
+            isUnsat = conflict != null
+            PropagationSession.preparation(live, cancellation, conflict).also { sessions = it }
+        }
+        return builder.next()?.also {
+            result = it
+            sessions = null
+        }
     }
 }

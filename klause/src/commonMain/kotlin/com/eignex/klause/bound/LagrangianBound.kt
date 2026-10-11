@@ -3,6 +3,9 @@ package com.eignex.klause.bound
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
+import com.eignex.klause.util.constructionIntArray
+import com.eignex.klause.util.constructionLongArray
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationSession
@@ -47,29 +50,43 @@ import kotlin.math.ceil
  * which λ to try — every evaluated `L(λ)` is exact, so the reported bound is always valid. Overflow
  * (large coefficients) makes the node's bound unavailable, never wrong.
  */
-internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : LagrangianDualBound {
+internal class LagrangianBound(
+    private val problem: Problem,
+    private val objective: LinearObjective?,
+    deferred: Boolean = false,
+) : LagrangianDualBound {
     /** Variables of all chosen AllDifferent blocks, concatenated; empty when none is eligible. */
-    private val vars: IntArray
-    private val inV: BooleanArray
+    private lateinit var vars: IntArray
+    private lateinit var inV: BooleanArray
 
     /** Block boundaries: block `j` spans `vars[blockStart[j] until blockStart[j + 1]]`. */
-    private val blockStart: IntArray
+    private lateinit var blockStart: IntArray
 
     /** Linking constraints (Linear factors entirely over [vars]); dualized with one multiplier each. */
-    private val linkVars: Array<IntArray>
-    private val linkCoeffs: Array<LongArray>
-    private val linkRhs: LongArray
-    private val linkSign: IntArray // +1: λ≥0 (LE), -1: λ≤0 (GE), 0: free (EQ)
+    private lateinit var linkVars: Array<IntArray>
+    private lateinit var linkCoeffs: Array<LongArray>
+    private lateinit var linkRhs: LongArray
+    private lateinit var linkSign: IntArray // +1: λ≥0 (LE), -1: λ≤0 (GE), 0: free (EQ)
 
-    private val intCoef: LongArray
-    private val boolWeight: LongArray
-    private val objConstant: Long
+    private lateinit var intCoef: LongArray
+    private lateinit var boolWeight: LongArray
+    private var objConstant: Long = 0L
 
-    val applicable: Boolean
+    var applicable: Boolean = false
+        private set
 
     init {
+        if (!deferred) preparation().forEach { }
+    }
+
+    internal fun preparation(): Iterator<Unit> = sequence {
+        var visits = 0
         val numInt = problem.numIntVars
-        val blocks = if (objective == null) emptyList() else chooseBlocks(problem)
+        var blocks: List<IntArray> = emptyList()
+        if (objective != null) for (next in chooseBlocks(problem)) {
+            if (next != null) blocks = next
+            yield(Unit)
+        }
         if (blocks.isEmpty()) {
             vars = EmptyIntArray
             inV = BooleanArray(numInt)
@@ -87,6 +104,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             val starts = IntArrayList()
             starts.add(0)
             for (b in blocks) {
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
                 for (v in b) flat.add(v)
                 starts.add(flat.size)
             }
@@ -99,6 +117,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             val lr = LongArrayList()
             val ls = IntArrayList()
             for (f in problem.factors) {
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
                 if (f !is Linear) continue
                 val row = f.integerConstants ?: continue
                 val sign = when (f.op) {
@@ -107,7 +126,15 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
                     LinearOp.EQ -> 0
                     LinearOp.NE -> continue // not a linear relaxation
                 }
-                if (f.vars.any { !inV[it] }) continue // only constraints over the chosen blocks are dualized
+                var contained = true
+                for (v in f.vars) {
+                    if (!inV[v]) {
+                        contained = false
+                        break
+                    }
+                    if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+                }
+                if (!contained) continue
                 lv.add(f.vars.copyOf())
                 lc.add(row.coeffs)
                 lr.add(row.bound)
@@ -115,22 +142,24 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             }
             linkVars = lv.toTypedArray()
             linkCoeffs = lc.toTypedArray()
-            linkRhs = LongArray(lr.size) { lr[it] }
-            linkSign = IntArray(ls.size) { ls[it] }
+            linkRhs = constructionLongArray(lr.size) { lr[it] }
+            linkSign = constructionIntArray(ls.size) { ls[it] }
             val obj = objective ?: error("blocks chosen only when objective is non-null")
-            intCoef = LongArray(numInt) { obj.intCoefficientValues.getOrElse(it) { 0L } }
-            boolWeight = LongArray(problem.numBoolVars) { obj.boolWeightValues.getOrElse(it) { 0L } }
+            intCoef = constructionLongArray(numInt) { obj.intCoefficientValues.getOrElse(it) { 0L } }
+            boolWeight = constructionLongArray(problem.numBoolVars) { obj.boolWeightValues.getOrElse(it) { 0L } }
             objConstant = obj.constant
             applicable = true
         }
-    }
+    }.iterator()
 
     /** Greedily pick pairwise variable-disjoint eligible AllDifferents under the total-variable cap. */
-    private fun chooseBlocks(problem: Problem): List<IntArray> {
+    private fun chooseBlocks(problem: Problem): Sequence<List<IntArray>?> = sequence {
+        var visits = 0
         val chosen = ArrayList<IntArray>()
         val used = IntHashSet()
         var total = 0
         for (f in problem.factors) {
+            if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(null)
             if (f !is AllDifferent || f.vars.size !in 2..MAX_VARS) continue
             // Only a *true* all-distinct admits the weighted-assignment bound: the excepted values of an
             // `alldifferent_except` may repeat (so "fewer distinct values than variables" is not
@@ -143,7 +172,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             for (v in f.vars) used.add(v)
             total += f.vars.size
         }
-        return chosen
+        yield(chosen)
     }
 
     /** Number of dualized linking constraints; the multiplier vector has this length. */

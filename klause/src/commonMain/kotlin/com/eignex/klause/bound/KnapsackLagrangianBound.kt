@@ -2,6 +2,9 @@ package com.eignex.klause.bound
 
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
+import com.eignex.klause.util.constructionIntArray
+import com.eignex.klause.util.constructionLongArray
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
@@ -41,36 +44,59 @@ import kotlin.math.ceil
  * next λ; every evaluated `L(λ)` is exact, so the reported bound is always valid. Overflow makes the
  * node's bound unavailable, never wrong.
  */
-internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObjective?) : LagrangianDualBound {
+internal class KnapsackLagrangianBound(
+    private val problem: Problem,
+    private val objective: LinearObjective?,
+    deferred: Boolean = false,
+) : LagrangianDualBound {
     /** Boolean variable id per local index (the union of the knapsack/link/objective variables). */
-    private val varIds: IntArray
+    private lateinit var varIds: IntArray
 
     /** Objective coefficient per local index. */
-    private val cost: LongArray
+    private lateinit var cost: LongArray
 
     /** Kept-knapsack: local item indices, positive weights, and the capacity. */
-    private val kItems: IntArray
-    private val kWeights: LongArray
-    private val kCap: Long
+    private lateinit var kItems: IntArray
+    private lateinit var kWeights: LongArray
+    private var kCap: Long = 0L
 
     /** Dualized linking rows (other PseudoBooleans), as `Σ coeff·x_local ⟨sign⟩ rhs` over local indices. */
-    private val rowVars: Array<IntArray>
-    private val rowCoeffs: Array<LongArray>
-    private val rowRhs: LongArray
-    private val rowSign: IntArray // +1: λ≥0 (LE), -1: λ≤0 (GE), 0: free (EQ)
+    private lateinit var rowVars: Array<IntArray>
+    private lateinit var rowCoeffs: Array<LongArray>
+    private lateinit var rowRhs: LongArray
+    private lateinit var rowSign: IntArray // +1: λ≥0 (LE), -1: λ≤0 (GE), 0: free (EQ)
 
     /** Objective contribution of the integer variables (this bound only reasons over the bools). */
-    private val intCoef: LongArray
-    private val objConstant: Long
+    private lateinit var intCoef: LongArray
+    private var objConstant: Long = 0L
 
-    val applicable: Boolean
+    var applicable: Boolean = false
+        private set
 
     init {
-        val pbs = if (objective == null) emptyList() else problem.factors.filterIsInstance<PseudoBoolean>()
+        if (!deferred) preparation().forEach { }
+    }
+
+    internal fun preparation(): Iterator<Unit> = sequence {
+        var visits = 0
+        val pbs = ArrayList<PseudoBoolean>()
+        if (objective != null) for (factor in problem.factors) {
+            if (factor is PseudoBoolean) pbs.add(factor)
+            if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
         // The subproblem knapsack must be a clean capacity row: all positive literals, positive weights,
         // a DP-bounded capacity. The cleanest, largest such row is kept; the rest are dualized.
-        val subProblem = pbs.filter { cleanCapacity(it) }
-            .maxByOrNull { it.literals.size }
+        var chosen: PseudoBoolean? = null
+        for (factor in pbs) {
+            var clean = factor.op == PbOp.LE && factor.bound >= 0
+            for (k in factor.literals.indices) {
+                clean = clean && Lit.isPositive(factor.literals[k]) && factor.weights[k] > 0L
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+            if (clean && (chosen == null || factor.literals.size > chosen.literals.size)) chosen = factor
+            if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
+        val subProblem = chosen
         if (objective == null || subProblem == null) {
             varIds = EmptyIntArray
             cost = EmptyLongArray
@@ -87,7 +113,8 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
         } else {
             // Local index space: every bool var that appears in the kept knapsack, a linking row, or the
             // objective. A variable absent from all three contributes nothing and is left out.
-            val index = MutableIntIntMap()
+            val index = MutableIntIntMap(problem.numBoolVars)
+            yield(Unit)
             val ids = IntArrayList()
             fun local(v: Int): Int {
                 if (index.containsKey(v)) return index.getOrDefault(v, -1)
@@ -96,24 +123,36 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
                 index.put(v, idx)
                 return idx
             }
-            for (k in subProblem.literals.indices) local(Lit.variable(subProblem.literals[k]))
-            val others = pbs.filter { it !== subProblem }
-            for (f in others) for (lit in f.literals) local(Lit.variable(lit))
-            for (b in objective.boolWeightValues.indices) if (objective.boolWeightValues[b] != 0L) local(b)
+            for (k in subProblem.literals.indices) {
+                local(Lit.variable(subProblem.literals[k]))
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+            val others = ArrayList<PseudoBoolean>()
+            for (factor in pbs) {
+                if (factor !== subProblem) others.add(factor)
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+            for (f in others) for (lit in f.literals) {
+                local(Lit.variable(lit))
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+            for (b in objective.boolWeightValues.indices) {
+                if (objective.boolWeightValues[b] != 0L) local(b)
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
             varIds = ids.toIntArray()
-            index.clear()
-            for (i in varIds.indices) index.put(varIds[i], i)
 
-            cost = LongArray(varIds.size) { objective.boolWeightValues.getOrElse(varIds[it]) { 0L } }
+            cost = constructionLongArray(varIds.size) { objective.boolWeightValues.getOrElse(varIds[it]) { 0L } }
 
             val kIdx = IntArrayList()
             val kW = LongArrayList()
             for (k in subProblem.literals.indices) {
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
                 kIdx.add(index.getOrDefault(Lit.variable(subProblem.literals[k]), -1))
                 kW.add(subProblem.weights[k])
             }
             kItems = kIdx.toIntArray()
-            kWeights = LongArray(kW.size) { kW[it] }
+            kWeights = constructionLongArray(kW.size) { kW[it] }
             kCap = subProblem.bound
 
             val rv = ArrayList<IntArray>()
@@ -121,15 +160,19 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             val rr = LongArrayList()
             val rs = IntArrayList()
             for (f in others) {
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
                 val sign = when (f.op) {
                     PbOp.LE -> 1
                     PbOp.GE -> -1
                     PbOp.EQ -> 0
                 }
                 val cols = IntArray(f.literals.size)
+                yield(Unit)
                 val vals = LongArray(f.literals.size)
+                yield(Unit)
                 var rhs = f.bound
                 for (k in f.literals.indices) {
+                    if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
                     val lit = f.literals[k]
                     cols[k] = index.getOrDefault(Lit.variable(lit), -1)
                     val w = f.weights[k]
@@ -148,18 +191,14 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             }
             rowVars = rv.toTypedArray()
             rowCoeffs = rc.toTypedArray()
-            rowRhs = LongArray(rr.size) { rr[it] }
-            rowSign = IntArray(rs.size) { rs[it] }
+            rowRhs = constructionLongArray(rr.size) { rr[it] }
+            rowSign = constructionIntArray(rs.size) { rs[it] }
 
-            intCoef = LongArray(problem.numIntVars) { objective.intCoefficientValues.getOrElse(it) { 0L } }
+            intCoef = constructionLongArray(problem.numIntVars) { objective.intCoefficientValues.getOrElse(it) { 0L } }
             objConstant = objective.constant
             applicable = kCap in 0..MAX_CAP && kItems.size <= MAX_ITEMS
         }
-    }
-
-    /** A PseudoBoolean usable as the kept subproblem: `Σ wᵢ·xᵢ ≤ bound`, all positive literals/weights. */
-    private fun cleanCapacity(f: PseudoBoolean): Boolean =
-        f.op == PbOp.LE && f.bound >= 0 && f.literals.all { Lit.isPositive(it) } && f.weights.all { it > 0 }
+    }.iterator()
 
     /** Number of dualized linking constraints; the multiplier vector has this length. */
     override val multiplierCount: Int get() = rowVars.size

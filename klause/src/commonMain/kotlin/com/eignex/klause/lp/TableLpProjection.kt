@@ -71,9 +71,20 @@ internal fun Table.emitLpRelaxation(builder: RelaxationBuilder) {
 }
 
 internal fun Table.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
+    var result: LpSizeEstimate? = null
+    sequence<Unit> { result = prepareLpHull(this@estimateLpHull, boxes) }.forEach { }
+    return result
+}
+
+internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: Table, boxes: RootBoxes): LpSizeEstimate? {
+    val hi = factor.hi
+    val numTuples = factor.numTuples
+    val xs = factor.xs
+    val arity = factor.arity
+
     if (hi != null) return null
     if (numTuples > MAX_TUPLES) return null
-    if (!boxes.statesBothBounds(xs)) return null
+    if (!prepareStatesBothBounds(boxes, xs)) return null
     // One selector per tuple (upper bound on the root-feasible ones) + Σ y = 1 + one channel
     // per column.
     return LpSizeEstimate(cols = numTuples.toLong(), rows = 1L + arity)

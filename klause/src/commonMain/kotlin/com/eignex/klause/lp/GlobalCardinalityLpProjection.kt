@@ -76,10 +76,24 @@ internal fun GlobalCardinality.emitLpRelaxation(builder: RelaxationBuilder) {
 }
 
 internal fun GlobalCardinality.estimateLpHull(boxes: RootBoxes): LpSizeEstimate? {
+    var result: LpSizeEstimate? = null
+    sequence<Unit> { result = prepareLpHull(this@estimateLpHull, boxes) }.forEach { }
+    return result
+}
+
+internal suspend fun SequenceScope<Unit>.prepareLpHull(factor: GlobalCardinality, boxes: RootBoxes): LpSizeEstimate? {
+    val countVars = factor.countVars
+    val presents = factor.presents
+    val xs = factor.xs
+    val cover = factor.cover
+
     if (countVars == null || presents.isNotEmpty()) return null
-    if (!boxes.statesBothBounds(xs)) return null
+    if (!prepareStatesBothBounds(boxes, xs)) return null
     var cells = 0L
-    for (x in xs) cells += boxes.domain(x).values.size.toLong()
+    for ((position, x) in xs.withIndex()) {
+        cells += boxes.domain(x).values.size.toLong()
+        if ((position + 1) % 256 == 0) yield(Unit)
+    }
     if (cells == 0L || cells > MAX_GCC_CELLS) return null
     // One z selector per var×root-box value; (Σz=1, channel) per var + one count row per cover value.
     return LpSizeEstimate(cols = cells, rows = 2L * xs.size + cover.size)

@@ -177,4 +177,27 @@ class LpAutoConfigTest {
         assertFalse(r.gomory)
         assertTrue(r.energeticReasoning)
     }
+    @Test
+    fun `retained hull planning preserves the eager plan across checkpoints`() {
+        val settings = KlauseConfig.DEFAULT.copy(
+            lpCeilingTableauCells = Long.MAX_VALUE, lpMaxTableauCells = Long.MAX_VALUE,
+        ).problemSettings()
+        val p = Problem(
+            0, 514, Array(514) { if (it == 513) IntDomain(0, 513) else IntDomain(0, 0) },
+            arrayOf(NValue(513, IntArray(513) { it })), settings = settings,
+        )
+        val expected = LpAutoConfig.resolve(p, LpConfig.AGGRESSIVE)
+        var actual: LpPlan? = null
+        val planning = sequence<Unit> {
+            actual = with(LpAutoConfig) { prepare(p, LpConfig.AGGRESSIVE, LpPlan()) }
+        }.iterator()
+
+        planning.next()
+        assertEquals(null, actual)
+        while (planning.hasNext()) planning.next()
+
+        assertEquals(expected, actual)
+        assertTrue(expected.nValue)
+    }
+
 }

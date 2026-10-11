@@ -17,6 +17,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
@@ -180,6 +181,35 @@ internal fun candidateArcCount(succ: IntArray, selfLoops: Boolean, cap: Int, dom
     for (i in succ.indices) {
         eachCandidateArcHead(domainOf(succ[i]), i, succ.size, selfLoops) { arcs++ }
         if (arcs > cap) return arcs
+    }
+    return arcs
+}
+
+internal suspend fun SequenceScope<Unit>.prepareCandidateArcCount(
+    succ: IntArray,
+    selfLoops: Boolean,
+    cap: Int,
+    domainOf: (Int) -> IntDomain,
+): Int {
+    var arcs = 0
+    var visits = 0
+    for (i in succ.indices) {
+        val dom = domainOf(succ[i])
+        if (dom.valueCount <= succ.size) {
+            val span = dom.values
+            for (k in 0 until span.size) {
+                val j = span.valueAt(k)
+                if ((selfLoops || j != i.toLong()) && j >= 0 && j < succ.size) arcs++
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+        } else {
+            for (j in succ.indices) {
+                if ((selfLoops || j != i) && dom.contains(j.toLong())) arcs++
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+        }
+        if (arcs > cap) return arcs
+        if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
     }
     return arcs
 }
@@ -531,12 +561,12 @@ internal class CpToLpRelaxation(
     private val tableHull: Boolean = false,
     /** When true, emit the energetic makespan lower-bound row for each Cumulative / Disjunctive whose
      *  makespan variable can be verified (see [CumulativeRelaxation]). One row per plan. */
-    cumulative: Boolean = false,
+    private val cumulative: Boolean = false,
     /** When true, project each constant-size Diffn onto both axes as a cumulative and emit the same
      *  energetic makespan row — a sound lower bound on a strip-length / extent variable (its
      *  `t1 = min-est` case is the area bound `Σ wᵢ·hᵢ ≤ W·H`). One row per derived plan; a no-op unless
      *  an axis extent is provably an upper bound on every task end (so it only fires when it helps). */
-    diffn: Boolean = false,
+    private val diffn: Boolean = false,
     /** When true, emit the time-indexed `x_{i,t}` relaxation of each Cumulative / Disjunctive over a
      *  bounded horizon: assignment + start channel + per-time resource rows. Adds O(n·H)
      *  columns, so it is hard-gated on the horizon and total cell count. */
@@ -599,17 +629,12 @@ internal class CpToLpRelaxation(
      *  strength, so they contribute only their CORE rows (if any). */
     private val suppressedHullFactors: Set<Int> = emptySet(),
     internal val auxiliarySources: LpAuxiliarySources = LpAuxiliarySources(),
+    deferred: Boolean = false,
 ) {
     private val linearProjection = LinearLpProjection()
 
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
-    private val cumulativeRelaxation: CumulativeRelaxation? =
-        if (cumulative || diffn) {
-            CumulativeRelaxation(problem, includeCumulative = cumulative, includeDiffn = diffn)
-                .takeIf { it.applicable }
-        } else {
-            null
-        }
+    private var cumulativeRelaxation: CumulativeRelaxation? = null
 
     /**
      * Whether this relaxer emits no row whose coefficients depend on the live domains, the
@@ -621,12 +646,34 @@ internal class CpToLpRelaxation(
      * a not-yet-wired hull off the persistent path (checked at build). When this holds and every
      * column is re-derivable, live column bounds suffice to reuse the fixed relaxation layout.
      */
-    private val structurallyPersistent: Boolean =
-        !objectiveCone && !cumulative && !diffn &&
-            problem.factors.none {
-                it is ReifiedLinear || it is ReifiedPseudoBoolean || it is ReifiedCardinality ||
-                    it is ReifiedRealLinear
+
+    private var structurallyPersistent: Boolean = false
+
+    init {
+        if (!deferred) preparation().forEach { }
+    }
+
+    fun preparation(): Iterator<Unit> = sequence {
+        if (cumulative || diffn) {
+            val owner = CumulativeRelaxation(
+                problem, includeCumulative = cumulative, includeDiffn = diffn, deferred = true,
+            )
+            owner.preparation().forEach { yield(Unit) }
+            cumulativeRelaxation = owner.takeIf { it.applicable }
+        }
+        structurallyPersistent = !objectiveCone && !cumulative && !diffn
+        if (structurallyPersistent) for (fid in problem.factors.indices) {
+            val factor = problem.factors[fid]
+            if (factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
+                factor is ReifiedRealLinear
+            ) {
+                structurallyPersistent = false
+                break
             }
+            if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
+    }.iterator()
+
 
     /**
      * Objective-cone membership, structural (depends only on `Problem.factors` and the

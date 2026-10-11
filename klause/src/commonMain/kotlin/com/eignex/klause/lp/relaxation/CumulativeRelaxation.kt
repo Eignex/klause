@@ -6,6 +6,9 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
+import com.eignex.klause.util.constructionIntArray
+import com.eignex.klause.util.constructionLongArray
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpRowPremises
@@ -77,6 +80,7 @@ internal class CumulativeRelaxation(
      *  `Σ wᵢ·hᵢ ≤ W·H`) lower-bounds a strip-length / extent variable. Using the *maximum* perpendicular
      *  extent as capacity only loosens, so it stays sound; off by default. */
     private val includeDiffn: Boolean = false,
+    deferred: Boolean = false,
 ) {
 
     /**
@@ -102,7 +106,18 @@ internal class CumulativeRelaxation(
     /** The validated, live right-hand side of one [AreaPlan]'s row at a node. */
     internal class RowSpec(val rhs: Long, val global: Boolean, val premises: LpRowPremises?)
 
-    val plans: List<AreaPlan> = buildPlans()
+    var plans: List<AreaPlan> = emptyList()
+        private set
+
+    private var constructionVisits = 0
+
+    init {
+        if (!deferred) preparation().forEach { }
+    }
+
+    fun preparation(): Iterator<Unit> = sequence<Unit> {
+        plans = buildPlans()
+    }.iterator()
 
     val applicable: Boolean get() = plans.isNotEmpty()
 
@@ -203,41 +218,49 @@ internal class CumulativeRelaxation(
         return LpRowPremises(pv.toIntArray(), BooleanArray(count) { false }, pt.toLongArray())
     }
 
+
     // Structural plan construction: once, at problem load.
 
-    private fun buildPlans(): List<AreaPlan> {
+    private suspend fun SequenceScope<Unit>.buildPlans(): List<AreaPlan> {
         val scheds = schedulingFactors()
         if (scheds.isEmpty()) return emptyList()
         val links = makespanLinks()
         val out = ArrayList<AreaPlan>()
-        for (s in scheds) out.addAll(plansFor(s, links))
+        for (s in scheds) {
+            out.addAll(plansFor(s, links))
+            yield(Unit)
+        }
         return out
     }
 
     /** Plans for one scheduling factor: a makespan variable ≥ the end of every task it covers. */
-    private fun plansFor(s: Sched, links: MakespanLinks): List<AreaPlan> {
+    private suspend fun SequenceScope<Unit>.plansFor(s: Sched, links: MakespanLinks): List<AreaPlan> {
         // makespanVar → covered task local-indices.
         val cover = MutableIntObjectMap<IntArrayList>()
         for (i in s.starts.indices) {
+            if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             if (s.dur[i] <= 0 || s.res[i] <= 0) continue
             // The row's energy counts each task from its earliest start. Over a start the model leaves
             // open below that edge is the search box's invented endpoint, not the model's, so the row
             // would claim energy no solution outside the box has to spend.
             if (!problem.statesLowerBound(s.starts[i])) continue
-            links.endUpperBoundsOf(s.starts[i], s.dur[i]).forEach { m ->
+            endUpperBoundsOf(links, s.starts[i], s.dur[i]).forEach { m ->
                 cover.getOrPut(m) { IntArrayList() }.add(i)
+                if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             }
         }
         if (cover.isEmpty()) return emptyList()
         // Strongest coverage first; deterministic var-id tie-break. Keep at most MAX_MAKESPAN_VARS.
-        val coverEntries = ArrayList<Pair<Int, IntArrayList>>(cover.size)
-        cover.forEach { m, idxs -> coverEntries.add(m to idxs) }
-        val ranked = coverEntries
-            // The trivial fallback right-hand side is `cap · M.min`, so a makespan the model leaves open
-            // below has no floor of its own to fall back on.
-            .filter { it.second.size >= MIN_COVER && problem.statesLowerBound(it.first) }
-            .sortedWith(compareByDescending<Pair<Int, IntArrayList>> { it.second.size }.thenBy { it.first })
-            .take(MAX_MAKESPAN_VARS)
+        val ranked = ArrayList<Pair<Int, IntArrayList>>(MAX_MAKESPAN_VARS + 1)
+        val order = compareByDescending<Pair<Int, IntArrayList>> { it.second.size }.thenBy { it.first }
+        cover.forEach { m, idxs ->
+            if (idxs.size >= MIN_COVER && problem.statesLowerBound(m)) {
+                ranked.add(m to idxs)
+                ranked.sortWith(order)
+                if (ranked.size > MAX_MAKESPAN_VARS) ranked.removeAt(ranked.lastIndex)
+            }
+            if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
         return ranked.mapNotNull { (m, idxs) ->
             val k = idxs.size
             // `capacity · M.rootMin` is the row's fallback right-hand side, so a product that does not
@@ -252,9 +275,9 @@ internal class CumulativeRelaxation(
                 makespanVar = m,
                 capacity = s.cap,
                 floor = floor,
-                startVars = IntArray(k) { s.starts[idxs[it]] },
-                durations = LongArray(k) { s.dur[idxs[it]] },
-                resources = LongArray(k) { s.res[idxs[it]] },
+                startVars = constructionIntArray(k) { s.starts[idxs[it]] },
+                durations = constructionLongArray(k) { s.dur[idxs[it]] },
+                resources = constructionLongArray(k) { s.res[idxs[it]] },
             )
         }
     }
@@ -262,9 +285,10 @@ internal class CumulativeRelaxation(
     /** A scheduling factor normalized to constant per-task duration / minimum demand / max capacity. */
     private class Sched(val starts: IntArray, val dur: LongArray, val res: LongArray, val cap: Long)
 
-    private fun schedulingFactors(): List<Sched> {
+    private suspend fun SequenceScope<Unit>.schedulingFactors(): List<Sched> {
         val out = ArrayList<Sched>()
         for (f in problem.factors) {
+            if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             when (f) {
                 is Cumulative -> {
                     if (!includeCumulative) continue
@@ -336,27 +360,13 @@ internal class CumulativeRelaxation(
      */
     private inner class MakespanLinks {
         /** `geFrom[v]` = pairs `(w, c)` with a proven `w ≥ v + c`, from two-variable Linear rows. */
-        private val geFrom = MutableIntObjectMap<ArrayList<LongArray>>() // value: [w, c]
+        val geFrom = MutableIntObjectMap<ArrayList<LongArray>>() // value: [w, c]
 
         /** `maxResultsOf[operand]` = `ArrayMinMax(max)` results, each ≥ that operand. */
-        private val maxResultsOf = MutableIntObjectMap<IntArrayList>()
-
-        init {
-            for (f in problem.factors) {
-                when (f) {
-                    is Linear -> if (f.integerConstants != null && f.vars.size == 2) addLinearLinks(f)
-
-                    is ArrayMinMax -> if (f.max) {
-                        for (x in f.xs) maxResultsOf.getOrPut(x) { IntArrayList() }.add(f.result)
-                    }
-
-                    else -> Unit
-                }
-            }
-        }
+        val maxResultsOf = MutableIntObjectMap<IntArrayList>()
 
         /** Record every `w ≥ v + c` implied by a two-variable [Linear] `coeffA·a + coeffB·b op bound`. */
-        private fun addLinearLinks(f: Linear) {
+        fun addLinearLinks(f: Linear) {
             // Only ±1-coefficient rows produce a link; a coefficient outside ±1 (including any beyond
             // Int range) matches neither pattern below and adds nothing.
             val row = f.integerConstants ?: return
@@ -380,26 +390,45 @@ internal class CumulativeRelaxation(
             geFrom.getOrPut(v) { ArrayList() }.add(longArrayOf(w.toLong(), c))
         }
 
-        fun endUpperBoundsOf(start: Int, dur: Long): IntHashSet {
-            val result = IntHashSet()
-            val queue = IntArrayDeque()
-            // Seed: vars directly proven ≥ start + c with c ≥ dur are ≥ the task end.
-            geFrom[start]?.forEach { wc ->
-                if (wc[1] >= dur) {
-                    val w = wc[0].toInt()
-                    if (result.add(w)) queue.addLast(w)
-                }
-            }
-            // Close through max edges: result = max(...) ≥ operand ≥ end ⇒ result ≥ end too.
-            while (queue.isNotEmpty()) {
-                val v = queue.removeFirst()
-                maxResultsOf[v]?.forEach { m -> if (result.add(m)) queue.addLast(m) }
-            }
-            return result
-        }
     }
 
-    private fun makespanLinks(): MakespanLinks = MakespanLinks()
+    private suspend fun SequenceScope<Unit>.makespanLinks(): MakespanLinks {
+        val links = MakespanLinks()
+        for (f in problem.factors) {
+            when (f) {
+                is Linear -> if (f.integerConstants != null && f.vars.size == 2) links.addLinearLinks(f)
+                is ArrayMinMax -> if (f.max) for (x in f.xs) {
+                    links.maxResultsOf.getOrPut(x) { IntArrayList() }.add(f.result)
+                    if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+                }
+                else -> Unit
+            }
+            if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
+        return links
+    }
+
+    private suspend fun SequenceScope<Unit>.endUpperBoundsOf(links: MakespanLinks, start: Int, dur: Long): IntHashSet {
+        val result = IntHashSet()
+        val queue = IntArrayDeque()
+        // Seed: vars directly proven ≥ start + c with c ≥ dur are ≥ the task end.
+        links.geFrom[start]?.forEach { wc ->
+            if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            if (wc[1] >= dur) {
+                val w = wc[0].toInt()
+                if (result.add(w)) queue.addLast(w)
+            }
+        }
+        // Close through max edges: result = max(...) ≥ operand ≥ end ⇒ result ≥ end too.
+        while (queue.isNotEmpty()) {
+            val v = queue.removeFirst()
+            links.maxResultsOf[v]?.forEach { m ->
+                if (result.add(m)) queue.addLast(m)
+                if (++constructionVisits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+        }
+        return result
+    }
 
     internal companion object {
         /** Per-factor task cap: above it the `O(n log n)` row build is skipped (sound loosening). */

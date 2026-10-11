@@ -226,6 +226,29 @@ class SearchSession(
         return if (result is ComponentResult.Consistent) propagate() else result
     }
 
+    internal fun prepareInitialization(
+        initialize: (SearchComponent, SearchContext) -> Iterator<ComponentResult?>,
+    ): Iterator<ComponentResult?> = sequence {
+        for (component in components) {
+            val pending = initialize(component, this@SearchSession)
+            var result: ComponentResult? = null
+            while (result == null) {
+                activeComponent = component
+                try {
+                    result = pending.next()
+                } finally {
+                    activeComponent = null
+                }
+                if (result == null) yield(null)
+            }
+            if (result !is ComponentResult.Consistent) {
+                yield(recordConflict(component, result))
+                return@sequence
+            }
+        }
+        yield(propagate())
+    }.iterator()
+
     /** Assert [decision], then run a shared propagation round. */
     fun push(decision: SearchDecision): ComponentResult {
         lastPushCreatedLevel = false
