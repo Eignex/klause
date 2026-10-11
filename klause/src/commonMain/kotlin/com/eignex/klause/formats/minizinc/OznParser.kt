@@ -486,4 +486,8 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
 /** Raised when parsing or evaluating MiniZinc `.ozn` output fails — the single catchable exception for
  *  this front-end, matching the one-class convention of the other formats. */
-class OznParseException(message: String) : FormatException("MiniZinc output", message)
+class OznParseException : FormatException {
+    constructor(message: String) : super("MiniZinc output", message)
+
+    internal constructor(message: String, cause: Throwable) : super("MiniZinc output", message, cause)
+}
