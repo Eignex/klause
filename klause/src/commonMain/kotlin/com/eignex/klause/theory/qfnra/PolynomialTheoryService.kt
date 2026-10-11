@@ -71,6 +71,7 @@ internal class PolynomialTheoryInvocation(
         private set
     var queries: Long = 0
         private set
+    val workExhausted: Boolean get() = params.maximumWork?.let { stats.workSpent >= it } == true
 
     fun check(
         condition: PolynomialCondition = PolynomialCondition(),
