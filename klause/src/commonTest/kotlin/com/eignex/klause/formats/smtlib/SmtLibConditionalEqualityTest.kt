@@ -23,6 +23,35 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `an unused later conditional leaves the budget available for an asserted ordering`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const b Bool) (declare-const x Int)
+                (assert (<= (ite b 1 9) 4))
+                (assert (let ((unused (ite (= (ite (<= x 0) x 2) 1) 4 5))) true))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+        assertIs<ComponentResult.Consistent>(session.initialize())
+
+        assertIs<SearchResult.Satisfied>(
+            session.solve(parsed.model.numBoolVars, SearchSolveParams(maxDecisions = 0)),
+        )
+
+        assertEquals(true, session.boolValue(parsed.boolVarNames.getValue("b")))
+    }
+
+    @Test
     fun `an expanded ordering comparison shares its primitive source predicate`() {
         val parsed = SmtLib.parse(
             """

@@ -174,24 +174,63 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         }.literal
     }
 
-    fun expandPending(builder: Compiler.Builder) {
+    fun expandPending(builder: Compiler.Builder, objective: LinearObjectiveSpec?) {
+        val owned = ownedPredicateFactors(builder.factors)
+        val queries = pendingEqualities.entries.associateBy { Lit.variable(it.value.literal) }
+        val pending = ArrayDeque<Int>()
+        val visited = HashSet<Int>()
+        pending.addAll(builder.boolNames.values)
+        objective?.boolWeights?.forEachIndexed { variable, weight ->
+            if (weight != 0L) pending.addLast(variable)
+        }
+        for (factor in builder.factors) {
+            if (factor !in owned) pending.addAll(factor.variables.boolVars.toList())
+        }
         val replaced = HashSet<Factor>()
-        for ((key, equality) in pendingEqualities.entries.toList().asReversed()) {
-            val expanded = when (key) {
-                is Key -> expand(key.variable, key.value, builder, key.operator)
-                is PairKey -> expandPair(key, builder)
-            } ?: continue
-            if (expanded == equality.literal) continue
-            val clauses = listOf(
-                Clause(intArrayOf(Lit.negate(equality.literal), expanded)),
-                Clause(intArrayOf(equality.literal, Lit.negate(expanded))),
-            )
-            builder.factors.addAll(clauses)
-            definePredicate(Lit.variable(equality.literal), clauses)
-            replaced.add(equality.factor)
+        while (pending.isNotEmpty()) {
+            val variable = pending.removeLast()
+            if (!visited.add(variable)) continue
+            queries[variable]?.let { (key, equality) ->
+                val expanded = when (key) {
+                    is Key -> expand(key.variable, key.value, builder, key.operator)
+                    is PairKey -> expandPair(key, builder)
+                }
+                if (expanded != null && expanded != equality.literal) {
+                    val clauses = listOf(
+                        Clause(intArrayOf(Lit.negate(equality.literal), expanded)),
+                        Clause(intArrayOf(equality.literal, Lit.negate(expanded))),
+                    )
+                    builder.factors.addAll(clauses)
+                    definePredicate(variable, clauses)
+                    replaced.add(equality.factor)
+                }
+            }
+            booleanDefinitions[variable]?.forEach { factor ->
+                pending.addAll(factor.variables.boolVars.toList())
+            }
         }
         builder.factors.removeAll { it in replaced }
         pendingEqualities.clear()
+    }
+
+    private fun ownedPredicateFactors(factors: List<Factor>): Set<Factor> {
+        val owned = HashSet<Factor>()
+        val outputs = HashSet<Int>()
+        fun own(parts: List<Factor>) {
+            owned.addAll(parts)
+            for (factor in parts) (factor as? ReifiedFactor)?.let { outputs.add(it.auxBoolVar) }
+        }
+        definitions.values.forEach { own(it.factors) }
+        for ((variable, parts) in booleanDefinitions) {
+            outputs.add(variable)
+            own(parts)
+        }
+        for (factor in factors) {
+            if (factor is ReifiedFactor && factor !in owned && factor.auxBoolVar !in outputs) {
+                own(listOf(factor))
+            }
+        }
+        return owned
     }
 
     private fun expandPair(key: PairKey, builder: Compiler.Builder): Int? {
