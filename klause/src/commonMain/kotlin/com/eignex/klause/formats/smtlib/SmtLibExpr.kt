@@ -12,8 +12,6 @@ import com.eignex.klause.lowering.allDifferentWindow
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
-import com.eignex.klause.lowering.tseitinAnd
-import com.eignex.klause.lowering.tseitinOr
 
 /** Post each conjunct of an assertion. `and`/`let` nesting is walked with an explicit worklist (not
  *  recursion) so a degenerate conjunction can't overflow the stack; relations, arithmetic equalities
@@ -120,11 +118,11 @@ internal fun Compiler.Builder.boolBinding(name: String, b: Compiler.Builder.Bind
 
 /** Reify boolean ite as `(c and x) or (!c and y)`. */
 internal fun Compiler.Builder.tseitinIte(c: Int, x: Int, y: Int): Int =
-    tseitinOr(listOf(tseitinAnd(listOf(c, x)), tseitinAnd(listOf(Lit.negate(c), y))))
+    reifyOr(listOf(reifyAnd(listOf(c, x)), reifyAnd(listOf(Lit.negate(c), y))))
 
 /** Compile n-ary equality as pairwise equality to the first operand. */
 internal fun <T> Compiler.Builder.chainEqToFirst(items: List<T>, relate: (T, T) -> Int): Int =
-    tseitinAnd((1 until items.size).map { relate(items[0], items[it]) })
+    reifyAnd((1 until items.size).map { relate(items[0], items[it]) })
 
 /** Syntactic bool/int classifier for a term, following `ite`/`let` to their result term without
  *  recursion so a deeply nested chain cannot overflow the stack. */
