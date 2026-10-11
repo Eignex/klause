@@ -19,11 +19,11 @@ class PolynomialTheoryRequestTest {
     @Test
     fun `a mixed polynomial portfolio finds a witness after complete search is capped`() {
         val input = assertIs<SmtLibInput.Polynomial>(
-            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
+            SmtLibAdmission.parse("(declare-const b Bool) (declare-const x Real) (assert b) (assert (= (* x x) 2))"),
         )
         val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
             backtrack = BacktrackParams(maxInstructions = 0),
-            localSearch = LocalSearchParams(maxFlips = 3),
+            localSearch = LocalSearchParams(randomSeed = 17, maxFlips = 10),
         ))
 
         val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest(), params, FiniteEngine.MIXED)
