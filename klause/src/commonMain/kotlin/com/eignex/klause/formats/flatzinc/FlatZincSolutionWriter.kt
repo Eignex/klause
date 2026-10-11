@@ -102,7 +102,7 @@ internal fun writeFlatZincExactCoordinates(
             sb.append('\n')
         }
     }
-    if (program.floatVarsByName.isNotEmpty() &&
+    if (program.floatVarsByName.values.any { it.lpOnly } &&
         program.floatVarsByName.values.all { !it.lpOnly || sample.exactRealValue(it.varId) != null }
     ) {
         val prefix = if (program.floatVarsByName.values.any { !it.lpOnly }) "klause-coordinate" else "klause-exact"
