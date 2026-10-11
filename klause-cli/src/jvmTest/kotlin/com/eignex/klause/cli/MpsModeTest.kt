@@ -9,6 +9,7 @@ import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -108,6 +109,32 @@ class MpsModeTest {
     }
 
     @Test
+    fun `open continuous incumbents report the source objective without an optimum claim`() {
+        val mps = File.createTempFile("mpsopenincumbent", ".mps").apply {
+            writeText(
+                "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n" +
+                    " M0 'MARKER' 'INTORG'\n I R -1\n M1 'MARKER' 'INTEND'\n" +
+                    " X COST 0.5 R 1\nBOUNDS\n LI B I 3\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "ls", "--param", "node-limit=100", mps.absolutePath)))
+        }
+
+        val values = text.lines().single { it.startsWith("v ") }.removePrefix("v ").split(' ')
+            .associate { coordinate -> coordinate.split('=').let { it[0] to it[1].toDouble() } }
+        val integer = values.getValue("I")
+        val real = values.getValue("X")
+        val objective = text.lines().last { it.startsWith("o ") }.removePrefix("o ").toDouble()
+        assertTrue(integer >= 3.0 && integer % 1.0 == 0.0 && real >= integer, text)
+        assertEquals(real * 0.5, objective)
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertFalse("s OPTIMUM FOUND" in text.lines(), text)
+    }
+
+    @Test
     fun `pure continuous decimal lowerings admit only source tolerance witnesses`() {
         val mps = File.createTempFile("mpscontinuoustolerance", ".mps").apply {
             writeText(
@@ -120,7 +147,7 @@ class MpsModeTest {
         val check = assertNotNull(solvable.toleranceCheck)
 
         assertTrue(check(Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.1))))
-        assertEquals(false, check(Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.2))))
+        assertFalse(check(Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.2))))
         assertEquals(SolvablePipeline.FiniteCp, solvable.pipeline)
     }
 
