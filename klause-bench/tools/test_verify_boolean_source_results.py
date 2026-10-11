@@ -66,6 +66,26 @@ class BooleanSourceCheckTest(unittest.TestCase):
             result = proof_check.check_cases([case], Path('.'))
         self.assertIn('source counterexample', result[0]['error'])
 
+    def test_satisfaction_sources_cannot_validate_a_claimed_objective(self):
+        for format_name, source, witness in [('DIMACS', 'p cnf 2 1\n1 2 0\n', 'v -1 2'),
+                                              ('OPB', '* #variable= 2 #constraint= 1\n+1 x1 +1 x2 >= 1;\n', 'v -x1 x2')]:
+            with self.subTest(format=format_name):
+                case = copy.deepcopy(self.case)
+                case['problem']['format'] = format_name
+                case['record'].update(finalWitness=witness, exactObjective='1')
+                with mock.patch.object(proof_check, 'source', return_value=source):
+                    result = proof_check.check_cases([case], Path('.'))
+                self.assertIn('source has no objective', result[0]['error'])
+
+    def test_opb_satisfaction_needs_no_optimization_claim(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(finalWitness='v -x1 x2', proven=True)
+        source = '* #variable= 2 #constraint= 1\n+1 x1 +1 x2 >= 1;\n'
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check(case, Path('.'))
+        self.assertEqual(result['proof'], 'source satisfaction')
+
     def test_nonlinear_opb_source_is_declined(self):
         case = copy.deepcopy(self.case)
         case['problem']['format'] = 'OPB'
