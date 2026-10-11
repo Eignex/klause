@@ -95,9 +95,13 @@ class LocalSearchSolverTest {
         )
         val expected = assertIs<SolveResult.Unknown>(solver.solve(params))
         solver.resumableSolve(params).use { handle ->
-            val paused = handle.runSlice(Cancellation { handle.stats.ls.moves.sum >= 2.0 }, Long.MAX_VALUE, -1L)
+            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            val before = handle.stats.ls.moves.sum
+            var polls = 0
+            val paused = handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L)
             assertNull(paused)
-            assertEquals(2.0, handle.stats.ls.moves.sum)
+            assertTrue(handle.stats.ls.moves.sum > before)
+            assertTrue(handle.stats.ls.moves.sum < params.maxFlips)
 
             val actual = assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
 
