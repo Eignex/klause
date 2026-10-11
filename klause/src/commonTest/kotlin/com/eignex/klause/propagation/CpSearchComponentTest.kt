@@ -13,10 +13,12 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchIntegerBound
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
@@ -33,6 +35,35 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class CpSearchComponentTest {
+    @Test
+    fun `a learned assertion reports its cascading native conflict`() {
+        for (nativeSat in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true), Lit.make(3, false))),
+            ))
+            val cp = CpSearchComponent(PropagationSession(problem, nativeSat = nativeSat))
+            val conflicts = ArrayList<PropagationResult.Unsat>()
+            cp.cascadeConflictObserver = conflicts::add
+            cp.rebase()
+            val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(4))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            val resolution = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(session))
+            session.popTo(resolution.conflict.decisionLevel)
+
+            val result = resolution.conflict.apply(session)
+
+            assertIs<SearchLearnedConflictResult.Backjump>(result)
+            assertEquals(1, conflicts.size)
+            assertSame(conflicts.single(), cp.lastConflict)
+            assertEquals(setOf(0, 1, 3), conflicts.single().conflictBools.toSet())
+        }
+    }
+
     @Test
     fun `shared indicator explanations retain their originating bound after narrowing`() {
         for (value in listOf(false, true)) {

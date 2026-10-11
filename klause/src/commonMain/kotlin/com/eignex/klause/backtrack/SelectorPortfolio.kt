@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.bandit.univariate.UCB1
@@ -94,6 +95,10 @@ internal class SelectorPortfolio(
         override fun onConflict(varRef: VarRef) {
             conflicts++
             current.variableSelector.onConflict(varRef)
+        }
+        override fun onConflict(varRef: VarRef?, conflict: BranchingConflict) {
+            conflicts++
+            current.variableSelector.onConflict(varRef, conflict)
         }
         override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
             conflicts++

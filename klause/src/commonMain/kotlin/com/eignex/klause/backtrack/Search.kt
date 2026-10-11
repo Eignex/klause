@@ -28,6 +28,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.search.BooleanBranching
+import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
@@ -391,7 +392,10 @@ private class CpSatisfactionTraversalPolicy(
     val brancher = BacktrackBrancher(
         session, params, sink, restart, seedDecisionLevels = seedDecisionLevels,
         nativeConflict = { cp.lastConflict },
-    ).also { cp.propagationObserver = it::onPropagation }
+    ).also {
+        cp.propagationObserver = it::onPropagation
+        cp.cascadeConflictObserver = it::onCascadeConflict
+    }
 
     override val solveParams = SearchSolveParams(
         maxDecisions = minOf(
@@ -515,6 +519,12 @@ internal class BacktrackBrancher(
         val conflict = nativeConflict()
         if (conflict == null) variables.onConflict(variable) else variables.onConflict(variable, conflict)
         values.onConflict(variable, value)
+        phase.onConflictTick()
+    }
+
+    fun onCascadeConflict(conflict: PropagationResult.Unsat) {
+        sink?.search?.observeFail()
+        variables.onConflict(null, BranchingConflict(conflict.conflictBools, conflict.conflictInts))
         phase.onConflictTick()
     }
 

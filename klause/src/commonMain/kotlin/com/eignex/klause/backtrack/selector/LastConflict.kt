@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
 import kotlin.random.Random
 
@@ -42,6 +43,11 @@ class LastConflict(private val base: VariableSelector) : VariableSelector {
     override fun onConflict(varRef: VarRef) {
         pending = varRef
         base.onConflict(varRef)
+    }
+
+    override fun onConflict(varRef: VarRef?, conflict: BranchingConflict) {
+        if (varRef != null) pending = varRef
+        base.onConflict(varRef, conflict)
     }
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {

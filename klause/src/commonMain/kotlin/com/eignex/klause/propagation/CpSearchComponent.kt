@@ -56,6 +56,7 @@ class CpSearchComponent(
     private var lastResult: PropagationResult? = null
     internal val lastConflict: PropagationResult.Unsat? get() = lastResult as? PropagationResult.Unsat
     internal var propagationObserver: ((PropagationResult.Implied) -> Unit)? = null
+    internal var cascadeConflictObserver: ((PropagationResult.Unsat) -> Unit)? = null
     private var sharedContext: com.eignex.klause.solver.search.SearchContext? = null
 
     /** Where conflicts this component cannot learn from are counted; null counts nothing. */
@@ -388,6 +389,8 @@ class CpSearchComponent(
                 }
 
                 is PropagationResult.Unsat -> {
+                    lastResult = result
+                    cascadeConflictObserver?.invoke(result)
                     val next = result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
                     when {
                         next == null -> SearchLearnedConflictResult.Chronological
