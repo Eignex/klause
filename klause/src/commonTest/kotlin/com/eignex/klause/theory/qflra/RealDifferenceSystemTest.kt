@@ -37,13 +37,30 @@ class RealDifferenceSystemTest {
         val system = assertNotNull(RealDifferenceSystem.prepare(model,
             model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }))
 
-        for (guide in listOf(null, doubleArrayOf(0.0), doubleArrayOf(1.0), doubleArrayOf(-1000.0),
-            doubleArrayOf(Double.MAX_VALUE), doubleArrayOf(Double.NaN))) {
-            val point = assertIs<RealDifferenceSystem.Result.Feasible>(
-                system.check(intArrayOf(), Cancellation.Never, guide)).point
+        val point = assertIs<RealDifferenceSystem.Result.Feasible>(
+            system.check(intArrayOf(), Cancellation.Never)).point
 
-            assertTrue(point.single() > BigFraction.ZERO)
-            assertTrue(point.single() < BigFraction.ONE)
+        assertTrue(point.single() > BigFraction.ZERO)
+        assertTrue(point.single() < BigFraction.ONE)
+    }
+
+    @Test
+    fun `cached potentials follow changed guard polarity`() {
+        val model = Problem(1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)))
+        val system = assertNotNull(RealDifferenceSystem.prepare(model,
+            model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }))
+
+        for (truth in listOf(1, 0, 1)) {
+            val point = assertIs<RealDifferenceSystem.Result.Feasible>(
+                system.check(intArrayOf(truth), Cancellation.Never)).point.single()
+
+            assertTrue(if (truth == 1) point <= BigFraction.ZERO else point > BigFraction.ZERO)
         }
     }
 
