@@ -259,7 +259,8 @@ packed storage, copying only on strict cost improvement and resetting after a pu
 sample. Each consuming restart receives a fresh expanded sample so policy mutation cannot
 alter the retained anchor or live assignment. Initialization and the restart immediately
 after publication receive null. Anchor capture and expansion consume no RNG draws or
-search instructions.
+search instructions. Anchor capture and expansion remain ordinary loop work outside the
+restart seeding timer.
 
 ## Phase timing
 
