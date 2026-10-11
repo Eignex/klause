@@ -51,14 +51,16 @@ internal fun solveQfNra(
     boolCount: Int,
     realCount: Int,
     params: QfNraParams = QfNraParams(),
+    condition: PolynomialCondition = PolynomialCondition(),
 ): QfNraResult {
     val work = QfNraWork(params)
     val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
     val algebraic = AlgebraicArithmetic(arithmetic)
     return try {
         arithmetic.step()
-        formula.requireVariableCounts(boolCount, realCount, arithmetic::step)
-        val normalized = PolynomialFormula.normalize(formula, arithmetic)
+        val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
+        conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
+        val normalized = PolynomialFormula.normalize(conditioned, arithmetic)
         val polynomials = normalized.atoms.map {
             arithmetic.step()
             it.polynomial
