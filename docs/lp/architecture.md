@@ -114,6 +114,14 @@ failure. Scaling fallback retires the factor owner before installing replacement
 columns. Compatible bound edits retain the owner; structural size changes construct a
 fresh fixed-dimension engine.
 
+[SimplexPricingState](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexPricingState.kt)
+owns Devex reference weights and reusable ordering buffers.
+[SimplexObservations](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexObservations.kt)
+owns per-solve counters, numerical observations and detached metric snapshots.
+Observation reset is independent of retained factors and exact caches. Allowance
+charging, numerical recovery and result/proof publication remain coordinated by
+`RevisedSimplex`. All owners remain within the closed `lp.engine` dependency boundary.
+
 Dual leaving selection uses verified Devex: correct and reselect a maintained
 weight below `0.25 * norm(rho)^2`. Entering selection uses a scaled Harris window,
 a ministep floor and an early-exit breakpoint walk. Nonzero objectives use Harris
