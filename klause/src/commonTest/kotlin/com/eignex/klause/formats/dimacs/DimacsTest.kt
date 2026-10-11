@@ -69,10 +69,11 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(3, w.numOriginalBoolVars)
-        assertEquals(3, w.problem.numBoolVars)
-        assertEquals(1, w.problem.factors.size)
-        assertEquals(1L, w.objective.boolWeights[0])
-        assertEquals(2L, w.objective.boolWeights[1])
+        assertEquals(5, w.problem.numBoolVars)
+        assertEquals(3, w.problem.factors.size)
+        assertEquals(0L, w.objective.boolWeights[0])
+        assertEquals(1L, w.objective.boolWeights[3])
+        assertEquals(2L, w.objective.boolWeights[4])
     }
 
     @Test
@@ -113,10 +114,10 @@ class DimacsTest {
         """.trimIndent()
         val w = Dimacs.parseWcnf(text)
         assertEquals(2, w.numOriginalBoolVars)
-        assertEquals(w.numOriginalBoolVars, w.problem.numBoolVars)
-        assertEquals(1, w.problem.factors.size)
-        assertEquals(5L, w.objective.boolWeights[0])
-        assertEquals(3L, w.objective.boolWeights[1])
+        assertEquals(4, w.problem.numBoolVars)
+        assertEquals(3, w.problem.factors.size)
+        assertEquals(5L, w.objective.boolWeights[2])
+        assertEquals(3L, w.objective.boolWeights[3])
     }
 
     @Test

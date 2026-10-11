@@ -8,14 +8,14 @@ import kotlin.test.assertEquals
 class DimacsDecoderTest {
     @Test
     fun `unit costs preserve both polarities and repeated clauses`() {
-        val decoded = Dimacs.parseWcnf("3 1 0\n2 -1 0\n2 1 0\n7 -2 0\n4 0\n").toProblem()
+        val decoded = Dimacs.parseWcnf("2 1 0\n2 -1 0\n2 1 0\n2 -2 0\n4 0\n").toProblem()
         val objective = decoded.objective.toLinearObjective()
         val assignment = Assignment(decoded.problem.numBoolVars, 0)
         for ((first, second, cost) in listOf(
-            Triple(false, false, 9L),
+            Triple(false, false, 8L),
             Triple(true, false, 6L),
-            Triple(false, true, 16L),
-            Triple(true, true, 13L),
+            Triple(false, true, 10L),
+            Triple(true, true, 8L),
         )) {
             assignment.setBool(0, first)
             assignment.setBool(1, second)
@@ -25,7 +25,7 @@ class DimacsDecoderTest {
 
     @Test
     fun `non unit clauses retain their violation cost`() {
-        val decoded = Dimacs.parseWcnf("3 1 0\n7 -1 -2 0\n").toProblem()
+        val decoded = Dimacs.parseWcnf("7 1 0\n7 -1 -2 0\n").toProblem()
         val objective = decoded.objective.toLinearObjective()
         val assignment = Assignment(decoded.problem.numBoolVars, 0)
         assignment.setBool(0, true)
@@ -37,10 +37,20 @@ class DimacsDecoderTest {
 
     @Test
     fun `unit coefficient overflow keeps the relaxation encoding`() {
-        val decoded = Dimacs.parseWcnf("9223372036854775806 -1 0\n2 -1 0\n").toProblem()
+        val decoded = Dimacs.parseWcnf("4611686018427387904 -1 0\n4611686018427387904 -1 0\n").toProblem()
         val assignment = Assignment(decoded.problem.numBoolVars, 0)
 
         assertEquals(2, decoded.problem.numBoolVars)
         assertEquals(0L, decoded.objective.toLinearObjective().evaluateLong(assignment))
+    }
+
+    @Test
+    fun `nonuniform soft costs retain independent relaxation variables`() {
+        val decoded = Dimacs.parseWcnf("3 1 0\n7 -2 0\n").toProblem()
+        val assignment = Assignment(decoded.problem.numBoolVars, 0)
+        assignment.setBool(2, true)
+
+        assertEquals(4, decoded.problem.numBoolVars)
+        assertEquals(3L, decoded.objective.toLinearObjective().evaluateLong(assignment))
     }
 }

@@ -581,8 +581,8 @@ Pure Boolean clausal optimization with at most 64 positive-cost variables can
 seed incumbents through greedy feasibility repairs when those variables occur
 only positively in hard clauses. A private satisfaction repair first obtains a
 feasible assignment with unaccepted cost variables true. Caller and baked-root
-pins form its stable verification scope; temporary cost and pure-literal pins
-apply through trial rebinding.
+pins form its stable scope. Temporary cost and pure-literal pins enter private
+projection; source reconstruction restores their original coordinates.
 
 Before trial repair, free true values become false when that single change
 preserves every hard clause. A retained clause walk tries cheap cost values in
@@ -594,7 +594,8 @@ and random state across slices, and restores the previous feasible assignment
 on failure. Moves spend the caller's shared node budget at the existing
 local-search rate; clause and assignment visits charge the owning arm's work.
 
-Remaining costly values receive private projected satisfaction repairs. Unit
+The initial feasible model and remaining costly values use private projected
+satisfaction repairs. Unit
 propagation removes fixed literals and satisfied clauses. Two bounded Boolean
 elimination passes reuse the presolve mechanism and its source reconstruction
 records, then surviving variables receive dense private coordinates. Each

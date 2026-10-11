@@ -198,10 +198,12 @@ The compiler marks the fresh binary channels as deterministic outputs. Domain-aw
 definition inference maintains those literal values and their unique unary equality
 predicates when the predicates have no other Boolean factor occurrences.
 
-WCNF unit soft clauses contribute cost directly to the original Boolean objective.
+WCNF objectives with equal soft weights fold unit costs into the original Boolean
+objective.
 A negative unit adds its weight when the variable is true; a positive unit adds a
 constant and a negative coefficient. Non-unit soft clauses use fresh relaxation
-variables and hard disjunctions. A unit also retains that encoding if folding its
+variables and hard disjunctions. Nonuniform weighted objectives retain relaxation
+variables for their soft clauses. A unit also retains that encoding if folding its
 cost would overflow a coefficient or constant. Empty soft clauses contribute fixed cost.
 
 XCSP min/max arithmetic expressions mark deterministic auxiliaries and materialized affine
