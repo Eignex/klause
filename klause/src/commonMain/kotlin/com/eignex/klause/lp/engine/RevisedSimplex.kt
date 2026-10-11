@@ -114,10 +114,20 @@ internal class RevisedSimplex(
     private val primalPricingTolerance: Double = TOL,
 ) : TableauCutSolver,
     PersistentLpSolver {
-    internal var lastNumericalMetrics = SimplexNumericalMetrics()
-        private set
-    override var lastTermination: LpFloatTermination? = null
-        private set
+    internal val lastDevexWeightCorrections: Int get() = observations.lastDevexWeightCorrections
+    internal val lastHarrisMinistepSelections: Int get() = observations.lastHarrisMinistepSelections
+    internal val lastTheoryPricingAttempts: Int get() = observations.lastTheoryPricingAttempts
+    internal val lastTheoryPricingSamples: Int get() = observations.lastTheoryPricingSamples
+    internal val lastTheoryPricingSuccessfulSamples: Int get() = observations.lastTheoryPricingSuccessfulSamples
+    internal val lastTheoryPricingDeclines: Int get() = observations.lastTheoryPricingDeclines
+    internal val lastTheoryPricingResourceStops: Int get() = observations.lastTheoryPricingResourceStops
+    internal val lastTheoryPricingWorkOps: Long get() = observations.lastTheoryPricingWorkOps
+    internal val lastTheoryPricingEstimatedFtranWorkOps: Long get() = observations.lastTheoryPricingEstimatedFtranWorkOps
+    internal val lastTheoryPricingSelections: Int get() = observations.lastTheoryPricingSelections
+    internal val lastTheorySelectedColumn: Int get() = observations.lastTheorySelectedColumn
+    private val observations = SimplexObservations()
+    internal val lastNumericalMetrics: SimplexNumericalMetrics get() = observations.numericalMetrics
+    override val lastTermination: LpFloatTermination? get() = observations.termination
     private var numericalFailure = false
     private val tolerance = TOL
     private val feasibilityTolerance = FEAS_TOL
@@ -138,17 +148,16 @@ internal class RevisedSimplex(
     private var continuationAvailable = false
     private var stoppedContinuationBasis: Basis? = null
 
-    /** Devex reference weights γ_i per basic row position (approximate ‖B⁻ᵀeᵢ‖²); all 1 at a fresh
-     *  reference frame, reset on every refactorization. */
-    private val gamma = DoubleArray(m) { 1.0 }
+    private val pricingState = SimplexPricingState(m, numVars)
+    private val gamma = pricingState.gamma
+    private val pricingOrder = pricingState.order
+    private val pricingScratch = pricingState.scratch
     private val workspace = SimplexWorkspace(m, numVars)
     private val dualRhs = workspace.dualRhs
     private val dualValues = workspace.dualValues
     private val qualityRhs = workspace.qualityRhs
     private val basicRhs = workspace.basicRhs
     private val boundChange = workspace.boundChange
-    private val pricingOrder = IntArray(numVars)
-    private val pricingScratch = IntArray(numVars)
     private val dualBeta = workspace.dualBeta
     private val primalBeta = workspace.primalBeta
     private val phaseOneBeta = workspace.phaseOneBeta
@@ -198,61 +207,11 @@ internal class RevisedSimplex(
     private var cachedPrimalOnly = false
     private var cachedNumerical: LpScalingView? = null
     private var cachedStatus: Array<VarStatus>? = null
-    private var pivots = 0
-    private var warmStarted = false
-    private var refactorizations = 0
-    private var initialRefactorizations = 0
-    private var warmStartRefactorizations = 0
-    private var singularRecoveryRefactorizations = 0
-    private var updateLimitRefactorizations = 0
-    private var backendRequestedRefactorizations = 0
-    private var reconcileRecoveryRefactorizations = 0
-    private var numericalRecoveryRefactorizations = 0
-    private var primalRefactorizations = 0
-    private var warmAttempts = 0
-    private var objectiveWarmAttempts = 0
-    private var objectiveWarmHits = 0
-    private var objectiveWarmRepairs = 0
-    internal var lastDevexWeightCorrections: Int = 0
-        private set
-    internal var lastHarrisMinistepSelections: Int = 0
-        private set
-    internal var lastTheoryPricingAttempts: Int = 0
-        private set
-    internal var lastTheoryPricingSamples: Int = 0
-        private set
-    internal var lastTheoryPricingSuccessfulSamples: Int = 0
-        private set
-    internal var lastTheoryPricingDeclines: Int = 0
-        private set
-    internal var lastTheoryPricingResourceStops: Int = 0
-        private set
-    internal var lastTheoryPricingWorkOps: Long = 0L
-        private set
-    internal var lastTheoryPricingEstimatedFtranWorkOps: Long = 0L
-        private set
-    internal var lastTheoryPricingSelections: Int = 0
-        private set
-    internal var lastTheorySelectedColumn: Int = -1
-        private set
 
-    /**
-     * Numerical trouble this solve met, counted rather than only acted on.
-     *
-     * [singularRefactorizations] counts factorizations that came back singular and
-     * [smallPivotBails] the pivots abandoned because the spike's pivot entry was below [TOL]. Both
-     * paths end a solve without a [FloatLpResult], so a caller reading the result alone sees none of
-     * them — which is why they are read off the engine, as [lastPivots] is. They are the measurement
-     * behind two open questions: whether the basis needs scaling, and how often repairing a
-     * rank-deficient basis in place would save a cold start.
-     */
-    private var singularRefactorizations = 0
-    private var smallPivotBails = 0
     private val work = LpWork()
 
     // Building a scaling view is preparation the next solve reports, apart from the iterations its work limit caps.
     private val pendingNumericalWork = LpWork().apply { add(numerical.metrics.work) }
-    private var lastPreparationOps = 0L
 
     // The work counted into [work] is charged to the caller's token at every poll and when a solve ends,
     // so a work-metered token stops the solve at the same pivot however loaded the machine is.
@@ -269,15 +228,6 @@ internal class RevisedSimplex(
         chargedOps = ops
     }
 
-    private var maxLuFill = 0.0 // max (nnz of the held factors) / nnz(B) over this solve's factorizations
-    private var maxLuDensity = 0.0 // max (nnz of the held factors) / m² — 1.0 means the factors are dense
-    private var maxLuDim = 0 // basis dimension m at which maxLuDensity was observed
-    private var sourcePrimalResidual = 0.0
-    private var sourceBoundViolation = 0.0
-    private var sourceBasicDualResidual = 0.0
-    private var sourceResidualCalls = 0L
-    private var sourceResidualNanos = 0L
-    private var sourceResidualScaledCalls = 0L
     private var deferUnscaledSourceDiagnostics = false
 
     override fun deferUnscaledSourceDiagnostics() {
@@ -286,9 +236,9 @@ internal class RevisedSimplex(
 
     override val scalingMetrics: LpScalingMetrics
         get() = numerical.metrics.copy(
-            sourcePrimalResidual = sourcePrimalResidual,
-            sourceBoundViolation = sourceBoundViolation,
-            sourceBasicDualResidual = sourceBasicDualResidual,
+            sourcePrimalResidual = observations.sourcePrimalResidual,
+            sourceBoundViolation = observations.sourceBoundViolation,
+            sourceBasicDualResidual = observations.sourceBasicDualResidual,
         )
     internal val scaleVersion: Long get() = numerical.version
 
@@ -430,16 +380,6 @@ internal class RevisedSimplex(
         private set
 
     /**
-     * Nonbasic columns whose reduced cost is zero at the last termination — dual degeneracy.
-     *
-     * Many tied columns mean the pivot rule has little to choose between, which is when a solve stalls
-     * and spending more on it repays least. A budgeting policy reads this to decide whether a solve that
-     * ran out of budget deserves a larger one or a smaller one. Only maintained when [trackDegeneracy],
-     * since it costs a pass over the columns that a solve otherwise need not make.
-     */
-    private var degenerateColumns = 0
-
-    /**
      * Count nonbasic columns with zero reduced cost against duals [y].
      *
      * Deliberately does not charge [work]: this pass exists to inform the budgeting policy, and a meter
@@ -453,40 +393,18 @@ internal class RevisedSimplex(
             if (status[j] == VarStatus.BASIC) continue
             if (abs(cost(j) - columnDot(y, j)) <= TOL) count++
         }
-        degenerateColumns = count
+        observations.degenerateColumns = count
     }
 
-    override val lastDegenerateColumns: Int get() = degenerateColumns
+    override val lastDegenerateColumns: Int get() = observations.degenerateColumns
     override val lastColumns: Int get() = numVars
-    override val lastPivots: Int get() = pivots
-    override val lastRefactorizations: Int get() = refactorizations
-    override val lastWarmStarted: Boolean get() = warmStarted
+    override val lastPivots: Int get() = observations.pivots
+    override val lastRefactorizations: Int get() = observations.refactorizations
+    override val lastWarmStarted: Boolean get() = observations.warmStarted
     override val lastWorkOps: Long get() = work.ops
-    override val lastSingularRefactorizations: Int get() = singularRefactorizations
-    override val lastSmallPivotBails: Int get() = smallPivotBails
-    override val lastMetrics: LpSolveMetrics get() = LpSolveMetrics(
-        pivots = pivots,
-        workOps = work.ops,
-        warmAttempts = warmAttempts,
-        warmHits = if (warmStarted) 1 else 0,
-        singularRefactorizations = singularRefactorizations,
-        smallPivotBails = smallPivotBails,
-        initialRefactorizations = initialRefactorizations,
-        warmStartRefactorizations = warmStartRefactorizations,
-        singularRecoveryRefactorizations = singularRecoveryRefactorizations,
-        updateLimitRefactorizations = updateLimitRefactorizations,
-        backendRequestedRefactorizations = backendRequestedRefactorizations,
-        reconcileRecoveryRefactorizations = reconcileRecoveryRefactorizations,
-        numericalRecoveryRefactorizations = numericalRecoveryRefactorizations,
-        primalRefactorizations = primalRefactorizations,
-        objectiveWarmAttempts = objectiveWarmAttempts,
-        objectiveWarmHits = objectiveWarmHits,
-        objectiveWarmRepairs = objectiveWarmRepairs,
-        preparationOps = lastPreparationOps,
-        sourceResidualCalls = sourceResidualCalls,
-        sourceResidualNanos = sourceResidualNanos,
-        sourceResidualScaledCalls = sourceResidualScaledCalls,
-    )
+    override val lastSingularRefactorizations: Int get() = observations.singularRefactorizations
+    override val lastSmallPivotBails: Int get() = observations.smallPivotBails
+    override val lastMetrics: LpSolveMetrics get() = observations.snapshot(work.ops)
 
     init {
         rebuildRowView()
@@ -563,19 +481,19 @@ internal class RevisedSimplex(
      */
     private fun refactorize(reason: LpRefactorReason): RefactorResult {
         if (repairStop != null) {
-            lastTermination = repairTermination()
+            observations.termination = repairTermination()
             return RefactorResult.FAILED
         }
-        refactorizations++
+        observations.refactorizations++
         when (reason) {
-            LpRefactorReason.INITIAL -> initialRefactorizations++
-            LpRefactorReason.WARM_START -> warmStartRefactorizations++
-            LpRefactorReason.SINGULAR_RECOVERY -> singularRecoveryRefactorizations++
-            LpRefactorReason.UPDATE_LIMIT -> updateLimitRefactorizations++
-            LpRefactorReason.BACKEND_REQUESTED -> backendRequestedRefactorizations++
-            LpRefactorReason.RECONCILE_RECOVERY -> reconcileRecoveryRefactorizations++
-            LpRefactorReason.NUMERICAL_RECOVERY -> numericalRecoveryRefactorizations++
-            LpRefactorReason.PRIMAL -> primalRefactorizations++
+            LpRefactorReason.INITIAL -> observations.initialRefactorizations++
+            LpRefactorReason.WARM_START -> observations.warmStartRefactorizations++
+            LpRefactorReason.SINGULAR_RECOVERY -> observations.singularRecoveryRefactorizations++
+            LpRefactorReason.UPDATE_LIMIT -> observations.updateLimitRefactorizations++
+            LpRefactorReason.BACKEND_REQUESTED -> observations.backendRequestedRefactorizations++
+            LpRefactorReason.RECONCILE_RECOVERY -> observations.reconcileRecoveryRefactorizations++
+            LpRefactorReason.NUMERICAL_RECOVERY -> observations.numericalRecoveryRefactorizations++
+            LpRefactorReason.PRIMAL -> observations.primalRefactorizations++
         }
         nnzB = 0
         for (t in 0 until m) nnzB += columnNnz(basicVar[t])
@@ -591,7 +509,7 @@ internal class RevisedSimplex(
             false
         }
         if (!basisLifecycle.factorized) {
-            singularRefactorizations++
+            observations.singularRefactorizations++
             val remaining = effectiveWorkLimit.takeIf { it > 0 }?.let { maxOf(0, it - work.ops) }
             val control = BasisRepairControl(cancellation, remaining)
             val recovery = try {
@@ -609,14 +527,14 @@ internal class RevisedSimplex(
                 work.add(control.spentWork)
                 repairStop = control.stop
                 repairCallbackFailure = control.callbackFailure
-                if (repairStop != null) lastTermination = repairTermination()
+                if (repairStop != null) observations.termination = repairTermination()
             }
             return when (recovery) {
                 is BasisRecoveryResult.Failed -> {
                     numericalFailure = true
                     if (recovery.decline == BasisRepairDecline.CANCELLED) {
                         repairStop = BasisRepairStop.CANCELLED
-                        lastTermination = LpFloatTermination.CANCELLED
+                        observations.termination = LpFloatTermination.CANCELLED
                     }
                     invalidateBasisDependentState()
                     RefactorResult.FAILED
@@ -643,11 +561,11 @@ internal class RevisedSimplex(
         if (m > 0 && nnzB > 0) {
             val held = solver.nnz.toDouble()
             val fill = held / nnzB
-            if (fill > maxLuFill) maxLuFill = fill
+            if (fill > observations.maxLuFill) observations.maxLuFill = fill
             val density = held / (m.toDouble() * m.toDouble())
-            if (density > maxLuDensity) {
-                maxLuDensity = density
-                maxLuDim = m
+            if (density > observations.maxLuDensity) {
+                observations.maxLuDensity = density
+                observations.maxLuDim = m
             }
         }
         refactorPolicy.recordFactorization(
@@ -916,32 +834,9 @@ internal class RevisedSimplex(
     private val allZeroCost: Boolean get() = (0 until numVars).all { cost(it) == 0.0 }
     private val originalZeroCost: Boolean get() = (0 until numVars).all { numerical.costD(it) == 0.0 }
 
-    /** Reset the Devex reference weights to 1 (a fresh reference frame). */
-    private fun resetGamma() {
-        gamma.fill(1.0)
-    }
+    private fun resetGamma() = pricingState.resetReference()
 
-    /**
-     * Devex reference-weight update after a pivot on row [r] with spike [alpha] (`= B⁻¹A_q`, pivot
-     * element `alpha[r]`). Each row's weight grows toward `(αᵢ/αᵣ)²·γᵣ` (the reference-frame estimate
-     * of the new row norm), and the pivot row takes `max(γᵣ/αᵣ², 1)`. Costs the already-computed
-     * spike's nonzeros. Indexed by row position, so it is applied before the basis-column reassignment.
-     */
-    private fun updateGamma(alpha: IndexedVector, r: Int) {
-        val pivot = alpha[r]
-        val tau = gamma[r]
-        val pivotSq = pivot * pivot
-        // Only the spike's nonzeros can raise a weight: a zero `αᵢ` gives a candidate of zero and the
-        // weights never fall below 1, so the rows the spike misses would keep what they have anyway.
-        alpha.forEachStored { i, v ->
-            if (i != r) {
-                val ratio = v / pivot
-                val cand = ratio * ratio * tau
-                if (cand > gamma[i]) gamma[i] = cand
-            }
-        }
-        gamma[r] = maxOf(tau / pivotSq, 1.0)
-    }
+    private fun updateGamma(alpha: IndexedVector, r: Int) = pricingState.update(alpha, r)
 
     /** Squared Euclidean norm of the pivotal row, with a stable norm before the final square. */
     private fun pivotalRowSquaredNorm(): Double {
@@ -1000,7 +895,7 @@ internal class RevisedSimplex(
     }
 
     private fun prepareSourceBasis(warm: Basis?, token: Cancellation): Basis? {
-        lastTermination = null
+        observations.termination = null
         continuationAvailable = false
         stoppedContinuationBasis = null
         exactBasisCache.clear()
@@ -1038,7 +933,7 @@ internal class RevisedSimplex(
     }
 
     override fun adopt(state: LpExactState, token: Cancellation): Boolean {
-        lastTermination = null
+        observations.termination = null
         val current = model.exactState ?: return false
         if (!current.sameMatrix(state) || token()) return false
         val next = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
@@ -1172,7 +1067,7 @@ internal class RevisedSimplex(
 
     private fun resourcesRemain(progress: SolveProgress): Boolean {
         val stop = remainingStop(progress) ?: return true
-        lastTermination = stop
+        observations.termination = stop
         return false
     }
 
@@ -1182,7 +1077,7 @@ internal class RevisedSimplex(
             clearArtificialBounds()
             repairNonbasicStatuses()
         }
-        lastTermination = reason
+        observations.termination = reason
         return result
     }
 
@@ -1195,29 +1090,29 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     private fun runChargedSolve(progress: SolveProgress, block: (reset: Boolean) -> FloatLpResult?): FloatLpResult? {
-        lastTermination = null
-        lastNumericalMetrics = SimplexNumericalMetrics()
+        observations.termination = null
+        observations.numericalMetrics = SimplexNumericalMetrics()
         numericalFailure = false
         return try {
             var result = numericalSolve(progress, block, allowUnscaledFallback = true)
             if (result?.optimal != true &&
                 (progress.iterations >= maxIterations || (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit))
             ) {
-                lastNumericalMetrics.capExits++
+                observations.numericalMetrics.capExits++
             }
             if (rejectedExactBasis?.contentEquals(result?.basis?.basicVars ?: basicVar) == true) {
                 clearNumericalPublication()
                 basisLifecycle.kept = false
                 result = null
-                lastTermination = LpFloatTermination.OTHER
+                observations.termination = LpFloatTermination.OTHER
             }
             if (result == null && infeasibleRay == null && numericalFailure) {
                 basisLifecycle.factorized = false
                 basisLifecycle.kept = false
             }
-            lastTermination = when {
+            observations.termination = when {
                 result?.optimal == true -> LpFloatTermination.OPTIMAL_CANDIDATE
-                lastTermination != null -> lastTermination
+                observations.termination != null -> observations.termination
                 result != null -> LpFloatTermination.OTHER
                 infeasibleRay != null -> LpFloatTermination.INFEASIBLE_CANDIDATE
                 numericalFailure -> LpFloatTermination.NUMERICAL
@@ -1225,7 +1120,7 @@ internal class RevisedSimplex(
             }
             result
         } catch (primary: Throwable) {
-            lastTermination = null
+            observations.termination = null
             try {
                 close()
             } catch (cleanup: Throwable) {
@@ -1254,7 +1149,7 @@ internal class RevisedSimplex(
             return numericalSolve(progress, block, false, reset = false)
         }
         val result = if (model.exactState != null && cancellation()) {
-            lastTermination = LpFloatTermination.CANCELLED
+            observations.termination = LpFloatTermination.CANCELLED
             solvedExactState = null
             optimalBasis = null
             optimalPrimal = null
@@ -1311,7 +1206,7 @@ internal class RevisedSimplex(
 
     @Suppress("TooGenericExceptionCaught")
     private fun retireAfterArithmeticFailure(primary: ArithmeticException): FloatLpResult? {
-        lastTermination = LpFloatTermination.NUMERICAL
+        observations.termination = LpFloatTermination.NUMERICAL
         val continuation = continuationBasis(model)
         try {
             close()
@@ -1335,55 +1230,19 @@ internal class RevisedSimplex(
         clearArtificialBounds()
         repairStop = null
         repairCallbackFailure = null
-        degenerateColumns = 0
         solvedExactState = null
         optimalBasis = null
         optimalPrimal = null
         infeasibleBasis = null
         infeasibleRow = -1
         infeasibleRay = null
-        pivots = 0
-        maxLuFill = 0.0
-        maxLuDensity = 0.0
-        maxLuDim = 0
-        sourcePrimalResidual = 0.0
-        sourceBoundViolation = 0.0
-        sourceBasicDualResidual = 0.0
-        sourceResidualCalls = 0L
-        sourceResidualNanos = 0L
-        sourceResidualScaledCalls = 0L
-        refactorizations = 0
-        initialRefactorizations = 0
-        warmStartRefactorizations = 0
-        singularRecoveryRefactorizations = 0
-        updateLimitRefactorizations = 0
-        backendRequestedRefactorizations = 0
-        reconcileRecoveryRefactorizations = 0
-        numericalRecoveryRefactorizations = 0
-        primalRefactorizations = 0
-        objectiveWarmAttempts = 0
-        objectiveWarmHits = 0
-        objectiveWarmRepairs = 0
-        warmAttempts = if (warmAttempted) 1 else 0
-        singularRefactorizations = 0
-        smallPivotBails = 0
-        lastDevexWeightCorrections = 0
-        lastHarrisMinistepSelections = 0
-        lastTheoryPricingAttempts = 0
-        lastTheoryPricingSamples = 0
-        lastTheoryPricingSuccessfulSamples = 0
-        lastTheoryPricingDeclines = 0
-        lastTheoryPricingResourceStops = 0
-        lastTheoryPricingWorkOps = 0L
-        lastTheoryPricingEstimatedFtranWorkOps = 0L
-        lastTheoryPricingSelections = 0
-        lastTheorySelectedColumn = -1
+        observations.reset(warmAttempted)
         chargeWork()
         work.reset()
         chargedOps = 0L
-        lastPreparationOps = pendingNumericalWork.ops
+        observations.lastPreparationOps = pendingNumericalWork.ops
         pendingNumericalWork.reset()
-        warmStarted = false
+        observations.warmStarted = false
     }
 
     private fun solveCore(
@@ -1400,30 +1259,30 @@ internal class RevisedSimplex(
         if (model.exactState != null &&
             (enforced != null || cancellation() || model.exactState?.conflict != null)
         ) {
-            if (cancellation()) lastTermination = LpFloatTermination.CANCELLED
+            if (cancellation()) observations.termination = LpFloatTermination.CANCELLED
             return null
         }
         val kept = reuse && basisLifecycle.kept && basisLifecycle.factorized
         basisLifecycle.kept = false
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
         // start there is; a warm basis alone still pays for a factorization.
-        warmStarted = if (reset) kept else warmStarted || kept
+        observations.warmStarted = if (reset) kept else observations.warmStarted || kept
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
         if (!kept) {
             clearArtificialBounds()
             if (warm == null) {
                 coldStart()
             } else {
-                if (!tryWarmStart(warm)) coldStart() else warmStarted = true
+                if (!tryWarmStart(warm)) coldStart() else observations.warmStarted = true
             }
             if (refactorize(
-                    if (warmStarted) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL,
+                    if (observations.warmStarted) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL,
                 ) == RefactorResult.FAILED
             ) {
                 if (repairStop != null) return null
                 // The warm basis factorized singular, so the solve runs from the slack start after all.
                 coldStart()
-                warmStarted = false
+                observations.warmStarted = false
                 if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == RefactorResult.FAILED) return null
             }
         }
@@ -1452,23 +1311,23 @@ internal class RevisedSimplex(
             before.rowRevision == after.rowRevision && before.model.objective != after.model.objective
         if (objectiveOnly || (kept && before != null && cachedPrimalOnly)) {
             if (before?.model?.objective != after?.model?.objective) {
-                objectiveWarmAttempts++
-                objectiveWarmHits++
+                observations.objectiveWarmAttempts++
+                observations.objectiveWarmHits++
             }
             return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
         }
         val sameObjective = before?.model?.objective == after?.model?.objective
         val sameSeats = cachedStatus?.contentEquals(status) == true
-        if ((warmStarted || after != null) &&
+        if ((observations.warmStarted || after != null) &&
             (!kept || !sameObjective || !sameSeats) && !dualFeasible()
         ) {
             // Only the slack start is boxed: a warm or kept basis carries a pivot path the primal can
             // continue, and boxing it would trade that for a cold dual.
-            val slackStart = !kept && !warmStarted && after != null
+            val slackStart = !kept && !observations.warmStarted && after != null
             if (!slackStart || !installArtificialBounds()) {
                 if (kept && before != null && after != null && before.model.objective != after.model.objective) {
-                    objectiveWarmAttempts++
-                    objectiveWarmRepairs++
+                    observations.objectiveWarmAttempts++
+                    observations.objectiveWarmRepairs++
                 }
                 return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
             }
@@ -1577,8 +1436,8 @@ internal class RevisedSimplex(
                 pivotalRow(r)
                 val trueWeight = pivotalRowSquaredNorm()
                 if (!(gamma[r] < DEVEX_WEIGHT_THRESHOLD * trueWeight)) break
-                gamma[r] = trueWeight
-                lastDevexWeightCorrections++
+                pricingState.correctWeight(r, trueWeight)
+                observations.lastDevexWeightCorrections++
                 if (cancellation()) {
                     return stopped(
                         LpFloatTermination.CANCELLED,
@@ -1625,7 +1484,7 @@ internal class RevisedSimplex(
                 )
             }
             if (entering == EnteringChoice.ResourceStopped) {
-                lastTheoryPricingResourceStops++
+                observations.lastTheoryPricingResourceStops++
                 val reason = if (cancellation()) LpFloatTermination.CANCELLED else LpFloatTermination.WORK
                 return stopped(reason, if (model.exactState == null) boundOnly(beta) else null)
             }
@@ -1682,7 +1541,7 @@ internal class RevisedSimplex(
             if (abs(spikeVec[r]) < tolerance) {
                 // Numerically singular pivot. Counted before giving up: a solve lost here leaves no
                 // result to read, so this is the only place the loss is visible.
-                smallPivotBails++
+                observations.smallPivotBails++
                 numericalFailure = true
                 return null
             }
@@ -1691,7 +1550,7 @@ internal class RevisedSimplex(
             status[leaving] = sideStatus(leaving, upper = !belowLower)
             basicVar[r] = q
             status[q] = VarStatus.BASIC
-            pivots++
+            observations.pivots++
             // Hand the solver back the spike and the pivotal row it just produced, so folding the pivot
             // in costs one FTRAN rather than a recomputation. A rebuild — asked for by the solver or by
             // the chain limit — opens a fresh Devex reference frame; a failed one gives up soundly.
@@ -2009,7 +1868,7 @@ internal class RevisedSimplex(
             repairNonbasicStatuses()
             return false
         }
-        if (boxed > 0) lastNumericalMetrics.artificialStarts++
+        if (boxed > 0) observations.numericalMetrics.artificialStarts++
         return true
     }
 
@@ -2056,7 +1915,7 @@ internal class RevisedSimplex(
             }
         }
         artificialWidenings++
-        lastNumericalMetrics.artificialWidenings++
+        observations.numericalMetrics.artificialWidenings++
     }
 
     /** Retire the artificial sides once no nonbasic sits on one; the leaving scan's finiteness follows. */
@@ -2096,7 +1955,7 @@ internal class RevisedSimplex(
             }
             released++
         }
-        lastNumericalMetrics.artificialReleases += released
+        observations.numericalMetrics.artificialReleases += released
         return released
     }
 
@@ -2105,7 +1964,7 @@ internal class RevisedSimplex(
      * arbitrarily, so the primal restarts from the slack start the solve had before boxing.
      */
     private fun handArtificialBasisToPrimal(progress: SolveProgress): FloatLpResult? {
-        lastNumericalMetrics.artificialHandoffs++
+        observations.numericalMetrics.artificialHandoffs++
         clearArtificialBounds()
         coldStart()
         if (refactorize(LpRefactorReason.PRIMAL) == RefactorResult.FAILED) return null
@@ -2204,7 +2063,7 @@ internal class RevisedSimplex(
             }
             if (r == -1) r = rAny
             if (r == -1) {
-                smallPivotBails++
+                observations.smallPivotBails++
                 numericalFailure = true
                 return IterationResult.FAILED // singular spike: no pivotable row
             }
@@ -2213,7 +2072,7 @@ internal class RevisedSimplex(
             status[evicted] = VarStatus.AT_LOWER
             basicVar[r] = sc
             status[sc] = VarStatus.BASIC
-            pivots++
+            observations.pivots++
             // No pivotal row here: this is a designated primal-style pivot, so the solver computes the
             // transposed solve itself if its update needs one.
             when (foldPivot(r, sc, evicted, withPivotEta = false)) {
@@ -2270,7 +2129,7 @@ internal class RevisedSimplex(
                         best
                     }
                     flipPassedBreakpoints(elig, flipCount)
-                    if (ratioBuf[selected] > ratioBuf[j] + harrisTolerance) lastHarrisMinistepSelections++
+                    if (ratioBuf[selected] > ratioBuf[j] + harrisTolerance) observations.lastHarrisMinistepSelections++
                     return EnteringChoice.Selected(selected)
                 }
                 return EnteringChoice.Selected(null)
@@ -2335,9 +2194,9 @@ internal class RevisedSimplex(
         leavingRow: Int,
         enforced: BooleanArray?,
     ): EnteringChoice {
-        lastTheoryPricingAttempts++
+        observations.lastTheoryPricingAttempts++
         if (candidates.isEmpty()) {
-            lastTheoryPricingDeclines++
+            observations.lastTheoryPricingDeclines++
             return EnteringChoice.Selected(null)
         }
         addTheoryPricingWork(candidateOrderingWork(candidates.size))
@@ -2359,7 +2218,7 @@ internal class RevisedSimplex(
             val support = probeTheorySupport(candidate, leavingRow, enforced)
             when (support) {
                 TheoryProbe.ArithmeticDeclined -> {
-                    lastTheoryPricingDeclines++
+                    observations.lastTheoryPricingDeclines++
                     return EnteringChoice.Selected(null)
                 }
 
@@ -2381,20 +2240,20 @@ internal class RevisedSimplex(
             }
         }
         if (best == -1) {
-            lastTheoryPricingDeclines++
+            observations.lastTheoryPricingDeclines++
             return EnteringChoice.Selected(null)
         }
-        lastTheoryPricingSelections++
-        lastTheorySelectedColumn = best
+        observations.lastTheoryPricingSelections++
+        observations.lastTheorySelectedColumn = best
         return EnteringChoice.Selected(best)
     }
 
     private fun probeTheorySupport(candidate: Int, leavingRow: Int, enforced: BooleanArray?): TheoryProbe {
-        lastTheoryPricingSamples++
+        observations.lastTheoryPricingSamples++
         val solveCharge = nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m
         addTheoryPricingWork(solveCharge)
-        lastTheoryPricingEstimatedFtranWorkOps += solveCharge
-        lastTheoryPricingWorkOps += columnNnz(candidate).toLong()
+        observations.lastTheoryPricingEstimatedFtranWorkOps += solveCharge
+        observations.lastTheoryPricingWorkOps += columnNnz(candidate).toLong()
         scatterColumn(candidate, pricingSpikeVec)
         if (pricingResourceStopped()) return TheoryProbe.ResourceStopped
         val solver = solver()
@@ -2411,7 +2270,7 @@ internal class RevisedSimplex(
         }
         if (pricingResourceStopped()) return TheoryProbe.ResourceStopped
         if (failed) return TheoryProbe.ArithmeticDeclined
-        lastTheoryPricingSuccessfulSamples++
+        observations.lastTheoryPricingSuccessfulSamples++
         var support = 0
         pricingSpikeVec.forEachStored { row, value ->
             addTheoryPricingWork(1L)
@@ -2432,7 +2291,7 @@ internal class RevisedSimplex(
 
     private fun addTheoryPricingWork(amount: Long) {
         work.add(amount)
-        lastTheoryPricingWorkOps += amount
+        observations.lastTheoryPricingWorkOps += amount
     }
 
     private fun pricingResourceStopped(): Boolean =
@@ -2490,12 +2349,12 @@ internal class RevisedSimplex(
             model.objectiveD(obj),
             y.copyOf(),
             primal,
-            pivots,
-            maxLuFill,
-            maxLuDensity,
-            luMaxDim = maxLuDim,
-            warmStarted = warmStarted,
-            refactorizations = refactorizations,
+            observations.pivots,
+            observations.maxLuFill,
+            observations.maxLuDensity,
+            luMaxDim = observations.maxLuDim,
+            warmStarted = observations.warmStarted,
+            refactorizations = observations.refactorizations,
             exactState = model.exactState,
         )
     }
@@ -2505,9 +2364,9 @@ internal class RevisedSimplex(
         try {
             computeSourceResiduals(beta, sourceDuals)
         } finally {
-            sourceResidualCalls++
-            if (numerical.applied) sourceResidualScaledCalls++
-            sourceResidualNanos += started.elapsedNow().inWholeNanoseconds
+            observations.sourceResidualCalls++
+            if (numerical.applied) observations.sourceResidualScaledCalls++
+            observations.sourceResidualNanos += started.elapsedNow().inWholeNanoseconds
         }
     }
 
@@ -2527,14 +2386,14 @@ internal class RevisedSimplex(
             }
         }
         for (i in 0 until m) residual[i] += values[n + i]
-        sourcePrimalResidual = residual.maxOfOrNull { abs(it) } ?: 0.0
+        observations.sourcePrimalResidual = residual.maxOfOrNull { abs(it) } ?: 0.0
 
         var boundViolation = 0.0
         for (j in 0 until numVars) {
             if (model.hasFiniteLower(j)) boundViolation = maxOf(boundViolation, model.lowerD(j) - values[j])
             if (model.hasFiniteUpper(j)) boundViolation = maxOf(boundViolation, values[j] - model.upperD(j))
         }
-        sourceBoundViolation = maxOf(0.0, boundViolation)
+        observations.sourceBoundViolation = maxOf(0.0, boundViolation)
 
         var dualResidual = 0.0
         for (v in basicVar) {
@@ -2547,9 +2406,9 @@ internal class RevisedSimplex(
             }
             dualResidual = maxOf(dualResidual, abs(model.costD(v) - dot))
         }
-        sourceBasicDualResidual = dualResidual
+        observations.sourceBasicDualResidual = dualResidual
         if (numerical.applied &&
-            (!sourcePrimalResidual.isFinite() || !sourceBoundViolation.isFinite() || !dualResidual.isFinite())
+            (!observations.sourcePrimalResidual.isFinite() || !observations.sourceBoundViolation.isFinite() || !dualResidual.isFinite())
         ) {
             throw LpScalingArithmeticException()
         }
@@ -2591,12 +2450,12 @@ internal class RevisedSimplex(
             model.objectiveD(obj),
             y.copyOf(),
             primal,
-            pivots,
-            maxLuFill,
-            maxLuDensity,
-            luMaxDim = maxLuDim,
-            warmStarted = warmStarted,
-            refactorizations = refactorizations,
+            observations.pivots,
+            observations.maxLuFill,
+            observations.maxLuDensity,
+            luMaxDim = observations.maxLuDim,
+            warmStarted = observations.warmStarted,
+            refactorizations = observations.refactorizations,
             optimal = false,
             exactState = model.exactState,
         )
@@ -2708,7 +2567,7 @@ internal class RevisedSimplex(
     private fun primalPhase1(progress: SolveProgress): IterationResult {
         val beta = basicValues(phaseOneBeta)
         if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
-            lastTermination = LpFloatTermination.WORK
+            observations.termination = LpFloatTermination.WORK
             return IterationResult.FAILED
         }
         val gamma = phaseOneGradient
@@ -2718,11 +2577,11 @@ internal class RevisedSimplex(
         while (progress.iterations < maxIter) {
             val iteration = progress.primalIterations++
             if (iteration % CANCEL_POLL == 0 && cancellation()) {
-                lastTermination = LpFloatTermination.CANCELLED
+                observations.termination = LpFloatTermination.CANCELLED
                 return IterationResult.FAILED
             }
             if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) {
-                lastTermination = LpFloatTermination.WORK
+                observations.termination = LpFloatTermination.WORK
                 return IterationResult.FAILED
             }
             var w = 0.0
@@ -2784,7 +2643,7 @@ internal class RevisedSimplex(
                     basisLifecycle.kept = true
                     retainBasicValues(beta)
                 }
-                lastTermination = LpFloatTermination.INFEASIBLE_CANDIDATE
+                observations.termination = LpFloatTermination.INFEASIBLE_CANDIDATE
                 return IterationResult.FAILED
             }
 
@@ -2832,7 +2691,7 @@ internal class RevisedSimplex(
                 continue
             }
             if (abs(alpha[leaving]) < tolerance) {
-                smallPivotBails++
+                observations.smallPivotBails++
                 numericalFailure = true
                 return IterationResult.FAILED
             }
@@ -2840,7 +2699,7 @@ internal class RevisedSimplex(
             status[evicted] = sideStatus(evicted, leavingToUpper)
             basicVar[leaving] = q
             status[q] = VarStatus.BASIC
-            pivots++
+            observations.pivots++
             when (foldPivot(leaving, q, evicted, withPivotEta = false)) {
                 PivotFold.UPDATED, PivotFold.REBUILT -> Unit
                 PivotFold.BASIS_CHANGED -> return IterationResult.BASIS_CHANGED
@@ -2848,7 +2707,7 @@ internal class RevisedSimplex(
             }
             basicValues(beta)
         }
-        lastTermination = LpFloatTermination.PIVOTS
+        observations.termination = LpFloatTermination.PIVOTS
         return IterationResult.FAILED // budget exhausted
     }
 
@@ -2880,7 +2739,7 @@ internal class RevisedSimplex(
         clearArtificialBounds()
         if (!reset && !resourcesRemain(progress)) return null
         if (model.exactState != null && (cancellation() || model.exactState?.conflict != null)) {
-            if (cancellation()) lastTermination = LpFloatTermination.CANCELLED
+            if (cancellation()) observations.termination = LpFloatTermination.CANCELLED
             return null
         }
         basisLifecycle.kept = false
@@ -2888,12 +2747,12 @@ internal class RevisedSimplex(
             if (warm == null || !tryWarmStart(warm)) {
                 lowerStart()
             } else {
-                warmStarted = true
+                observations.warmStarted = true
             }
             if (refactorize(LpRefactorReason.PRIMAL) == RefactorResult.FAILED) {
                 if (repairStop != null) return null
                 lowerStart()
-                warmStarted = false
+                observations.warmStarted = false
                 if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == RefactorResult.FAILED) return null
             }
         }
@@ -2925,7 +2784,7 @@ internal class RevisedSimplex(
             if (effectiveWorkLimit > 0L && work.ops >= effectiveWorkLimit) return stopped(LpFloatTermination.WORK)
             // Floating Bland ordering is a bounded anti-cycling heuristic, not a termination proof.
             val bland = progress.primalDegenerate >= blandStall
-            if (bland && !progress.primalBlandActive) lastNumericalMetrics.primalBlandEntries++
+            if (bland && !progress.primalBlandActive) observations.numericalMetrics.primalBlandEntries++
             progress.primalBlandActive = bland
             val y = duals()
             when (refactorAtQualitySafePoint()) {
@@ -3007,7 +2866,7 @@ internal class RevisedSimplex(
                 continue
             }
             if (abs(alpha[leaving]) < tolerance) {
-                smallPivotBails++
+                observations.smallPivotBails++
                 numericalFailure = true
                 return null // numerically singular pivot
             }
@@ -3016,7 +2875,7 @@ internal class RevisedSimplex(
             status[evicted] = sideStatus(evicted, leavingToUpper)
             basicVar[leaving] = q
             status[q] = VarStatus.BASIC
-            pivots++
+            observations.pivots++
             when (foldPivot(leaving, q, evicted, withPivotEta = false)) {
                 PivotFold.UPDATED, PivotFold.REBUILT -> Unit
                 PivotFold.BASIS_CHANGED -> return restartPrimal(progress)

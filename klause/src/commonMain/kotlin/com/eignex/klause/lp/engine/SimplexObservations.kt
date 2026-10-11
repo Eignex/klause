@@ -1,0 +1,110 @@
+package com.eignex.klause.lp.engine
+
+internal class SimplexObservations {
+    var numericalMetrics = SimplexNumericalMetrics()
+    var termination: LpFloatTermination? = null
+    var pivots = 0
+    var warmStarted = false
+    var refactorizations = 0
+    var initialRefactorizations = 0
+    var warmStartRefactorizations = 0
+    var singularRecoveryRefactorizations = 0
+    var updateLimitRefactorizations = 0
+    var backendRequestedRefactorizations = 0
+    var reconcileRecoveryRefactorizations = 0
+    var numericalRecoveryRefactorizations = 0
+    var primalRefactorizations = 0
+    var warmAttempts = 0
+    var objectiveWarmAttempts = 0
+    var objectiveWarmHits = 0
+    var objectiveWarmRepairs = 0
+    var lastDevexWeightCorrections: Int = 0
+    var lastHarrisMinistepSelections: Int = 0
+    var lastTheoryPricingAttempts: Int = 0
+    var lastTheoryPricingSamples: Int = 0
+    var lastTheoryPricingSuccessfulSamples: Int = 0
+    var lastTheoryPricingDeclines: Int = 0
+    var lastTheoryPricingResourceStops: Int = 0
+    var lastTheoryPricingWorkOps: Long = 0L
+    var lastTheoryPricingEstimatedFtranWorkOps: Long = 0L
+    var lastTheoryPricingSelections: Int = 0
+    var lastTheorySelectedColumn: Int = -1
+    var singularRefactorizations = 0
+    var smallPivotBails = 0
+    var lastPreparationOps = 0L
+    var maxLuFill = 0.0
+    var maxLuDensity = 0.0
+    var maxLuDim = 0
+    var sourcePrimalResidual = 0.0
+    var sourceBoundViolation = 0.0
+    var sourceBasicDualResidual = 0.0
+    var sourceResidualCalls = 0L
+    var sourceResidualNanos = 0L
+    var sourceResidualScaledCalls = 0L
+    var degenerateColumns = 0
+
+    fun reset(warmAttempted: Boolean) {
+        degenerateColumns = 0
+        pivots = 0
+        maxLuFill = 0.0
+        maxLuDensity = 0.0
+        maxLuDim = 0
+        sourcePrimalResidual = 0.0
+        sourceBoundViolation = 0.0
+        sourceBasicDualResidual = 0.0
+        sourceResidualCalls = 0L
+        sourceResidualNanos = 0L
+        sourceResidualScaledCalls = 0L
+        refactorizations = 0
+        initialRefactorizations = 0
+        warmStartRefactorizations = 0
+        singularRecoveryRefactorizations = 0
+        updateLimitRefactorizations = 0
+        backendRequestedRefactorizations = 0
+        reconcileRecoveryRefactorizations = 0
+        numericalRecoveryRefactorizations = 0
+        primalRefactorizations = 0
+        objectiveWarmAttempts = 0
+        objectiveWarmHits = 0
+        objectiveWarmRepairs = 0
+        warmAttempts = if (warmAttempted) 1 else 0
+        singularRefactorizations = 0
+        smallPivotBails = 0
+        lastDevexWeightCorrections = 0
+        lastHarrisMinistepSelections = 0
+        lastTheoryPricingAttempts = 0
+        lastTheoryPricingSamples = 0
+        lastTheoryPricingSuccessfulSamples = 0
+        lastTheoryPricingDeclines = 0
+        lastTheoryPricingResourceStops = 0
+        lastTheoryPricingWorkOps = 0L
+        lastTheoryPricingEstimatedFtranWorkOps = 0L
+        lastTheoryPricingSelections = 0
+        lastTheorySelectedColumn = -1
+    }
+
+    fun snapshot(workOps: Long): LpSolveMetrics = LpSolveMetrics(
+        pivots = pivots,
+        workOps = workOps,
+        warmAttempts = warmAttempts,
+        warmHits = if (warmStarted) 1 else 0,
+        singularRefactorizations = singularRefactorizations,
+        smallPivotBails = smallPivotBails,
+        initialRefactorizations = initialRefactorizations,
+        warmStartRefactorizations = warmStartRefactorizations,
+        singularRecoveryRefactorizations = singularRecoveryRefactorizations,
+        updateLimitRefactorizations = updateLimitRefactorizations,
+        backendRequestedRefactorizations = backendRequestedRefactorizations,
+        reconcileRecoveryRefactorizations = reconcileRecoveryRefactorizations,
+        numericalRecoveryRefactorizations = numericalRecoveryRefactorizations,
+        primalRefactorizations = primalRefactorizations,
+        objectiveWarmAttempts = objectiveWarmAttempts,
+        objectiveWarmHits = objectiveWarmHits,
+        objectiveWarmRepairs = objectiveWarmRepairs,
+        preparationOps = lastPreparationOps,
+        sourceResidualCalls = sourceResidualCalls,
+        sourceResidualNanos = sourceResidualNanos,
+        sourceResidualScaledCalls = sourceResidualScaledCalls,
+    )
+
+}
