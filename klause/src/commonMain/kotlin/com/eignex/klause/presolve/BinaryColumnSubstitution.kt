@@ -26,7 +26,7 @@ import com.eignex.klause.util.LongArrayList
  * ([com.eignex.klause.propagation.PbConflictResolvent]), so as [Linear] rows these models get no
  * division-based learning, no at-most-one clique merging and no coefficient strengthening over literals.
  *
- * The column is substituted **outright** — an existing equality indicator or a fresh Boolean carries its
+ * The column is substituted **outright** — an existing unary indicator or a fresh Boolean carries its
  * value without a channelling factor. Channelling instead (a reified `x = 1 ⟺ b` per column) would trade
  * the [Linear] rows
  * for pseudo-Boolean rows *plus* a reified factor each, and reified single-variable indicators are

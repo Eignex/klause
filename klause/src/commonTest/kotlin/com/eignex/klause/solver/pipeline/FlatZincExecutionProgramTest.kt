@@ -14,8 +14,8 @@ import kotlin.test.assertTrue
 
 class FlatZincExecutionProgramTest {
     @Test
-    fun `Boolean objective projection preserves exact optima near the integer limit`() {
-        for ((directive, expectedScore) in listOf("minimize" to Long.MAX_VALUE - 1L, "maximize" to Long.MAX_VALUE)) {
+    fun `objectives beyond exact floating point integer precision retain their integer variable`() {
+        for ((directive, expectedCoefficient) in listOf("minimize" to 1L, "maximize" to -1L)) {
             val program = parseFlatZinc(
                 """
                 var bool: a;
@@ -28,12 +28,8 @@ class FlatZincExecutionProgramTest {
             )
             val objective = checkNotNull(program.linearObjective())
 
-            val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(program.problem.bake()).minimize(
-                objective, BacktrackParams(randomSeed = 0L),
-            ))
-
-            assertTrue(objective.intCoefficients.all { it == 0L })
-            assertEquals(expectedScore, result.assignment.ints[program.intVarsByName.getValue("score")])
+            assertEquals(expectedCoefficient, objective.intCoefficients[program.intVarsByName.getValue("score")])
+            assertTrue(objective.boolWeights.all { it == 0L })
         }
     }
 
@@ -43,9 +39,13 @@ class FlatZincExecutionProgramTest {
             val program = parseFlatZinc(
                 """
                 var bool: a;
+                var bool: impossible;
+                var bool: atZero;
                 var 0..1: x;
                 var -2..0: score;
                 constraint int_lin_eq([2, 1], [x, score], 0);
+                constraint int_lin_le_reif([1, 2], [x, x], -1, impossible);
+                constraint int_le_reif(x, 0, atZero);
                 constraint bool2int(a, x);
                 solve $directive score;
                 """.trimIndent(),
@@ -54,7 +54,8 @@ class FlatZincExecutionProgramTest {
             val prepared = PresolvePipeline.run(
                 program.problem, objective, PresolveConfig.parse("affine,binary-columns"), false,
             )
-            val adjusted = checkNotNull(prepared.objective)
+            val adjusted = prepared.objective ?: objective
+            assertTrue(objective.intCoefficients.all { it == 0L })
 
             val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(prepared.problem.bake()).minimize(
                 adjusted, BacktrackParams(randomSeed = 0L),

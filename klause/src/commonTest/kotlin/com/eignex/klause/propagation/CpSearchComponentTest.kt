@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -32,6 +33,33 @@ import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 class CpSearchComponentTest {
+    @Test
+    fun `shared indicator explanations retain their originating bound after narrowing`() {
+        for (value in listOf(false, true)) {
+            val cp = CpSearchComponent(
+                PropagationSession(
+                    Problem(
+                        1, 1, arrayOf(IntDomain(0, 10)),
+                        arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)),
+                    ),
+                ),
+            )
+            cp.rebase()
+            val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            val bound = if (value) SearchDecision.IntAtMost(0, 5L) else SearchDecision.IntAtLeast(0, 6L)
+            assertIs<ComponentResult.Consistent>(session.push(bound))
+            val boundLiteral = assertNotNull(session.atomLiteral(bound))
+            val later = if (value) SearchDecision.IntAtMost(0, 3L) else SearchDecision.IntAtLeast(0, 8L)
+            assertIs<ComponentResult.Consistent>(session.push(later))
+            val implied = Lit.make(0, value)
+
+            val reason = cp.reasonFor(implied)
+
+            assertEquals(setOf(implied, boundLiteral xor 1), reason?.literals?.toSet())
+        }
+    }
+
     @Test
     fun `an unnameable native antecedent declines its shared proof`() {
         val cp = CpSearchComponent(

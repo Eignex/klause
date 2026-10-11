@@ -53,7 +53,9 @@ private fun FlatZincCompiler.postBooleanZeroSum(
     reifyLit: Int?,
 ): Boolean {
     val zeroLiterals = booleanZeroSumLiterals(coeffs, vars, op, bound) ?: return false
-    if (reifyLit != null) {
+    if (bound < 0L) {
+        if (reifyLit != null) factors.add(Clause(intArrayOf(Lit.negate(reifyLit)))) else postFalseFactor()
+    } else if (reifyLit != null) {
         tseitinAnd(zeroLiterals, reifyLit)
     } else {
         for (literal in zeroLiterals) factors.add(Clause(intArrayOf(literal)))
@@ -67,7 +69,7 @@ private fun FlatZincCompiler.booleanZeroSumLiterals(
     op: LinearOp,
     bound: Long,
 ): List<Int>? {
-    if (coeffs.size != vars.size || bound != 0L || (op != LinearOp.LE && op != LinearOp.EQ) ||
+    if (coeffs.size != vars.size || bound > 0L || (op != LinearOp.LE && op != LinearOp.EQ) ||
         coeffs.any { it < 0L }
     ) return null
     val literals = LinkedHashSet<Int>()
@@ -117,12 +119,16 @@ internal fun FlatZincCompiler.selectBooleanZeroSumLowering() {
         val reified = constraint.name.endsWith("_reif")
         expectArity(constraint, if (reified) 4 else 3)
         val bound = evalIntConst(constraint.args[2])
-        if (bound != 0L) continue
+        if (bound > 0L) continue
         val coeffs = evalIntConstArrayLong(constraint.args[0])
         if (coeffs.any { it < 0L }) continue
         val vars = existingZeroSumColumns(constraint.args[1], coeffs) ?: continue
         val literals = booleanZeroSumLiterals(coeffs, vars, op, bound) ?: continue
-        clauses += literals.size + if (reified) 1L else 0L
+        clauses += if (bound < 0L) {
+            if (reified) 1L else 2L
+        } else {
+            literals.size + if (reified) 1L else 0L
+        }
         if (clauses > booleanZeroSumClauseLimit) {
             // Select once for the whole model so row order cannot choose which integers remain channelled.
             lowerBooleanZeroSums = false

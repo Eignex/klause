@@ -51,8 +51,9 @@ private fun Problem.supportsBooleanObjectiveProjection(objectiveVar: Int): Boole
             is Linear -> factor.integerConstants != null && factor.op != LinearOp.NE &&
                 factor.vars.all { it == objectiveVar || intBounds.isFixedOrBinary(it) }
 
-            is ReifiedLinear -> factor.integerConstants != null && factor.vars.size == 1 &&
-                intBounds.isFixedOrBinary(factor.vars.single())
+            is ReifiedLinear -> factor.integerConstants != null &&
+                factor.vars.all { intBounds.isFixedOrBinary(it) } &&
+                factor.vars.count { !intBounds.isFixed(it) } <= 1
 
             else -> false
         }
@@ -60,7 +61,10 @@ private fun Problem.supportsBooleanObjectiveProjection(objectiveVar: Int): Boole
 
 private fun IntBounds.isFixedOrBinary(variable: Int): Boolean =
     hasLower(variable) && hasUpper(variable) &&
-        (lower(variable) == upper(variable) || lower(variable) >= 0L && upper(variable) <= 1L)
+        (lower(variable) == upper(variable) || (lower(variable) >= 0L && upper(variable) <= 1L))
+
+private fun IntBounds.isFixed(variable: Int): Boolean =
+    hasLower(variable) && hasUpper(variable) && lower(variable) == upper(variable)
 
 private fun projectBooleanRow(
     problem: Problem,
@@ -111,5 +115,8 @@ private fun projectBooleanRow(
         if (weight < 0L) minimum = addExact(minimum, weight) else maximum = addExact(maximum, weight)
     }
     subExact(maximum, minimum)
+    // Boolean incumbent comparisons must distinguish adjacent integer costs through their Double scores.
+    val exactDoubleLimit = 1L shl 53
+    if (minimum < -exactDoubleLimit || maximum > exactDoubleLimit) return null
     return LinearObjective(boolWeights = weights, constant = constant)
 }

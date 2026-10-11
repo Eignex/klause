@@ -28,7 +28,9 @@ FlatZinc retains `bool2int` channels and recognizes them independently of constr
 order. Nonnegative weighted sums of channelled integers constrained to zero
 (`<= 0` or `= 0`) lower to Boolean conjunctions over the complemented input
 literals. Reified sums use the shared clause encoder; unreified sums pin those
-literals. Zero coefficients contribute no requirement. Other bounds and signed
+literals. Zero coefficients contribute no requirement. Negative bounds on these
+nonnegative sums encode false, leaving their input channels unrestricted in reified
+forms. Positive bounds and signed
 sums retain arithmetic propagation. Before emitting integer linear rows, lowering
 estimates the total clause expansion of eligible rows. If it exceeds 32,768
 clauses, all these rows retain arithmetic propagation. This model-wide limit
@@ -36,10 +38,11 @@ bounds expansion without making constraint order select a partial encoding.
 
 A FlatZinc integer objective defined by an unconditional unit-coefficient equality
 over Boolean-channelled binary columns can use the equivalent Boolean weighted
-objective. Projection requires supported integer linear rows and single-variable
-reified readers; general multi-variable reified arithmetic retains the integer
+objective. Projection requires supported integer linear rows and reified readers
+with at most one unfixed integer; general multi-variable reified arithmetic retains the integer
 objective. Channel polarity and fixed terms contribute exact weights and constants.
-Overflowing arithmetic retains the original objective. This changes the objective
+Overflowing arithmetic or a cost range outside `[-2^53, 2^53]` retains the original
+objective, preserving distinct integer scores in the Boolean optimizer. This changes the objective
 expression while preserving the source model and named integer outputs; normal
 presolve may eliminate and reconstruct those integer columns.
 

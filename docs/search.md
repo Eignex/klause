@@ -119,7 +119,8 @@ and the current decision depth so an asserting backjump retains its consequence.
 Reified arithmetic skips reason construction when a settled relation agrees with
 its assigned indicator. New indicator pins and opposing assignments retain the
 pin and conflict explanation protocol. Single-sided linear indicator deductions
-record the existing lazy linear payload during trailed search. Conflict analysis
+record the existing lazy linear payload during trailed search. Shared Boolean premise
+export resolves this payload into historical literals before traversing its proof graph. Conflict analysis
 resolves it against the bounds at the pin, rather than later domains; untrailed
 and two-sided deductions retain eager explanations. Linear bound propagation
 constructs a reason only when the proposed bound tightens the live domain;
