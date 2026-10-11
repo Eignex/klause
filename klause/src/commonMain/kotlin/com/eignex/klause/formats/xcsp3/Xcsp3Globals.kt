@@ -80,6 +80,7 @@ internal fun Compiler.Builder.element(e: XmlElement) {
             hi = domainMin(v) + domainSpan(v) - 1
         }
         val selected = newAuxVar(lo, hi)
+        definedVars.add(selected)
         factors.add(
             Element(idx = idx, result = selected, arr = arr, arrIsVars = arrIsVars, indexOffset = offset),
         )
@@ -88,14 +89,14 @@ internal fun Compiler.Builder.element(e: XmlElement) {
     }
     val value = e.child("value")?.textContent?.trim()
         ?: throw UnsupportedXcsp3Exception("element: missing <value> or <condition>")
+    val result = singleTermVar(value)
+    definedVars.add(result)
     factors.add(
-        Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = arrIsVars, indexOffset = offset),
+        Element(idx = idx, result = result, arr = arr, arrIsVars = arrIsVars, indexOffset = offset),
     )
 }
 
-/** `element` over a matrix `M`: `M[i][j] = v` with `<index> i j </index>`. A constant matrix
- *  is a 3-column [Table] over `(i, j, v)` — one tuple per cell; a matrix of variables (e.g. an
- *  `x[][]` array reference, which the constant path reads as empty) is decomposed cell-by-cell. */
+// Constant matrix selection uses a table; variable selection keeps the native element constraint.
 @Suppress("ThrowsCount") // one guard per unsupported shape (bad index, empty constant/variable matrix)
 internal fun Compiler.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
     // Matrix element uses per-axis start indices (defaulting to 0), not a single startIndex.
@@ -143,9 +144,7 @@ internal fun Compiler.Builder.constMatrixRows(text: String): List<IntArray>? {
     return rows
 }
 
-/** `element` over a matrix of variables: `M[i][j] = v`, decomposed as `(i=r) ∧ (j=c) ⟹ v = M[r][c]`
- *  per cell, with the index pinned into the matrix's range so an out-of-range selection cannot
- *  leave `v` unconstrained. */
+// Separate axis bounds prevent an out-of-range column from aliasing a valid flattened cell.
 internal fun Compiler.Builder.elementVarMatrix(
     rows: List<IntArray>,
     i: Int,
@@ -155,20 +154,33 @@ internal fun Compiler.Builder.elementVarMatrix(
     colOff: Int,
 ) {
     val nCols = rows[0].size
-    require(rows.all { it.size == nCols }) { "element: ragged <matrix>" }
-    // The index must select a real cell (Element semantics require a valid index).
-    factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.GE, rowOff))
-    factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.LE, rowOff + rows.size - 1))
-    factors.add(Linear(intArrayOf(1), intArrayOf(j), LinearOp.GE, colOff))
-    factors.add(Linear(intArrayOf(1), intArrayOf(j), LinearOp.LE, colOff + nCols - 1))
-    for (r in rows.indices) {
-        val iEq = reifyLinear(intArrayOf(1), intArrayOf(i), LinearOp.EQ, r + rowOff)
-        for (c in rows[r].indices) {
-            val jEq = reifyLinear(intArrayOf(1), intArrayOf(j), LinearOp.EQ, c + colOff)
-            val vEq = reifyLinear(intArrayOf(1, -1), intArrayOf(v, rows[r][c]), LinearOp.EQ, 0)
-            factors.add(Clause(intArrayOf(Lit.negate(iEq), Lit.negate(jEq), vEq))) // (i=r)∧(j=c) ⟹ v=M[r][c]
-        }
+    require(nCols > 0 && rows.all { it.size == nCols }) { "element: empty or ragged <matrix>" }
+    val cells = rows.size.toLong() * nCols
+    require(cells <= Int.MAX_VALUE) { "element: matrix is too large" }
+    if (domains[i].min < rowOff) factors.add(Linear(longArrayOf(1L), intArrayOf(i), LinearOp.GE, rowOff.toLong()))
+    if (domains[i].max > rowOff.toLong() + rows.size - 1L) {
+        factors.add(Linear(longArrayOf(1L), intArrayOf(i), LinearOp.LE, rowOff.toLong() + rows.size - 1L))
     }
+    if (domains[j].min < colOff) factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.GE, colOff.toLong()))
+    if (domains[j].max > colOff.toLong() + nCols - 1L) {
+        factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.LE, colOff.toLong() + nCols - 1L))
+    }
+    val index = newAuxVar(0L, cells - 1L)
+    definedVars.add(index)
+    definedVars.add(v)
+    factors.add(
+        Linear(
+            longArrayOf(nCols.toLong(), 1L, -1L), intArrayOf(i, j, index),
+            LinearOp.EQ, nCols.toLong() * rowOff + colOff,
+        ),
+    )
+    factors.add(
+        Element(
+            idx = index, result = v,
+            arr = LongArray(cells.toInt()) { rows[it / nCols][it % nCols].toLong() },
+            arrIsVars = true, indexOffset = 0,
+        ),
+    )
 }
 
 internal fun Compiler.Builder.channel(e: XmlElement) {
@@ -907,9 +919,7 @@ internal fun Compiler.Builder.cardinality(e: XmlElement) {
 internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
     val eq = newBool()
     factors.add(ReifiedLinear(eq, longArrayOf(1), intArrayOf(x), LinearOp.EQ, value))
-    val ch = newAuxVar(0L, 1L)
-    factors.add(ReifiedLinear(eq, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
-    return ch
+    return litTo01(Lit.make(eq, true))
 }
 
 /** `binPacking`: item `i` goes to bin `list[i]`; each bin's total item size meets the condition. */

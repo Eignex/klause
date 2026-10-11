@@ -23,9 +23,11 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
@@ -96,7 +98,11 @@ class BacktrackSolver internal constructor(
      *  [BacktrackParams.objectiveBoundSupplier] for external bound sharing (its [BacktrackParams.cancellation]
      *  is superseded per slice). */
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
-        ResumableMinimize(this, objective, params)
+        if ((params.nativeSat ?: true) && problem.isClausal()) {
+            ResumableMinimize(this, objective, params)
+        } else {
+            PreparingMinimize(this, objective, params)
+        }
 
     /**
      * Open a reusable [RepairSearch] for the LNS destroy/repair loop: one persistent
@@ -124,6 +130,8 @@ class BacktrackSolver internal constructor(
             rebindable = true,
         )
         return object : RepairSearch {
+            override val stats: SolveStats get() = handle.stats
+
             override fun repair(
                 assumptions: Assumptions,
                 decisionBudget: Long,

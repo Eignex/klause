@@ -10,17 +10,23 @@ import com.eignex.klause.util.IntHashSet
  * Propagation-engine projection of an immutable `Problem`. It owns the propagator table and every
  * propagation wakeup index, keeping those engine allocations out of the model object.
  */
-class PropagationProblem(
+class PropagationProblem private constructor(
     /** Immutable model data compiled by this projection. */
     val problem: Problem,
+    preparedPropagators: Array<out Propagator>?,
 ) {
+    /** Construct a private propagation projection over [problem]. */
+    constructor(problem: Problem) : this(problem, null)
+
     /** Whether this projection can use the packed native-SAT propagation lane. */
     val isNativeSatEligible: Boolean = problem.isClausal()
 
     /** One propagator per model factor, materialized only by consumers of the general CP lane. */
     val propagators: Array<out Propagator> by lazy {
-        val preparation = FactorProjectionPreparation()
-        Array(problem.numFactors) { problem.factors[it].propagatorProjection(preparation) }
+        preparedPropagators ?: run {
+            val preparation = FactorProjectionPreparation()
+            Array(problem.numFactors) { problem.factors[it].propagatorProjection(preparation) }
+        }
     }
 
     /** Propagator occurrences indexed by Boolean variable. */
@@ -89,6 +95,18 @@ class PropagationProblem(
     }
 
     internal val clauseArena: ClauseArena by lazy { ClauseArena.of(problem) }
+
+    internal companion object {
+        fun preparation(problem: Problem): Iterator<PropagationProblem?> = sequence {
+            val preparation = FactorProjectionPreparation()
+            val propagators = Array<Propagator>(problem.numFactors) { NoPropagator }
+            for (fid in propagators.indices) {
+                propagators[fid] = problem.factors[fid].propagatorProjection(preparation)
+                if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            }
+            yield(PropagationProblem(problem, propagators))
+        }.iterator()
+    }
 
     private inline fun retain(src: IntArray, keep: (Int) -> Boolean): IntArray {
         var kept = 0

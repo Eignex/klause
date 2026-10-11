@@ -3,10 +3,16 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -20,6 +26,140 @@ class DefinitionalSweepInferTest {
         Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.EQ, 0),
         Product(a = 3, b = 3, result = 4),
     )
+
+    @Test
+    fun `nested element results follow their selected inputs`() {
+        val problem = Problem(
+            0, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(
+                Element(0, 3, longArrayOf(2, 2), arrIsVars = true, indexOffset = 0),
+                Element(0, 2, longArrayOf(1, 1), arrIsVars = true, indexOffset = 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3)))
+        state.invariants = sweep.network(4, 0)
+        sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+        state.recompute()
+        val move = Move.IntSet(1, 1)
+        val predicted = state.netDelta(move)
+
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(2))
+        assertEquals(1L, state.assignment.intValue(3))
+        assertEquals(0L, predicted)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `nested element result repairs reach an admissible source cell`() {
+        val problem = Problem(
+            0, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(
+                Element(0, 3, longArrayOf(2, 2), arrIsVars = true, indexOffset = 0),
+                Element(0, 2, longArrayOf(1, 1), arrIsVars = true, indexOffset = 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3)))
+        state.invariants = sweep.network(4, 0)
+        sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+        state.recompute()
+        state.moveSink.addChannelingIntSet(state, 3, 1)
+        val move = state.moveSink.list.single()
+        val predicted = state.netDelta(move)
+
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(1))
+        assertEquals(1L, state.assignment.intValue(2))
+        assertEquals(1L, state.assignment.intValue(3))
+        assertEquals(0L, predicted)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `binary element results retain their selection orientation under predicates`() {
+        val problem = Problem(
+            1, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(0, 1), arrIsVars = false, indexOffset = 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        state.assignment.setInt(0, 0)
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
+        state.invariants = sweep.network(2, 1)
+        sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+        state.recompute()
+
+        state.apply(Move.IntSet(0, 1))
+
+        assertEquals(1L, state.assignment.intValue(1))
+        assertEquals(false, state.assignment.boolValue(0))
+        assertEquals(1L, state.cost)
+        state.recompute()
+        assertEquals(1L, state.cost)
+    }
+
+    @Test
+    fun `element results with competing definitions remain searched`() {
+        val element = Element(0, 2, longArrayOf(0, 1), arrIsVars = false, indexOffset = 0)
+        for (other in listOf<Factor>(
+            Element(1, 2, longArrayOf(0, 1), arrIsVars = false, indexOffset = 0),
+            Product(0, 1, 2),
+        )) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(element, other))
+
+            assertNull(DefinitionalSweep.infer(problem, intArrayOf(2)))
+        }
+    }
+
+    @Test
+    fun `cyclic element results remain searched`() {
+        for (factors in listOf(
+            arrayOf<Factor>(Element(0, 1, longArrayOf(1, 1), arrIsVars = true, indexOffset = 0)),
+            arrayOf<Factor>(Element(1, 1, longArrayOf(0, 1), arrIsVars = false, indexOffset = 0)),
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(2, 2), arrIsVars = true, indexOffset = 0),
+                Element(0, 2, longArrayOf(1, 1), arrIsVars = true, indexOffset = 0),
+            ),
+        )) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors)
+
+            assertNull(DefinitionalSweep.infer(problem, intArrayOf(1, 2)))
+        }
+    }
+
+    @Test
+    fun `element output domains preserve incompatible selection violations`() {
+        for (index in listOf(-1L, 0L, 1L)) {
+            val problem = Problem(
+                0, 2, arrayOf(IntDomain(-1, 1), IntDomain(0, 0)),
+                arrayOf<Factor>(Element(0, 1, longArrayOf(1), arrIsVars = false, indexOffset = 0)),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+            state.assignment.setInt(0, index)
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
+            state.invariants = sweep.network(2, 0)
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+
+            state.recompute()
+
+            assertEquals(0L, state.assignment.intValue(1))
+            assertEquals(1L, state.cost)
+        }
+    }
 
     @Test
     fun `functional objective over a product-capped sum descends the decision vars`() {
@@ -41,6 +181,135 @@ class DefinitionalSweepInferTest {
         // (excluding it from search) would only stall repair. The hint must not claim it.
         val factors = arrayOf<Factor>(Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0))
         assertNull(DefinitionalSweep.infer(factors, numIntVars = 3, definedHints = intArrayOf(2)))
+    }
+
+    @Test
+    fun `a hinted element index follows coordinate moves`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Element(2, 3, longArrayOf(0, 1, 2, 3), arrIsVars = false, indexOffset = 0),
+        )
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3), IntDomain(0, 3))
+        val problem = Problem(0, 4, domains, factors).bake()
+        val sweep = assertNotNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2)))
+        val state = LocalSearchState(problem, Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.invariants = sweep.network(4, 0)
+        state.recompute()
+
+        state.apply(Move.IntSet(0, 1))
+        state.apply(Move.IntSet(1, 0))
+
+        assertEquals(2L, state.assignment.intValue(2))
+        val cost = state.cost
+        state.recompute()
+        assertEquals(cost, state.cost)
+    }
+
+    @Test
+    fun `a hinted equality index follows coordinate moves and updates its channels`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+        )
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 8), IntDomain(0, 1))
+        val problem = Problem(1, 4, domains, factors)
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3))).network(4, 1)
+        for (v in domains.indices) state.assignment.setInt(v, 0)
+        state.assignment.setBool(0, false)
+        state.recompute()
+
+        state.apply(Move.IntSet(0, 1))
+        state.apply(Move.IntSet(1, 2))
+
+        assertEquals(8L, state.assignment.intValue(2))
+        assertEquals(true, state.assignment.boolValue(0))
+        assertEquals(1L, state.assignment.intValue(3))
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `unhinted equality indexes remain searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+        )
+
+        assertNull(DefinitionalSweep.infer(factors, 3))
+    }
+
+    @Test
+    fun `an equality index constrained outside its definition stays searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 7),
+        )
+
+        assertNull(DefinitionalSweep.infer(factors, 3, intArrayOf(2)))
+    }
+
+    @Test
+    fun `an equality index with more than two inputs stays searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(6, 2, 1, -1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 8),
+        )
+
+        assertNull(DefinitionalSweep.infer(factors, 4, intArrayOf(3)))
+    }
+
+    @Test
+    fun `an element index constrained outside its definition stays searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Element(2, 3, longArrayOf(0, 1, 2, 3), arrIsVars = false, indexOffset = 0),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 2),
+        )
+
+        assertNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2)))
+    }
+
+    @Test
+    fun `an element index with another element role stays searched`() {
+        for (element in listOf(
+            Element(2, 2, longArrayOf(0, 1, 2, 3), arrIsVars = false, indexOffset = 0),
+            Element(2, 3, longArrayOf(0, 1, 2, 3), arrIsVars = true, indexOffset = 0),
+        )) {
+            val factors = arrayOf<Factor>(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                element,
+            )
+
+            assertNull(DefinitionalSweep.infer(factors, 4, intArrayOf(2)))
+        }
+    }
+
+    @Test
+    fun `an affine coordinate constrained outside the index chain stays searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, -1),
+            Linear(intArrayOf(2, 1, -1), intArrayOf(2, 1, 3), LinearOp.EQ, 2),
+            Element(3, 4, longArrayOf(0, 1, 2, 3), arrIsVars = false, indexOffset = 0),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 2),
+        )
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(1, 2), IntDomain(0, 3), IntDomain(0, 3))
+        val state = LocalSearchState(Problem(0, 5, domains, factors).bake(), Random(5))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 1)
+        state.assignment.setInt(3, 0)
+        state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 5, intArrayOf(2, 3))).network(5, 0)
+        state.recompute()
+
+        state.apply(Move.IntSet(0, 1))
+
+        assertEquals(1L, state.assignment.intValue(2))
     }
 
     @Test

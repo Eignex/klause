@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
 import com.eignex.klause.solver.result.LpContinuationStats
@@ -264,7 +265,7 @@ private fun appendRouteCertifierStats(
  */
 internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum
-    if (stats.run.backend != "ls" && moves == 0.0) return emptyList()
+    if (stats.run.backend != "ls" && moves == 0.0 && stats.ls.bestResidual == null) return emptyList()
 
     val out = ArrayList<Pair<String, String>>()
     out += "lsMoves" to "${moves.toLong()}"
@@ -274,6 +275,19 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
     if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)
     if (stats.ls.incumbentViolation.isFinite()) out += "lsIncumbentViolation" to round4(stats.ls.incumbentViolation)
+    stats.ls.bestResidual?.let { residual ->
+        out += "lsBestResidualViolation" to residual.cost.toString()
+        for ((kind, degree) in residual.byKind.entries.sortedBy { it.key }) {
+            out += "lsBestResidual.$kind" to degree.toString()
+        }
+        for (factor in residual.factors) {
+            val bools = factor.bools.entries.joinToString(",") { (id, value) -> "b$id:$value" }.ifEmpty { "-" }
+            val ints = factor.ints.entries.joinToString(",") { (id, value) -> "i$id:$value" }.ifEmpty { "-" }
+            out += "lsBestResidualFactor.${factor.id}" to
+                "kind=${factor.kind} degree=${factor.degree} bools=$bools ints=$ints " +
+                "omittedBools=${factor.omittedBools} omittedInts=${factor.omittedInts}"
+        }
+    }
     val completions = stats.ls.completions.sum.toLong()
     if (completions > 0L) {
         out += "lsCompletions" to "$completions"
@@ -343,7 +357,18 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
                 "\"message\":${it.message?.let(::diagnosticString) ?: "null"},\"trace\":${diagnosticString(it.trace)}}"
         }
     }
-    return listOfNotNull(profile, reseeding) + schedule + failures
+    val alns = stats.alns
+    val inner = if (alns == AlnsStats()) emptyList() else listOf(
+        "alnsBootstrapCpNodes" to "${alns.bootstrapCpNodes}",
+        "alnsBootstrapLsMoves" to "${alns.bootstrapLsMoves}",
+        "alnsRepairCpNodes" to "${alns.repairCpNodes}",
+        "alnsRepairLsMoves" to "${alns.repairLsMoves}",
+        "alnsOuterAllowance" to "${alns.outerAllowance}",
+        "alnsBootstrapCpMillis" to "${alns.bootstrapCpMillis}",
+        "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
+        "alnsRepairMillis" to "${alns.repairMillis}",
+    )
+    return listOfNotNull(profile, reseeding) + schedule + failures + inner
 }
 
 private fun diagnosticString(value: String): String = buildString {

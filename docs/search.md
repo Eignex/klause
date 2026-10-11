@@ -101,7 +101,8 @@ with route-specific errors. Custom implied linear rows remain available to LP
 relaxation independently of either execution interface.
 
 Shared table preparation transfers no-op verdicts only under matching contiguous
-column domains. MDD preparation sharing includes the initial and accepting states;
+column domains. Each private propagation projection retains one preparation context
+across its chunks. MDD preparation sharing includes the initial and accepting states;
 value relabeling prepares an index over the relabeled transition array. Reversible
 live tuples, diagram reachability and all assignment-dependent payloads remain
 state-owned.
@@ -146,6 +147,12 @@ over large unconditional holes. Support gathering can stop after all live values
 of a ground column are covered, while every tuple is still checked for feasibility.
 The reversible live prefix is committed once per completed sweep, including
 empty-prefix conflicts; sibling branches restore filtering from trailed state.
+
+Construction-time root propagation folds unary Table restrictions whose expanded
+supports total at most 4096 values. It intersects a sorted survivor set with the
+current domain without walking that domain's span, so local search samples from
+the same unconditional restrictions. Larger unary relations and multi-column
+tables retain deferred preparation. Search-time filtering retains STR2 explanations.
 
 LP explanations cite selected source bound witnesses and recursively expanded
 row, fixing and cutoff premises. Current CP propagation and source LP conflicts
@@ -226,6 +233,20 @@ propagation visits and per 600 LP work units. Construction is charged once;
 fractional charges carry forward and overspending is repaid by later slices.
 Decision/move limits still count their original events.
 
+General CP optimization handles open with private preparation. Propagator projection
+and root propagation advance in batches of 256 factors, retaining the queue, watcher
+changes and deductions between turns. A paused root is not a search session and cannot
+publish a sample or refutation. Completion installs its fixpoint or derived conflict
+once, then enables the ordinary trail and branch-and-bound search. Propagator objects
+remain private to the handle. Preparation work, fractional charges and overspend debt
+carry into search without being charged again; the stats sink retains its timing window.
+A cancellation between root fires pauses the private queue without marking the
+fixpoint unusable. Final assumption seeding and search installation can abort
+initialization, and their partial state cannot resume or publish a result.
+The packed native-SAT optimization path and satisfaction/repair construction retain
+their constructor lifecycle. State allocation, occurrence indexes, individual factor
+calls, assumption seeding and LP construction remain atomic work.
+
 Before the first accepted witness, a selected complete-search family runs its
 available arm with the least charged work. Shared clauses, root fixings and
 objective floors remain credited, but cannot exclude a silent search from its
@@ -282,7 +303,8 @@ progress in batches. Matching arms can continue that shared preparation; a mutex
 each batch and publishes only the complete projection. A suspended arm holds no lock.
 Assignment seeding, individual factor calls,
 restart policy mutations and repair searches remain atomic work that can overrun a segment.
-Before the first incumbent, an optimization arm that has not executed an instruction
+Before the first incumbent, an optimization arm with pending private preparation or
+a local-search arm that has not executed an instruction
 receives preparation revisits after all initial siblings have been admitted. Unfinished
 arms rotate in arm order until they enter search or terminate. Each revisit uses the
 base allowance and the regular family time share; it does not grow later slices. Dedicated lanes resume their own
@@ -306,6 +328,13 @@ before initializing factor costs, avoiding an evaluation of the intermediate
 random assignment. Custom restart policies retain their ordinary restart protocol.
 ALNS skips its local-search fallback when the complete-engine bootstrap returns
 without an incumbent after cancellation, avoiding fresh seeding after the deadline.
+Its terminal statistics distinguish measured bootstrap CP nodes, bootstrap LS moves,
+repair CP nodes and repair LS moves from the declared outer repair allowance.
+Retained CP repair counters contribute each fragment's difference, not its cumulative
+history. Separate wall times include bootstrap construction and seeding and repair
+construction and reseeding. These observations do not alter scheduler work or solve-wide
+budgets; an allowance alone does not establish useful inner search. Direct construction
+and custom repair operators report engine work only when they supply observations.
 Hinted min/max expression outputs, their materialized affine operands and output aliases
 form a one-way definition cone. Unhinted min/max globals remain searched. Competing
 definitions and cyclic cones remain searched; independent constraints on a defined output
@@ -318,8 +347,80 @@ Element matching-cell indexes and range endpoints use Long arithmetic, including
 whose valid array indexes cross the Int boundary. Matching-cell scans skip unreachable
 inverse targets until an admissible index repair is found.
 
+Hinted native Element results are maintained from their indexes and selected cells.
+Competing definitions and cyclic selections remain searched. Value-directed result
+repairs change an admissible selected cell or backsolve a matching index through its
+source coordinates. Each repair scans at most 32 array positions and offers at most
+four alternatives, following at most 16 nested selections. Output and input domains,
+pins and implicit owners remain enforced; an out-of-range index or a domain-clamped
+result leaves the defining constraint subject to ordinary violation scoring.
+
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
+Element index repairs backsolve affine definitions with one or two distinct integer
+inputs and a unit output coefficient. Hinted affine indexes with one or two inputs
+feeding only unit unary equality predicates use the same maintained definitions and
+bounded inverse for value-directed repairs. Independent constraints on an index
+prevent this inference. Requested outputs and input coordinates respect pins and
+implicit owners. Hinted one-input affine chains feeding only
+such index definitions are maintained from their searched leaves; other occurrences
+prevent their inference. Inverse repairs follow at most 16 such aliases, checking each
+intermediate domain and rejecting conflicting targets for a shared leaf.
+Single-coordinate repairs precede joint moves; joint repair enumerates at most 64
+present members of one input domain. Affine aliases over retained extrema use the
+extremum inverse repair so their derived inputs remain reachable. Input domains,
+pins and implicit owners filter the complete move before publication. Equality indicators
+join coordinate moves and carry admissible binary channels after protecting all
+requested coordinates, while arithmetic counter-shifts cannot overwrite those
+coordinates. Unsupported definitions, overflow and nonintegral inverses decline the
+candidate; an unreachable matching cell does not stop the remaining element scan.
+Value-driven moves carry equality indicator flips through directly connected unit
+equality channels over 0/1 integers. Channel targets must be present in the root domain
+and pass the generic pinned, defined and implicit-owner filters; a claimed coordinate
+is never overwritten. Equality rows coalesce consistency flips for the same indicator;
+ordinary repeated Boolean flips are interpreted by their final parity.
+Product definitions then maintain their outputs from the coordinated channel changes.
+Wider inputs and other row shapes retain their independent repair neighborhoods.
+Violated Table rows retain single-coordinate repairs and add at most two joint tuple
+repairs. Joint repairs and structured tuple jumps carry equality indicators and binary
+channels with every table coordinate protected from counter-shifts. A protected changed
+coordinate rejects the entire tuple move, preserving the chosen row's support; maintained
+columns decline tuple construction. The ordinary scorer grades the complete assignment.
+Cumulative overload repair can remove a maintained product duration through a unit
+binary equality channel and a unary equality choice predicate. It checks zero in the
+channel and duration domains, pins and implicit owners before proposing a complete
+choice-and-channel move. Per repair call, at most 16 such moves are drawn from at most
+32 present values of each choice domain, with at most four alternatives per predicate.
+The starting peak task advances per worker so early candidates cannot consume every call's budget.
+Start-time repairs skip absent tasks and tasks with zero duration or demand; present
+positive-footprint tasks retain neighboring and sampled targets outside the maximum peak.
+The ordinary scorer grades every affected factor; removing a footprint does not
+establish that the complete assignment is feasible.
+Domain-aware definition inference derives hinted unit equality channels only when
+their source bounds are within 0/1. A channel's predicate is derived only from a unique
+unit unary equality whose other Boolean occurrences are channels. Mixed integer and
+Boolean definitions are ordered together; competing outputs and cyclic cones stay
+searched. Pinned values survive evaluation, and clipped channels retain their factor
+violations without replacing a maintained predicate during seeding.
+Implicitly owned integer outputs remain unchanged during per-move propagation;
+the affected definition factors retain any resulting violations.
+Diversification kicks also exclude maintained Boolean outputs from direct flips.
+Repairs into retained literal channels change an admissible Boolean input or backsolve
+a retained unary equality into a searched integer or an existing extremum inverse.
+When a Boolean predicate remains searched, unit unary equality sources supply bounded
+coordinated choice moves before a direct flip; all other constraints and duration
+fanout remain graded.
+These repairs check output domains, pins and implicit owners; false equality targets
+sample at most four alternatives from at most 32 present values, including bounded
+walks through larger domains. Literal chains stop at depth 16. The Cumulative duration
+neighborhood uses the same inverse route. Clause, cardinality and weighted Boolean-row
+repairs backsolve maintained equality predicates through their integer inputs after
+binary lowering removes the integer channels. Substituted integer pins remain in place;
+source-coordinate pins and owners still filter every inverse move.
+Functional objective inference declines cones crossing literal-to-integer channels;
+ordinary objective scoring still grades the complete maintained assignment.
+The portfolio's ALNS inner local search shares the definition sweep and immutable
+network used by ordinary LS workers using invariants.
 Boolean break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization pass.
 Moves feeding definitions score the complete propagated assignment, including derived
@@ -327,8 +428,9 @@ factor degrees and objective coordinates. Compounds without definition readers r
 additive linear objective scoring for distinct coordinates and the objective's own
 incremental delta; repeated-coordinate linear deltas use a probe of the final values.
 Probes apply compound inputs together before
-one definition pass, save affected input/output values, and restore those values directly;
-an inverse definition that cannot write does not strand a derived output. Probe activity
+one definition pass, save affected input/output values, and restore those values directly.
+Each probe reuses its definition cone for saving and propagation.
+An inverse definition that cannot write does not strand a derived output. Probe activity
 is suppressed and its best-cost observation is discarded. Real moves in probes and
 restoration do not advance the committed row-refresh cadence. Weighted probes snapshot and
 scan only factors whose degrees change, in factor-id order to retain the full-scan
@@ -336,6 +438,12 @@ floating-point accumulation order.
 Committed moves reconcile cost and violated membership from exact post-move degrees.
 Factor data and engine projections are separate: the local-search projection supplies
 an `Invariant`, while mutable payloads belong to each `LocalSearchState`.
+Comparison-clause integer scores substitute the target in every matching literal,
+including repeated variables, and retain the minimum saturated comparison shortfall.
+Violated comparison clauses offer admissible literal bounds in addition to neighboring
+values. Inequalities round toward the satisfying side of domain holes; unreachable
+equalities are declined. Targets use coordinated channeling and inverse repairs,
+with pinned and implicitly owned source coordinates protected before synthesis.
 Candidate `deltaIf*` methods return the exact degree change. Ordinary `apply*` methods
 update payloads after the assignment changes; their return values are implementation-specific
 and callers must read the post-move degree for scoring. Reified linear invariants offer
@@ -345,6 +453,20 @@ Optimization restart policies receive only accepted feasible incumbents. Before 
 incumbent, their random-restart fallback can diversify the feasibility walk. Residual
 violation improvements contribute telemetry without becoming restart anchors. Published
 samples and samples retained by custom restart policies remain independent of subsequent updates.
+Optional local-search residual reporting observes committed assignments at loop and
+publication boundaries. Strict cost improvements retain a fresh per-kind sum of the
+maintained factor degrees, paired with their exact total. Probes are not observed.
+Reified linear categories partition their total by comparison operator and input
+shape: one input bounded to 0..1 (`binary`), another single input (`unary`), or
+multiple inputs (`multi`). Binary input bounds do not establish channel semantics.
+Each observation includes up to eight highest-degree representative factors, one per
+kind. Each representative retains its degree and up to sixteen distinct Boolean and
+sixteen distinct integer values from that committed assignment, with omission counts.
+Factor and variable ids belong to the local-search model after lowering and presolve.
+Worker aggregation selects one whole observation at the lowest total; it never adds
+breakdowns from different assignments. A zero residual does not establish domain,
+completion or source feasibility, and the observation does not replace an incumbent.
+Disabled reporting allocates no recorder and performs no factor scans.
 
 Optimization portfolios can reseed stale resumable arms after an incumbent;
 `reseed-stale-threshold` defaults to 3 non-improving segments, with 0 disabling it.
@@ -406,7 +528,7 @@ requested root-cut plans.
 | Field | Meaning |
 |---|---|
 | `propagationWork` | Monotonic dispatch, literal, watcher, level and linear-term/reason visits, including work across undo |
-| `rootPropagationWork`, `rootPropagationMs` | Constructor root-fixpoint work and time |
+| `rootPropagationWork`, `rootPropagationMs` | Initialization root-fixpoint work and time, including private preparation |
 | `propagationMs` | Fixpoint elapsed time; some counted reason scans are outside it |
 | Arm `maxMs`, `initMs` | Longest elapsed segment and handle construction cost |
 | `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
@@ -419,3 +541,6 @@ component reasons. Zero does not establish complete factor reason coverage.
 Missing metrics remain missing, including root theory refutations that never
 enter shared search. Ratios of visit work to fixpoint time are coarse because
 their scopes differ.
+
+`initMs` measures opening the handle. Preparation deferred into slices contributes to
+segment time and live propagation counters; it is not included in opening time.

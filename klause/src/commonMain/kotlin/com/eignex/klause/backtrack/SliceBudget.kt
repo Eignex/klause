@@ -17,6 +17,7 @@ internal class SliceBudget(
     private val nodeCount: () -> Long,
     private val lpWork: () -> Long,
     private val propagationWork: () -> Long = { 0L },
+    preparation: SliceBudget? = null,
 ) {
     /** The armed slice's wall-clock end; null before the first slice. */
     var deadline: TimeSource.Monotonic.ValueTimeMark? = null
@@ -32,12 +33,12 @@ internal class SliceBudget(
 
     // LP work already turned into slice nodes. It runs across slices, so work done between two slices, the root LP
     // included, is charged to the next one.
-    private var lpWorkMark = 0L
-    private var propagationWorkMark = 0L
+    private var lpWorkMark: Long = preparation?.lpWorkMark ?: 0L
+    private var propagationWorkMark: Long = preparation?.propagationWorkMark ?: 0L
 
     // Nodes an earlier slice spent past its budget. One LP solve can cost many slices' worth of nodes, and a slice
     // cannot stop inside it, so the excess is repaid from the slices that follow.
-    private var nodeDebt = 0L
+    private var nodeDebt: Long = preparation?.nodeDebt ?: 0L
 
     /**
      * Arm the next slice: [sliceNodes] work units when non-negative, and at most [sliceMillis] of wall time. False

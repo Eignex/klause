@@ -966,7 +966,7 @@ class ResumableMinimizeTest {
         assertTrue(terminal is MinimizeResult.Unknown && search.stats.lp.standalonePasses.sum > 1.0, "$terminal")
     }
     @Test
-    fun `cancelled optimization opening cannot expose partially initialized state`() {
+    fun `cancelled optimization preparation cannot expose partially initialized state`() {
         val fixture = FiniteCutoffKnapsackFixture
         val factory = RecordingLpEngineFactory()
         var cancelled = false
@@ -982,7 +982,11 @@ class ResumableMinimizeTest {
         )
         val solver = BacktrackSolver(fixture.problem, LpSolveContext(factory))
 
-        assertFailsWith<SearchInitializationCancelled> { solver.resumable(fixture.objective, params) }
+        solver.resumable(fixture.objective, params).use { search ->
+            assertFailsWith<SearchInitializationCancelled> {
+                search.runSlice(params.cancellation, Long.MAX_VALUE, -1L) {}
+            }
+        }
 
         solver.resumable(fixture.objective, fixture.params).use { search ->
             assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})

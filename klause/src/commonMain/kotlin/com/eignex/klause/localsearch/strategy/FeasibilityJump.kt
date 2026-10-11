@@ -117,7 +117,7 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
             return state.synthesizeChannelingMove(v, nv)
         }
         val v = scope.boolVars[pick - nInt]
-        if (state.assumptions.isFrozenBool(v)) return null
+        if (!state.moveSink.allowsBool(v)) return null
         return Move.BoolFlip(v)
     }
 }

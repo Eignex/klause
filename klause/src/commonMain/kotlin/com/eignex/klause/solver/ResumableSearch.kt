@@ -85,6 +85,9 @@ interface ResumableSearch : AutoCloseable {
     /** Work performed while opening this handle, included in [work]. */
     val initialWork: Long get() = 0L
 
+    /** When true, another slice can continue private initialization before searching. */
+    val preparationPending: Boolean get() = false
+
     override fun close() {}
 }
 
@@ -135,7 +138,14 @@ internal interface InstructionSlicedSolve : ResumableSolve {
     fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult?
 }
 
+internal interface IncumbentBootstrapSearch : ResumableSearch {
+    val bootstrapPending: Boolean
+}
+
 internal interface InstructionSlicedSearch : ResumableSearch {
+    /** Cumulative scheduling instructions; LNS allowances can differ from observed inner-engine work. */
+    val chargedInstructions: Long get() = stats.ls.moves.sum.toLong()
+
     fun runInstructionSlice(
         global: Cancellation,
         sliceMillis: Long,
@@ -159,6 +169,8 @@ interface ResumableSolver<P : SolverParams> : Solver<P> {
  * fragments. Single-threaded and stateful; obtain one from a backtrack solver.
  */
 internal interface RepairSearch : AutoCloseable {
+    val stats: SolveStats get() = SolveStats.EMPTY
+
     /**
      * Solve the fragment pinned by [assumptions] under a [decisionBudget] (decisions), pruning against
      * [cutoff] and stopping when [cancellation] fires. The caller MUST keep [cutoff] monotone

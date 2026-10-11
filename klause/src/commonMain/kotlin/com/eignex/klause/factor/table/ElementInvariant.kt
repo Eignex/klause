@@ -88,16 +88,14 @@ internal class ElementInvariant(
             val target = idxDom.clamp(
                 if (idxVal < indexOffset) indexOffset.toLong() else indexOffset.toLong() + len - 1L,
             )
-            if (target in idxDom && target != idxVal) sink.addChannelingIntSet(state, idx, target)
+            if (target in idxDom && target != idxVal) sink.addElementIndexSet(state, idx, target)
         }
         for (p in 0 until len) {
             val evp = if (arrIsVars) state.assignment.intValue(arr[p].toInt()) else arr[p]
             if (evp == resultVal) {
                 val cand = indexOffset.toLong() + p
                 if (cand != idxVal && cand in idxDom) {
-                    val before = sink.size
-                    sink.addChannelingIntSet(state, idx, cand)
-                    if (sink.size > before) break
+                    if (sink.addElementIndexSet(state, idx, cand)) break
                 }
             }
         }

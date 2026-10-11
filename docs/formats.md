@@ -180,8 +180,23 @@ DIMACS CNF supplies Boolean clauses. WCNF supplies weighted partial MaxSAT.
 OPB/WBO supplies pseudo-Boolean constraints and objectives, including supported
 product and soft-constraint encodings. XCSP3 supplies finite-domain variables,
 supported globals and optional objectives. Each frontend retains its source
-objective orientation and output names. Unsupported constructs decline through
-the common solve surface.
+objective orientation and output names. XCSP3 variable-matrix selection uses a
+row-major index equality and a native `Element` factor. The compiler marks the
+flattened index, selected result and affine expression outputs as functionally defined. Local search
+maintains index-only affine chains from their source inputs; independently constrained
+affine outputs remain searched. Eligible unique Element results follow indexes and selected
+cells, with inverse repairs into their source coordinates or admissible cells. Competing
+and cyclic definitions remain searched. Bounds on each source index enforce the matrix range when
+its declared domain extends beyond it, including nonzero axis offsets; repeated
+cells and aliases retain their source variable identities. Unsupported constructs
+decline through the common solve surface. Boolean-valued XCSP arithmetic terms
+use fresh 0/1 integers tied directly to their source literal by a reified equality,
+including negated literals; products, sum terms and bin-packing indicators share this encoding.
+Products of a Boolean expression and a declared integer use their declared equality
+output directly, so local search maintains the source product output during moves.
+The compiler marks the fresh binary channels as deterministic outputs. Domain-aware
+definition inference maintains those literal values and their unique unary equality
+predicates when the predicates have no other Boolean factor occurrences.
 
 XCSP min/max arithmetic expressions mark deterministic auxiliaries and materialized affine
 operands as definition hints. Top-level equalities retain output aliases; hints alone do

@@ -91,12 +91,24 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     internal fun allowsInt(varId: Int): Boolean =
         !assumptions.isFrozenInt(varId) && invariants?.isDefinedInt(varId) != true && !ownedByOther(varId)
 
+    internal fun allowsDefinedInt(varId: Int): Boolean =
+        !assumptions.isFrozenInt(varId) && !ownedByOther(varId)
+
     /** Queue a Boolean-flip move on `boolVar`. */
     fun addBoolFlip(varId: Int) {
         if (!allowsBool(varId)) return
         lane.add(encodeBoolFlip(varId))
         valueLane.add(0L)
         cachedList = null
+    }
+
+    internal fun addChannelingBoolFlip(state: LocalSearchState, varId: Int) {
+        if (invariants?.isDefinedBool(varId) != true) {
+            addBoolFlip(varId)
+            return
+        }
+        if (assumptions.isFrozenBool(varId)) return
+        LiteralChannelRepair(state, this).proposePredicate(varId, !state.assignment.boolValue(varId))
     }
 
     /** Queue an int-set move on `intVar`. */
@@ -191,6 +203,22 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
      */
     fun addChannelingIntSet(state: LocalSearchState, varId: Int, newValue: Long) {
         if (invariants?.isDefinedInt(varId) == true) {
+            val element = invariants?.elementResultDefinition(varId)
+            if (element != null) {
+                ElementResultRepair(state, this, element).propose(newValue)
+                return
+            }
+            if (invariants?.literalChannel(varId) != null) {
+                LiteralChannelRepair(state, this).propose(varId, newValue)
+                return
+            }
+            if (invariants?.hasExtremumRepair(varId) != true) {
+                val linear = invariants?.linearDefinition(varId)
+                if (linear != null) {
+                    AffineIndexRepair(state, this, linear).propose(newValue)
+                    return
+                }
+            }
             val repair = extremumRepair(state, varId, newValue, ::allowsInt) ?: return
             addCompound(repair.map { (input, target) -> Move.IntSet(input, target) })
             return
@@ -206,6 +234,15 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
             // shouldn't happen but stay total
             is Move.RealSet -> addRealSet(m.varId, m.newValue)
         }
+    }
+
+    internal fun addElementIndexSet(state: LocalSearchState, varId: Int, newValue: Long): Boolean {
+        if (assumptions.isFrozenInt(varId)) return false
+        val linear = if (invariants?.hasExtremumRepair(varId) == true) null else invariants?.linearDefinition(varId)
+        if (linear != null) return AffineIndexRepair(state, this, linear).propose(newValue)
+        val before = size
+        addChannelingIntSet(state, varId, newValue)
+        return size > before
     }
 
     private fun materialize(): List<Move> {

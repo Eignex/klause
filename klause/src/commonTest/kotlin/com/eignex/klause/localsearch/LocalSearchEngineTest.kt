@@ -13,9 +13,11 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -30,6 +32,58 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+
+    @Test
+    fun `residual reporting retains the best committed assignment after a worse move`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 3)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+        )
+        var picks = 0
+        val strategy = SourceDrivenStrategy(
+            sources = emptyList(),
+            perturbation = { Move.IntSet(0, longArrayOf(1, 3, 0)[picks++]) },
+            feasibleDescent = FeasibleDescent.SelfOwned,
+        )
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+        )
+        val params = LocalSearchParams(
+            maxFlips = 3, reportResiduals = true,
+            initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
+        )
+
+        search.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { handle ->
+            val counted = assertIs<InstructionSlicedSearch>(handle)
+            assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 2L) {})
+            val paused = handle.stats.ls.bestResidual
+
+            val result = assertIs<MinimizeResult.Unknown>(
+                counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 2L) {},
+            )
+
+            assertEquals(7L, paused?.cost)
+            assertEquals(mapOf("Linear" to 7L), result.stats.ls.bestResidual?.byKind)
+            assertEquals(
+                listOf(LocalSearchResidualFactor(0, "Linear", 7L, emptyMap(), mapOf(0 to 3L))),
+                result.stats.ls.bestResidual?.factors,
+            )
+        }
+    }
+
+    @Test
+    fun `residual reporting is disabled by default`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 3)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+        )
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+        val params = LocalSearchParams(maxFlips = 0, initialAssignment = Sample(BooleanArray(0), longArrayOf(0)))
+
+        val result = search.improvements(LinearObjective(), params, warm = null).last()
+
+        assertNull(result.stats.ls.bestResidual)
+    }
 
     @Test
     fun `early root and unsupported verdicts release handle ownership`() {

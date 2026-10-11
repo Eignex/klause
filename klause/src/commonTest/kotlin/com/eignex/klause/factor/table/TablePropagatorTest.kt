@@ -8,12 +8,14 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.intdomain.SurvivorsDomain
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
@@ -28,6 +30,127 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TablePropagatorTest {
+
+    @Test
+    fun `bounded unary supports constrain local search root domains`() {
+        val cases = listOf(
+            Table(intArrayOf(0), longArrayOf(10, 1, 5, 5)) to listOf(1L, 5L, 10L),
+            Table(intArrayOf(0), longArrayOf(1, 8), longArrayOf(3, 10)) to listOf(1L, 3L, 8L, 9L, 10L),
+        )
+        for ((table, expected) in cases) {
+            val domain = IntDomain(0, 14).excludeValue(2)
+            val problem = Problem(0, 1, arrayOf(domain), arrayOf<Factor>(table))
+
+            val model = LocalSearchModel.of(problem.bake())
+
+            assertEquals(expected, (0L..14L).filter { it in model.domains[0] })
+            assertEquals(domain, problem.intDomainOrNull(0))
+        }
+    }
+
+    @Test
+    fun `sparse unary supports fold without walking their span`() {
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 1_000_000)),
+            arrayOf<Factor>(Table(intArrayOf(0), longArrayOf(1_000_000, 0, 0))),
+        )
+
+        val model = LocalSearchModel.of(problem.bake())
+
+        assertEquals(2L, model.domains[0].valueCount)
+        assertEquals(0L, model.domains[0].min)
+        assertEquals(1_000_000L, model.domains[0].max)
+        assertTrue(500_000L !in model.domains[0])
+    }
+
+    @Test
+    fun `unary restrictions intersect during root propagation`() {
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 14)),
+            arrayOf<Factor>(
+                Table(intArrayOf(0), longArrayOf(1), longArrayOf(10)),
+                Table(intArrayOf(0), longArrayOf(5), longArrayOf(7)),
+            ),
+        )
+
+        val baked = problem.bake()
+
+        assertEquals(IntDomain(5, 7), baked.rootIntDomain(0))
+    }
+
+    @Test
+    fun `disjoint unary supports refute the root`() {
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 1)),
+            arrayOf<Factor>(Table(intArrayOf(0), longArrayOf(2))),
+        )
+
+        val baked = problem.bake()
+
+        assertIs<PropagationResult.Unsat>(baked.baked)
+    }
+
+    @Test
+    fun `large unary supports remain deferred during bake`() {
+        val cases = listOf(
+            Table(intArrayOf(0), longArrayOf(1), longArrayOf(5_000)),
+            Table(intArrayOf(0), longArrayOf(Long.MIN_VALUE), longArrayOf(Long.MAX_VALUE)),
+            Table(intArrayOf(0), LongArray(4_097) { 1L }),
+        )
+        for (table in cases) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 14)), arrayOf<Factor>(table))
+
+            val baked = problem.bake()
+
+            assertEquals(IntDomain(0, 14), baked.rootIntDomain(0))
+        }
+    }
+
+    @Test
+    fun `bounded unary supports preserve Long endpoints`() {
+        val cases = listOf(
+            Triple(Long.MIN_VALUE, Long.MIN_VALUE, Long.MIN_VALUE + 1),
+            Triple(Long.MAX_VALUE - 2, Long.MAX_VALUE - 1, Long.MAX_VALUE),
+        )
+        for ((base, lower, upper) in cases) {
+            val problem = Problem(
+                0,
+                1,
+                arrayOf(IntDomain(base, base + 2)),
+                arrayOf<Factor>(Table(intArrayOf(0), longArrayOf(lower), longArrayOf(upper))),
+            )
+
+            val baked = problem.bake()
+
+            assertEquals(IntDomain(lower, upper), baked.rootIntDomain(0))
+        }
+    }
+
+    @Test
+    fun `wide table support iteration stops at the upper Long endpoint`() {
+        for (lower in listOf(Long.MAX_VALUE, Long.MAX_VALUE - 1)) {
+            val problem = Problem(
+                0,
+                2,
+                arrayOf(IntDomain(0, 0), IntDomain(Long.MAX_VALUE - 2, Long.MAX_VALUE)),
+                arrayOf<Factor>(
+                    Table(intArrayOf(0, 1), longArrayOf(0, lower), longArrayOf(0, Long.MAX_VALUE)),
+                ),
+            )
+            val state = PropagationState(problem, Assumptions.None)
+
+            val conflict = state.runToFixpoint(allFactors = true)
+
+            assertNull(conflict)
+            assertEquals(IntDomain(lower, Long.MAX_VALUE), state.intDomains[1])
+        }
+    }
 
     @Test
     fun `skipExpensiveBake defers the table's root pruning`() {

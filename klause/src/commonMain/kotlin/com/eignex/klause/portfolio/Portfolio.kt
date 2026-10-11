@@ -3,6 +3,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ProblemProfile
@@ -403,7 +404,11 @@ class Portfolio(
                 work = (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
             } else if (handle != null) {
                 val workBefore = handle.work - if (opening) handle.initialWork else 0L
-                val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
+                val instructionsBefore = if (worker.acceptsInstructionBudget) {
+                    (handle as? InstructionSlicedSearch)?.chargedInstructions ?: handle.stats.ls.moves.sum.toLong()
+                } else {
+                    0L
+                }
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
                     val millis = remainingMillis(armToken)
@@ -416,7 +421,9 @@ class Portfolio(
                 terminal = outcome.getOrNull()
                 failure = outcome.exceptionOrNull()
                 work = if (worker.acceptsInstructionBudget) {
-                    countedInstructions(claim, handle.stats.ls.moves.sum - instructionsBefore)
+                    val instructions = (handle as? InstructionSlicedSearch)?.chargedInstructions
+                        ?: handle.stats.ls.moves.sum.toLong()
+                    countedInstructions(claim, (instructions - instructionsBefore).toDouble())
                 } else {
                     handle.work - workBefore
                 }
@@ -475,7 +482,8 @@ class Portfolio(
                 }
                 if (claim.foundFirst) run.startImprovementPhase()
                 if (handle != null && terminal == null && !failed &&
-                    worker.family == ArmFamily.LocalSearch && stats?.ls?.moves?.sum == 0.0
+                    (handle.preparationPending ||
+                        (worker.family == ArmFamily.LocalSearch && stats?.ls?.moves?.sum == 0.0))
                 ) {
                     run.revisitPreparation(arm)
                 }
@@ -712,20 +720,31 @@ class Portfolio(
         }
 
         // The free arm furthest below its owed share, else the policy's pick among free arms: a family first, so a
-        // family's share does not grow with its arm count, then an arm of that family. LNS works on an incumbent, so it
-        // waits for one unless it is all that is left.
+        // family's share does not grow with its arm count, then an arm of that family. An LNS bootstrap competes
+        // within local search's feasibility share; a neighborhood needs an incumbent unless it is all that is left.
         private fun policyPick(eligibleArms: List<Int>): Int {
             owedArm(eligibleArms)?.let { return it }
             val free = eligibleArms.filter { !busy[it] && !retired[it] }
             if (free.isEmpty()) return -1
-            val present = free.mapTo(LinkedHashSet()) { workers[it].family }
+            val present = free.mapTo(LinkedHashSet()) { policyFamily(it) }
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
             val family = families.choose(eligible)
-            val candidates = free.filter { workers[it].family == family }
+            val candidates = free.filter { policyFamily(it) == family }
             // Complete-search progress can remain invisible until a leaf; shared deductions do not
             // establish which search will reach the first witness.
             if (!improving && !family.observable) return candidates.minBy { armWork[it] }
             return armAmong(candidates)
+        }
+
+        private fun policyFamily(arm: Int): ArmFamily {
+            val family = workers[arm].family
+            return if (!improving && family == ArmFamily.Lns &&
+                (handles[arm] as? IncumbentBootstrapSearch)?.bootstrapPending == true
+            ) {
+                ArmFamily.LocalSearch
+            } else {
+                family
+            }
         }
 
         // A policy that cannot be restricted to [candidates] is asked until it names one of them.
@@ -798,7 +817,7 @@ class Portfolio(
             if (!unproductiveProbe) {
                 val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
                 bandit.update(arm, reward, weight)
-                families.record(workers[arm].family, progressed = reward > 0.0, plateau = improving)
+                families.record(policyFamily(arm), progressed = reward > 0.0, plateau = improving)
             }
             // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.
