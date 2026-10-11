@@ -1,5 +1,7 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.Format
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -14,7 +16,7 @@ class Z3ReferenceTest {
         val r = Z3Reference.parse("sat\n", elapsedMs = 121, cmd = cmd)
         assertEquals(true, r.feasible)
         assertTrue(r.proven)
-        assertNull(r.objective, "QF_LIA is a decision problem")
+        assertNull(r.objective)
     }
 
     @Test
@@ -34,7 +36,7 @@ class Z3ReferenceTest {
     @Test
     fun `the last verdict line wins and surrounding noise is ignored`() {
         // z3 may print warnings/comments before the check-sat answer; only the bare verdict counts.
-        val r = Z3Reference.parse("(error \"parse note\")\n; a comment\nsat\n", elapsedMs = 7, cmd = cmd)
+        val r = Z3Reference.parse("; a comment\nsat\n", elapsedMs = 7, cmd = cmd)
         assertEquals(true, r.feasible)
         assertTrue(r.proven)
     }
@@ -44,5 +46,51 @@ class Z3ReferenceTest {
         val r = Z3Reference.parse("(error \"boom\")\n", elapsedMs = 3, cmd = cmd)
         assertNull(r.feasible)
         assertFalse(r.proven)
+    }
+
+    @Test
+    fun `a parse error followed by sat does not earn proof credit`() {
+        val r = Z3Reference.parse("(error \"unsupported assertion\")\nsat\n", 7, cmd)
+
+        assertNull(r.feasible)
+        assertFalse(r.proven)
+        assertEquals("error", r.stats["referenceStatus"])
+    }
+
+    @Test
+    fun `failed exits retain stderr and do not earn proof credit`() {
+        val r = Z3Reference.parse("sat\n", 7, cmd, stderr = "out of memory", exitCode = 1)
+
+        assertNull(r.feasible)
+        assertEquals("out of memory", r.stats["referenceStderr"])
+        assertEquals("1", r.stats["referenceExitCode"])
+    }
+
+    @Test
+    fun `watchdog termination retains its outcome`() {
+        val r = Z3Reference.parse("", 30_000, cmd, exitCode = 137, killed = true)
+
+        assertNull(r.feasible)
+        assertEquals("timeout", r.stats["referenceStatus"])
+        assertEquals("true", r.stats["referenceWatchdogKilled"])
+    }
+
+    @Test
+    fun `native timeout is distinct from an unknown verdict`() {
+        val r = Z3Reference.parse("timeout\n", 10_000, cmd)
+
+        assertNull(r.feasible)
+        assertEquals("timeout", r.stats["referenceStatus"])
+    }
+
+    @Test
+    fun `algebraic model bytes survive reference parsing`() {
+        val model = "(\n  (define-fun x () Real (root-obj (+ (^ x 2) (- 2)) 2))\n)"
+        val stdout = "sat\n$model\n"
+
+        val r = Z3Reference.parse(stdout, 7, cmd)
+
+        assertEquals(stdout, r.rawOutput)
+        assertEquals(model, SolveEvidence.finalWitness(Format.SMTLIB, r.rawOutput))
     }
 }

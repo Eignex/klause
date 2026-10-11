@@ -59,6 +59,26 @@ Regenerate using
 [generate.py](../../klause-bench/scripts/lp-component-split/generate.py).
 These fixtures are explicit experiments rather than CI smoke selection.
 
+## Polynomial-real SMT fixtures
+
+[QF_NRA version 1](../../klause-bench/smoke-corpus/qfnra-v1/manifest.json)
+contains 37 bounded core, 24 frozen holdout and five separate extension controls.
+Every source is original work by Eignex Klause contributors under Apache-2.0;
+no third-party corpus bytes are redistributed. The manifest fixes suite/name,
+path, original SHA-256, mathematical expectation, membership class, reason,
+attribution and license. Mathematical expectations are not executed verification.
+Catalog core/holdout expectations retain SAT/UNSAT; extension expectations remain
+unknown even when a reference accepts the extension.
+
+Polynomial cases declare only Real/Bool variables and use exact rational/decimal
+constants, polynomial arithmetic and Boolean comparisons. Constant nonzero division
+is rational coefficient syntax. Symbolic division, mixed integer sorts, negative
+powers, transcendental functions and multiple-query sessions have separate identities.
+The fetched QF_NRA archive preserves its per-family attribution/licenses and is
+not certified as polynomial by its logic tag. See the benchmark README for
+[named selection](../../klause-bench/README.md#selection-and-named-sets) and
+[reference authority](../../klause-bench/README.md#smt-reference-records).
+
 ## XCSP3 reference importer
 
 [`test_solve.py`](../../klause-bench/xcsp3-cpsat/test_solve.py) contains self-authored
