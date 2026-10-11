@@ -13,7 +13,10 @@ class RationalPolynomialArithmeticTest {
     fun `square free decomposition retains each root multiplicity`() {
         val a = RationalPolynomial.of(-1, 1)
         val b = RationalPolynomial.of(2, 1)
-        val polynomial = arithmetic.multiply(arithmetic.multiply(a, a), arithmetic.multiply(arithmetic.multiply(b, b), b))
+        val polynomial = arithmetic.multiply(
+            arithmetic.multiply(a, a),
+            arithmetic.multiply(arithmetic.multiply(b, b), b),
+        )
 
         val factors = arithmetic.squareFreeFactors(polynomial)
 
@@ -63,7 +66,10 @@ class RationalPolynomialArithmeticTest {
     fun `root count excludes roots on either endpoint`() {
         val polynomial = RationalPolynomial.of(0, -1, 0, 1)
 
-        val count = arithmetic.countOpen(arithmetic.sturm(polynomial), RationalInterval(BigFraction.MINUS_ONE, BigFraction.ONE))
+        val count = arithmetic.countOpen(
+            arithmetic.sturm(polynomial),
+            RationalInterval(BigFraction.MINUS_ONE, BigFraction.ONE),
+        )
 
         assertEquals(1, count)
     }

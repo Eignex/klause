@@ -81,7 +81,11 @@ Polynomial contexts charge and poll the invocation's `Cancellation` between
 coefficient operations and elimination steps. Interruption throws
 `PolynomialInterrupted` without publishing a partial mathematical result. Inputs,
 polynomials and completed intervals outlive the context and never retain mutable
-producer buffers.
+producer buffers. Dense coefficient expansion defaults to at most 65,536 entries
+and elimination matrices to at most 262,144 cells per allocation. Callers can
+configure these invocation limits. A checked `PolynomialResourceLimit` identifies
+dense expansion, matrix allocation or degree overflow before allocating or
+truncating data; this is a resource decline, never a mathematical verdict.
 
 The [library API contract](api.md) classifies supported, experimental and implementation
 surfaces and defines typed mapping and migration boundaries.

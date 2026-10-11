@@ -51,7 +51,10 @@ class PolynomialArithmeticTest {
             arithmetic.multiply(arithmetic.subtract(x, constant(1)), arithmetic.subtract(x, constant(2))),
             arithmetic.subtract(x, constant(3)),
         )
-        val right = arithmetic.multiply(arithmetic.subtract(x, constant(2)), arithmetic.subtract(arithmetic.scale(x, fraction(2)), constant(1)))
+        val right = arithmetic.multiply(
+            arithmetic.subtract(x, constant(2)),
+            arithmetic.subtract(arithmetic.scale(x, fraction(2)), constant(1)),
+        )
 
         val result = arithmetic.principalSubresultants(left, right, 0)
 
@@ -86,6 +89,24 @@ class PolynomialArithmeticTest {
 
         assertFailsWith<PolynomialInterrupted> { cancelled.resultant(arithmetic.power(x, 3), arithmetic.add(x, y), 0) }
         assertTrue(work > 5)
+    }
+
+    @Test
+    fun `dense expansion declines before degree overflow or allocation`() {
+        val huge = Polynomial.of(listOf(PolynomialTerm(Monomial.of(mapOf(0 to Int.MAX_VALUE)), BigFraction.ONE)))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { arithmetic.coefficients(huge, 0) }
+
+        assertEquals(PolynomialResource.DENSE_COEFFICIENTS, failure.resource)
+    }
+
+    @Test
+    fun `projection matrix respects the invocation allocation limit`() {
+        val bounded = PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 3))
+
+        val failure = assertFailsWith<PolynomialResourceLimit> { bounded.resultant(x, arithmetic.add(x, y), 0) }
+
+        assertEquals(PolynomialResource.MATRIX_CELLS, failure.resource)
     }
 
     private fun fraction(value: Long): BigFraction = BigFraction.ofLong(value)
