@@ -175,15 +175,15 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
-public final class com/eignex/klause/backtrack/FlatZincSearchHintsKt {
-	public static final fun toBacktrackParams (Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;II)Lcom/eignex/klause/backtrack/BacktrackParams;
-}
-
 public final class com/eignex/klause/backtrack/NodeBudget {
 	public fun <init> (J)V
 	public final fun exhausted ()Z
 	public final fun getLimit ()J
 	public final fun getSpent ()J
+}
+
+public final class com/eignex/klause/backtrack/SearchHintsKt {
+	public static final fun toBacktrackParams (Lcom/eignex/klause/ir/SearchHints;II)Lcom/eignex/klause/backtrack/BacktrackParams;
 }
 
 public final class com/eignex/klause/backtrack/SearchTier {
@@ -637,6 +637,7 @@ public final class com/eignex/klause/compile/CompiledSchema {
 	public final fun getBoolVarIdByName ()Ljava/util/Map;
 	public final fun getDefaultBacktrackParams ()Lcom/eignex/klause/backtrack/BacktrackParams;
 	public final fun getFloatDecoders ()Ljava/util/Map;
+	public final fun getFloatRepresentations ()Ljava/util/Map;
 	public final fun getIntVarIdByName ()Ljava/util/Map;
 	public final fun getNominalIndicators ()Ljava/util/Map;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
@@ -2024,15 +2025,39 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincCompilerKt {
 	public static synthetic fun parseFlatZinc$default (Ljava/lang/String;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
 }
 
+public final class com/eignex/klause/formats/flatzinc/FlatZincExecutionProgram {
+	public fun <init> (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;)V
+	public final fun component1 ()Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
+	public final fun component2 ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
+	public final fun component3 ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
+	public final fun copy (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;)Lcom/eignex/klause/formats/flatzinc/FlatZincExecutionProgram;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/flatzinc/FlatZincExecutionProgram;Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;ILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincExecutionProgram;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
+	public final fun getLocalSearchObjective ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
+	public final fun getProgram ()Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/flatzinc/FlatZincExecutionProgramKt {
+	public static final fun linearObjective (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;)Lcom/eignex/klause/solver/objective/LinearObjective;
+	public static final fun parseFlatZincExecution (Lcom/eignex/klause/util/CharSource;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/flatzinc/FlatZincExecutionProgram;
+	public static final fun parseFlatZincExecution (Ljava/lang/String;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/formats/flatzinc/FlatZincExecutionProgram;
+	public static synthetic fun parseFlatZincExecution$default (Lcom/eignex/klause/util/CharSource;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincExecutionProgram;
+	public static synthetic fun parseFlatZincExecution$default (Ljava/lang/String;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincExecutionProgram;
+}
+
 public class com/eignex/klause/formats/flatzinc/FlatZincParseException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;II)V
 }
 
 public final class com/eignex/klause/formats/flatzinc/FlatZincProgram {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component10 ()Ljava/util/Map;
+	public final fun component11 ()Ljava/util/Map;
 	public final fun component2 ()Lcom/eignex/klause/formats/flatzinc/SolveDirective;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Ljava/util/Map;
@@ -2041,12 +2066,13 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincProgram {
 	public final fun component7 ()Ljava/util/List;
 	public final fun component8 ()Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;
 	public final fun component9 ()Ljava/util/Map;
-	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/formats/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getArraysByName ()Ljava/util/Map;
 	public final fun getBoolVarsByName ()Ljava/util/Map;
 	public final fun getEnumLabelsByVar ()Ljava/util/Map;
+	public final fun getFloatRepresentations ()Ljava/util/Map;
 	public final fun getFloatVarsByName ()Ljava/util/Map;
 	public final fun getIntVarsByName ()Ljava/util/Map;
 	public final fun getOutputItems ()Ljava/util/List;
@@ -2074,6 +2100,10 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincSearchHints {
 	public final fun getTiers ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/flatzinc/FlatZincSearchHintsKt {
+	public static final fun toSearchHints (Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;)Lcom/eignex/klause/ir/SearchHints;
 }
 
 public final class com/eignex/klause/formats/flatzinc/FlatZincSearchTier {
@@ -2120,6 +2150,13 @@ public final class com/eignex/klause/formats/flatzinc/FlatZincSearchVarSelector 
 	public static fun values ()[Lcom/eignex/klause/formats/flatzinc/FlatZincSearchVarSelector;
 }
 
+public final class com/eignex/klause/formats/flatzinc/FlatZincSolutionWriterKt {
+	public static final fun writeFlatZincSolution (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;Z)Ljava/lang/String;
+	public static final fun writeFlatZincSolution (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Z)Ljava/lang/String;
+	public static synthetic fun writeFlatZincSolution$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;ZILjava/lang/Object;)Ljava/lang/String;
+	public static synthetic fun writeFlatZincSolution$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;ZILjava/lang/Object;)Ljava/lang/String;
+}
+
 public abstract interface class com/eignex/klause/formats/flatzinc/OutputItem {
 }
 
@@ -2154,6 +2191,12 @@ public final class com/eignex/klause/formats/flatzinc/OutputItem$ShowVar : com/e
 	public final fun getName ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/flatzinc/OznApplier {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun render (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;)Ljava/lang/String;
+	public final fun render (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;)Ljava/lang/String;
 }
 
 public final class com/eignex/klause/formats/flatzinc/SetVarLayout {
@@ -3089,6 +3132,42 @@ public final class com/eignex/klause/ir/RealVars : com/eignex/klause/ir/VarList 
 	public fun getSpanInts ()[I
 }
 
+public final class com/eignex/klause/ir/SearchGroup {
+	public fun <init> ([I[ILcom/eignex/klause/ir/VariableSelection;Lcom/eignex/klause/ir/ValueSelection;)V
+	public synthetic fun <init> ([I[ILcom/eignex/klause/ir/VariableSelection;Lcom/eignex/klause/ir/ValueSelection;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()[I
+	public final fun component2 ()[I
+	public final fun component3 ()Lcom/eignex/klause/ir/VariableSelection;
+	public final fun component4 ()Lcom/eignex/klause/ir/ValueSelection;
+	public final fun copy ([I[ILcom/eignex/klause/ir/VariableSelection;Lcom/eignex/klause/ir/ValueSelection;)Lcom/eignex/klause/ir/SearchGroup;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/SearchGroup;[I[ILcom/eignex/klause/ir/VariableSelection;Lcom/eignex/klause/ir/ValueSelection;ILjava/lang/Object;)Lcom/eignex/klause/ir/SearchGroup;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBoolVars ()[I
+	public final fun getIntVars ()[I
+	public final fun getValueSelector ()Lcom/eignex/klause/ir/ValueSelection;
+	public final fun getVarSelector ()Lcom/eignex/klause/ir/VariableSelection;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/ir/SearchHints {
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/ir/VariableSelection;Lcom/eignex/klause/ir/ValueSelection;Z)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/ir/VariableSelection;Lcom/eignex/klause/ir/ValueSelection;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Lcom/eignex/klause/ir/VariableSelection;
+	public final fun component3 ()Lcom/eignex/klause/ir/ValueSelection;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/util/List;Lcom/eignex/klause/ir/VariableSelection;Lcom/eignex/klause/ir/ValueSelection;Z)Lcom/eignex/klause/ir/SearchHints;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/SearchHints;Ljava/util/List;Lcom/eignex/klause/ir/VariableSelection;Lcom/eignex/klause/ir/ValueSelection;ZILjava/lang/Object;)Lcom/eignex/klause/ir/SearchHints;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFallbackValueSelector ()Lcom/eignex/klause/ir/ValueSelection;
+	public final fun getFallbackVarSelector ()Lcom/eignex/klause/ir/VariableSelection;
+	public final fun getSolutionGuided ()Z
+	public final fun getTiers ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/ir/SourceIntDomains {
 	public static final field Companion Lcom/eignex/klause/ir/SourceIntDomains$Companion;
 	public final fun declaredOrNull (I)Lcom/eignex/klause/ir/IntDomain;
@@ -3156,6 +3235,18 @@ public final class com/eignex/klause/ir/UnitConsts : com/eignex/klause/ir/LongCo
 	public fun toLongArray ()[J
 }
 
+public final class com/eignex/klause/ir/ValueSelection : java/lang/Enum {
+	public static final field Maximum Lcom/eignex/klause/ir/ValueSelection;
+	public static final field Median Lcom/eignex/klause/ir/ValueSelection;
+	public static final field Middle Lcom/eignex/klause/ir/ValueSelection;
+	public static final field Minimum Lcom/eignex/klause/ir/ValueSelection;
+	public static final field Random Lcom/eignex/klause/ir/ValueSelection;
+	public static final field Split Lcom/eignex/klause/ir/ValueSelection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/ir/ValueSelection;
+	public static fun values ()[Lcom/eignex/klause/ir/ValueSelection;
+}
+
 public abstract interface class com/eignex/klause/ir/VarList {
 	public fun getBoolVars ()[I
 	public fun getInts ()[I
@@ -3183,6 +3274,20 @@ public final class com/eignex/klause/ir/VarRemap {
 	public final fun lits ([I)[I
 	public final fun real (I)I
 	public final fun reals ([I)[I
+}
+
+public final class com/eignex/klause/ir/VariableSelection : java/lang/Enum {
+	public static final field DomWdeg Lcom/eignex/klause/ir/VariableSelection;
+	public static final field InputOrder Lcom/eignex/klause/ir/VariableSelection;
+	public static final field LargestDomain Lcom/eignex/klause/ir/VariableSelection;
+	public static final field LargestUpperBound Lcom/eignex/klause/ir/VariableSelection;
+	public static final field MaxRegret Lcom/eignex/klause/ir/VariableSelection;
+	public static final field RandomOrder Lcom/eignex/klause/ir/VariableSelection;
+	public static final field SmallestDomain Lcom/eignex/klause/ir/VariableSelection;
+	public static final field SmallestLowerBound Lcom/eignex/klause/ir/VariableSelection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/ir/VariableSelection;
+	public static fun values ()[Lcom/eignex/klause/ir/VariableSelection;
 }
 
 public final class com/eignex/klause/ir/WideConstants : com/eignex/klause/ir/IntegralConstants {
@@ -4697,6 +4802,21 @@ public final class com/eignex/klause/lowering/FloatBucketing {
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 	public final fun valueOf (I)D
+}
+
+public final class com/eignex/klause/lowering/FloatRepresentation {
+	public fun <init> (ILjava/lang/String;)V
+	public synthetic fun <init> (ILjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (ILjava/lang/String;)Lcom/eignex/klause/lowering/FloatRepresentation;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/FloatRepresentation;ILjava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/lowering/FloatRepresentation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getApproximate ()Z
+	public final fun getApproximation ()Ljava/lang/String;
+	public final fun getComponent ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/lp/Contribution : java/lang/Enum {
@@ -9185,8 +9305,8 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveResult {
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/ir/SearchHints;Lcom/eignex/klause/solver/pipeline/ComponentPlan;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/ir/SearchHints;Lcom/eignex/klause/solver/pipeline/ComponentPlan;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun getFiniteProblem ()Lcom/eignex/klause/ir/Problem;
@@ -9196,7 +9316,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
 	public final fun getObjectiveIntVar ()Ljava/lang/Integer;
 	public final fun getOptimize ()Z
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
-	public final fun getSearchHints ()Lcom/eignex/klause/formats/flatzinc/FlatZincSearchHints;
+	public final fun getSearchHints ()Lcom/eignex/klause/ir/SearchHints;
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveVerdict : java/lang/Enum {
@@ -9228,36 +9348,6 @@ public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlanRequest {
 	public final fun getRandomSeed ()Ljava/lang/Long;
 	public final fun getSolveBudgetMillis ()Ljava/lang/Long;
 	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
-}
-
-public final class com/eignex/klause/solver/pipeline/FlatZincExecutionProgram {
-	public fun <init> (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;)V
-	public final fun component1 ()Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
-	public final fun component2 ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
-	public final fun component3 ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
-	public final fun copy (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;)Lcom/eignex/klause/solver/pipeline/FlatZincExecutionProgram;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/FlatZincExecutionProgram;Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/FlatZincExecutionProgram;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
-	public final fun getLocalSearchObjective ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
-	public final fun getProgram ()Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/solver/pipeline/FlatZincExecutionProgramKt {
-	public static final fun linearObjective (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;)Lcom/eignex/klause/solver/objective/LinearObjective;
-	public static final fun parseFlatZincExecution (Lcom/eignex/klause/util/CharSource;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/solver/pipeline/FlatZincExecutionProgram;
-	public static final fun parseFlatZincExecution (Ljava/lang/String;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;)Lcom/eignex/klause/solver/pipeline/FlatZincExecutionProgram;
-	public static synthetic fun parseFlatZincExecution$default (Lcom/eignex/klause/util/CharSource;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/FlatZincExecutionProgram;
-	public static synthetic fun parseFlatZincExecution$default (Ljava/lang/String;IJZJJDDZLcom/eignex/klause/ir/ProblemSettings;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/FlatZincExecutionProgram;
-}
-
-public final class com/eignex/klause/solver/pipeline/FlatZincSolutionWriterKt {
-	public static final fun writeFlatZincSolution (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;Z)Ljava/lang/String;
-	public static final fun writeFlatZincSolution (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Z)Ljava/lang/String;
-	public static synthetic fun writeFlatZincSolution$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;ZILjava/lang/Object;)Ljava/lang/String;
-	public static synthetic fun writeFlatZincSolution$default (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;ZILjava/lang/Object;)Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/IntVariableOwner : java/lang/Enum {
@@ -9533,12 +9623,6 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat : co
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/solver/pipeline/OznApplier {
-	public fun <init> (Ljava/lang/String;)V
-	public final fun render (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;)Ljava/lang/String;
-	public final fun render (Lcom/eignex/klause/formats/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;)Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/PipelineConfigException : java/lang/RuntimeException {

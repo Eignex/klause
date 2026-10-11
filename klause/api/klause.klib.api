@@ -89,6 +89,38 @@ final enum class com.eignex.klause.ir/ObjectiveSense : kotlin/Enum<com.eignex.kl
     final fun values(): kotlin/Array<com.eignex.klause.ir/ObjectiveSense> // com.eignex.klause.ir/ObjectiveSense.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.ir/ValueSelection : kotlin/Enum<com.eignex.klause.ir/ValueSelection> { // com.eignex.klause.ir/ValueSelection|null[0]
+    enum entry Maximum // com.eignex.klause.ir/ValueSelection.Maximum|null[0]
+    enum entry Median // com.eignex.klause.ir/ValueSelection.Median|null[0]
+    enum entry Middle // com.eignex.klause.ir/ValueSelection.Middle|null[0]
+    enum entry Minimum // com.eignex.klause.ir/ValueSelection.Minimum|null[0]
+    enum entry Random // com.eignex.klause.ir/ValueSelection.Random|null[0]
+    enum entry Split // com.eignex.klause.ir/ValueSelection.Split|null[0]
+
+    final val entries // com.eignex.klause.ir/ValueSelection.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.ir/ValueSelection> // com.eignex.klause.ir/ValueSelection.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.ir/ValueSelection // com.eignex.klause.ir/ValueSelection.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.ir/ValueSelection> // com.eignex.klause.ir/ValueSelection.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.ir/VariableSelection : kotlin/Enum<com.eignex.klause.ir/VariableSelection> { // com.eignex.klause.ir/VariableSelection|null[0]
+    enum entry DomWdeg // com.eignex.klause.ir/VariableSelection.DomWdeg|null[0]
+    enum entry InputOrder // com.eignex.klause.ir/VariableSelection.InputOrder|null[0]
+    enum entry LargestDomain // com.eignex.klause.ir/VariableSelection.LargestDomain|null[0]
+    enum entry LargestUpperBound // com.eignex.klause.ir/VariableSelection.LargestUpperBound|null[0]
+    enum entry MaxRegret // com.eignex.klause.ir/VariableSelection.MaxRegret|null[0]
+    enum entry RandomOrder // com.eignex.klause.ir/VariableSelection.RandomOrder|null[0]
+    enum entry SmallestDomain // com.eignex.klause.ir/VariableSelection.SmallestDomain|null[0]
+    enum entry SmallestLowerBound // com.eignex.klause.ir/VariableSelection.SmallestLowerBound|null[0]
+
+    final val entries // com.eignex.klause.ir/VariableSelection.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.ir/VariableSelection> // com.eignex.klause.ir/VariableSelection.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.ir/VariableSelection // com.eignex.klause.ir/VariableSelection.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.ir/VariableSelection> // com.eignex.klause.ir/VariableSelection.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.localsearch.movesource/Phase : kotlin/Enum<com.eignex.klause.localsearch.movesource/Phase> { // com.eignex.klause.localsearch.movesource/Phase|null[0]
     enum entry Any // com.eignex.klause.localsearch.movesource/Phase.Any|null[0]
     enum entry Feasible // com.eignex.klause.localsearch.movesource/Phase.Feasible|null[0]
@@ -3892,6 +3924,8 @@ final class com.eignex.klause.compile/CompiledSchema { // com.eignex.klause.comp
         final fun <get-defaultBacktrackParams>(): com.eignex.klause.backtrack/BacktrackParams? // com.eignex.klause.compile/CompiledSchema.defaultBacktrackParams.<get-defaultBacktrackParams>|<get-defaultBacktrackParams>(){}[0]
     final val floatDecoders // com.eignex.klause.compile/CompiledSchema.floatDecoders|{}floatDecoders[0]
         final fun <get-floatDecoders>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.model/FloatSpec> // com.eignex.klause.compile/CompiledSchema.floatDecoders.<get-floatDecoders>|<get-floatDecoders>(){}[0]
+    final val floatRepresentations // com.eignex.klause.compile/CompiledSchema.floatRepresentations|{}floatRepresentations[0]
+        final fun <get-floatRepresentations>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> // com.eignex.klause.compile/CompiledSchema.floatRepresentations.<get-floatRepresentations>|<get-floatRepresentations>(){}[0]
     final val intVarIdByName // com.eignex.klause.compile/CompiledSchema.intVarIdByName|{}intVarIdByName[0]
         final fun <get-intVarIdByName>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.compile/CompiledSchema.intVarIdByName.<get-intVarIdByName>|<get-intVarIdByName>(){}[0]
     final val nominalIndicators // com.eignex.klause.compile/CompiledSchema.nominalIndicators|{}nominalIndicators[0]
@@ -5129,8 +5163,27 @@ final class com.eignex.klause.formats.dimacs/WeightedCnfClause { // com.eignex.k
     final fun toString(): kotlin/String // com.eignex.klause.formats.dimacs/WeightedCnfClause.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram { // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram|null[0]
+    constructor <init>(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?) // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.<init>|<init>(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?){}[0]
+
+    final val definitionalSweep // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.definitionalSweep|{}definitionalSweep[0]
+        final fun <get-definitionalSweep>(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.definitionalSweep.<get-definitionalSweep>|<get-definitionalSweep>(){}[0]
+    final val localSearchObjective // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.localSearchObjective|{}localSearchObjective[0]
+        final fun <get-localSearchObjective>(): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.localSearchObjective.<get-localSearchObjective>|<get-localSearchObjective>(){}[0]
+    final val program // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.program|{}program[0]
+        final fun <get-program>(): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.program.<get-program>|<get-program>(){}[0]
+
+    final fun component1(): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.component3|component3(){}[0]
+    final fun copy(com.eignex.klause.formats.flatzinc/FlatZincProgram = ..., com.eignex.klause.solver.objective/IncrementalObjective? = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ...): com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.copy|copy(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.formats.flatzinc/FlatZincProgram { // com.eignex.klause.formats.flatzinc/FlatZincProgram|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.formats.flatzinc/SolveDirective, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing>, kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray>, kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>?, com.eignex.klause.formats.flatzinc/FlatZincSearchHints?, kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ...) // com.eignex.klause.formats.flatzinc/FlatZincProgram.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.formats.flatzinc/SolveDirective, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, kotlin/Int>, kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing>, kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray>, kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>?, com.eignex.klause.formats.flatzinc/FlatZincSearchHints?, kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> = ...) // com.eignex.klause.formats.flatzinc/FlatZincProgram.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatRepresentation>){}[0]
 
     final val arraysByName // com.eignex.klause.formats.flatzinc/FlatZincProgram.arraysByName|{}arraysByName[0]
         final fun <get-arraysByName>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray> // com.eignex.klause.formats.flatzinc/FlatZincProgram.arraysByName.<get-arraysByName>|<get-arraysByName>(){}[0]
@@ -5138,6 +5191,8 @@ final class com.eignex.klause.formats.flatzinc/FlatZincProgram { // com.eignex.k
         final fun <get-boolVarsByName>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.flatzinc/FlatZincProgram.boolVarsByName.<get-boolVarsByName>|<get-boolVarsByName>(){}[0]
     final val enumLabelsByVar // com.eignex.klause.formats.flatzinc/FlatZincProgram.enumLabelsByVar|{}enumLabelsByVar[0]
         final fun <get-enumLabelsByVar>(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> // com.eignex.klause.formats.flatzinc/FlatZincProgram.enumLabelsByVar.<get-enumLabelsByVar>|<get-enumLabelsByVar>(){}[0]
+    final val floatRepresentations // com.eignex.klause.formats.flatzinc/FlatZincProgram.floatRepresentations|{}floatRepresentations[0]
+        final fun <get-floatRepresentations>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> // com.eignex.klause.formats.flatzinc/FlatZincProgram.floatRepresentations.<get-floatRepresentations>|<get-floatRepresentations>(){}[0]
     final val floatVarsByName // com.eignex.klause.formats.flatzinc/FlatZincProgram.floatVarsByName|{}floatVarsByName[0]
         final fun <get-floatVarsByName>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing> // com.eignex.klause.formats.flatzinc/FlatZincProgram.floatVarsByName.<get-floatVarsByName>|<get-floatVarsByName>(){}[0]
     final val intVarsByName // com.eignex.klause.formats.flatzinc/FlatZincProgram.intVarsByName|{}intVarsByName[0]
@@ -5155,6 +5210,7 @@ final class com.eignex.klause.formats.flatzinc/FlatZincProgram { // com.eignex.k
 
     final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.flatzinc/FlatZincProgram.component1|component1(){}[0]
     final fun component10(): kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component10|component10(){}[0]
+    final fun component11(): kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component11|component11(){}[0]
     final fun component2(): com.eignex.klause.formats.flatzinc/SolveDirective // com.eignex.klause.formats.flatzinc/FlatZincProgram.component2|component2(){}[0]
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component3|component3(){}[0]
     final fun component4(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component4|component4(){}[0]
@@ -5163,7 +5219,7 @@ final class com.eignex.klause.formats.flatzinc/FlatZincProgram { // com.eignex.k
     final fun component7(): kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>? // com.eignex.klause.formats.flatzinc/FlatZincProgram.component7|component7(){}[0]
     final fun component8(): com.eignex.klause.formats.flatzinc/FlatZincSearchHints? // com.eignex.klause.formats.flatzinc/FlatZincProgram.component8|component8(){}[0]
     final fun component9(): kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> // com.eignex.klause.formats.flatzinc/FlatZincProgram.component9|component9(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.formats.flatzinc/SolveDirective = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray> = ..., kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>? = ..., com.eignex.klause.formats.flatzinc/FlatZincSearchHints? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ...): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.formats.flatzinc/FlatZincProgram.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>){}[0]
+    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.formats.flatzinc/SolveDirective = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatBucketing> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/FlatZincArray> = ..., kotlin.collections/List<com.eignex.klause.formats.flatzinc/OutputItem>? = ..., com.eignex.klause.formats.flatzinc/FlatZincSearchHints? = ..., kotlin.collections/Map<kotlin/String, kotlin.collections/List<kotlin/String>> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.flatzinc/SetVarLayout> = ..., kotlin.collections/Map<kotlin/String, com.eignex.klause.lowering/FloatRepresentation> = ...): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.formats.flatzinc/FlatZincProgram.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.formats.flatzinc.SolveDirective;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatBucketing>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.FlatZincArray>;kotlin.collections.List<com.eignex.klause.formats.flatzinc.OutputItem>?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;kotlin.collections.Map<kotlin.String,kotlin.collections.List<kotlin.String>>;kotlin.collections.Map<kotlin.String,com.eignex.klause.formats.flatzinc.SetVarLayout>;kotlin.collections.Map<kotlin.String,com.eignex.klause.lowering.FloatRepresentation>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.flatzinc/FlatZincProgram.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.flatzinc/FlatZincProgram.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.flatzinc/FlatZincProgram.toString|toString(){}[0]
@@ -5211,6 +5267,13 @@ final class com.eignex.klause.formats.flatzinc/FlatZincSearchTier { // com.eigne
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.flatzinc/FlatZincSearchTier.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.flatzinc/FlatZincSearchTier.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.flatzinc/FlatZincSearchTier.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.formats.flatzinc/OznApplier { // com.eignex.klause.formats.flatzinc/OznApplier|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.formats.flatzinc/OznApplier.<init>|<init>(kotlin.String){}[0]
+
+    final fun render(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver.pipeline/OpenTheoryAssignment): kotlin/String // com.eignex.klause.formats.flatzinc/OznApplier.render|render(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.pipeline.OpenTheoryAssignment){}[0]
+    final fun render(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample): kotlin/String // com.eignex.klause.formats.flatzinc/OznApplier.render|render(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample){}[0]
 }
 
 final class com.eignex.klause.formats.flatzinc/SetVarLayout { // com.eignex.klause.formats.flatzinc/SetVarLayout|null[0]
@@ -5790,6 +5853,50 @@ final class com.eignex.klause.ir/RealVars : com.eignex.klause.ir/VarList { // co
 
     final val reals // com.eignex.klause.ir/RealVars.reals|{}reals[0]
         final fun <get-reals>(): kotlin/IntArray // com.eignex.klause.ir/RealVars.reals.<get-reals>|<get-reals>(){}[0]
+}
+
+final class com.eignex.klause.ir/SearchGroup { // com.eignex.klause.ir/SearchGroup|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/IntArray, com.eignex.klause.ir/VariableSelection = ..., com.eignex.klause.ir/ValueSelection = ...) // com.eignex.klause.ir/SearchGroup.<init>|<init>(kotlin.IntArray;kotlin.IntArray;com.eignex.klause.ir.VariableSelection;com.eignex.klause.ir.ValueSelection){}[0]
+
+    final val boolVars // com.eignex.klause.ir/SearchGroup.boolVars|{}boolVars[0]
+        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.ir/SearchGroup.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
+    final val intVars // com.eignex.klause.ir/SearchGroup.intVars|{}intVars[0]
+        final fun <get-intVars>(): kotlin/IntArray // com.eignex.klause.ir/SearchGroup.intVars.<get-intVars>|<get-intVars>(){}[0]
+    final val valueSelector // com.eignex.klause.ir/SearchGroup.valueSelector|{}valueSelector[0]
+        final fun <get-valueSelector>(): com.eignex.klause.ir/ValueSelection // com.eignex.klause.ir/SearchGroup.valueSelector.<get-valueSelector>|<get-valueSelector>(){}[0]
+    final val varSelector // com.eignex.klause.ir/SearchGroup.varSelector|{}varSelector[0]
+        final fun <get-varSelector>(): com.eignex.klause.ir/VariableSelection // com.eignex.klause.ir/SearchGroup.varSelector.<get-varSelector>|<get-varSelector>(){}[0]
+
+    final fun component1(): kotlin/IntArray // com.eignex.klause.ir/SearchGroup.component1|component1(){}[0]
+    final fun component2(): kotlin/IntArray // com.eignex.klause.ir/SearchGroup.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.ir/VariableSelection // com.eignex.klause.ir/SearchGroup.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.ir/ValueSelection // com.eignex.klause.ir/SearchGroup.component4|component4(){}[0]
+    final fun copy(kotlin/IntArray = ..., kotlin/IntArray = ..., com.eignex.klause.ir/VariableSelection = ..., com.eignex.klause.ir/ValueSelection = ...): com.eignex.klause.ir/SearchGroup // com.eignex.klause.ir/SearchGroup.copy|copy(kotlin.IntArray;kotlin.IntArray;com.eignex.klause.ir.VariableSelection;com.eignex.klause.ir.ValueSelection){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SearchGroup.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SearchGroup.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/SearchGroup.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.ir/SearchHints { // com.eignex.klause.ir/SearchHints|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.ir/SearchGroup>, com.eignex.klause.ir/VariableSelection = ..., com.eignex.klause.ir/ValueSelection = ..., kotlin/Boolean = ...) // com.eignex.klause.ir/SearchHints.<init>|<init>(kotlin.collections.List<com.eignex.klause.ir.SearchGroup>;com.eignex.klause.ir.VariableSelection;com.eignex.klause.ir.ValueSelection;kotlin.Boolean){}[0]
+
+    final val fallbackValueSelector // com.eignex.klause.ir/SearchHints.fallbackValueSelector|{}fallbackValueSelector[0]
+        final fun <get-fallbackValueSelector>(): com.eignex.klause.ir/ValueSelection // com.eignex.klause.ir/SearchHints.fallbackValueSelector.<get-fallbackValueSelector>|<get-fallbackValueSelector>(){}[0]
+    final val fallbackVarSelector // com.eignex.klause.ir/SearchHints.fallbackVarSelector|{}fallbackVarSelector[0]
+        final fun <get-fallbackVarSelector>(): com.eignex.klause.ir/VariableSelection // com.eignex.klause.ir/SearchHints.fallbackVarSelector.<get-fallbackVarSelector>|<get-fallbackVarSelector>(){}[0]
+    final val solutionGuided // com.eignex.klause.ir/SearchHints.solutionGuided|{}solutionGuided[0]
+        final fun <get-solutionGuided>(): kotlin/Boolean // com.eignex.klause.ir/SearchHints.solutionGuided.<get-solutionGuided>|<get-solutionGuided>(){}[0]
+    final val tiers // com.eignex.klause.ir/SearchHints.tiers|{}tiers[0]
+        final fun <get-tiers>(): kotlin.collections/List<com.eignex.klause.ir/SearchGroup> // com.eignex.klause.ir/SearchHints.tiers.<get-tiers>|<get-tiers>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.eignex.klause.ir/SearchGroup> // com.eignex.klause.ir/SearchHints.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/VariableSelection // com.eignex.klause.ir/SearchHints.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.ir/ValueSelection // com.eignex.klause.ir/SearchHints.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.eignex.klause.ir/SearchHints.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<com.eignex.klause.ir/SearchGroup> = ..., com.eignex.klause.ir/VariableSelection = ..., com.eignex.klause.ir/ValueSelection = ..., kotlin/Boolean = ...): com.eignex.klause.ir/SearchHints // com.eignex.klause.ir/SearchHints.copy|copy(kotlin.collections.List<com.eignex.klause.ir.SearchGroup>;com.eignex.klause.ir.VariableSelection;com.eignex.klause.ir.ValueSelection;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/SearchHints.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/SearchHints.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/SearchHints.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.ir/SourceIntDomains { // com.eignex.klause.ir/SourceIntDomains|null[0]
@@ -7040,6 +7147,24 @@ final class com.eignex.klause.lowering/FloatBucketing { // com.eignex.klause.low
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering/FloatBucketing.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering/FloatBucketing.toString|toString(){}[0]
     final fun valueOf(kotlin/Int): kotlin/Double // com.eignex.klause.lowering/FloatBucketing.valueOf|valueOf(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.lowering/FloatRepresentation { // com.eignex.klause.lowering/FloatRepresentation|null[0]
+    constructor <init>(kotlin/Int, kotlin/String? = ...) // com.eignex.klause.lowering/FloatRepresentation.<init>|<init>(kotlin.Int;kotlin.String?){}[0]
+
+    final val approximate // com.eignex.klause.lowering/FloatRepresentation.approximate|{}approximate[0]
+        final fun <get-approximate>(): kotlin/Boolean // com.eignex.klause.lowering/FloatRepresentation.approximate.<get-approximate>|<get-approximate>(){}[0]
+    final val approximation // com.eignex.klause.lowering/FloatRepresentation.approximation|{}approximation[0]
+        final fun <get-approximation>(): kotlin/String? // com.eignex.klause.lowering/FloatRepresentation.approximation.<get-approximation>|<get-approximation>(){}[0]
+    final val component // com.eignex.klause.lowering/FloatRepresentation.component|{}component[0]
+        final fun <get-component>(): kotlin/Int // com.eignex.klause.lowering/FloatRepresentation.component.<get-component>|<get-component>(){}[0]
+
+    final fun component1(): kotlin/Int // com.eignex.klause.lowering/FloatRepresentation.component1|component1(){}[0]
+    final fun component2(): kotlin/String? // com.eignex.klause.lowering/FloatRepresentation.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/String? = ...): com.eignex.klause.lowering/FloatRepresentation // com.eignex.klause.lowering/FloatRepresentation.copy|copy(kotlin.Int;kotlin.String?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering/FloatRepresentation.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering/FloatRepresentation.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering/FloatRepresentation.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.lp.bounding/LpConfig { // com.eignex.klause.lp.bounding/LpConfig|null[0]
@@ -10529,7 +10654,7 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveResult { // com.eignex.
 }
 
 final class com.eignex.klause.solver.pipeline/FiniteSolveShape { // com.eignex.klause.solver.pipeline/FiniteSolveShape|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Int?, com.eignex.klause.localsearch/DefinitionalSweep?, com.eignex.klause.formats.flatzinc/FlatZincSearchHints? = ..., com.eignex.klause.solver.pipeline/ComponentPlan = ...) // com.eignex.klause.solver.pipeline/FiniteSolveShape.<init>|<init>(com.eignex.klause.ir.Problem;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Int?;com.eignex.klause.localsearch.DefinitionalSweep?;com.eignex.klause.formats.flatzinc.FlatZincSearchHints?;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Int?, com.eignex.klause.localsearch/DefinitionalSweep?, com.eignex.klause.ir/SearchHints? = ..., com.eignex.klause.solver.pipeline/ComponentPlan = ...) // com.eignex.klause.solver.pipeline/FiniteSolveShape.<init>|<init>(com.eignex.klause.ir.Problem;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Int?;com.eignex.klause.localsearch.DefinitionalSweep?;com.eignex.klause.ir.SearchHints?;com.eignex.klause.solver.pipeline.ComponentPlan){}[0]
 
     final val componentPlan // com.eignex.klause.solver.pipeline/FiniteSolveShape.componentPlan|{}componentPlan[0]
         final fun <get-componentPlan>(): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/FiniteSolveShape.componentPlan.<get-componentPlan>|<get-componentPlan>(){}[0]
@@ -10550,7 +10675,7 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveShape { // com.eignex.k
     final val problem // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem.<get-problem>|<get-problem>(){}[0]
     final val searchHints // com.eignex.klause.solver.pipeline/FiniteSolveShape.searchHints|{}searchHints[0]
-        final fun <get-searchHints>(): com.eignex.klause.formats.flatzinc/FlatZincSearchHints? // com.eignex.klause.solver.pipeline/FiniteSolveShape.searchHints.<get-searchHints>|<get-searchHints>(){}[0]
+        final fun <get-searchHints>(): com.eignex.klause.ir/SearchHints? // com.eignex.klause.solver.pipeline/FiniteSolveShape.searchHints.<get-searchHints>|<get-searchHints>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/FixedBacktrackPlan { // com.eignex.klause.solver.pipeline/FixedBacktrackPlan|null[0]
@@ -10583,25 +10708,6 @@ final class com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest { // com
         final fun <get-solveBudgetMillis>(): kotlin/Long? // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.solveBudgetMillis.<get-solveBudgetMillis>|<get-solveBudgetMillis>(){}[0]
     final val zeroObjectivePricing // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.zeroObjectivePricing|{}zeroObjectivePricing[0]
         final fun <get-zeroObjectivePricing>(): com.eignex.klause.lp.engine/LpZeroObjectivePricing // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.zeroObjectivePricing.<get-zeroObjectivePricing>|<get-zeroObjectivePricing>(){}[0]
-}
-
-final class com.eignex.klause.solver.pipeline/FlatZincExecutionProgram { // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram|null[0]
-    constructor <init>(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?) // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.<init>|<init>(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?){}[0]
-
-    final val definitionalSweep // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.definitionalSweep|{}definitionalSweep[0]
-        final fun <get-definitionalSweep>(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.definitionalSweep.<get-definitionalSweep>|<get-definitionalSweep>(){}[0]
-    final val localSearchObjective // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.localSearchObjective|{}localSearchObjective[0]
-        final fun <get-localSearchObjective>(): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.localSearchObjective.<get-localSearchObjective>|<get-localSearchObjective>(){}[0]
-    final val program // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.program|{}program[0]
-        final fun <get-program>(): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.program.<get-program>|<get-program>(){}[0]
-
-    final fun component1(): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.component2|component2(){}[0]
-    final fun component3(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.component3|component3(){}[0]
-    final fun copy(com.eignex.klause.formats.flatzinc/FlatZincProgram = ..., com.eignex.klause.solver.objective/IncrementalObjective? = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ...): com.eignex.klause.solver.pipeline/FlatZincExecutionProgram // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.copy|copy(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/FlatZincExecutionProgram.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klause.solver.pipeline/LsResolution|null[0]
@@ -10652,13 +10758,6 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryRequest { // com.eignex.
         final fun <get-route>(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryRequest.route.<get-route>|<get-route>(){}[0]
 
     final fun withPresolve(com.eignex.klause.presolve/PresolveConfig, kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget? = ...): com.eignex.klause.solver.pipeline/OpenTheoryRequest // com.eignex.klause.solver.pipeline/OpenTheoryRequest.withPresolve|withPresolve(com.eignex.klause.presolve.PresolveConfig;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?){}[0]
-}
-
-final class com.eignex.klause.solver.pipeline/OznApplier { // com.eignex.klause.solver.pipeline/OznApplier|null[0]
-    constructor <init>(kotlin/String) // com.eignex.klause.solver.pipeline/OznApplier.<init>|<init>(kotlin.String){}[0]
-
-    final fun render(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver.pipeline/OpenTheoryAssignment): kotlin/String // com.eignex.klause.solver.pipeline/OznApplier.render|render(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.pipeline.OpenTheoryAssignment){}[0]
-    final fun render(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample): kotlin/String // com.eignex.klause.solver.pipeline/OznApplier.render|render(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/PipelineConfigException : kotlin/RuntimeException { // com.eignex.klause.solver.pipeline/PipelineConfigException|null[0]
@@ -13148,8 +13247,8 @@ final val com.eignex.klause.util/BIG_ZERO // com.eignex.klause.util/BIG_ZERO|{}B
 
 final fun (com.eignex.klause.formats.dimacs/CnfDocument).com.eignex.klause.formats.dimacs/toProblem(com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.ir/Problem // com.eignex.klause.formats.dimacs/toProblem|toProblem@com.eignex.klause.formats.dimacs.CnfDocument(com.eignex.klause.ir.ProblemSettings){}[0]
 final fun (com.eignex.klause.formats.dimacs/WcnfDocument).com.eignex.klause.formats.dimacs/toProblem(com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.dimacs/WcnfProblem // com.eignex.klause.formats.dimacs/toProblem|toProblem@com.eignex.klause.formats.dimacs.WcnfDocument(com.eignex.klause.ir.ProblemSettings){}[0]
-final fun (com.eignex.klause.formats.flatzinc/FlatZincProgram).com.eignex.klause.solver.pipeline/linearObjective(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/linearObjective|linearObjective@com.eignex.klause.formats.flatzinc.FlatZincProgram(){}[0]
-final fun (com.eignex.klause.formats.flatzinc/FlatZincSearchHints).com.eignex.klause.backtrack/toBacktrackParams(kotlin/Int, kotlin/Int): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.backtrack/toBacktrackParams|toBacktrackParams@com.eignex.klause.formats.flatzinc.FlatZincSearchHints(kotlin.Int;kotlin.Int){}[0]
+final fun (com.eignex.klause.formats.flatzinc/FlatZincProgram).com.eignex.klause.formats.flatzinc/linearObjective(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.flatzinc/linearObjective|linearObjective@com.eignex.klause.formats.flatzinc.FlatZincProgram(){}[0]
+final fun (com.eignex.klause.formats.flatzinc/FlatZincSearchHints).com.eignex.klause.formats.flatzinc/toSearchHints(): com.eignex.klause.ir/SearchHints // com.eignex.klause.formats.flatzinc/toSearchHints|toSearchHints@com.eignex.klause.formats.flatzinc.FlatZincSearchHints(){}[0]
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.ProblemSettings){}[0]
 final fun (com.eignex.klause.formats.opb/OpbDocument).com.eignex.klause.formats.opb/toProblem(com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/toProblem|toProblem@com.eignex.klause.formats.opb.OpbDocument(com.eignex.klause.ir.ProblemSettings){}[0]
 final fun (com.eignex.klause.ir/ConstList).com.eignex.klause.ir/longsOrNull(): com.eignex.klause.ir/LongConstList? // com.eignex.klause.ir/longsOrNull|longsOrNull@com.eignex.klause.ir.ConstList(){}[0]
@@ -13169,6 +13268,7 @@ final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/varia
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver/hasFiniteIntegerRanges(): kotlin/Boolean // com.eignex.klause.solver/hasFiniteIntegerRanges|hasFiniteIntegerRanges@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver/isClausal(): kotlin/Boolean // com.eignex.klause.solver/isClausal|isClausal@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.theory.qflra/supportsExactLra(): kotlin/Boolean // com.eignex.klause.theory.qflra/supportsExactLra|supportsExactLra@com.eignex.klause.ir.Problem(){}[0]
+final fun (com.eignex.klause.ir/SearchHints).com.eignex.klause.backtrack/toBacktrackParams(kotlin/Int, kotlin/Int): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.backtrack/toBacktrackParams|toBacktrackParams@com.eignex.klause.ir.SearchHints(kotlin.Int;kotlin.Int){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/and(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/and|and@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/iff(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/iff|iff@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/implies(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/implies|implies@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
@@ -13265,6 +13365,10 @@ final fun com.eignex.klause.factor.scheduling.internals/simulateCumulativeStartD
 final fun com.eignex.klause.factor/reifiedIntCompare(kotlin/Int, kotlin/Int, com.eignex.klause.model/IntCmpOp, kotlin/Int): com.eignex.klause.factor.arithmetic/ReifiedLinear // com.eignex.klause.factor/reifiedIntCompare|reifiedIntCompare(kotlin.Int;kotlin.Int;com.eignex.klause.model.IntCmpOp;kotlin.Int){}[0]
 final fun com.eignex.klause.formats.flatzinc/parseFlatZinc(com.eignex.klause.util/CharSource, kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.formats.flatzinc/parseFlatZinc|parseFlatZinc(com.eignex.klause.util.CharSource;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Double;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
 final fun com.eignex.klause.formats.flatzinc/parseFlatZinc(kotlin/String, kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.flatzinc/FlatZincProgram // com.eignex.klause.formats.flatzinc/parseFlatZinc|parseFlatZinc(kotlin.String;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Double;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
+final fun com.eignex.klause.formats.flatzinc/parseFlatZincExecution(com.eignex.klause.util/CharSource, kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram // com.eignex.klause.formats.flatzinc/parseFlatZincExecution|parseFlatZincExecution(com.eignex.klause.util.CharSource;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Double;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
+final fun com.eignex.klause.formats.flatzinc/parseFlatZincExecution(kotlin/String, kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.formats.flatzinc/FlatZincExecutionProgram // com.eignex.klause.formats.flatzinc/parseFlatZincExecution|parseFlatZincExecution(kotlin.String;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Double;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
+final fun com.eignex.klause.formats.flatzinc/writeFlatZincSolution(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver.pipeline/OpenTheoryAssignment, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.formats.flatzinc/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.pipeline.OpenTheoryAssignment;kotlin.Boolean){}[0]
+final fun com.eignex.klause.formats.flatzinc/writeFlatZincSolution(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.formats.flatzinc/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample;kotlin.Boolean){}[0]
 final fun com.eignex.klause.formats.xcsp3/parseXml(kotlin/String): com.eignex.klause.formats.xcsp3/XmlElement // com.eignex.klause.formats.xcsp3/parseXml|parseXml(kotlin.String){}[0]
 final fun com.eignex.klause.ir/constsOf(kotlin/IntArray): com.eignex.klause.ir/LongConstList // com.eignex.klause.ir/constsOf|constsOf(kotlin.IntArray){}[0]
 final fun com.eignex.klause.ir/constsOf(kotlin/LongArray): com.eignex.klause.ir/LongConstList // com.eignex.klause.ir/constsOf|constsOf(kotlin.LongArray){}[0]
@@ -13326,13 +13430,9 @@ final fun com.eignex.klause.solver.pipeline/autoArms(kotlin/Int): kotlin/Int // 
 final fun com.eignex.klause.solver.pipeline/backtrackOverride(com.eignex.klause.solver.pipeline/EngineParams, kotlin/Boolean): kotlin/Function1<com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.backtrack/BacktrackParams>? // com.eignex.klause.solver.pipeline/backtrackOverride|backtrackOverride(com.eignex.klause.solver.pipeline.EngineParams;kotlin.Boolean){}[0]
 final fun com.eignex.klause.solver.pipeline/buildPortfolioScenario(com.eignex.klause.solver.pipeline/EngineParams, kotlin/Long?, kotlin/Int, com.eignex.klause.portfolio/Kind, com.eignex.klause.portfolio/EngineMix, kotlin/Int, com.eignex.klause.lp.bounding/LpConfig = ..., com.eignex.klause.lp.engine/LpZeroObjectivePricing = ..., kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? = ..., kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>>? = ..., com.eignex.klause.backtrack/BacktrackParams? = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin/Function1<com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.backtrack/BacktrackParams>? = ...): com.eignex.klause.portfolio/PortfolioScenario // com.eignex.klause.solver.pipeline/buildPortfolioScenario|buildPortfolioScenario(com.eignex.klause.solver.pipeline.EngineParams;kotlin.Long?;kotlin.Int;com.eignex.klause.portfolio.Kind;com.eignex.klause.portfolio.EngineMix;kotlin.Int;com.eignex.klause.lp.bounding.LpConfig;com.eignex.klause.lp.engine.LpZeroObjectivePricing;kotlin.collections.List<kotlin.Function0<com.eignex.klause.localsearch.strategy.LocalSearchRecipe>>?;kotlin.collections.List<kotlin.Function0<com.eignex.klause.backtrack.BacktrackRecipe>>?;com.eignex.klause.backtrack.BacktrackParams?;com.eignex.klause.backtrack.NodeBudget?;kotlin.Function1<com.eignex.klause.backtrack.BacktrackParams,com.eignex.klause.backtrack.BacktrackParams>?){}[0]
 final fun com.eignex.klause.solver.pipeline/ineffectiveNumerics(kotlin/String, kotlin.collections/Set<kotlin/String>, kotlin.collections/List<kotlin/String>): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/ineffectiveNumerics|ineffectiveNumerics(kotlin.String;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<kotlin.String>){}[0]
-final fun com.eignex.klause.solver.pipeline/parseFlatZincExecution(com.eignex.klause.util/CharSource, kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.solver.pipeline/FlatZincExecutionProgram // com.eignex.klause.solver.pipeline/parseFlatZincExecution|parseFlatZincExecution(com.eignex.klause.util.CharSource;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Double;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
-final fun com.eignex.klause.solver.pipeline/parseFlatZincExecution(kotlin/String, kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Boolean = ..., com.eignex.klause.ir/ProblemSettings = ...): com.eignex.klause.solver.pipeline/FlatZincExecutionProgram // com.eignex.klause.solver.pipeline/parseFlatZincExecution|parseFlatZincExecution(kotlin.String;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long;kotlin.Double;kotlin.Double;kotlin.Boolean;com.eignex.klause.ir.ProblemSettings){}[0]
 final fun com.eignex.klause.solver.pipeline/pipelineConfigError(kotlin/String): kotlin/Nothing // com.eignex.klause.solver.pipeline/pipelineConfigError|pipelineConfigError(kotlin.String){}[0]
 final fun com.eignex.klause.solver.pipeline/resolveBtRecipes(com.eignex.klause.solver.pipeline/EngineParams, com.eignex.klause.portfolio/Kind): com.eignex.klause.solver.pipeline/BtResolution // com.eignex.klause.solver.pipeline/resolveBtRecipes|resolveBtRecipes(com.eignex.klause.solver.pipeline.EngineParams;com.eignex.klause.portfolio.Kind){}[0]
 final fun com.eignex.klause.solver.pipeline/resolveLocalSearchRecipes(com.eignex.klause.solver.pipeline/EngineParams): com.eignex.klause.solver.pipeline/LsResolution // com.eignex.klause.solver.pipeline/resolveLocalSearchRecipes|resolveLocalSearchRecipes(com.eignex.klause.solver.pipeline.EngineParams){}[0]
-final fun com.eignex.klause.solver.pipeline/writeFlatZincSolution(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver.pipeline/OpenTheoryAssignment, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.solver.pipeline/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.pipeline.OpenTheoryAssignment;kotlin.Boolean){}[0]
-final fun com.eignex.klause.solver.pipeline/writeFlatZincSolution(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.solver.pipeline/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample;kotlin.Boolean){}[0]
 final fun com.eignex.klause.util/addExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/addExact|addExact(kotlin.Long;kotlin.Long){}[0]
 final fun com.eignex.klause.util/floorBigInt(kotlin/Double): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.util/floorBigInt|floorBigInt(kotlin.Double){}[0]
 final fun com.eignex.klause.util/maxOf(com.ionspin.kotlin.bignum.integer/BigInteger, com.ionspin.kotlin.bignum.integer/BigInteger): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.util/maxOf|maxOf(com.ionspin.kotlin.bignum.integer.BigInteger;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
