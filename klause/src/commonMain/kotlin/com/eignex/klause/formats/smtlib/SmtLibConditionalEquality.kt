@@ -54,6 +54,16 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private var diagnosticImagesBefore = 0
     private var diagnosticImagesAfter = 0
     private var diagnosticPairsEligible = 0
+    private val diagnosticGates = HashSet<Pair<String, List<Int>>>()
+    private val diagnosticGateRequests = HashMap<String, Int>()
+    private val diagnosticGateDuplicates = HashMap<String, Int>()
+
+    fun noteDiagnosticGate(operator: String, literals: List<Int>) {
+        diagnosticGateRequests[operator] = (diagnosticGateRequests[operator] ?: 0) + 1
+        if (!diagnosticGates.add(operator to literals.distinct().sorted())) {
+            diagnosticGateDuplicates[operator] = (diagnosticGateDuplicates[operator] ?: 0) + 1
+        }
+    }
 
     private fun diagnosticName(key: ComparisonKey): String = when (key) {
         is Key -> key.operator.name
@@ -68,6 +78,10 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         println("; conditionalImagesBefore=$diagnosticImagesBefore")
         println("; conditionalImagesAfter=$diagnosticImagesAfter")
         println("; conditionalPairsEligible=$diagnosticPairsEligible")
+        for (operator in listOf("AND", "OR", "IFF")) {
+            println("; conditionalGateRequests_$operator=${diagnosticGateRequests[operator] ?: 0}")
+            println("; conditionalGateDuplicates_$operator=${diagnosticGateDuplicates[operator] ?: 0}")
+        }
         println("; conditionalExpansionVisits=$work")
         println("; conditionalDefinedInts=${definitions.size}")
         println("; conditionalRetainedIntDefinitions=${definitions.size - unused.ints.size}")
