@@ -17,6 +17,11 @@ internal class PolynomialCondition(
     val lower = lower.toMap()
     val upper = upper.toMap()
 
+    override fun equals(other: Any?): Boolean = other is PolynomialCondition &&
+        bools == other.bools && lower == other.lower && upper == other.upper
+
+    override fun hashCode(): Int = 31 * (31 * bools.hashCode() + lower.hashCode()) + upper.hashCode()
+
     fun apply(formula: PolynomialRealFormula, boolCount: Int, realCount: Int, step: () -> Unit): PolynomialRealFormula {
         val terms = ArrayList<PolynomialRealFormula>()
         terms += formula
@@ -44,7 +49,7 @@ internal class PolynomialCondition(
 }
 
 internal class PolynomialTheoryService(
-    private val formula: PolynomialRealFormula,
+    val formula: PolynomialRealFormula,
     val boolCount: Int,
     val realCount: Int,
 ) {

@@ -48,7 +48,8 @@ class PolynomialStrategyAdaptersTest {
         )
         val shared = assertNotNull(SharedPolynomialModel.assemble(source, formula.formula))
 
-        for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS, FiniteEngine.MIXED)) {
+        val engines = listOf(FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS, FiniteEngine.MIXED)
+        for (engine in engines) {
             shared.service.invocation().use { invocation ->
                 val result = PolynomialStrategyAdapters(
                     shared, invocation,

@@ -84,10 +84,9 @@ internal object SolveCore {
         // poll, which burns the whole deadline and overshoots the cap several times over.
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
-        // The open routes run what `-e` asks for, and ALNS has no open counterpart.
+        // Linear open routes have no ALNS counterpart.
         val open = rawSolvable.pipeline.let {
-            it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch ||
-                it is SolvablePipeline.PolynomialTheory
+            it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch
         }
         if (open && engine == FiniteEngine.ALNS) usageError("engine `${engine.id}` has no open-model route")
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.

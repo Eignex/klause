@@ -132,7 +132,8 @@ class Assignment private constructor(
 
 /**
  * Owned immutable assignment snapshot. Constructor inputs and exported arrays are copied;
- * scalar accessors read the snapshot without allocation. [exactInts] and [exactReals] are authoritative.
+ * scalar accessors read the snapshot without allocation. [exactInts], [exactReals] and [algebraicReals]
+ * carry exact coordinate authority.
  */
 class Sample private constructor(
     bools: BooleanArray,
@@ -256,8 +257,9 @@ class Sample private constructor(
             exactReals == other.exactReals && algebraicReals == other.algebraicReals
     }
     override fun hashCode(): Int =
-        31 * (31 * (31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
-            (exactInts?.hashCode() ?: 0)) + approximateReals.contentHashCode()) + (exactReals?.hashCode() ?: 0)
+        31 * (31 * (31 * (31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
+            (exactInts?.hashCode() ?: 0)) + approximateReals.contentHashCode()) +
+            (exactReals?.hashCode() ?: 0)) + (algebraicReals?.hashCode() ?: 0)
 
     /** Authoritative integer coordinate, widened on demand for finite samples. */
     fun exactIntValue(id: Int): BigInt = exactInts?.get(id) ?: bigIntOf(integerValues[id])
