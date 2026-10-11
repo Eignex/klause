@@ -1248,7 +1248,9 @@ class LocalSearchState private constructor(
             val breaks = if (move is Move.Compound) newlyViolated else breakCount
             val cumulativeDelta = if (refineCumulative) cumulativeFractionDelta(weightedResidual) else 0.0
             val elementRepairs = elementEligibility?.let { elementPreservingRepairs(it) }
-            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs, newlyViolated)
+            return MoveEval(
+                breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs, newlyViolated,
+            )
         } finally {
             breakProbeActive = false
             restoreProbeCoordinates()

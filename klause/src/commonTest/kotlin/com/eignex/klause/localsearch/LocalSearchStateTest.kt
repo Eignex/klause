@@ -376,7 +376,7 @@ class LocalSearchStateTest {
             val activity = state.tabu.touchCount.copyOf()
             val best = state.bestCostSeen
             val step = state.step
-            val membership = state.factorDegree.indices.map { it in state.violated }
+            val membership = state.factorDegree.indices.map { state.violated.contains(it) }
 
             state.moveSink.addChannelingIntSet(state, if (derivedIndex) 4 else 0, 1)
             val variant = state.moveSink.list.filterIsInstance<Move.Compound>().single()
@@ -391,7 +391,7 @@ class LocalSearchStateTest {
             assertContentEquals(weights, state.weights.factorWeights)
             assertContentEquals(touched, state.tabu.lastTouched)
             assertContentEquals(activity, state.tabu.touchCount)
-            assertEquals(membership, state.factorDegree.indices.map { it in state.violated })
+            assertEquals(membership, state.factorDegree.indices.map { state.violated.contains(it) })
             assertEquals(best, state.bestCostSeen)
             assertEquals(step, state.step)
             assertEquals(2L, state.cost)
@@ -452,7 +452,9 @@ class LocalSearchStateTest {
             when (grade) {
                 "new-break" -> assertEquals(1, state.breakScore(rejected))
                 "weighted" -> assertTrue(state.weightedNetDelta(rejected) > state.weightedNetDelta(root))
-                "objective" -> assertEquals(3.0, state.objectiveDelta(assertNotNull(state.shaping.objective), rejected))
+                "objective" -> assertEquals(
+                    3.0, state.objectiveDelta(assertNotNull(state.shaping.objective), rejected),
+                )
             }
             assertEquals(before, state.assignment.snapshot(), grade)
             assertContentEquals(degrees, state.factorDegree, grade)
