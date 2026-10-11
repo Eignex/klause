@@ -70,7 +70,7 @@ class LocalSearchResidualRecorderTest {
     @Test
     fun `element residual omissions count distinct coordinates across aliased roles`() {
         for ((sharedResult, selectedIndex) in listOf(false to false, true to false, false to true)) {
-            val cells = LongArray(32) { 2L + it % 20 }
+            val cells = LongArray(32) { 2L + (it - 2).mod(20) }
             cells[0] = 0
             cells[1] = 1
             cells[31] = if (selectedIndex) 0 else 21
