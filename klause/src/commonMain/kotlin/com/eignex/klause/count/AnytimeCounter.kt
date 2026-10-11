@@ -57,7 +57,8 @@ internal object AnytimeCounter {
                 BIG_TWO
             } else {
                 val domain = problem.rootIntDomain(intVars[d - boolVars.size])
-                bigIntOf(domain.max) - bigIntOf(domain.min) + BIG_ONE - bigIntOf(domain.holeCount)
+                domain.spanOrNull()?.let { bigIntOf(it.size) }
+                    ?: (bigIntOf(domain.max) - bigIntOf(domain.min) + BIG_ONE - bigIntOf(domain.holeCount))
             }
             suffix[d] = sizeAtD * suffix[d + 1]
         }

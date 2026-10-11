@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -37,6 +38,21 @@ class AnytimeCounterTest {
             assertEquals(budget - 1L, result.lower, "budget=$budget")
             assertEquals(3L, result.upper, "budget=$budget")
             assertEquals(budget == 4L, result.exact, "budget=$budget")
+        }
+    }
+
+    @Test
+    fun `sparse integer values across a wide span have their exact projected mass`() {
+        val clamp = 1L shl 62
+        val domain = intDomainFromSurvivors(longArrayOf(-clamp, clamp))
+        val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
+
+        for (budget in 1L..3L) {
+            val result = solver.exactCount(ExactCountConfig(maxChecks = budget)).last()
+
+            assertEquals(budget - 1L, result.lower, "budget=$budget")
+            assertEquals(2L, result.upper, "budget=$budget")
+            assertEquals(budget == 3L, result.exact, "budget=$budget")
         }
     }
 
