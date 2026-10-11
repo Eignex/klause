@@ -57,8 +57,8 @@ class PolynomialExpressionTest {
         val product = PolynomialExpression.Product(operands)
 
         operands[0] = PolynomialExpression.Constant.of(bigIntOf(9))
-        (sum.operands as MutableList)[0] = operands[0]
-        (product.operands as MutableList)[0] = operands[0]
+        (sum.operands as? MutableList)?.set(0, operands[0])
+        (product.operands as? MutableList)?.set(0, operands[0])
 
         assertEquals(listOf(variable, variable), sum.operands)
         assertEquals(listOf(variable, variable), product.operands)

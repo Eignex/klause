@@ -56,8 +56,8 @@ class PolynomialRealFormulaTest {
         val disjunction = PolynomialRealFormula.Or(operands)
 
         operands[0] = PolynomialRealFormula.Constant(false)
-        (conjunction.operands as MutableList)[0] = operands[0]
-        (disjunction.operands as MutableList)[0] = operands[0]
+        (conjunction.operands as? MutableList)?.set(0, operands[0])
+        (disjunction.operands as? MutableList)?.set(0, operands[0])
 
         assertEquals(listOf(variable, variable), conjunction.operands)
         assertEquals(listOf(variable, variable), disjunction.operands)
