@@ -54,6 +54,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 1_048_576)
     private var diagnosticImagesBefore = 0
     private var diagnosticImagesAfter = 0
     private var diagnosticPairsEligible = 0
+    private var diagnosticOpenImages = emptySet<Int>()
 
     private fun diagnosticName(key: ComparisonKey): String = when (key) {
         is Key -> key.operator.name
@@ -67,6 +68,9 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 1_048_576)
         }
         println("; conditionalImagesBefore=$diagnosticImagesBefore")
         println("; conditionalImagesAfter=$diagnosticImagesAfter")
+        println("; conditionalOpenImages=${diagnosticOpenImages.size}")
+        println("; conditionalRetainedOpenImages=${diagnosticOpenImages.count { it !in unused.ints }}")
+        println("; conditionalRetainedKnownImages=${definitions.count { (v, d) -> v !in unused.ints && d.image != null }}")
         println("; conditionalPairsEligible=$diagnosticPairsEligible")
         println("; conditionalExpansionVisits=$work")
         println("; conditionalDefinedInts=${definitions.size}")
@@ -224,6 +228,9 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 1_048_576)
         diagnosticPending = pendingEqualities.keys.groupingBy(::diagnosticName).eachCount()
         diagnosticImagesBefore = definitions.values.count { it.image != null }
         finishImages()
+        diagnosticOpenImages = definitions.filter { (variable, definition) ->
+            definition.image != null && builder.intDomains[variable] is PresolveDomain.Open
+        }.keys
         diagnosticImagesAfter = definitions.values.count { it.image != null }
         diagnosticPairsEligible = pendingEqualities.keys.filterIsInstance<PairKey>().count { key ->
             listOf(key.left, key.right).any { variable ->
