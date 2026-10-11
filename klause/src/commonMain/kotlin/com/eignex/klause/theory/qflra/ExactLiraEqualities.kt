@@ -103,7 +103,8 @@ internal class ExactLiraEqualities(
         }
         if (!forest.preparePaths(progressStop)) return ComponentResult.Indeterminate
         inconsistent?.let { row ->
-            val premises = forest.premises(row.target, row.source, progressStop) ?: return ComponentResult.Indeterminate
+            val premises = forest.comparisonPremises(row.target, row.source, row.sourceSign, progressStop)
+                ?: return ComponentResult.Indeterminate
             val truth = row.op == LinearOp.EQ
             return conflict(context, premises, row.literal(truth), stop)
         }
@@ -130,7 +131,8 @@ internal class ExactLiraEqualities(
                     ?: return ComponentResult.Indeterminate
                 paths + exclusion
             } else if (nonintegral) emptyList() else {
-                forest.premises(row.target, row.source, progressStop) ?: return ComponentResult.Indeterminate
+                forest.comparisonPremises(row.target, row.source, row.sourceSign, progressStop)
+                    ?: return ComponentResult.Indeterminate
             }
             if (assigned != null) {
                 return conflict(context, premises, row.literal(assigned), stop)
@@ -385,6 +387,14 @@ internal class ExactLiraEqualities(
         fun offsetPremises(target: Int, source: Int, stop: Cancellation): List<SearchAtomPremise>? {
             val first = premises(target, find(target).vertex, stop) ?: return null
             val second = premises(source, find(source).vertex, stop) ?: return null
+            return first + second
+        }
+
+        fun comparisonPremises(target: Int, source: Int, sign: Int, stop: Cancellation): List<SearchAtomPremise>? {
+            if (find(target).sign == sign * find(source).sign) return premises(target, source, stop)
+            val zero = parent.lastIndex
+            val first = premises(target, zero, stop) ?: return null
+            val second = premises(source, zero, stop) ?: return null
             return first + second
         }
 

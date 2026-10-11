@@ -24,6 +24,63 @@ import kotlin.test.assertNull
 
 class ExactLiraEqualitiesTest {
     @Test
+    fun `a signed comparison depending on a fixed component cites the fixing guard and retracts`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(
+            3,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 3),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(2, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, -1),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+        assertEquals(true, session.boolValue(2))
+        assertEquals(
+            setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true)),
+            session.reasonFor(2)?.literals?.toSet(),
+        )
+        session.popTo(1)
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+        assertNull(session.boolValue(2))
+    }
+
+    @Test
+    fun `a signed comparison conflict depending on a fixed component cites the fixing guard`() {
+        val open = Bits(2).also { it.set(0); it.set(1) }
+        val source = Problem(
+            3,
+            intBounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 3),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(2, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        for (variable in 0..2) session.push(SearchDecision.Bool(Lit.make(variable, true)))
+
+        val conflict = assertIs<ComponentResult.Conflict>(propagation.propagate(session, Cancellation.Never))
+
+        assertEquals(
+            setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false)),
+            assertNotNull(conflict.explanation).literals.toSet(),
+        )
+    }
+
+    @Test
     fun `negative signed comparisons preserve their direction and complemented source reasons`() {
         for ((operator, bound, truth) in listOf(
             Triple(LinearOp.LE, 0, false), Triple(LinearOp.GE, 0, true),

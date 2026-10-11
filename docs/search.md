@@ -148,6 +148,8 @@ sign reversals, representing `x - y = c` and `x + y = c`.
 Exact signed offsets decide comparisons even when no individual column has a
 bound. Explanation paths cite the selected source equality guards, including
 complemented disequalities; an inconsistent offset path refutes its active guards.
+Comparisons whose signed root does not cancel also cite the path fixing that
+component to zero.
 Active disequalities also exclude matching comparisons after both sides are
 canonicalized to forest components. These implications cite the disequality guard
 and each equality path used in either comparison; individual column bounds are
