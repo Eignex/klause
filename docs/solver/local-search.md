@@ -167,7 +167,8 @@ borrowed only until the synchronous move or probe returns and never enter snapsh
 Coordinate saving retains each touched Boolean, integer or real coordinate once,
 including defined outputs, and restores them through the incremental primitives.
 Reentrant move application, reversible probing, objective scoring or network replacement
-on the same state throws before mutating live scratch. Objective failures and cancellation
+on the same state throws before mutating live scratch, including callbacks during the
+initial objective evaluation. Objective failures and cancellation
 unwind the ordinary probe restoration; subsequent calls reuse cleared traversal marks.
 These operations remain atomic within the existing cancellation boundaries.
 

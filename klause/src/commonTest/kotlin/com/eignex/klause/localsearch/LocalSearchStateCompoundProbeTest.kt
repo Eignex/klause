@@ -87,34 +87,38 @@ class LocalSearchStateCompoundProbeTest {
     }
 
     @Test
-    fun `nested move operations cannot overwrite a live probe`() {
+    fun `nested move operations are rejected throughout grading`() {
         val problem = Problem(1, 2, Array(2) { IntDomain(0, 1) }, emptyArray())
-        for (operation in 0..3) {
-            val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
-            val network = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.Bool2Int(0, 0)), 2, 1)
-            state.invariants = network
-            state.recompute()
-            val move = Move.BoolFlip(0)
-            val duplicate = Move.Compound(listOf(move, move))
-            val before = state.assignment.snapshot()
-            val objective = object : Objective {
-                override fun evaluate(sample: Sample): Double {
-                    if (sample.boolValue(0)) when (operation) {
-                        0 -> state.netDelta(duplicate)
-                        1 -> state.objectiveDelta(LinearObjective(boolWeights = longArrayOf(1)), duplicate)
-                        2 -> state.apply(move)
-                        3 -> state.invariants = network
+        for (applied in listOf(false, true)) {
+            for (operation in 0..3) {
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
+                val network = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.Bool2Int(0, 0)), 2, 1)
+                state.invariants = network
+                state.recompute()
+                val move = Move.BoolFlip(0)
+                val duplicate = Move.Compound(listOf(move, move))
+                val before = state.assignment.snapshot()
+                val objective = object : Objective {
+                    override fun evaluate(sample: Sample): Double {
+                        if (sample.boolValue(0) == applied) when (operation) {
+                            0 -> state.netDelta(duplicate)
+                            1 -> state.objectiveDelta(
+                                LinearObjective(boolWeights = longArrayOf(1)), duplicate,
+                            )
+                            2 -> state.apply(move)
+                            3 -> state.invariants = network
+                        }
+                        return 0.0
                     }
-                    return 0.0
                 }
+
+                assertFailsWith<IllegalStateException> { state.objectiveDelta(objective, move) }
+
+                assertEquals(before, state.assignment.snapshot())
+                assertEquals(0L, state.netDelta(move))
+                state.apply(move)
+                assertEquals(1L, state.assignment.intValue(0))
             }
-
-            assertFailsWith<IllegalStateException> { state.objectiveDelta(objective, move) }
-
-            assertEquals(before, state.assignment.snapshot())
-            assertEquals(0L, state.netDelta(move))
-            state.apply(move)
-            assertEquals(1L, state.assignment.intValue(0))
         }
     }
 

@@ -1157,6 +1157,21 @@ class LocalSearchState private constructor(
         elementEligibility: MoveSink? = null,
     ): MoveEval {
         check(!probeActive && !moveActive) { "local-search probes cannot be nested" }
+        moveActive = true
+        try {
+            return probeMove(move, objective, refineCumulative, weightedResidual, elementEligibility)
+        } finally {
+            moveActive = false
+        }
+    }
+
+    private fun probeMove(
+        move: Move,
+        objective: Objective?,
+        refineCumulative: Boolean,
+        weightedResidual: Boolean,
+        elementEligibility: MoveSink?,
+    ): MoveEval {
         val oldCost = cost
         val oldBestCost = bestCostSeen
         val oldTracking = activityTracking
