@@ -11,8 +11,8 @@ import kotlin.random.Random
  * uniformly to every prior activity, but cheaper (we only mutate the increment, not every
  * activity entry). Periodically rescales when `increment` approaches [Double] overflow.
  *
- * Picks the unpinned variable with the highest activity. Ties follow the heap order. Activities persist across [onRestart] — that's the whole point of
- * VSIDS, learning carries over.
+ * Picks the unpinned variable with the highest activity. Ties follow the heap order. Activities persist
+ * across [onRestart], so learning carries over.
  *
  * Written against [BranchingState], so the same activities drive a finite CP traversal and a theory
  * traversal. A shared Boolean analyzer names the variables of its asserting clause. Native CP analysis
