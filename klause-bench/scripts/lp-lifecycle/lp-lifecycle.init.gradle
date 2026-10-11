@@ -6,7 +6,12 @@ gradle.projectsEvaluated {
     project.tasks.register('lpLifecycleComparison', JavaExec) {
         group = 'verification'
         dependsOn(compilation.compileTaskProvider)
-        classpath(compilation.output.allOutputs, compilation.runtimeDependencyFiles)
+        def cli = rootProject.findProperty('lpLifecycleCli')
+        if (cli == null) {
+            classpath(compilation.output.allOutputs, compilation.runtimeDependencyFiles)
+        } else {
+            classpath(compilation.output.allOutputs, project.fileTree(cli + '/lib') { include '*.jar' })
+        }
         mainClass.set('com.eignex.klause.lp.bounding.LpLifecycleComparisonKt')
         workingDir(rootProject.rootDir)
     }
