@@ -12,6 +12,8 @@ import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.portfolio.binaryIntegers
+import com.eignex.klause.portfolio.continuousMajority
 import com.eignex.klause.portfolio.finiteWitnessVerifier
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
@@ -53,7 +55,8 @@ fun FinitePipeline.portfolioExecutor(
         reseedStaleThreshold = scenario.reseedStaleThreshold,
         profile = profile,
         minShares = if (proofShares.isEmpty()) {
-            continuousLpShares(scenario, profile, workers.map { it.label }, objective)
+            continuousLpShares(scenario, profile, workers.map { it.label }, objective,
+                problem.continuousMajority, problem.binaryIntegers)
         } else {
             proofShares
         },
@@ -97,7 +100,10 @@ internal fun continuousLpShares(
     profile: ProblemProfile,
     labels: List<String>,
     objective: LinearObjective?,
+    continuousMajority: Boolean = false,
+    binaryIntegers: Boolean = false,
 ): DoubleArray {
+    if (continuousMajority && !binaryIntegers) return DoubleArray(0)
     if (objective?.realCoefficientValues?.any { it != 0.0 } != true) return DoubleArray(0)
     if (!LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return DoubleArray(0)
     if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.engine != EngineMix.MIXED ||
