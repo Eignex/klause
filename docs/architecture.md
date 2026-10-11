@@ -19,7 +19,7 @@ Packages below are under `com.eignex.klause` in
 
 | Package | Owns | Dependency rule |
 |---|---|---|
-| `ir` | Literals, variable descriptions, remapping, structural keys and `Problem` | Engine-neutral; no engines, compilation or input formats |
+| `ir` | Literals, variable descriptions, remapping, structural keys, polynomial source expressions/formulas and `Problem` | Engine-neutral; no engines, compilation or input formats |
 | `model`, `schema`, `compile` | Model expressions, schema DSL and compilation | Use shared IR and lowering |
 | `lowering` | Generic Boolean and constraint encodings | Independent of schema compiler and format callers |
 | `formats` | Parsing and lowering source syntax | Uses shared lowering; no compiler or concrete theory dependency |
@@ -38,6 +38,7 @@ Packages below are under `com.eignex.klause` in
 | `meta` | Adaptive large-neighbourhood search and core-guided optimization | Composes solver mechanisms |
 | `count` | Exact/approximate counting and near-uniform sampling | Uses compiled finite models and bounded solver cells |
 | `theory.difference`, `theory.lia`, `theory.qflra` | Open arithmetic fragments | Must not materialize finite CP domains |
+| `theory.qfnra` | Complete polynomial CAD projection-family construction | Reads the exact polynomial kernel; no finite domains or linear-engine state |
 | `solver.pipeline` | Source routing and one verdict surface | Selects theory once; frontends render assignments |
 | `solver.search` | Component protocol, decisions, traversal, retraction, learning and complete checks | Owns shared lifecycle across CP and theory components |
 
@@ -64,32 +65,21 @@ with internal input/result interfaces; it reads only neutral `util` primitives.
 Package dependency checks enforce its independence from model and solver state.
 Numerical tests run with the solver's JVM and Native tests.
 
-`arithmetic.polynomial` captures exact rational coefficients and nonnegative integer
-variable IDs in immutable sparse polynomials. Ascending IDs define lexicographic
-monomial ordering; the largest variable ID is the main variable. Callers remap IDs
-to select another elimination order. Bareiss elimination computes resultants and
-principal subresultant coefficients, indexed from zero through one less than the
-smaller degree; leading coefficients remain separately accessible. Zero resultants
-retain their shared-factor meaning. Rational univariate Euclidean division,
-square-free decomposition and Sturm sequences isolate distinct ordered real roots,
-including repeated and rational roots. Zero polynomials reject finite root-list
-requests; nonzero constants have no roots. Root intervals have exact rational
-endpoints and contain one root; equal endpoints identify an exact rational root.
-Nonpoint intervals exclude endpoint roots.
-
-Polynomial contexts charge and poll the invocation's `Cancellation` between
-coefficient operations and elimination steps. Interruption throws
-`PolynomialInterrupted` without publishing a partial mathematical result. Inputs,
-polynomials and completed intervals outlive the context and never retain mutable
-producer buffers. Dense coefficient expansion defaults to at most 65,536 entries
-and elimination matrices to at most 262,144 cells per allocation. Callers can
-configure these invocation limits; null disables either cap within the checked
-integer representation. A checked `PolynomialResourceLimit` identifies
-dense expansion, matrix allocation or degree overflow before allocating or
-truncating data; this is a resource decline, never a mathematical verdict.
+`arithmetic.polynomial` owns sparse exact polynomials, elimination determinants,
+rational and algebraic real roots, and specialization over earlier irrational
+coordinates. Its public `AlgebraicReal` metadata owns a rational defining polynomial,
+distinct ordered root index and exact isolating bounds. Algorithms remain internal,
+with caller-owned cancellation/work accounting and explicit allocation/representation
+declines. [Exact polynomial arithmetic](arithmetic/polynomial.md) defines these
+contracts and the configurable resource limits.
 
 The [library API contract](api.md) classifies supported, experimental and implementation
 surfaces and defines typed mapping and migration boundaries.
+
+The [polynomial real theory](solver/qfnra.md) selects complete Collins projection
+families over the exact kernel. It preserves declared dimensions and owns descending
+elimination order and projection-family buffers. Mathematical arithmetic remains in
+the kernel; projection policy remains in the theory.
 
 ## Model and ownership
 

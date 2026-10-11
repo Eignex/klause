@@ -195,6 +195,52 @@ an exact strict-feasibility refutation. A closure point on a strict boundary is
 insufficient. Budgets can leave the solve unknown; support for linear syntax is
 not an unlimited completeness guarantee for every integer model.
 
+### Polynomial source lowering
+
+The internal `SmtLibPolynomial.parse` entry point preserves pure Real/Bool polynomial
+satisfaction sources separately from `SmtLib.parse` and its linear factors. It performs
+no theory selection and publishes no SAT/UNSAT result. The existing SMT facade and
+CLI retain their supported linear routes.
+
+`ir.PolynomialExpression` retains exact reduced arbitrary-precision rational leaves,
+source real identities, sums, products and nonnegative integer powers. Relations
+retain both polynomial sides and equality, disequality or strict/non-strict ordering.
+`ir.PolynomialRealFormula` carries constants, source Boolean identities, negation,
+conjunction and disjunction. The mathematical kernel owns polynomial normalization;
+source IR does not implement sparse polynomial algebra. Structural equality describes
+the owned expression/formula graph, rather than general algebraic equivalence.
+`VarRemap` preserves coefficients, relations and Boolean polarity, including aliases;
+removing a referenced variable declines. Captured operands and source maps cannot be
+changed through caller buffers or getter results. Variable counts are checked before
+publication.
+
+The source entry point supports exact decimal/numeral coefficients, constant rational
+division, repeated-variable products, powers with exact constant nonnegative integer
+exponents (including lexical/helper-bound constants), chained comparisons, pairwise `distinct`,
+Boolean equality/xor/implication and conditionals. Numeric conditionals use fresh real
+identities with guarded defining equalities. Source declaration counts and name maps
+remain separate from total auxiliary counts; unconstrained declarations stay present.
+Name-map keys use canonical unquoted symbols; rendering must quote them when needed.
+A syntactic nonlinear marker distinguishes products of multiple nonconstant operands
+and nonconstant powers above one, without requiring polynomial expansion.
+
+Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun` macros
+capture their definition scope, and assertions retain the declarations visible at
+that source command. Unsupported syntax is rejected even inside a constant Boolean
+branch. One `check-sat` or `check-sat-assuming` query is accepted; Boolean literal
+assumptions are conjoined with the assertions. `get-model` is accepted as a request.
+Mixed integer sorts, symbolic or zero division, negative/noninteger/oversized powers,
+uninterpreted functions, nonpolynomial operations, quantifiers, objectives, incremental
+commands, multiple queries and `get-value` decline explicitly.
+
+The dedicated parser accepts caller `Cancellation`, defaulting to `Never`. It polls
+between streamed chunks, commands, evaluator frames and source identity validation,
+and before/after rational coefficient folds. Each completed rational addition or
+multiplication charges one source folding unit to the caller's meter. Interruption
+throws the distinct internal `PolynomialSourceInterrupted` signal without publishing
+a partial formula; invocation owners decide cancellation/budget result causality.
+Polynomial expansion and decision work remain owned by the nonlinear kernel/theory.
+
 ## MPS
 
 The MPS parser retains decimal source metadata, integer markers, bounds and
