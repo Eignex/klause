@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.InvariantNetworkPreparation
 import com.eignex.klause.localsearch.LocalSearchPreparation
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
@@ -197,7 +198,9 @@ object PortfolioBuilder {
             localSearchProjection = LocalSearchPreparation(
                 problem, LocalSearchModel.of(problem).domains, concurrency.lock(),
             ),
-            localSearchInvariants = lazy { definitionalSweep?.network(problem.numIntVars, problem.numBoolVars) },
+            localSearchInvariants = InvariantNetworkPreparation(
+                definitionalSweep, problem.numIntVars, problem.numBoolVars, concurrency.lock(),
+            ),
             identity = identity,
         )
     }

@@ -7,9 +7,22 @@ import kotlin.random.Random
  * Backed by a list of present elements and a parallel index map keyed by element id.
  * Element ids must be in [0, capacity).
  */
-class IntSwapSet(capacity: Int) {
-    private val elements = IntArrayList(capacity.coerceAtLeast(8))
-    private val position = IntArray(capacity) { -1 }
+class IntSwapSet private constructor(private val elements: IntArrayList, private val position: IntArray) {
+    constructor(capacity: Int) : this(IntArrayList(capacity.coerceAtLeast(8)), IntArray(capacity) { -1 })
+
+    internal companion object {
+        fun preparation(capacity: Int, batch: Int): Sequence<IntSwapSet?> = sequence {
+            val elements = IntArrayList(capacity.coerceAtLeast(8))
+            yield(null)
+            val position = IntArray(capacity)
+            yield(null)
+            for (from in 0 until capacity step batch) {
+                position.fill(-1, from, minOf(from + batch, capacity))
+                yield(null)
+            }
+            yield(IntSwapSet(elements, position))
+        }
+    }
 
     /** Number of elements currently in the set. */
     val size: Int get() = elements.size

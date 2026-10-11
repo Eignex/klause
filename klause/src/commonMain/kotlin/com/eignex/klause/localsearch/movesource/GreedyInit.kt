@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch.movesource
 
+import com.eignex.klause.localsearch.INITIALIZATION_BATCH
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
@@ -24,22 +25,30 @@ class GreedyInit {
         pass(state).advance(stop)
     }
 
-    internal fun pass(state: LocalSearchState): Pass {
+    internal fun pass(state: LocalSearchState): Pass = preparation(state).filterNotNull().first()
+
+    internal fun preparation(state: LocalSearchState): Sequence<Pass?> = sequence {
         val problem = state.problem
         val varCount = problem.numBoolVars + problem.numIntVars
         val eligibility = MoveSink()
         eligibility.setAssumptions(state.assumptions)
         eligibility.setInvariants(state.invariants)
         eligibility.setOwners(state.seeding.ownerInt)
-        val order = IntArray(varCount) { it }
+        val order = IntArray(varCount)
+        yield(null)
+        for (i in order.indices) {
+            order[i] = i
+            if ((i + 1) % INITIALIZATION_BATCH == 0) yield(null)
+        }
         // Fisher-Yates shuffle on the state's RNG so the pass is deterministic for a given seed.
         for (i in order.size - 1 downTo 1) {
             val j = state.rng.nextInt(i + 1)
             val tmp = order[i]
             order[i] = order[j]
             order[j] = tmp
+            if (i % INITIALIZATION_BATCH == 0) yield(null)
         }
-        return Pass(state, order, eligibility)
+        yield(Pass(state, order, eligibility))
     }
 
     internal inner class Pass(

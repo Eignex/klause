@@ -28,7 +28,12 @@ class ImplicitSeeding(
      *  largest-scope-first so no two seed factors share an int variable. Disjointness guarantees one
      *  factor's [Invariant.seedFeasible] never overwrites another's seeded vars, so the post-seed
      *  assignment satisfies every seeded global simultaneously. */
-    val implicitSeedFactors: IntArray by lazy { electImplicitSeedSet() }
+    private var preparedSeedFactors: IntArray? = null
+    val implicitSeedFactors: IntArray
+        get() {
+            seedSetSteps().forEach { }
+            return checkNotNull(preparedSeedFactors)
+        }
 
     /** Implicit-solving owner map over int vars: `ownerInt[v]` is the factor id that owns int var
      *  `v`, or `-1` if `v` is searched freely. A variable is owned once [seedImplicitFeasible] seeds
@@ -60,50 +65,94 @@ class ImplicitSeeding(
         return IntArray(out.size) { out[it] }
     }
 
-    private fun electImplicitSeedSet(): IntArray {
-        // Largest scope first to seed the most variables; ties broken by factor id for determinism
-        // (election must be reproducible, so the RNG never enters it).
-        val candidates = electedImplicit.sortedWith(
-            compareByDescending<Int> { problem.factors[it].intVars.size }.thenBy { it },
-        )
+    private fun seedSetSteps(): Sequence<Unit> = sequence {
+        if (preparedSeedFactors != null) return@sequence
+        val elected = IntArrayList()
+        for (id in 0 until problem.numFactors) {
+            if (projection.invariants[id].providesImplicitNeighbourhood) elected.add(id)
+            if ((id + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+        }
+        var candidates = elected.toIntArray()
+        yield(Unit)
+        var sorted = IntArray(candidates.size)
+        yield(Unit)
+        var visits = 0
+        var width = 1
+        // Stable merging retains largest-scope-first election and factor-id tie order.
+        while (width < candidates.size) {
+            var from = 0
+            while (from < candidates.size) {
+                val mid = minOf(from.toLong() + width, candidates.size.toLong()).toInt()
+                val end = minOf(mid.toLong() + width, candidates.size.toLong()).toInt()
+                var left = from
+                var right = mid
+                for (out in from until end) {
+                    val takeLeft = right == end || (left < mid &&
+                        problem.factors[candidates[left]].intVars.size >= problem.factors[candidates[right]].intVars.size)
+                    sorted[out] = if (takeLeft) candidates[left++] else candidates[right++]
+                    if (++visits % INITIALIZATION_BATCH == 0) yield(Unit)
+                }
+                from = end
+            }
+            val swap = candidates
+            candidates = sorted
+            sorted = swap
+            width = minOf(width.toLong() * 2, candidates.size.toLong()).toInt()
+        }
         val owned = BooleanArray(problem.numIntVars)
+        yield(Unit)
         val seeds = IntArrayList()
         for (id in candidates) {
+            if (++visits % INITIALIZATION_BATCH == 0) yield(Unit)
             val scope = problem.factors[id].intVars
             var disjoint = true
             for (v in scope) {
+                if (++visits % INITIALIZATION_BATCH == 0) yield(Unit)
                 if (owned[v]) {
                     disjoint = false
                     break
                 }
             }
             if (!disjoint) continue
-            for (v in scope) owned[v] = true
+            for (v in scope) {
+                owned[v] = true
+                if (++visits % INITIALIZATION_BATCH == 0) yield(Unit)
+            }
             seeds.add(id)
         }
-        return IntArray(seeds.size) { seeds[it] }
+        preparedSeedFactors = seeds.toIntArray()
     }
 
-    /** Implicit-solving feasible init: seed every [implicitSeedFactors] global into a satisfying
-     *  configuration (skipping vars frozen by [state]'s assumptions). Caller is responsible for the
-     *  subsequent recompute. */
+    /** Implicit-solving feasible init; costs are reconciled by the caller. */
     internal fun seedImplicitFeasible(state: LocalSearchState) {
-        val seeds = implicitSeedFactors
-        if (seeds.isEmpty()) return
-        val owners = ownerInt ?: IntArray(problem.numIntVars) { -1 }
-        owners.fill(-1)
-        for (i in seeds.indices) {
-            val fid = seeds[i]
-            // Own a global's variables only when it actually seeded feasible: a failed seed (e.g. an
-            // all-different with no perfect matching) leaves its vars infeasible, so they must stay in
-            // the generic neighbourhood to be repaired rather than be frozen out as "implicitly solved".
+        seedSteps(state).forEach { }
+    }
+
+    internal fun seedSteps(state: LocalSearchState): Sequence<Unit> = sequence {
+        yieldAll(seedSetSteps())
+        val seeds = checkNotNull(preparedSeedFactors)
+        if (seeds.isEmpty()) return@sequence
+        val owners = ownerInt ?: IntArray(problem.numIntVars)
+        yield(Unit)
+        for (from in owners.indices step INITIALIZATION_BATCH) {
+            owners.fill(-1, from, minOf(from + INITIALIZATION_BATCH, owners.size))
+            yield(Unit)
+        }
+        for (fid in seeds) {
+            yield(Unit)
+            // A failed seed leaves its coordinates searchable by ordinary repair.
             if (projection.invariants[fid].seedFeasible(state, fid)) {
-                for (v in problem.factors[fid].intVars) owners[v] = fid
+                val scope = problem.factors[fid].intVars
+                for (i in scope.indices) {
+                    owners[scope[i]] = fid
+                    if ((i + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+                }
             }
         }
         ownerInt = owners
         state.moveSink.setOwners(owners)
     }
+
 }
 
 /** Free-Boolean probe cap for [ImplicitSeeding.implicationGraph], mirroring the presolve

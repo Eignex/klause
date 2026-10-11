@@ -47,14 +47,27 @@ internal class WarmState {
      *  ALNS destroy keys on); restoring [bestCostSeen] lets `OrImprovesBestEver`
      *  aspiration see the full-history low. */
     internal fun applyTo(state: LocalSearchState) {
+        applySteps(state).forEach { }
+    }
+
+    internal fun applySteps(state: LocalSearchState): Sequence<Unit> = sequence {
         factorWeights?.let { w ->
-            if (w.size == state.weights.factorWeights.size) {
-                for (i in w.indices) state.weights.factorWeights[i] = w[i]
+            yieldAll(state.weights.preparation())
+            val target = state.weights.factorWeights
+            if (w.size == target.size) {
+                for (from in w.indices step INITIALIZATION_BATCH) {
+                    w.copyInto(target, from, from, minOf(from + INITIALIZATION_BATCH, w.size))
+                    yield(Unit)
+                }
             }
         }
         activityTouches?.let { t ->
-            if (t.size == state.tabu.touchCount.size) {
-                for (i in t.indices) state.tabu.touchCount[i] = t[i]
+            val target = state.tabu.touchCount
+            if (t.size == target.size) {
+                for (from in t.indices step INITIALIZATION_BATCH) {
+                    t.copyInto(target, from, from, minOf(from + INITIALIZATION_BATCH, t.size))
+                    yield(Unit)
+                }
             }
         }
         if (bestCostSeen < state.bestCostSeen) state.bestCostSeen = bestCostSeen

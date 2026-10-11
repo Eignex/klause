@@ -30,19 +30,15 @@ class FactorWeightBook(private val problem: Problem) {
      *  progress.
      *
      *  When [normalizeWeightsByClass] is set, non-implied invariants are additionally damped by class
-     *  population — see [initialFactorWeights]. */
+     *  population — see [preparation]. */
     val factorWeights: DoubleArray
         get() {
-            var w = _factorWeights
-            if (w == null) {
-                w = initialFactorWeights()
-                _factorWeights = w
-                _baseFactorWeights = w.copyOf()
-            }
-            return w
+            _factorWeights?.let { return it }
+            preparation().forEach { }
+            return checkNotNull(_factorWeights)
         }
 
-    /** The initial seeded per-factor weights ([initialFactorWeights]), snapshotted once when
+    /** The initial seeded per-factor weights ([preparation]), snapshotted once when
      *  [factorWeights] is first allocated and never mutated. SAPS-style smoothing pulls the live
      *  weights back toward this baseline rather than a flat constant, so the per-class / implied
      *  seeding survives the reactive bumping. */
@@ -62,27 +58,40 @@ class FactorWeightBook(private val problem: Problem) {
      *  above the mean over non-implied classes) is scaled so its aggregate weight is capped at that
      *  mean, never amplifying a smaller class above 1.0. Implied factors are pinned to
      *  [IMPLIED_FACTOR_INITIAL_WEIGHT] and excluded from the class tally. */
-    private fun initialFactorWeights(): DoubleArray {
+    internal fun preparation(): Sequence<Unit> = sequence {
+        if (_factorWeights != null) return@sequence
         val n = problem.numFactors
         val implied = problem.impliedFactorMask
-        val w = DoubleArray(n) { 1.0 }
+        val w = DoubleArray(n)
+        yield(Unit)
+        val counts = HashMap<KClass<*>, Int>()
         if (normalizeWeightsByClass) {
-            val counts = HashMap<KClass<*>, Int>()
             for (i in 0 until n) {
+                if (i % INITIALIZATION_BATCH == 0) yield(Unit)
                 if (implied != null && implied[i]) continue
                 val k = problem.factors[i]::class
                 counts[k] = (counts[k] ?: 0) + 1
             }
-            if (counts.isNotEmpty()) {
-                val meanClassSize = counts.values.sum().toDouble() / counts.size
-                for (i in 0 until n) {
-                    if (implied != null && implied[i]) continue
-                    val c = counts.getValue(problem.factors[i]::class)
-                    if (c > meanClassSize) w[i] = meanClassSize / c
-                }
+        }
+        var total = 0L
+        for (count in counts.values) total += count
+        val meanClassSize = if (counts.isEmpty()) 0.0 else total.toDouble() / counts.size
+        for (i in 0 until n) {
+            if (i % INITIALIZATION_BATCH == 0) yield(Unit)
+            w[i] = when {
+                implied != null && implied[i] -> IMPLIED_FACTOR_INITIAL_WEIGHT
+                counts.isNotEmpty() && counts.getValue(problem.factors[i]::class) > meanClassSize ->
+                    meanClassSize / counts.getValue(problem.factors[i]::class)
+                else -> 1.0
             }
         }
-        if (implied != null) for (i in 0 until n) if (implied[i]) w[i] = IMPLIED_FACTOR_INITIAL_WEIGHT
-        return w
+        val base = DoubleArray(n)
+        yield(Unit)
+        for (from in 0 until n step INITIALIZATION_BATCH) {
+            w.copyInto(base, from, from, minOf(from + INITIALIZATION_BATCH, n))
+            yield(Unit)
+        }
+        _baseFactorWeights = base
+        _factorWeights = w
     }
 }

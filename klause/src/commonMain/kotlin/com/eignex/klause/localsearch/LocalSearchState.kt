@@ -46,16 +46,36 @@ private const val MAX_PRESERVED_ELEMENT_SELECTIONS: Int = 32
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
  * per-factor scratch arrays ([intPayload], [refPayload]), and the aggregated hard cost.
  */
-class LocalSearchState(
+class LocalSearchState private constructor(
     /** The model being searched. */
     val model: LocalSearchModel,
     /** Search RNG. */
     val rng: Random,
     /** Variables pinned for this search. */
-    var assumptions: Assumptions = Assumptions.None,
+    var assumptions: Assumptions,
     /** Local-search projection for this state. */
-    val projection: LocalSearchProblem = LocalSearchProblem(model.problem, model.domains),
+    val projection: LocalSearchProblem,
+    buffers: LocalSearchBuffers,
 ) {
+    constructor(
+        model: LocalSearchModel,
+        rng: Random,
+        assumptions: Assumptions = Assumptions.None,
+        projection: LocalSearchProblem = LocalSearchProblem(model.problem, model.domains),
+    ) : this(model, rng, assumptions, projection, LocalSearchBuffers.preparation(model.problem).filterNotNull().first())
+
+    internal companion object {
+        fun preparation(
+            model: LocalSearchModel,
+            rng: Random,
+            assumptions: Assumptions,
+            projection: LocalSearchProblem,
+        ): Sequence<LocalSearchState?> = sequence {
+            for (buffers in LocalSearchBuffers.preparation(model.problem)) {
+                yield(buffers?.let { LocalSearchState(model, rng, assumptions, projection, it) })
+            }
+        }
+    }
     /** A search over the finite model [problem]. */
     constructor(
         problem: BakedProblem,
@@ -71,34 +91,30 @@ class LocalSearchState(
     val rootDomains: Array<IntDomain> = model.domains
 
     /** The current variable assignment. */
-    val assignment: Assignment = Assignment(
-        numBoolVars = problem.numBoolVars,
-        numIntVars = problem.numIntVars,
-        numRealVars = problem.numRealVars,
-    )
+    val assignment: Assignment = buffers.assignment
 
     /** Invariant ids currently violated (degree > 0). */
-    val violated: IntSwapSet = IntSwapSet(problem.numFactors)
+    val violated: IntSwapSet = buffers.violated
 
     /** Per-invariant graded violation degree (0 = satisfied), the source of truth for both
      *  [violated]-set membership (`degree > 0`) and [cost] (`Σ factorDegree`). Maintained
      *  from exact post-move degrees after updating invariant payloads, and recomputed from
      *  [Invariant.violationDegree] at [recompute]. The graded sum gives CBLS a descent gradient on
      *  tight arithmetic/global constraints rather than a flat count of violated invariants. */
-    val factorDegree: IntArray = IntArray(problem.numFactors)
-    val intPayload: IntArray = IntArray(problem.numFactors)
+    val factorDegree: IntArray = buffers.factorDegree
+    val intPayload: IntArray = buffers.intPayload
 
     /** Per-factor `Long` scratch, the wide counterpart to [intPayload]. The weighted-sum
      *  family ([Linear], [ReifiedLinear], `PseudoBoolean`, `ReifiedPseudoBoolean`) keeps its
      *  running `Σ coeff·value` here so large coefficients / wide domains can't wrap a 32-bit
      *  accumulator and silently corrupt `isViolated` / `violationDegree`. Clauses pack their two
      *  watched literal indices into this slot. */
-    val longPayload: LongArray = LongArray(problem.numFactors)
-    val refPayload: Array<Any?> = arrayOfNulls(problem.numFactors)
+    val longPayload: LongArray = buffers.longPayload
+    val refPayload: Array<Any?> = buffers.refPayload
 
     /** Per-factor `Double` scratch for rows over continuous columns, which keep their running sum in
      *  floating point; empty for a model with no continuous column. */
-    val doublePayload: DoubleArray = if (problem.numRealVars == 0) EmptyDoubleArray else DoubleArray(problem.numFactors)
+    val doublePayload: DoubleArray = buffers.doublePayload
 
     // Factors that read a continuous column; their floating-point sums drift and are refreshed from scratch.
     private val realFactors: IntArray by lazy(LazyThreadSafetyMode.NONE) {
@@ -140,7 +156,7 @@ class LocalSearchState(
     val shaping: ObjectiveShaping = ObjectiveShaping()
 
     /** Tabu / activity bookkeeping: the accepted-move clock, last-touched stamps, and touch counts. */
-    val tabu: TabuBook = TabuBook(problem)
+    val tabu: TabuBook = buffers.tabu
 
     /** Implicit-solving setup: elected globals, disjoint seed set, owner map, implication graph. */
     val seeding: ImplicitSeeding = ImplicitSeeding(problem, projection)
@@ -154,8 +170,8 @@ class LocalSearchState(
     val step: Long get() = tabu.step
 
     // Walks that never query Boolean break/make scores avoid their initialization and maintenance cost.
-    private val cachedBoolBreakCount: IntArray = IntArray(problem.numBoolVars)
-    private val cachedBoolMakeCount: IntArray = IntArray(problem.numBoolVars)
+    private val cachedBoolBreakCount: IntArray = buffers.cachedBoolBreakCount
+    private val cachedBoolMakeCount: IntArray = buffers.cachedBoolMakeCount
     private var boolScoresInitialized = false
     internal val boolBreakCount: IntArray
         get() {
@@ -197,16 +213,16 @@ class LocalSearchState(
     /** Configuration-Checking flag per Boolean variable. `true` means a neighboring variable has
      *  been touched since this var was last flipped (or since restart), so CCASat-style strategies
      *  treat it as eligible to re-flip; `false` means re-flipping it would be a no-progress cycle. */
-    val boolConfChange: BooleanArray = BooleanArray(problem.numBoolVars) { true }
+    val boolConfChange: BooleanArray = buffers.boolConfChange
 
     /** Configuration-Checking flag per integer variable. See [boolConfChange]. */
-    val intConfChange: BooleanArray = BooleanArray(problem.numIntVars) { true }
+    val intConfChange: BooleanArray = buffers.intConfChange
 
     // Which factors make their variables each other's neighbours for configuration checking: the model's own. The
     // objective-bound overlay spans every objective variable, so marking through it would make every variable a
     // neighbour of every other, which is no configuration checking at all, and cost a pass over the objective on
     // every flip.
-    private val confNeighbours = BooleanArray(problem.factors.size) { problem.factors[it] !is ObjectiveBoundFactor }
+    private val confNeighbours = buffers.confNeighbours
 
     // A weighted probe saves only degrees that change, avoiding a model-wide copy and scan per candidate.
     private var degScratch: IntArray? = null
@@ -221,8 +237,8 @@ class LocalSearchState(
     // first touch. The break count is then a scan of only the touched factors: a factor can flip
     // into violation only if its degree changed.
     private var breakProbeActive = false
-    private val probeTouched: BooleanArray = BooleanArray(problem.numFactors)
-    private val probeWasViolated: BooleanArray = BooleanArray(problem.numFactors)
+    private val probeTouched: BooleanArray = buffers.probeTouched
+    private val probeWasViolated: BooleanArray = buffers.probeWasViolated
     private val probeTouchedList: IntArrayList = IntArrayList()
 
     // Set for the whole apply+revert span of a move probe. While active, applyBoolFlip /
@@ -261,6 +277,52 @@ class LocalSearchState(
         assumptions.forEachInt { id, value -> assignment.setInt(id, value) }
         for (r in 0 until problem.numRealVars) assignment.setReal(r, startingReal(r))
         resetStepCounters()
+    }
+
+    internal fun initialAssignmentSteps(sample: Sample?): Sequence<Unit> = sequence {
+        val carried = sample != null && sample.numBoolVars == problem.numBoolVars &&
+            sample.numIntVars == problem.numIntVars
+        if (carried) {
+            for (b in 0 until problem.numBoolVars) {
+                assignment.setBool(b, checkNotNull(sample).boolValue(b))
+                if ((b + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+            }
+            for (v in rootDomains.indices) {
+                assignment.setInt(v, checkNotNull(sample).intValue(v))
+                if ((v + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+            }
+        } else {
+            for (from in 0 until assignment.boolWordCount step INITIALIZATION_BATCH) {
+                assignment.randomizeBoolWords(rng, from, minOf(from + INITIALIZATION_BATCH, assignment.boolWordCount))
+                yield(Unit)
+            }
+            for (v in rootDomains.indices) {
+                assignment.setInt(v, rootDomains[v].randomValue(rng))
+                if ((v + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+            }
+            if (model.anchoredSampling) {
+                for (v in rootDomains.indices) {
+                    assignment.setInt(v, anchoredValue(rootDomains[v], rootDomains[v].clamp(0L)))
+                    if ((v + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+                }
+            }
+        }
+        yield(Unit)
+        // Pins are applied after every random draw, including the anchored pass.
+        for (i in assumptions.boolKeys.indices) {
+            assignment.setBool(assumptions.boolKeys[i], assumptions.boolValues[i])
+            if ((i + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+        }
+        for (i in assumptions.intKeys.indices) {
+            assignment.setInt(assumptions.intKeys[i], assumptions.intValues[i])
+            if ((i + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+        }
+        val carriedReals = carried && checkNotNull(sample).numRealVars == problem.numRealVars
+        for (r in 0 until problem.numRealVars) {
+            assignment.setReal(r, if (carriedReals) checkNotNull(sample).approximateRealValue(r) else startingReal(r))
+            if ((r + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
+        }
+        // A fresh state has an empty activity epoch and configuration flags already set.
     }
 
     /** Set the continuous columns to [sample]'s values when it carries one per column, else to their starting

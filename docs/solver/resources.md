@@ -43,6 +43,14 @@ bootstrap slices retain the containing lifetime scope and rearm their invocation
 | Open-theory limits | Open policy work, leaves and decisions, retained complete theory scope | `Long.MAX_VALUE` / exhausted scope | Unknown budget exhaustion; completed proofs only |
 | Neutral kernel controls | Caller-owned native work, optional maximum and cancellation | Missing maximum / zero maximum is exhausted | Kernel interruption without solver result semantics |
 
+Local-search initial preparation retains its progress between cancelled invocations.
+Buffer allocation, assignment seeding and definition preparation spend wall time without
+search instructions; resuming them neither renews nor charges the containing move
+allowance. Only committed walk/restart instructions advance that ledger. Invocation
+expiry leaves private preparation paused; closing discards its cursor. Individual
+runtime allocations and factor calls remain atomic and may overrun the deadline; see
+[initialization boundaries](local-search.md#projections-and-preparation).
+
 The solve-wide decision/move currency excludes propagation and LP work. Ordinary LS
 instructions and CP repair decisions charge the same containing `NodeBudget`. The
 private clausal primal search and walk also charge that ledger. Their decisions and
