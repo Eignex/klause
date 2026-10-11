@@ -27,6 +27,72 @@ import kotlin.test.assertTrue
  */
 class LocalSearchStateTest {
     @Test
+    fun `root repairs coordinate already violated Element selections`() {
+        for (definedResults in listOf(false, true)) {
+            val problem = Problem(
+                0, 9, arrayOf(
+                    IntDomain(0, 1), IntDomain(2, 3), IntDomain(1, 1), IntDomain(1, 1),
+                    IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0),
+                ), arrayOf<Factor>(
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, -2),
+                    Element(0, 2, longArrayOf(4, 5), true, 0),
+                    Element(1, 3, longArrayOf(6, 7), true, 2),
+                    Cumulative(intArrayOf(0, 8), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val hints = if (definedResults) intArrayOf(1, 2, 3) else intArrayOf(1)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, hints)).network(9, 0)
+            for ((variable, value) in longArrayOf(0, 2, 1, 1, 0, 0, 1, 0, 0).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+            val before = state.assignment.snapshot()
+            val degrees = state.factorDegree.copyOf()
+            val payloads = state.intPayload.copyOf()
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+            val coordinated = state.moveSink.list.filterIsInstance<Move.Compound>().single()
+            val predicted = state.netDelta(coordinated)
+
+            assertEquals(before, state.assignment.snapshot())
+            assertEquals(2L, state.cost)
+            assertContentEquals(degrees, state.factorDegree)
+            assertContentEquals(payloads, state.intPayload)
+            assertTrue(state.moveSink.list.any { it == Move.IntSet(0, 1) })
+            assertEquals(0L, state.netDelta(Move.IntSet(0, 1)))
+            assertEquals(-2L, predicted)
+            state.apply(coordinated)
+            assertEquals(1L, state.assignment.intValue(5))
+            assertEquals(1L, state.assignment.intValue(7))
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `violated Element repair variants keep pinned destination cells`() {
+        val problem = Problem(
+            0, 5, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 0)),
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(2, 3), true, 0),
+                Cumulative(intArrayOf(0, 4), longArrayOf(1, 1), longArrayOf(1, 1), 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), Assumptions.None.withInt(3, 0))
+        state.assignment.setInt(1, 1)
+        state.recompute()
+        val before = state.assignment.snapshot()
+
+        state.moveSink.addChannelingIntSet(state, 0, 1)
+
+        assertEquals(listOf(Move.IntSet(0, 1)), state.moveSink.list)
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(2L, state.cost)
+    }
+
+    @Test
     fun `root repairs preserve multiple selected Element requirements`() {
         for (definedResults in listOf(false, true)) {
             val problem = Problem(

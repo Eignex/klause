@@ -700,8 +700,6 @@ class LocalSearchState(
                 val element = problem.factors[fid] as? Element ?: continue
                 if (!element.arrIsVars || element.idx != variable || !considered.add(fid)) continue
                 if (considered.size > MAX_PRESERVED_ELEMENT_SELECTIONS) return null
-                val wasViolated = if (probeTouched[fid]) probeWasViolated[fid] else factorDegree[fid] > 0
-                if (wasViolated) continue
                 if (!preserveElementTarget(element, eligibility, targets)) return null
             }
         }
