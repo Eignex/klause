@@ -217,6 +217,11 @@ See
 and
 [ClauseDb](../../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/ClauseDb.kt).
 
+Continuous-by-continuous `ContinuousProduct` factors declare no finite execution
+route. Their real memberships never demand finite domains. Propagation and local
+scoring projections reject the factor; exact and tolerance LP leaf completions
+withhold nonlinear feasibility. See [continuous source lowering](../formats.md#schema-continuous-products).
+
 ## Open real arithmetic
 
 The `theory.qflra` component owns exact real feasibility in shared search. [Input

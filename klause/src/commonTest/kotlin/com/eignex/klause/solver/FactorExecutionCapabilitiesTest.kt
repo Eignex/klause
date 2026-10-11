@@ -146,6 +146,19 @@ class FactorExecutionCapabilitiesTest {
     }
 
     @Test
+    fun `continuous products explicitly decline finite execution and linear certification`() {
+        val factor = ContinuousProduct(0, 0, 1)
+        val capabilities = factor.executionCapabilities()
+
+        assertEquals(PropagationCapability.UNSUPPORTED, capabilities.propagation)
+        assertEquals(AssignmentCheckCapability.UNSUPPORTED, capabilities.assignmentCheck)
+        assertEquals(ScoringCapability.UNSUPPORTED, capabilities.scoring)
+        assertEquals(RelaxationCapability.NONE, capabilities.relaxation)
+        assertFailsWith<IllegalStateException> { factor.propagatorProjection() }
+        assertFailsWith<IllegalStateException> { factor.invariantProjection() }
+    }
+
+    @Test
     fun `custom linear declarations retain their sound relaxation path`() {
         val factor = object : Factor by Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1) {}
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(factor))
