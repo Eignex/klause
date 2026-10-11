@@ -104,10 +104,11 @@ internal fun PolynomialExpression.remap(remap: VarRemap): PolynomialExpression {
 
 internal fun polynomialExpressionsEqual(left: PolynomialExpression, right: PolynomialExpression): Boolean {
     val work = ArrayDeque<Pair<PolynomialExpression, PolynomialExpression>>()
+    val seen = HashSet<PolynomialNodePair<PolynomialExpression>>()
     work.addLast(left to right)
     while (work.isNotEmpty()) {
         val (first, second) = work.removeLast()
-        if (first === second) continue
+        if (first === second || !seen.add(PolynomialNodePair(first, second))) continue
         when (first) {
             is PolynomialExpression.Constant -> if (second !is PolynomialExpression.Constant || first != second) return false
             is PolynomialExpression.Variable -> if (second !is PolynomialExpression.Variable || first.id != second.id) return false
@@ -137,4 +138,10 @@ internal fun polynomialExpressionsEqual(left: PolynomialExpression, right: Polyn
         }
     }
     return true
+}
+
+internal class PolynomialNodePair<T : Any>(private val first: T, private val second: T) {
+    override fun hashCode(): Int = 31 * first.hashCode() + second.hashCode()
+    override fun equals(other: Any?): Boolean =
+        other is PolynomialNodePair<*> && first === other.first && second === other.second
 }

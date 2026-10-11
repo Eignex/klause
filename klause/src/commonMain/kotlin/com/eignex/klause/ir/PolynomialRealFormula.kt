@@ -130,10 +130,11 @@ internal fun PolynomialRealFormula.requireVariableCounts(boolCount: Int, realCou
 
 private fun polynomialFormulasEqual(left: PolynomialRealFormula, right: PolynomialRealFormula): Boolean {
     val work = ArrayDeque<Pair<PolynomialRealFormula, PolynomialRealFormula>>()
+    val seen = HashSet<PolynomialNodePair<PolynomialRealFormula>>()
     work.addLast(left to right)
     while (work.isNotEmpty()) {
         val (first, second) = work.removeLast()
-        if (first === second) continue
+        if (first === second || !seen.add(PolynomialNodePair(first, second))) continue
         when (first) {
             is PolynomialRealFormula.Constant -> if (second !is PolynomialRealFormula.Constant || first.value != second.value) return false
             is PolynomialRealFormula.BooleanVariable -> if (second !is PolynomialRealFormula.BooleanVariable || first.id != second.id) return false
