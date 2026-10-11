@@ -27,15 +27,15 @@ internal object Xcsp3SourceValidation {
 
     fun validate(ref: ProblemRef, rawOutput: String, exactObjective: String? = null): SourceValidation {
         val hashes = SolveEvidence.sourceHashes(ref)
-        val witness = candidate(rawOutput) ?: return Xcsp3SourceChecker.result("unknown", "no complete XCSP3 instantiation")
-            .copy(sourceHashes = hashes)
+        val witness = candidate(rawOutput) ?: return Xcsp3SourceChecker
+            .result("unknown", "no complete XCSP3 instantiation").copy(sourceHashes = hashes)
         val reported = objective(rawOutput)
         if (exactObjective != null && reported != exactObjective) {
             return Xcsp3SourceChecker.result("invalid", "reported objective differs from retained output")
                 .copy(sourceHashes = hashes)
         }
         val directory = Files.createTempDirectory("klause-xcsp-source-check-").toFile()
-        val validation = try {
+        val validation = runCatching {
             CorpusFiles.withPlainFile(CorpusFetcher.resolve(ref.source)) { source ->
                 val pinnedSource = source.copyTo(File(directory, "source.xml"))
                 val input = File(directory, "witness.xml").apply { writeText(witness) }
@@ -56,11 +56,9 @@ internal object Xcsp3SourceValidation {
                     if (process.isAlive) process.destroyForcibly().waitFor()
                 }
             }
-        } catch (failure: Exception) {
+        }.getOrElse { failure ->
             Xcsp3SourceChecker.result("unknown", "source checking failed: ${failure.message.orEmpty().take(500)}")
-        } finally {
-            directory.deleteRecursively()
-        }
+        }.also { directory.deleteRecursively() }
         return if (SolveEvidence.sourceHashes(ref) != hashes) {
             Xcsp3SourceChecker.result("unknown", "source files changed during validation").copy(sourceHashes = hashes)
         } else {
