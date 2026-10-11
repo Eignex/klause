@@ -31,6 +31,7 @@ import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
@@ -174,6 +175,30 @@ internal object FiniteCutoffKnapsackFixture {
 }
 
 class ResumableMinimizeTest {
+    @Test
+    fun `optimization delivers successful deductions to its finite selector`() {
+        val deductions = ArrayList<PropagationResult.Implied>()
+        val base = com.eignex.klause.backtrack.selector.InputOrder
+        val selector = object : VariableSelector by base {
+            override fun fresh(): VariableSelector = this
+            override fun onPropagation(implied: PropagationResult.Implied) {
+                deductions += implied
+            }
+        }
+        val problem = Problem(
+            2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+        )
+
+        val result = BacktrackSolver(problem.bake()).minimize(
+            LinearObjective(boolCoefficients = longArrayOf(-1, 0)),
+            BacktrackParams(variableSelector = selector, valueSelector = IndomainMax),
+        )
+
+        assertIs<MinimizeResult.Optimal>(result)
+        assertTrue(deductions.any { it.boolValueOrNull(1) == true })
+        assertTrue(result.stats.search.propagations.sum > 0.0)
+    }
+
     @Test
     fun `a completed clausal proposal is delivered while work debt blocks search`() {
         val solver = BacktrackSolver(Problem(

@@ -509,9 +509,7 @@ private fun smtStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     return out
 }
 
-/** Conflict-analysis diagnostic counters for `-s` — why 1UIP learning was skipped or rejected.
- *  Only the MiniZinc mode reports them today; kept apart from [searchStatPairs] so the other
- *  modes' leaner blocks stay lean. */
+/** Native CP conflict-analysis diagnostic counters for `-s`, separate from shared theory analysis. */
 internal fun caStatPairs(stats: SolveStats): List<Pair<String, String>> = listOf(
     "caNotApplicable" to "${stats.ca.notApplicable.sum.toLong()}",
     "caNonAsserting" to "${stats.ca.nonAsserting.sum.toLong()}",

@@ -77,6 +77,11 @@ tuples, diagram reachability and all assignment-dependent payloads remain state-
 
 ### Branching and global deductions
 
+Finite branching receives the native conflict's full variable and factor attribution,
+including implication-graph variables for learned conflicts. Successful CP fixpoints
+deliver newly reported deductions to propagation-aware selectors in both satisfaction
+and optimization search.
+
 Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights and
 its heap belong to the solve, retain conflict bumps across restarts, and apply bumps
 received before the first selection once during initialization. Fresh selectors isolate
@@ -197,6 +202,9 @@ domains are created by this graph.
 
 | Field | Meaning |
 |---|---|
+| `propagations` | Finite Boolean, singleton, bound, hole and survivor-set deductions reported by completed search fixpoints; excludes decision and root pins |
+| `learned` | Learned consequences observed by the traversal, including native CP learning |
+| `caNotApplicable`, `caNonAsserting` | Native CP analyses declining a usable or asserting consequence; exported by every CLI format |
 | `propagationWork` | Monotonic dispatch, literal, watcher, level and linear-term/reason visits, including work across undo |
 | `rootPropagationWork`, `rootPropagationMs` | Initialization root-fixpoint work and time, including private preparation |
 | `propagationMs` | Fixpoint elapsed time; some counted reason scans are outside it |

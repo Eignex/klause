@@ -1,5 +1,9 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.ConflictAnalysisStats
+import com.eignex.klause.solver.result.RunStats
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.kumulant.stat.summary.SumResult
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -24,6 +28,19 @@ class DimacsModeTest {
         writeText(text)
         deleteOnExit()
     }.absolutePath
+
+    @Test
+    fun `native conflict coverage is printed separately from open theory coverage`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "backtrack"),
+            ca = ConflictAnalysisStats(notApplicable = SumResult(3.0), nonAsserting = SumResult(2.0)),
+        )
+
+        val out = capture { DimacsOutput().onStatistics(stats, solveTimeMs = 0, solutions = 0) }
+
+        assertTrue("c caNotApplicable=3" in out, out)
+        assertTrue("c caNonAsserting=2" in out, out)
+    }
 
     @Test
     fun `a satisfiable cnf prints s SATISFIABLE with a full signed model line`() {

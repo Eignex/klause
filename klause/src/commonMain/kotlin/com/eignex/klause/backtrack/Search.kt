@@ -173,7 +173,7 @@ internal class CpSatisfactionTraversal(
         }
     }
     private val traversal = CpSatisfactionTraversalPolicy(
-        cp.session,
+        cp,
         params,
         sink,
         seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
@@ -378,7 +378,7 @@ private fun closeLpResources(resources: List<LpSearchResource>) {
 
 /** CP-specific wiring around the shared traversal engine for satisfaction and model streaming. */
 private class CpSatisfactionTraversalPolicy(
-    private val session: PropagationSession,
+    private val cp: CpSearchComponent,
     private val params: BacktrackParams,
     sink: SolveStatsSink?,
     seedDecisionLevels: Int,
@@ -387,7 +387,11 @@ private class CpSatisfactionTraversalPolicy(
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
 
-    val brancher = BacktrackBrancher(session, params, sink, restart, seedDecisionLevels = seedDecisionLevels)
+    private val session: PropagationSession get() = cp.session
+    val brancher = BacktrackBrancher(
+        session, params, sink, restart, seedDecisionLevels = seedDecisionLevels,
+        nativeConflict = { cp.lastConflict },
+    ).also { cp.propagationObserver = it::onPropagation }
 
     override val solveParams = SearchSolveParams(
         maxDecisions = minOf(
@@ -440,6 +444,7 @@ internal class BacktrackBrancher(
     private val restart: RestartSchedule,
     private val branching: BacktrackBranching = BacktrackBranching.Selectors,
     private val seedDecisionLevels: Int = 0,
+    private val nativeConflict: () -> PropagationResult.Unsat? = { null },
 ) : SearchBrancher,
     SearchRunObserver {
     // Node count from which the next restart may count root fixings. The count visits every variable, so it runs
@@ -507,9 +512,17 @@ internal class BacktrackBrancher(
     override fun onConflict(decision: SearchDecision?) {
         sink?.search?.observeFail()
         val (variable, value) = decision?.asSelectorDecision() ?: return
-        variables.onConflict(variable)
+        val conflict = nativeConflict()
+        if (conflict == null) variables.onConflict(variable) else variables.onConflict(variable, conflict)
         values.onConflict(variable, value)
         phase.onConflictTick()
+    }
+
+    fun onPropagation(implied: PropagationResult.Implied) {
+        variables.onPropagation(implied)
+        val count = implied.numBools + implied.numInts + implied.intMinKeys.size + implied.intMaxKeys.size +
+            implied.intHoleVarIds.size + implied.intSetKeys.size
+        sink?.search?.observePropagation(count.toLong())
     }
 
     override fun onLearnedConflict(conflict: com.eignex.klause.solver.search.SearchLearnedConflict) {

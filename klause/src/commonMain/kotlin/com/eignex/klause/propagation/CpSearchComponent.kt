@@ -54,6 +54,8 @@ class CpSearchComponent(
     private var sharedRootLevel = 0
     private val nativeLevelBySharedLevel = IntArrayList().apply { add(0) }
     private var lastResult: PropagationResult? = null
+    internal val lastConflict: PropagationResult.Unsat? get() = lastResult as? PropagationResult.Unsat
+    internal var propagationObserver: ((PropagationResult.Implied) -> Unit)? = null
     private var sharedContext: com.eignex.klause.solver.search.SearchContext? = null
 
     /** Where conflicts this component cannot learn from are counted; null counts nothing. */
@@ -220,6 +222,7 @@ class CpSearchComponent(
         skippedVariable: Int,
         publish: (SearchDecision, SearchAtomPremise) -> ComponentResult,
     ): ComponentResult {
+        if (!session.fixpointCancelled) propagationObserver?.invoke(result)
         var published: ComponentResult = ComponentResult.Consistent
         result.forEachBool { variable, value ->
             if (variable != skippedVariable) {
