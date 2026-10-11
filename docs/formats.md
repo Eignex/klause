@@ -171,14 +171,15 @@ nonlinear integer/real arithmetic remain outside the supported theory surface.
 
 Native factor coverage is broader than SMT source admission. `Product` represents
 finite Int × Int multiplication and `RealProduct` represents finite Int × Real
-multiplication, but the linear SMT facade rejects products of multiple nonconstant
-operands. Polynomial fallback accepts pure Real/Bool satisfaction only; it does
-not admit nonlinear integer sources even when their integers have finite bounds.
-Neither native product factor represents Real × Real multiplication. See the
+multiplication. `ContinuousProduct` represents exact Real × Real multiplication
+through the shared model and [schema lowering](#schema-continuous-products), but
+shared solver execution remains unsupported. The linear SMT facade rejects products
+of multiple nonconstant operands. Polynomial fallback accepts pure Real/Bool
+satisfaction only; it does not admit nonlinear integer sources even when their
+integers have finite bounds. See the
 [implemented arithmetic routes](architecture.md#implemented-arithmetic-routes).
-Polynomial composition and continuous products are under active work in
-[#2621](https://github.com/Eignex/klause/issues/2621) and
-[#2622](https://github.com/Eignex/klause/issues/2622); nonlinear integer SMT admission
+Shared polynomial execution is under active work in
+[#2621](https://github.com/Eignex/klause/issues/2621); nonlinear integer SMT admission
 is tracked in [#2625](https://github.com/Eignex/klause/issues/2625). These are
 implementation gaps rather than admission restrictions imposed by the support
 policy. Update this coverage when those routes land.

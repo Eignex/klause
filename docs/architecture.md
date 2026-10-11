@@ -91,11 +91,12 @@ the entire source solve.
 ### Implemented arithmetic routes
 
 This table is a coverage snapshot, not a permanent limit on Klause's model surface.
+`ContinuousProduct` represents exact Real × Real products in the shared model and
+schema lowering, but has no shared execution route.
 Shared polynomial integration is active work in
-[#2621](https://github.com/Eignex/klause/issues/2621), and continuous product factors
-are active work in [#2622](https://github.com/Eignex/klause/issues/2622). Their
-implementations expand the affected rows; the Bool+Int propagation boundary and
-source publication guarantees above remain the contract.
+[#2621](https://github.com/Eignex/klause/issues/2621). That integration expands the
+affected execution rows; the Bool+Int propagation boundary and source publication
+guarantees above remain the contract.
 Coverage across all model routes is tracked in
 [#2624](https://github.com/Eignex/klause/issues/2624).
 
@@ -107,7 +108,7 @@ Coverage across all model routes is tracked in
 | Linear real arithmetic | Exact LRA theory or certified LP completion within a mixed model | Source strictness, Boolean structure and bounds remain authoritative |
 | Finite integer `RealProduct` | Finite search with LP relaxations and exact continuous completion | Int × Real → Real; fixing the integer operand makes the product linear |
 | Pure Real/Bool polynomial satisfaction | Separate exact CAD invocation (`exact-nra`) | No shared mixed-factor composition, local-search/ALNS execution or polynomial optimization |
-| Real × Real products in `Problem` | No built-in factor or composed exact route | Pure polynomial source formulas use the separate CAD route |
+| Real × Real `ContinuousProduct` | Exact shared factor representation and schema lowering; no composed execution route | Finite propagation and local scoring reject the factor; LP completion cannot certify nonlinear feasibility. Shared polynomial execution remains in #2621; pure polynomial source formulas use the separate CAD route |
 | Continuous quadratic objectives | No built-in certified quadratic optimization route | Tracked in [#2626](https://github.com/Eignex/klause/issues/2626); finite integer product objectives and linear routes already exist |
 | `exp`, `log`, `sin` and other transcendental constraints | No built-in source/theory route | Tracked in [#2627](https://github.com/Eignex/klause/issues/2627); polynomial theory does not assign these functions semantics |
 
