@@ -45,7 +45,13 @@ import kotlin.time.TimeSource
  */
 internal object SolveCore {
 
-    fun solve(rawSolvable: Solvable, common: CommonOptions, output: OutputProtocol) {
+    fun solve(rawSolvable: Solvable, common: CommonOptions, protocol: OutputProtocol) {
+        val output = object : OutputProtocol by protocol {
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                protocol.onAllowanceStatistics(nodeBudgetStatPairs(common.nodeBudget))
+                protocol.onStatistics(stats, solveTimeMs, solutions)
+            }
+        }
         // Engine resolution: explicit `-e` wins, then `-f` (free) ≡ `-e cp`, else the configured
         // default ([defaultEngine] — the built-in [FiniteEngine.DEFAULT] or a packaged image's env override).
         val engine = common.engine
@@ -85,7 +91,7 @@ internal object SolveCore {
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenLocalSearch -> {
                 // Local search proves no optimum, so a run without a deadline ends where its node allowance does.
-                val nodeBudget = takeOpenNodeLimit(common)?.let(::NodeBudget)
+                val nodeBudget = takeOpenNodeLimit(common)?.let(::NodeBudget).also { common.nodeBudget = it }
                 val stop = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
                 val params = TheoryParams(
                     cancellation = stop,
@@ -246,7 +252,7 @@ internal object SolveCore {
 
             SolvablePipeline.FiniteCp -> dropOpenOnlyParams(common)
         }
-        val nodeBudget = takeNodeBudget(common)
+        val nodeBudget = takeNodeBudget(common).also { common.nodeBudget = it }
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
         // `-p N` is MiniZinc-standard parallelism = the **core** count. The portfolio engines
         // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked

@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.LinearObjectiveSpec
@@ -163,6 +164,7 @@ internal class CommonOptions {
     internal var presolveBudget: PresolveBudget? = null
     internal var presolveTimeCancellation: Cancellation = Cancellation.Never
     internal var routingToken: Cancellation? = null
+    internal var nodeBudget: NodeBudget? = null
 
     /** Wall time (ms) the front-end load took — parse + construction-time bake — set by the driver
      *  around `session.load`, so `dry-run-presolve` can split parse from bake. */
@@ -586,6 +588,7 @@ internal interface OutputProtocol {
     fun onExactSolution(rendered: String, objective: BigFraction)
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
+    fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {}
 
     /** Record why the run stopped, before [onComplete] renders the verdict. Ignored by default — only
      *  the modes that report a reason consume it. */

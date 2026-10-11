@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
@@ -481,4 +482,13 @@ class CliStatsTest {
         assertEquals("8000", pairs["portfolioMaxSliceWork"])
         assertEquals("2.0", pairs["portfolioSliceGrowth"])
     }
+    @Test
+    fun `an exhausted zero solve allowance reports its effective remaining work`() {
+        val pairs = nodeBudgetStatPairs(NodeBudget(0L)).toMap()
+
+        assertEquals("0", pairs["nodeBudgetLimit"])
+        assertEquals("0", pairs["nodeBudgetSpent"])
+        assertEquals("0", pairs["nodeBudgetRemaining"])
+    }
+
 }

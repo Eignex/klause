@@ -46,7 +46,8 @@ The solve-wide decision/move currency excludes propagation and LP work. Ordinary
 instructions and CP repair decisions charge the same containing `NodeBudget`. ALNS
 charges each outer iteration's declared flip allowance once; the inner LS repair is
 not billed again for its moves, while CP repair decisions remain additional native
-work. Scheduler coverage for finite ALNS segments uses the offered segment allowance;
+work. CLI statistics expose `nodeBudgetLimit`, `nodeBudgetSpent` and
+`nodeBudgetRemaining` from the containing ledger, including cooperative overspend. Scheduler coverage for finite ALNS segments uses the offered segment allowance;
 it is distinct from actual inner work. Native bootstrap/repair counters and
 `alnsOuterAllowance` retain those distinctions in statistics.
 
