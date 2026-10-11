@@ -22,6 +22,75 @@ import kotlin.test.assertTrue
 
 class CumulativeInvariantTest {
     @Test
+    fun `start repairs skip tasks without a resource footprint`() {
+        for (inactive in listOf(
+            "duration", "resource", "variable duration", "variable resource", "presence", "negated presence",
+        )) {
+            val optional = inactive == "presence" || inactive == "negated presence"
+            val present = inactive == "negated presence"
+            val factor = Cumulative(
+                intArrayOf(0, 1, 2),
+                longArrayOf(2, 2, if (inactive == "duration") 0 else 2),
+                longArrayOf(1, 1, if (inactive == "resource") 0 else 1),
+                1,
+                presents = if (optional) {
+                    intArrayOf(Lit.make(0, present), Lit.make(0, present), Lit.make(0, !present))
+                } else {
+                    intArrayOf()
+                },
+                durationVars = if (inactive == "variable duration") intArrayOf(3, 3, 4) else intArrayOf(),
+                resourceVars = if (inactive == "variable resource") intArrayOf(5, 5, 6) else intArrayOf(),
+            )
+            val problem = Problem(
+                1, 7, arrayOf(
+                    IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4), IntDomain(2, 2),
+                    IntDomain(0, 2), IntDomain(1, 1), IntDomain(0, 1),
+                ), arrayOf<Factor>(factor),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            for ((variable, value) in longArrayOf(0, 0, 0, 2, 0, 1, 0).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.assignment.setBool(0, present)
+            state.recompute()
+            assertTrue(state.cost > 0L, inactive)
+
+            state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+
+            val moves = state.moveSink.list
+            assertTrue(moves.isNotEmpty(), inactive)
+            assertTrue(moves.all { it is IntSet && it.varId < 2 }, inactive)
+            assertTrue(moves.any { state.netDelta(it) < 0L }, inactive)
+        }
+    }
+
+    @Test
+    fun `start repairs retain improvements outside the maximum peak`() {
+        val problem = Problem(
+            0, 4, Array(4) { IntDomain(0, 9) }, arrayOf<Factor>(
+                Cumulative(intArrayOf(0, 1, 2, 3), longArrayOf(2, 2, 2, 2), longArrayOf(1, 1, 1, 1), 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        for ((variable, value) in longArrayOf(0, 0, 5, 5).withIndex()) {
+            state.assignment.setInt(variable, value)
+        }
+        state.recompute()
+        val before = state.cost
+
+        state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+        val move = state.moveSink.list.first { it is IntSet && it.varId == 2 && it.newValue == 6L }
+        val predicted = state.netDelta(move)
+        state.apply(move)
+
+        assertTrue(predicted < 0L)
+        assertEquals(predicted, state.cost - before)
+        val cost = state.cost
+        state.recompute()
+        assertEquals(cost, state.cost)
+    }
+
+    @Test
     fun `conditional duration choice repairs grade other Boolean constraints`() {
         for (bound in listOf(0, 1)) {
             val factors = arrayOf<Factor>(

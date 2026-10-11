@@ -267,14 +267,16 @@ internal class CumulativeInvariant(
         val maxTargets = 4
         var durationRepairs = 0
         for (i in 0 until n) {
+            if (!OptionalPresence.isPresentInAssignment(presents, i, state)) continue
             val v = starts[i]
             val cur = state.assignment.intValue(v)
             val d = curDur(state, i)
             val r = curRes(state, i)
+            if (d <= 0 || r <= 0) continue
             val dom = state.rootDomains[v]
-            val runsAtPeak = (peakT >= 0 && r > 0 && d > 0 && cur <= absT && absT < cur + d)
+            val runsAtPeak = (peakT >= 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
-                if (durationVars.isNotEmpty() && OptionalPresence.isPresentInAssignment(presents, i, state) &&
+                if (durationVars.isNotEmpty() &&
                     durationRepairs < CUMULATIVE_MAX_DURATION_REPAIRS
                 ) {
                     durationRepairs += ConditionalProductRepair(
