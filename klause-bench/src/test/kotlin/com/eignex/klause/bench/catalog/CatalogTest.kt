@@ -99,7 +99,7 @@ class CatalogTest {
     @Test
     fun `mps-core resolves integer, LP-only-float and infeasible instances`() {
         val byName = Catalog.suite("mps-core").problems.associateBy { it.name }
-        assertEquals(4, byName.size)
+        assertEquals(12, byName.size)
         assertEquals(Expected.Unsat, byName.getValue("infeasible-tiny").expected)
 
         val blend = InProcessRunner.resolve(ref("mps-core", "blend-tiny"))
