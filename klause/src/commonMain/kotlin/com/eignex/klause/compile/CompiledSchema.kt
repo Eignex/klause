@@ -2,8 +2,9 @@ package com.eignex.klause.compile
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
-import com.eignex.klause.compile.SetLayout
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lowering.FloatRepresentation
+import com.eignex.klause.lowering.SetLayout
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
@@ -28,7 +29,7 @@ import com.eignex.klause.solver.objective.minimizeInt
  *
  * Boolean-side names map to packed-bit ids in `boolVarIdByName`; integer/float-side names map
  * to int-array ids in `intVarIdByName`. Float vars round-trip through their bucket index
- * using the [FloatSpec] in `floatDecoders`.
+ * using the [FloatSpec] in `floatDecoders`; real columns retain certified coordinates separately.
  */
 class CompiledSchema internal constructor(
     /** The compiled solver problem. */
@@ -57,6 +58,8 @@ class CompiledSchema internal constructor(
      * rather than bucketed; their value is read from [Sample.reals]. Empty when floats
      *  are bucketed (see [floatDecoders]). */
     internal val realVarIdByName: Map<String, Int> = emptyMap(),
+    /** Per-component representation and approximation reason by source float name. */
+    val floatRepresentations: Map<String, FloatRepresentation> = emptyMap(),
 ) {
     /** Return the schema's declared `BacktrackParams` if any, else a fresh default
      *  [BacktrackParams]. Convenience for the common

@@ -22,6 +22,31 @@ routing proof for MPS, SMT-LIB and exact FlatZinc, allowing a supported source t
 be measured through its open route. Unsupported syntax or a declined exact
 operation remains undecided.
 
+## Execution metadata and schema floats
+
+`ir.SearchHints` carries ordered Boolean/integer variable groups, variable-selection
+and value-selection intent, fallback policy and solution guidance. Frontends translate
+syntax into these groups before finite execution; real-column identifiers never enter
+integer branch groups. Backtracking owns selector allocation. Source expressions,
+FlatZinc output, MiniZinc output templates and protocol comments belong to the
+FlatZinc frontend. The shared pipeline consumes neutral finite execution data.
+
+Schema float rows join the names they reference into components. Top-level
+non-strict linear equalities and inequalities use real columns unless their component
+also contains a strict/disequal row or an optional float. Such a component uses its
+declared integer grid; unrelated Boolean constraints and float components do not
+change that choice. Nested reified schema float expressions still decline. Shared
+`lowering.SetLayout` owns sorted indicator universes and membership lookup; source
+names, labels and set expressions stay with their callers.
+
+Both compilers expose `FloatRepresentation` by source name, with component identity
+and an explicit approximation reason. A null reason denotes source correspondence,
+not a certificate from a solve. Grid search has no source completeness or optimum
+claim. Independently check every original row and bound at the returned coordinates
+before admitting a mixed model's witness; checking only the exact component is
+insufficient. Schema callers can inspect this provenance before decoding or reporting
+results. The benchmark strips grid proof credit even for a source-valid witness.
+
 ## FlatZinc Boolean channels
 
 FlatZinc retains `bool2int` channels and recognizes them independently of constraint
@@ -70,8 +95,35 @@ Authoritative rational witness coordinates are emitted as `% klause-exact:`
 comments while standard assignments retain MiniZinc-compatible decimal rendering.
 The benchmark's independent checker reads the original FlatZinc text, interpreting
 float literals as binary64 rationals and checking exact coordinates without rounding.
-Its `flatzinc-binary64` scope is distinct from pinning original MiniZinc source;
-it does not change the policy for compiler-rounded bounds or relax constraints.
+Its `flatzinc-binary64` scope is distinct from pinning original MiniZinc source.
+Mixed exact/grid witnesses retain rational exact coordinates and the exact binary64
+value of each decoded grid point, together with `% klause-float-component:` comments
+identifying representation and approximation reason. These coordinate comments do
+not certify an approximated component. Missing exact coordinates or unsupported
+source predicates leave validation unknown.
+
+### Rounded FlatZinc bounds
+
+Exact FlatZinc means mathematical arithmetic over the binary64 values of its parsed
+float literals, with every declared bound retained. It does not mean decimal-literal
+arithmetic, rounded execution of every operation, or inferred MiniZinc source semantics.
+No epsilon or widened bound repairs a compiler-rounded interval. Components detected
+with integer-image endpoints rounded across a declared bound decline exact mode;
+default compilation records the rounded-arithmetic approximation reason and uses the
+grid. This conservative decline prevents presenting a different source solution set
+as an exact MiniZinc result.
+
+For the cylinder scaling row, binary64 `0.01` is
+`5764607523034235/576460752303423488`. Multiplying by integer `200` gives
+`144115188075855875/72057594037927936`, strictly greater than the declared upper
+bound `2.0` by `3/72057594037927936`. The rational product violates that bound;
+substituting rounded `2.0` violates the exact row. Decimal `1/100` would yield `2`,
+but choosing it would change the literal policy. Neither assignment receives exact
+binary64 witness credit. A default grid candidate may receive only feasibility
+credit from an independent original MiniZinc source check under its numerical
+semantics. An exact flattened checker reports its separate scope and cannot establish
+that source claim. Source-feasible rounded arithmetic requires an explicitly different
+semantics contract before admission to an exact route.
 
 See [FlatZincFloatPolicy](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincFloatPolicy.kt)
 and [FlatZincIntegerFloatImages](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincIntegerFloatImages.kt).

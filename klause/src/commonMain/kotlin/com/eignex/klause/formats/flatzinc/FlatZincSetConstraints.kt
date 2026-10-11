@@ -148,7 +148,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
 }
 
 private fun FlatZincCompiler.emitSetInConst(xConst: Int, layout: SetVarLayout, rExpr: FznExpr?) {
-    val idx = layout.elements.binarySearchInt(xConst)
+    val idx = layout.layout.indexOf(xConst)
     if (idx < 0) {
         if (rExpr != null) {
             val r = resolveBoolLit(rExpr)
@@ -181,7 +181,7 @@ private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layo
                 bound = v,
             ),
         )
-        val setIdx = layout.elements.binarySearchInt(v)
+        val setIdx = layout.layout.indexOf(v)
         if (rExpr == null) {
             if (setIdx < 0) {
                 factors.add(Clause(intArrayOf(Lit.make(chan, false))))
@@ -220,7 +220,7 @@ internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) 
         for (i in s.elements.indices) {
             val e = s.elements[i]
             val sBit = s.indicatorBoolIds[i]
-            val tIdx = t.elements.binarySearchInt(e)
+            val tIdx = t.layout.indexOf(e)
             if (tIdx < 0) {
                 factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
             } else {
@@ -233,7 +233,7 @@ internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) 
     val auxes = IntArrayList(s.elements.size)
     for (i in s.elements.indices) {
         val sBit = s.indicatorBoolIds[i]
-        val tIdx = t.elements.binarySearchInt(s.elements[i])
+        val tIdx = t.layout.indexOf(s.elements[i])
         val aux = allocBool("__subset_aux_${s.name}_${t.name}_${s.elements[i]}")
         auxes.add(Lit.make(aux, true))
         if (tIdx < 0) {
@@ -269,7 +269,7 @@ internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
         for (i in s.elements.indices) {
             val e = s.elements[i]
             val sBit = s.indicatorBoolIds[i]
-            val tIdx = t.elements.binarySearchInt(e)
+            val tIdx = t.layout.indexOf(e)
             if (tIdx < 0) {
                 factors.add(Clause(intArrayOf(Lit.make(sBit, false))))
             } else {
@@ -279,7 +279,7 @@ internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
             }
         }
         for (i in t.elements.indices) {
-            if (s.elements.binarySearchInt(t.elements[i]) < 0) {
+            if (s.layout.indexOf(t.elements[i]) < 0) {
                 factors.add(Clause(intArrayOf(Lit.make(t.indicatorBoolIds[i], false))))
             }
         }
@@ -395,7 +395,7 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
     val emptyLit = Lit
 
     fun indicator(set: SetVarLayout, elem: Int): Int? {
-        val idx = set.elements.binarySearchInt(elem)
+        val idx = set.layout.indexOf(elem)
         return if (idx < 0) null else set.indicatorBoolIds[idx]
     }
     run {

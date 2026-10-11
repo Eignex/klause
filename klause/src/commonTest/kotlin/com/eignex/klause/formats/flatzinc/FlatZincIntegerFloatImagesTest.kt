@@ -4,7 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -28,6 +27,9 @@ class FlatZincIntegerFloatImagesTest {
         assertFalse(program.floatVarsByName.getValue("scaled").lpOnly)
         val error = assertFailsWith<UnsupportedFlatZincException> { parseFlatZinc(source, exactFloats = true) }
         assertTrue(error.message.orEmpty().contains("require rounded arithmetic"))
+        assertTrue(error.message.orEmpty().contains("binary64 rational literals"))
+        assertTrue(program.floatRepresentations.getValue("scaled").approximate)
+        assertTrue(program.floatRepresentations.getValue("scaled").approximation.orEmpty().contains("rounded arithmetic"))
     }
 
     @Test

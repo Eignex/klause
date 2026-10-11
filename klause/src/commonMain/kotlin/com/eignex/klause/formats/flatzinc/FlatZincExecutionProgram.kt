@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.pipeline
+package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
@@ -7,7 +7,6 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_FLOAT_LO
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ProblemSettings

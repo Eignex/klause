@@ -225,9 +225,8 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
 
         IntCmpOp.NE -> LinearOp.NE
     }
-    if (schemaFloatsLpOnly) {
-        // LP-only continuous columns: emit the raw double coefficients over the real
-        // columns, no bucket scaling. The gate admits only LE/GE/EQ float-linears here.
+    if (c.varNames.all { it in realVarIdByName }) {
+        // Every float in a row shares its component's representation.
         val realVars = IntArray(n) { realVarIdByName.getValue(c.varNames[it]) }
         factors += Linear(EmptyIntArray, EmptyDoubleArray, realVars, c.coeffs.copyOf(), realOp, c.bound)
         return

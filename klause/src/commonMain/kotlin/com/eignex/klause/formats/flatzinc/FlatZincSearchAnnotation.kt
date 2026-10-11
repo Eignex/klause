@@ -70,7 +70,7 @@ private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, 
                 return
             }
             floatVars[name]?.let {
-                ints.add(it.varId)
+                if (!it.lpOnly) ints.add(it.varId)
                 return
             }
             setVarsByName[name]?.let { layout ->
@@ -82,9 +82,9 @@ private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, 
                     when (arr.elementKind) {
                         FlatZincArray.Vars.ElementKind.Bool -> for (v in arr.varIds) bools.add(v)
 
-                        FlatZincArray.Vars.ElementKind.Int,
-                        FlatZincArray.Vars.ElementKind.Float,
-                        -> for (v in arr.varIds) ints.add(v)
+                        FlatZincArray.Vars.ElementKind.Int -> for (v in arr.varIds) ints.add(v)
+                        FlatZincArray.Vars.ElementKind.Float -> arr.floatBucketings.orEmpty()
+                            .filter { !it.lpOnly }.forEach { ints.add(it.varId) }
                     }
                 }
 
@@ -101,9 +101,10 @@ private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, 
             when (arr.elementKind) {
                 FlatZincArray.Vars.ElementKind.Bool -> bools.add(arr.varIds[idx])
 
-                FlatZincArray.Vars.ElementKind.Int,
-                FlatZincArray.Vars.ElementKind.Float,
-                -> ints.add(arr.varIds[idx])
+                FlatZincArray.Vars.ElementKind.Int -> ints.add(arr.varIds[idx])
+                FlatZincArray.Vars.ElementKind.Float -> arr.floatBucketings?.get(idx)?.let {
+                    if (!it.lpOnly) ints.add(it.varId)
+                }
             }
         }
 

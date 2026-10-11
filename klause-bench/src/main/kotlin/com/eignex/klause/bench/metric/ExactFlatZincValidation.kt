@@ -145,6 +145,14 @@ internal object ExactFlatZincValidation {
                 require(args.size == 2)
                 return array(args[0]).any { boolean(it) } || array(args[1]).any { !boolean(it) }
             }
+            if (name == "array_float_element" || name == "array_int_element") {
+                require(args.size == 3)
+                val index = numeric(args[0])
+                require(index.integral) { "non-integer array index" }
+                val values = array(args[1])
+                val selected = values.indices.firstOrNull { index == number((it + 1).toString()) } ?: return false
+                return equal(values[selected], args[2])
+            }
             val base = name.removeSuffix("_reif").removeSuffix("_imp")
             val arity = if ("_lin_" in base || base.endsWith("_times") ||
                 base.endsWith("_plus") || base == "float_div"
@@ -157,6 +165,8 @@ internal object ExactFlatZincValidation {
                 "predicate arity"
             }
             val relation = when (base) {
+                "int2float" -> equal(args[0], args[1])
+
                 "float_eq", "int_eq", "bool_eq" -> equal(args[0], args[1])
 
                 "float_ne", "int_ne" -> !equal(args[0], args[1])

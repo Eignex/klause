@@ -12,7 +12,9 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lowering.CnfLowering
+import com.eignex.klause.lowering.FloatRepresentation
 import com.eignex.klause.lowering.ProblemBuilder
+import com.eignex.klause.lowering.SetLayout
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
@@ -112,11 +114,7 @@ internal class Lowering(val pinAbsentOptVars: Boolean, settings: ProblemSettings
     val floatMetaBuckets = IntArrayList()
     val floatVarIdByName = mutableMapOf<String, Int>() // float-id (metadata index) by name
 
-    // LP-only continuous columns: when [schemaFloatsLpOnly] holds, every schema float is a
-    // real variable (the simplex resolves it) rather than a bucket-index int, and float-linear rows lower
-    // to real [com.eignex.klause.factor.arithmetic.Linear]. `realVarIdByName` maps a float name to its real
-    // var id; parallel real bounds by real var id.
-    var schemaFloatsLpOnly = false
+    var floatRepresentations: Map<String, FloatRepresentation> = emptyMap()
     val realVarIdByName get() = problemBuilder.realVarIdByName
 
     /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
@@ -429,33 +427,8 @@ fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): Compile
 // asserting constraints, and packaging the engine state. Kept off the Lowering class so the
 // engine itself stays free of any SchemaDef / schema-shape dependency.
 
-/**
- * Whether every schema float can be an LP-only continuous variable: the model declares a
- * float, and every constraint is either a top-level non-strict, non-`ne` [FloatLinearConstraint] or a
- * constraint that could not hide a float-linear. Conservatively declines (keeps bucketing) on any
- * compound Boolean top-level constraint (`And`/`Or`/`Not`/`Implies`/`Iff`), which could reify or nest a
- * float-linear, and on any strict/`ne` float-linear (not exactly LP-representable). A whole-surface gate:
- * either all floats are LP-only or all bucketed, avoiding a mixed representation in one problem.
- */
-private fun schemaFloatsAreLpOnly(def: SchemaDef<SchemaEntry>): Boolean {
-    if (def.entries.values.none { it is FloatSpec }) return false
-    for ((_, entry) in def.entries) {
-        if (entry !is NamedConstraint) continue
-        when (val e = entry.expr) {
-            is FloatLinearConstraint -> if (e.op != IntCmpOp.LE && e.op != IntCmpOp.GE && e.op != IntCmpOp.EQ) {
-                return false
-            }
-
-            is And, is Or, is Not, is Implies, is Iff -> return false
-
-            else -> Unit
-        }
-    }
-    return true
-}
-
 private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
-    schemaFloatsLpOnly = schemaFloatsAreLpOnly(def)
+    floatRepresentations = schemaFloatRepresentations(def)
     for ((name, entry) in def.entries) {
         when (entry) {
             is BoolSpec -> bindBoolName(name, newBoolVar())
@@ -496,7 +469,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
 
             is FloatSpec -> {
                 floatDecoders[name] = entry
-                if (schemaFloatsLpOnly) {
+                if (!floatRepresentations.getValue(name).approximate) {
                     // LP-only continuous column: a real variable the simplex resolves, no
                     // bucketing. `decode` reads it from `Sample.reals`; float-linear lowers to a real row.
                     newRealVar(entry.min, entry.max, name)
@@ -538,6 +511,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
         setLayouts = setLayouts.toMap(),
         setNominalLabels = setLabelOrder.toMap(),
         realVarIdByName = realVarIdByName.toMap(),
+        floatRepresentations = floatRepresentations,
     )
 }
 

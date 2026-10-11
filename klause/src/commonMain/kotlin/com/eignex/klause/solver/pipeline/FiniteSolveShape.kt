@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -22,8 +22,8 @@ class FiniteSolveShape(
     val objectiveIntVar: Int?,
     /** Source-level definitional sweep for local-search workers. */
     val definitionalSweep: DefinitionalSweep?,
-    /** Source-provided search hints, decoded by the pipeline for the fixed route. */
-    val searchHints: FlatZincSearchHints? = null,
+    /** Neutral variable order, value selection and grouping for the finite route. */
+    val searchHints: SearchHints? = null,
     /** Component ownership selected from the canonical source model. */
     val componentPlan: ComponentPlan = problem.componentPlan(preferFinite = true),
 ) {

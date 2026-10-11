@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.formats.flatzinc.SolveDirective
+import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -21,16 +22,15 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.objective.maximizeInt
 import com.eignex.klause.solver.objective.minimizeInt
 import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import com.eignex.klause.theory.qflra.QfLraSystem
 import com.eignex.klause.util.Cancellation
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import java.nio.file.Files
-import java.nio.file.Path
 
 internal object OrderingReuseInvestigation {
     @JvmStatic

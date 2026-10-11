@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.pipeline
+package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.formats.minizinc.*
 import kotlin.math.abs

@@ -1,10 +1,8 @@
-package com.eignex.klause.solver.pipeline
+package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.formats.flatzinc.FlatZincArray
-import com.eignex.klause.formats.flatzinc.FlatZincProgram
-import com.eignex.klause.formats.flatzinc.SetVarLayout
 import com.eignex.klause.formats.minizinc.*
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.util.IntArrayList
 
 /** Renders solver samples through a parsed `.ozn` template. */

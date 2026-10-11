@@ -28,7 +28,17 @@ class FlatZincSearchAnnotationTest {
 
     private fun toParams(program: FlatZincProgram): BacktrackParams {
         val hints = searchHints(program)
-        return hints.toBacktrackParams(program.problem.numBoolVars, program.problem.numIntVars)
+        return hints.toSearchHints().toBacktrackParams(program.problem.numBoolVars, program.problem.numIntVars)
+    }
+
+    @Test
+    fun `mixed float arrays exclude real columns from integer search groups`() {
+        val program = parseFlatZinc("var 0.0..1.0: exact; var 0.0..1.0: grid; array[1..2] of var float: xs = [exact, grid]; constraint float_le(grid, 0.5); solve :: int_search(xs, input_order, indomain_max, complete) satisfy;")
+
+        val neutral = searchHints(program).toSearchHints()
+
+        assertContentEquals(intArrayOf(program.floatVarsByName.getValue("grid").varId), neutral.tiers.single().intVars)
+        assertEquals(com.eignex.klause.ir.ValueSelection.Maximum, neutral.tiers.single().valueSelector)
     }
 
     @Test

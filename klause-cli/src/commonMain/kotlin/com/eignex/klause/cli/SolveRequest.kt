@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -72,8 +72,8 @@ internal class Solvable(
          *  objective weights one: their values are real, so the total has no exact integral form. Null
          *  leaves [objectiveValue] the whole objective. */
         continuousObjectiveValue: ((Sample) -> Double)? = null,
-        /** Model-supplied FlatZinc search annotation. */
-        searchHints: FlatZincSearchHints? = null,
+        /** Model-supplied finite search intent. */
+        searchHints: SearchHints? = null,
         /** The component set selected once while loading the source model. */
         pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
         /** LP work performed while proving bounds for pipeline selection. */
@@ -107,7 +107,7 @@ internal class Solvable(
     val linearObjective: LinearObjective? get() = finite?.linearObjective
     val objVarId: Int? get() = finite?.objectiveIntVar
     val definitionalSweep: DefinitionalSweep? get() = finite?.definitionalSweep
-    val searchHints: FlatZincSearchHints? get() = finite?.searchHints
+    val searchHints: SearchHints? get() = finite?.searchHints
     val finiteShape: FiniteSolveShape get() = requireNotNull(finite) { "open model was not materialized" }
     val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
 }
@@ -119,7 +119,7 @@ private fun Problem.finiteSolveShape(
     linearObjective: LinearObjective?,
     objectiveIntVar: Int?,
     definitionalSweep: DefinitionalSweep?,
-    searchHints: FlatZincSearchHints?,
+    searchHints: SearchHints?,
 ): FiniteSolveShape {
     val route = pipelineRoute(linearObjective, maximize)
     require(route is SourceProblemRoute.Finite) { "finite solve requested for ${sourceRouteName(route)}" }

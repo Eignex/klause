@@ -6,8 +6,8 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
-import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
@@ -192,7 +192,7 @@ internal class FiniteExecutionRequest(
     /** Optional FlatZinc definitional sweep for local-search workers. */
     val definitionalSweep: DefinitionalSweep?,
     /** Optional decoded source search hints. */
-    val searchHints: FlatZincSearchHints?,
+    val searchHints: SearchHints?,
     /** Portfolio worker count. Ignored by the fixed route. */
     val cores: Int,
     /** Repeatable engine tuning parameters. */
