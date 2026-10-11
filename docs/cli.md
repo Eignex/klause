@@ -214,12 +214,15 @@ arithmetic residual at each leaf. Activity order is opt-in.
 defines their scopes and the distinction from native CP analysis.
 
 Every format's `-s` output includes `solvePipeline`: `finite-cp`, `open-theory`,
-`open-local-search` or `refuted`, the frontend's selected solve entry point.
+`polynomial-theory`, `open-local-search`, `interrupted` or `refuted`, the frontend's
+selected solve entry point or terminal admission outcome.
 `declaredTheoryRoute` is the open request's theory classification before source-safe
 preparation. `reportedBackend` is the final statistics snapshot's backend identifier;
 it can be `mixed`, or retain the declared theory when preparation stops before a
 theory runs. These labels describe different stages and do not independently prove
-that a theory check executed. A routing refutation has no solve backend to report.
+that a theory check executed. Polynomial requests declare `exact_nra`, distinct from
+their reported `exact-nra` backend. A routing refutation or interrupted source
+admission has no solve backend to report.
 
 `frontendLoadMs` covers the driver's inclusive `session.load`: parsing, lowering,
 routing and solvable construction. It excludes process startup and does not isolate
@@ -227,6 +230,8 @@ parsing. `frontendRoutingMs` and `frontendRoutingOutcome` appear only when the
 frontend measured routing (`finite`, `open`, `unsupported` or `refuted`). Routing is
 nested within frontend load, so the durations must not be added. The driver resets
 these observations before each load and freezes them for its solve invocation.
+Polynomial and interrupted source admission return before bound routing, so their
+inclusive load observation has no separate frontend routing measurement.
 
 `nativeCpPropagationWork`, `nativeCpRootPropagationWork`, `nativeCpPropagationMs`
 and `nativeCpRootPropagationMs` expose existing native fixpoint measurements when
