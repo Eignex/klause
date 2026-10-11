@@ -139,12 +139,14 @@ private fun PropagationState.replayVarUndo(undoSize: Int) {
     // and need it re-inserted on backtrack (combined-index encoding: bool id `v`, int id
     // `numBoolVars + v`). Captured once so the no-listener case stays a single null check.
     val unassigned = unassignListener
+    val retracting = retractingListener
     val numBool = problem.numBoolVars
     var i = undo.size - 1
     while (i >= undoSize) {
         when (undo.tag[i]) {
             0 -> { // bool pin — prior state is always unassigned
                 val v = undo.varId[i]
+                retracting?.invoke(v)
                 boolValues[v] = null
                 boolLevel[v] = -1
                 boolReason[v] = -1
@@ -154,6 +156,7 @@ private fun PropagationState.replayVarUndo(undoSize: Int) {
 
             1 -> { // int change — restore the full recorded prior int-var state
                 val v = undo.varId[i]
+                retracting?.invoke(numBool + v)
                 boundMoves[v]?.let { it.truncateTo(it.size - 1) }
                 boundMovePriorMin[v]?.let { it.truncateTo(it.size - 1) }
                 boundMovePriorMax[v]?.let { it.truncateTo(it.size - 1) }
@@ -176,6 +179,7 @@ private fun PropagationState.replayVarUndo(undoSize: Int) {
 
             2 -> { // interior carve — re-insert the carved value
                 val v = undo.varId[i]
+                retracting?.invoke(numBool + v)
                 unassigned?.invoke(numBool + v)
                 intDomains[v] = intDomains[v].includeInteriorValue(undo.carved[i])
                 intLevel[v] = undo.level[i]

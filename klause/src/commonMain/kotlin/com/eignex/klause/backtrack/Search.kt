@@ -463,6 +463,9 @@ internal class BacktrackBrancher(
     private val touchedSeedLevels = IntHashSet()
 
     init {
+        if (params.phaseSaving || params.targetPhasing) {
+            session.retractingListener = { phase.capture(it, session) }
+        }
         if (variables.tracksUnassign) {
             val numBool = session.problem.numBoolVars
             session.unassignListener = { encoded ->

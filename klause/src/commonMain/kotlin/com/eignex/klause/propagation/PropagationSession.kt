@@ -82,6 +82,12 @@ class PropagationSession private constructor(
             state.unassignListener = value
         }
 
+    internal var retractingListener: ((Int) -> Unit)?
+        get() = state.retractingListener
+        set(value) {
+            state.retractingListener = value
+        }
+
     /** `levelStates[L]` is the [PropagationState.LevelMark] right after level `L`'s
      *  fixpoint. Index 0 = post-bake. Array-backed stack with explicit [levelTop]; grows by
      *  doubling. Marks are tiny (four ints + rare payload copies) — no pooling needed. */

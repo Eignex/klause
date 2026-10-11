@@ -1,14 +1,56 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.CpBranching
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class PhaseSavingTest {
+
+    @Test
+    fun `a propagated phase survives backtracking`() {
+        for (nativeSat in listOf(false, true)) {
+            val problem = Problem(2, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+            ))
+            val native = PropagationSession(problem, nativeSat = nativeSat)
+            val cp = CpSearchComponent(native, branching = CpBranching.None)
+            val session = SearchSession(listOf(cp), atoms = SearchAtomRegistry(2))
+            val selector = object : VariableSelector by InputOrder {
+                override fun fresh(): VariableSelector = this
+                override fun pick(session: PropagationSession, rng: Random): VarRef = VarRef.Bool(1)
+            }
+            val brancher = BacktrackBrancher(
+                native,
+                BacktrackParams(variableSelector = selector, valueSelector = IndomainMin, phaseSaving = true),
+                null,
+                NoRestartSchedule,
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            session.popTo(0)
+
+            val alternatives = brancher.nextBranch(session)
+
+            assertEquals(SearchDecision.Bool(Lit.make(1, true)), alternatives?.first())
+        }
+    }
 
     private fun boolSession(numBools: Int): PropagationSession =
         PropagationSession(Problem(numBools, 0, emptyArray(), emptyList()))

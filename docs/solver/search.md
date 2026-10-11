@@ -82,7 +82,9 @@ including implication-graph variables for learned conflicts. VSIDS bumps each im
 variable once per conflict, including a failed decision already in that set. Conflicts cascading from a
 native learned assertion also update activity and failure counters; they have no fresh
 branch decision to blame. Successful CP fixpoints deliver newly reported deductions to propagation-aware selectors in both satisfaction
-and optimization search.
+and optimization search. Phase saving captures determined values before native trail
+retraction, retaining propagated polarities as well as decision polarities across
+backjumps and restarts.
 
 Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights and
 its heap belong to the solve, retain conflict bumps across restarts, and apply bumps
