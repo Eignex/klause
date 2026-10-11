@@ -32,6 +32,10 @@ class BenchCacheTest {
                     BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = policy),
                 )
             }
+            assertNotEquals(
+                BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = "xcsp3-source-witness-v1"),
+                BenchCache.keyFor(model, null, "klause", budget, build, validationPolicy = XCSP_SOURCE_POLICY),
+            )
         } finally {
             root.deleteRecursively()
         }

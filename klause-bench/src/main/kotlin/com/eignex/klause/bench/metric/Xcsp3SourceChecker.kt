@@ -7,9 +7,14 @@ import javax.xml.parsers.DocumentBuilderFactory
 import kotlinx.serialization.encodeToString
 import org.w3c.dom.Document
 import org.w3c.dom.Element
+import org.xcsp.common.Condition
+import org.xcsp.common.Types.TypeCtr
 import org.xcsp.common.domains.Domains.Dom
 import org.xcsp.parser.XParser
 import org.xcsp.parser.callbacks.SolutionChecker
+import org.xcsp.parser.callbacks.XCallbacks.Implem
+import org.xcsp.parser.callbacks.XCallbacks2
+import org.xcsp.parser.entries.XConstraints.XCtr
 import org.xcsp.parser.entries.XVariables.XVarInteger
 import org.xml.sax.InputSource
 
@@ -49,10 +54,13 @@ internal object Xcsp3SourceChecker {
         checkAssignment(parser, root)?.let { return it }
         pinObjective(parser, root, objective)?.let { return it }
         val cost = objective?.let { " cost=\"$it\"" }.orEmpty()
-        val names = xmlText(root.getElementsByTagName("list").item(0).textContent)
-        val values = xmlText(root.getElementsByTagName("values").item(0).textContent)
-        val pinned = "<instantiation$cost><list>$names</list><values>$values</values></instantiation>"
+        val names = root.getElementsByTagName("list").item(0).textContent
+        val values = root.getElementsByTagName("values").item(0).textContent
+        val pinned = "<instantiation$cost><list>${xmlText(names)}</list><values>${xmlText(values)}</values></instantiation>"
         return runCatching {
+            val assignment = names.trim().split(Regex("\\s+")).zip(values.trim().split(Regex("\\s+")))
+                .associate { (name, value) -> name to value.toInt() }
+            DirectSumRangeGuard(assignment).loadConstraints(parser)
             val checker = SolutionChecker(false, source.absolutePath, pinned.byteInputStream())
             when {
                 checker.violatedCtrs.isNotEmpty() -> result("invalid", "source constraints reject candidate")
@@ -124,4 +132,42 @@ internal object Xcsp3SourceChecker {
         setFeature("http://xml.org/sax/features/external-general-entities", false)
         setFeature("http://xml.org/sax/features/external-parameter-entities", false)
     }.newDocumentBuilder()
+}
+
+private class DirectSumRangeGuard(private val assignment: Map<String, Int>) : XCallbacks2 {
+    private val implementation = Implem(this).apply { rawParameters() }
+
+    override fun implem(): Implem = implementation
+
+    override fun loadCtr(c: XCtr) {
+        // Other constraints and objectives still require SolutionChecker's independent checks.
+        if (c.type == TypeCtr.sum) super<XCallbacks2>.loadCtr(c)
+    }
+
+    override fun unimplementedCase(vararg objects: Any?): Any =
+        throw UnsupportedOperationException("expression sums or meta-constraints are outside direct-sum range checking")
+
+    override fun buildCtrSum(id: String, list: Array<XVarInteger>, condition: Condition) {
+        checkSum(list) { 1 }
+    }
+
+    override fun buildCtrSum(id: String, list: Array<XVarInteger>, coeffs: IntArray, condition: Condition) {
+        checkSum(list) { coeffs[it] }
+    }
+
+    override fun buildCtrSum(id: String, list: Array<XVarInteger>, coeffs: Array<XVarInteger>, condition: Condition) {
+        checkSum(list) { assignment.getValue(coeffs[it].id) }
+    }
+
+    private fun checkSum(list: Array<XVarInteger>, coefficient: (Int) -> Int) {
+        var sum = 0
+        try {
+            for (i in list.indices) {
+                val term = Math.multiplyExact(assignment.getValue(list[i].id), coefficient(i))
+                sum = Math.addExact(sum, term)
+            }
+        } catch (_: ArithmeticException) {
+            throw ArithmeticException("direct sum exceeds checker integer range")
+        }
+    }
 }

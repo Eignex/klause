@@ -314,9 +314,15 @@ array cells. Duplicate, unknown, missing, malformed and out-of-domain coordinate
 violated constraints and incorrect objectives are rejected. Compact variable/value
 forms are outside this checking surface. Reified/soft constraints, multiple
 objectives, unsupported checker callbacks, oversized integer coordinates and the
-ten-second/512 MiB checker subprocess limit leave checking `unknown`.
+ten-second/512 MiB checker subprocess limit leave checking `unknown`. Before the
+pinned checker's signed 32-bit direct-sum callbacks run, a range guard checks each
+assigned product and running total, including constant and variable coefficients.
+Overflow leaves checking `unknown`, even if later terms cancel it. The source
+parser expands array lists, groups, slides and blocks for this guard. Expression
+sum lists and logical meta-constraints are outside the guard's supported surface
+and leave checking `unknown`; it does not certify arithmetic in other callbacks.
 
-XCSP records use `validationPolicy=xcsp3-source-witness-v1` and
+XCSP records use `validationPolicy=xcsp3-source-witness-v2` and
 `sourceValidationScope=xcsp3-source`; `sourceValidationChecker` identifies the
 pinned checker. `sourceHashes` binds the original plain source before solving
 and is checked for stability during validation. `finalWitness` and
