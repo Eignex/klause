@@ -49,6 +49,7 @@ internal class ExactLiraAffineEqualities(
         BigFraction.of(value, BIG_ONE).takeIf { it.withinLimit() }?.let { column to it }
     }
     private val basis = HashMap<Int, Equation>()
+    private val exclusions = HashMap<Signature, Exclusion>()
     private var foundationReady = false
     private var queryCursor = 0
     private var remaining = 0
@@ -105,6 +106,7 @@ internal class ExactLiraAffineEqualities(
             if (source.processed && !source.active(context)) {
                 basisResets++
                 basis.clear()
+                exclusions.clear()
                 facts.forEach { it.processed = false }
                 foundationReady = false
                 break
@@ -179,14 +181,45 @@ internal class ExactLiraAffineEqualities(
                 if (interrupted) return ComponentResult.Indeterminate
                 continue
             }
-            if (reduced.terms.isNotEmpty()) continue
-            constantQueries++
-            val truth = source.comparison.truth(reduced.bound)
             val assigned = if (source.activator == ALWAYS) true else context.boolValue(source.activator)
+            val truth: Boolean
+            val guards: Set<Int>
+            if (reduced.terms.isEmpty()) {
+                constantQueries++
+                truth = source.comparison.truth(reduced.bound)
+                guards = reduced.guards
+            } else {
+                if (source.comparison.op != LinearOp.EQ && source.comparison.op != LinearOp.NE) continue
+                val negative = source.excluded(context)
+                if (!negative && exclusions.isEmpty()) continue
+                val signature = signature(reduced)
+                if (signature == null) {
+                    if (interrupted) return ComponentResult.Indeterminate
+                    continue
+                }
+                val retained = exclusions[signature]
+                if (retained != null && !retained.source.excluded(context)) exclusions.remove(signature)
+                val support = exclusions[signature]?.guards
+                if (negative) {
+                    val literal = source.literal(context)
+                    val leaves = if (literal == ALWAYS) reduced.guards else reduced.guards + literal
+                    if (leaves.size <= MAX_GUARDS &&
+                        (signature in exclusions || exclusions.size < MAX_EXCLUSIONS)
+                    ) {
+                        exclusions[signature] = Exclusion(source, leaves.toSet())
+                    }
+                    continue
+                }
+                if (support == null) continue
+                val combined = reduced.guards + support
+                if (combined.size > MAX_GUARDS) continue
+                truth = source.comparison.op == LinearOp.NE
+                guards = combined
+            }
             if (assigned == truth) continue
-            if (assigned != null) return conflict(context, reduced.guards, source.literal(context), stop)
+            if (assigned != null) return conflict(context, guards, source.literal(context), stop)
             val decision = SearchDecision.Bool(Lit.make(source.activator, truth))
-            val reason = context.explainAtoms(premise(reduced.guards), decision) ?: continue
+            val reason = context.explainAtoms(premise(guards), decision) ?: continue
             if (stop()) return ComponentResult.Indeterminate
             val result = context.imply(decision.literal, reason)
             if (result !is ComponentResult.Consistent) return result
@@ -239,6 +272,23 @@ internal class ExactLiraAffineEqualities(
         return true
     }
 
+    private fun signature(reduced: Reduced): Signature? {
+        val pivot = reduced.terms.keys.maxOrNull() ?: return null
+        val coefficient = reduced.terms.getValue(pivot)
+        if (coefficient == BigFraction.ONE) return Signature(reduced.terms, reduced.bound)
+        val inverse = coefficient.reciprocal()
+        val bound = reduced.bound * inverse
+        if (!bound.withinLimit()) return null
+        val terms = HashMap<Int, BigFraction>()
+        for ((column, value) in reduced.terms) {
+            if (!step()) return null
+            val normalized = value * inverse
+            if (!normalized.withinLimit()) return null
+            terms[column] = normalized
+        }
+        return Signature(terms, bound)
+    }
+
     private fun conflict(
         context: SearchContext,
         guards: Set<Int>,
@@ -279,10 +329,18 @@ internal class ExactLiraAffineEqualities(
 
         fun literal(context: SearchContext): Int =
             if (activator == ALWAYS) ALWAYS else Lit.make(activator, checkNotNull(context.boolValue(activator)))
+
+        fun excluded(context: SearchContext): Boolean {
+            val truth = if (activator == ALWAYS) true else context.boolValue(activator)
+            return (comparison.op == LinearOp.EQ && truth == false) ||
+                (comparison.op == LinearOp.NE && truth == true)
+        }
     }
 
     private data class Equation(val terms: Map<Int, BigFraction>, val bound: BigFraction, val guards: Set<Int>)
     private data class Reduced(val terms: Map<Int, BigFraction>, val bound: BigFraction, val guards: Set<Int>)
+    private data class Signature(val terms: Map<Int, BigFraction>, val bound: BigFraction)
+    private data class Exclusion(val source: Source, val guards: Set<Int>)
 
     private companion object {
         const val ALWAYS = -1
@@ -290,5 +348,6 @@ internal class ExactLiraAffineEqualities(
         const val MAX_BITS = 256
         const val MAX_GUARDS = 256
         const val MAX_VISITS = 8192
+        const val MAX_EXCLUSIONS = 4096
     }
 }

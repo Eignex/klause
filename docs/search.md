@@ -153,6 +153,11 @@ Comparison queries retain a circular cursor across bounded passes, so an
 unresolved prefix cannot consume every pass before later comparisons are visited.
 The cursor carries no proof state; every pass validates cached source guards
 before querying the basis.
+Reduced disequalities retain normalized affine signatures with their source and
+basis guards. A matching equality is false and a matching disequality is true,
+even when the residual still has open terms. Basis reset clears these signatures;
+lookup also checks that the source exclusion remains asserted. At most 4096
+signatures are retained, and normalization consumes the same elimination allowance.
 Declared fixed columns supply unconditional facts. Boolean coefficients and
 disjunction alternatives remain with the complete theory.
 

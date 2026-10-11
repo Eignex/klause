@@ -127,6 +127,49 @@ class ExactLiraAffineEqualitiesTest {
     }
 
     @Test
+    fun `affine exclusions imply guarded comparisons and retract`() {
+        for ((operator, negativeTruth) in listOf(LinearOp.EQ to false, LinearOp.NE to true)) {
+            for (queryOperator in listOf(LinearOp.EQ, LinearOp.NE)) {
+                for (sign in listOf(1, -1)) {
+                    val open = Bits(3).also { bits -> repeat(3, bits::set) }
+                    val source = Problem(
+                        3,
+                        intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+                        factors = arrayOf(
+                            ReifiedLinear(0, intArrayOf(1, -1, -1), intArrayOf(2, 0, 1), LinearOp.EQ, 0),
+                            ReifiedLinear(2, intArrayOf(sign, sign), intArrayOf(0, 1), queryOperator, sign),
+                            ReifiedLinear(1, intArrayOf(-sign), intArrayOf(2), operator, -sign),
+                        ),
+                    )
+                    val propagation = ExactLiraAffineEqualities(source, source.factors.map { factor ->
+                        factor.linearRows.map { it.exactForm(0) }
+                    }) { _, _ -> ComponentResult.Consistent }
+                    val session = SearchSession(emptyList())
+                    session.push(SearchDecision.Bool(Lit.make(0, true)))
+                    session.push(SearchDecision.Bool(Lit.make(1, negativeTruth)))
+
+                    repeat(2) {
+                        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+                    }
+
+                    val queryTruth = queryOperator == LinearOp.NE
+                    assertEquals(queryTruth, session.boolValue(2))
+                    assertEquals(
+                        setOf(Lit.make(0, false), Lit.make(1, !negativeTruth), Lit.make(2, queryTruth)),
+                        assertNotNull(session.reasonFor(2)).literals.toSet(),
+                    )
+                    session.popTo(1)
+                    assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+                    assertNull(session.boolValue(2))
+                    session.push(SearchDecision.Bool(Lit.make(1, !negativeTruth)))
+                    assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+                    assertEquals(!queryTruth, session.boolValue(2))
+                }
+            }
+        }
+    }
+
+    @Test
     fun `bounded affine passes eventually imply comparisons beyond unresolved prefixes`() {
         val open = Bits(33).also { bits -> repeat(32, bits::set) }
         val source = Problem(
