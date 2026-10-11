@@ -1,0 +1,3 @@
+# Frozen canonical source syntax variants; original qfnra-v1 memberships remain distinct.
+smtlib-qfnra-source-canonical-v1/degeneracy/degree-drop
+smtlib-qfnra-source-canonical-v1/degeneracy/equal-degree-common-root

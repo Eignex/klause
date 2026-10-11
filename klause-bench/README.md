@@ -70,6 +70,18 @@ The [fixture manifest](smoke-corpus/qfnra-v1/manifest.json) binds every identity
 its original source SHA-256, license and mathematical expectation. Change names
 for membership or byte changes; preserve version-1 selections.
 
+`qfnra-source-canonical-v1` selects two canonical negative-constant variants under
+`smtlib-qfnra-source-canonical-v1`: `degeneracy/degree-drop` and
+`degeneracy/equal-degree-common-root`. Their [manifest](smoke-corpus/qfnra-source-canonical-v1/manifest.json)
+records original and variant source hashes and the `-1` to `(- 1)` transformation.
+The original `qfnra-core-v1` identities remain in their frozen membership and
+reference records. Z3 accepts their bare negative numerals; the dedicated polynomial
+source parser treats those atoms as names and declines them. Report those source
+load declines under their original identities. Use the distinct canonical set for
+canonical source admission coverage, retaining unsuccessful original records.
+An atom audit of all 66 version-1 core/holdout/extension sources found bare negative
+numeric atoms only in these two sources. It does not certify full source admission.
+
 `qfnra-extensions-v1` keeps five symbolic-division, mixed-integer, negative-power,
 transcendental and multiple-query controls separate. Its catalog expectations are
 unknown: these cases describe input boundaries rather than polynomial capability.
