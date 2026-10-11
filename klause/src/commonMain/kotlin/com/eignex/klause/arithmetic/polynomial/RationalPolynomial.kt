@@ -36,12 +36,13 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         },
     )
 
-    fun scale(value: RationalPolynomial, coefficient: BigFraction): RationalPolynomial = RationalPolynomial(
-        value.coefficients.map {
+    fun scale(value: RationalPolynomial, coefficient: BigFraction): RationalPolynomial {
+        arithmetic.step()
+        return RationalPolynomial(value.coefficients.map {
             arithmetic.step()
             it * coefficient
-        },
-    )
+        })
+    }
 
     fun multiply(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial {
         arithmetic.step()
@@ -57,14 +58,17 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         return RationalPolynomial(result)
     }
 
-    fun derivative(value: RationalPolynomial): RationalPolynomial = RationalPolynomial(
-        (1..value.degree).map {
+    fun derivative(value: RationalPolynomial): RationalPolynomial {
+        arithmetic.step()
+        arithmetic.denseSize((value.degree - 1).coerceAtLeast(-1))
+        return RationalPolynomial((1..value.degree).map {
             arithmetic.step()
             value[it] * BigFraction.ofLong(it.toLong())
-        },
-    )
+        })
+    }
 
     fun evaluate(value: RationalPolynomial, at: BigFraction): BigFraction {
+        arithmetic.step()
         var result = BigFraction.ZERO
         for (coefficient in value.coefficients.asReversed()) {
             arithmetic.step()
@@ -75,7 +79,10 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
 
     fun divide(left: RationalPolynomial, right: RationalPolynomial): Pair<RationalPolynomial, RationalPolynomial> {
         require(!right.isZero)
-        val quotient = MutableList((left.degree - right.degree + 1).coerceAtLeast(0)) { BigFraction.ZERO }
+        arithmetic.step()
+        val quotient = MutableList(arithmetic.denseSize((left.degree - right.degree).coerceAtLeast(-1))) {
+            BigFraction.ZERO
+        }
         var remainder = left
         while (!remainder.isZero && remainder.degree >= right.degree) {
             arithmetic.step()
@@ -98,10 +105,13 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         return quotient
     }
 
-    fun monic(value: RationalPolynomial): RationalPolynomial =
-        if (value.isZero) value else scale(value, value[value.degree].reciprocal())
+    fun monic(value: RationalPolynomial): RationalPolynomial {
+        arithmetic.step()
+        return if (value.isZero) value else scale(value, value[value.degree].reciprocal())
+    }
 
     fun gcd(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial {
+        arithmetic.step()
         var a = left
         var b = right
         while (!b.isZero) {
@@ -161,6 +171,7 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
     }
 
     fun countOpen(sequence: List<RationalPolynomial>, interval: RationalInterval): Int {
+        arithmetic.step()
         if (interval.isPoint) return 0
         return variations(sequence, interval.lower) - variations(sequence, interval.upper) -
             if (evaluate(sequence[0], interval.upper).isZero) 1 else 0
