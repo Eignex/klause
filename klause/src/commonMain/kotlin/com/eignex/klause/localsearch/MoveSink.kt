@@ -102,6 +102,15 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
     }
 
+    internal fun addChannelingBoolFlip(state: LocalSearchState, varId: Int) {
+        if (invariants?.isDefinedBool(varId) != true) {
+            addBoolFlip(varId)
+            return
+        }
+        if (assumptions.isFrozenBool(varId)) return
+        LiteralChannelRepair(state, this).proposePredicate(varId, !state.assignment.boolValue(varId))
+    }
+
     /** Queue an int-set move on `intVar`. */
     fun addIntSet(varId: Int, newValue: Long) {
         if (!allowsInt(varId)) return
@@ -195,7 +204,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     fun addChannelingIntSet(state: LocalSearchState, varId: Int, newValue: Long) {
         if (invariants?.isDefinedInt(varId) == true) {
             if (invariants?.literalChannel(varId) != null) {
-                LiteralChannelRepair(state, this, varId).propose(newValue)
+                LiteralChannelRepair(state, this).propose(varId, newValue)
                 return
             }
             if (invariants?.hasExtremumRepair(varId) != true) {

@@ -29,7 +29,7 @@ internal class ConditionalProductRepair(
             state.assignment.intValue(variable) != 1L
         ) return
         if (state.invariants?.literalChannel(variable) != null) {
-            added += LiteralChannelRepair(state, sink, variable, limit - added).propose(0L)
+            added += LiteralChannelRepair(state, sink, limit - added).propose(variable, 0L)
             return
         }
         if (!sink.allowsInt(variable)) return

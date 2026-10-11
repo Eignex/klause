@@ -363,8 +363,8 @@ columns decline tuple construction. The ordinary scorer grades the complete assi
 Cumulative overload repair can remove a maintained product duration through a unit
 binary equality channel and a unary equality choice predicate. It checks zero in the
 channel and duration domains, pins and implicit owners before proposing a complete
-choice-and-channel move. Per repair call, at most 16 such moves are drawn from choice
-domains with at most 32 present values, with at most four alternatives per predicate.
+choice-and-channel move. Per repair call, at most 16 such moves are drawn from at most
+32 present values of each choice domain, with at most four alternatives per predicate.
 The ordinary scorer grades every affected factor; removing a footprint does not
 establish that the complete assignment is feasible.
 Domain-aware definition inference derives hinted unit equality channels only when
@@ -382,8 +382,12 @@ When a Boolean predicate remains searched, unit unary equality sources supply bo
 coordinated choice moves before a direct flip; all other constraints and duration
 fanout remain graded.
 These repairs check output domains, pins and implicit owners; false equality targets
-sample at most four alternatives from at most 32 present values, and literal chains
-stop at depth 16. The Cumulative duration neighborhood uses the same inverse route.
+sample at most four alternatives from at most 32 present values, including bounded
+walks through larger domains. Literal chains stop at depth 16. The Cumulative duration
+neighborhood uses the same inverse route. Clause, cardinality and weighted Boolean-row
+repairs backsolve maintained equality predicates through their integer inputs after
+binary lowering removes the integer channels. Substituted integer pins remain in place;
+source-coordinate pins and owners still filter every inverse move.
 Functional objective inference declines cones crossing literal-to-integer channels;
 ordinary objective scoring still grades the complete maintained assignment.
 The portfolio's ALNS inner local search shares the definition sweep and immutable

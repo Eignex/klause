@@ -86,7 +86,7 @@ internal class CardinalityInvariant(
                 val v = Lit.variable(lit)
                 val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
                 val helpsIncrease = !isTrue
-                if (wantIncrease == helpsIncrease) sink.addBoolFlip(v)
+                if (wantIncrease == helpsIncrease) sink.addChannelingBoolFlip(state, v)
             }
             return
         }
@@ -97,9 +97,9 @@ internal class CardinalityInvariant(
                 netChange += if (Lit.evaluate(lit, state.assignment.boolValue(v))) -1 else +1
             }
             if (wantIncrease && netChange > 0) {
-                sink.addBoolFlip(v)
+                sink.addChannelingBoolFlip(state, v)
             } else if (!wantIncrease && netChange < 0) {
-                sink.addBoolFlip(v)
+                sink.addChannelingBoolFlip(state, v)
             }
         }
     }

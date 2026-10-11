@@ -18,6 +18,77 @@ import kotlin.test.assertTrue
 
 class LiteralChannelRepairTest {
     @Test
+    fun `Boolean predicate repairs survive substituted integer pins`() {
+        for ((initial, desired) in listOf(0L to true, 42L to false)) {
+            val source = Problem(
+                1, 2, arrayOf(IntDomain(0, 89), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 42),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ),
+            )
+            val lowered = Problem(
+                1, 2, arrayOf(IntDomain(0, 89), IntDomain(0, 0)),
+                arrayOf<Factor>(source.factors[0], Clause(intArrayOf(Lit.make(0, desired)))),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(lowered), Random(3), Assumptions.None.withInt(1, 0))
+            state.assignment.setInt(0, initial)
+            val sweep = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(1)))
+            state.invariants = sweep.network(2, 1)
+            sweep.sweep(state.assignment, state.rootDomains, lowered.factors)
+            state.recompute()
+            state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+            assertTrue(state.moveSink.list.isNotEmpty())
+            val move = state.moveSink.list.first()
+            val before = state.cost
+            val predicted = state.netDelta(move)
+
+            state.apply(move)
+
+            assertEquals(desired, state.assignment.boolValue(0))
+            assertEquals(desired, state.assignment.intValue(0) == 42L)
+            assertEquals(0L, state.assignment.intValue(1))
+            assertEquals(before + predicted, state.cost)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `Boolean predicate repairs respect source pins and owners`() {
+        for (protection in listOf("source pin", "source owner", "Boolean pin")) {
+            val source = Problem(
+                1, 2, arrayOf(IntDomain(0, 89), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 42),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ),
+            )
+            val lowered = Problem(
+                1, 2, arrayOf(IntDomain(0, 89), IntDomain(0, 0)),
+                arrayOf<Factor>(source.factors[0], Clause(intArrayOf(Lit.make(0, false)))),
+            )
+            val assumptions = when (protection) {
+                "source pin" -> Assumptions.None.withInt(0, 42)
+                "Boolean pin" -> Assumptions.None.withBool(0, true)
+                else -> Assumptions.None
+            }
+            val state = LocalSearchState(LocalSearchModel.open(lowered), Random(3), assumptions)
+            state.assignment.setInt(0, 42)
+            val sweep = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(1)))
+            state.invariants = sweep.network(2, 1)
+            if (protection == "source owner") state.moveSink.setOwners(intArrayOf(7, -1))
+            sweep.sweep(state.assignment, state.rootDomains, lowered.factors)
+            state.recompute()
+
+            state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+
+            assertTrue(state.moveSink.list.isEmpty(), protection)
+        }
+    }
+
+    @Test
     fun `equality index repairs coordinate both inputs and their channels`() {
         for ((initial, target) in listOf(0L to 8L, 8L to 0L)) {
             val problem = Problem(

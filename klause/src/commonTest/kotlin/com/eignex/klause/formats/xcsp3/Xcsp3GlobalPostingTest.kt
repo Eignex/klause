@@ -12,6 +12,8 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.presolve.BakeConfig
+import com.eignex.klause.presolve.BinaryColumnSubstitution
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
@@ -109,6 +111,40 @@ class Xcsp3GlobalPostingTest {
         assertEquals(0L, state.cost)
         state.recompute()
         assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `Boolean packing repairs move source items after binary lowering`() {
+        for ((size, capacity) in listOf(1 to 1, 2 to 3, 1 to 2)) {
+            val limits = List(33) { capacity }.joinToString(" ")
+            val parsed = parse(
+                "<binPacking><list>x y z</list><sizes>$size $size $size</sizes><limits>$limits</limits></binPacking>",
+                """<var id="x">0..32</var><var id="y">0..32</var><var id="z">0..32</var>""",
+            )
+            val source = parsed.problem
+            val lowered = assertNotNull(
+                BinaryColumnSubstitution.substitute(source.bake(), emptySet(), BakeConfig.NONE),
+            ).problem
+            val state = LocalSearchState(lowered, Random(5))
+            for (name in listOf("x", "y", "z")) state.assignment.setInt(parsed.intVarNames.getValue(name), 16)
+            val sweep = assertNotNull(DefinitionalSweep.infer(source, parsed.definedVars))
+            state.invariants = sweep.network(lowered.numIntVars, lowered.numBoolVars)
+            sweep.sweep(state.assignment, state.rootDomains, lowered.factors)
+            state.recompute()
+            for (id in state.factors.indices) state.factors[id].proposeRepairMoves(state, id, state.moveSink)
+            assertTrue(state.moveSink.list.isNotEmpty())
+            val move = state.moveSink.list.minBy { state.netDelta(it) }
+            val before = state.cost
+            val predicted = state.netDelta(move)
+
+            state.apply(move)
+
+            assertTrue(state.cost < before)
+            assertEquals(before + predicted, state.cost)
+            val committed = state.cost
+            state.recompute()
+            assertEquals(committed, state.cost)
+        }
     }
 
     @Test

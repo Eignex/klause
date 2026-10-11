@@ -3,14 +3,16 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.randomValue
 
 internal class LiteralChannelRepair(
     private val state: LocalSearchState,
     private val sink: MoveSink,
-    private val output: Int,
     private val limit: Int = MAX_ALTERNATIVES,
 ) {
-    fun propose(target: Long): Int = propose(output, target, 0, limit)
+    fun propose(output: Int, target: Long): Int = propose(output, target, 0, limit)
+
+    fun proposePredicate(indicator: Int, desired: Boolean): Int = proposePredicate(indicator, desired, 0, limit)
 
     private fun propose(variable: Int, target: Long, depth: Int, remaining: Int): Int {
         if (depth >= MAX_DEPTH || remaining <= 0 || target !in 0L..1L ||
@@ -28,19 +30,33 @@ internal class LiteralChannelRepair(
             sink.addBoolFlip(b)
             return sink.size - before
         }
-        val predicate = network.equalityPredicate(b) ?: return 0
+        return proposePredicate(b, desired, depth, remaining)
+    }
+
+    private fun proposePredicate(b: Int, desired: Boolean, depth: Int, remaining: Int): Int {
+        if (depth >= MAX_DEPTH || remaining <= 0 || state.assumptions.isFrozenBool(b) ||
+            state.assignment.boolValue(b) == desired
+        ) return 0
+        val predicate = state.invariants?.equalityPredicate(b) ?: return 0
         val domain = state.rootDomains[predicate.input]
         if (desired) {
             if (predicate.value !in domain) return 0
             return input(predicate.input, predicate.value, depth, minOf(remaining, MAX_ALTERNATIVES))
         }
-        val span = domain.spanOrNull(MAX_CHOICE_VALUES) ?: return 0
-        val offset = state.rng.nextInt(span.size)
+        return predicateAlternatives(predicate, depth, remaining)
+    }
+
+    private fun predicateAlternatives(predicate: EqualityPredicateDefinition, depth: Int, remaining: Int): Int {
+        val domain = state.rootDomains[predicate.input]
+        val span = domain.spanOrNull(MAX_CHOICE_VALUES)
+        val offset = if (span == null) 0 else state.rng.nextInt(span.size)
+        var next = if (span == null) domain.randomValue(state.rng) else 0L
         var added = 0
-        for (i in 0 until span.size) {
-            val value = span.valueAt((offset + i) % span.size)
+        val cap = minOf(remaining, MAX_ALTERNATIVES)
+        for (i in 0 until (span?.size ?: MAX_CHOICE_VALUES.toInt())) {
+            val value = if (span == null) next else span.valueAt((offset + i) % span.size)
+            if (span == null) next = if (next == domain.max) domain.min else domain.higher(next)
             if (value == predicate.value || value == state.assignment.intValue(predicate.input)) continue
-            val cap = minOf(remaining, MAX_ALTERNATIVES)
             added += input(predicate.input, value, depth, cap - added)
             if (added >= cap) break
         }
