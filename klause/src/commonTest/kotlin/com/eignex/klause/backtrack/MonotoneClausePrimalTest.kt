@@ -128,7 +128,8 @@ class MonotoneClausePrimalTest {
             this[29] = 2L
         })
         val primal = assertNotNull(MonotoneClausePrimal.create(
-            solver, objective, BacktrackParams(assumptions = Assumptions(bools = mapOf(32 to true))), Cancellation.Never,
+            solver, objective, BacktrackParams(assumptions = Assumptions(bools = mapOf(32 to true))),
+            Cancellation.Never,
         ))
 
         primal.use {
