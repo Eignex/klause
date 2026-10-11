@@ -185,6 +185,35 @@ internal fun candidateArcCount(succ: IntArray, selfLoops: Boolean, cap: Int, dom
     return arcs
 }
 
+internal suspend fun SequenceScope<Unit>.prepareCandidateArcCount(
+    succ: IntArray,
+    selfLoops: Boolean,
+    cap: Int,
+    domainOf: (Int) -> IntDomain,
+): Int {
+    var arcs = 0
+    var visits = 0
+    for (i in succ.indices) {
+        val dom = domainOf(succ[i])
+        if (dom.valueCount <= succ.size) {
+            val span = dom.values
+            for (k in 0 until span.size) {
+                val j = span.valueAt(k)
+                if ((selfLoops || j != i.toLong()) && j >= 0 && j < succ.size) arcs++
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+        } else {
+            for (j in succ.indices) {
+                if ((selfLoops || j != i) && dom.contains(j.toLong())) arcs++
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+        }
+        if (arcs > cap) return arcs
+        if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+    }
+    return arcs
+}
+
 /**
  * Fill [out] (length `model.m`) with per-row enforcement at [session]'s pins: every non-gated row is
  * enforced, a gated row only while its activating pin holds — at most one of an atom/complement pair.

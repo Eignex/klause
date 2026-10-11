@@ -109,6 +109,8 @@ internal class CumulativeRelaxation(
     var plans: List<AreaPlan> = emptyList()
         private set
 
+    private var constructionVisits = 0
+
     init {
         if (!deferred) preparation().forEach { }
     }
@@ -216,7 +218,6 @@ internal class CumulativeRelaxation(
         return LpRowPremises(pv.toIntArray(), BooleanArray(count) { false }, pt.toLongArray())
     }
 
-    private var constructionVisits = 0
 
     // Structural plan construction: once, at problem load.
 

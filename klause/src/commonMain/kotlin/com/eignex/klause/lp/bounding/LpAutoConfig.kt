@@ -32,7 +32,8 @@ import com.eignex.klause.lp.prepareLpHull
 import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
-import com.eignex.klause.lp.relaxation.candidateArcCount
+import com.eignex.klause.lp.relaxation.prepareCandidateArcCount
+import com.eignex.klause.lp.prepareStatesBothBounds
 import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBothBounds
@@ -407,8 +408,10 @@ object LpAutoConfig {
             if (n < 2) continue
             // Mirrors the build's own decline: an open-sided successor gets no arc model, so its arcs
             // must not enter the estimate either.
-            if (!problem.statesBothBounds(succ)) continue
-            val arcs = candidateArcCount(succ, selfLoops, CpToLpRelaxation.MAX_CIRCUIT_ARCS, problem::rootDomainOf)
+            if (!prepareStatesBothBounds(problem, succ)) continue
+            val arcs = prepareCandidateArcCount(
+                succ, selfLoops, CpToLpRelaxation.MAX_CIRCUIT_ARCS, problem::rootDomainOf,
+            )
             if (arcs == 0 || arcs > CpToLpRelaxation.MAX_CIRCUIT_ARCS) continue
             any = true
             cols += arcs
@@ -452,7 +455,7 @@ object LpAutoConfig {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             // Mirrors the build's own decline: a view with an open-sided start gets no time-indexed
             // model, so its columns must not enter the estimate either.
-            if (!problem.statesBothBounds(v.starts)) continue
+            if (!prepareStatesBothBounds(problem, v.starts)) continue
             val n = v.starts.size
             var t0 = Long.MAX_VALUE
             var t1 = Long.MIN_VALUE
