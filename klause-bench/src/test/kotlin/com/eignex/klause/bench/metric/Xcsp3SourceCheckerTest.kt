@@ -2,6 +2,9 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.source.CorpusFetcher
 import java.io.File
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -32,13 +35,12 @@ class Xcsp3SourceCheckerTest {
         assertNull(checked.checkedWitness)
     }
 
-    @Test
-    fun `incorrect and malformed source objectives are rejected`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["9", "10.0", "1/2", "NaN"])
+    fun `incorrect and malformed source objectives are rejected`(objective: String) {
         val witness = "<instantiation><list>a b c</list><values>2 2 0</values></instantiation>"
 
-        for (objective in listOf("9", "10.0", "1/2", "NaN")) {
-            assertEquals("invalid", Xcsp3SourceChecker.inspect(source, witness, objective).status, objective)
-        }
+        assertEquals("invalid", Xcsp3SourceChecker.inspect(source, witness, objective).status)
     }
 
     @Test
@@ -48,19 +50,18 @@ class Xcsp3SourceCheckerTest {
         assertEquals("unknown", Xcsp3SourceChecker.inspect(source, witness, null).status)
     }
 
-    @Test
-    fun `malformed incomplete duplicate unknown and out of domain assignments are rejected`() {
-        for (witness in listOf(
-            "<instantiation><list>a b c</list><values>2 2 0</values>",
-            "<instantiation><list>a b</list><values>2 2</values></instantiation>",
-            "<instantiation><list>a a c</list><values>2 2 0</values></instantiation>",
-            "<instantiation><list>a b unknown</list><values>2 2 0</values></instantiation>",
-            "<instantiation><list>a b c</list><values>3 1 0</values></instantiation>",
-            "<instantiation><list>a b c</list><values>2 2 *</values></instantiation>",
-            "<instantiation><values>2 2 0</values><list>a b c</list></instantiation>",
-        )) {
-            assertEquals("invalid", Xcsp3SourceChecker.inspect(source, witness, "10").status, witness)
-        }
+    @ParameterizedTest
+    @ValueSource(strings = [
+        "<instantiation><list>a b c</list><values>2 2 0</values>",
+        "<instantiation><list>a b</list><values>2 2</values></instantiation>",
+        "<instantiation><list>a a c</list><values>2 2 0</values></instantiation>",
+        "<instantiation><list>a b unknown</list><values>2 2 0</values></instantiation>",
+        "<instantiation><list>a b c</list><values>3 1 0</values></instantiation>",
+        "<instantiation><list>a b c</list><values>2 2 *</values></instantiation>",
+        "<instantiation><values>2 2 0</values><list>a b c</list></instantiation>",
+    ])
+    fun `malformed incomplete duplicate unknown and out of domain assignments are rejected`(witness: String) {
+        assertEquals("invalid", Xcsp3SourceChecker.inspect(source, witness, "10").status)
     }
 
     @Test
@@ -103,8 +104,9 @@ class Xcsp3SourceCheckerTest {
         }
     }
 
-    @Test
-    fun `source objectives remain exact beyond the signed word range`() {
+    @ParameterizedTest
+    @CsvSource("1000000000000000000000000000,valid", "1000000000000000000000000001,invalid")
+    fun `source objectives remain exact beyond the signed word range`(objective: String, status: String) {
         val model = File.createTempFile("xcsp-product-", ".xml")
         try {
             model.writeText(
@@ -113,8 +115,7 @@ class Xcsp3SourceCheckerTest {
             )
             val witness = "<instantiation><list>a b c</list><values>1 1 1</values></instantiation>"
 
-            assertEquals("valid", Xcsp3SourceChecker.inspect(model, witness, "1000000000000000000000000000").status)
-            assertEquals("invalid", Xcsp3SourceChecker.inspect(model, witness, "1000000000000000000000000001").status)
+            assertEquals(status, Xcsp3SourceChecker.inspect(model, witness, objective).status)
         } finally {
             model.delete()
         }
