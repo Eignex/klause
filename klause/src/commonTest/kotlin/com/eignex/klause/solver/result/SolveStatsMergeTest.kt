@@ -126,12 +126,14 @@ class SolveStatsMergeTest {
             smt = SmtStats(
                 reductionNs = 7,
                 sourceLp = SourceLpWorkStats(operations = 2, floatWork = 11, modeledWork = 13),
+                affine = AffineEqualityStats(passes = 3, queryReductions = 7, budgetStops = 1),
             ),
         )
         val right = SolveStats(
             smt = SmtStats(
                 reductionNs = 17,
                 sourceLp = SourceLpWorkStats(operations = 3, floatWork = 19, modeledWork = 23),
+                affine = AffineEqualityStats(passes = 5, queryReductions = 11, budgetStops = 2),
             ),
         )
 
@@ -141,5 +143,8 @@ class SolveStatsMergeTest {
         assertEquals(24L, merged.reductionNs)
         assertEquals(30L, merged.sourceLp.floatWork)
         assertEquals(36L, merged.sourceLp.modeledWork)
+        assertEquals(8L, merged.affine.passes)
+        assertEquals(18L, merged.affine.queryReductions)
+        assertEquals(3L, merged.affine.budgetStops)
     }
 }

@@ -37,6 +37,44 @@ data class SourceLpWorkStats(
     )
 }
 
+/** Sparse affine source propagation work, independent of LP work and proof authority. */
+data class AffineEqualityStats(
+    /** Propagation invocations, including interrupted passes. */
+    val passes: Long = 0,
+    /** Cached bases cleared after a supporting source guard was retracted. */
+    val basisResets: Long = 0,
+    /** Source equations admitted into the basis or proved redundant. */
+    val factsAdded: Long = 0,
+    /** Comparison reductions attempted after the source-fact pass. */
+    val queryReductions: Long = 0,
+    /** Completed comparison reductions with no remaining open terms. */
+    val constantQueries: Long = 0,
+    /** Boolean implications accepted by shared search and the theory owner. */
+    val implications: Long = 0,
+    /** Source conflicts returned before invoking the LP. */
+    val conflicts: Long = 0,
+    /** Charged elimination and normalization term visits. */
+    val termVisits: Long = 0,
+    /** Passes that consume their elimination visit allowance. */
+    val budgetStops: Long = 0,
+    /** Propagation time, including guard validation and explanation construction. */
+    val activeNs: Long = 0,
+) {
+    /** Combine independent propagation deltas. */
+    fun mergedWith(other: AffineEqualityStats): AffineEqualityStats = AffineEqualityStats(
+        passes + other.passes,
+        basisResets + other.basisResets,
+        factsAdded + other.factsAdded,
+        queryReductions + other.queryReductions,
+        constantQueries + other.constantQueries,
+        implications + other.implications,
+        conflicts + other.conflicts,
+        termVisits + other.termVisits,
+        budgetStops + other.budgetStops,
+        activeNs + other.activeNs,
+    )
+}
+
 /** Exact-arithmetic telemetry for complete SMT theory routes. */
 data class SmtStats(
     /** Exact-theory conflicts returned to the shared search. */
@@ -73,6 +111,8 @@ data class SmtStats(
     val continuation: LpContinuationStats = LpContinuationStats(),
     /** Common-engine source adapters, separate from retired cold-simplex counters. */
     val sourceLp: SourceLpWorkStats = SourceLpWorkStats(),
+    /** Sparse source equality propagation, before the complete LP fallback. */
+    val affine: AffineEqualityStats = AffineEqualityStats(),
 ) {
     /** Combine independent solve slices. */
     fun mergedWith(other: SmtStats): SmtStats = SmtStats(
@@ -93,11 +133,18 @@ data class SmtStats(
         wideWitnessAccepted + other.wideWitnessAccepted,
         continuation.mergedWith(other.continuation),
         sourceLp.mergedWith(other.sourceLp),
+        affine.mergedWith(other.affine),
     )
 }
 
 /** Mutable exact-SMT telemetry for one top-level open-theory request. */
 internal class SmtStatsSink {
+    private var affine = AffineEqualityStats()
+
+    fun observeAffine(delta: AffineEqualityStats) {
+        affine = affine.mergedWith(delta)
+    }
+
     private var sourceLp = SourceLpWorkStats()
 
     fun observeSourceLp(delta: SourceLpWorkStats) {
@@ -161,6 +208,6 @@ internal class SmtStatsSink {
         conflicts, explainedConflicts, unexplainedConflicts, conflictLiterals,
         reductionRequests, reductionCacheHits, reductionAccepted, reductionDeclined, reductionNs,
         witnessCandidates, witnessAccepted, strictWitnessCandidates, strictWitnessAccepted,
-        wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp,
+        wideWitnessCandidates, wideWitnessAccepted, continuation, sourceLp, affine,
     )
 }

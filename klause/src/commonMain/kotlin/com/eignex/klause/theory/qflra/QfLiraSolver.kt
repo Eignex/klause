@@ -157,7 +157,7 @@ class ExactLiraSearchComponent(
     private val lp: LpPropagator by lpDelegate
     private val system by lazy { LiveQfLraSystem(model, lp, exactForms) }
     private val affineEqualities by lazy {
-        ExactLiraAffineEqualities(model, exactForms) { decision, context ->
+        ExactLiraAffineEqualities(model, exactForms, observe = { smtStats?.observeAffine(it) }) { decision, context ->
             lp.assertWithin(decision, context, operationStop)
         }
     }

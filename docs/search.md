@@ -363,6 +363,12 @@ and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
 | `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
 | `openNonAssertingConflicts` | Sound shared conflicts retaining chronological fallback |
 | `openReductionNs` | Total shared reduction selection and watch-rebuild time |
+| `smtAffinePasses`, `smtAffineBasisResets` | Sparse affine propagation invocations and cache clears after supporting guard retraction |
+| `smtAffineFactsAdded` | Source equations admitted into the basis or proved redundant |
+| `smtAffineQueryReductions`, `smtAffineConstantQueries` | Comparison reductions attempted and completed reductions with no open terms |
+| `smtAffineImplications`, `smtAffineConflicts` | Accepted Boolean implications and source conflicts returned before LP solving |
+| `smtAffineTermVisits`, `smtAffineBudgetStops` | Charged elimination visits and passes consuming their visit allowance |
+| `smtAffineActiveNs` | Sparse propagation time including guard validation and explanations; separate from LP time |
 | `portfolioReseedStaleThreshold`, arm `reseeds` | Effective stale threshold and reseed count |
 
 A nonzero non-asserting count is a reason to capture the conflict and inspect

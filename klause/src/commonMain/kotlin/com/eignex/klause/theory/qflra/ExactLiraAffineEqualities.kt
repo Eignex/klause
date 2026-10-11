@@ -9,6 +9,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.AffineEqualityStats
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
@@ -18,10 +19,12 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.PollStride
 import com.eignex.klause.util.magnitudeBitLength
+import kotlin.time.TimeSource.Monotonic
 
 internal class ExactLiraAffineEqualities(
     model: Problem,
     forms: List<List<ExactRowForm>>,
+    private val observe: ((AffineEqualityStats) -> Unit)? = null,
     private val accept: (SearchDecision, SearchContext) -> ComponentResult,
 ) {
     private val rows = if (model.numRealVars != 0) emptyList() else {
@@ -50,14 +53,48 @@ internal class ExactLiraAffineEqualities(
     private var remaining = 0
     private var interrupted = false
     private var progressStop: Cancellation = Cancellation.Never
+    private var basisResets = 0L
+    private var factsAdded = 0L
+    private var queryReductions = 0L
+    private var constantQueries = 0L
+    private var implications = 0L
+    private var conflicts = 0L
     var implied = false
         private set
 
     fun propagate(context: SearchContext, stop: Cancellation): ComponentResult {
+        basisResets = 0
+        factsAdded = 0
+        queryReductions = 0
+        constantQueries = 0
+        implications = 0
+        conflicts = 0
+        remaining = MAX_VISITS
+        val mark = Monotonic.markNow()
+        return try {
+            propagateWithin(context, stop)
+        } finally {
+            observe?.invoke(
+                AffineEqualityStats(
+                    passes = 1,
+                    basisResets = basisResets,
+                    factsAdded = factsAdded,
+                    queryReductions = queryReductions,
+                    constantQueries = constantQueries,
+                    implications = implications,
+                    conflicts = conflicts,
+                    termVisits = (MAX_VISITS - remaining).toLong(),
+                    budgetStops = if (remaining == 0) 1 else 0,
+                    activeNs = mark.elapsedNow().inWholeNanoseconds,
+                ),
+            )
+        }
+    }
+
+    private fun propagateWithin(context: SearchContext, stop: Cancellation): ComponentResult {
         implied = false
         if (stop()) return ComponentResult.Indeterminate
         if (rows.isEmpty()) return ComponentResult.Consistent
-        remaining = MAX_VISITS
         interrupted = false
         val stride = PollStride()
         val metered = stop.workMeter() != null
@@ -65,6 +102,7 @@ internal class ExactLiraAffineEqualities(
         for (source in facts) {
             if (progressStop()) return ComponentResult.Indeterminate
             if (source.processed && !source.active(context)) {
+                basisResets++
                 basis.clear()
                 facts.forEach { it.processed = false }
                 foundationReady = false
@@ -91,6 +129,7 @@ internal class ExactLiraAffineEqualities(
             if (reduced.terms.isEmpty()) {
                 if (!reduced.bound.isZero) return conflict(context, reduced.guards, literal, stop)
                 source.processed = true
+                factsAdded++
                 continue
             }
             val guards = reduced.guards.toMutableSet()
@@ -122,18 +161,21 @@ internal class ExactLiraAffineEqualities(
             }
             basis[pivot] = Equation(terms, bound, guards.toSet())
             source.processed = true
+            factsAdded++
         }
         if (interrupted) return ComponentResult.Indeterminate
         for (source in rows) {
             if (progressStop()) return ComponentResult.Indeterminate
             if (source.processed) continue
             if (remaining == 0) break
+            queryReductions++
             val reduced = reduce(source.comparison)
             if (reduced == null) {
                 if (interrupted) return ComponentResult.Indeterminate
                 continue
             }
             if (reduced.terms.isNotEmpty()) continue
+            constantQueries++
             val truth = source.comparison.truth(reduced.bound)
             val assigned = if (source.activator == ALWAYS) true else context.boolValue(source.activator)
             if (assigned == truth) continue
@@ -146,6 +188,7 @@ internal class ExactLiraAffineEqualities(
             val accepted = accept(decision, context)
             if (accepted !is ComponentResult.Consistent) return accepted
             implied = true
+            implications++
         }
         return if (interrupted || stop()) ComponentResult.Indeterminate else ComponentResult.Consistent
     }
@@ -200,7 +243,10 @@ internal class ExactLiraAffineEqualities(
         if (stop()) return ComponentResult.Indeterminate
         val leaves = if (literal == ALWAYS) guards else guards + literal
         val reason = context.explainAtoms(premise(leaves))
-        return if (stop()) ComponentResult.Indeterminate else ComponentResult.Conflict(reason)
+        return if (stop()) ComponentResult.Indeterminate else {
+            conflicts++
+            ComponentResult.Conflict(reason)
+        }
     }
 
     private fun premise(guards: Set<Int>): SearchAtomPremise = SearchAtomPremise.All(
