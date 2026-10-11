@@ -4,6 +4,7 @@ import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.scheduling.internals.CumulativeLsState
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -19,11 +20,216 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CumulativeInvariantTest {
+    @Test
+    fun `unequal duration start swaps repair jointly improving overloads`() {
+        for (variableFootprints in listOf(false, true)) {
+            val factor = Cumulative(
+                intArrayOf(0, 1, 2, 3), longArrayOf(2, 1, 3, 1), longArrayOf(1, 1, 1, 1), 2,
+                durationVars = if (variableFootprints) intArrayOf(4, 5, 6, 5) else intArrayOf(),
+                resourceVars = if (variableFootprints) intArrayOf(7, 7, 7, 7) else intArrayOf(),
+            )
+            val problem = Problem(
+                0, 8, arrayOf(
+                    IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 0), IntDomain(1, 1),
+                    IntDomain(2, 2), IntDomain(1, 1), IntDomain(3, 3), IntDomain(1, 1),
+                ), arrayOf<Factor>(factor),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            for ((variable, value) in longArrayOf(0, 2, 0, 1, 2, 1, 3, 1).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+            state.weights.factorWeights[0] = 3.5
+            assertEquals(1L, state.cost)
+            assertEquals(1L, state.netDelta(IntSet(0, 2)) + state.netDelta(IntSet(1, 0)))
+            val snapshot = state.assignment.snapshot()
+            val payload = state.refPayload[0] as CumulativeLsState
+            val usage = payload.usage.copyOf()
+
+            state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+
+            val move = assertNotNull(state.moveSink.list.filterIsInstance<Move.Compound>().firstOrNull {
+                it.parts.toSet() == setOf(IntSet(0, 2), IntSet(1, 0))
+            })
+            assertEquals(snapshot, state.assignment.snapshot())
+            assertContentEquals(usage, payload.usage)
+            assertEquals(1L, payload.overage)
+            assertEquals(1L, state.cost)
+            assertEquals(-1L, state.netDelta(move))
+            assertEquals(-3.5, state.weightedNetDelta(move))
+            state.apply(move)
+            assertEquals(0L, state.cost)
+            assertEquals(0, state.intPayload[0])
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `start swap filters retain ties and worsening overloads`() {
+        for (worsening in listOf(false, true)) {
+            val values = if (worsening) longArrayOf(0, 3, 0, 1, 3) else longArrayOf(0, 2, 0, 2)
+            val durations = if (worsening) longArrayOf(3, 1, 6, 1, 3) else longArrayOf(2, 1, 3, 1)
+            val problem = Problem(
+                0, values.size, Array(values.size) {
+                    if (it < 2) IntDomain(0, values[1]) else IntDomain(values[it], values[it])
+                }, arrayOf<Factor>(Cumulative(
+                    IntArray(values.size) { it }, durations, LongArray(values.size) { 1L }, 2,
+                )),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            for ((variable, value) in values.withIndex()) state.assignment.setInt(variable, value)
+            state.recompute()
+            val before = state.cost
+            val swap = Move.Compound(listOf(IntSet(0, values[1]), IntSet(1, 0)))
+            assertEquals(if (worsening) 1L else 0L, state.netDelta(swap))
+            val snapshot = state.assignment.snapshot()
+            val payload = state.refPayload[0] as CumulativeLsState
+            val usage = payload.usage.copyOf()
+
+            state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+
+            assertTrue(state.moveSink.list.none { it is Move.Compound })
+            assertEquals(snapshot, state.assignment.snapshot())
+            assertContentEquals(usage, payload.usage)
+            assertEquals(before, payload.overage)
+            assertEquals(before, state.cost)
+            state.apply(swap)
+            assertEquals(before + if (worsening) 1L else 0L, state.cost)
+            val cost = state.cost
+            state.recompute()
+            assertEquals(cost, state.cost)
+        }
+    }
+
+    @Test
+    fun `start swaps grade every aliased role and restore the profile`() {
+        for (alias in listOf("shared starts", "remapped starts", "duration", "resource", "capacity")) {
+            val shared = alias == "shared starts" || alias == "remapped starts"
+            val source = Cumulative(
+                if (shared) intArrayOf(0, 1, 2, 3, if (alias == "remapped starts") 8 else 0, 1)
+                    else intArrayOf(0, 1, 2, 3),
+                if (shared) longArrayOf(2, 1, 3, 1, 1, 1) else longArrayOf(2, 1, 3, 1),
+                LongArray(if (shared) 6 else 4) { 1L }, 2,
+                durationVars = if (alias == "duration") intArrayOf(1, 4, 5, 4) else intArrayOf(),
+                resourceVars = if (alias == "resource") intArrayOf(1, 4, 4, 4) else intArrayOf(),
+                capacityVar = if (alias == "capacity") 0 else -1,
+            )
+            val factor = if (alias == "remapped starts") {
+                source.remap(VarRemap(intArrayOf(), intArrayOf(0, 1, 2, 3, 4, 5, 6, 7, 0)))
+            } else source
+            val problem = Problem(
+                0, 8, arrayOf(
+                    IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 0), IntDomain(1, 1),
+                    IntDomain(1, 1), IntDomain(3, 3), IntDomain(0, 0), IntDomain(0, 0),
+                ), arrayOf<Factor>(factor),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            for ((variable, value) in longArrayOf(0, 2, 0, 1, 1, 3, 0, 0).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+            val before = state.cost
+            val snapshot = state.assignment.snapshot()
+            val payload = state.refPayload[0] as CumulativeLsState
+            val usage = payload.usage.copyOf()
+            val cap = payload.cap
+
+            state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+
+            val move = assertNotNull(state.moveSink.list.filterIsInstance<Move.Compound>().firstOrNull {
+                it.parts.toSet() == setOf(IntSet(0, 2), IntSet(1, 0))
+            }, alias)
+            assertEquals(snapshot, state.assignment.snapshot(), alias)
+            assertContentEquals(usage, payload.usage, alias)
+            assertEquals(before, payload.overage, alias)
+            assertEquals(cap, payload.cap, alias)
+            val predicted = state.netDelta(move)
+            assertTrue(predicted < 0L, alias)
+            state.apply(move)
+            assertEquals(before + predicted, state.cost, alias)
+            assertEquals(if (shared) 2L else 0L, state.cost, alias)
+            val cost = state.cost
+            state.recompute()
+            assertEquals(cost, state.cost, alias)
+        }
+    }
+
+    @Test
+    fun `start swaps require two admissible searched coordinates`() {
+        for (protection in listOf("domain", "pin", "owner", "definition")) {
+            for (protected in 0..1) {
+                val factors = arrayListOf<Factor>(Cumulative(
+                    intArrayOf(0, 1, 2, 3), longArrayOf(2, 1, 3, 1), longArrayOf(1, 1, 1, 1), 2,
+                ))
+                if (protection == "definition") factors.add(Product(4, 5, protected))
+                val problem = Problem(
+                    0, 6, arrayOf(
+                        IntDomain(0, if (protection == "domain" && protected == 0) 1 else 2),
+                        IntDomain(if (protection == "domain" && protected == 1) 1 else 0, 2),
+                        IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 2), IntDomain(1, 1),
+                    ), factors.toTypedArray(),
+                )
+                val assumptions = if (protection == "pin") {
+                    Assumptions.None.withInt(protected, if (protected == 0) 0L else 2L)
+                } else Assumptions.None
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+                if (protection == "owner") state.moveSink.setOwners(IntArray(6) { if (it == protected) 7 else -1 })
+                if (protection == "definition") {
+                    state.invariants = assertNotNull(DefinitionalSweep.infer(factors.toTypedArray(), 6)).network(6, 0)
+                }
+                for ((variable, value) in longArrayOf(0, 2, 0, 1, if (protected == 0) 0 else 2, 1).withIndex()) {
+                    state.assignment.setInt(variable, value)
+                }
+                state.recompute()
+
+                state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+
+                assertTrue(state.moveSink.list.none { it is Move.Compound }, "$protection/$protected")
+            }
+        }
+    }
+
+    @Test
+    fun `start swap grading includes maintained durations in other resources`() {
+        val factors = arrayOf<Factor>(
+            Cumulative(intArrayOf(0, 1, 2, 3), longArrayOf(2, 1, 3, 1), longArrayOf(1, 1, 1, 1), 2),
+            Product(0, 4, 5),
+            Cumulative(intArrayOf(6), longArrayOf(6), longArrayOf(2), 1, durationVars = intArrayOf(5)),
+        )
+        val problem = Problem(
+            0, 7, arrayOf(
+                IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 0), IntDomain(1, 1),
+                IntDomain(3, 3), IntDomain(0, 6), IntDomain(0, 0),
+            ), factors,
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 7)).network(7, 0)
+        for ((variable, value) in longArrayOf(0, 2, 0, 1, 3, 0, 0).withIndex()) state.assignment.setInt(variable, value)
+        state.recompute()
+        assertEquals(1L, state.cost)
+
+        state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+        val move = assertNotNull(state.moveSink.list.filterIsInstance<Move.Compound>().firstOrNull {
+            it.parts.toSet() == setOf(IntSet(0, 2), IntSet(1, 0))
+        })
+        val predicted = state.netDelta(move)
+        state.apply(move)
+
+        assertEquals(5L, predicted)
+        assertEquals(0, state.factorDegree[0])
+        assertEquals(6L, state.assignment.intValue(5))
+        assertEquals(6L, state.cost)
+        state.recompute()
+        assertEquals(6L, state.cost)
+    }
+
     @Test
     fun `shared starts preserve simultaneous overload after a shift`() {
         for (remapped in listOf(false, true)) {

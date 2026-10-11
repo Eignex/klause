@@ -406,6 +406,7 @@ internal class CumulativeInvariant(
         for (i in peakTasks) {
             if (swapsAdded >= CUMULATIVE_MAX_SWAPS) break
             val iV = starts[i]
+            if (!sink.allowsInt(iV)) continue
             val iCur = state.assignment.intValue(iV)
             val iDom = state.rootDomains[iV]
             for (j in 0 until n) {
@@ -416,12 +417,11 @@ internal class CumulativeInvariant(
                 if (dj0 <= 0 || rj0 <= 0) continue
                 if (!OptionalPresence.isPresentInAssignment(presents, j, state)) continue
                 val jV = starts[j]
+                if (!sink.allowsInt(jV)) continue
                 val jCur = state.assignment.intValue(jV)
                 if (jCur !in iDom || iCur !in state.rootDomains[jV]) continue
                 if (jCur == iCur) continue
-                val di = simulateCumulativeStartDelta(ls, iCur, jCur, curDur(state, i), curRes(state, i))
-                val dj = simulateCumulativeStartDelta(ls, jCur, iCur, dj0, rj0)
-                if (di + dj >= 0) continue
+                if (simulateStartSwap(state, ls, i, j) >= 0L) continue
                 sink.addChannelingCompound(
                     state,
                     listOf(
@@ -431,6 +431,68 @@ internal class CumulativeInvariant(
                 )
                 swapsAdded++
             }
+        }
+    }
+
+    private fun simulateStartSwap(state: LocalSearchState, ls: CumulativeLsState, i: Int, j: Int): Long {
+        val before = ls.overage
+        applyStartSwap(state, ls, i, j, reverse = false)
+        return try {
+            ls.overage - before
+        } finally {
+            applyStartSwap(state, ls, i, j, reverse = true)
+        }
+    }
+
+    private fun applyStartSwap(state: LocalSearchState, ls: CumulativeLsState, i: Int, j: Int, reverse: Boolean) {
+        val iV = starts[i]
+        val jV = starts[j]
+        val iCur = state.assignment.intValue(iV)
+        val jCur = state.assignment.intValue(jV)
+        fun swapped(variable: Int, value: Long): Long = when (variable) {
+            iV -> jCur
+            jV -> iCur
+            else -> value
+        }
+        fun applyTask(task: Int) {
+            if (!OptionalPresence.isPresentInAssignment(presents, task, state)) return
+            val start = state.assignment.intValue(starts[task])
+            val duration = curDur(state, task)
+            val resource = curRes(state, task)
+            val swappedStart = swapped(starts[task], start)
+            val swappedDuration = if (durationVars.isEmpty()) duration else swapped(durationVars[task], duration)
+            val swappedResource = if (resourceVars.isEmpty()) resource else swapped(resourceVars[task], resource)
+            val oldStart = if (reverse) swappedStart else start
+            val newStart = if (reverse) start else swappedStart
+            if (duration == swappedDuration && resource == swappedResource) {
+                if (duration > 0L && resource > 0L) {
+                    applyCumulativeStartDelta(ls, oldStart, newStart, duration, resource)
+                }
+            } else {
+                val oldDuration = if (reverse) swappedDuration else duration
+                val newDuration = if (reverse) duration else swappedDuration
+                val oldResource = if (reverse) swappedResource else resource
+                val newResource = if (reverse) resource else swappedResource
+                if (oldResource > 0L) applyCumulativeResDelta(ls, oldStart, oldDuration, oldResource, 0L)
+                if (newResource > 0L) applyCumulativeResDelta(ls, newStart, newDuration, 0L, newResource)
+            }
+        }
+        // Grade every affected footprint against the combined load without copying the timeline.
+        val iAlias = aliasIndex[iV]
+        if (iAlias < 0) applyTask(i) else for (task in aliasPositions[iAlias]) applyTask(task)
+        fun applyPartner(task: Int) {
+            if (starts[task] == iV || durationVars.getOrNull(task) == iV || resourceVars.getOrNull(task) == iV) return
+            applyTask(task)
+        }
+        val jAlias = aliasIndex[jV]
+        if (jAlias < 0) {
+            applyPartner(j)
+        } else {
+            for (task in aliasPositions[jAlias]) applyPartner(task)
+        }
+        if (capacityVar == iV || capacityVar == jV) {
+            val cap = curCap(state)
+            applyCumulativeCapacityDelta(ls, if (reverse) cap else swapped(capacityVar, cap))
         }
     }
 
