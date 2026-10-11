@@ -357,6 +357,7 @@ object BenchCli {
             return
         }
         val backend = (f["backend"] ?: f["reference"] ?: "cp-sat").lowercase()
+        refs.forEach { ReferenceSolve.solverIdFor(it, backend) }
         require(refs.none { it.format == Format.MINIZINC } || SolverInvocation.referenceAvailable(backend)) {
             "reference solver '$backend' is not registered with minizinc (`minizinc --solvers`)"
         }

@@ -23,11 +23,19 @@ internal object ReferenceSolve {
     )
 
     /** The solver [ref]'s format is referenced by; [backend] names the one for formats that take a choice. */
-    fun solverIdFor(ref: ProblemRef, backend: String): String = when (ref.format) {
-        Format.DIMACS, Format.OPB, Format.WCNF -> "clasp"
-        Format.SMTLIB -> "z3"
-        Format.MPS -> "scip"
-        else -> backend
+    fun solverIdFor(ref: ProblemRef, backend: String, solver: String? = null): String {
+        val id = solver ?: when (ref.format) {
+            Format.DIMACS, Format.OPB, Format.WCNF -> "clasp"
+            Format.SMTLIB -> "z3"
+            Format.MPS -> "scip"
+            else -> backend
+        }
+        SOLVERS[ref.format]?.let { known ->
+            require(id in known) {
+                "reference solver '$id' does not solve ${ref.format}; it is solved by ${known.joinToString()}"
+            }
+        }
+        return id
     }
 
     /** The reference solvers each format can be solved by, the default first; MiniZinc takes any
@@ -38,6 +46,7 @@ internal object ReferenceSolve {
         Format.WCNF to listOf("clasp"),
         Format.SMTLIB to listOf("z3", "cvc5"),
         Format.MPS to listOf("scip", "highs"),
+        Format.XCSP3 to listOf("cp-sat"),
     )
 
     /**
@@ -52,12 +61,7 @@ internal object ReferenceSolve {
         budget: Budget,
         solver: String? = null,
     ): Run {
-        val id = solver ?: solverIdFor(ref, backend)
-        SOLVERS[ref.format]?.let { known ->
-            require(
-                id in known,
-            ) { "reference solver '$id' does not solve ${ref.format}; it is solved by ${known.joinToString()}" }
-        }
+        val id = solverIdFor(ref, backend, solver)
         // One worker unless asked for more: a MiniZinc backend such as cp-sat otherwise starts one per core, so cases
         // run side by side oversubscribe the machine and their times say more about the load than the instance.
         val settings = asked.copy(processors = asked.processors ?: 1)
