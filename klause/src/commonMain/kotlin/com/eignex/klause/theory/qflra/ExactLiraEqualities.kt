@@ -222,15 +222,18 @@ internal class ExactLiraEqualities(
                 if (terms.size > 2) continue
                 val first = terms.firstOrNull()
                 val second = terms.getOrNull(1)
-                if (second != null && first?.value != second.value.negated()) continue
+                if (second != null && first?.value != second.value.negated() && first?.value != second.value) continue
                 val positive = first?.value?.signum() != -1
                 val magnitude = first?.value?.let { if (positive) it else it.negated() } ?: BigFraction.ONE
-                val normalized = bound * magnitude.reciprocal()
+                val reversed = second != null && first?.value == second.value
+                val quotient = bound * magnitude.reciprocal()
+                val normalized = if (reversed && !positive) quotient.negated() else quotient
                 val impossible = terms.isEmpty() || normalized.den != BIG_ONE
                 if (!impossible && (normalized.num < room.negate() || normalized.num > room)) continue
-                val target = if (positive) first?.key ?: zero else second?.key ?: zero
-                val source = if (positive) second?.key ?: zero else first?.key ?: zero
-                if (!impossible && forest.difference(target, source) == normalized.num.toLong()) continue
+                val target = if (positive || reversed) first?.key ?: zero else second?.key ?: zero
+                val source = if (positive || reversed) second?.key ?: zero else first?.key ?: zero
+                val sourceSign = if (reversed) -1 else 1
+                if (!impossible && forest.difference(target, source, sourceSign) == normalized.num.toLong()) continue
                 val premises = forest.expressionPremises(comparison.terms, progressStop)
                     ?: return ComponentResult.Indeterminate
                 val literal = if (activator == ALWAYS) ALWAYS else Lit.make(activator, truth)
@@ -242,16 +245,21 @@ internal class ExactLiraEqualities(
                 )
                 batch += DerivedEquality(
                     target, source,
-                    normalized.num.toLong(), premise,
+                    normalized.num.toLong(), premise, sourceSign,
                 )
             }
             var changed = false
             for (equality in batch) {
                 if (progressStop()) return ComponentResult.Indeterminate
-                val previous = forest.difference(equality.target, equality.source)
+                val previous = forest.difference(equality.target, equality.source, equality.sourceSign)
                 if (previous == equality.value) continue
-                if (!forest.join(equality.target, equality.source, equality.value, equality.premise)) {
-                    val premises = forest.premises(equality.target, equality.source, progressStop)
+                if (!forest.join(
+                        equality.target, equality.source, equality.value, equality.premise, equality.sourceSign,
+                    )
+                ) {
+                    val premises = forest.comparisonPremises(
+                        equality.target, equality.source, equality.sourceSign, progressStop,
+                    )
                         ?: return ComponentResult.Indeterminate
                     return conflict(context, premises + equality.premise, ALWAYS, stop)
                 }
@@ -267,6 +275,7 @@ internal class ExactLiraEqualities(
         val source: Int,
         val value: Long,
         val premise: SearchAtomPremise,
+        val sourceSign: Int,
     )
 
     private fun propagateGeneral(

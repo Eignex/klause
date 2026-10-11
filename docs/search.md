@@ -149,7 +149,8 @@ the root stays open and compatible parity remains undecided.
 
 Larger expressions can be constant when their signed coefficients cancel within
 each component. Active larger equalities and sign-changing cycles reduce against
-the forest for at most four passes. Supported residuals add integer offset facts;
+the forest for at most four passes. One-column residuals and two-column residuals
+with equal coefficient magnitudes add integer offset facts, including signed sums;
 nonintegral or inconsistent residuals refute their active guards. Each batch
 captures immutable source and offset premises before adding its facts.
 Explanation adjacency is built on demand and invalidated by each forest join;

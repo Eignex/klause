@@ -24,6 +24,69 @@ import kotlin.test.assertNull
 
 class ExactLiraEqualitiesTest {
     @Test
+    fun `a conflicting signed residual batch cites the component fixing guards`() {
+        val open = Bits(4).also { bits -> repeat(4, bits::set) }
+        val source = Problem(
+            5,
+            intBounds = IntBounds.fromModelBounds(LongArray(4), LongArray(4), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 3),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 5),
+                ReifiedLinear(2, intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(3, intArrayOf(1, 1, -1), intArrayOf(0, 2, 3), LinearOp.EQ, -1),
+                ReifiedLinear(4, intArrayOf(1, -1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 3),
+            ),
+        )
+        val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        for (guard in 0..4) session.push(SearchDecision.Bool(Lit.make(guard, true)))
+
+        val conflict = assertIs<ComponentResult.Conflict>(propagation.propagate(session, Cancellation.Never))
+
+        assertEquals(
+            (0..4).map { Lit.make(it, false) }.toSet(),
+            assertNotNull(conflict.explanation).literals.toSet(),
+        )
+    }
+
+    @Test
+    fun `a larger equality yields a signed residual with its source guards and retracts`() {
+        for ((operator, truth) in listOf(LinearOp.EQ to true, LinearOp.NE to false)) {
+            for (sign in listOf(1, -1)) {
+                val open = Bits(3).also { bits -> repeat(3, bits::set) }
+                val source = Problem(
+                    3,
+                    intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+                    factors = arrayOf(
+                        ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 3),
+                        ReifiedLinear(1, intArrayOf(sign, sign, -sign), intArrayOf(0, 1, 2), operator, 0),
+                        ReifiedLinear(2, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 3),
+                    ),
+                )
+                val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+                    factor.linearRows.map { it.exactForm(0) }
+                }) { _, _ -> ComponentResult.Consistent }
+                val session = SearchSession(emptyList())
+                session.push(SearchDecision.Bool(Lit.make(0, true)))
+                session.push(SearchDecision.Bool(Lit.make(1, truth)))
+
+                assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+                assertEquals(true, session.boolValue(2))
+                assertEquals(
+                    setOf(Lit.make(0, false), Lit.make(1, !truth), Lit.make(2, true)),
+                    session.reasonFor(2)?.literals?.toSet(),
+                )
+                session.popTo(1)
+                assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+                assertNull(session.boolValue(2))
+            }
+        }
+    }
+
+    @Test
     fun `a signed equality path rejects an incompatible parity with its guard and retracts`() {
         for ((operator, truth) in listOf(LinearOp.EQ to false, LinearOp.NE to true)) {
             for (bound in listOf(0L, Long.MIN_VALUE)) {
