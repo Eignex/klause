@@ -190,7 +190,9 @@ class SourceDrivenStrategy(
                 noiseMoves.minOfOrNull { score(state, it) } ?: Double.POSITIVE_INFINITY,
                 primaryScoreMoves.minOfOrNull { score(state, it) } ?: Double.POSITIVE_INFINITY,
             )
-            primaryScoreMoves + alternatives.filter { score(state, it) < bestPrimary }
+            if (bestPrimary < 0.0) primaryScoreMoves else {
+                primaryScoreMoves + alternatives.filter { score(state, it) < bestPrimary }
+            }
         }
         // A NoiseSchedule retunes its level and steers the acceptance rule (WalkSAT noise / probSAT cb);
         // noise-free rules ignore the level.
