@@ -1,7 +1,10 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.formats.minizinc.OznParseException
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class OznApplierTest {
@@ -27,5 +30,14 @@ class OznApplierTest {
         val out = applier.render(program, sample)
 
         assertTrue("[{-2147483648}, {2147483647}]" in out, out)
+    }
+
+    @Test
+    fun `integer bindings outside the rendering range report an evaluation error`() {
+        val program = parseFlatZinc("var int: x; solve satisfy;")
+        val sample = Sample(BooleanArray(0), LongArray(0), exactInts = listOf(parseBigInt("9223372036854775808")))
+        val applier = OznApplier("int: x; output [show(x)];")
+
+        assertFailsWith<OznParseException> { applier.render(program, sample) }
     }
 }

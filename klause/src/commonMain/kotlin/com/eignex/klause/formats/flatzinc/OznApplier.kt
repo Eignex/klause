@@ -34,7 +34,7 @@ class OznApplier(oznSource: String) {
         // Float-backed int vars are rendered under their float names.
         for ((name, id) in program.intVarsByName) {
             if (program.floatVarsByName.containsKey(name)) continue
-            out[name] = OznValue.IntV(sample.intValue(id).toLong())
+            out[name] = intBindingFrom(sample.intValue(id))
         }
         for ((name, b) in program.floatVarsByName) {
             val value = sample.floatValue(b)
@@ -48,6 +48,10 @@ class OznApplier(oznSource: String) {
         }
         return out
     }
+
+    private fun intBindingFrom(value: String): OznValue.IntV = OznValue.IntV(
+        value.toLongOrNull() ?: throw OznParseException("integer binding outside signed 64-bit range: $value"),
+    )
 
     private fun setBindingFrom(layout: SetVarLayout, sample: FlatZincValues): OznValue.SetV {
         val present = IntArrayList()
@@ -73,7 +77,7 @@ class OznApplier(oznSource: String) {
                 when (arr.elementKind) {
                     FlatZincArray.Vars.ElementKind.Bool -> OznValue.BoolV(sample.boolValue(v))
 
-                    FlatZincArray.Vars.ElementKind.Int -> OznValue.IntV(sample.intValue(v).toLong())
+                    FlatZincArray.Vars.ElementKind.Int -> intBindingFrom(sample.intValue(v))
 
                     FlatZincArray.Vars.ElementKind.Float -> {
                         val b = requireNotNull(arr.floatBucketings)[idx]
