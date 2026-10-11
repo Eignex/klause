@@ -65,6 +65,17 @@ Element repairs to complete improving fallback selection. The original arm retai
 its full repair neighborhood. Explicit local-search pools, local-search-only execution,
 parallel pools and non-scheduling models retain their selected recipes.
 
+## Finite objective recipe diversity
+
+A curated single-core mixed finite-CP optimization pool with at least six configured
+slots admits the restart-level selector portfolio beside the SAT guard when its initial
+backtrack pair has no LP recipe. The selector worker uses its own UCB1 policy over
+variable and value heuristics at internal restarts. It occupies the conflict-driven
+slot; an expanded pool containing both recipes swaps their positions. The configured
+pool size, local-search positions, slice allowances and family scheduling are preserved.
+Explicit recipes, backtrack edits, source annotations, continuous models and parallel
+lanes retain their selected recipes.
+
 ## Slice accounting and coverage
 
 The counted schedule starts at 5000 node equivalents, grows by 1.5 after an ordinary

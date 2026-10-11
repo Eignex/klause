@@ -9,6 +9,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -303,7 +304,7 @@ internal object PortfolioComposition {
      *  the model's [PortfolioScenario.annotationArm] taking the last slot when present and there are ≥ 2 slots
      *  (so the class's leading complete recipe keeps slot 0). Every resulting arm spends [PortfolioScenario.nodeBudget],
      *  which is applied to the composed pool so that capping a run does not also change which pool it composes. */
-    private fun btArms(scenario: PortfolioScenario, count: Int, facts: ProblemFacts): List<WorkerConfig> {
+    private fun btArms(scenario: PortfolioScenario, count: Int, facts: ProblemFacts): List<BacktrackWorkerConfig> {
         val lpCeiling = scenario.lpCeiling
         val btPool = scenario.btPool
         val annotationArm = scenario.annotationArm
@@ -375,7 +376,11 @@ internal object PortfolioComposition {
         } else {
             emptyList()
         }
-        val backtrack = if (btCount > 0) btArms(scenario, btCount, facts) else emptyList()
+        val backtrack = if (btCount > 0) {
+            finiteDescentArms(scenario, facts, btArms(scenario, btCount, facts))
+        } else {
+            emptyList()
+        }
         if (scenario.kind == Kind.COP) {
             // Sequential portfolios warm every arm in list order. A complete arm must receive its first
             // slice before the local-search incumbents, which cannot prove an optimum and otherwise delay
@@ -390,6 +395,33 @@ internal object PortfolioComposition {
         // Appending retains the incumbent cores and every existing worker's seed position.
         continuousLpArm(scenario, facts, arms)?.let { arms += it }
         return arms
+    }
+
+    private fun finiteDescentArms(
+        scenario: PortfolioScenario,
+        facts: ProblemFacts,
+        selected: List<BacktrackWorkerConfig>,
+    ): List<BacktrackWorkerConfig> {
+        if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.arms < PortfolioScenario.DEFAULT_ARMS ||
+            facts.profile.problemClass != ProblemClass.FiniteCp ||
+            scenario.btPool != null || scenario.lsPool != null || scenario.btEdit != null ||
+            scenario.annotationArm != null || selected.take(2).any { it.label.startsWith("lp-") }
+        ) return selected
+        val conflict = selected.indexOfFirst { it.label == "conflictDriven" }
+        if (conflict < 0) return selected
+        val selector = selected.indexOfFirst { it.label == "selector-switch" }
+        // Restart-level heuristic diversity complements the SAT guard when no relaxation worker is available.
+        return selected.toMutableList().also { arms ->
+            if (selector >= 0) {
+                arms[conflict] = selected[selector]
+                arms[selector] = selected[conflict]
+            } else {
+                arms[conflict] = BacktrackWorkerConfig(
+                    BacktrackCatalog.byLabel("selector-switch").capLp(scenario.lpCeiling).spending(scenario.nodeBudget),
+                    scenario.zeroObjectivePricing,
+                )
+            }
+        }
     }
 
     private fun continuousLpArm(
