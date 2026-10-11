@@ -33,3 +33,17 @@ returned list do not change captured families. Immutable kernel polynomials may 
 shared. One caller-supplied arithmetic context spans construction; interruption and
 kernel resource stops propagate without publishing a partial family. See
 [resource allowances](resources.md) for the containing scope.
+
+## Witness ownership
+
+[ExactNraAssignment](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/ExactNraAssignment.kt)
+captures Boolean buffers and an immutable list of exact real scalars. Scalar metadata
+survives the producing arithmetic context and reconstructs each coordinate by its
+rational defining polynomial and distinct-root index. Coordinates are never rounded
+to rational points or binary64 for publication.
+
+The pipeline's `OpenTheoryAssignment.ExactNra` preserves these values beside its
+linear rational witnesses. Its `algebraicRealValue(id)` extension follows source
+reconstruction wrappers without replacing the exact real coordinate. Rational
+coordinates retain reduced rational text; irrational text and the typed metadata
+contract are defined in the [API contract](../api.md).

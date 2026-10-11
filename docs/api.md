@@ -46,6 +46,17 @@ implementation visibility is not a promise of stable lifecycle or extension beha
 The `arithmetic.polynomial` algorithms and contexts are internal implementation
 mechanisms. `AlgebraicReal` exports only owned exact scalar metadata, as defined in
 [exact polynomial arithmetic](arithmetic/polynomial.md#rational-roots-and-scalar-identity).
+
+`ExactNraAssignment` captures Boolean and exact algebraic real coordinates. Its real
+values include rational points and selected irrational roots; reading a coordinate
+does not refine it or require its producing arithmetic context. The common
+`OpenTheoryAssignment.ExactNra` witness preserves this representation.
+`algebraicRealValue(id)` returns its typed scalar through reconstruction wrappers.
+Other routes retain their existing rational text and return null from that accessor.
+For irrational values, `realValue(id)` returns `root(index;[c0,c1,...])`: coefficients
+are exact rationals in ascending exponent order, and the index is one-based among
+the defining polynomial's distinct real roots in increasing order. This text carries
+an exact value; callers rendering another format use the typed metadata.
 Numerical equality requires exact arithmetic comparison rather than object identity.
 
 The `lp.lattice` package is an internal implementation mechanism within `klause`.

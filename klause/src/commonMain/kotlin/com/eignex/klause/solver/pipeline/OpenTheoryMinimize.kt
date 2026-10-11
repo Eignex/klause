@@ -561,7 +561,7 @@ class OpenTheoryMinimizer internal constructor(
 
             // A real-only route has no integer column to read, which only a constant objective may ask of
             // it: every weighted term names one.
-            is OpenTheoryAssignment.ExactLra -> check(terms.isEmpty()) {
+            is OpenTheoryAssignment.ExactLra, is OpenTheoryAssignment.ExactNra -> check(terms.isEmpty()) {
                 "a route with no integer column cannot value an objective weighting one"
             }
 
@@ -613,8 +613,7 @@ private fun Problem.sameDeclaredIntegerRanges(other: Problem): Boolean {
  * A witness read as the exact point a ray certificate takes its branch at.
  *
  * The routes carry their values at different widths — a difference witness in `Long`, an exact one in
- * arbitrary precision — and every one of them is a rational exactly, which is the arithmetic the
- * certificate reasons in.
+ * arbitrary precision. Linear optimization certificates require rational coordinates.
  */
 private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = when (this) {
     is OpenTheoryAssignment.Difference -> RouteWitness(
@@ -646,6 +645,8 @@ private fun OpenTheoryAssignment.exactWitness(realColumns: Int): ExactWitness = 
         { assignment.reals[it] },
         { error("a route with no integer column cannot value an objective weighting one") },
     )
+
+    is OpenTheoryAssignment.ExactNra -> error("polynomial-real witnesses do not support rational ray certificates")
 
     // Real columns come from the route underneath, which alone knows their width. The integer columns are
     // the rebuild's whenever it recovered any — reading the witness under it would take their values from
