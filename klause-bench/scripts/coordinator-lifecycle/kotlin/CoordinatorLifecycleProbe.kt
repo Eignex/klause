@@ -49,6 +49,8 @@ fun main(args: Array<String>) {
             record(result::class.simpleName.orEmpty())
             if (result is MinimizeResult.WithSample) {
                 witness(result.sample)
+                val sourceObjective = (0 until source.numBoolVars).count { result.sample.boolValue(it) }.toDouble()
+                check(result.objective == sourceObjective) { "objective disagrees with the source assignment" }
                 record(result.objective.toString())
             }
         }
