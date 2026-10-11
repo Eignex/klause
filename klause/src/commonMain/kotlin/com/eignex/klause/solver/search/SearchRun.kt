@@ -343,7 +343,7 @@ class SearchRun internal constructor(
         return false
     }
 
-    /**
+    /*
      * Retain a conflict explanation the shared database does not already own elsewhere.
      *
      * A component with its own conflict analyzer keeps the clause in its own database and propagates it
@@ -452,7 +452,6 @@ class SearchRun internal constructor(
         }
     }
 
-    /** Return the shared session to its root and run every mode-specific restart action. */
     private fun restart(): SearchRunEvent? = when (session.restart()) {
         ComponentResult.Consistent -> {
             frames.clear()
@@ -634,14 +633,14 @@ sealed interface SearchResult {
     data object Indeterminate : SearchResult
 }
 
-/** What one learned conflict did to the run. */
+/* What one learned conflict did to the run. */
 private enum class LearnedOutcome {
-    /** The search resumes from the backjump level. */
+    /* The search resumes from the backjump level. */
     RESUMED,
 
-    /** The conflict was never applied; the original conflict is still live. */
+    /* The conflict was never applied; the original conflict is still live. */
     UNAPPLIED,
 
-    /** The backjump ran but did not resume, so the caller backtracks below it. */
+    /* The backjump ran but did not resume, so the caller backtracks below it. */
     ABANDONED,
 }
