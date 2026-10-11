@@ -83,6 +83,7 @@ object LocalSearchCatalog {
         LocalSearchArm.CblsPrimaryPlateauIlsBasin -> cblsRecipe(arm.label, ilsBasin()) {
             Cbls(stallSwapCap = 16, tabu = cblsTabu()).also { it.prioritizePrimaryRepairs = true }
         }
+        LocalSearchArm.ProbsatPlain -> LocalSearchRecipe(arm.label, ProbSat(tabu = cblsTabu()))
 
         LocalSearchArm.CblsPlateauIlsBasin ->
             cblsRecipe(arm.label, ilsBasin()) { Cbls(stallSwapCap = 16, tabu = cblsTabu()) }
@@ -210,6 +211,7 @@ object LocalSearchCatalog {
         LocalSearchArm.SaReheatFixed,
         LocalSearchArm.SaPhasedFixed,
         LocalSearchArm.CblsPrimaryPlateauIlsBasin,
+        LocalSearchArm.ProbsatPlain,
     )
 
     private val cspOrder: List<LocalSearchArm> = copOrder.filter { it != LocalSearchArm.CblsHotpairFixed }
@@ -220,10 +222,11 @@ object LocalSearchCatalog {
     }
 
     // [rankedArms] led by the arms written for [problemClass]: on a pseudo-Boolean model, the flip walk over violated
-    // constraints and the jump moves that read its linear rows. Clausal and mixed-integer models keep the credit
-    // order, whose general CBLS arms find their solutions and improvements; leading with these displaced them.
+    // constraints and the jump moves that read its linear rows. Clausal satisfaction uses the fixed-break flip
+    // walk; optimizing clausal and mixed-integer models keep the general credit order.
     private fun rankedArms(kind: Kind, problemClass: ProblemClass): List<LocalSearchArm> {
         val lead = when (problemClass) {
+            ProblemClass.Sat -> if (kind == Kind.CSP) listOf(LocalSearchArm.ProbsatPlain) else emptyList()
             ProblemClass.PseudoBoolean -> listOf(LocalSearchArm.ProbsatBanditFixed, LocalSearchArm.FeasibilityJumpFixed)
             else -> emptyList()
         }
@@ -265,6 +268,7 @@ object LocalSearchCatalog {
  */
 internal enum class LocalSearchArm(val label: String) {
     CblsFixed("cbls/fixed"),
+    ProbsatPlain("probsat/plain"),
     AdaptiveProbsatFixed("adaptive-probsat/fixed"),
     CblsPlateauIlsBasin("cbls-plateau/ils-basin"),
     CblsPrimaryPlateauIlsBasin("cbls-primary-plateau/ils-basin"),

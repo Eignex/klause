@@ -158,7 +158,7 @@ object BacktrackCatalog {
     private fun make(arm: BacktrackArm): BacktrackRecipe = when (arm) {
         BacktrackArm.SatOptimized -> satOptimized()
         BacktrackArm.ClausalFocused -> clausal(arm, 0.8)
-        BacktrackArm.ClausalBalanced -> clausal(arm, 0.9)
+        BacktrackArm.ClausalBalanced -> clausal(arm, 0.975)
         BacktrackArm.ClausalStable -> clausal(arm, 0.99)
         BacktrackArm.ConflictDriven -> conflictDriven()
         BacktrackArm.LpAggressive -> lpArm(LpEmphasis.AGGRESSIVE)
