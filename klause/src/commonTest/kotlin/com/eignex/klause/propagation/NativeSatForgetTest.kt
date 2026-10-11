@@ -25,6 +25,23 @@ class NativeSatForgetTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `surviving clauses propagate after repeated reductions and additions`() {
+        val session = session(8, or(6, true, 7, true))
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))), 3)
+        session.addLearnedClause(Clause(or(0, true, 5, true)), 2)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(3, true), Lit.make(4, true), Lit.make(5, true))), 3)
+        session.forgetLearnedClauses { index, _ -> index != 1 }
+        session.addLearnedClause(Clause(or(0, true, 3, true)), 2)
+        session.forgetLearnedClauses { index, _ -> index != 0 }
+        session.pinBool(3, false)
+
+        session.pinBool(4, false)
+
+        assertEquals(true, session.boolValue(0))
+        assertEquals(true, session.boolValue(5))
+    }
+
+    @Test
     fun `learned watch scans find an open prefix after backtracking`() {
         val session = session(7, or(5, true, 6, true))
         session.addLearnedClause(Clause(IntArray(5) { Lit.make(it, true) }), 3)
