@@ -89,7 +89,7 @@ internal fun clausalProofShares(
     val proof = labels.indexOf("bt/clausal-balanced")
     if (proof < 0) return DoubleArray(0)
     // A refutation supplies no incumbent progress, so family rewards cannot identify its approaching proof.
-    return DoubleArray(labels.size).also { it[proof] = 0.92 }
+    return DoubleArray(labels.size).also { it[proof] = 0.98 }
 }
 
 internal fun continuousLpShares(

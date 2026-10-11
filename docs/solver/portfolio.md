@@ -202,7 +202,7 @@ admission requires a clausal model; pseudo-Boolean models retain their cutting-p
 palette.
 
 Clausal satisfaction leads its complete-search slots with the balanced recipe. A
-curated sequential mixed pool reserves 92% of active time for that worker after the
+curated sequential mixed pool reserves 98% of active time for that worker after the
 initial probes: a refutation emits no incumbent progress from which family rewards
 could predict the approaching proof. Explicit pools, parameter edits and search
 annotations retain unreserved scheduling. Automatic single-core mixed clausal
