@@ -449,4 +449,6 @@ and is skipped behind an existing shared incumbent or within repair fragments.
 The search counters distinguish eligible clausal probe starts, feasibility trial starts,
 returned trial models, completed improving proposals, and proposals verified and installed
 as arm incumbents. The CLI emits these counters together when a probe starts, including
-zero counts for stages it did not reach. They describe heuristic progress and carry no proof.
+zero counts for stages it did not reach. Outcome counters separate an empty residual
+clause, a private infeasible verdict, and an incomplete stop without a model. They
+describe heuristic progress and carry no proof.
