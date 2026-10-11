@@ -21,7 +21,7 @@ migration rather than an immediate visibility or signature break.
 | `theory` protocols | `Theory`, its context/check contract and authoritative exact assignment values; custom theories retain their native representations |
 | `lp` projection protocols | `RelaxationBuilder`, factor relaxation/hull interfaces and typed source/CP/LP mapping handles |
 | Format entry points | Public parsing, compilation and solution-writing facades; source/result meaning follows [input semantics](formats.md) |
-| Exported numerical contracts | `BigInt`, `BigFraction`, `Cancellation` and `WorkMeter` retain their JVM/native ownership and representation contracts in `klause` |
+| Exported numerical contracts | `BigInt`, `BigFraction`, `AlgebraicReal`, `Cancellation` and `WorkMeter` retain their JVM/native ownership and representation contracts in `klause` |
 
 Supported extensions supply the behavior their interfaces document. A custom factor
 keeps borrowed arrays and structural keys stable; a custom component supplies complete
@@ -42,6 +42,11 @@ implementation mechanisms. Published helper collections and lowered compiler/par
 state are implementation APIs unless the supported table names their contract.
 Consumers retain compatibility descriptors while migrating to a supported entry point;
 implementation visibility is not a promise of stable lifecycle or extension behavior.
+
+The `arithmetic.polynomial` algorithms and contexts are internal implementation
+mechanisms. `AlgebraicReal` exports only owned exact scalar metadata, as defined in
+[exact polynomial arithmetic](arithmetic/polynomial.md#rational-roots-and-scalar-identity).
+Numerical equality requires exact arithmetic comparison rather than object identity.
 
 The `lp.lattice` package is an internal implementation mechanism within `klause`.
 Its reductions borrow caller-owned input rows and expose read-only result buffers

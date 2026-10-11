@@ -65,29 +65,13 @@ with internal input/result interfaces; it reads only neutral `util` primitives.
 Package dependency checks enforce its independence from model and solver state.
 Numerical tests run with the solver's JVM and Native tests.
 
-`arithmetic.polynomial` captures exact rational coefficients and nonnegative integer
-variable IDs in immutable sparse polynomials. Ascending IDs define lexicographic
-monomial ordering; the largest variable ID is the main variable. Callers remap IDs
-to select another elimination order. Bareiss elimination computes resultants and
-principal subresultant coefficients, indexed from zero through one less than the
-smaller degree; leading coefficients remain separately accessible. Zero resultants
-retain their shared-factor meaning. Rational univariate Euclidean division,
-square-free decomposition and Sturm sequences isolate distinct ordered real roots,
-including repeated and rational roots. Zero polynomials reject finite root-list
-requests; nonzero constants have no roots. Root intervals have exact rational
-endpoints and contain one root; equal endpoints identify an exact rational root.
-Nonpoint intervals exclude endpoint roots.
-
-Polynomial contexts charge and poll the invocation's `Cancellation` between
-coefficient operations and elimination steps. Interruption throws
-`PolynomialInterrupted` without publishing a partial mathematical result. Inputs,
-polynomials and completed intervals outlive the context and never retain mutable
-producer buffers. Dense coefficient expansion defaults to at most 65,536 entries
-and elimination matrices to at most 262,144 cells per allocation. Callers can
-configure these invocation limits; null disables either cap within the checked
-integer representation. A checked `PolynomialResourceLimit` identifies
-dense expansion, matrix allocation or degree overflow before allocating or
-truncating data; this is a resource decline, never a mathematical verdict.
+`arithmetic.polynomial` owns sparse exact polynomials, elimination determinants,
+rational and algebraic real roots, and specialization over earlier irrational
+coordinates. Its public `AlgebraicReal` metadata owns a rational defining polynomial,
+distinct ordered root index and exact isolating bounds. Algorithms remain internal,
+with caller-owned cancellation/work accounting and explicit allocation/representation
+declines. [Exact polynomial arithmetic](arithmetic/polynomial.md) defines these
+contracts and the configurable resource limits.
 
 The [library API contract](api.md) classifies supported, experimental and implementation
 surfaces and defines typed mapping and migration boundaries.

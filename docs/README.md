@@ -32,6 +32,7 @@ User-facing documentation is maintained separately at
 | [Portfolios](solver/portfolio.md) | Witness/proof admission, slice scheduling, arm selection, reseeding and failures |
 | [LP architecture](lp/architecture.md) | Exact model authority, bound trails, basis owners, consumers and cuts |
 | [LP certification](lp/certification.md) | Bounds, witnesses, conflicts, rays and resource limits |
+| [Exact polynomial arithmetic](arithmetic/polynomial.md) | Polynomial projection, rational/algebraic roots, specialization and arithmetic resources |
 | [Numerical dependencies](lp/dependencies.md) | Koblas/Kumulant pins, kernel contracts and runtime support |
 
 ## Measurement and fixtures

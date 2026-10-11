@@ -3574,6 +3574,19 @@ final class <#A: out kotlin/Any?, #B: out kotlin/Any?> com.eignex.klause.solver.
         final fun <get-version>(): kotlin/Long // com.eignex.klause.solver.incumbent/VerifiedIncumbent.version.<get-version>|<get-version>(){}[0]
 }
 
+final class com.eignex.klause.arithmetic.polynomial/AlgebraicReal { // com.eignex.klause.arithmetic.polynomial/AlgebraicReal|null[0]
+    final val definingCoefficients // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.definingCoefficients|{}definingCoefficients[0]
+        final fun <get-definingCoefficients>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.definingCoefficients.<get-definingCoefficients>|<get-definingCoefficients>(){}[0]
+    final val lowerBound // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.lowerBound|{}lowerBound[0]
+        final fun <get-lowerBound>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.lowerBound.<get-lowerBound>|<get-lowerBound>(){}[0]
+    final val rational // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rational|{}rational[0]
+        final fun <get-rational>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rational.<get-rational>|<get-rational>(){}[0]
+    final val rootIndex // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rootIndex|{}rootIndex[0]
+        final fun <get-rootIndex>(): kotlin/Int // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rootIndex.<get-rootIndex>|<get-rootIndex>(){}[0]
+    final val upperBound // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.upperBound|{}upperBound[0]
+        final fun <get-upperBound>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.upperBound.<get-upperBound>|<get-upperBound>(){}[0]
+}
+
 final class com.eignex.klause.backtrack.selector/Chb : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/Chb|null[0]
     constructor <init>(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...) // com.eignex.klause.backtrack.selector/Chb.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
 
