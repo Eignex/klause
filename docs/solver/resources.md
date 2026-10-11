@@ -127,3 +127,8 @@ conditioned checks. Every check receives only the remaining allowance and forwar
 its observed arithmetic work once to the containing caller meter. Query condition
 assembly belongs to that work scope. New finite branches and retractions do not renew
 it. Independent invocations receive independent ledgers.
+
+Polynomial strategy composition stops its containing search when the cumulative
+native work allowance is exhausted or a representation resource declines. Workers
+cannot restart the allowance or spin on completion queries after that stop. Native
+resource causes and finite search telemetry remain visible in the pipeline result.

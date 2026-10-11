@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
 import com.eignex.klause.simplex.exact.BigFraction
@@ -14,6 +16,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialTheoryRequestTest {
+    @Test
+    fun `a mixed polynomial portfolio finds a witness after complete search is capped`() {
+        val input = assertIs<SmtLibInput.Polynomial>(
+            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
+        )
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            backtrack = BacktrackParams(maxInstructions = 0),
+            localSearch = LocalSearchParams(maxFlips = 3),
+        ))
+
+        val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest(), params, FiniteEngine.MIXED)
+
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result)
+        assertNotNull(witness.assignment.algebraicRealValue(0))
+        assertTrue(witness.stats.ls.moves.sum > 0)
+    }
+
+    @Test
+    fun `native exhaustion stops every polynomial strategy before entry`() {
+        val input = assertIs<SmtLibInput.Polynomial>(
+            SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
+        )
+
+        for (engine in FiniteEngine.entries) {
+            val execution = OpenTheoryPipeline.execute(
+                input.problem.pipelineRequest(), PolynomialTheoryParams(maximumWork = 0), engine,
+            )
+
+            assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
+            assertEquals(0L, execution.stats.workSpent)
+        }
+    }
+
     @Test
     fun `source assumptions publish original coordinates without numeric ite auxiliaries`() {
         val input = assertIs<SmtLibInput.Polynomial>(
