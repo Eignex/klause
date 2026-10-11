@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.PreparedSource
@@ -33,6 +34,7 @@ import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
+import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.parseBigInt
@@ -47,7 +49,12 @@ sealed interface OpenTheoryAssignment {
     /** Exact integer value at source variable [id], in decimal form. */
     fun intValue(id: Int): String
 
-    /** Exact real value at source variable [id], in rational or decimal form. */
+    /**
+     * Exact real value at source variable [id]. Rational routes retain rational or decimal text.
+     * An irrational coordinate uses `root(index;[c0,c1,...])`, with rational coefficients in
+     * ascending exponent order and a one-based index among distinct ordered real roots.
+     * [algebraicRealValue] provides typed reconstruction metadata for polynomial-real witnesses.
+     */
     fun realValue(id: Int): String
 
     /** A Long-backed integer witness from the difference theory. */
@@ -92,6 +99,20 @@ sealed interface OpenTheoryAssignment {
         override fun realValue(id: Int): String = assignment.reals[id].toString()
     }
 
+    /** A rational or irrational real witness from exact polynomial arithmetic. */
+    data class ExactNra(
+        /** Owned exact polynomial-real witness. */
+        val assignment: ExactNraAssignment,
+    ) : OpenTheoryAssignment {
+        override fun boolValue(id: Int): Boolean = assignment.boolValue(id)
+        override fun intValue(id: Int): String = error("exact NRA has no integer variables: $id")
+        override fun realValue(id: Int): String {
+            val value = assignment.realValue(id)
+            return value.rational?.toString()
+                ?: "root(${value.rootIndex};[${value.definingCoefficients.joinToString(",")}])"
+        }
+    }
+
     /**
      * A witness of a reduced model, carrying the Boolean columns a source pass eliminated.
      *
@@ -119,6 +140,16 @@ sealed interface OpenTheoryAssignment {
         override fun intValue(id: Int): String = integerValues?.get(id)?.toString() ?: base.intValue(id)
         override fun realValue(id: Int): String = base.realValue(id)
     }
+}
+
+/**
+ * Typed exact scalar for a polynomial-real witness, including through source reconstruction.
+ * Returns null for routes whose real coordinates retain their existing rational string surface.
+ */
+fun OpenTheoryAssignment.algebraicRealValue(id: Int): AlgebraicReal? = when (this) {
+    is OpenTheoryAssignment.ExactNra -> assignment.realValue(id)
+    is OpenTheoryAssignment.Rebuilt -> base.algebraicRealValue(id)
+    else -> null
 }
 
 internal fun SourceMapping.lift(assignment: OpenTheoryAssignment): OpenTheoryAssignment =

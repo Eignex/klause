@@ -9543,6 +9543,20 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactL
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactNra : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+	public fun <init> (Lcom/eignex/klause/theory/qfnra/ExactNraAssignment;)V
+	public fun boolValue (I)Z
+	public final fun component1 ()Lcom/eignex/klause/theory/qfnra/ExactNraAssignment;
+	public final fun copy (Lcom/eignex/klause/theory/qfnra/ExactNraAssignment;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactNra;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactNra;Lcom/eignex/klause/theory/qfnra/ExactNraAssignment;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactNra;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssignment ()Lcom/eignex/klause/theory/qfnra/ExactNraAssignment;
+	public fun hashCode ()I
+	public fun intValue (I)Ljava/lang/String;
+	public fun realValue (I)Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Rebuilt : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;[Z[Ljava/math/BigInteger;)V
 	public fun boolValue (I)Z
@@ -9733,6 +9747,10 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat : co
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheorySolverKt {
+	public static final fun algebraicRealValue (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;I)Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
 }
 
 public final class com/eignex/klause/solver/pipeline/PipelineConfigException : java/lang/RuntimeException {
@@ -12531,6 +12549,16 @@ public final class com/eignex/klause/theory/qflra/SourceBoundTerm {
 	public final fun getSource ()Lcom/eignex/klause/solver/search/SearchValueKey;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/qfnra/ExactNraAssignment {
+	public fun <init> ([ZLjava/util/List;)V
+	public final fun boolValue (I)Z
+	public final fun getBoolCount ()I
+	public final fun getBools ()[Z
+	public final fun getRealCount ()I
+	public final fun getReals ()Ljava/util/List;
+	public final fun realValue (I)Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
 }
 
 public final class com/eignex/klause/util/BigIntKt {
