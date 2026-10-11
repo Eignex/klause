@@ -13,6 +13,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResumableOpenTheoryTest {
@@ -55,6 +56,22 @@ class ResumableOpenTheoryTest {
 
         assertIs<OpenTheoryResult.Sat>(result)
         assertTrue(slices > 1, "slices=$slices")
+    }
+
+    @Test
+    fun `paused source theory work remains visible after closing`() {
+        val problem = chain(8, total = 20)
+        val request = OpenTheoryRequest(problem, componentPlan = problem.componentPlan())
+        val search = ResumableOpenTheory(OpenTheoryPipeline.engineFor(request), TheoryParams())
+
+        val result = search.runSlice(Cancellation.Never, sliceMillis = Long.MAX_VALUE, sliceWork = 1)
+        val before = search.stats.smt.affine
+
+        assertNull(result)
+        assertTrue(before.passes > 0)
+        search.close()
+        search.close()
+        assertEquals(before, search.stats.smt.affine)
     }
 
     @Test

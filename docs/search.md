@@ -348,6 +348,8 @@ snapshot. Repeated snapshots replace the live entry; closing captures the final
 counters and merges the handle once, including when reseeding or stopping the pool.
 Open-theory handles capture live-round progress before releasing their traversal;
 closing a completed round does not capture its counters again.
+Paused open-theory snapshots also include cumulative SMT source work before a
+round reaches its verdict. Closing a pending round preserves that source accounting.
 Ordinary arm exceptions retire their producer and leave siblings running. The schedule
 retains one diagnostic per arm with its identity, operation, segment, charged work,
 exception type/message and cause trace. Type, message and trace are capped at 128,

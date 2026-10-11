@@ -54,8 +54,12 @@ internal class ResumableOpenTheory(
     /** The search's root fixings and glue clauses so far, counted over [state]. */
     val progress: SearchStats get() = state.progress(run?.session)
 
-    /** The verdict's stats once decided, else the work and progress counters so far. */
-    val stats: SolveStats get() = verdict?.stats ?: SolveStats(openTheory = state.work.snapshot(), search = progress)
+    /** The verdict's stats once decided, else the work, source-theory and progress counters so far. */
+    val stats: SolveStats get() = verdict?.stats ?: SolveStats(
+        openTheory = state.work.snapshot(),
+        search = progress,
+        smt = state.smt.snapshot(),
+    )
 
     /**
      * Advance until a verdict, [global] firing, or the slice ending: after [sliceWork] `openWork` units when
