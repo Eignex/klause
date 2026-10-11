@@ -273,7 +273,11 @@ license and redistribution policy.
 
 Family-aware sampling applies before resolution. `-Dklause.bench.shard=i/n`
 selects every nth chosen instance before compilation-cache access. MiniZinc
-Challenge discovery excludes families without `.dzn`/`.json` data and
+Challenge instances with data use `year/family/data` keys. Data-free instances
+use `year/family/model`, retaining the chosen model's relative path without `.mzn`;
+the family key remains `year/family`. Reference results for bare data-free family
+keys do not identify the chosen model and cannot be reused under these instance keys.
+MiniZinc Challenge discovery excludes 2026 families without `.dzn`/`.json` data and
 `2010/depot_placement`, whose legacy annotation does not compile. Exclusions
 precede sampling and caps.
 

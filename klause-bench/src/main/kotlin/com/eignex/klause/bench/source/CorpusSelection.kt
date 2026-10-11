@@ -60,7 +60,8 @@ internal object CorpusSelection {
         fun discover(root: File): List<Discovered>
 
         /** MiniZinc-Challenge layout: one dir per problem family under [subDir], each with one
-         *  or more `.mzn` (pick the primary) plus `.dzn` data files in nested dirs. */
+         *  or more `.mzn` (pick the primary) plus `.dzn` data files in nested dirs. Data-free
+         *  instances retain the primary model's basename in their key. */
         data class MznChallenge(val subDir: String = "") : Layout {
             override fun discover(root: File): List<Discovered> {
                 val base = if (subDir.isEmpty()) root else File(root, subDir)
@@ -251,7 +252,8 @@ internal object CorpusSelection {
                 // familyKey is set explicitly (not left to the name.substringBefore('/') fallback)
                 // because a year-prefixed name already contains a '/' (`2013/black-hole`), which
                 // would otherwise collapse every problem in a year into one family.
-                out += Discovered(familyName, mznRel, familyKey = familyName)
+                val modelName = primary.relativeTo(pd).path.removeSuffix(".mzn")
+                out += Discovered("$familyName/$modelName", mznRel, familyKey = familyName)
             } else {
                 dzns.mapTo(out) { dzn ->
                     Discovered(
