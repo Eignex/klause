@@ -22,6 +22,18 @@ import kotlin.test.assertTrue
 class PortfolioPlanTest {
 
     @Test
+    fun `portfolio phase timing accepts an explicit opt in`() {
+        for (enabled in listOf(false, true)) {
+            val scenario = buildPortfolioScenario(
+                EngineParams(listOf("ls-phase-times=$enabled")), 1L, 1, Kind.COP, EngineMix.MIXED, 6,
+            )
+
+            assertEquals(enabled, scenario.reportLsPhaseTimes)
+            assertEquals(enabled, scenario.copy(phaseRetention = 0.5).reportLsPhaseTimes)
+        }
+    }
+
+    @Test
     fun `portfolio residual reporting accepts an explicit opt in`() {
         val scenario = buildPortfolioScenario(
             EngineParams(listOf("ls-residuals=true")), 1L, 1, Kind.COP, EngineMix.MIXED, 6,

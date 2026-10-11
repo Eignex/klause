@@ -246,6 +246,15 @@ violation improvements contribute telemetry without becoming restart anchors. Pu
 samples and samples retained by custom restart policies remain independent of subsequent
 updates.
 
+## Phase timing
+
+Opt-in `ls-phase-times=true` portfolio diagnostics report active local-search nanoseconds
+for preparation, seeding, move selection, application and other work. Preparation covers
+projections, state and definition installation; seeding includes restart reconciliation
+and greedy repair. Selection includes proposal generation and reversible scoring probes.
+Suspended turns do not accrue time, and nested phases are charged once. ALNS inner work
+uses its separate bootstrap and repair counters. Diagnostic timing is disabled by default.
+
 ## Residual diagnostics
 
 Optional local-search residual reporting observes committed assignments at loop and

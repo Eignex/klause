@@ -26,12 +26,17 @@ internal class LocalSearchWorkerConfig(
     val recipe: LocalSearchRecipe,
     val nodeBudget: NodeBudget? = null,
     private val reportResiduals: Boolean = false,
+    private val reportPhaseTimes: Boolean = false,
 ) :
     WorkerConfig {
 
     override val label: String get() = recipe.label
 
-    override fun withLsResiduals(): LocalSearchWorkerConfig = LocalSearchWorkerConfig(recipe, nodeBudget, true)
+    override fun withLsResiduals(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes)
+
+    override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true)
 
     /** Build an LS worker: its [LocalSearchSolver] session (with the per-move invariant network when
      *  a [definitionalSweep] is present and the recipe enables it) + λ-shaped params, exposing the
@@ -89,6 +94,7 @@ internal class LocalSearchWorkerConfig(
             // no-op for the pool's weight-blind arms.
             normalizeWeightsByClass = true,
             reportResiduals = reportResiduals,
+            reportPhaseTimes = reportPhaseTimes,
             // Bidirectional cross-engine flow: publish incumbents this arm finds and, on restart, anchor
             // on the verified global best — so LS and backtrack incumbents circulate both ways.
             pooledIncumbents = matchedPools?.solutions,

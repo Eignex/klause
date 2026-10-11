@@ -32,6 +32,20 @@ import kotlin.test.assertTrue
 class CliStatsTest {
 
     @Test
+    fun `local search phase times print before the first move`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "mixed"),
+            ls = LocalSearchStats(phaseNanos = mapOf("preparation" to 7L, "seeding" to 0L)),
+        )
+
+        val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
+
+        assertEquals("7", pairs["lsPhaseNanos.preparation"])
+        assertEquals("0", pairs["lsPhaseNanos.seeding"])
+        assertTrue(lsStatPairs(SolveStats.EMPTY, solveTimeMs = 0).isEmpty())
+    }
+
+    @Test
     fun `ALNS inner work is printed separately from its outer allowance`() {
         val stats = SolveStats(alns = AlnsStats(
             bootstrapCpNodes = 13, bootstrapLsMoves = 7, repairCpNodes = 17, repairLsMoves = 5,

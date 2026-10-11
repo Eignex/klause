@@ -53,7 +53,8 @@ object PortfolioBuilder {
     ): List<PortfolioWorker> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective)
         val plan = PortfolioComposition.plan(scenario, facts)
-        val composed = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
+        val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
+        val composed = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
         // Expand the composed arms to one entry per lane. A lane is a worker slot; a parallel track
         // wants one per core, the sequential track one per arm — so laneCount is maxOf(arms, cores).
         // When arms >= cores (every existing scenario) this is a no-op cycle that returns the composed
