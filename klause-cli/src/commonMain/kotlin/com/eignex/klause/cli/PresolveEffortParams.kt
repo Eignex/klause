@@ -51,4 +51,6 @@ internal fun presolveEffortStats(
         rounds = budget?.rounds,
         passCalls = budget?.passCalls.orEmpty(),
         probeCalls = budget?.probeCalls,
+        rootConstructionEntries = budget?.rootConstructionEntries,
+        rootPropagationWork = budget?.rootPropagationWork,
     )

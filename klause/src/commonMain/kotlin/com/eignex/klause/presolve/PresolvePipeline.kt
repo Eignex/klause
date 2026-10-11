@@ -18,11 +18,6 @@ import kotlin.time.TimeSource
  *  exits as soon as a harvest tightens nothing, which is the common case after the first round. */
 private const val MAX_PRESOLVE_HARVEST_ROUNDS = 4
 
-// Work units per factor-and-term of the base bake, against one simplex op: bake time per unit over the 60 MIPLIB
-// 2017, 40 QF_LIA and 40 MiniZinc Challenge models of the calibration sample, ~1.4e-4 ms. The bake cannot be
-// cut short by the budget, so it is charged once it ran and the passes after it see what it cost.
-private const val BAKE_WORK_WEIGHT = 53L
-
 /**
  * The outcome of [PresolvePipeline.run]: the transformed [problem], a [reconstruct] that lifts a solution
  * of it back to the original variable space, the [stats], and [changed] — false when presolve altered
@@ -216,7 +211,6 @@ object PresolvePipeline {
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
         val baked = prebaked.bake(cancellation)
-        cancellation.charge(BAKE_WORK_WEIGHT * passBaseUnits(prebaked.factors))
         val seeded = RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
         val mappings = ArrayList<SourceMapping>()

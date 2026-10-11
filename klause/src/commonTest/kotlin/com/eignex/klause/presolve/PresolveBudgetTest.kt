@@ -61,7 +61,7 @@ class PresolveBudgetTest {
     fun `the phase token charges its budget and fires once the budget is spent`() {
         val budget = PresolveBudget(100)
         val phase = budget.orSpent(Cancellation.Never)
-        assertSame(budget, phase.workMeter())
+        assertSame(budget.slice(100).workMeter(), phase.workMeter())
 
         phase.charge(100)
 
