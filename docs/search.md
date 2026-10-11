@@ -425,7 +425,8 @@ only positively in hard clauses. A private satisfaction repair keeps unaccepted
 cost variables true and tries their cheap values in descending weight order.
 A pure-literal pass fixes free residual variables to satisfying values. Only
 feasible trials are retained. Clause-local polishing releases these pins and removes unnecessary
-costly values; the composed verifier checks the full proposal before publication.
+costly values; polishing resumes across slices before the composed verifier checks the full
+proposal for publication.
 Failed or cancelled trials contribute no infeasibility or optimality proof.
 
 The probe retains its repair session across portfolio slices. Its cumulative

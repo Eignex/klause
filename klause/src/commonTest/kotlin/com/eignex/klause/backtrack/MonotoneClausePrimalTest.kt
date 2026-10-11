@@ -87,9 +87,9 @@ class MonotoneClausePrimalTest {
         val primal = assertNotNull(MonotoneClausePrimal.create(
             solver, objective, BacktrackParams(), Cancellation.Never,
         ))
-        primal.use {
-            var sample = it.advance(sliceNodes = 1L)
-            repeat(30) { if (sample == null && !it.isDone) sample = it.advance(sliceNodes = 1L) }
+        primal.use { probe ->
+            var sample = probe.advance(sliceNodes = 1L)
+            repeat(30) { if (sample == null && !probe.isDone) sample = probe.advance(sliceNodes = 1L) }
             assertEquals(0L, objective.evaluateLong(assertNotNull(sample)))
         }
     }
