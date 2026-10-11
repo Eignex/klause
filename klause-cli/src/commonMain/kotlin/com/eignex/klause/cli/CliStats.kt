@@ -292,6 +292,9 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
             out += "lsBestResidualFactor.${factor.id}" to
                 "kind=${factor.kind} degree=${factor.degree} bools=$bools ints=$ints " +
                 "omittedBools=${factor.omittedBools} omittedInts=${factor.omittedInts}"
+            for ((key, value) in factor.details.entries.sortedBy { it.key }) {
+                out += "lsBestResidualFactorDetails.${factor.id}.$key" to value
+            }
         }
     }
     val completions = stats.ls.completions.sum.toLong()

@@ -1,9 +1,16 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearInvariant
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.ReifiedLinearInvariant
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.internals.CumulativeLsState
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
 
@@ -49,9 +56,102 @@ internal class LocalSearchResidualRecorder {
                     ints.take(MAX_COORDINATES).associateWith(state.assignment::intValue),
                     (bools.size - MAX_COORDINATES).coerceAtLeast(0),
                     (ints.size - MAX_COORDINATES).coerceAtLeast(0),
+                    factorDetails(state, fid),
                 )
             }
-        best = LocalSearchResidual(state.cost, byKind, factors)
+        val definitions = definitionDetails(state, factors)
+        best = LocalSearchResidual(state.cost, byKind, factors.map { factor ->
+            val details = LinkedHashMap(factor.details)
+            for (v in factor.ints.keys) details.putAll(definitions.getValue("i$v"))
+            for (v in factor.bools.keys) details.putAll(definitions.getValue("b$v"))
+            factor.copy(details = details)
+        })
+    }
+
+    private fun factorDetails(state: LocalSearchState, fid: Int): Map<String, String> {
+        val details = LinkedHashMap<String, String>()
+        when (val factor = state.problem.factors[fid]) {
+            is ComparisonClause -> {
+                for (i in 0 until minOf(factor.vars.size, MAX_COORDINATES)) {
+                    details["literal.$i"] = "i${factor.vars[i]}:${factor.ops[i]}:${factor.consts[i]}"
+                }
+                details["omittedLiterals"] = (factor.vars.size - MAX_COORDINATES).coerceAtLeast(0).toString()
+            }
+            is Linear -> rowDetails(details, factor.vars, factor.op, factor.integerConstants,
+                if (state.factors[fid] is LinearInvariant) state.longPayload[fid] else null)
+            is ReifiedLinear -> rowDetails(details, factor.vars, factor.op, factor.integerConstants,
+                if (state.factors[fid] is ReifiedLinearInvariant) state.longPayload[fid] else null)
+        }
+        return details
+    }
+
+    private fun rowDetails(
+        details: MutableMap<String, String>,
+        vars: IntArray,
+        op: LinearOp,
+        constants: IntegerConstants?,
+        activity: Long?,
+    ) {
+        details["op"] = op.toString()
+        if (constants == null) {
+            details["row"] = "unsupported-constants"
+            details["activity"] = "unsupported-grader"
+            return
+        }
+        details["bound"] = constants.bound.toString()
+        for (i in 0 until minOf(vars.size, MAX_COORDINATES)) {
+            details["term.$i"] = "${constants.coeff(i)}:i${vars[i]}"
+        }
+        details["omittedTerms"] = (vars.size - MAX_COORDINATES).coerceAtLeast(0).toString()
+        details["activity"] = activity?.toString() ?: "unsupported-grader"
+    }
+
+    private fun definitionDetails(
+        state: LocalSearchState,
+        factors: List<LocalSearchResidualFactor>,
+    ): Map<String, Map<String, String>> {
+        val details = LinkedHashMap<String, Map<String, String>>()
+        for (factor in factors) {
+            for (v in factor.ints.keys) details["i$v"] = mapOf("i$v.definition.kind" to "none")
+            for (v in factor.bools.keys) details["b$v"] = mapOf("b$v.definition.kind" to "none")
+        }
+        if (details.isEmpty()) return details
+        val network = state.invariants ?: return details
+        // A flat pass captures only requested outputs; it never follows their dependency cones.
+        for (i in 0 until network.size) {
+            val node = network.node(i)
+            val coordinate = if (node.outIsBool) "b${node.out}" else "i${node.out}"
+            if (coordinate !in details) continue
+            val inputs = ArrayList<String>(MAX_COORDINATES)
+            for (v in node.intInputs.take(MAX_COORDINATES)) inputs.add("i$v")
+            for (v in node.boolInputs.take(MAX_COORDINATES - inputs.size)) inputs.add("b$v")
+            details[coordinate] = mapOf(
+                "$coordinate.definition.kind" to definitionKind(node),
+                "$coordinate.definition.inputs" to inputs.joinToString(",").ifEmpty { "-" },
+                "$coordinate.definition.omittedInputs" to
+                    (node.intInputs.size + node.boolInputs.size - inputs.size).toString(),
+            )
+        }
+        return details
+    }
+
+    private fun definitionKind(node: DefinitionalSweep.SweepNode): String = when (node) {
+        is DefinitionalSweep.SweepNode.IntDef -> when (node.node) {
+            is FunctionalObjective.Abs -> "IntDef.Abs"
+            is FunctionalObjective.Extreme -> "IntDef.Extreme"
+            is FunctionalObjective.Times -> "IntDef.Times"
+            is FunctionalObjective.Plus -> "IntDef.Plus"
+            is FunctionalObjective.Lin -> "IntDef.Lin"
+        }
+        is DefinitionalSweep.SweepNode.CmpReif -> "CmpReif"
+        is DefinitionalSweep.SweepNode.SetInReif -> "SetInReif"
+        is DefinitionalSweep.SweepNode.Bool2Int -> "Bool2Int"
+        is DefinitionalSweep.SweepNode.BoolFold -> "BoolFold"
+        is DefinitionalSweep.SweepNode.ElementDef -> "ElementDef"
+        is LiteralIntDefinition -> "LiteralIntDefinition"
+        is EqualityPredicateDefinition -> "EqualityPredicateDefinition"
+        is ElementResultDefinition -> "ElementResultDefinition"
+        else -> "unsupported-definition"
     }
 
     private fun elementCoordinates(state: LocalSearchState, factor: Element): List<Int> {

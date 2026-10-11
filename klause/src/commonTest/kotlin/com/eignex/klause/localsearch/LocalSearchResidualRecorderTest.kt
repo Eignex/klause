@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
@@ -10,7 +11,11 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.plus
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,6 +23,218 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 class LocalSearchResidualRecorderTest {
+    @Test
+    fun `comparison residual details preserve ordered repeated literals with an omission count`() {
+        val vars = IntArray(18) { it % 2 }
+        val ops = Array(18) { if (it % 2 == 0) LinearOp.EQ else LinearOp.GE }
+        val constants = LongArray(18) { 1L + it }
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 20) },
+            arrayOf<Factor>(ComparisonClause(vars, ops, constants)))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.recompute()
+        val recorder = LocalSearchResidualRecorder()
+
+        recorder.observe(state)
+
+        val observed = assertNotNull(recorder.best).factors.single()
+        assertEquals(listOf(0, 1), observed.ints.keys.toList())
+        assertEquals((0 until 16).map { "i${vars[it]}:${ops[it]}:${constants[it]}" },
+            observed.details.filterKeys { it.startsWith("literal.") }.values.toList())
+        assertEquals("2", observed.details["omittedLiterals"])
+        assertEquals(0, observed.omittedInts)
+    }
+
+    @Test
+    fun `integer row details retain signed terms and committed activity after a scoring probe`() {
+        for (reified in listOf(false, true)) {
+            val coefficients = IntArray(18) { if (it % 2 == 0) 3 else -2 }
+            val vars = IntArray(18) { it }
+            val factor = if (reified) ReifiedLinear(0, coefficients, vars, LinearOp.EQ, 14)
+                else Linear(coefficients, vars, LinearOp.EQ, 14)
+            val problem = Problem(1, 18, Array(18) { IntDomain(0, 2) }, arrayOf<Factor>(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            repeat(18) { state.assignment.setInt(it, 1) }
+            state.assignment.setBool(0, true)
+            state.recompute()
+            val recorder = LocalSearchResidualRecorder()
+            recorder.observe(state)
+            val initial = assertNotNull(recorder.best)
+
+            assertEquals(-3L, state.netDelta(Move.IntSet(0, 2)))
+            recorder.observe(state)
+
+            assertSame(initial, recorder.best)
+            val observed = initial.factors.single()
+            assertEquals("9", observed.details["activity"])
+            assertEquals("none", observed.details["i0.definition.kind"])
+            assertEquals("EQ", observed.details["op"])
+            assertEquals("14", observed.details["bound"])
+            assertEquals((0 until 16).map { "${coefficients[it]}:i$it" },
+                observed.details.filterKeys { it.startsWith("term.") }.values.toList())
+            assertEquals("2", observed.details["omittedTerms"])
+            assertEquals(1L, state.assignment.intValue(0))
+            assertEquals(9L, state.longPayload[0])
+
+            state.apply(Move.IntSet(0, 2))
+            recorder.observe(state)
+
+            assertEquals("12", recorder.best?.factors?.single()?.details?.get("activity"))
+            val committedCost = state.cost
+            state.recompute()
+            assertEquals(committedCost, state.cost)
+            assertEquals(12L, state.longPayload[0])
+            assertEquals("9", observed.details["activity"])
+        }
+    }
+
+    @Test
+    fun `linear residual terms retain canonical inequality signs and coalesced order`() {
+        val factor = Linear(intArrayOf(2, -3, 4), intArrayOf(1, 0, 1), LinearOp.GE, 11)
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(factor))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 1)
+        state.assignment.setInt(1, 1)
+        state.recompute()
+        val recorder = LocalSearchResidualRecorder()
+
+        recorder.observe(state)
+
+        val details = assertNotNull(recorder.best).factors.single().details
+        assertEquals("LE", details["op"])
+        assertEquals("-11", details["bound"])
+        assertEquals(listOf("-6:i1", "3:i0"),
+            details.filterKeys { it.startsWith("term.") }.values.toList())
+        assertEquals("0", details["omittedTerms"])
+        assertEquals("-3", details["activity"])
+    }
+
+    @Test
+    fun `real row residual details identify unsupported constants and activity`() {
+        val factor = Linear(intArrayOf(0), doubleArrayOf(0.5), intArrayOf(0),
+            doubleArrayOf(1.5), LinearOp.EQ, 10.5)
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(factor),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 1)
+        state.assignment.setReal(0, 1.0)
+        state.recompute()
+        val recorder = LocalSearchResidualRecorder()
+
+        recorder.observe(state)
+
+        val details = assertNotNull(recorder.best).factors.single().details
+        assertEquals("unsupported-constants", details["row"])
+        assertEquals("unsupported-grader", details["activity"])
+        assertEquals(null, details["bound"])
+        assertEquals(null, details["term.0"])
+    }
+
+    @Test
+    fun `residual definition references are bounded for pinned integer and Boolean outputs`() {
+        val problem = Problem(18, 18, Array(18) { IntDomain(0, 20) }, arrayOf<Factor>(
+            ComparisonClause(intArrayOf(0), arrayOf(LinearOp.EQ), longArrayOf(0)),
+            Clause(intArrayOf(Lit.make(0, true))),
+        ))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3),
+            Assumptions.None.withInt(0, 17).withBool(0, false))
+        val inputs = IntArray(17) { it + 1 }
+        state.invariants = InvariantNetwork(listOf(
+            DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Lin(
+                0, 1, LongArray(17) { -1 }, Array(17) { FunctionalObjective.Operand.v(it + 1) }, 0,
+            ), inputs),
+            DefinitionalSweep.SweepNode.BoolFold(0, IntArray(17) { Lit.make(it + 1, true) }, true),
+        ), 18, 18)
+        repeat(18) {
+            state.assignment.setInt(it, if (it == 0) 17 else 1)
+            state.assignment.setBool(it, false)
+        }
+        state.recompute()
+        val recorder = LocalSearchResidualRecorder()
+        recorder.observe(state)
+        val observed = assertNotNull(recorder.best)
+
+        state.netDelta(Move.Compound(listOf(Move.IntSet(1, 2), Move.BoolFlip(1))))
+        recorder.observe(state)
+
+        assertSame(observed, recorder.best)
+        val integerDetails = observed.factors.first { it.kind == "ComparisonClause" }.details
+        val boolDetails = observed.factors.first { it.kind == "Clause" }.details
+        assertEquals("IntDef.Lin", integerDetails["i0.definition.kind"])
+        assertEquals((1..16).joinToString(",") { "i$it" }, integerDetails["i0.definition.inputs"])
+        assertEquals("1", integerDetails["i0.definition.omittedInputs"])
+        assertEquals("BoolFold", boolDetails["b0.definition.kind"])
+        assertEquals((1..16).joinToString(",") { "b$it" }, boolDetails["b0.definition.inputs"])
+        assertEquals("1", boolDetails["b0.definition.omittedInputs"])
+        assertEquals(17L, state.assignment.intValue(0))
+        assertEquals(1L, state.assignment.intValue(1))
+        assertEquals(false, state.assignment.boolValue(0))
+        assertEquals(false, state.assignment.boolValue(1))
+        assertEquals(observed.cost, state.cost)
+        state.recompute()
+        assertEquals(observed.cost, state.cost)
+    }
+
+    @Test
+    fun `captured definition references survive a replacement network and committed input change`() {
+        val problem = Problem(1, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(
+            ComparisonClause(intArrayOf(0, 1), arrayOf(LinearOp.EQ, LinearOp.EQ), longArrayOf(2, 2)),
+        ))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.Bool2Int(0, 0)), 2, 1)
+        state.moveSink.setOwners(intArrayOf(-1, 0))
+        state.assignment.setBool(0, false)
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.recompute()
+        val recorder = LocalSearchResidualRecorder()
+        recorder.observe(state)
+        val captured = assertNotNull(recorder.best).factors.single()
+
+        state.apply(Move.BoolFlip(0))
+        state.invariants = null
+        recorder.observe(state)
+
+        assertEquals("Bool2Int", captured.details["i0.definition.kind"])
+        assertEquals("b0", captured.details["i0.definition.inputs"])
+        assertEquals("0", captured.details["i0.definition.omittedInputs"])
+        assertEquals("none", captured.details["i1.definition.kind"])
+        assertEquals(null, captured.details["i1.definition.inputs"])
+        assertEquals(null, captured.details["b0.definition.kind"])
+        assertEquals(mapOf(0 to 0L, 1 to 0L), captured.ints)
+        assertEquals("none", recorder.best?.factors?.single()?.details?.get("i0.definition.kind"))
+    }
+
+    @Test
+    fun `exact row residual details identify unsupported activity instead of a payload placeholder`() {
+        for ((wideConstants, reified) in listOf(false to false, true to false, false to true, true to true)) {
+            val factor = if (wideConstants) {
+                val wide = bigIntOf(Long.MAX_VALUE) + bigIntOf(1)
+                if (reified) ReifiedLinear(0, intArrayOf(0), arrayOf(wide), LinearOp.EQ, bigIntOf(0))
+                else Linear(intArrayOf(0), arrayOf(wide), LinearOp.EQ, bigIntOf(0))
+            } else {
+                if (reified) ReifiedLinear(0, longArrayOf(Long.MAX_VALUE), intArrayOf(0), LinearOp.EQ, 0L)
+                else Linear(longArrayOf(Long.MAX_VALUE), intArrayOf(0), LinearOp.EQ, 0L)
+            }
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, 1)
+            state.assignment.setBool(0, true)
+            state.recompute()
+            val recorder = LocalSearchResidualRecorder()
+
+            recorder.observe(state)
+
+            val details = assertNotNull(recorder.best).factors.single().details
+            assertEquals("EQ", details["op"])
+            assertEquals("unsupported-grader", details["activity"])
+            assertEquals(if (wideConstants) "unsupported-constants" else null, details["row"])
+            assertEquals(if (wideConstants) null else "${Long.MAX_VALUE}:i0", details["term.0"])
+            assertEquals(if (wideConstants) null else "0", details["bound"])
+        }
+    }
+
     @Test
     fun `element residual coordinates prioritize the selected cell across index offsets`() {
         for (offset in listOf(0, 1, -17, Int.MIN_VALUE, Int.MAX_VALUE)) {
@@ -259,7 +476,7 @@ class LocalSearchResidualRecorderTest {
         assertEquals(mapOf("Linear" to 10L, "Clause" to 1L), initial?.byKind)
         assertEquals(
             LocalSearchResidualFactor(0, "Linear", 10L, emptyMap(), mapOf(0 to 0L)),
-            initial?.factors?.first(),
+            initial?.factors?.first()?.copy(details = emptyMap()),
         )
         assertEquals(8L, improved?.cost)
         assertEquals(mapOf("Linear" to 7L, "Clause" to 1L), recorder.best?.byKind)
@@ -268,7 +485,7 @@ class LocalSearchResidualRecorderTest {
                 LocalSearchResidualFactor(0, "Linear", 7L, emptyMap(), mapOf(0 to 3L)),
                 LocalSearchResidualFactor(1, "Clause", 1L, mapOf(0 to false), emptyMap()),
             ),
-            recorder.best?.factors,
+            recorder.best?.factors?.map { it.copy(details = emptyMap()) },
         )
     }
 
@@ -291,7 +508,7 @@ class LocalSearchResidualRecorderTest {
         assertEquals(mapOf("Linear" to 12L), recorder.best?.byKind)
         assertEquals(
             listOf(LocalSearchResidualFactor(1, "Linear", 10L, emptyMap(), mapOf(0 to 0L))),
-            recorder.best?.factors,
+            recorder.best?.factors?.map { it.copy(details = emptyMap()) },
         )
     }
 

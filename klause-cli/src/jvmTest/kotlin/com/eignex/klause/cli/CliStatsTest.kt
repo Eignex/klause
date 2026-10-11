@@ -109,7 +109,33 @@ class CliStatsTest {
             pairs["lsBestResidualFactor.3"],
         )
         assertTrue("lsIncumbentObjective" !in pairs)
+        assertTrue(pairs.keys.none { it.startsWith("lsBestResidualFactorDetails.") })
     }
+
+    @Test
+    fun `residual detail pairs preserve signed values without changing the coordinate pair`() {
+        val stats = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(
+            5, mapOf("Linear" to 5L), listOf(LocalSearchResidualFactor(
+                3, "Linear", 5, emptyMap(), mapOf(4 to 2L), details = mapOf(
+                    "term.0" to "-3:i4", "activity" to "-6", "op" to "EQ", "bound" to "-1",
+                    "i4.definition.kind" to "IntDef.Lin", "i4.definition.inputs" to "i2,b1",
+                    "i4.definition.omittedInputs" to "1",
+                ),
+            )),
+        )))
+
+        val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
+
+        assertEquals("kind=Linear degree=5 bools=- ints=i4:2 omittedBools=0 omittedInts=0",
+            pairs["lsBestResidualFactor.3"])
+        assertEquals("-3:i4", pairs["lsBestResidualFactorDetails.3.term.0"])
+        assertEquals("-6", pairs["lsBestResidualFactorDetails.3.activity"])
+        assertEquals("-1", pairs["lsBestResidualFactorDetails.3.bound"])
+        assertEquals("i2,b1", pairs["lsBestResidualFactorDetails.3.i4.definition.inputs"])
+        assertEquals("1", pairs["lsBestResidualFactorDetails.3.i4.definition.omittedInputs"])
+        assertTrue(lsStatPairs(SolveStats.EMPTY, solveTimeMs = 0).isEmpty())
+    }
+
     @Test
     fun `refused float phase costs are emitted without a node solve`() {
         val stats = SolveStats(lp = LpStats(phases = mapOf("CLEANUP_STANDALONE" to
