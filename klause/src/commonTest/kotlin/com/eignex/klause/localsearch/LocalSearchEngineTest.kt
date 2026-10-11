@@ -255,7 +255,10 @@ class LocalSearchEngineTest {
             assertEquals(7L, paused?.cost)
             assertEquals(mapOf("Linear" to 7L), result.stats.ls.bestResidual?.byKind)
             assertEquals(
-                listOf(LocalSearchResidualFactor(0, "Linear", 7L, emptyMap(), mapOf(0 to 3L))),
+                listOf(LocalSearchResidualFactor(0, "Linear", 7L, emptyMap(), mapOf(0 to 3L),
+                    details = mapOf("op" to "LE", "bound" to "-10", "term.0" to "-1:i0",
+                        "omittedTerms" to "0", "activity" to "-3", "i0.definition.kind" to "none"),
+                )),
                 result.stats.ls.bestResidual?.factors,
             )
         }
