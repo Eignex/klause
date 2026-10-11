@@ -247,7 +247,9 @@ class RootBakerTest {
         val budget = PresolveBudget(reference.spent())
         val problem = source.bake(budget.orSpent(Cancellation.Never))
 
-        val result = assertIs<PropagationResult.Implied>(RootBaker.bake(problem, BakeConfig(probeFailedLiterals = true)))
+        val result = assertIs<PropagationResult.Implied>(
+            RootBaker.bake(problem, BakeConfig(probeFailedLiterals = true)),
+        )
 
         assertEquals(1L, result.intMinOrNullCompat(0))
         assertEquals(null, result.boolValueOrNull(0))
