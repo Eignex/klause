@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -137,6 +138,27 @@ class MonotoneClausePrimalTest {
             assertEquals(1L, objective.evaluateLong(sample))
             assertTrue(sample.bools[28])
             assertTrue(sample.bools[32])
+        }
+    }
+
+    @Test
+    fun `baked root pins survive trial reduction`() {
+        val problem = Problem(
+            4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
+            ),
+        ).bake().conditionedRoot(Assumptions(bools = mapOf(3 to true)), Cancellation.Never)
+        val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L))
+        val primal = assertNotNull(MonotoneClausePrimal.create(
+            BacktrackSolver(problem), objective, BacktrackParams(), Cancellation.Never,
+        ))
+
+        primal.use {
+            val sample = assertNotNull(it.advance())
+
+            assertTrue(sample.bools[3])
+            assertEquals(1L, objective.evaluateLong(sample))
         }
     }
 

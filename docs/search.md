@@ -434,7 +434,7 @@ cost variables true and tries their cheap values in descending weight order.
 A bounded pure-literal fixpoint fixes free residual variables to satisfying values.
 Each trial removes clauses satisfied by its pins, drops false pinned literals, and
 compacts the remaining Boolean coordinates into an isolated clausal model. Returned
-models restore the original pins and coordinates before polishing and verification.
+models restore the caller and baked-root pins and original coordinates before polishing and verification.
 Learned clauses remain local to that reduced trial. Only
 feasible trials are retained. Clause-local polishing releases these pins and removes unnecessary
 costly values; polishing resumes across slices before the composed verifier checks the full
