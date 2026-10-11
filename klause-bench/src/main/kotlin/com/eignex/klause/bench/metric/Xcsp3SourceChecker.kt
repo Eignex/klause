@@ -85,6 +85,11 @@ internal object Xcsp3SourceChecker {
         }
         val names = children[0].textContent.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         val values = children[1].textContent.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (names.any { it.contains("[]") || it.contains("..") } ||
+            values.any { Regex("-?[0-9]+x[0-9]+").matches(it) }
+        ) {
+            return result("unknown", "compact assignments require expansion before checking")
+        }
         if (names.size != values.size || names.size != names.toSet().size || names.toSet() != parser.mapForVars.keys) {
             return result("invalid", "assignment must cover every source variable exactly once")
         }

@@ -91,6 +91,44 @@ class Xcsp3SourceCheckerTest {
     }
 
     @Test
+    fun `a missing unconstrained source coordinate cannot earn witness credit`() {
+        val model = File.createTempFile("xcsp-unconstrained-", ".xml")
+        try {
+            model.writeText(source.readText().replace("<variables>", "<variables><var id='free'>0..1</var>"))
+            val witness = "<instantiation><list>a b c</list><values>2 2 0</values></instantiation>"
+
+            assertEquals("invalid", Xcsp3SourceChecker.inspect(model, witness, "10").status)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @Test
+    fun `source objectives remain exact beyond the signed word range`() {
+        val model = File.createTempFile("xcsp-product-", ".xml")
+        try {
+            model.writeText(
+                source.readText().replace("<maximize type=\"sum\">", "<maximize type=\"product\">")
+                    .replace("<coeffs> 3 2 1 </coeffs>", "<coeffs> 1000000000 1000000000 1000000000 </coeffs>"),
+            )
+            val witness = "<instantiation><list>a b c</list><values>1 1 1</values></instantiation>"
+
+            assertEquals("valid", Xcsp3SourceChecker.inspect(model, witness, "1000000000000000000000000000").status)
+            assertEquals("invalid", Xcsp3SourceChecker.inspect(model, witness, "1000000000000000000000000001").status)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @Test
+    fun `compact array assignments remain unchecked until expanded`() {
+        val model = File(source.parentFile, "graph-coloring-tiny.xml")
+        val witness = "<instantiation><list>v[]</list><values>1 2 1 2</values></instantiation>"
+
+        assertEquals("unknown", Xcsp3SourceChecker.inspect(model, witness, null).status)
+    }
+
+    @Test
     fun `an instantiation cost cannot disagree with its reported objective`() {
         val witness = "<instantiation cost='9'><list>a b c</list><values>2 2 0</values></instantiation>"
 
