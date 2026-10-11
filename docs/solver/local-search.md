@@ -457,3 +457,12 @@ CLI pairs use `lsBestResidualFactorDetails.<factor-id>.<key>`; existing coordina
 pairs retain their format. Captures own detached metadata and never grade or mutate
 the assignment. Coordinate-only construction and the legacy constructor/copy
 compatibility descriptors remain available; copies retain captured details.
+
+A finite projection can use `CandidateCompletion` even when its assignment workspace
+has no continuous coordinates. The polynomial adapter pins the complete finite
+candidate and asks the exact theory for its continuous completion. Rejected or
+indeterminate candidates trigger the ordinary restart path; neither result refutes
+the source model. Finite factor degrees guide the walk, while native polynomial
+work has its own cumulative allowance. Completed samples own exact algebraic
+coordinates and a source witness certificate. ALNS bootstrap and CP repairs use
+the same shared polynomial component; neighbourhood pins do not renew its allowance.

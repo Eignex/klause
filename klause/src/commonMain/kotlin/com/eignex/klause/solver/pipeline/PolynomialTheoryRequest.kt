@@ -1,16 +1,16 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
+import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.ir.PolynomialRealProblem
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
-import com.eignex.klause.theory.qfnra.QfNraReason
-import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.theory.qfnra.solveQfNra
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
 
@@ -18,6 +18,7 @@ import kotlin.time.TimeSource
 class PolynomialTheoryRequest internal constructor(
     /** Original source identities and polynomial formula. */
     val problem: PolynomialRealProblem,
+    internal val sharedModel: SharedPolynomialModel? = null,
 )
 
 /** Select the complete polynomial-real theory without materializing finite domains. */
@@ -35,6 +36,8 @@ data class PolynomialTheoryParams(
     val timeout: Cancellation = Cancellation.Never,
     /** External cooperative token, forwarding native charges once to its meter. */
     val cancellation: Cancellation = Cancellation.Never,
+    /** Finite search, heuristic and neighbourhood controls for theory composition. */
+    val strategy: PolynomialStrategyParams = PolynomialStrategyParams(),
 ) {
     init {
         require(maximumWork == null || maximumWork >= 0)
@@ -94,58 +97,54 @@ fun OpenTheoryPipeline.execute(
             OpenTheoryResult.Unknown(reason, envelope(reason == TerminationReason.Timeout)),
             stats,
         )
-    if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
-        return incomplete(TerminationReason.Unsupported, PolynomialTheoryStats())
-    }
     val source = request.problem
-    val native = solveQfNra(
-        source.formula,
-        source.totalBoolCount,
-        source.totalRealCount,
-        QfNraParams(
-            stop,
-            params.maximumWork,
-            PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
+    val shared = request.sharedModel ?: requireNotNull(SharedPolynomialModel.assemble(
+        Problem(
+            numBoolVars = source.totalBoolCount, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray(),
+            numRealVars = source.totalRealCount,
+            realLower = DoubleArray(source.totalRealCount) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(source.totalRealCount) { Double.POSITIVE_INFINITY },
         ),
-    )
+        source.formula,
+    ))
+    val invocation = shared.service.invocation(QfNraParams(
+        stop, params.maximumWork,
+        PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
+    ))
+    val result = invocation.use { PolynomialStrategyAdapters(shared, it, params.strategy, stop).solve(engine) }
+    val native = invocation.stats
     val stats = PolynomialTheoryStats(
-        native.stats.projectedPolynomials,
-        native.stats.liftedCells,
-        native.stats.workSpent,
+        native.projectedPolynomials,
+        native.liftedCells,
+        native.workSpent,
     )
     if (stop()) {
         return incomplete(if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled, stats)
     }
-    return when (native) {
-        is QfNraResult.Satisfiable -> {
+    return when (result) {
+        is SolveResult.Sat -> {
+            val sample = result.assignment
             val assignment = ExactNraAssignment(
-                BooleanArray(source.sourceBoolCount) { native.assignment.boolValue(it) },
-                List(source.sourceRealCount) { native.assignment.realValue(it) },
+                BooleanArray(source.sourceBoolCount) { sample.boolValue(it) },
+                List(source.sourceRealCount) { requireNotNull(sample.algebraicReals)[it] },
+            )
+            val exact = OpenTheoryAssignment.ExactNra(assignment)
+            val published = if (shared.source.numIntVars == 0) exact else OpenTheoryAssignment.Rebuilt(
+                exact, assignment.bools,
+                Array(shared.source.numIntVars) { bigIntOf(sample.intValue(it)) },
             )
             if (stop()) {
                 incomplete(if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled, stats)
             } else {
-                PolynomialTheoryExecution(
-                    OpenTheoryResult.Sat(OpenTheoryAssignment.ExactNra(assignment), envelope()),
-                    stats,
-                )
+                PolynomialTheoryExecution(OpenTheoryResult.Sat(published, result.stats), stats)
             }
         }
-
-        is QfNraResult.Unsatisfiable -> PolynomialTheoryExecution(OpenTheoryResult.Unsat(envelope()), stats)
-
-        is QfNraResult.Unknown -> {
-            val reason = when (native.reason) {
-                QfNraReason.Interrupted -> TerminationReason.Cancelled
-                QfNraReason.WorkLimit, QfNraReason.ResourceLimit -> TerminationReason.BudgetExhausted
-            }
-            val resource = when (native.resource) {
-                PolynomialResource.DENSE_COEFFICIENTS -> PolynomialTheoryResource.DenseCoefficients
-                PolynomialResource.MATRIX_CELLS -> PolynomialTheoryResource.MatrixCells
-                PolynomialResource.DEGREE_OVERFLOW -> PolynomialTheoryResource.DegreeOverflow
-                null -> null
-            }
-            incomplete(reason, stats).copy(resource = resource)
-        }
+        is SolveResult.Unsat -> PolynomialTheoryExecution(OpenTheoryResult.Unsat(result.stats), stats)
+        is SolveResult.Unknown -> incomplete(result.reason, stats).copy(resource = when (invocation.lastUnknown?.resource) {
+            PolynomialResource.DENSE_COEFFICIENTS -> PolynomialTheoryResource.DenseCoefficients
+            PolynomialResource.MATRIX_CELLS -> PolynomialTheoryResource.MatrixCells
+            PolynomialResource.DEGREE_OVERFLOW -> PolynomialTheoryResource.DegreeOverflow
+            null -> null
+        })
     }
 }

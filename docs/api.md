@@ -163,3 +163,10 @@ and return independent metadata views; decoding uses private lookups. Generic in
 protocols require immutable accepted assignment/objective payloads; custom verifiers
 capture producer state before acceptance. Built-in carriers can be shared through
 publication and repeated incumbent reads without copying in the search loop.
+
+`Sample.algebraicReals` carries immutable exact polynomial coordinates independently
+of its approximate real buffer. Approximate values remain display or heuristic
+metadata and carry no polynomial proof authority. An unchanged sample copy retains
+its source witness certificate; changing any coordinate or exact scalar list discards
+it. Polynomial pipeline strategy controls expose finite backtracking, local-search
+and ALNS effort separately from the native arithmetic allowance.

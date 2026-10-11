@@ -11,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PolynomialTheoryRequestTest {
     @Test
@@ -150,15 +151,16 @@ class PolynomialTheoryRequestTest {
     }
 
     @Test
-    fun `a local search request receives no polynomial proof authority`() {
+    fun `a local search candidate receives an exact polynomial witness`() {
         val input = assertIs<SmtLibInput.Polynomial>(
             SmtLibAdmission.parse("(declare-const x Real) (assert (= (* x x) 2))"),
         )
 
         val execution = OpenTheoryPipeline.execute(input.problem.pipelineRequest(), engine = FiniteEngine.LOCAL_SEARCH)
 
-        assertEquals(TerminationReason.Unsupported, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
-        assertEquals(PolynomialTheoryStats(), execution.stats)
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+        assertNotNull(witness.algebraicRealValue(0))
+        assertTrue(execution.stats.workSpent > 0)
         assertNull(execution.resource)
     }
 }

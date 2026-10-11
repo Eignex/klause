@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
@@ -9,12 +10,14 @@ import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.search.contribute
+import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.util.Cancellation
 
 internal class PolynomialSearchComponent(
     private val service: PolynomialTheoryService,
     private val invocation: PolynomialTheoryInvocation,
     integerColumns: Map<Int, Int> = emptyMap(),
+    private val capture: ((QfNraAssignment, SearchContext) -> Sample)? = null,
 ) : TheoryComponent {
     private val integerColumns = integerColumns.toMap()
     val witnessKey = SearchModelKey(QfNraAssignment::class)
@@ -54,14 +57,19 @@ internal class PolynomialSearchComponent(
     override fun contributeModel(model: SearchModel, context: SearchContext) {
         val accepted = requireNotNull(outcome as? QfNraResult.Satisfiable)
         model.contribute(witnessKey, accepted.assignment)
+        capture?.let { model.contribute(completedSearchSample, it(accepted.assignment, context)) }
     }
 
     private fun evaluate(context: SearchContext): QfNraResult? {
         if (context.cancelled()) return null
         val current = PolynomialSignature(
             (0 until service.boolCount).mapNotNull { id -> context.boolValue(id)?.let { id to it } }.toMap(),
-            integerColumns.mapNotNull { (source, column) -> context.intLowerBound(source)?.let { column to it } }.toMap(),
-            integerColumns.mapNotNull { (source, column) -> context.intUpperBound(source)?.let { column to it } }.toMap(),
+            integerColumns.mapNotNull { (source, column) ->
+                context.intLowerBound(source)?.let { column to it }
+            }.toMap(),
+            integerColumns.mapNotNull { (source, column) ->
+                context.intUpperBound(source)?.let { column to it }
+            }.toMap(),
         )
         if (signature == current) return outcome
         if (!context.consumeCheck()) return null

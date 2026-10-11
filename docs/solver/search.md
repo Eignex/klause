@@ -367,3 +367,13 @@ keys preserve arbitrary-precision and rational coordinates alongside the compati
 keys. Opaque legacy values remain borrowed read-only. Extensions retain open keys for
 arrays, functions and native theory values; their captured payloads must be immutable.
 See [API migration and mappings](../api.md#typed-contributions-and-migration).
+
+Polynomial components consume the shared trail's semantic finite bounds. Exact
+refutation of their real relaxation rejects the containing branch; only a query
+with all participating finite coordinates fixed may supply a completed witness.
+The shared model carries that completed sample beside the finite contribution, so
+backtracking satisfaction and optimization retain exact algebraic coordinates.
+Optimization installs additional component factories before its first shared check.
+Finite LP primal proposals and transferred initial candidates are withheld when
+additional theory components still require a complete check; ordinary traversal
+remains available. See [polynomial composition](qfnra.md#conditioned-theory-service).

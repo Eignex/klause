@@ -285,3 +285,11 @@ segment time and live propagation counters; it is not included in opening time.
 [Search statistics](search.md#statistics) and [benchmark
 records](../../klause-bench/README.md#saved-results) define propagation, conflict and
 saved-result accounting.
+
+Polynomial composition builds workers over one finite projection and one immutable
+polynomial source scope. Its sequential mixed pool contains complete backtracking,
+finite local search and ALNS bootstrap/repair workers. Exact continuous completion
+is required before a sample receives that source's witness certificate. Only the
+complete worker receives proof admission; heuristic failure and neighbourhood
+exhaustion do not certify infeasibility. The containing polynomial invocation owns
+native work across workers and is closed after portfolio handles and sessions.
