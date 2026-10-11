@@ -18,7 +18,6 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.minimizeBool
 import com.eignex.klause.solver.objective.minimizeInt
-import com.eignex.klause.solver.objective.throughBooleanChannels
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -49,8 +48,7 @@ fun FlatZincProgram.linearObjective(): LinearObjective? {
         LinearObjective(realCoefficients = DoubleArray(problem.numRealVars).also { it[real.varId] = 1.0 })
     } ?: boolVarsByName[name]?.let { problem.minimizeBool(it) }
         ?: problem.minimizeInt(intVarsByName.getValue(name))
-    val oriented = if (maximize) objective.negated() else objective
-    return oriented.throughBooleanChannels(problem) ?: oriented
+    return if (maximize) objective.negated() else objective
 }
 
 private data class FlatZincExecutionMetadata(
