@@ -341,6 +341,38 @@ class LocalSearchEngineTest {
     }
 
     @Test
+    fun `anchoring satisfaction policies restart from the best infeasible assignment`() {
+        val policies = listOf(
+            AdaptivePerturbationRestart(maxFlipsBeforeRestart = 2, perturbationStrength = 0),
+            StagnationRestart(maxFlipsBeforeRestart = 2, perturbationStrength = 0),
+            IteratedLocalSearchRestart(maxFlipsBeforeRestart = 2, initialPerturbationStrength = 0),
+        )
+        for (policy in policies) {
+            val problem = Problem(
+                0, 1, arrayOf(IntDomain(0, 9)),
+                arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+            )
+            val visited = mutableListOf<Long>()
+            val strategy = SourceDrivenStrategy(
+                sources = emptyList(),
+                perturbation = {
+                    visited += it.assignment.intValue(0)
+                    Move.IntSet(0, if (visited.size == 1) 3L else 2L)
+                },
+                feasibleDescent = FeasibleDescent.SelfOwned,
+            )
+            val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
+            val params = LocalSearchParams(
+                maxFlips = 6L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0L)),
+            )
+
+            assertTrue(search.samples(params, warm = null).toList().isEmpty())
+
+            assertEquals(listOf(0L, 3L, 3L, 2L), visited)
+        }
+    }
+
+    @Test
     fun `satisfaction resets its anchor after each published sample`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 3)),
