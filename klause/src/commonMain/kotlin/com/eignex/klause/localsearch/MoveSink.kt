@@ -31,6 +31,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private var compounds: ArrayList<Move.Compound>? = null
     private var cachedList: List<Move>? = null
     private var elementPreservingProbes: Int = 0
+    internal var alternativeRepairs: MoveSink? = null
 
     /** Materialized [Move] view. Stable across reads until the sink is mutated.
      *  Compound moves follow primitives in the iteration order. */
@@ -187,6 +188,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         cachedList = null
         proposer = NO_PROPOSER
         elementPreservingProbes = 0
+        alternativeRepairs = null
     }
 
     /** Channeling-aware variant of [addIntSet]. Asks [state] to synthesize the coordinated
