@@ -131,26 +131,24 @@ internal class MonotoneClausePrimal private constructor(
             if (trial == null) {
                 trials++
                 val next = if (bootstrap) accepted else accepted.withBool(variables[index], false)
-                if (bootstrap) {
-                    val search = repair ?: openRepair(solver, params.assumptions) ?: return null
-                    val simplified = purePins(next)
-                    pure = simplified.second
-                    search.rebind(simplified.first, Long.MAX_VALUE)
-                } else {
-                    retireRepair()
-                    val prepared = ClausePrimalProjection.prepare(
-                        solver.problem, next, params.nativeSat, phaseToken,
-                    ) { literalWork += it }
-                    val reduced = prepared.projection
-                    if (reduced == null) {
-                        if (prepared.infeasible) infeasible++ else incomplete++
-                        index++
-                        continue
+                retireRepair()
+                val scope = if (bootstrap) purePins(next).first else next
+                val prepared = ClausePrimalProjection.prepare(
+                    solver.problem, scope, params.nativeSat, phaseToken,
+                ) { literalWork += it }
+                val reduced = prepared.projection
+                if (reduced == null) {
+                    if (prepared.infeasible) infeasible++ else incomplete++
+                    if (bootstrap) {
+                        close()
+                        return null
                     }
-                    projection = reduced
-                    pure = emptyList()
-                    openRepair(BacktrackSolver(reduced.problem), Assumptions.None) ?: return null
+                    index++
+                    continue
                 }
+                projection = reduced
+                pure = emptyList()
+                openRepair(BacktrackSolver(reduced.problem), Assumptions.None) ?: return null
                 trial = next
             }
             val nodes = if (sliceNodes < 0L) -1L else (sliceNodes - (work - startWork)).coerceAtLeast(0L)
