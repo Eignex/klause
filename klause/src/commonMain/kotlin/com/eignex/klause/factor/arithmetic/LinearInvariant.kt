@@ -77,16 +77,31 @@ internal class LinearInvariant(
             }
             return
         }
+        var sideTargets: ArrayList<IntSet>? = null
         forEachRepairTerm(state) { i ->
             val v = vars[i]
             val c = coeffs[i]
             if (c != 0L) {
                 val cur = state.assignment.intValue(v)
                 val sumWithout = sum - c * cur
-                val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true, domain = state.rootDomains[v])
-                if (target != null && target != cur) sink.addChannelingIntSet(state, v, target)
+                val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true)
+                if (target != null) {
+                    val domain = state.rootDomains[v]
+                    val clamped = domain.clamp(target)
+                    if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
+                    if (op == LinearOp.LE || op == LinearOp.GE) {
+                        val rounded = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true, domain = domain)
+                        if (rounded != null && rounded != clamped && rounded != cur &&
+                            linearHolds(sumWithout + c * rounded, op, bound)
+                        ) {
+                            val targets = sideTargets ?: ArrayList<IntSet>().also { sideTargets = it }
+                            targets.add(IntSet(v, rounded))
+                        }
+                    }
+                }
             }
         }
+        for (target in sideTargets.orEmpty()) sink.addChannelingIntSet(state, target.varId, target.newValue)
     }
 
     /** Visit every term index on a narrow row, or a fresh [REPAIR_SAMPLE_CAP]-sized random sample on a

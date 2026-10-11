@@ -256,11 +256,15 @@ variants retain the move sink's existing bounds.
 
 ### Linear repairs
 
-Linear inequality targets round domain holes toward the requested predicate truth,
-using the coefficient sign to select the rounding direction. If that side has no
-present value, ordinary Linear repairs retain a clamped endpoint as a partial repair.
-Reified repairs require the rounded body to match the retained or flipped indicator.
-Equality and disequality target clamping retains its nearest-value behavior.
+Linear repairs offer nearest-clamped targets in term order, retaining partial
+interior and endpoint repairs. Inequality repairs then append distinct moving targets
+rounded through domain holes toward the requested predicate truth, using coefficient
+sign to select the direction. The added targets must attain that truth. Both target
+sets use the same bounded term sample on wide ordinary Linear rows.
+Reified repairs offer valid nearest-clamped candidates in indicator and term order,
+then offer distinct rounded alternatives. The move sink groups primitives before
+compounds when exposing candidates. Body targets must match the retained or flipped
+indicator. Equality and disequality retain their nearest-value behavior.
 
 ### Comparison clauses
 
