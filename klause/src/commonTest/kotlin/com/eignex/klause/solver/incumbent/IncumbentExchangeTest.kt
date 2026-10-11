@@ -22,8 +22,11 @@ class IncumbentExchangeTest {
         val exchange = IncumbentExchange<Sample, Long>(
             improves = { candidate, standing -> candidate < standing },
             verifier = { candidate ->
-                if (objective.evaluateLong(candidate.assignment) == candidate.objective) Verification.Accepted(candidate)
-                else Verification.Rejected("objective differs")
+                if (objective.evaluateLong(candidate.assignment) == candidate.objective) {
+                    Verification.Accepted(candidate)
+                } else {
+                    Verification.Rejected("objective differs")
+                }
             },
         )
         exchange.offer(sample, 6)

@@ -24,7 +24,10 @@ class ExactLraAssignment(
     fun boolValue(id: Int): Boolean = booleanValues[id]
 
     /** Capture replacement coordinates in an owned witness. */
-    fun copy(bools: BooleanArray = booleanValues, reals: List<BigFraction> = realValues): ExactLraAssignment = ExactLraAssignment(bools, reals)
+    fun copy(
+        bools: BooleanArray = booleanValues,
+        reals: List<BigFraction> = realValues,
+    ): ExactLraAssignment = ExactLraAssignment(bools, reals)
 
     /** Coordinate view for destructuring. */
     operator fun component1(): BooleanArray = bools
