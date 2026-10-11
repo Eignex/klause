@@ -3,11 +3,7 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.report.Reports
 import java.io.File
 import java.io.StringReader
-import java.io.StringWriter
 import javax.xml.parsers.DocumentBuilderFactory
-import javax.xml.transform.TransformerFactory
-import javax.xml.transform.dom.DOMSource
-import javax.xml.transform.stream.StreamResult
 import kotlinx.serialization.encodeToString
 import org.w3c.dom.Document
 import org.w3c.dom.Element
@@ -52,9 +48,10 @@ internal object Xcsp3SourceChecker {
         val root = solution.documentElement
         checkAssignment(parser, root)?.let { return it }
         pinObjective(parser, root, objective)?.let { return it }
-        val pinned = StringWriter().also {
-            TransformerFactory.newInstance().newTransformer().transform(DOMSource(root), StreamResult(it))
-        }.toString().substringAfter("?>").trim()
+        val cost = objective?.let { " cost=\"$it\"" }.orEmpty()
+        val names = xmlText(root.getElementsByTagName("list").item(0).textContent)
+        val values = xmlText(root.getElementsByTagName("values").item(0).textContent)
+        val pinned = "<instantiation$cost><list>$names</list><values>$values</values></instantiation>"
         return runCatching {
             val checker = SolutionChecker(false, source.absolutePath, pinned.byteInputStream())
             when {
@@ -119,6 +116,8 @@ internal object Xcsp3SourceChecker {
         }
         return null
     }
+
+    private fun xmlText(text: String): String = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     private fun builder() = DocumentBuilderFactory.newInstance().apply {
         setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
