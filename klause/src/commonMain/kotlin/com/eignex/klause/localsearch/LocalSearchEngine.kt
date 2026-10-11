@@ -162,7 +162,8 @@ internal class LocalSearchEngine(
     ) {
         // These reset policies start from an unanchored random draw; scoring before the sweep is redundant.
         val randomDraw = configuredRestart is FixedCadenceRestart || configuredRestart is AdaptivePerturbationRestart ||
-            configuredRestart is IteratedLocalSearchRestart || configuredRestart is StagnationRestart
+            configuredRestart is IteratedLocalSearchRestart || configuredRestart is StagnationRestart ||
+            configuredRestart is LubyRestart
         if (!randomDraw || (!slicedInitialization(checkpoint) && definitionalSweep == null && !seedImplicitOnRestart)) {
             restarts.restart(state, bestSoFar = null)
             return
@@ -170,6 +171,7 @@ internal class LocalSearchEngine(
         prepareSteps(state.initialAssignmentSteps(null), params, checkpoint)
         prepareInitialAssignment(state, params, checkpoint)
         recomputeInitial(state, params, checkpoint)
+        (configuredRestart as? LubyRestart)?.advanceCadence()
     }
 
     private fun slicedInitialization(checkpoint: LocalSearchCheckpoint?): Boolean =
@@ -732,8 +734,11 @@ internal class LocalSearchEngine(
             val bestAnchor = if (configuredRestart is FixedCadenceRestart || configuredRestart is LubyRestart) {
                 null
             } else {
-                Assignment(problem.numBoolVars, problem.numIntVars, problem.numRealVars).also {
-                    state.assignment.copyInto(it)
+                preparedValue(
+                    Assignment.preparation(problem.numBoolVars, problem.numIntVars, problem.numRealVars),
+                    params, checkpoint,
+                ).also {
+                    prepareSteps(state.assignment.copySteps(it, INITIALIZATION_BATCH), params, checkpoint)
                 }
             }
             // Bounded per yield, not per session: maxFlips elapsing without a fresh sample means the
