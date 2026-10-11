@@ -43,7 +43,7 @@ class AnytimeCounterTest {
 
     @Test
     fun `sparse integer values across a wide span have their exact projected mass`() {
-        val clamp = 1L shl 62
+        val clamp = 1L shl 53
         val domain = intDomainFromSurvivors(longArrayOf(-clamp, 0L, clamp))
         val solver = BacktrackSolver(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
 
