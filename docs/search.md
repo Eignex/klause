@@ -152,6 +152,8 @@ each component. Active larger equalities and sign-changing cycles reduce against
 the forest for at most four passes. Supported residuals add integer offset facts;
 nonintegral or inconsistent residuals refute their active guards. Each batch
 captures immutable source and offset premises before adding its facts.
+Explanation adjacency is built on demand and invalidated by each forest join;
+residual equalities already represented by the forest need no new reasons.
 Unsupported residuals remain with the complete theory; the pass limit establishes
 no verdict. The forest is rebuilt from current assertions, so retraction drops
 their effects. Wide offsets remain with the full theory. The scan does not

@@ -101,7 +101,6 @@ internal class ExactLiraEqualities(
             }
             if (forest.difference(row.target, row.source, row.sourceSign) == null) unresolved += row
         }
-        if (!forest.preparePaths(progressStop)) return ComponentResult.Indeterminate
         inconsistent?.let { row ->
             val premises = forest.comparisonPremises(row.target, row.source, row.sourceSign, progressStop)
                 ?: return ComponentResult.Indeterminate
@@ -229,6 +228,9 @@ internal class ExactLiraEqualities(
                 val normalized = bound * magnitude.reciprocal()
                 val impossible = terms.isEmpty() || normalized.den != BIG_ONE
                 if (!impossible && (normalized.num < room.negate() || normalized.num > room)) continue
+                val target = if (positive) first?.key ?: zero else second?.key ?: zero
+                val source = if (positive) second?.key ?: zero else first?.key ?: zero
+                if (!impossible && forest.difference(target, source) == normalized.num.toLong()) continue
                 val premises = forest.expressionPremises(comparison.terms, progressStop)
                     ?: return ComponentResult.Indeterminate
                 val literal = if (activator == ALWAYS) ALWAYS else Lit.make(activator, truth)
@@ -239,8 +241,7 @@ internal class ExactLiraEqualities(
                     },
                 )
                 batch += DerivedEquality(
-                    if (positive) checkNotNull(first).key else second?.key ?: zero,
-                    if (positive) second?.key ?: zero else checkNotNull(first).key,
+                    target, source,
                     normalized.num.toLong(), premise,
                 )
             }
@@ -250,7 +251,6 @@ internal class ExactLiraEqualities(
                 val previous = forest.difference(equality.target, equality.source)
                 if (previous == equality.value) continue
                 if (!forest.join(equality.target, equality.source, equality.value, equality.premise)) {
-                    if (!forest.preparePaths(progressStop)) return ComponentResult.Indeterminate
                     val premises = forest.premises(equality.target, equality.source, progressStop)
                         ?: return ComponentResult.Indeterminate
                     return conflict(context, premises + equality.premise, ALWAYS, stop)
@@ -258,7 +258,6 @@ internal class ExactLiraEqualities(
                 changed = true
             }
             if (!changed) return ComponentResult.Consistent
-            if (!forest.preparePaths(progressStop)) return ComponentResult.Indeterminate
         }
         return ComponentResult.Consistent
     }
@@ -354,6 +353,7 @@ internal class ExactLiraEqualities(
         private val pathParent = IntArray(size) { -1 }
         private val pathPremise = arrayOfNulls<SearchAtomPremise>(size)
         private val depth = IntArray(size)
+        private var pathsReady = false
 
         private data class Root(val vertex: Int, val offset: Long, val sign: Int)
 
@@ -473,10 +473,11 @@ internal class ExactLiraEqualities(
                 if (rank[first.vertex] == rank[second.vertex]) rank[first.vertex]++
             }
             edges += Edge(target, source, premise)
+            pathsReady = false
             return true
         }
 
-        fun preparePaths(stop: Cancellation): Boolean {
+        private fun preparePaths(stop: Cancellation): Boolean {
             pathParent.fill(-1)
             pathPremise.fill(null)
             depth.fill(0)
@@ -518,10 +519,12 @@ internal class ExactLiraEqualities(
                     }
                 }
             }
+            pathsReady = true
             return true
         }
 
         fun premises(target: Int, source: Int, stop: Cancellation): List<SearchAtomPremise>? {
+            if (!pathsReady && !preparePaths(stop)) return null
             var first = target
             var second = source
             val result = ArrayList<SearchAtomPremise>()
