@@ -13,12 +13,21 @@ data class PortfolioStats(
     val profile: ProblemProfile? = null,
     /** Effective reseeding threshold; null when no executor supplied one. */
     val reseedStaleThreshold: Int? = null,
+    /** Effective first counted-segment allowance; null outside a configured portfolio. */
+    val baseSliceWork: Long? = null,
+    /** Effective maximum counted-segment allowance. */
+    val maxSliceWork: Long? = null,
+    /** Effective geometric growth of ordinary segments. */
+    val sliceGrowth: Double? = null,
 ) {
     /** Combine two runs' schedules: the arms of both, in order, under the first one's classification. */
     fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(
         arms + o.arms,
         profile ?: o.profile,
         reseedStaleThreshold ?: o.reseedStaleThreshold,
+        baseSliceWork ?: o.baseSliceWork,
+        maxSliceWork ?: o.maxSliceWork,
+        sliceGrowth ?: o.sliceGrowth,
     )
 }
 

@@ -161,7 +161,7 @@ class Portfolio(
         require(workers.isNotEmpty()) { "Portfolio must have at least one worker" }
         require(lanes >= 1) { "lanes must be ≥ 1" }
         require(baseSliceMillis > 0 && maxSliceMillis >= baseSliceMillis) { "invalid slice bounds" }
-        require(sliceGrowth >= 1.0) { "sliceGrowth must be ≥ 1.0" }
+        require(sliceGrowth.isFinite() && sliceGrowth >= 1.0) { "sliceGrowth must be finite and ≥ 1.0" }
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
         require(phaseRetention in 0.0..1.0) { "phaseRetention must be in [0, 1]" }
         require(baseSliceWork > 0 && maxSliceWork >= baseSliceWork) { "invalid work slice bounds" }
@@ -876,7 +876,10 @@ class Portfolio(
         /** The pool's total counters, every arm that did work included, with the schedule attached. */
         fun folded(): SolveStats = (completedStats.filterNotNull() + liveStats.filterNotNull())
             .fold(SolveStats.EMPTY) { acc, stats -> acc.mergedWith(stats) }
-            .copy(portfolio = log.stats(ledger).copy(profile = profile, reseedStaleThreshold = reseedStaleThreshold))
+            .copy(portfolio = log.stats(ledger).copy(
+                profile = profile, reseedStaleThreshold = reseedStaleThreshold,
+                baseSliceWork = baseSliceWork, maxSliceWork = maxSliceWork, sliceGrowth = sliceGrowth,
+            ))
 
         fun closeHandle(arm: Int) {
             val handle = handles[arm] ?: return
@@ -1027,6 +1030,7 @@ class Portfolio(
             witnessCheck: WitnessCheck? = null,
             onFault: ((ArmFault) -> Unit)? = null,
             minShares: DoubleArray = DoubleArray(0),
+            maxSliceWork: Long = 150_000,
         ): Portfolio = Portfolio(
             workers = workers,
             bandit = DiscountedThompson(workers.size, Random(seed), halfLife),
@@ -1036,6 +1040,7 @@ class Portfolio(
             sliceGrowth = sliceGrowth,
             reseedStaleThreshold = reseedStaleThreshold,
             baseSliceWork = baseSliceWork,
+            maxSliceWork = maxSliceWork,
             probeSliceMillis = probeSliceMillis,
             phaseRetention = phaseRetention,
             profile = profile,

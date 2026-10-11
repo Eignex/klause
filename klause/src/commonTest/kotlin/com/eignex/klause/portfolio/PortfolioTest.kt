@@ -208,6 +208,22 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 class PortfolioTest {
 
     @Test
+    fun `counted schedules expose their effective slice policy`() {
+        var slices = 0
+        val handles = List(2) { ScriptedSearch(offers = { false }, onSlice = { slices++ }) }
+        val result = Portfolio.thompson(
+            handles.mapIndexed { i, handle -> trackingWorker("retained-$i", i, handle) },
+            baseSliceWork = 10L, maxSliceWork = 20L, sliceGrowth = 2.0,
+        ).use { it.minimize(Cancellation { slices >= 4 }) }
+
+        assertEquals(10L, result.stats.portfolio.baseSliceWork)
+        assertEquals(20L, result.stats.portfolio.maxSliceWork)
+        assertEquals(2.0, result.stats.portfolio.sliceGrowth)
+        assertEquals(50L, handles.sumOf { it.work })
+    }
+
+
+    @Test
     fun `a caught reseed close failure retires the arm and retains its incumbent`() {
         var slices = 0
         val sample = Sample(BooleanArray(0), LongArray(0))

@@ -461,7 +461,8 @@ class CliStatsTest {
             reseeds = 2,
             failure = ArmFailure(7, "IllegalStateException", "row \"R\"\n\t\\", "slice", 2, 30, "cause\r\nframe"),
         )
-        val stats = SolveStats(portfolio = PortfolioStats(listOf(arm), reseedStaleThreshold = 4))
+        val stats = SolveStats(portfolio = PortfolioStats(listOf(arm), reseedStaleThreshold = 4,
+            baseSliceWork = 1_000L, maxSliceWork = 8_000L, sliceGrowth = 2.0))
 
         val pairs = portfolioStatPairs(stats).toMap()
 
@@ -476,5 +477,8 @@ class CliStatsTest {
             pairs["armFailure.bt-0"],
         )
         assertEquals("4", pairs["portfolioReseedStaleThreshold"])
+        assertEquals("1000", pairs["portfolioBaseSliceWork"])
+        assertEquals("8000", pairs["portfolioMaxSliceWork"])
+        assertEquals("2.0", pairs["portfolioSliceGrowth"])
     }
 }
