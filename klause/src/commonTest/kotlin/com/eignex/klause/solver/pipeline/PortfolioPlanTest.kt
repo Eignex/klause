@@ -22,6 +22,31 @@ import kotlin.test.assertTrue
 class PortfolioPlanTest {
 
     @Test
+    fun `portfolio resolves distinct slice schedules`() {
+        val controls = listOf(emptyList<String>() to Triple(5_000L, 150_000L, 1.5),
+            listOf("slice-work=1000", "slice-max-work=1000", "slice-growth=1") to Triple(1_000L, 1_000L, 1.0),
+            listOf("slice-work=20000", "slice-max-work=60000", "slice-growth=2") to Triple(20_000L, 60_000L, 2.0))
+        for ((params, expected) in controls) {
+            val scenario = buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)
+
+            assertEquals(expected, Triple(scenario.sliceWork, scenario.maxSliceWork, scenario.sliceGrowth))
+            val copied = scenario.copy(seed = 7L)
+            assertEquals(expected, Triple(copied.sliceWork, copied.maxSliceWork, copied.sliceGrowth))
+        }
+    }
+
+    @Test
+    fun `portfolio rejects invalid slice schedules`() {
+        for (params in listOf(listOf("slice-work=0"), listOf("slice-work=-1"),
+            listOf("slice-max-work=4999"), listOf("slice-growth=0.5"), listOf("slice-growth=NaN"),
+            listOf("slice-growth=Infinity"))) {
+            assertFailsWith<PipelineConfigException> {
+                buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)
+            }
+        }
+    }
+
+    @Test
     fun `portfolio phase timing accepts an explicit opt in`() {
         for (enabled in listOf(false, true)) {
             val scenario = buildPortfolioScenario(

@@ -22,6 +22,192 @@ import kotlin.test.assertTrue
 
 class ElementInvariantTest {
     @Test
+    fun `grading probes retain the next matching index scan window`() {
+        val cells = LongArray(65) { if (it == 1 || it == 40 || it == 64) 1L else 0L }
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 64), IntDomain(0, 64), IntDomain(1, 1)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Element(1, 2, cells, false, 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, 3, intArrayOf(1))).network(3, 0)
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 1)
+        state.recompute()
+        val before = state.assignment.snapshot()
+        val cost = state.cost
+
+        state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+        val move = state.moveSink.list.single()
+        val firstDelta = state.netDelta(move)
+        val secondDelta = state.netDelta(move)
+        state.moveSink.clear()
+        state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+        val nextWindow = state.moveSink.list.filterIsInstance<Move.IntSet>().map { it.newValue }
+
+        assertEquals(-cost, firstDelta)
+        assertEquals(firstDelta, secondDelta)
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(cost, state.cost)
+        assertEquals(listOf(1L, 40L), nextWindow)
+    }
+
+    @Test
+    fun `failed affine inverses consume the extra matching index allowance`() {
+        val cells = LongArray(9) { if (it == 2 || it == 3 || it == 5 || it == 7 || it == 8) 9L else 1L }
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 4), IntDomain(0, 8), IntDomain(9, 9)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Element(1, 2, cells, false, 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, 3, intArrayOf(1))).network(3, 0)
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.assignment.setInt(2, 9)
+        state.recompute()
+
+        state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+        val first = state.moveSink.list.filterIsInstance<Move.IntSet>().map { it.newValue }
+        state.moveSink.clear()
+        state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+        val next = state.moveSink.list.filterIsInstance<Move.IntSet>().map { it.newValue }
+
+        assertEquals(listOf(1L), first)
+        assertEquals(listOf(1L, 4L), next)
+    }
+
+    @Test
+    fun `alternative matching indexes retain the first repair and grade every constraint`() {
+        for (offset in listOf(Int.MAX_VALUE, Int.MIN_VALUE, -2)) {
+            val start = offset.toLong()
+            val problem = Problem(
+                0, 2, arrayOf(IntDomain(start, start + 3).excludeValue(start + 2), IntDomain(1, 1)),
+                arrayOf<Factor>(
+                    Element(0, 1, longArrayOf(0, 1, 1, 1), false, offset),
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, start + 3),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, start)
+            state.assignment.setInt(1, 1)
+            state.recompute()
+            val before = state.cost
+
+            state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+            val moves = state.moveSink.list.filterIsInstance<Move.IntSet>()
+            val move = moves.single { it.newValue == start + 3 }
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(start + 1, moves.first().newValue)
+            assertTrue(moves.none { it.newValue == start + 2 })
+            assertEquals(start + 3, state.assignment.intValue(0))
+            assertEquals(-before, predicted)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `matching index scan windows advance independently in shared projections`() {
+        val cells = LongArray(65) { if (it == 1 || it == 40 || it == 64) 1L else 0L }
+        val problem = Problem(
+            0, 2, arrayOf(IntDomain(0, 64), IntDomain(1, 1)),
+            arrayOf<Factor>(Element(0, 1, cells, false, 0)),
+        )
+        val first = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        val second = LocalSearchState(first.model, Random(3), projection = first.projection)
+        for (state in listOf(first, second)) {
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(1, 1)
+            state.recompute()
+        }
+
+        first.factors[0].proposeRepairMoves(first, 0, first.moveSink)
+        val firstWindow = first.moveSink.list.filterIsInstance<Move.IntSet>().map { it.newValue }
+        first.moveSink.clear()
+        first.recompute()
+        first.factors[0].proposeRepairMoves(first, 0, first.moveSink)
+        val nextWindow = first.moveSink.list.filterIsInstance<Move.IntSet>().map { it.newValue }
+        second.factors[0].proposeRepairMoves(second, 0, second.moveSink)
+        val otherWindow = second.moveSink.list.filterIsInstance<Move.IntSet>().map { it.newValue }
+
+        assertEquals(listOf(1L), firstWindow)
+        assertEquals(listOf(1L, 40L), nextWindow)
+        assertEquals(firstWindow, otherWindow)
+        assertEquals(Random(3).nextLong(), first.rng.nextLong())
+        assertEquals(Random(3).nextLong(), second.rng.nextLong())
+    }
+
+    @Test
+    fun `matching index proposals add at most two further targets`() {
+        val cells = LongArray(65) { if (it == 0) 0L else 1L }
+        val problem = Problem(
+            0, 2, arrayOf(IntDomain(0, 64), IntDomain(1, 1)),
+            arrayOf<Factor>(Element(0, 1, cells, false, 0)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.recompute()
+
+        state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+        val first = state.moveSink.list.filterIsInstance<Move.IntSet>().map { it.newValue }
+        state.moveSink.clear()
+        state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+        val next = state.moveSink.list.filterIsInstance<Move.IntSet>().map { it.newValue }
+
+        assertEquals(listOf(1L, 2L, 3L), first)
+        assertEquals(listOf(1L, 4L, 5L), next)
+    }
+
+    @Test
+    fun `alternative affine index repairs retain protected root coordinates`() {
+        for (protection in listOf("pin", "owner", "definition")) {
+            val problem = Problem(
+                0, 5, arrayOf(
+                    IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 5), IntDomain(9, 9), IntDomain(0, 0),
+                ),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(3, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                    Element(2, 3, longArrayOf(1, 9, 9, 1, 9, 9), false, 0),
+                    Product(4, 4, 0),
+                ),
+            )
+            val assumptions = if (protection == "pin") Assumptions.None.withInt(0, 0) else Assumptions.None
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+            val factors = if (protection == "definition") problem.factors else problem.factors.copyOfRange(0, 2)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(factors, 5, intArrayOf(2))).network(5, 0)
+            if (protection == "owner") state.moveSink.setOwners(intArrayOf(7, -1, -1, -1, -1))
+            for ((variable, value) in longArrayOf(0, 0, 0, 9, 0).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+            val before = state.cost
+
+            state.factors[1].proposeRepairMoves(state, 1, state.moveSink)
+            val move = state.moveSink.list.filterIsInstance<Move.IntSet>().single { it.varId == 1 && it.newValue == 2L }
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(0L, state.assignment.intValue(0))
+            assertEquals(2L, state.assignment.intValue(1))
+            assertEquals(2L, state.assignment.intValue(2))
+            assertEquals(-before, predicted)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
     fun `joint index repairs carry indicator channels into product outputs`() {
         for (bound in listOf(0, 1)) {
             val factors = arrayOf<Factor>(

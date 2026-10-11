@@ -118,7 +118,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         if (!core.atLevel(depth)) return null
         if (retained.depth > depth) retained.retract(depth)
-        var edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation)
+        var edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation) ?: return null
         engine.noteNodeOverhead(edit.emittedExtent * LpNodeOverhead.BUILD)
         weakenedBoundDepth(edit)?.let { assertionDepth ->
             if (assertionDepth < 0) return null
@@ -131,7 +131,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             retained.retract(minOf(retained.depth, target))
             cuts.retract(minOf(cuts.depth, target))
             if (!core.atLevel(depth)) return null
-            edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation)
+            edit = retained.prepare(requireNotNull(core.state), domains, engine.params.cancellation) ?: return null
             engine.noteNodeOverhead(edit.emittedExtent * LpNodeOverhead.BUILD)
         }
         if (!core.editSources(edit) { column, upper -> boundPremise(edit, column, upper, session) }) return null

@@ -1,5 +1,10 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
@@ -24,12 +29,30 @@ import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SourceLpWorkStats
+import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 
 class CliStatsTest {
+
+    @Test
+    fun `presolve prints native construction separately from converted phase work`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList()).bake(budget.orSpent(Cancellation.Never))
+        val stats = SolveStats(presolve = PresolveStats(
+            effort = presolveEffortStats(PresolveConfig.NONE, budget, Duration.ZERO),
+        ))
+
+        val pairs = presolveStatPairs(stats).toMap()
+
+        assertEquals("1", pairs["presolveRootConstructionEntries"])
+        assertEquals("0", pairs["presolveRootPropagationWork"])
+        assertEquals("53", pairs["presolveWork"])
+        assertEquals("0", pairs["presolveProbeCalls"])
+    }
 
     @Test
     fun `local search phase times print before the first move`() {
@@ -438,7 +461,8 @@ class CliStatsTest {
             reseeds = 2,
             failure = ArmFailure(7, "IllegalStateException", "row \"R\"\n\t\\", "slice", 2, 30, "cause\r\nframe"),
         )
-        val stats = SolveStats(portfolio = PortfolioStats(listOf(arm), reseedStaleThreshold = 4))
+        val stats = SolveStats(portfolio = PortfolioStats(listOf(arm), reseedStaleThreshold = 4,
+            baseSliceWork = 1_000L, maxSliceWork = 8_000L, sliceGrowth = 2.0))
 
         val pairs = portfolioStatPairs(stats).toMap()
 
@@ -453,5 +477,8 @@ class CliStatsTest {
             pairs["armFailure.bt-0"],
         )
         assertEquals("4", pairs["portfolioReseedStaleThreshold"])
+        assertEquals("1000", pairs["portfolioBaseSliceWork"])
+        assertEquals("8000", pairs["portfolioMaxSliceWork"])
+        assertEquals("2.0", pairs["portfolioSliceGrowth"])
     }
 }

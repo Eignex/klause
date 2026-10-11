@@ -56,6 +56,10 @@ open integers, linear reals, scheduling, routing, packing, other globals, MIP,
 SAT, MaxSAT and PB. `sweep` includes them all. Material membership changes take
 new names so results under one name stay comparable.
 
+`continuous-mip-v1` fixes 167 MIPLIB 2017 optimization sources with both integer
+and continuous columns. It includes finite and open routes and selects every member
+without a changing reference filter. It is separate from the smaller `mip` theme set.
+
 | Filter | Meaning |
 |---|---|
 | `suite=a,b` | Restrict suites; `core` expands to the in-process core |

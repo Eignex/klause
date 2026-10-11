@@ -281,4 +281,8 @@ data class PresolveEffortStats(
     val passCalls: Map<String, Int>,
     /** Root propagation probe and repair calls across tiers and reseeds; null without a meter. */
     val probeCalls: Long?,
+    /** Native model entries used for root and probe construction; null without a meter. */
+    val rootConstructionEntries: Long? = null,
+    /** Native propagation work across root bakes, probes and repairs; null without a meter. */
+    val rootPropagationWork: Long? = null,
 )

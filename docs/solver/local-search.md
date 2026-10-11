@@ -88,6 +88,14 @@ and range endpoints use Long arithmetic, including offsets whose valid array ind
 cross the Int boundary. Matching-cell scans skip unreachable inverse targets until an
 admissible index repair is found.
 
+Native Element violation repairs retain their first reachable matching index and may
+attempt two further index repairs from a rotating scan of at most 32 array positions.
+Scan progress belongs to each state's Element payload and records proposal history,
+including proposals generated during reverted repair chains. Cost recomputation preserves
+it; grading probes do not advance it.
+Additional targets use ordinary index inverse repairs and complete move grading; nested
+Element and literal-channel index definitions retain the first-candidate neighborhood.
+
 ### Element results
 
 Hinted native Element results are maintained from their indexes and selected cells.

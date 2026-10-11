@@ -3,22 +3,22 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.formats.smtlib.toExactLpModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.theory.qflra.QfLraSystem
+import com.eignex.klause.theory.qflra.toExactLpModel
 import com.eignex.klause.util.Cancellation
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.nio.file.Files
-import java.nio.file.Path
 
 internal object ExactBasisCoverage {
     @JvmStatic

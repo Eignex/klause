@@ -23,7 +23,8 @@ import com.eignex.klause.util.times
  * it (it appears in no row, so it takes any value) or keeps it in the open lane. Returning `null` for such
  * a column is the honest answer, not a failure.
  */
-internal class TriangularBounds(
+@LatticeApi
+class TriangularBounds internal constructor(
     /** Lower bound per column, `null` where the sweep derives none. */
     val lo: Array<BigInt?>,
     /** Upper bound per column, `null` where the sweep derives none. */
@@ -46,7 +47,8 @@ internal class TriangularBounds(
  * than `rows · cols` — a zero term contributes nothing to either side in any case.
  */
 @Suppress("NestedBlockDepth", "CyclomaticComplexMethod")
-internal fun triangularBounds(
+@LatticeApi
+fun triangularBounds(
     h: List<SparseIntRow>,
     cols: Int,
     rowLo: Array<BigInt?>,

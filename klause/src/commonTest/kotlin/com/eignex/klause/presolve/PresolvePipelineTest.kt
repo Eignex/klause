@@ -14,11 +14,36 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PresolvePipelineTest {
+
+    @Test
+    fun `the pipeline does not charge another construction for an already baked input`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
+            .bake(budget.orSpent(Cancellation.Never))
+        val spent = budget.spent()
+
+        PresolvePipeline.run(problem, null, PresolveConfig.NONE, false, presolveBudget = budget)
+
+        assertEquals(spent, budget.spent())
+        assertEquals(1L, budget.rootConstructionEntries)
+    }
+
+    @Test
+    fun `the pipeline charges fresh root construction once`() {
+        val budget = PresolveBudget(Long.MAX_VALUE)
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
+
+        PresolvePipeline.run(problem, null, PresolveConfig.NONE, false, presolveBudget = budget)
+
+        assertEquals(1L, budget.rootConstructionEntries)
+        assertEquals(53L, budget.spent())
+    }
 
     @Test
     fun `isolated wide output uses root propagation without prebake LP`() {

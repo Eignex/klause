@@ -4,6 +4,16 @@ Start with [system architecture](architecture.md) before changing subsystem
 boundaries. This guide owns setup smoke commands and contribution workflows;
 the [CLI](cli.md) owns launcher and runtime details.
 
+## Package boundary check
+
+`python3 scripts/check_architecture.py` checks documented outbound dependencies across
+production Kotlin source sets. `python3 scripts/test_check_architecture.py` checks the
+checker itself. `./gradlew checkArchitecture` runs both without compiling Kotlin,
+and every module's `check` depends on it. Python 3 is required for this check.
+The checker is lexical; JVM/native compilation and consumer tests validate symbol
+resolution and module visibility. [System architecture](architecture.md) defines
+the enforced ownership rules.
+
 ## Getting started
 
 ```sh
@@ -83,6 +93,12 @@ file in the stack can be flakes; rerun before investigating. A finding naming a
 file and rule needs investigation. Check the named symbol for Dokka translation
 failures.
 
+All library modules and the CLI use the same JVM and Linux x64 default targets.
+`klause-numerics` and `klause-lattice` publish alongside `klause`, with their own
+ABI snapshots and numerical tests. The JVM CI job runs each module's `check`; the
+Native job tests both numerical leaves and the solver, then links and starts the
+release CLI executable. The JVM job installs and starts the CLI distribution,
+checking that its runtime dependencies are packaged.
 The default build targets JVM and Linux x64. Releases opt into Linux arm64 and
 macOS arm64 with `-Ptargets.full`. Native tests and documentation checks run in
 CI. Benchmarks, capture and timing tools are opt-in; see [benchmarking](../klause-bench/README.md).

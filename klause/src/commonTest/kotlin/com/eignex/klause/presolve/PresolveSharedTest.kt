@@ -72,22 +72,28 @@ class PresolveSharedTest {
         val config = BakeConfig(probeIntBounds = true)
         val rebuilt = PresolveShared.rebuildProblem(problem, problem.factors.toList(), bakeConfig = config)
         val probes = budget.probeCalls
+        val work = budget.spent()
+        val entries = budget.rootConstructionEntries
 
         PresolveShared.rebuildProblem(rebuilt, rebuilt.factors.toList(), bakeConfig = config)
 
         assertTrue(budget.probeCalls > probes)
+        assertTrue(budget.rootConstructionEntries > entries)
+        assertTrue(budget.spent() > work)
+        assertEquals(53L * (budget.rootConstructionEntries + budget.rootPropagationWork), budget.spent())
     }
 
     @Test
     fun `charges through a rebuilt problem consume the originating allowance`() {
-        val budget = PresolveBudget(100)
+        val budget = PresolveBudget(1000)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
             .bake(budget.orSpent(Cancellation.Never))
         val rebuilt = PresolveShared.rebuildProblem(problem, problem.factors.toList())
 
+        val remaining = budget.remaining()
         rebuilt.cancellation.charge(25)
 
-        assertEquals(75L, budget.remaining())
+        assertEquals(remaining - 25L, budget.remaining())
     }
 
     @Test

@@ -26,7 +26,11 @@ scaling disabled. `ComponentLpSolver` composes it for component-wise OBBT.
 Among Klause packages, `lp.engine` depends only on `util`, `simplex.exact`,
 `lp.lattice` and `simplex.basis`. Model assembly, factors, propagation, presolve
 and search stay outside it. `lp.lattice` depends only on `util`.
-Consumers use interfaces and factories. See [system boundaries](../architecture.md).
+`lp.lattice` is compiled in `klause-lattice`, depending only on the `util` primitives
+provided by `klause-numerics`. Its opt-in seam exposes borrowed sparse rows and
+read-only reduction results; mutable elimination state remains internal to the leaf.
+`BigFraction` and platform `BigInt` primitives are compiled in `klause-numerics`.
+Consumers use interfaces and factories. See [system boundaries](../architecture.md#numerical-module-interfaces).
 
 ## Numerical authority
 
@@ -90,6 +94,11 @@ import decline can retain a bounded fresh fallback with warm hints, metrics,
 limits, cancellation and cleanup. A later scoped projection decline does not
 enter that fallback. Fresh fallback does not retain factors between calls.
 Factor retention alone is not a complete-consumer speed guarantee.
+
+Retained source preparation declines when an emitted projection cannot import exact
+authority. It publishes no partial source layout or numerical owner. Node bounding
+withholds deductions; continuous leaf completion returns indeterminate and preserves
+the search's incomplete flag. A projection decline does not retire a search worker.
 
 ## Floating simplex and basis factors
 

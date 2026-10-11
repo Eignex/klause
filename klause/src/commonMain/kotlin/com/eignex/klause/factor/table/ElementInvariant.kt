@@ -17,7 +17,7 @@ internal class ElementInvariant(
 ) : Invariant {
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        // Stateless — re-derived per query.
+        // Preserve the state's matching-index cursor across cost recomputation.
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
@@ -90,15 +90,50 @@ internal class ElementInvariant(
             )
             if (target in idxDom && target != idxVal) sink.addElementIndexSet(state, idx, target)
         }
+        var firstMatch = -1
         for (p in 0 until len) {
             val evp = if (arrIsVars) state.assignment.intValue(arr[p].toInt()) else arr[p]
             if (evp == resultVal) {
                 val cand = indexOffset.toLong() + p
-                if (cand != idxVal && cand in idxDom) {
-                    if (sink.addElementIndexSet(state, idx, cand)) break
+                if (cand != idxVal && cand in idxDom && sink.addElementIndexSet(state, idx, cand)) {
+                    firstMatch = p
+                    break
                 }
             }
         }
+        if (firstMatch >= 0) proposeAlternativeIndexes(state, factorId, sink, firstMatch)
+    }
+
+    private fun proposeAlternativeIndexes(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: MoveSink,
+        firstMatch: Int,
+    ) {
+        val network = state.invariants
+        if (network?.isDefinedInt(idx) == true &&
+            network.linearDefinition(idx) == null && !network.hasExtremumRepair(idx)
+        ) return
+        val idxVal = state.assignment.intValue(idx)
+        val resultVal = state.assignment.intValue(result)
+        var attempts = 0
+        for (i in 0 until minOf(arr.size, MAX_EXTRA_POSITIONS)) {
+            val position = state.intPayload[factorId]
+            state.intPayload[factorId] = if (position + 1 == arr.size) 0 else position + 1
+            if (position == firstMatch) continue
+            val entry = arr[position]
+            val value = if (arrIsVars) state.assignment.intValue(entry.toInt()) else entry
+            val target = indexOffset.toLong() + position
+            if (value != resultVal || target == idxVal || target !in state.rootDomains[idx]) continue
+            sink.addElementIndexSet(state, idx, target)
+            attempts++
+            if (attempts >= MAX_EXTRA_REPAIRS) return
+        }
+    }
+
+    private companion object {
+        const val MAX_EXTRA_POSITIONS = 32
+        const val MAX_EXTRA_REPAIRS = 2
     }
 }
 
