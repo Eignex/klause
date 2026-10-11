@@ -67,17 +67,18 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
 }
 
 /**
- * The lane routing chose under `-v`, beside the time it took and the work its bound proof charged. The elapsed
+ * Retain the measured frontend route for invocation statistics and log it under `-v`. The elapsed
  * ceiling can stop routing before its work allowance is exhausted.
  */
 internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) {
+    val lane = when (route) {
+        is SourceProblemRoute.Finite -> "finite"
+        is SourceProblemRoute.OpenTheory -> "open"
+        is SourceProblemRoute.UnsupportedOpen -> "unsupported"
+        SourceProblemRoute.Refuted -> "refuted"
+    }
+    frontendRouting = CliRoutingStats(lane, elapsedMs)
     cliLogger(verbose).v {
-        val lane = when (route) {
-            is SourceProblemRoute.Finite -> "finite"
-            is SourceProblemRoute.OpenTheory -> "open"
-            is SourceProblemRoute.UnsupportedOpen -> "unsupported"
-            SourceProblemRoute.Refuted -> "refuted"
-        }
         "route: $lane in ${elapsedMs}ms" + presolveBudget?.let { ", routing work ${it.spent()}" }.orEmpty()
     }
 }
@@ -166,9 +167,9 @@ internal class CommonOptions {
     internal var routingToken: Cancellation? = null
     internal var nodeBudget: NodeBudget? = null
 
-    /** Wall time (ms) the front-end load took — parse + construction-time bake — set by the driver
-     *  around `session.load`, so `dry-run-presolve` can split parse from bake. */
+    /** Inclusive frontend load time, including parsing, lowering, routing and solvable construction. */
     var loadElapsedMs: Long? = null
+    internal var frontendRouting: CliRoutingStats? = null
     var randomSeed: Long? = null
     var verbose = false
     var exact = false

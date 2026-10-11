@@ -212,6 +212,32 @@ arithmetic residual at each leaf. Activity order is opt-in.
 `-s` reports `openAssertingConflicts`, `openNonAssertingConflicts` and
 `openReductionNs`. The [search statistics contract](solver/search.md#statistics)
 defines their scopes and the distinction from native CP analysis.
+
+Every format's `-s` output includes `solvePipeline`: `finite-cp`, `open-theory`,
+`open-local-search` or `refuted`, the frontend's selected solve entry point.
+`declaredTheoryRoute` is the open request's theory classification before source-safe
+preparation. `reportedBackend` is the final statistics snapshot's backend identifier;
+it can be `mixed`, or retain the declared theory when preparation stops before a
+theory runs. These labels describe different stages and do not independently prove
+that a theory check executed. A routing refutation has no solve backend to report.
+
+`frontendLoadMs` covers the driver's inclusive `session.load`: parsing, lowering,
+routing and solvable construction. It excludes process startup and does not isolate
+parsing. `frontendRoutingMs` and `frontendRoutingOutcome` appear only when the
+frontend measured routing (`finite`, `open`, `unsupported` or `refuted`). Routing is
+nested within frontend load, so the durations must not be added. The driver resets
+these observations before each load and freezes them for its solve invocation.
+
+`nativeCpPropagationWork`, `nativeCpRootPropagationWork`, `nativeCpPropagationMs`
+and `nativeCpRootPropagationMs` expose existing native fixpoint measurements when
+their snapshot contains positive native work or time. The root values are subsets
+of the total values, including private native preparation; milliseconds truncate
+nanoseconds. An omitted block means no evidenced native measurement, not zero
+open-theory propagation or root cost. Open-theory root and propagation timing remain
+unavailable. Existing LS counters remain independent; `--param ls-phase-times=true`
+enables the finite portfolio's optional `lsPhaseNanos.*` measurements, but the open
+portfolio does not wire that option into its LS workers.
+
 `--param open-bound-proof=false` declines the routing bound proof, so a model whose open sides the
 relaxation would have closed goes to the open theory instead of the finite lane. That is what runs one
 instance down both lanes; shrinking `-t` does not substitute, since it starves the solve along with the

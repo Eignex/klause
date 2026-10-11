@@ -156,7 +156,33 @@ class CliModeTest {
 
         assertTrue("; smtTheoryChecks=" in output, output)
         assertTrue("; smtWitnessCandidates=1" in output, output)
+        assertEquals("sat", output.lineSequence().first())
+        assertTrue("; frontendLoadMs=" in output, output)
+        assertTrue("; frontendRoutingMs=" in output, output)
+        assertTrue("; frontendRoutingOutcome=open" in output, output)
+        assertTrue("; solvePipeline=open-theory" in output, output)
+        assertTrue("; declaredTheoryRoute=exact_lra" in output, output)
+        assertFalse("; nativeCpRootPropagationMs=" in output, output)
         assertFalse("optimizationStatus=" in output, output)
+    }
+
+    @Test
+    fun `SMT finite pipeline statistics remain optional comments after the verdict`() {
+        val smt = File.createTempFile("cliphases", ".smt2").apply {
+            writeText("(declare-const b Bool)\n(assert b)\n(check-sat)\n")
+            deleteOnExit()
+        }
+
+        val measured = capture { runCli(arrayOf("-s", "-e", "backtrack", smt.absolutePath)) }
+        val ordinary = capture { runCli(arrayOf("-e", "backtrack", smt.absolutePath)) }
+
+        assertEquals("sat", measured.lineSequence().first())
+        assertEquals("sat", ordinary.lineSequence().first())
+        assertTrue("; solvePipeline=finite-cp" in measured, measured)
+        assertTrue("; frontendRoutingOutcome=finite" in measured, measured)
+        assertFalse("declaredTheoryRoute=" in measured, measured)
+        assertFalse("solvePipeline=" in ordinary, ordinary)
+        assertFalse("frontendLoadMs=" in ordinary, ordinary)
     }
 
     @Test

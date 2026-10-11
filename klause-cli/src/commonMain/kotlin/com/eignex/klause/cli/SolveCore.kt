@@ -47,9 +47,11 @@ import kotlin.time.TimeSource
 internal object SolveCore {
 
     fun solve(rawSolvable: Solvable, common: CommonOptions, protocol: OutputProtocol) {
+        val invocationStats = cliInvocationStats(common, rawSolvable.pipeline)
         val output = object : OutputProtocol by protocol {
             override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
                 protocol.onAllowanceStatistics(nodeBudgetStatPairs(common.nodeBudget))
+                protocol.onAllowanceStatistics(invocationStats.pairs(stats))
                 protocol.onStatistics(stats, solveTimeMs, solutions)
             }
         }

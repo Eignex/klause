@@ -270,6 +270,10 @@ files and compiler identity are outside original model/data hashes.
 | Field/channel | Contract |
 |---|---|
 | `elapsedMs` | Subprocess launch through output consumption; nullable for legacy/unlaunched runs |
+| `stats.frontendLoadMs` | Inclusive frontend parse, lowering, routing and solvable construction; excludes process startup |
+| `stats.frontendRoutingMs`, `frontendRoutingOutcome` | Measured frontend routing time and outcome; absent when unmeasured; nested within frontend load |
+| `stats.solvePipeline`, `declaredTheoryRoute`, `reportedBackend` | Selected CLI solve entry point, pre-preparation theory declaration, and final backend snapshot; distinct stages |
+| `stats.nativeCpPropagationWork`, `nativeCpRootPropagationWork`, `nativeCpPropagationMs`, `nativeCpRootPropagationMs` | Existing native fixpoint aggregates when native measurement is evidenced; root is a subset, not open-theory root cost |
 | `timeToBestMs`, `timeToFirstFeasibleMs` | Nullable without a witness; distinct from total elapsed time |
 | `exactObjective` | Canonical integer/reduced rational text; authoritative for comparisons and references |
 | `objective` | Legacy approximate display; may be null outside binary64 range |
@@ -285,6 +289,13 @@ no objective credit. `best-found`, plain `sat` and unbounded witnesses earn no
 optimality credit; an unbounded record's objective belongs to its feasible point.
 The exact ladder's phase timing is inclusive. Missing metrics remain missing,
 and work/pivots do not substitute for elapsed time.
+Frontend load and routing times overlap, as do native propagation totals and their
+root subsets. Native timing aggregates can include several workers and private
+preparation, so subtracting them from invocation duration does not recover theory
+time. Missing startup, open-theory root and open-theory propagation clocks remain
+unavailable. A declared or reported theory label alone does not establish execution;
+preparation can stop before its first check. See the [CLI statistics scopes](../docs/cli.md)
+and [search contract](../docs/solver/search.md#statistics).
 
 Outputs are staging locations. Store active notes, scripts, manifests, records
 and reports in the shared external `klause-evidence/campaigns/<name>/` directory
