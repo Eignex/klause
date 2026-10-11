@@ -69,6 +69,8 @@ internal class LocalSearchOptimizeRun(
         return verdict
     }
 
+    override fun close() = super<LocalSearchRun>.close()
+
     override fun discardCursor() {
         cursor = null
     }
