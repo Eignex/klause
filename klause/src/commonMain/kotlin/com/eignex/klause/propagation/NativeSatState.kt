@@ -60,6 +60,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     // The origin an imported learned clause came from, parallel to the learned columns; see [OriginCounts].
     private val learnedOrigin = IntArrayList()
+    private val learnedScanPos = IntArrayList()
 
     /** Uses of imported learned clauses, by origin. */
     val importUses = OriginCounts()
@@ -256,6 +257,7 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedTier.add(ClauseTier.UNSET.ordinal)
         learnedUsed.add(0)
         learnedOrigin.add(origin)
+        learnedScanPos.add(0)
         learnedCount++
         learnedWatchPos.add(0)
         learnedWatchPos.add(0)
@@ -340,6 +342,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val newTier = IntArrayList()
         val newUsed = IntArrayList()
         val newOrigin = IntArrayList()
+        val newScanPos = IntArrayList()
         val newWatchPos = IntArrayList(initialCapacity = 2 * survivors)
         for (i in 0 until learnedCount) {
             if (remap[i] < 0) continue
@@ -352,6 +355,7 @@ internal class NativeSatState(private val state: PropagationState) {
             newTier.add(learnedTier[i])
             newUsed.add(learnedUsed[i])
             newOrigin.add(learnedOrigin[i])
+            newScanPos.add(learnedScanPos[i])
             newWatchPos.add(watchPosition(h, 0))
             newWatchPos.add(watchPosition(h, 1))
         }
@@ -362,6 +366,7 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedTier.replaceWith(newTier)
         learnedUsed.replaceWith(newUsed)
         learnedOrigin.replaceWith(newOrigin)
+        learnedScanPos.replaceWith(newScanPos)
         learnedWatchPos.replaceWith(newWatchPos)
         learnedCount = survivors
     }
@@ -462,8 +467,10 @@ internal class NativeSatState(private val state: PropagationState) {
                 wi++
                 continue
             }
-            val replacement = findNonFalse(lits, start, len, lIdx, otherIdx)
+            val scanStart = if (baseClause) 0 else learnedScanPos[h - baseCount]
+            val replacement = findNonFalse(lits, start, len, lIdx, otherIdx, scanStart)
             if (replacement >= 0) {
+                if (!baseClause) learnedScanPos[h - baseCount] = if (replacement + 1 == len) 0 else replacement + 1
                 val newLit = lits[start + replacement]
                 setWatchPosition(h, if (slot0IsFalse) 0 else 1, replacement)
                 removeWatchAt(falseLit, wi) // swap-pop; re-process wi without advancing
@@ -481,8 +488,13 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     /** A non-false literal index other than the two watched ([lIdx], [otherIdx]); -1 if none. */
-    private fun findNonFalse(lits: IntArray, start: Int, len: Int, lIdx: Int, otherIdx: Int): Int {
-        for (k in 0 until len) {
+    private fun findNonFalse(lits: IntArray, start: Int, len: Int, lIdx: Int, otherIdx: Int, scanStart: Int): Int {
+        for (k in scanStart until len) {
+            if (k == lIdx || k == otherIdx) continue
+            if (!litFalse(lits[start + k])) return k
+        }
+        // Backtracking can reopen a prefix that an earlier scan passed while every literal was false.
+        for (k in 0 until scanStart) {
             if (k == lIdx || k == otherIdx) continue
             if (!litFalse(lits[start + k])) return k
         }
