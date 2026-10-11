@@ -762,6 +762,14 @@ internal object Suites {
         vendored("feasible-tiny", Category.CSP, Expected.Sat)
         vendored("float-tiny", Category.CSP, Expected.Sat)
         vendored("infeasible-tiny", Category.UNSAT, Expected.Unsat)
+        vendored("pure-real-min", Category.OPTIMIZATION, Expected.Sat)
+        vendored("pure-real-max", Category.OPTIMIZATION, Expected.Sat)
+        vendored("pure-real-unsat", Category.UNSAT, Expected.Unsat)
+        vendored("pure-real-unbounded", Category.OPTIMIZATION, Expected.Sat)
+        vendored("open-real-min", Category.OPTIMIZATION, Expected.Sat)
+        vendored("open-real-max", Category.OPTIMIZATION, Expected.Sat)
+        vendored("open-rounded-objective", Category.OPTIMIZATION, Expected.Sat)
+        vendored("open-rounded-sat", Category.CSP, Expected.Sat)
     }
 
     /** In-code crafted SAT: pigeonhole PHPₙ (UNSAT, CDCL stress) + random-3SAT at the phase

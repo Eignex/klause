@@ -46,7 +46,7 @@ declaration. See [corpus management](../../klause-bench/README.md#catalog-and-co
 | `schema` | Self-authored campaign and roster schemas; regenerate campaign with `:klause-bench:dumpSchema` |
 | `smtlib` | Self-authored linear integer/real satisfaction, optimization, infeasibility, disjunction and exact-rational cases |
 | `xcsp3` | Self-authored magic-series, sum optimization, magic-square and graph-colouring cases |
-| `mps` | Self-authored small integer optimization, equality feasibility, continuous-column and infeasible models |
+| `mps` | Self-authored integer and continuous optimization, equality feasibility, infeasibility, unboundedness and open decimal witness controls |
 | `lp-component-split` | Self-authored dense bounded block systems for the explicit measurement suite |
 
 MiniZinc smoke models live under
