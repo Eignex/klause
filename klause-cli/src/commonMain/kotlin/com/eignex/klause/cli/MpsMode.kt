@@ -120,8 +120,12 @@ internal object MpsMode : CliMode {
                 is SourceProblemRoute.OpenTheory -> {
                     witnessOnly = !compiled.sourceExact
                     // Refuting a lowered objective bound does not refute the corresponding decimal source bound.
-                    val canDecide = route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request)
-                    if (!witnessOnly && canDecide) {
+                    val canDecide = when {
+                        witnessOnly -> false
+                        route.request.objective == null -> true
+                        else -> OpenTheoryPipeline.canMinimize(route.request)
+                    }
+                    if (canDecide) {
                         openTheorySolvable(
                             route.request,
                             renderOpen,
