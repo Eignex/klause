@@ -415,7 +415,7 @@ class LocalSearchState(
                 }
             }
             collect(move)
-            net.affectedNodes(ints.toIntArray(), bools.toIntArray())
+            net.affectedNodes(ints.toIntArray(), bools.toIntArray(), assignment)
         }
         for (idx in nodes) {
             val n = net.node(idx)
@@ -1020,7 +1020,7 @@ class LocalSearchState(
         }
         collect(move)
         val net = invariants
-        val affected = net?.affectedNodes(ints.toIntArray(), bools.toIntArray()) ?: EmptyIntArray
+        val affected = net?.affectedNodes(ints.toIntArray(), bools.toIntArray(), assignment) ?: EmptyIntArray
         if (net != null) {
             for (idx in affected) {
                 val node = net.node(idx)

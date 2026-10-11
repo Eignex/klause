@@ -597,11 +597,22 @@ class InvariantNetwork internal constructor(
      * read-cone, computed by a marked worklist walk. Negative var ids are ignored so callers
      * can reuse fixed-size scratch arrays.
      */
-    fun affectedNodes(seedInts: IntArray, seedBools: IntArray): IntArray {
+    fun affectedNodes(seedInts: IntArray, seedBools: IntArray): IntArray =
+        findAffectedNodes(seedInts, seedBools, null)
+
+    internal fun affectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment): IntArray =
+        findAffectedNodes(seedInts, seedBools, assignment)
+
+    private fun findAffectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment?): IntArray {
         val marked = IntHashSet()
         val work = IntArrayDeque()
         fun seedInt(v: Int) {
-            if (v >= 0) for (i in intReaders[v]) if (marked.add(i)) work.addLast(i)
+            if (v < 0) return
+            for (i in intReaders[v]) {
+                val node = nodeArr[i]
+                if (assignment != null && node is ElementResultDefinition && !node.reads(v, assignment)) continue
+                if (marked.add(i)) work.addLast(i)
+            }
         }
         fun seedBool(v: Int) {
             if (v >= 0) for (i in boolReaders[v]) if (marked.add(i)) work.addLast(i)

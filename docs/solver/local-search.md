@@ -102,6 +102,10 @@ The one-way definition network contains immutable reader indexes; matching mixed
 arms share its lazy construction while each state applies definitions to its own
 assignment.
 
+Native Element result cones skip writes to unselected cells. Direct and transitive
+index dependencies retain the result cone, including compounds that change the index
+and its destination cell together. Probe saving and propagation use the same cone.
+
 ### Affine inverse repairs
 
 Element index repairs backsolve affine definitions with one or two distinct integer

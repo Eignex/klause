@@ -17,6 +17,14 @@ internal class ElementResultDefinition(val factor: Element) : SweepNode {
         intArrayOf(factor.idx)
     }
 
+    fun reads(variable: Int, assignment: Assignment): Boolean {
+        // Index writes can select a cell that was unselected before the move.
+        if (variable == factor.idx) return true
+        val index = assignment.intValue(factor.idx)
+        if (index < factor.indexOffset || index >= factor.indexOffset.toLong() + factor.arr.size) return false
+        return factor.arrIsVars && factor.arr[(index - factor.indexOffset).toInt()].toInt() == variable
+    }
+
     override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
         val index = assignment.intValue(factor.idx)
         if (index < factor.indexOffset || index >= factor.indexOffset.toLong() + factor.arr.size) {
