@@ -441,3 +441,8 @@ pauses the current traversal without restarting it. Feasibility search receives 
 solve allowance in active execution time, capped at 5 seconds; each trial also has a
 decision cap of at least 20,000 or twice the Boolean variable count. The whole-solve cancellation also bounds every activation. It runs once before ordinary optimization
 and is skipped behind an existing shared incumbent or within repair fragments.
+
+The search counters distinguish eligible clausal probe starts, feasibility trial starts,
+returned trial models, completed improving proposals, and proposals verified and installed
+as arm incumbents. The CLI emits these counters together when a probe starts, including
+zero counts for stages it did not reach. They describe heuristic progress and carry no proof.

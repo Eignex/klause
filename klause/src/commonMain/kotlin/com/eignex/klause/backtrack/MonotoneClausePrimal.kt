@@ -42,6 +42,13 @@ internal class MonotoneClausePrimal private constructor(
     private var polishingIndex = 0
     private var polishingPureCount = 0
 
+    var trials: Long = 0L
+        private set
+    var models: Long = 0L
+        private set
+    var proposals: Long = 0L
+        private set
+
     val work: Long get() = (repair?.work ?: 0L) + literalWork / PROPAGATION_WORK_PER_NODE
     val isDone: Boolean
         get() = closed || (polishing == null && (index == variables.size || phaseToken()))
@@ -83,6 +90,7 @@ internal class MonotoneClausePrimal private constructor(
         }
         while (!isDone && !params.cancellation()) {
             if (trial == null) {
+                trials++
                 val next = accepted.withBool(variables[index], false)
                 val simplified = purePins(next)
                 trial = next
@@ -99,6 +107,7 @@ internal class MonotoneClausePrimal private constructor(
             val sample = trialSample ?: (terminal as? MinimizeResult.WithSample)?.sample
             trialSample = null
             if (sample == null) continue
+            models++
             accepted = completedTrial
             polishing = Sample(sample.bools.copyOf(), sample.ints)
             polishingVariables = pure + variables
@@ -160,6 +169,7 @@ internal class MonotoneClausePrimal private constructor(
         val value = objective.evaluate(candidate)
         return if (value < bestValue) {
             bestValue = value
+            proposals++
             candidate
         } else {
             null

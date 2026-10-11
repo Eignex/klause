@@ -28,4 +28,31 @@ class SearchStatsTest {
             listOf(stats.learnedClauses.sum, stats.learnedLiterals.sum, stats.learnedLbd.sum),
         )
     }
+    @Test
+    fun `clausal probe counters add across workers`() {
+        val first = SearchStatsSink().apply {
+            clausalPrimalStarts = 1L
+            clausalPrimalTrials = 3L
+            clausalPrimalModels = 2L
+            clausalPrimalProposals = 1L
+            clausalPrimalAccepted = 1L
+        }.snapshot()
+        val second = SearchStatsSink().apply {
+            clausalPrimalStarts = 2L
+            clausalPrimalTrials = 4L
+            clausalPrimalModels = 1L
+            clausalPrimalProposals = 1L
+        }.snapshot()
+
+        val combined = first.mergedWith(second)
+
+        assertEquals(
+            listOf(3.0, 7.0, 3.0, 2.0, 1.0),
+            listOf(
+                combined.clausalPrimalStarts.sum, combined.clausalPrimalTrials.sum, combined.clausalPrimalModels.sum,
+                combined.clausalPrimalProposals.sum, combined.clausalPrimalAccepted.sum,
+            ),
+        )
+    }
+
 }
