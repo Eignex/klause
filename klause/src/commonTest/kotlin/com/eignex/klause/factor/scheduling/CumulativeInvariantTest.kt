@@ -1,23 +1,27 @@
 package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.FactorPropagationOracle
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.internals.CumulativeLsState
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.FunctionalObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -416,7 +420,10 @@ class CumulativeInvariantTest {
 
     @Test
     fun `conditional choice swaps repair both resources without moving starts`() {
-        for ((bound, reversed) in listOf(1 to false, 0 to false, 1 to true, 0 to true)) {
+        for ((bound, reversed, reduced) in listOf(
+            Triple(1, false, false), Triple(0, false, false), Triple(1, true, false), Triple(0, true, false),
+            Triple(1, false, true), Triple(0, false, true), Triple(1, true, true), Triple(0, true, true),
+        )) {
             val factors = ArrayList<Factor>()
             repeat(4) { i ->
                 factors.add(ReifiedLinear(i, intArrayOf(1), intArrayOf(i % 2), LinearOp.EQ, i / 2))
@@ -431,7 +438,7 @@ class CumulativeInvariantTest {
                 intArrayOf(12, 13), longArrayOf(3, 1), longArrayOf(1, 1), 1,
                 durationVars = intArrayOf(10, 11),
             ))
-            val problem = Problem(
+            val source = Problem(
                 4, 16, Array(16) {
                     when (it) {
                         in 0..5 -> IntDomain(0, 1)
@@ -443,8 +450,30 @@ class CumulativeInvariantTest {
                     }
                 }, factors.toTypedArray(),
             )
+            val network = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(2, 3, 4, 5))).network(16, 4)
+            val problem = if (reduced) Problem(4, 16, source.finiteIntDomains(), source.factors.map { factor ->
+                if (factor is Product) {
+                    val rewrite = factor.structuralReduce(source.finiteIntDomains())
+                    assertTrue(rewrite is FactorReduction.Rewrite)
+                    rewrite.replacement.single()
+                } else factor
+            }.toTypedArray()) else source
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
-            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4, 5))).network(16, 4)
+            state.invariants = if (reduced) {
+                InvariantNetwork(List(network.size) { index ->
+                    val node = network.node(index)
+                    if (!node.outIsBool && node.out in 8..11) {
+                        val linear = problem.factors[3 * (node.out - 8) + 2] as Linear
+                        val row = assertNotNull(linear.integerConstants)
+                        val output = linear.vars.indexOf(node.out)
+                        val input = 1 - output
+                        DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Lin(
+                            node.out, row.coeff(output), longArrayOf(row.coeff(input)),
+                            arrayOf(FunctionalObjective.Operand.v(linear.vars[input])), row.bound,
+                        ), intArrayOf(linear.vars[input]))
+                    } else node
+                }, 16, 4)
+            } else network
             val first = if (bound == 1) 0L else 1L
             val values = longArrayOf(first, 1L - first, 1, 0, 0, 1, 3, 1, 3, 0, 0, 1, 0, 0, 2, 1)
             for ((variable, value) in values.withIndex()) {
@@ -476,12 +505,12 @@ class CumulativeInvariantTest {
 
     @Test
     fun `conditional choice swaps preserve protected coordinates`() {
-        for (protection in listOf(
+        for ((protection, reduced) in listOf(
             "first choice pin", "second choice pin", "first choice owner", "second choice owner",
             "first channel pin", "second channel pin", "first channel owner", "second channel owner",
             "first indicator pin", "second indicator pin", "first duration pin", "second duration pin",
             "first duration owner", "second duration owner", "destination domain",
-        )) {
+        ).flatMap { listOf(it to false, it to true) }) {
             val factors = ArrayList<Factor>()
             repeat(4) { i ->
                 factors.add(ReifiedLinear(i, intArrayOf(1), intArrayOf(i % 2), LinearOp.EQ, i / 2))
@@ -507,7 +536,16 @@ class CumulativeInvariantTest {
                 }
             }
             if (protection == "destination domain") domains[1] = IntDomain(1, 1)
-            val problem = Problem(4, 16, domains, factors.toTypedArray())
+            val source = Problem(4, 16, domains, factors.toTypedArray())
+            val network = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(2, 3, 4, 5))).network(16, 4)
+            val reducedFactors = if (reduced) factors.map { factor ->
+                if (factor is Product) {
+                    val rewrite = factor.structuralReduce(domains)
+                    assertTrue(rewrite is FactorReduction.Rewrite)
+                    rewrite.replacement.single()
+                } else factor
+            }.toTypedArray() else factors.toTypedArray()
+            val problem = Problem(4, 16, domains, reducedFactors)
             val variable = when {
                 protection.contains("choice") -> if (protection.startsWith("first")) 0 else 1
                 protection.contains("channel") -> if (protection.startsWith("first")) 2 else 3
@@ -524,7 +562,21 @@ class CumulativeInvariantTest {
                 else -> Assumptions.None
             }
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
-            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4, 5))).network(16, 4)
+            state.invariants = if (reduced) {
+                InvariantNetwork(List(network.size) { index ->
+                    val node = network.node(index)
+                    if (!node.outIsBool && node.out in 8..11) {
+                        val linear = problem.factors[3 * (node.out - 8) + 2] as Linear
+                        val row = assertNotNull(linear.integerConstants)
+                        val output = linear.vars.indexOf(node.out)
+                        val input = 1 - output
+                        DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Lin(
+                            node.out, row.coeff(output), longArrayOf(row.coeff(input)),
+                            arrayOf(FunctionalObjective.Operand.v(linear.vars[input])), row.bound,
+                        ), intArrayOf(linear.vars[input]))
+                    } else node
+                }, 16, 4)
+            } else network
             if (protection.endsWith("owner")) state.moveSink.setOwners(IntArray(16) { if (it == variable) 16 else -1 })
             for ((id, value) in values.withIndex()) state.assignment.setInt(id, value)
             repeat(4) { state.assignment.setBool(it, state.assignment.intValue(it % 2) == (it / 2).toLong()) }
@@ -659,7 +711,7 @@ class CumulativeInvariantTest {
 
     @Test
     fun `conditional duration choice repairs grade other Boolean constraints`() {
-        for (bound in listOf(0, 1)) {
+        for ((bound, reduced) in listOf(0 to false, 1 to false, 0 to true, 1 to true)) {
             val factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
@@ -670,14 +722,36 @@ class CumulativeInvariantTest {
                 ),
                 Clause(intArrayOf(Lit.make(0, bound == 1))),
             )
-            val problem = Problem(
+            val source = Problem(
                 1, 7, arrayOf(
                     IntDomain(0, 2), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3),
                     IntDomain(0, 0), IntDomain(3, 3), IntDomain(0, 0),
                 ), factors,
             )
+            val network = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(1))).network(7, 1)
+            val problem = if (reduced) Problem(1, 7, source.finiteIntDomains(), factors.map { factor ->
+                if (factor is Product) {
+                    val rewrite = factor.structuralReduce(source.finiteIntDomains())
+                    assertTrue(rewrite is FactorReduction.Rewrite)
+                    rewrite.replacement.single()
+                } else factor
+            }.toTypedArray()) else source
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
-            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(7, 1)
+            state.invariants = if (reduced) {
+                val linear = problem.factors[2] as Linear
+                val row = assertNotNull(linear.integerConstants)
+                val output = linear.vars.indexOf(3)
+                val input = 1 - output
+                InvariantNetwork(List(network.size) { i ->
+                    val node = network.node(i)
+                    if (!node.outIsBool && node.out == 3) {
+                        DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Lin(
+                            3, row.coeff(output), longArrayOf(row.coeff(input)),
+                            arrayOf(FunctionalObjective.Operand.v(linear.vars[input])), row.bound,
+                        ), intArrayOf(linear.vars[input]))
+                    } else node
+                }, 7, 1)
+            } else network
             val values = longArrayOf(if (bound == 1) 0L else 1L, 1, 3, 3, 0, 3, 0)
             for ((variable, value) in values.withIndex()) {
                 state.assignment.setInt(variable, value)
@@ -708,7 +782,10 @@ class CumulativeInvariantTest {
 
     @Test
     fun `conditional durations repair overload through admissible choices`() {
-        for ((bound, retained) in listOf(0 to false, 1 to false, 0 to true, 1 to true)) {
+        for ((bound, retained, reduced) in listOf(
+            Triple(0, false, false), Triple(1, false, false), Triple(0, true, false), Triple(1, true, false),
+            Triple(0, false, true), Triple(1, false, true), Triple(0, true, true), Triple(1, true, true),
+        )) {
             val factors = arrayOf<Factor>(
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
@@ -718,19 +795,41 @@ class CumulativeInvariantTest {
                     durationVars = intArrayOf(3, 5),
                 ),
             )
-            val problem = Problem(
+            val source = Problem(
                 1, 7, arrayOf(
                     IntDomain(0, 2), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3),
                     IntDomain(0, 0), IntDomain(3, 3), IntDomain(0, 0),
                 ), factors,
             )
-            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
             val sweep = if (retained) {
-                DefinitionalSweep.infer(problem, intArrayOf(1))
+                DefinitionalSweep.infer(source, intArrayOf(1))
             } else {
                 DefinitionalSweep.infer(factors, 7)
             }
-            state.invariants = assertNotNull(sweep).network(7, 1)
+            val network = assertNotNull(sweep).network(7, 1)
+            val problem = if (reduced) Problem(1, 7, source.finiteIntDomains(), factors.map { factor ->
+                if (factor is Product) {
+                    val rewrite = factor.structuralReduce(source.finiteIntDomains())
+                    assertTrue(rewrite is FactorReduction.Rewrite)
+                    rewrite.replacement.single()
+                } else factor
+            }.toTypedArray()) else source
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = if (reduced) {
+                val linear = problem.factors[2] as Linear
+                val row = assertNotNull(linear.integerConstants)
+                val output = linear.vars.indexOf(3)
+                val input = 1 - output
+                InvariantNetwork(List(network.size) { i ->
+                    val node = network.node(i)
+                    if (!node.outIsBool && node.out == 3) {
+                        DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Lin(
+                            3, row.coeff(output), longArrayOf(row.coeff(input)),
+                            arrayOf(FunctionalObjective.Operand.v(linear.vars[input])), row.bound,
+                        ), intArrayOf(linear.vars[input]))
+                    } else node
+                }, 7, 1)
+            } else network
             state.assignment.setInt(0, if (bound == 1) 0L else 1L)
             state.assignment.setInt(1, 1)
             state.assignment.setInt(2, 3)

@@ -14,7 +14,13 @@ internal class ConditionalProductRepair(
 
     fun propose(): Int {
         if (limit <= 0 || 0L !in state.rootDomains[output] || !sink.allowsDefinedInt(output)) return 0
-        val product = state.invariants?.intDefinition(output) as? FunctionalObjective.Times ?: return 0
+        val definition = state.invariants?.intDefinition(output)
+        if (definition is FunctionalObjective.Lin) {
+            val scaled = positiveScaledBinaryDefinition(state, output) ?: return 0
+            channel(scaled.first)
+            return added
+        }
+        val product = definition as? FunctionalObjective.Times ?: return 0
         val a = product.a.varId
         val b = product.b.varId
         if (a < 0 || b < 0 || a == b) return 0
@@ -88,4 +94,20 @@ internal class ConditionalProductRepair(
         const val MAX_CHOICE_VALUES = 32L
         const val MAX_PER_PREDICATE = 4
     }
+}
+
+internal fun positiveScaledBinaryDefinition(state: LocalSearchState, output: Int): Pair<Int, Long>? {
+    val linear = state.invariants?.linearDefinition(output) ?: return null
+    if (linear.c != 0L || linear.ins.size != 1 || linear.coeffs.size != 1) return null
+    val input = linear.ins[0].varId
+    if (input < 0 || input == output) return null
+    val coefficient = linear.coeffs[0]
+    val scale = when (linear.outCoeff) {
+        1L -> if (coefficient < 0L && coefficient != Long.MIN_VALUE) -coefficient else return null
+        -1L -> if (coefficient > 0L) coefficient else return null
+        else -> return null
+    }
+    val domain = state.rootDomains[input]
+    if (domain.min < 0L || domain.max > 1L) return null
+    return input to scale
 }

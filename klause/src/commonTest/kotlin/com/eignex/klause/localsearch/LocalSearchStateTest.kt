@@ -7,12 +7,14 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.FunctionalObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -28,6 +30,104 @@ import kotlin.test.assertTrue
  * [strategy.CblsStallSwapTest] fixture (GE/LE only) deliberately avoids.
  */
 class LocalSearchStateTest {
+    @Test
+    fun `scaled maintained literal channels backsolve exact binary targets`() {
+        for ((bound, outputCoefficient) in listOf(0 to 1L, 1 to 1L, 0 to -1L, 1 to -1L)) {
+            val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3))
+            val rewrite = Product(1, 2, 3).structuralReduce(domains)
+            assertTrue(rewrite is FactorReduction.Rewrite)
+            val problem = Problem(1, 4, domains, arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+                rewrite.replacement.single(),
+            ))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val network = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(4, 1)
+            state.invariants = InvariantNetwork(List(network.size) { network.node(it) } + listOf(
+                DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Lin(
+                    3, outputCoefficient, longArrayOf(-3 * outputCoefficient),
+                    arrayOf(FunctionalObjective.Operand.v(1)), 0,
+                ), intArrayOf(1)),
+            ), 4, 1)
+            state.assignment.setInt(0, if (bound == 1) 0 else 1)
+            state.assignment.setInt(1, 1)
+            state.assignment.setInt(2, 3)
+            state.assignment.setInt(3, 3)
+            state.assignment.setBool(0, bound == 1)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 3, 1)
+            assertTrue(state.moveSink.list.isEmpty())
+
+            for (target in listOf(0L, 3L, 0L)) {
+                state.moveSink.clear()
+                val snapshot = state.assignment.snapshot()
+                state.moveSink.addChannelingIntSet(state, 3, target)
+                val move = assertNotNull(state.moveSink.list.firstOrNull())
+                val predicted = state.netDelta(move)
+                assertEquals(snapshot, state.assignment.snapshot())
+                state.apply(move)
+
+                assertEquals(target, state.assignment.intValue(3))
+                assertEquals(target / 3, state.assignment.intValue(1))
+                assertEquals(state.assignment.intValue(0) == 0L, state.assignment.boolValue(0))
+                assertEquals(0L, predicted)
+                assertEquals(0L, state.cost)
+                state.recompute()
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
+    fun `scaled literal inverses preserve protected coordinates and target domains`() {
+        for (protection in listOf(
+            "choice pin", "choice owner", "channel pin", "channel owner", "indicator pin",
+            "output pin", "output owner", "output domain", "channel domain",
+        )) {
+            val domains = arrayOf(
+                IntDomain(0, 1), IntDomain(if (protection == "channel domain") 1 else 0, 1),
+                IntDomain(3, 3), IntDomain(if (protection == "output domain") 1 else 0, 3),
+            )
+            val problem = Problem(1, 4, domains, arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                Linear(intArrayOf(1, -3), intArrayOf(3, 1), LinearOp.EQ, 0),
+            ))
+            val assumptions = when (protection) {
+                "choice pin" -> Assumptions.None.withInt(0, 0)
+                "channel pin" -> Assumptions.None.withInt(1, 1)
+                "indicator pin" -> Assumptions.None.withBool(0, true)
+                "output pin" -> Assumptions.None.withInt(3, 3)
+                else -> Assumptions.None
+            }
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+            val network = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(4, 1)
+            state.invariants = InvariantNetwork(List(network.size) { network.node(it) } + listOf(
+                DefinitionalSweep.SweepNode.IntDef(FunctionalObjective.Lin(
+                    3, 1, longArrayOf(-3), arrayOf(FunctionalObjective.Operand.v(1)), 0,
+                ), intArrayOf(1)),
+            ), 4, 1)
+            val owned = when (protection) {
+                "choice owner" -> 0
+                "channel owner" -> 1
+                "output owner" -> 3
+                else -> -1
+            }
+            if (owned >= 0) state.moveSink.setOwners(IntArray(4) { if (it == owned) 4 else -1 })
+            for ((id, value) in longArrayOf(0, 1, 3, 3).withIndex()) state.assignment.setInt(id, value)
+            state.assignment.setBool(0, true)
+            state.recompute()
+            val snapshot = state.assignment.snapshot()
+
+            state.moveSink.addChannelingIntSet(state, 3, 0)
+
+            assertTrue(state.moveSink.list.isEmpty(), protection)
+            assertEquals(snapshot, state.assignment.snapshot(), protection)
+            assertEquals(0L, state.cost, protection)
+        }
+    }
+
     @Test
     fun `suspended initial assignment preserves mixed seeded draws and pins`() {
         val problem = Problem(513, 513, Array(513) { IntDomain(-3, 7) }, emptyArray())
