@@ -7,8 +7,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -122,7 +122,8 @@ class InvariantNetworkTest {
         val network = InvariantNetwork(
             List(40) { DefinitionalSweep.SweepNode.Bool2Int(it, 0) }, 41, 1,
         )
-        val state = LocalSearchState(LocalSearchModel.open(Problem(1, 41, Array(41) { IntDomain(0, 1) }, emptyArray())), Random(3))
+        val problem = Problem(1, 41, Array(41) { IntDomain(0, 1) }, emptyArray())
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         val ints = IntArrayList()
         val bools = IntArrayList().also { it.add(0) }
         val traversal = DefinitionTraversal(network)
@@ -133,7 +134,8 @@ class InvariantNetworkTest {
         ints.add(40)
         assertEquals(0, network.affectedNodes(ints, bools, state.assignment, traversal).size)
         bools.add(0)
-        assertContentEquals(IntArray(40) { it }, network.affectedNodes(ints, bools, state.assignment, traversal).toIntArray())
+        assertContentEquals(IntArray(40) { it },
+            network.affectedNodes(ints, bools, state.assignment, traversal).toIntArray())
         assertContentEquals(IntArray(40) { it }, snapshot)
     }
 

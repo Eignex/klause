@@ -20,8 +20,8 @@ import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.Objective
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlin.test.Test
@@ -45,7 +45,8 @@ class LocalSearchStateCompoundProbeTest {
             0, 3, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
             arrayOf<Factor>(Product(0, 1, 2), Linear(intArrayOf(1), intArrayOf(2), LinearOp.EQ, 0)),
         )
-        for (failure in listOf(IllegalArgumentException("grading failed"), CancellationException("grading cancelled"))) {
+        val failures = listOf(IllegalArgumentException("grading failed"), CancellationException("grading cancelled"))
+        for (failure in failures) {
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
             state.invariants = assertNotNull(DefinitionalSweep.infer(problem)).network(3, 0)
             state.assignment.setInt(1, 3)
