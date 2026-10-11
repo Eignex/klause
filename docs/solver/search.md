@@ -142,6 +142,10 @@ after the last replacement and wrap over the complete clause, so undo can reopen
 earlier literal. Clause compaction preserves the cursor with its surviving watches;
 base-clause storage remains immutable and uses the fixed scan order.
 
+Native learned-database reductions pack surviving literals and metadata forward in
+their existing buffers, then truncate the tails. Survivor order, watches and scan
+cursors remain aligned without allocating replacement column buffers.
+
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump. Sound
 resolvents that cannot assert retain chronological fallback. Root refutations, unusable

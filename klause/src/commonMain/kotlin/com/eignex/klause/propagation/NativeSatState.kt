@@ -334,50 +334,37 @@ internal class NativeSatState(private val state: PropagationState) {
             watchSizes[lit] = w
         }
 
-        // Rebuild the learned literal buffer, starts, policy columns, and watch positions for survivors.
-        val newLits = IntArrayList()
-        val newStarts = IntArrayList()
-        val newLbd = IntArrayList()
-        val newPermanent = IntArrayList()
-        val newTier = IntArrayList()
-        val newUsed = IntArrayList()
-        val newOrigin = IntArrayList()
-        val newScanPos = IntArrayList()
-        val newWatchPos = IntArrayList(initialCapacity = 2 * survivors)
+        // A survivor's destination precedes its source, so packing forward cannot overwrite an
+        // unread clause. Keep the original starts and buffer size live until every source is read.
+        var literalWrite = 0
         for (i in 0 until learnedCount) {
-            if (remap[i] < 0) continue
-            val h = baseCount + i
-            newStarts.add(newLits.size)
-            val len = clauseLen(h)
-            for (k in 0 until len) newLits.add(litOf(h, k))
-            newLbd.add(learnedLbd[i])
-            newPermanent.add(learnedPermanent[i])
-            newTier.add(learnedTier[i])
-            newUsed.add(learnedUsed[i])
-            newOrigin.add(learnedOrigin[i])
-            newScanPos.add(learnedScanPos[i])
-            newWatchPos.add(watchPosition(h, 0))
-            newWatchPos.add(watchPosition(h, 1))
+            val target = remap[i]
+            if (target < 0) continue
+            val start = learnedStarts[i]
+            val end = learnedEnd(i)
+            learnedStarts[target] = literalWrite
+            for (k in start until end) learnedLits[literalWrite++] = learnedLits[k]
+            learnedLbd[target] = learnedLbd[i]
+            learnedPermanent[target] = learnedPermanent[i]
+            learnedTier[target] = learnedTier[i]
+            learnedUsed[target] = learnedUsed[i]
+            learnedOrigin[target] = learnedOrigin[i]
+            learnedScanPos[target] = learnedScanPos[i]
+            learnedWatchPos[2 * target] = learnedWatchPos[2 * i]
+            learnedWatchPos[2 * target + 1] = learnedWatchPos[2 * i + 1]
         }
-        learnedLits.replaceWith(newLits)
-        learnedStarts.replaceWith(newStarts)
-        learnedLbd.replaceWith(newLbd)
-        learnedPermanent.replaceWith(newPermanent)
-        learnedTier.replaceWith(newTier)
-        learnedUsed.replaceWith(newUsed)
-        learnedOrigin.replaceWith(newOrigin)
-        learnedScanPos.replaceWith(newScanPos)
-        learnedWatchPos.replaceWith(newWatchPos)
+        learnedLits.truncateTo(literalWrite)
+        learnedStarts.truncateTo(survivors)
+        learnedLbd.truncateTo(survivors)
+        learnedPermanent.truncateTo(survivors)
+        learnedTier.truncateTo(survivors)
+        learnedUsed.truncateTo(survivors)
+        learnedOrigin.truncateTo(survivors)
+        learnedScanPos.truncateTo(survivors)
+        learnedWatchPos.truncateTo(2 * survivors)
         learnedCount = survivors
     }
 
-    private fun IntArrayList.replaceWith(other: IntArrayList) {
-        clear()
-        for (i in 0 until other.size) add(other[i])
-    }
-
-    /** Assert `litOf(h, unitIdx)` as forced by clause [h]. Returns false (and records the conflict)
-     *  when the assignment contradicts — the caller decides whether to flag [pendingConflict]. */
     private fun pinUnit(h: Int, unitIdx: Int): Boolean {
         state.currentFactor = h
         state.currentLevel = state.levelToDecisionVar.size
