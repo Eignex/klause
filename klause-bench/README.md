@@ -243,6 +243,18 @@ fixtures and architectural conclusions, then delete obsolete campaign bundles.
 The [evidence policy](../docs/development.md#campaign-evidence) prohibits committed
 raw/generated archives and campaign GitHub workflows.
 
+Publish evidence needed by active reviews as downloadable snapshot assets on the
+public Klause-lab `active-evidence-<campaign>` prerelease. The lab's
+[active evidence workflow](https://github.com/Eignex/klause-lab/blob/main/deploy/SETUP.md#active-campaign-evidence)
+owns staging, per-file manifests, anonymous reviewer downloads and verification
+before extraction. Preserve experiment/selection, raw records/profiles, executed
+source/build identities, validation provenance and separately generated summaries;
+disclose missing evidence and checking limits. Link the release and pin the
+manifest's SHA-256 in the review. Release assets survive CI expiry and lab job
+cleanup while needed. After promoting useful results and checking all active
+consumers, delete obsolete release assets/tags, ended lab jobs and external copies
+under that workflow; do not retain a historical archive.
+
 ## Source validation
 
 MiniZinc float runs independently check the final complete witness; integer runs
