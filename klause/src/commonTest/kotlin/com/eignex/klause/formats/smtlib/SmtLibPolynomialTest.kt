@@ -256,7 +256,9 @@ class SmtLibPolynomialTest {
         assertEquals(PolynomialExpression.Variable(SourceRealId(1)), assertion.left)
         val trueGuard = assertIs<PolynomialRealFormula.Or>(terms[1])
         val falseGuard = assertIs<PolynomialRealFormula.Or>(terms[2])
-        assertEquals(PolynomialRealFormula.Not(PolynomialRealFormula.BooleanVariable(SourceBoolId(0))), trueGuard.operands[0])
+        assertEquals(
+            PolynomialRealFormula.Not(PolynomialRealFormula.BooleanVariable(SourceBoolId(0))), trueGuard.operands[0],
+        )
         assertEquals(PolynomialRealFormula.BooleanVariable(SourceBoolId(0)), falseGuard.operands[0])
         assertEquals(assertion.left, assertIs<PolynomialRealFormula.Atom>(trueGuard.operands[1]).left)
         assertEquals(assertion.left, assertIs<PolynomialRealFormula.Atom>(falseGuard.operands[1]).left)

@@ -20,9 +20,15 @@ internal class SmtLibPolynomialProblem(
     checkpoint: () -> Unit = {},
 ) {
     init {
-        require(sourceRealCount in 0..realCount && sourceBoolCount in 0..boolCount) { "invalid polynomial source count" }
-        require(realVarNames.values.toSet() == (0 until sourceRealCount).toSet()) { "invalid polynomial real source map" }
-        require(boolVarNames.values.toSet() == (0 until sourceBoolCount).toSet()) { "invalid polynomial Boolean source map" }
+        require(sourceRealCount in 0..realCount && sourceBoolCount in 0..boolCount) {
+            "invalid polynomial source count"
+        }
+        require(realVarNames.values.toSet() == (0 until sourceRealCount).toSet()) {
+            "invalid polynomial real source map"
+        }
+        require(boolVarNames.values.toSet() == (0 until sourceBoolCount).toSet()) {
+            "invalid polynomial Boolean source map"
+        }
         formula.requireVariableCounts(boolCount, realCount, checkpoint)
     }
 
@@ -73,7 +79,9 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
             "declare-fun" -> {
                 command.polynomialSize(4)
                 val parameters = command.items[2] as? SExpr.SList ?: smtUnsupported("malformed declare-fun arguments")
-                if (parameters.items.isNotEmpty()) smtUnsupported("polynomial arithmetic does not support uninterpreted functions")
+                if (parameters.items.isNotEmpty()) {
+                    smtUnsupported("polynomial arithmetic does not support uninterpreted functions")
+                }
                 declare(command.polynomialName(1), command.polynomialAtom(3))
             }
             "define-fun" -> define(command)
@@ -100,8 +108,11 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
                         is SExpr.Atom -> assumption
                         is SExpr.SList -> {
                             assumption.polynomialSize(2)
-                            if (assumption.polynomialHead() != "not") smtUnsupported("polynomial assumption must be a Boolean literal")
-                            assumption.items[1] as? SExpr.Atom ?: smtUnsupported("polynomial assumption must be a Boolean literal")
+                            if (assumption.polynomialHead() != "not") {
+                                smtUnsupported("polynomial assumption must be a Boolean literal")
+                            }
+                            assumption.items[1] as? SExpr.Atom
+                                ?: smtUnsupported("polynomial assumption must be a Boolean literal")
                         }
                     }
                     if (declarations[polynomialSymbol(atom.text)] !is PolynomialValue.Boolean) {
@@ -123,7 +134,9 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
     fun build(): SmtLibPolynomialProblem {
         val lowering = PolynomialRealLowering(realNames.size)
         val evaluator = SmtLibPolynomialEvaluator(lowering, cancellation = cancellation)
-        val formulas = assertions.map { (expression, environment) -> evaluator.evaluate(expression, environment).boolean() }
+        val formulas = assertions.map { (expression, environment) ->
+            evaluator.evaluate(expression, environment).boolean()
+        }
         return SmtLibPolynomialProblem(
             lowering.formula(formulas), lowering.realCount, boolNames.size, realNames.size, boolNames.size,
             evaluator.hasNonlinearTerms, realNames, boolNames, { cancellation.polynomialSourceCheckpoint() },
@@ -159,7 +172,8 @@ internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation =
             environment(),
         )
         val parametersForValidation = names.mapIndexed { index, parameter ->
-            parameter to if (sorts[index]) PolynomialValue.Boolean.variable(index) else PolynomialValue.Real.variable(index)
+            parameter to if (sorts[index]) PolynomialValue.Boolean.variable(index)
+            else PolynomialValue.Real.variable(index)
         }.toMap()
         val value = SmtLibPolynomialEvaluator(
             PolynomialRealLowering(realNames.size + names.size), validateOnly = true, cancellation = cancellation,
@@ -188,7 +202,8 @@ internal fun polynomialBooleanSort(sort: String): Boolean = when (sort) {
 }
 
 internal fun SExpr.SList.polynomialAtom(index: Int): String =
-    (items.getOrNull(index) as? SExpr.Atom)?.text?.let(::polynomialSymbol) ?: smtUnsupported("malformed polynomial atom")
+    (items.getOrNull(index) as? SExpr.Atom)?.text?.let(::polynomialSymbol)
+        ?: smtUnsupported("malformed polynomial atom")
 
 internal fun SExpr.SList.polynomialHead(): String = polynomialAtom(0)
 
@@ -210,7 +225,10 @@ internal fun SExpr.SList.polynomialName(index: Int): String {
     return text
 }
 
-private class PolynomialSourceInput(private val source: CharSource, private val cancellation: Cancellation) : CharSource {
+private class PolynomialSourceInput(
+    private val source: CharSource,
+    private val cancellation: Cancellation,
+) : CharSource {
     private var chunk = ""
     private var offset = 0
 

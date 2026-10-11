@@ -110,8 +110,12 @@ internal fun polynomialExpressionsEqual(left: PolynomialExpression, right: Polyn
         val (first, second) = work.removeLast()
         if (first === second || !seen.add(PolynomialNodePair(first, second))) continue
         when (first) {
-            is PolynomialExpression.Constant -> if (second !is PolynomialExpression.Constant || first != second) return false
-            is PolynomialExpression.Variable -> if (second !is PolynomialExpression.Variable || first.id != second.id) return false
+            is PolynomialExpression.Constant -> {
+                if (second !is PolynomialExpression.Constant || first != second) return false
+            }
+            is PolynomialExpression.Variable -> {
+                if (second !is PolynomialExpression.Variable || first.id != second.id) return false
+            }
             is PolynomialExpression.Power -> {
                 if (second !is PolynomialExpression.Power || first.exponent != second.exponent) return false
                 work.addLast(first.base to second.base)
