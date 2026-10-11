@@ -706,8 +706,7 @@ internal class LpEngine(
     }
 
     /** Discrete objective lower-bound dominance against the incumbent. */
-    private inner class LinearBound : RelaxationBound {
-        override val applicable: Boolean = objective.realCoefficientValues.all { it == 0.0 }
+    private inner class LinearBound(override val applicable: Boolean) : RelaxationBound {
 
         override fun prune(
             session: PropagationSession,
@@ -997,8 +996,16 @@ internal class LpEngine(
             residualAuxVars = ids
             residualOversized = rows > RESIDUAL_MAX_ROWS
         }
+        var linearApplicable = true
+        for (v in objective.realCoefficientValues.indices) {
+            if (objective.realCoefficientValues[v] != 0.0) {
+                linearApplicable = false
+                break
+            }
+            if ((v + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+        }
         bounds = listOfNotNull(
-            LinearBound(),
+            LinearBound(linearApplicable),
             energeticBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.energeticEvery) },
             cumulativeFlowBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.cumulativeFlowEvery) },
             lagBound?.let { LagrangianArm(it) },
