@@ -17,12 +17,14 @@ class ImplicitSeeding(
     private val maxImplicationCandidates: Int = IMPLICATION_SEED_MAX_CANDIDATES,
 ) {
 
+    private var preparedElected: IntArray? = null
+    private var preparedSeedFactors: IntArray? = null
+
     /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals whose
      *  [Invariant.proposeStructuredMoves] preserves their own feasibility (see
      *  [Invariant.providesImplicitNeighbourhood]). The engine draws their feasibility-preserving moves
      *  even during infeasibility, and seeds them feasible at search start. Built once on first
      *  access. */
-    private var preparedElected: IntArray? = null
     val electedImplicit: IntArray
         get() = preparedElected ?: electImplicitFactors().also { preparedElected = it }
 
@@ -30,7 +32,6 @@ class ImplicitSeeding(
      *  largest-scope-first so no two seed factors share an int variable. Disjointness guarantees one
      *  factor's [Invariant.seedFeasible] never overwrites another's seeded vars, so the post-seed
      *  assignment satisfies every seeded global simultaneously. */
-    private var preparedSeedFactors: IntArray? = null
     val implicitSeedFactors: IntArray
         get() {
             seedSetSteps().forEach { }
@@ -92,7 +93,8 @@ class ImplicitSeeding(
                 var right = mid
                 for (out in from until end) {
                     val takeLeft = right == end || (left < mid &&
-                        problem.factors[candidates[left]].intVars.size >= problem.factors[candidates[right]].intVars.size)
+                        problem.factors[candidates[left]].intVars.size >=
+                        problem.factors[candidates[right]].intVars.size)
                     sorted[out] = if (takeLeft) candidates[left++] else candidates[right++]
                     if (++visits % INITIALIZATION_BATCH == 0) yield(Unit)
                 }

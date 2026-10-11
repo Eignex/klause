@@ -142,10 +142,10 @@ class LocalSearchEngineTest {
             1, 513, Array(513) { IntDomain(0, 9) },
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
         )
-        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
-        val warm = WarmState()
         val params = LocalSearchParams(maxFlips = 1L, randomSeed = 3L)
         for (stopAt in listOf(1, 10, 20, 30, 40)) {
+            val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+            val warm = WarmState()
             var polls = 0
             val handle = search.resumableSolve(params, warm)
             assertNull(handle.runSlice(Cancellation { ++polls >= stopAt }, Long.MAX_VALUE, -1L))
@@ -154,11 +154,11 @@ class LocalSearchEngineTest {
             assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
             assertTrue(warm.activityTouches().isEmpty())
             assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) }
+            search.resumableSolve(params, warm).use {
+                assertIs<SolveResult.Unknown>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            }
+            assertTrue(warm.bestCostSeen() < Long.MAX_VALUE)
         }
-        search.resumableSolve(params, warm).use {
-            assertIs<SolveResult.Unknown>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
-        }
-        assertTrue(warm.bestCostSeen() < Long.MAX_VALUE)
     }
 
     @Test
