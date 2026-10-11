@@ -5,6 +5,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.formats.smtlib.SmtLibAdmission
 import com.eignex.klause.formats.smtlib.SmtLibInput
+import com.eignex.klause.ir.PolynomialRealFormula
+import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -16,6 +18,30 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialTheoryRequestTest {
+    @Test
+    fun `constant polynomial truth has a runnable empty ALNS projection`() {
+        val source = PolynomialRealProblem(
+            PolynomialRealFormula.Constant(true), 1, 0, 1, 0, mapOf("x" to 0), emptyMap(),
+        )
+        val params = PolynomialTheoryParams(strategy = PolynomialStrategyParams(alnsIterations = 2))
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, FiniteEngine.ALNS)
+
+        val witness = assertIs<OpenTheoryResult.Sat>(execution.result).assignment
+        assertNotNull(witness.algebraicRealValue(0))
+    }
+
+    @Test
+    fun `constant polynomial refutation stays unknown in a heuristic strategy`() {
+        val source = PolynomialRealProblem(
+            PolynomialRealFormula.Constant(false), 1, 0, 1, 0, mapOf("x" to 0), emptyMap(),
+        )
+
+        val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.ALNS)
+
+        assertIs<OpenTheoryResult.Unknown>(execution.result)
+    }
+
     @Test
     fun `a mixed polynomial portfolio finds a witness after complete search is capped`() {
         val input = assertIs<SmtLibInput.Polynomial>(

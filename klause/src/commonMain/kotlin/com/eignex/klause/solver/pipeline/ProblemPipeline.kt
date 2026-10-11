@@ -209,7 +209,7 @@ private sealed interface BoundedRouting {
 }
 
 /**
- * The route a frontend hands to the solver for one source model.
+ * Legacy finite and linear route classification. Use [pipelineRoute] for polynomial composition.
  *
  * A fully bounded model stays on the finite route: that is a frontend policy about which engine owns a
  * finite domain, not a statement that no theory could decide it. Anything with an open integer side is
