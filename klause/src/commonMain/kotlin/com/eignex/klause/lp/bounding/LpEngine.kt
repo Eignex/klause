@@ -998,13 +998,13 @@ internal class LpEngine(
             residualOversized = rows > RESIDUAL_MAX_ROWS
         }
         bounds = listOfNotNull(
-        LinearBound(),
-        energeticBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.energeticEvery) },
-        cumulativeFlowBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.cumulativeFlowEvery) },
-        lagBound?.let { LagrangianArm(it) },
-        knapsackLagBound?.let { LagrangianArm(it) },
-        LpSimplexBound(),
-    )
+            LinearBound(),
+            energeticBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.energeticEvery) },
+            cumulativeFlowBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.cumulativeFlowEvery) },
+            lagBound?.let { LagrangianArm(it) },
+            knapsackLagBound?.let { LagrangianArm(it) },
+            LpSimplexBound(),
+        )
 
     }.iterator()
 
