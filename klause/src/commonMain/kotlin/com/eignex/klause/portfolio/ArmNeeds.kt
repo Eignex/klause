@@ -14,7 +14,7 @@ import com.eignex.klause.solver.objective.LinearObjective
  * a model that offers all of them, and gives the slot to the next arm in its order.
  */
 internal sealed interface ArmNeed {
-    /** A pure clausal model, whose propagation and explanations stay Boolean. */
+    // A pure clausal model, whose propagation and explanations stay Boolean.
     data object Clausal : ArmNeed
 
     /** An objective: the arm steers by it, so on a satisfaction model it is a copy of its base arm. */

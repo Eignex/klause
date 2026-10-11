@@ -25,6 +25,22 @@ class NativeSatForgetTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `learned watch scans find an open prefix after backtracking`() {
+        val session = session(7, or(5, true, 6, true))
+        session.addLearnedClause(Clause(IntArray(5) { Lit.make(it, true) }), 3)
+        session.pinBool(0, false)
+        session.pinBool(1, false)
+        session.popToLevel(0)
+        session.pinBool(4, false)
+        session.pinBool(2, false)
+        session.pinBool(3, false)
+
+        session.pinBool(0, false)
+
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
     fun `opposite pins after undo propagate opposite deductions`() {
         val session = session(2, or(0, false, 1, true), or(0, true, 1, false))
         session.pinBool(0, true)

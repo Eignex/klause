@@ -137,6 +137,11 @@ Native Boolean propagation keeps a session-local truth byte per Boolean variable
 single-load literal checks. Pins and undo mirror the canonical assignment bitsets;
 open, false and true remain distinct. The general lane does not allocate this mirror.
 
+Native learned clauses retain one replacement-scan cursor per live clause. Scans start
+after the last replacement and wrap over the complete clause, so undo can reopen any
+earlier literal. Clause compaction preserves the cursor with its surviving watches;
+base-clause storage remains immutable and uses the fixed scan order.
+
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump. Sound
 resolvents that cannot assert retain chronological fallback. Root refutations, unusable
