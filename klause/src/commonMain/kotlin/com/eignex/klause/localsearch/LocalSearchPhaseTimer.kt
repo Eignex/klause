@@ -79,6 +79,7 @@ internal fun <T> Sequence<T>.withActiveLocalSearchTime(timer: LocalSearchPhaseTi
             override fun next(): T {
                 timer.resume()
                 try {
+                    if (!source.hasNext()) throw NoSuchElementException()
                     return source.next()
                 } finally {
                     timer.pause()
