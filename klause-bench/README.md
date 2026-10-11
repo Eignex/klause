@@ -52,7 +52,7 @@ forwarded to the bench JVM. Keep the CLI distribution and runtime fixed during a
 `sets/<name>.txt` fixes membership as one `<suite>/<problem>` identity per line,
 matching `select`; `@<set>` includes another set and `#` starts a comment.
 Focused sets cover the structural themes reported by `select features=true`:
-open integers, linear reals, scheduling, routing, packing, other globals, MIP,
+open integers, linear reals, polynomial (nonlinear) reals, scheduling, routing, packing, other globals, MIP,
 SAT, MaxSAT and PB. `sweep` includes them all. Material membership changes take
 new names so results under one name stay comparable.
 

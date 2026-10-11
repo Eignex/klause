@@ -79,6 +79,7 @@ class InstanceClassifierTest {
             themes(Format.XCSP3, "<instance><constraints><circuit>x</circuit></constraints></instance>"),
         )
         assertEquals(setOf("open-int", "linear-real"), themes(Format.SMTLIB, "(set-logic QF_LIRA)\n(assert true)"))
+        assertEquals(setOf("nonlinear-real"), themes(Format.SMTLIB, "(set-logic QF_NRA)\n(assert true)"))
         assertEquals(setOf("maxsat"), themes(Format.WCNF, "p wcnf 1 1 2\n1 1 0\n"))
     }
 
