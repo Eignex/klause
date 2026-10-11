@@ -166,6 +166,21 @@ materialize finite CP domains or publish feasibility. Ordinary cancellation is
 polled within 64 visits and before publishing each implication or conflict;
 metered tokens retain immediate checks at every scan visit.
 
+Unit-coefficient integer equalities also feed a sparse exact affine basis. It
+substitutes larger definitions across open columns, decides constant comparisons
+and rejects inconsistent equations or nonintegral constant fixings. Each basis
+row retains a flat set of source guard literals. New active equalities extend the
+basis; a retracted supporting guard clears it before any further publication.
+Declared fixed columns supply unconditional facts. Boolean coefficients and
+disjunction alternatives remain with the complete theory.
+
+Affine elimination admits at most 32 terms and 256 source guards per row, bounds
+coefficient and RHS numerators and denominators to 256 bits, and limits each pass
+to 8192 elimination term visits. Wider rows and incomplete reductions add no
+facts. These limits establish no feasibility or exhaustion; unresolved rows keep
+the complete LP fallback. Cancellation is checked within 64 visits, immediately
+for metered tokens, and before each implication or conflict.
+
 ## Learned-clause retention
 
 The shared learned store has its cap off by default. When capped, reduction runs

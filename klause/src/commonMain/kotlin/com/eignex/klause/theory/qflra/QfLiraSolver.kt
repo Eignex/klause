@@ -161,6 +161,11 @@ class ExactLiraSearchComponent(
             lp.assertWithin(decision, context, operationStop)
         }
     }
+    private val affineEqualities by lazy {
+        ExactLiraAffineEqualities(model, exactForms) { decision, context ->
+            lp.assertWithin(decision, context, operationStop)
+        }
+    }
 
     internal fun solveWith(context: LpSolveContext) {
         check(this.context == null)
@@ -570,6 +575,13 @@ class ExactLiraSearchComponent(
         }
         if (equalityResult !is ComponentResult.Consistent) return equalityResult
         if (equalities.implied) return ComponentResult.Consistent
+        val affineResult = affineEqualities.propagate(context, operationStop)
+        if (affineResult is ComponentResult.Conflict) {
+            smtStats?.observeConflict(affineResult.explanation)
+            outcome = ComponentCheck.Infeasible(affineResult.explanation)
+        }
+        if (affineResult !is ComponentResult.Consistent) return affineResult
+        if (affineEqualities.implied) return ComponentResult.Consistent
         if (bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
