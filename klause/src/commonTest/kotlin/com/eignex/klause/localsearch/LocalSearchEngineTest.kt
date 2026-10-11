@@ -824,7 +824,7 @@ class LocalSearchEngineTest {
         assertEquals(1.0, ls.completionsRefuted.sum)
     }
     @Test
-    fun `a resumed local search retains its opening cancellation scope`() {
+    fun `a resumed local search retains its bound lifetime cancellation scope`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0, 3)),
             arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
