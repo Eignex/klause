@@ -13,6 +13,26 @@ import kotlin.test.assertTrue
 class ContiguousDomainTest {
 
     @Test
+    fun `iteration visits Long endpoints exactly once`() {
+        val cases = listOf(
+            listOf(Long.MIN_VALUE, Long.MIN_VALUE + 1, Long.MIN_VALUE + 2),
+            listOf(Long.MAX_VALUE - 2, Long.MAX_VALUE - 1, Long.MAX_VALUE),
+            listOf(Long.MAX_VALUE),
+        )
+        for (expected in cases) {
+            val domain = ContiguousDomain(expected.first(), expected.last())
+            val seen = mutableListOf<Long>()
+
+            domain.forEach {
+                assertTrue(seen.size < expected.size)
+                seen.add(it)
+            }
+
+            assertEquals(expected, seen)
+        }
+    }
+
+    @Test
     fun `clamp saturates a value to the domain bounds`() {
         val d = ContiguousDomain(1, 10)
         assertEquals(5, d.clamp(5))
