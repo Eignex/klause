@@ -26,6 +26,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -69,12 +70,15 @@ class ExactLiraSearchComponentTest {
         )
         for (atRoot in listOf(false, true)) {
             ExactLiraSearchComponent(model).use { component ->
-                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
-                assertIs<ComponentResult.Consistent>(session.initialize())
                 val decision = SearchDecision.Bool(Lit.make(0, false))
+                val clauses = if (atRoot) {
+                    listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(decision.literal)))))
+                } else {
+                    emptyList()
+                }
+                val session = SearchSession(clauses + component, atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
                 if (atRoot) {
-                    assertIs<ComponentResult.Consistent>(session.publish(decision))
-                    assertIs<ComponentResult.Consistent>(session.propagate())
                     assertEquals(0, session.decisionLevel)
                 } else {
                     assertIs<ComponentResult.Consistent>(session.push(decision))
