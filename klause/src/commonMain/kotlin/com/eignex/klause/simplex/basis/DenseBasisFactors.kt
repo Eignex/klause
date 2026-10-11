@@ -100,8 +100,14 @@ internal class DenseBasisFactors(private val source: SparseMatrix) {
             }
         }
         if (k + 1 == n) return true
-        updates += n.toLong() * n
-        koblas.ger(-1.0, multipliers, pivotRow, matrix)
+        val start = k + 1
+        val extent = n - start
+        updates += extent.toLong() * extent
+        koblas.ger(
+            -1.0, multipliers, pivotRow, matrix,
+            rowOffset = start, columnOffset = start, rows = extent, columns = extent,
+            xOffset = start, yOffset = start,
+        )
         for (j in k + 1 until n) {
             for (i in k + 1 until n) {
                 visits++
