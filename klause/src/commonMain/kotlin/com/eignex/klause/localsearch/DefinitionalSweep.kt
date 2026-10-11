@@ -16,10 +16,9 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayDeque
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.toSortedIntArray
 
 /**
  * A local-search acceleration structure (consumed by [LocalSearchSolver]): the topologically-
@@ -688,29 +687,53 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
     internal fun affectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment): IntArray =
         findAffectedNodes(seedInts, seedBools, assignment)
 
-    private fun findAffectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment?): IntArray {
-        val marked = IntHashSet()
-        val work = IntArrayDeque()
+    private fun findAffectedNodes(seedInts: IntArray, seedBools: IntArray, assignment: Assignment?): IntArray =
+        findAffectedNodes(
+            seedInts, seedInts.size, seedBools, seedBools.size, assignment, DefinitionTraversal(this),
+        ).toIntArray()
+
+    internal fun affectedNodes(
+        seedInts: IntArrayList,
+        seedBools: IntArrayList,
+        assignment: Assignment,
+        traversal: DefinitionTraversal,
+    ): IntArrayList = findAffectedNodes(
+        seedInts.backingData, seedInts.size, seedBools.backingData, seedBools.size, assignment, traversal,
+    )
+
+    private fun findAffectedNodes(
+        seedInts: IntArray,
+        intCount: Int,
+        seedBools: IntArray,
+        boolCount: Int,
+        assignment: Assignment?,
+        traversal: DefinitionTraversal,
+    ): IntArrayList {
+        check(traversal.network === this) { "definition traversal belongs to another network" }
+        traversal.clear()
+        val work = traversal.nodes
         fun seedInt(v: Int) {
             if (v < 0) return
             for (i in intReaders[v]) {
                 val node = nodeArr[i]
                 if (assignment != null && node is ElementResultDefinition && !node.reads(v, assignment)) continue
-                if (marked.add(i)) work.addLast(i)
+                traversal.add(i)
             }
         }
         fun seedBool(v: Int) {
-            if (v >= 0) for (i in boolReaders[v]) if (marked.add(i)) work.addLast(i)
+            if (v >= 0) for (i in boolReaders[v]) traversal.add(i)
         }
-        for (v in seedInts) seedInt(v)
-        for (v in seedBools) seedBool(v)
-        while (work.isNotEmpty()) {
-            val i = work.removeFirst()
-            val n = nodeArr[i]
+        for (p in 0 until intCount) seedInt(seedInts[p])
+        for (p in 0 until boolCount) seedBool(seedBools[p])
+        var position = 0
+        while (position < work.size) {
+            val n = nodeArr[work[position++]]
             if (n.outIsBool) seedBool(n.out) else seedInt(n.out)
         }
-        return marked.toSortedIntArray()
+        work.backingData.sort(0, work.size)
+        return work
     }
+
 }
 
 private class DefinitionIndex(
