@@ -16,6 +16,30 @@ import kotlin.test.assertTrue
 
 class MonotoneClausePrimalTest {
     @Test
+    fun `a completed model is polished after its search slice ends`() {
+        val problem = Problem(
+            3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
+            ),
+        ).bake()
+        val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L))
+        lateinit var primal: MonotoneClausePrimal
+        primal = assertNotNull(MonotoneClausePrimal.create(
+            BacktrackSolver(problem), objective,
+            BacktrackParams(cancellation = Cancellation { primal.models > 0L }), Cancellation.Never,
+        ))
+
+        primal.use {
+            val sample = assertNotNull(it.advance())
+
+            assertEquals(1L, objective.evaluateLong(sample))
+            assertTrue(sample.bools[0])
+            assertTrue(!sample.bools[2])
+        }
+    }
+
+    @Test
     fun `greedy feasible assumptions preserve hard clauses and improve cost`() {
         val problem = Problem(
             3, 0, emptyArray(),

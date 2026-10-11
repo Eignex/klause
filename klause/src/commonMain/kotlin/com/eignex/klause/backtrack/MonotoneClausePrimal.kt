@@ -10,6 +10,7 @@ import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 internal class MonotoneClausePrimal private constructor(
@@ -76,12 +77,12 @@ internal class MonotoneClausePrimal private constructor(
     }
 
     private fun advanceBody(sliceMillis: Long, sliceNodes: Long): Sample? {
-        if (params.cancellation()) return null
+        if (lifetime()) return null
         if (polishing != null) {
             finishPolishing()?.let { return it }
             if (polishing != null) return null
         }
-        if (isDone) return null
+        if (params.cancellation() || isDone) return null
         val startWork = work
         val start = TimeSource.Monotonic.markNow()
         val search = repair ?: try {
@@ -169,8 +170,9 @@ internal class MonotoneClausePrimal private constructor(
     private fun finishPolishing(): Sample? {
         val candidate = checkNotNull(polishing)
         val values = candidate.bools
+        val budget = lifetime or Cancellation.after(100.milliseconds)
         while (polishingIndex < polishingVariables.size) {
-            if (params.cancellation()) return null
+            if (budget()) return null
             val pureVariable = polishingIndex < polishingPureCount
             val variable = polishingVariables[polishingIndex++]
             if ((pureVariable || values[variable]) && occurrences[variable].all { clause ->

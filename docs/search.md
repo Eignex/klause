@@ -436,8 +436,10 @@ Trials reseed one private source-coordinate satisfaction session with caller,
 baked-root, cost and pure-literal assumptions. Assumption-guarded learned clauses
 and search phases remain local to that session and survive between trials. Only
 feasible trials retain their cheaper cost assumptions. Clause-local polishing releases these pins and removes unnecessary
-costly values; polishing resumes across slices before the composed verifier checks the full
-proposal for publication.
+costly values. Each polishing activation has a 100 ms cap and retains the whole-solve
+deadline; it can finish a feasible model after the search slice expires. Its work
+remains charged to the arm. Polishing resumes across activations before the composed
+verifier checks the full proposal for publication.
 A completed proposal can be verified and delivered while the arm repays slice work
 debt. Verification retains its 100 ms cap and the whole-solve deadline; work debt
 continues to block further search. Failed or cancelled trials contribute no
