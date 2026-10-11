@@ -7,15 +7,14 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
+import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.util.Cancellation
-import kotlin.time.TimeSource
 
 /** A polynomial request composing exact continuous constraints with finite factors. */
 class PolynomialTheoryRequest internal constructor(
@@ -133,8 +132,13 @@ fun OpenTheoryPipeline.minimize(
         is MinimizeResult.Unbounded -> completed.copy(sample = request.capture(completed.sample))
         else -> completed
     }
-    val reason = if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled
-    val published = if (!stop()) result else when (result) {
+    val nativeStopped = invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit
+    val reason = when {
+        params.timeout() -> TerminationReason.Timeout
+        stop() -> TerminationReason.Cancelled
+        else -> TerminationReason.BudgetExhausted
+    }
+    val published = if (!stop() && !nativeStopped) result else when (result) {
         is MinimizeResult.WithSample -> MinimizeResult.BestFound(result.sample, result.objective, reason, result.stats)
         else -> MinimizeResult.Unknown(reason, result.stats)
     }
@@ -170,14 +174,16 @@ fun OpenTheoryPipeline.execute(
     params: PolynomialTheoryParams = PolynomialTheoryParams(),
     engine: FiniteEngine = FiniteEngine.MIXED,
 ): PolynomialTheoryExecution {
-    val started = TimeSource.Monotonic.markNow()
     val stop = params.timeout or params.cancellation
-    fun envelope(timedOut: Boolean = false): SolveStats = SolveStats(
-        run = RunStats("exact-nra", started.elapsedNow().inWholeMilliseconds, timedOut),
-    )
-    fun incomplete(reason: TerminationReason, stats: PolynomialTheoryStats): PolynomialTheoryExecution =
+    fun incomplete(
+        reason: TerminationReason,
+        stats: PolynomialTheoryStats,
+        searchStats: SolveStats,
+    ): PolynomialTheoryExecution =
         PolynomialTheoryExecution(
-            OpenTheoryResult.Unknown(reason, envelope(reason == TerminationReason.Timeout)),
+            OpenTheoryResult.Unknown(reason, searchStats.copy(
+                run = searchStats.run.copy(timedOut = reason == TerminationReason.Timeout),
+            )),
             stats,
         )
     val source = request.problem
@@ -194,7 +200,9 @@ fun OpenTheoryPipeline.execute(
         native.workSpent,
     )
     if (stop()) {
-        return incomplete(if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled, stats)
+        return incomplete(
+            if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled, stats, result.stats,
+        )
     }
     return when (result) {
         is SolveResult.Sat -> {
@@ -209,13 +217,22 @@ fun OpenTheoryPipeline.execute(
                 Array(shared.source.numIntVars) { bigIntOf(sample.intValue(it)) },
             )
             if (stop()) {
-                incomplete(if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled, stats)
+                incomplete(
+                    if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
+                    stats, result.stats,
+                )
             } else {
                 PolynomialTheoryExecution(OpenTheoryResult.Sat(published, result.stats), stats)
             }
         }
         is SolveResult.Unsat -> PolynomialTheoryExecution(OpenTheoryResult.Unsat(result.stats), stats)
-        is SolveResult.Unknown -> incomplete(result.reason, stats).copy(
+        is SolveResult.Unknown -> incomplete(
+            if (invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit) {
+                TerminationReason.BudgetExhausted
+            } else result.reason,
+            stats,
+            result.stats,
+        ).copy(
             resource = when (invocation.lastUnknown?.resource) {
                 PolynomialResource.DENSE_COEFFICIENTS -> PolynomialTheoryResource.DenseCoefficients
                 PolynomialResource.MATRIX_CELLS -> PolynomialTheoryResource.MatrixCells

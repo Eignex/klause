@@ -29,6 +29,7 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialSearchComponent
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.QfNraResult
+import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 
@@ -50,9 +51,12 @@ internal class PolynomialStrategyAdapters(
     private val model: SharedPolynomialModel,
     private val invocation: PolynomialTheoryInvocation,
     private val params: PolynomialStrategyParams,
-    private val cancellation: Cancellation,
+    cancellation: Cancellation,
 ) {
-    private val finite: BakedProblem = model.finite.bake(cancellation)
+    private val cancellation = cancellation or Cancellation {
+        invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit
+    }
+    private val finite: BakedProblem = model.finite.bake(this.cancellation)
     private val identity = ModelIdentity.of(model.source)
 
     private fun certified(sample: Sample): Sample = sample.also {
