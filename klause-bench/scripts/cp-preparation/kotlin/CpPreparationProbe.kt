@@ -15,6 +15,7 @@ import com.eignex.klause.util.Cancellation
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
+import java.util.Base64
 
 fun main(args: Array<String>) {
     val input = args[0]
@@ -45,6 +46,16 @@ fun main(args: Array<String>) {
     check(allocations.isThreadAllocatedMemorySupported)
     allocations.isThreadAllocatedMemoryEnabled = true
     val thread = Thread.currentThread().threadId()
+    fun encoded(value: String) = Base64.getEncoder().encodeToString(value.toByteArray())
+    val runtime = ManagementFactory.getRuntimeMXBean()
+    println(
+        "EXECUTION javaVersion=${System.getProperty("java.version")} " +
+            "javaHome64=${encoded(System.getProperty("java.home"))} " +
+            "arguments64=${encoded(runtime.inputArguments.joinToString("\n"))} " +
+            "classPath64=${encoded(System.getProperty("java.class.path"))} " +
+            "solverSource64=${encoded(BacktrackSolver::class.java.protectionDomain.codeSource.location.toString())} " +
+            "propagationSource64=${encoded(PropagationPreparation::class.java.protectionDomain.codeSource.location.toString())}",
+    )
     fun bytes() = allocations.getThreadAllocatedBytes(thread)
     println("MODEL input=$input ints=${problem.numIntVars} bools=${problem.numBoolVars} factors=${problem.numFactors}")
     for (round in 0..rounds) {
