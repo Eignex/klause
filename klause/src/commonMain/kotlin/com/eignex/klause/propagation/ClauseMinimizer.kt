@@ -33,6 +33,7 @@ internal interface ReasonGraph {
 internal class ClauseMinimizer(private val state: PropagationState, private val graph: ReasonGraph) {
     private var inClause = EmptyBooleanArray
     private var toDrop = EmptyBooleanArray
+    private val redundancyCache = MutableIntIntMap()
 
     // Reusable explicit-stack buffers for the iterative [isRedundant] DFS (cleared per call),
     // so deep implication graphs can't overflow the call stack. Three parallel stacks: the
@@ -82,7 +83,8 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
         }
         // Per-call redundancy memo: -1 absent, 0 = non-redundant, 1 = redundant. A primitive
         // int map avoids boxing the var key and the Boolean value per cached node.
-        val cache = MutableIntIntMap(learned.size * 4)
+        val cache = redundancyCache
+        cache.clear()
         toDrop = scratch(toDrop, universeSize)
         var dropCount = 0
         for (i in 0 until learned.size) {
