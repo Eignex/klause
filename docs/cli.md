@@ -147,7 +147,11 @@ Solver-control flags are common to **every** mode:
     id spaces after lowering and presolve. Reified rows use
     `ReifiedLinear.<op>.<shape>`, with `binary` for one
     input bounded to 0..1, `unary` for another single input and `multi` for multiple
-    inputs. The categories partition the total. These diagnostics do not claim a
+    inputs. Additive `lsBestResidualFactorDetails.<id>.<key>` pairs report bounded
+    ordered comparison/row semantics and captured coordinates' maintained definitions;
+    [the local-search contract](solver/local-search.md#residual-observations) defines
+    their keys, omission counts and unsupported shapes. The categories partition the
+    total. These diagnostics do not claim a
     feasible witness; collecting them adds scans at strict improvements and should
     be separated from acceptance timing.
   - resource work: `node-limit=auto|unlimited|N` and `presolve-work-limit=auto|unlimited|N`.
