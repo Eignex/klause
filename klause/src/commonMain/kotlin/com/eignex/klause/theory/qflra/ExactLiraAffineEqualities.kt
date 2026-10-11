@@ -50,6 +50,7 @@ internal class ExactLiraAffineEqualities(
     }
     private val basis = HashMap<Int, Equation>()
     private val exclusions = HashMap<Signature, Exclusion>()
+    private var basisGeneration = 0L
     private var foundationReady = false
     private var queryCursor = 0
     private var remaining = 0
@@ -106,6 +107,7 @@ internal class ExactLiraAffineEqualities(
             if (source.processed && !source.active(context)) {
                 basisResets++
                 basis.clear()
+                basisGeneration++
                 exclusions.clear()
                 facts.forEach { it.processed = false }
                 foundationReady = false
@@ -163,6 +165,7 @@ internal class ExactLiraAffineEqualities(
                 return conflict(context, reduced.guards, literal, stop)
             }
             basis[pivot] = Equation(terms, bound, guards.toSet())
+            basisGeneration++
             source.processed = true
             factsAdded++
         }
@@ -175,8 +178,14 @@ internal class ExactLiraAffineEqualities(
             if (queryCursor == rows.size) queryCursor = 0
             scanned++
             if (source.processed) continue
-            queryReductions++
-            val reduced = reduce(source.comparison)
+            val reduced = if (source.queryGeneration == basisGeneration) source.query else {
+                queryReductions++
+                reduce(source.comparison)?.also {
+                    source.queryGeneration = basisGeneration
+                    source.query = it
+                    source.normalized = null
+                }
+            }
             if (reduced == null) {
                 if (interrupted) return ComponentResult.Indeterminate
                 continue
@@ -192,7 +201,7 @@ internal class ExactLiraAffineEqualities(
                 if (source.comparison.op != LinearOp.EQ && source.comparison.op != LinearOp.NE) continue
                 val negative = source.excluded(context)
                 if (!negative && exclusions.isEmpty()) continue
-                val signature = signature(reduced)
+                val signature = source.normalized ?: signature(reduced)?.also { source.normalized = it }
                 if (signature == null) {
                     if (interrupted) return ComponentResult.Indeterminate
                     continue
@@ -320,6 +329,9 @@ internal class ExactLiraAffineEqualities(
 
     private class Source(val comparison: ExactComparison, val activator: Int) {
         var processed = false
+        var queryGeneration = -1L
+        var query: Reduced? = null
+        var normalized: Signature? = null
 
         fun active(context: SearchContext): Boolean {
             val truth = if (activator == ALWAYS) true else context.boolValue(activator)

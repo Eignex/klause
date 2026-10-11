@@ -170,6 +170,36 @@ class ExactLiraAffineEqualitiesTest {
     }
 
     @Test
+    fun `adding an affine definition invalidates an unresolved comparison reduction`() {
+        val open = Bits(3).also { bits -> repeat(3, bits::set) }
+        val source = Problem(
+            3,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1, -1, -1), intArrayOf(2, 0, 1), LinearOp.EQ, 0),
+                ReifiedLinear(1, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 7),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 7),
+            ),
+        )
+        val propagation = ExactLiraAffineEqualities(source, source.factors.map { factor ->
+            factor.linearRows.map { it.exactForm(0) }
+        }) { _, _ -> ComponentResult.Consistent }
+        val session = SearchSession(emptyList())
+        session.push(SearchDecision.Bool(Lit.make(0, true)))
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+        assertNull(session.boolValue(2))
+
+        session.push(SearchDecision.Bool(Lit.make(1, true)))
+        assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+        assertEquals(true, session.boolValue(2))
+        assertEquals(
+            setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true)),
+            assertNotNull(session.reasonFor(2)).literals.toSet(),
+        )
+    }
+
+    @Test
     fun `retracting an affine definition invalidates retained exclusions`() {
         val open = Bits(3).also { bits -> repeat(3, bits::set) }
         val source = Problem(

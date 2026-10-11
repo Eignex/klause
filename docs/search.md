@@ -169,6 +169,10 @@ Comparison queries retain a circular cursor across bounded passes, so an
 unresolved prefix cannot consume every pass before later comparisons are visited.
 The cursor carries no proof state; every pass validates cached source guards
 before querying the basis.
+Completed comparison reductions and normalized signatures are cached per source
+row for one basis generation. Adding an independent equation or retracting a
+supporting guard advances the generation; incomplete reductions are not cached.
+Every pass validates basis guards before using retained reductions.
 Reduced disequalities retain normalized affine signatures with their source and
 basis guards. A matching equality is false and a matching disequality is true,
 even when the residual still has open terms. Basis reset clears these signatures;
@@ -448,7 +452,7 @@ requested root-cut plans.
 | `openReductionNs` | Total shared reduction selection and watch-rebuild time |
 | `smtAffinePasses`, `smtAffineBasisResets` | Sparse affine propagation invocations and cache clears after supporting guard retraction |
 | `smtAffineFactsAdded` | Source equations admitted into the basis or proved redundant |
-| `smtAffineQueryReductions`, `smtAffineConstantQueries` | Comparison reductions attempted and completed reductions with no open terms |
+| `smtAffineQueryReductions`, `smtAffineConstantQueries` | Comparison reductions attempted and constant comparisons considered, including retained reductions |
 | `smtAffineImplications`, `smtAffineConflicts` | Accepted Boolean implications and source conflicts returned before LP solving |
 | `smtAffineTermVisits`, `smtAffineBudgetStops` | Charged elimination visits and passes consuming their visit allowance |
 | `smtAffineActiveNs` | Sparse propagation time including guard validation and explanations; separate from LP time |
