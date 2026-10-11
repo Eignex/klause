@@ -96,6 +96,21 @@ class ApproxMCTest {
     }
 
     @Test
+    fun `an empty real interval has zero public projected models`() {
+        for (max in listOf(1L, 2L)) {
+            val model = Problem(
+                0, 1, arrayOf(IntDomain(1, max)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(1.0),
+            )
+
+            val count = BacktrackSolver(model.bake()).approximateCount(ApproxCountConfig(seed = 0L))
+
+            assertTrue(count.exact)
+            assertEquals(0L, count.estimate)
+        }
+    }
+
+    @Test
     fun `conditioned mixed counts restore Boolean pins and integer holes`() {
         val model = Problem(
             1, 1, arrayOf(IntDomain(0, 2)), emptyArray(),

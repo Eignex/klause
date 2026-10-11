@@ -91,6 +91,22 @@ class UniGenTest {
     }
 
     @Test
+    fun `an empty real interval has no accurate samples`() {
+        for (max in listOf(1L, 2L)) {
+            val model = Problem(
+                0, 1, arrayOf(IntDomain(1, max)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(1.0),
+            )
+
+            val samples = BacktrackSolver(model.bake()).samples(
+                SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L), BacktrackParams(),
+            )
+
+            assertTrue(samples.none())
+        }
+    }
+
+    @Test
     fun `conditioned accurate real witnesses retain the captured scope`() {
         val model = Problem(
             2, 1, arrayOf(IntDomain(0, 2)),
