@@ -154,7 +154,25 @@ internal class MonotoneClausePrimal private constructor(
     private fun reduce(pins: Assumptions): ReducedTrial? {
         val fixed = pins.bools
         val mapping = IntArray(solver.problem.numBoolVars) { -1 }
+        val present = BooleanArray(solver.problem.numBoolVars)
+        for (clause in clauses) {
+            if (phaseToken()) return null
+            literalWork += clause.literals.size
+            if (clause.literals.any { literal ->
+                    fixed[Lit.variable(literal)]?.let { Lit.evaluate(literal, it) } == true
+                }
+            ) continue
+            for (literal in clause.literals) {
+                val variable = Lit.variable(literal)
+                if (variable !in fixed) present[variable] = true
+            }
+        }
         val variables = IntArrayList()
+        for (variable in present.indices) {
+            if (!present[variable]) continue
+            mapping[variable] = variables.size
+            variables.add(variable)
+        }
         val residual = mutableListOf<Clause>()
         for (clause in clauses) {
             if (phaseToken()) return null
@@ -167,10 +185,6 @@ internal class MonotoneClausePrimal private constructor(
             for (literal in clause.literals) {
                 val variable = Lit.variable(literal)
                 if (variable in fixed) continue
-                if (mapping[variable] < 0) {
-                    mapping[variable] = variables.size
-                    variables.add(variable)
-                }
                 literals.add(Lit.make(mapping[variable], Lit.isPositive(literal)))
             }
             if (literals.size == 0) return null
