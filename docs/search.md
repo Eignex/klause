@@ -229,7 +229,10 @@ Decision/move limits still count their original events.
 Before the first accepted witness, a selected complete-search family runs its
 available arm with the least charged work. Shared clauses, root fixings and
 objective floors remain credited, but cannot exclude a silent search from its
-family's coverage. Family selection retains its progress policy; after the first
+family's coverage. Before a witness, observable violation reductions can earn
+a family more turns; complete-search root fixings and glue clauses do not favor
+its family, because deduction throughput does not predict the first witness.
+Those counters remain recorded. After the first
 witness, arm selection also follows that policy. Initial admission, preparation
 revisits and explicit minimum time shares retain precedence. A segment reporting
 no charged work uses its slice allowance for coverage accounting.
