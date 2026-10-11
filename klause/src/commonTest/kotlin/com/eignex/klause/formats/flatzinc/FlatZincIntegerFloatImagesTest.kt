@@ -29,7 +29,8 @@ class FlatZincIntegerFloatImagesTest {
         assertTrue(error.message.orEmpty().contains("require rounded arithmetic"))
         assertTrue(error.message.orEmpty().contains("binary64 rational literals"))
         assertTrue(program.floatRepresentations.getValue("scaled").approximate)
-        assertTrue(program.floatRepresentations.getValue("scaled").approximation.orEmpty().contains("rounded arithmetic"))
+        val reason = program.floatRepresentations.getValue("scaled").approximation.orEmpty()
+        assertTrue(reason.contains("rounded arithmetic"))
     }
 
     @Test

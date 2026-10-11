@@ -33,7 +33,15 @@ class FlatZincSearchAnnotationTest {
 
     @Test
     fun `mixed float arrays exclude real columns from integer search groups`() {
-        val program = parseFlatZinc("var 0.0..1.0: exact; var 0.0..1.0: grid; array[1..2] of var float: xs = [exact, grid]; constraint float_le(grid, 0.5); solve :: int_search(xs, input_order, indomain_max, complete) satisfy;")
+        val program = parseFlatZinc(
+            """
+            var 0.0..1.0: exact;
+            var 0.0..1.0: grid;
+            array[1..2] of var float: xs = [exact, grid];
+            constraint float_le(grid, 0.5);
+            solve :: int_search(xs, input_order, indomain_max, complete) satisfy;
+            """.trimIndent(),
+        )
 
         val neutral = searchHints(program).toSearchHints()
 

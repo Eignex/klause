@@ -207,7 +207,9 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
     }
 
     override fun onComplete(verdict: Verdict) {
-        if (floatApproximation) println("% klause-float-claim: grid search; source witness check required; no source proof")
+        if (floatApproximation) {
+            println("% klause-float-claim: grid search; source witness check required; no source proof")
+        }
         when (flatZincSourceVerdict(verdict, floatApproximation)) {
             Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
 
@@ -222,7 +224,9 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
             // standard terminator without changing what the protocol promises.
             Verdict.UNKNOWN -> {
                 println("=====UNKNOWN=====")
-                println("% ${if (floatApproximation) "grid search cannot prove the source model" else context.softVerdictCause()}")
+                val cause = if (floatApproximation) "grid search cannot prove the source model" else
+                    context.softVerdictCause()
+                println("% $cause")
             }
         }
     }

@@ -74,7 +74,8 @@ class CompilerTest {
             "gridRow" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("grid"), IntCmpOp.GT, 0.25)),
         )).compile()
 
-        val sample = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 0))).assignment
+        val result = BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 0))
+        val sample = assertIs<SolveResult.Sat>(result).assignment
 
         val exactId = compiled.realVarIdByName.getValue("exact")
         val rational = requireNotNull(sample.exactReals)[exactId]
