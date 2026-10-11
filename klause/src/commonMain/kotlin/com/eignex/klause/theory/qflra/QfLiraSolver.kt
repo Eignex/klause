@@ -102,6 +102,18 @@ class ExactLiraSearchComponent(
     private val disjunctOwner = Any()
     private var disjunctionRegistrationDeclined = false
     private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    private val preparedRows = model.factors.flatMapIndexed { factorIndex, factor ->
+        factor.linearRows.mapIndexed { index, row ->
+            PreparedSourceRow(
+                RowAddress(factorIndex, index),
+                row,
+                exactForms[factorIndex][index],
+                row.booleanVariables().toIntArray(),
+                factor.linearForm is LinearForm.Disjunction,
+            )
+        }
+    }
+    private val sourceAssertionLevels = IntArray(preparedRows.size) { -1 }
     private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
@@ -461,23 +473,25 @@ class ExactLiraSearchComponent(
     private fun assertSource(context: SearchContext): Boolean {
         if (!installSource()) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
-        for ((factorIndex, factor) in model.factors.withIndex()) {
-            for ((index, row) in factor.linearRows.withIndex()) {
-                val address = RowAddress(factorIndex, index)
-                val asserted = node.rowAssertions[address]
-                if (factor.linearForm is LinearForm.Disjunction && asserted == null) continue
-                val truth = node.rowTruth(address, row, bools) ?: continue
-                val comparison = exactForms[factorIndex][index].comparison(truth) { bools[it] == TRUE }
-                val leaves = row.booleanVariables().map { variable ->
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
-                }.toMutableList<SearchAtomPremise>()
-                if (asserted != null) leaves += SearchAtomPremise.Asserted(SearchDecision.Theory(asserted))
-                val premise = SearchAtomPremise.All(leaves)
-                if (comparison.op == LinearOp.NE) {
-                    disequalities += Triple(address, comparison, premise)
-                } else if (!system.assertComparison(comparison, null, premise)) {
-                    return false
-                }
+        for ((index, prepared) in preparedRows.withIndex()) {
+            // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
+            // Root checks still permit substitution through newly published root-fixed columns.
+            if (context.decisionLevel > 0 && sourceAssertionLevels[index] >= 0) continue
+            val address = prepared.address
+            val asserted = node.rowAssertions[address]
+            if (prepared.disjunction && asserted == null) continue
+            val truth = node.rowTruth(address, prepared.row, bools) ?: continue
+            val comparison = prepared.form.comparison(truth) { bools[it] == TRUE }
+            val leaves = prepared.booleans.map { variable ->
+                SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(variable, bools[variable] == TRUE)))
+            }.toMutableList<SearchAtomPremise>()
+            if (asserted != null) leaves += SearchAtomPremise.Asserted(SearchDecision.Theory(asserted))
+            val premise = SearchAtomPremise.All(leaves)
+            if (comparison.op == LinearOp.NE) {
+                disequalities += Triple(address, comparison, premise)
+            } else {
+                if (!system.assertComparison(comparison, null, premise)) return false
+                sourceAssertionLevels[index] = context.decisionLevel
             }
         }
         for (atom in node.sourceBranches) {
@@ -794,6 +808,9 @@ class ExactLiraSearchComponent(
     }
 
     private fun retractSource(decisionLevel: Int) {
+        for (index in sourceAssertionLevels.indices) {
+            if (sourceAssertionLevels[index] > decisionLevel) sourceAssertionLevels[index] = -1
+        }
         for (variable in bools.indices) {
             if (boolLevels[variable] > decisionLevel) {
                 bools[variable] = UNASSIGNED
@@ -1320,6 +1337,14 @@ private data class IntegerLinearBranch(
 private data class RowAddress(val factor: Int, val row: Int) : Comparable<RowAddress> {
     override fun compareTo(other: RowAddress): Int = compareValuesBy(this, other, RowAddress::factor, RowAddress::row)
 }
+
+private class PreparedSourceRow(
+    val address: RowAddress,
+    val row: LinearRow,
+    val form: ExactRowForm,
+    val booleans: IntArray,
+    val disjunction: Boolean,
+)
 
 private data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),

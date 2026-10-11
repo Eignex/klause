@@ -23,6 +23,12 @@ Complete assignments use source-keyed values from each owner. CP-learned Boolean
 remain natively owned by CP while their shared consequences reach theory peers. The
 shared store does not duplicate the CP pin.
 
+Open linear arithmetic prepares immutable source row addresses, forms and Boolean
+dependencies once per component. A resolved comparison remains asserted through
+its LP scope; deeper checks reuse it until retraction removes that scope. Root
+checks can substitute newly fixed columns. Disequalities re-evaluate their justified
+direction against active bounds, and complete witnesses still check source rows.
+
 ## Finite propagation
 
 Fresh presolve rebuilds retain the originating cancellation token and accounting
