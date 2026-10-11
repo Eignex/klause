@@ -1,15 +1,5 @@
 package com.eignex.klause.compile
 
-import kotlin.test.assertFalse
-
-import com.eignex.klause.simplex.exact.BigFraction
-
-import com.eignex.klause.model.FloatSpec
-
-import com.eignex.klause.model.FloatLinearConstraint
-
-import com.eignex.klause.model.BoolSpec
-
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.config.KlauseConfig
@@ -21,12 +11,17 @@ import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.bounding.LpAutoConfig
+import com.eignex.klause.model.BoolRef
+import com.eignex.klause.model.BoolSpec
+import com.eignex.klause.model.FloatLinearConstraint
+import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
 import com.eignex.klause.model.IntLit
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.NamedConstraint
+import com.eignex.klause.model.Not
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
@@ -42,12 +37,14 @@ import com.eignex.klause.schema.minus
 import com.eignex.klause.schema.not
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.SolveResult
 import com.eignex.skema.SchemaDef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
