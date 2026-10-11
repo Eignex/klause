@@ -390,6 +390,7 @@ internal class LocalSearchEngine(
         sink.start()
         val supported = localSearchSupports(model, completion != null)
         val effective = if (supported) model.pinsUnder(params.assumptions) else null
+        val maxInstructions = moveCap(params)
         val control = LocalSearchRunControl(params.cancellation)
         val cursor = effective?.let {
             streamImpl(
@@ -401,7 +402,7 @@ internal class LocalSearchEngine(
             ).iterator()
         }
         return LocalSearchSolveRun(
-            params, supported, effective != null, model.refutesModel, moveCap(params),
+            params, supported, effective != null, model.refutesModel, maxInstructions,
             cursor, sink, control, ownership::release,
         )
     }
