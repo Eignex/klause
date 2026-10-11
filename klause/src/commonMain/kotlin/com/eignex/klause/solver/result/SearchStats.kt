@@ -50,6 +50,16 @@ data class SearchStats(
     val propagationNanos: SumResult = ZERO_COUNT,
     /** Nanoseconds in the session constructor's root fixpoint. */
     val rootPropagationNanos: SumResult = ZERO_COUNT,
+    /** Eligible clausal primal probes created. */
+    val clausalPrimalStarts: SumResult = ZERO_COUNT,
+    /** Clausal primal feasibility trials started. */
+    val clausalPrimalTrials: SumResult = ZERO_COUNT,
+    /** Feasible trial models returned by the private satisfaction search. */
+    val clausalPrimalModels: SumResult = ZERO_COUNT,
+    /** Strictly improving clausal primal models completed by polishing. */
+    val clausalPrimalProposals: SumResult = ZERO_COUNT,
+    /** Clausal primal proposals verified and installed as arm incumbents. */
+    val clausalPrimalAccepted: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers' search stats: counters add, peak depth maxes, depth means weight-combine. */
     fun mergedWith(o: SearchStats): SearchStats = SearchStats(
@@ -71,11 +81,23 @@ data class SearchStats(
         inprocessProbes = SumResult(inprocessProbes.sum + o.inprocessProbes.sum),
         inprocessVisits = SumResult(inprocessVisits.sum + o.inprocessVisits.sum),
         glueClauses = SumResult(glueClauses.sum + o.glueClauses.sum),
+        clausalPrimalStarts = SumResult(clausalPrimalStarts.sum + o.clausalPrimalStarts.sum),
+        clausalPrimalTrials = SumResult(clausalPrimalTrials.sum + o.clausalPrimalTrials.sum),
+        clausalPrimalModels = SumResult(clausalPrimalModels.sum + o.clausalPrimalModels.sum),
+        clausalPrimalProposals = SumResult(clausalPrimalProposals.sum + o.clausalPrimalProposals.sum),
+        clausalPrimalAccepted = SumResult(clausalPrimalAccepted.sum + o.clausalPrimalAccepted.sum),
+
     )
 }
 
 /** Mutable [SearchStats] accumulator; snapshots into a [SearchStats]. See [SolveStatsSink]. */
 internal class SearchStatsSink {
+    var clausalPrimalStarts: Long = 0L
+    var clausalPrimalTrials: Long = 0L
+    var clausalPrimalModels: Long = 0L
+    var clausalPrimalProposals: Long = 0L
+    var clausalPrimalAccepted: Long = 0L
+
     var propagationWork: () -> Long = { 0L }
     var rootPropagationWork: () -> Long = { 0L }
     var propagationNanos: () -> Long = { 0L }
@@ -161,6 +183,12 @@ internal class SearchStatsSink {
         inprocessProbes = SumResult(inprocessProbes.toDouble()),
         inprocessVisits = SumResult(inprocessVisits.toDouble()),
         glueClauses = SumResult(glueClauses.toDouble()),
+        clausalPrimalStarts = SumResult(clausalPrimalStarts.toDouble()),
+        clausalPrimalTrials = SumResult(clausalPrimalTrials.toDouble()),
+        clausalPrimalModels = SumResult(clausalPrimalModels.toDouble()),
+        clausalPrimalProposals = SumResult(clausalPrimalProposals.toDouble()),
+        clausalPrimalAccepted = SumResult(clausalPrimalAccepted.toDouble()),
+
     )
 }
 
