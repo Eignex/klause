@@ -76,7 +76,11 @@ internal object MpsMode : CliMode {
                 if (witnessOnly) {
                     val witness = try {
                         compiled.sourceWitness(compiled.columns.map { column ->
-                            val value = if (column.real) assignment.realValue(column.id) else assignment.intValue(column.id)
+                            val value = if (column.real) {
+                                assignment.realValue(column.id)
+                            } else {
+                                assignment.intValue(column.id)
+                            }
                             parseOpenMpsNumber(value)
                         })
                     } catch (_: MpsLoweringException) {
@@ -116,7 +120,8 @@ internal object MpsMode : CliMode {
                 is SourceProblemRoute.OpenTheory -> {
                     witnessOnly = !compiled.sourceExact
                     // Refuting a lowered objective bound does not refute the corresponding decimal source bound.
-                    if (!witnessOnly && (route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request))) {
+                    val canDecide = route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request)
+                    if (!witnessOnly && canDecide) {
                         openTheorySolvable(
                             route.request,
                             renderOpen,
