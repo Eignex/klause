@@ -225,8 +225,9 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
 
         IntCmpOp.NE -> LinearOp.NE
     }
-    if (c.varNames.all { it in realVarIdByName }) {
-        // Every float in a row shares its component's representation.
+    if (c.op != IntCmpOp.LT && c.op != IntCmpOp.GT && c.op != IntCmpOp.NE &&
+        c.varNames.all { it in realVarIdByName }
+    ) {
         val realVars = IntArray(n) { realVarIdByName.getValue(c.varNames[it]) }
         factors += Linear(EmptyIntArray, EmptyDoubleArray, realVars, c.coeffs.copyOf(), realOp, c.bound)
         return

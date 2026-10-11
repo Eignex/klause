@@ -27,6 +27,17 @@ class ExactFlatZincValidationTest {
     """.trimIndent()
 
     @Test
+    fun `mixed finite float choices are checked from the original constant array`() {
+        val source = "var 1..1: i; var 0.0..1.0: exact; var 0.0..1.0: grid; constraint array_float_element(i, [0.125], exact); constraint float_le(grid, 0.5); solve satisfy;"
+        val valid = "i = 1;\nexact = 1/8;\ngrid = 1/2;"
+
+        assertEquals("valid", ExactFlatZincValidation.inspect(source, valid, null).status)
+        for (invalid in listOf(valid.replace("exact = 1/8", "exact = 1/4"), valid.replace("grid = 1/2", "grid = 3/4"))) {
+            assertEquals("invalid", ExactFlatZincValidation.inspect(source, invalid, null).status)
+        }
+    }
+
+    @Test
     fun `rounded cylinder bound cannot accept an exact binary64 product`() {
         val source = "var 50..200: n; var 50.0..200.0: raw; var 0.5..2.0: scaled; constraint int2float(n, raw); constraint float_lin_eq([0.01, -1.0], [raw, scaled], 0.0); solve satisfy;"
         val exact = "n = 200; raw = 200; scaled = 144115188075855875/72057594037927936;".replace("; ", ";\n")
