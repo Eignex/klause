@@ -439,7 +439,10 @@ Learned clauses remain local to that reduced trial. Only
 feasible trials are retained. Clause-local polishing releases these pins and removes unnecessary
 costly values; polishing resumes across slices before the composed verifier checks the full
 proposal for publication.
-Failed or cancelled trials contribute no infeasibility or optimality proof.
+A completed proposal can be verified and delivered while the arm repays slice work
+debt. Verification retains its 100 ms cap and the whole-solve deadline; work debt
+continues to block further search. Failed or cancelled trials contribute no
+infeasibility or optimality proof.
 
 The feasibility repair uses the SAT preset with inprocessing and target capture disabled,
 starts fresh Boolean decisions with false, and retains each trial session across portfolio slices. Its cumulative

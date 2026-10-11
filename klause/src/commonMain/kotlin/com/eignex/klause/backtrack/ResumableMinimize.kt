@@ -354,6 +354,7 @@ internal class ResumableMinimize(
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = global
+        publishClausePrimalCandidate()?.let(onIncumbent)
         if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
@@ -531,15 +532,7 @@ internal class ResumableMinimize(
                     sink.search.clausalPrimalInfeasible = primal.infeasible
                     sink.search.clausalPrimalIncomplete = primal.incomplete
                 }
-                clausePrimalCandidate?.let { sample ->
-                    if (pausable && sliceCancelled()) return StepEvent.Paused
-                    val published = publishLpProposal(sample)
-                    clausePrimalCandidate = null
-                    if (published != null) {
-                        sink.search.clausalPrimalAccepted++
-                        return StepEvent.Incumbent(published)
-                    }
-                }
+                publishClausePrimalCandidate()?.let { return StepEvent.Incumbent(it) }
                 if (!primal.isDone && pausable && sliceCancelled()) return StepEvent.Paused
                 if (primal.isDone) primal.close()
             }
@@ -756,8 +749,20 @@ internal class ResumableMinimize(
         return recordIfImproving(accepted.assignment, accepted.objective)
     }
 
-    private fun verifiedLpProposal(proposal: Sample): Candidate<Sample, Double>? {
-        val budget = params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
+    private fun publishClausePrimalCandidate(): MinimizeResult.WithSample? {
+        val proposal = clausePrimalCandidate ?: return null
+        clausePrimalCandidate = null
+        val accepted = verifiedLpProposal(proposal, runEndToken()) ?: return null
+        val published = recordIfImproving(accepted.assignment, accepted.objective) ?: return null
+        sink.search.clausalPrimalAccepted++
+        return published
+    }
+
+    private fun verifiedLpProposal(
+        proposal: Sample,
+        cancellation: Cancellation = params.cancellation,
+    ): Candidate<Sample, Double>? {
+        val budget = cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         val verifier = ComposedSampleVerifier(problem, objective, budget)
         val verdict = verifier.verify(Candidate(proposal, objective.evaluate(proposal)))
         return (verdict as? Verification.Accepted)?.candidate
