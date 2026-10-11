@@ -6,6 +6,19 @@ atom's original left-minus-right sign and relation. The formula evaluator preser
 Boolean references and arbitrary `Not`, `And` and `Or` structure. Source parsing and
 frontend routing remain caller responsibilities; the theory reads no input format.
 
+The complete fragment is polynomial real satisfaction with rational coefficients
+and Boolean structure. It does not include transcendental functions or integer
+integrality. Completeness does not guarantee completion within invocation limits.
+The [support policy](../architecture.md#solver-identity-and-support-policy) permits
+sound incomplete mechanisms alongside complete fragment procedures. This theory's
+pipeline route is a separate invocation over `PolynomialRealProblem`, rather than
+a component composing arbitrary factors from `Problem` in shared search.
+Shared composition is active work in
+[#2621](https://github.com/Eignex/klause/issues/2621); the separate invocation boundary
+describes implemented coverage rather than the intended limit of polynomial support.
+In particular, rejecting local-search execution violates the required availability
+of a complete-search/local-search portfolio over the same source problem.
+
 ## Projection families
 
 [PolynomialProjection](../../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialProjection.kt)

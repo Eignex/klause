@@ -32,6 +32,20 @@ cannot establish an exact count. Polynomial algebraic assignments belong to the
 [polynomial pipeline](qfnra.md), whose opaque source snapshots are outside these
 `Solver` counting and sampling entry points.
 
+## Exact count bounds
+
+Anytime exact counting reports proven projected assignments as its lower bound and
+adds all unchecked or undecided subtree mass to its upper bound. A feasibility check
+replaces only the checked child's mass, so exhausting `maxChecks` partway through an
+expansion retains its unchecked siblings and the deeper frontier. An `Unknown` check
+retains its entire subtree in the upper bound and prevents an exact result.
+
+Subtree products and frontier updates use exact integer arithmetic, including integer
+domain widths and holes. Published lower bounds rise and upper bounds fall.
+`Count.upper == Long.MAX_VALUE` is an unbounded sentinel when the bound exceeds the
+public `Long` range; saturation does not establish exactness. Exactness requires all
+projected branches to be decided and a representable count.
+
 ## Streams and exclusive ownership
 
 `openSamples`, `openEnumerate`, `openExactCount` and `openImprovements` return

@@ -46,10 +46,53 @@ internal fun PolynomialValue.boolean(): PolynomialRealFormula =
 private fun PolynomialValue.real(): PolynomialExpression =
     (this as? PolynomialValue.Real)?.expression ?: smtUnsupported("polynomial real operand expected")
 
-internal data class PolynomialEnvironment(
-    val values: Map<String, PolynomialValue>,
-    val macros: Map<String, PolynomialMacro>,
-)
+internal class PolynomialBindings {
+    private class Binding(val version: Int, val value: PolynomialValue?, val macro: PolynomialMacro?)
+
+    // Append-only entries keep earlier visibility cutoffs valid without copying the table.
+    private val bindings = HashMap<String, Binding>()
+
+    fun contains(name: String): Boolean = name in bindings
+
+    fun declare(name: String, value: PolynomialValue) {
+        check(name !in bindings)
+        bindings[name] = Binding(bindings.size, value, null)
+    }
+
+    fun define(name: String, macro: PolynomialMacro) {
+        check(name !in bindings)
+        bindings[name] = Binding(bindings.size, null, macro)
+    }
+
+    fun environment(): PolynomialEnvironment = PolynomialEnvironment(this, bindings.size)
+
+    fun value(name: String, visibleBindings: Int): PolynomialValue? =
+        bindings[name]?.takeIf { it.version < visibleBindings }?.value
+
+    fun macro(name: String, visibleBindings: Int): PolynomialMacro? =
+        bindings[name]?.takeIf { it.version < visibleBindings }?.macro
+}
+
+internal class PolynomialEnvironment(
+    private val bindings: PolynomialBindings,
+    private val visibleBindings: Int,
+    private val locals: Map<String, PolynomialValue> = emptyMap(),
+    private val parent: PolynomialEnvironment? = null,
+) {
+    fun value(name: String): PolynomialValue? {
+        var scope: PolynomialEnvironment? = this
+        while (scope != null) {
+            scope.locals[name]?.let { return it }
+            scope = scope.parent
+        }
+        return bindings.value(name, visibleBindings)
+    }
+
+    fun macro(name: String): PolynomialMacro? = bindings.macro(name, visibleBindings)
+
+    fun withValues(values: Map<String, PolynomialValue>): PolynomialEnvironment =
+        if (values.isEmpty()) this else PolynomialEnvironment(bindings, visibleBindings, values.toMap(), this)
+}
 
 internal data class PolynomialMacro(
     val parameters: List<String>,
@@ -92,7 +135,7 @@ internal class SmtLibPolynomialEvaluator(
                     val bindings = frame.bindings.zip(pop(values, frame.bindings.size)).toMap()
                     work.addLast(
                         PolynomialFrame.Evaluate(
-                            frame.body, frame.environment.copy(values = frame.environment.values + bindings),
+                            frame.body, frame.environment.withValues(bindings),
                         ),
                     )
                 }
@@ -104,7 +147,7 @@ internal class SmtLibPolynomialEvaluator(
                     work.addLast(
                         PolynomialFrame.Evaluate(
                             frame.macro.body,
-                            frame.macro.environment.copy(values = frame.macro.environment.values + bindings),
+                            frame.macro.environment.withValues(bindings),
                         ),
                     )
                 }
@@ -122,8 +165,8 @@ internal class SmtLibPolynomialEvaluator(
         when (val node = frame.expression) {
             is SExpr.Atom -> {
                 val literal = polynomialLiteral(node.text, cancellation)
-                val bound = frame.environment.values[polynomialSymbol(node.text)]
-                val macro = frame.environment.macros[polynomialSymbol(node.text)]
+                val bound = frame.environment.value(polynomialSymbol(node.text))
+                val macro = frame.environment.macro(polynomialSymbol(node.text))
                 when {
                     literal != null -> values.addLast(PolynomialValue.Real(constant(literal)))
                     bound != null -> values.addLast(bound)
@@ -139,7 +182,7 @@ internal class SmtLibPolynomialEvaluator(
             }
             is SExpr.SList -> {
                 val head = node.polynomialHead()
-                val macro = if (head in frame.environment.values) null else frame.environment.macros[head]
+                val macro = if (frame.environment.value(head) != null) null else frame.environment.macro(head)
                 when {
                     head == "let" -> scheduleLet(node, frame.environment, work)
                     macro != null -> {

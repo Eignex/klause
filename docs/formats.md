@@ -6,6 +6,14 @@ The [CLI](cli.md#formats-and-dispatch) lists dispatch names and extensions.
 
 ## Finite and open models
 
+The [support policy](architecture.md#solver-identity-and-support-policy) separates
+source semantics, strategy coverage and proof authority. A frontend admits only
+syntax it can preserve losslessly under its declared semantics. A supported model
+can still receive UNKNOWN from an incomplete or resource-limited solve; unsupported
+syntax and execution retain their own diagnostics or termination cause. Admission
+coverage still differs between strategies; these differences are implementation
+gaps under the shared portfolio requirement.
+
 Source routing chooses a finite solve, an open-theory solve, a refutation or an
 unsupported result. It can first prove that open integer sides have finite bounds.
 That proof uses a slice of the shared preparation allowance and the solve's
@@ -161,6 +169,20 @@ The theory packages cover difference arithmetic, LIA, LRA/LIRA and complete pure
 polynomial real satisfaction. Bitvectors, arrays, strings, quantifiers and mixed
 nonlinear integer/real arithmetic remain outside the supported theory surface.
 
+Native factor coverage is broader than SMT source admission. `Product` represents
+finite Int × Int multiplication and `RealProduct` represents finite Int × Real
+multiplication, but the linear SMT facade rejects products of multiple nonconstant
+operands. Polynomial fallback accepts pure Real/Bool satisfaction only; it does
+not admit nonlinear integer sources even when their integers have finite bounds.
+Neither native product factor represents Real × Real multiplication. See the
+[implemented arithmetic routes](architecture.md#implemented-arithmetic-routes).
+Polynomial composition and continuous products are under active work in
+[#2621](https://github.com/Eignex/klause/issues/2621) and
+[#2622](https://github.com/Eignex/klause/issues/2622); nonlinear integer SMT admission
+is tracked in [#2625](https://github.com/Eignex/klause/issues/2625). These are
+implementation gaps rather than admission restrictions imposed by the support
+policy. Update this coverage when those routes land.
+
 Asserted and reified equalities between an integer conditional result and a constant
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
 results are shared within one parse; nested definitions are traversed iteratively.
@@ -273,7 +295,15 @@ and nonconstant powers above one, without requiring polynomial expansion.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun` macros
 capture their definition scope, and assertions retain the declarations visible at
-that source command. Unsupported syntax is rejected even inside a constant Boolean
+that source command. A compiler-owned append-only binding table stores each declaration
+and macro once. Environments retain a visibility cutoff into that table; appending
+bindings cannot expose forward references in an earlier assertion or macro body.
+Assertions between binding commands share an environment. Local `let` and parameter
+scopes capture only their own bindings and link to their enclosing environment,
+without copying global tables. Lookups walk local scopes iteratively before reading
+the visible global entry. The table and lexical environments belong to admission
+and are discarded after lowering; published source IR retains neither.
+Unsupported syntax is rejected even inside a constant Boolean
 branch. One `check-sat` or `check-sat-assuming` query is accepted; Boolean literal
 assumptions are conjoined with the assertions. `get-model` is accepted as a request.
 Mixed integer sorts, symbolic or zero division, negative/noninteger/oversized powers,

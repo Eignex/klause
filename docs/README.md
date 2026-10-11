@@ -8,6 +8,14 @@ unless a page states otherwise.
 User-facing documentation is maintained separately at
 [eignex.com/docs/klause](https://eignex.com/docs/klause/).
 
+The [solver identity and support policy](architecture.md#solver-identity-and-support-policy)
+requires shared model breadth and an available complete-search/local-search
+portfolio for every supported problem. Current route restrictions are recorded as
+coverage gaps; mathematical completeness and proof authority remain distinct.
+The [proof-file vision](architecture.md#independently-checkable-proof-files) extends
+that contract to independent verification of source results; current in-memory
+certificates do not implement proof export.
+
 ## Development and frontends
 
 | Page | Owns |
@@ -21,7 +29,7 @@ User-facing documentation is maintained separately at
 
 | Page | Owns |
 |---|---|
-| [System architecture](architecture.md) | Modules, dependency boundaries and source-model ownership |
+| [System architecture](architecture.md) | Solver identity, support and result guarantees, arithmetic routes, modules, dependency boundaries and source-model ownership |
 | [Library API](api.md) | Supported surfaces, migration, typed mappings and snapshot/buffer ownership |
 | [Sessions and streams](solver/sessions.md) | Assumptions, conditioned queries, cursor ownership and retained caller state |
 | [Search and propagation](solver/search.md) | Shared traversal, finite fixpoints, explanations, learned clauses, open real feasibility and clausal primal preparation |

@@ -4,6 +4,14 @@ Portfolios admit engine results under a shared source scope and schedule retaine
 workers. [Sessions](sessions.md) own assumptions; [LP
 certification](../lp/certification.md) owns numerical proof checks.
 
+The [solver identity contract](../architecture.md#solver-identity-and-support-policy)
+requires callers to be able to pair complete search and local search for every
+supported problem, with both arms executing the same source constraints and
+objective. A standalone theory route or a filtered-out unsupported LS arm does
+not meet that requirement. Route restrictions below describe implemented coverage;
+they are gaps to close rather than exceptions to the contract. Complete-search
+proof authority does not imply mathematical completeness for every admitted theory.
+
 ## Witnesses and proof scope
 
 Open portfolios transport exact assignments in `Sample` rather than through a side
@@ -42,6 +50,11 @@ accepted feasible point can remain the best incumbent. The certificate is an in-
 attestation of the engine's check, not a serialized proof or an independent proof
 checker. Numerical proofs remain owned by their engines; a point alone never certifies a
 recession direction.
+
+The [proof-file vision](../architecture.md#independently-checkable-proof-files)
+requires independently checkable evidence back to the source, including justified
+imports across workers. These in-memory attestations do not meet that target;
+serializing a certificate token alone does not provide a derivation.
 
 Built-in shared channels belong to the same model and objective. Workers reject foreign
 pools; objective and variable bound imports require matching certificates. The shared
