@@ -11,6 +11,7 @@ internal class PropagationIndexes(
     val nonIntOccurrences: Array<IntArray>,
     val intEvents: Boolean,
     val intDeltas: Boolean,
+    val nativeEligible: Boolean,
 ) {
     companion object {
         fun preparation(problem: Problem, propagators: Array<Propagator>): Sequence<PropagationIndexes?> = sequence {
@@ -24,10 +25,13 @@ internal class PropagationIndexes(
             yield(null)
             val watched = arrayOfNulls<IntHashSet>(problem.numFactors)
             yield(null)
+            var clausal = problem.numIntVars == 0 && problem.numRealVars == 0 &&
+                problem.numBoolVars > 0 && problem.factors.isNotEmpty()
             var events = false
             var deltas = false
             var visits = 0
             for (fid in propagators.indices) {
+                clausal = clausal && problem.factors[fid] is com.eignex.klause.factor.bool.Clause
                 val prop = propagators[fid]
                 val watches = prop.initialIntEventWatches
                 if (watches != null) {
@@ -95,7 +99,7 @@ internal class PropagationIndexes(
             @Suppress("UNCHECKED_CAST")
             yield(PropagationIndexes(
                 bools as Array<IntArray>, ints as Array<IntArray>,
-                nonBools as Array<IntArray>, nonInts as Array<IntArray>, events, deltas,
+                nonBools as Array<IntArray>, nonInts as Array<IntArray>, events, deltas, clausal,
             ))
         }
     }

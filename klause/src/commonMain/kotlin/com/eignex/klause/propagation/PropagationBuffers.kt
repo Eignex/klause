@@ -36,6 +36,8 @@ internal class PropagationBuffers(
     val intMaxAntecedents: Array<IntArray?>,
     val boolPinPos: IntArray,
     val atoms: AtomStore,
+    val watches: BoolWatcherIndex,
+    val refPayloadStore: ArrayList<Any?>,
     val binaryClauseCount: Int,
 ) {
     companion object {
@@ -142,6 +144,22 @@ internal class PropagationBuffers(
             yield(null)
             val atoms = AtomStore(problem.numIntVars)
             yield(null)
+            var watcherCount = 0
+            for (fid in projection.propagators.indices) {
+                watcherCount += projection.propagators[fid].initialBoolWatchers?.size ?: 0
+                if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            }
+            var watcherIndex: BoolWatcherIndex? = null
+            for (next in BoolWatcherIndex.preparation(problem.numBoolVars, watcherCount)) {
+                if (next != null) watcherIndex = next
+                yield(null)
+            }
+            val refPayloadStore = ArrayList<Any?>(problem.numFactors)
+            yield(null)
+            repeat(problem.numFactors) { fid ->
+                refPayloadStore.add(null)
+                if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            }
             var binaryClauseCount = 0
             for (fid in problem.factors.indices) {
                 val factor = problem.factors[fid]
@@ -177,6 +195,8 @@ internal class PropagationBuffers(
                 intMaxAntecedents,
                 boolPinPos,
                 atoms,
+                checkNotNull(watcherIndex),
+                refPayloadStore,
                 binaryClauseCount,
             ))
         }

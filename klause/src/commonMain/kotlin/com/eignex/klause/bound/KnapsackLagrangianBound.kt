@@ -167,8 +167,10 @@ internal class KnapsackLagrangianBound(
                     PbOp.GE -> -1
                     PbOp.EQ -> 0
                 }
-                val cols = constructionIntArray(f.literals.size)
-                val vals = constructionLongArray(f.literals.size)
+                val cols = IntArray(f.literals.size)
+                yield(Unit)
+                val vals = LongArray(f.literals.size)
+                yield(Unit)
                 var rhs = f.bound
                 for (k in f.literals.indices) {
                     if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)

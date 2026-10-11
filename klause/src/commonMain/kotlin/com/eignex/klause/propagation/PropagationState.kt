@@ -414,7 +414,7 @@ class PropagationState private constructor(
     /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
      *  alongside the learned-clause registry without copying the full array. */
     internal val refPayloadStore: ArrayList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
-        ArrayList<Any?>(problem.numFactors).apply { repeat(problem.numFactors) { add(null) } }
+        prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply { repeat(problem.numFactors) { add(null) } }
     }
 
     /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every
@@ -479,7 +479,9 @@ class PropagationState private constructor(
 
     /** Per-literal bool watcher index (watch lists, blockers, back-pointers) —
      *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
-    internal val watches: BoolWatcherIndex by lazy(LazyThreadSafetyMode.NONE) { BoolWatcherIndex(problem.numBoolVars) }
+    internal val watches: BoolWatcherIndex by lazy(LazyThreadSafetyMode.NONE) {
+        prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars)
+    }
 
     /**
      * Per-bool-var antecedent literals — the literal-form reason why this variable's
