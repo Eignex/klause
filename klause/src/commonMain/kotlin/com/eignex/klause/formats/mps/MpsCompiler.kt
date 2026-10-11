@@ -202,7 +202,15 @@ class MpsCompiled(
      * certified on, not over the decimals they round, so an exact check of it would reject a point that sits on a
      * rounded row or bound.
      */
-    fun sourceWitness(ints: LongArray, reals: List<BigFraction>?): MpsSourceWitness {
+    fun sourceWitness(ints: LongArray, reals: List<BigFraction>?): MpsSourceWitness =
+        sourceWitness(columns.map { column -> sourceColumnValue(column, ints, reals) })
+
+    /**
+     * Check exact coordinates in source [columns] order, including integer values outside `Long`.
+     * Source integrality is required exactly; rows and bounds use decimal tolerance only when [sourceExact] is false.
+     */
+    fun sourceWitness(values: List<BigFraction>): MpsSourceWitness {
+        if (values.size != columns.size) mpsLoweringError("source witness does not cover every column")
         val source = checkNotNull(sourceModel) { "MPS source model is unavailable" }
         val numbers = source.sourceNumbers()
         val tolerance = if (sourceExact) BigFraction.ZERO else MPS_TOLERANCE_EXACT
@@ -211,9 +219,11 @@ class MpsCompiled(
                 val magnitude = scale?.absolute() ?: return@fold widest
                 if (magnitude > widest) magnitude else widest
             }
-        val values = columns.map { column -> sourceColumnValue(column, ints, reals) }
         source.variables.forEachIndexed { index, variable ->
             val value = values[index]
+            if (variable.integer && value.den != BIG_ONE) {
+                mpsLoweringError("source witness violates integrality of '${variable.name}'")
+            }
             val (lower, upper) = numbers.variableBounds[index]
             if (lower.finiteMps()?.fraction?.let { value < it - slack(it) } == true ||
                 upper.finiteMps()?.fraction?.let { value > it + slack(it) } == true

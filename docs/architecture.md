@@ -102,7 +102,7 @@ and render its result. They do not invoke concrete theories directly. Open routi
 can prove missing bounds before selecting the finite lane; it retains the source
 semantics if that proof declines. See [input semantics](formats.md).
 
-SMT-LIB and source-exact MPS can use an open local-search route when the selected
+SMT-LIB and MPS can use an open local-search route when the selected
 theory cannot decide an objective or fragment. That route searches for witnesses
 without turning failure into refutation. Exact FlatZinc declines an unsupported
 open fragment. Route-specific guarantees belong to the shared pipeline and source

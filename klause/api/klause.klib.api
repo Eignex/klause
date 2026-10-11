@@ -5295,6 +5295,7 @@ final class com.eignex.klause.formats.mps/MpsCompiled { // com.eignex.klause.for
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsCompiled.hashCode|hashCode(){}[0]
     final fun sourceObjective(kotlin/LongArray, kotlin/DoubleArray): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.formats.mps/MpsCompiled.sourceObjective|sourceObjective(kotlin.LongArray;kotlin.DoubleArray){}[0]
+    final fun sourceWitness(kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>): com.eignex.klause.formats.mps/MpsSourceWitness // com.eignex.klause.formats.mps/MpsCompiled.sourceWitness|sourceWitness(kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
     final fun sourceWitness(kotlin/LongArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>?): com.eignex.klause.formats.mps/MpsSourceWitness // com.eignex.klause.formats.mps/MpsCompiled.sourceWitness|sourceWitness(kotlin.LongArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsCompiled.toString|toString(){}[0]
     final fun withinTolerance(kotlin/LongArray, kotlin/DoubleArray): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.withinTolerance|withinTolerance(kotlin.LongArray;kotlin.DoubleArray){}[0]

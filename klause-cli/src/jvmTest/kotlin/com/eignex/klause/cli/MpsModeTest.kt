@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -152,7 +153,7 @@ class MpsModeTest {
     }
 
     @Test
-    fun `open decimal lowerings retain a source correspondence diagnostic`() {
+    fun `exact open decimal lowerings retain a source correspondence diagnostic`() {
         val mps = File.createTempFile("mpsopenrounded", ".mps").apply {
             writeText(
                 "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
@@ -162,15 +163,69 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        for (exact in listOf(false, true)) {
-            val failure = assertFailsWith<MpsLoweringException> {
-                MpsMode.newSession().load(mps.absolutePath, CommonOptions().apply { this.exact = exact })
-            }
-
-            val route = if (exact) "exact MPS lowering" else "open MPS source"
-            assertTrue("$route differs" in failure.message.orEmpty(), failure.message)
-            assertTrue("column bound 'X'" in failure.message.orEmpty(), failure.message)
+        val failure = assertFailsWith<MpsLoweringException> {
+            MpsMode.newSession().load(mps.absolutePath, CommonOptions().apply { exact = true })
         }
+
+        assertTrue("exact MPS lowering differs" in failure.message.orEmpty(), failure.message)
+        assertTrue("column bound 'X'" in failure.message.orEmpty(), failure.message)
+    }
+
+    @Test
+    fun `default open decimal witnesses report their original objective without proof claims`() {
+        val mps = File.createTempFile("mpsopentolerance", ".mps").apply {
+            writeText(
+                "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 1 R -1\n M1 'MARKER' 'INTEND'\n X COST 1.0000000000000000001 R 1\n" +
+                    "BOUNDS\n LI B I 0\n LO B X 0.1\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+        val session = MpsMode.newSession()
+        val solvable = session.load(mps.absolutePath, CommonOptions())
+        val pipeline = solvable.pipeline as SolvablePipeline.OpenLocalSearch
+        val assignment = OpenTheoryAssignment.Sampled(
+            Sample(BooleanArray(0), longArrayOf(0L), doubleArrayOf(1.0), listOf(BigFraction.ONE)),
+        )
+        val rendered = pipeline.render(assignment)
+        val output = session.output(CommonOptions())
+
+        val text = capture {
+            output.onExactSolution(rendered, BigFraction.ONE)
+            output.onComplete(Verdict.OPTIMAL)
+        }
+
+        assertTrue("o 1.0000000000000000001" in text.lines(), text)
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+        assertFalse("s OPTIMUM FOUND" in text.lines(), text)
+    }
+
+    @Test
+    fun `default open decimal witnesses outside source tolerance are withheld`() {
+        val mps = File.createTempFile("mpsopenreject", ".mps").apply {
+            writeText(
+                "NAME T\nROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n" +
+                    " I COST 1 R -1\n M1 'MARKER' 'INTEND'\n X R 1\n" +
+                    "BOUNDS\n LI B I 0\n LO B X 0.1\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+        val session = MpsMode.newSession()
+        val solvable = session.load(mps.absolutePath, CommonOptions())
+        val pipeline = solvable.pipeline as SolvablePipeline.OpenLocalSearch
+        val assignment = OpenTheoryAssignment.Sampled(
+            Sample(BooleanArray(0), longArrayOf(1L), doubleArrayOf(0.0), listOf(BigFraction.ZERO)),
+        )
+        val rendered = pipeline.render(assignment)
+        val output = session.output(CommonOptions())
+
+        val text = capture {
+            output.onExactSolution(rendered, BigFraction.ONE)
+            output.onComplete(Verdict.BEST_FOUND)
+        }
+
+        assertTrue("s UNKNOWN" in text.lines(), text)
+        assertFalse(text.lines().any { it.startsWith("v ") || it.startsWith("o ") }, text)
     }
 
     @Test

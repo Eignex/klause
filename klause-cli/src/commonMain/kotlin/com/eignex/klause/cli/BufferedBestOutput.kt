@@ -43,6 +43,8 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     /** The incumbent's objective, for a format whose status line depends on it. */
     protected open fun onSolutionObjective(objective: Long?) = Unit
 
+    protected open fun acceptsSourceWitness(): Boolean = true
+
     /** Why the run stopped; see [VerdictContext]. Set before the verdict is rendered. */
     protected var context: VerdictContext = VerdictContext()
         private set
@@ -58,6 +60,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     }
 
     final override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
+        if (!acceptsSourceWitness()) return
         best = rendered
         onSolutionObjective(objective)
         if (!streamObjective) return
@@ -71,6 +74,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     }
 
     final override fun onExactSolution(rendered: String, objective: BigFraction) {
+        if (!acceptsSourceWitness()) return
         best = rendered
         if (streamObjective) println("$objectivePrefix${formatExactObjective(objective)}")
     }

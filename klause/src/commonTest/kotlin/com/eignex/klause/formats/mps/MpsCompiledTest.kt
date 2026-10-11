@@ -4,6 +4,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -13,6 +15,41 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class MpsCompiledTest {
+
+    @Test
+    fun `source coordinates retain integer values beyond Long`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\n" +
+                " M1 'MARKER' 'INTEND'\nBOUNDS\n FR B I\nENDATA",
+        ).toProblem()
+        val value = BigFraction.of(parseBigInt("10000000000000000000"), BIG_ONE)
+
+        val witness = compiled.sourceWitness(listOf(value))
+
+        assertEquals("10000000000000000000", witness.objective.toString())
+        assertEquals(listOf(value), witness.values)
+    }
+
+    @Test
+    fun `source coordinates require exact integer integrality`() {
+        val compiled = Mps.parse(
+            "ROWS\n N COST\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1\n" +
+                " M1 'MARKER' 'INTEND'\nBOUNDS\n FR B I\nENDATA",
+        ).toProblem()
+
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(listOf(BigFraction.ofLong(2L).reciprocal()))
+        }
+    }
+
+    @Test
+    fun `source coordinates must cover every declared column`() {
+        val compiled = Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 1\nENDATA").toProblem()
+
+        assertFailsWith<MpsLoweringException> {
+            compiled.sourceWitness(emptyList())
+        }
+    }
 
     @Test
     fun `a free continuous integer definition preserves source values and objective`() {

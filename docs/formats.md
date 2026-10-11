@@ -14,7 +14,7 @@ finite domain.
 
 `-e` selects a finite engine and can control an open local-search request. Models
 routed to a complete open theory use the shared theory solve independently of
-that choice. SMT-LIB and source-exact MPS can fall back to open local search for
+that choice. SMT-LIB and MPS can fall back to open local search for
 an unsupported fragment or objective; it supplies witnesses without a completeness
 claim. Exact FlatZinc declines unsupported open fragments.
 `--param open-bound-proof=false` disables the
@@ -173,11 +173,20 @@ point is not an exact witness. Optimum publication requires no
 the source. Exact source witnesses use exact decimal checks when correspondence
 holds, and decimal tolerance otherwise.
 
-The open MPS route declines purely continuous models and inexact source lowering.
+Purely continuous MPS sources use the finite LP lane, including fractional objectives.
+Source-exact open mixed models use a supported complete theory when available.
 Complete theory optimization requires an integral objective without continuous
 or Boolean cost and a bound row remaining inside the supported theory. Other
-objectives can use open local search for incumbents, with source-exact lowering
-still required. Check the frontend's route and decline reason before attributing
+objectives use open local search for incumbents without an optimum claim.
+
+Default open models whose lowering differs from the source also use witness search.
+Before publication, their arbitrary-width integer and rational real coordinates are
+checked against original decimal rows, indicators and bounds with the source tolerance;
+integer integrality remains exact. Their objective is recomputed from source decimals.
+Rejected points are withheld and establish no refutation. These routes publish no
+optimum, infeasibility or unboundedness claim, even when the lowered model was decided.
+The source difference is reported beside the result. `--exact` retains its source
+correspondence requirement. Check routing and source qualifications before attributing
 a missing result to the simplex.
 
 See [MpsCompiler](../klause/src/commonMain/kotlin/com/eignex/klause/formats/mps/MpsCompiler.kt)
