@@ -17,7 +17,7 @@ def source(record, source_root):
     assert re.fullmatch('[0-9a-f]{64}', digest), 'invalid source hash'
     raw = (source_root / (digest + '.txt')).read_bytes()
     assert hashlib.sha256(raw).hexdigest() == digest, 'source hash mismatch'
-    return raw.decode('ascii')
+    return raw.decode('utf-8')
 
 
 def assignment(witness, size, opb=False, bitstring=False):
@@ -116,8 +116,7 @@ def pigeonhole(clauses):
 
 def opb(text):
     header = re.search('#variable=\\s*(\\d+)', text)
-    assert header
-    size = int(header[1])
+    size = int(header[1]) if header else None
     parts = ' '.join((line for line in text.splitlines() if not line.lstrip().startswith('*'))).split(';')
     objective = None
     rows = []
@@ -138,11 +137,14 @@ def opb(text):
         pattern = '([+-]?\\d+)\\s+(~?x[1-9]\\d*)'
         terms = [(int(coef), int(name.lstrip('~x')), name.startswith('~')) for coef, name in re.findall(pattern, expression)]
         assert not re.sub(pattern, '', expression).strip(), 'nonlinear or unsupported OPB expression'
-        assert all((1 <= index <= size for _, index, _ in terms))
+        assert all((size is None or 1 <= index <= size for _, index, _ in terms))
         if relation == 'min':
             objective = terms
         else:
             rows.append((terms, relation, rhs))
+    if size is None:
+        terms = (objective or []) + [term for row, _, _ in rows for term in row]
+        size = max((index for _, index, _ in terms), default=0)
     return (size, objective, rows)
 
 

@@ -1,4 +1,5 @@
 import copy
+import hashlib
 from pathlib import Path
 import unittest
 from unittest import mock
@@ -85,6 +86,41 @@ class BooleanSourceCheckTest(unittest.TestCase):
         with mock.patch.object(proof_check, 'source', return_value=source):
             result = proof_check.check(case, Path('.'))
         self.assertEqual(result['proof'], 'source satisfaction')
+
+    def test_utf8_source_comments_preserve_hashed_bytes(self):
+        text = '* x1 \u2192 x2\n+1 x1 +1 x2 >= 1;\n'
+        raw = text.encode('utf-8')
+        record = dict(sourceHashes={'model': hashlib.sha256(raw).hexdigest()})
+
+        with mock.patch.object(Path, 'read_bytes', return_value=raw):
+            result = proof_check.source(record, Path('.'))
+
+        self.assertEqual(result, text)
+
+    def test_optional_opb_header_preserves_constraints_and_objective(self):
+        for header in ['', '* #variable= 2 #constraint= 1\n']:
+            with self.subTest(header=header):
+                case = copy.deepcopy(self.case)
+                case['problem']['format'] = 'OPB'
+                case['record'].update(finalWitness='v -x1 x2', exactObjective='2')
+                source = header + 'min: +1 x1 +2 x2;\n+1 x1 +1 x2 >= 1;\n'
+
+                with mock.patch.object(proof_check, 'source', return_value=source):
+                    result = proof_check.check(case, Path('.'))
+
+                self.assertEqual(result['objective'], 2)
+                self.assertEqual(result['witness'], 'source feasible')
+
+    def test_declared_opb_variable_range_is_enforced(self):
+        case = copy.deepcopy(self.case)
+        case['problem']['format'] = 'OPB'
+        case['record'].update(finalWitness='v -x1 x2', exactObjective='2')
+        source = '* #variable= 1 #constraint= 1\nmin: +2 x2;\n+1 x1 >= 0;\n'
+
+        with mock.patch.object(proof_check, 'source', return_value=source):
+            result = proof_check.check_cases([case], Path('.'))
+
+        self.assertIn('error', result[0])
 
     def test_nonlinear_opb_source_is_declined(self):
         case = copy.deepcopy(self.case)

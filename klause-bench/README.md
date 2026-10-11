@@ -383,7 +383,9 @@ independent of paired timing analysis and Klause's internal certificates.
 `DIMACS`, `WCNF` and linear `OPB` records against original source bytes in that same
 hash-named directory. It accepts complete signed-literal assignments, OPB variable
 names and WCNF bitstrings. Clauses, hard weights, Boolean integrality and integer
-objectives use exact arithmetic. Nonlinear or unsupported syntax is declined.
+objectives use exact arithmetic. UTF-8 comments preserve original byte hashes.
+Linear OPB bodies can omit the variable-count comment; their range is inferred
+from referenced indices. Nonlinear or unsupported syntax is declined.
 
 ```sh
 python3 klause-bench/tools/verify_boolean_source_results.py /path/to/cases.json \
