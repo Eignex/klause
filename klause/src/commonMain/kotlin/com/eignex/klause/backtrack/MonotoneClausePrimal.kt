@@ -261,18 +261,20 @@ internal class MonotoneClausePrimal private constructor(
         ): MonotoneClausePrimal? {
             val start = TimeSource.Monotonic.markNow()
             val problem = solver.problem
-            val rootPins = (problem.rootDeductions as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None
-            val scopedParams = params.copy(assumptions = rootPins.mergedWith(params.assumptions))
             if (problem.numIntVars != 0 || problem.numRealVars != 0 ||
                 objective.boolWeights.any { it < 0L } || objective.intCoefficients.any { it != 0L }
             ) return null
-            val variables = objective.boolWeights.indices.filter { objective.boolWeights[it] > 0L }
+            val rootPins = (problem.rootDeductions as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None
+            val scopedParams = params.copy(assumptions = rootPins.mergedWith(params.assumptions))
+            val costVariables = objective.boolWeights.indices.filter { objective.boolWeights[it] > 0L }
                 .sortedWith(compareByDescending<Int> { objective.boolWeights[it] }.thenByDescending { it })
-            if (variables.isEmpty() || variables.size > 64) return null
-            if (variables.any { variable ->
-                    variable >= problem.numBoolVars || scopedParams.assumptions.boolValueOrNull(variable) != null
+            if (costVariables.isEmpty() || costVariables.size > 64) return null
+            if (costVariables.any { variable ->
+                    variable >= problem.numBoolVars || params.assumptions.boolValueOrNull(variable) != null
                 }
             ) return null
+            val variables = costVariables.filter { rootPins.boolValueOrNull(it) == null }
+            if (variables.isEmpty()) return null
             val occurrences = Array(problem.numBoolVars) { mutableListOf<Clause>() }
             var literalWork = 0L
             val clauses = mutableListOf<Clause>()
