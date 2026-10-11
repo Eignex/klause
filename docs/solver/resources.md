@@ -20,8 +20,8 @@ an explicit work setting can still supply an exhausted or finite work allowance.
 Built-in `withCancellation` adapters replace the invocation token while retaining any
 separately bound lifetime scope. `withLifetimeCancellation` composes a persistent token
 that bounds construction and every later invocation or retained slice. Ordinary
-parameter cancellation bounds handle construction only; each slice supplies its own
-invocation token. These scopes keep their earliest deadline without retaining an old
+parameter cancellation bounds one-shot execution and retained-handle construction;
+each retained slice supplies its own invocation token. These scopes keep their earliest deadline without retaining an old
 slice deadline. Portfolio construction and the first search segment share the offered
 segment deadline. ALNS bootstrap construction uses its shortened phase token; later
 bootstrap slices retain the containing lifetime scope and rearm their invocation clock.
@@ -44,7 +44,10 @@ bootstrap slices retain the containing lifetime scope and rearm their invocation
 | Neutral kernel controls | Caller-owned native work, optional maximum and cancellation | Missing maximum / zero maximum is exhausted | Kernel interruption without solver result semantics |
 
 The solve-wide decision/move currency excludes propagation and LP work. Ordinary LS
-instructions and CP repair decisions charge the same containing `NodeBudget`. ALNS
+instructions and CP repair decisions charge the same containing `NodeBudget`. The
+private clausal primal search and walk also charge that ledger. Their decisions and
+walk instructions are not included in the enclosing arm's `nodes` and `lsMoves`
+counters, so those exported counters alone cannot reconstruct the solve charge. ALNS
 charges each outer iteration's declared flip allowance once; the inner LS repair is
 not billed again for its moves, while CP repair decisions remain additional native
 work. CLI statistics expose `nodeBudgetLimit`, `nodeBudgetSpent` and
