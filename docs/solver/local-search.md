@@ -192,7 +192,9 @@ During infeasibility, weighted and raw move ranking interpolates Cumulative over
 within their compressed grade buckets. Each factor contributes a fraction below one
 grade unit, scaled by its weight for weighted scoring. A complete reversible probe
 grades propagated and compound moves; integer costs and feasibility checks retain their
-existing meaning. Interpolation and primitive delta predictions use the same saturated
+existing meaning. Primitive moves without definition readers or Cumulative occurrences
+use direct degree scoring. Their weighted repair score equals the raw delta until
+weights are allocated. Interpolation and primitive delta predictions use the same saturated
 payload as committed Cumulative grades. Weight and plateau-stall schedules recognize a
 lower unweighted fraction sum when integer costs tie. Integer-cost drops take
 precedence, and restarts re-anchor both components. Recipes using break scoring retain

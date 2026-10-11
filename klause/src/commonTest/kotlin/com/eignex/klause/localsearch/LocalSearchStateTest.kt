@@ -3,11 +3,13 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
@@ -219,6 +221,119 @@ class LocalSearchStateTest {
             assertEquals(5, state.moveSink.list.count { it is Move.IntSet })
             assertEquals(1L, state.cost)
         }
+    }
+
+    @Test
+    fun `unrelated primitive repair scores preserve weights and committed state`() {
+        for (coordinate in listOf("boolean", "integer", "real")) {
+            for (allocated in listOf(false, true)) {
+                val problem = Problem(
+                    1, 3, arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(0, 3)),
+                    arrayOf<Factor>(
+                        Cumulative(intArrayOf(0, 1), longArrayOf(84, 84), longArrayOf(1, 1), 1),
+                        Clause(intArrayOf(Lit.make(0, true))),
+                        Linear(intArrayOf(2), intArrayOf(2), LinearOp.GE, 6),
+                        Linear(intArrayOf(1), intArrayOf(2), LinearOp.GE, 2),
+                        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 3.0),
+                    ),
+                    numRealVars = 1,
+                    realLower = doubleArrayOf(0.0),
+                    realUpper = doubleArrayOf(10.0),
+                )
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+                repeat(3) { state.assignment.setInt(it, 0L) }
+                state.assignment.setBool(0, false)
+                state.assignment.setReal(0, 0.0)
+                state.recompute()
+                state.weights.normalizeWeightsByClass = true
+                if (allocated) {
+                    for ((fid, weight) in doubleArrayOf(2.0, 3.5, 2.5, 0.75, 1.5).withIndex()) {
+                        state.weights.factorWeights[fid] = weight
+                    }
+                }
+                val before = state.assignment.snapshot()
+                val cost = state.cost
+                val overload = state.intPayload[0]
+                val bestCost = state.bestCostSeen
+                val step = state.tabu.step
+                val touched = state.tabu.lastTouched.copyOf()
+                val activity = state.tabu.touchCount.copyOf()
+                val weightedBefore = if (allocated) {
+                    state.factorDegree.indices.sumOf { state.weights.factorWeights[it] * state.factorDegree[it] }
+                } else {
+                    cost.toDouble()
+                }
+                val move = when (coordinate) {
+                    "boolean" -> Move.BoolFlip(0)
+                    "integer" -> Move.IntSet(2, 1L)
+                    else -> Move.RealSet(0, 1.0)
+                }
+
+                val raw = state.repairNetDelta(move, weighted = false)
+                val weighted = state.repairNetDelta(move, weighted = true)
+                repeat(2) {
+                    assertEquals(raw, state.repairNetDelta(move, weighted = false), coordinate)
+                    assertEquals(weighted, state.repairNetDelta(move, weighted = true), coordinate)
+                }
+
+                assertEquals(before, state.assignment.snapshot(), coordinate)
+                assertEquals(cost, state.cost, coordinate)
+                assertEquals(overload, state.intPayload[0], coordinate)
+                assertEquals(bestCost, state.bestCostSeen, coordinate)
+                assertEquals(step, state.tabu.step, coordinate)
+                assertContentEquals(touched, state.tabu.lastTouched, coordinate)
+                assertContentEquals(activity, state.tabu.touchCount, coordinate)
+                assertEquals(allocated, state.weights.allocated, coordinate)
+                if (!allocated) assertEquals(raw, weighted, coordinate)
+
+                state.apply(move)
+                val committed = state.cost
+                state.recompute()
+                val weightedAfter = if (allocated) {
+                    state.factorDegree.indices.sumOf { state.weights.factorWeights[it] * state.factorDegree[it] }
+                } else {
+                    state.cost.toDouble()
+                }
+
+                assertEquals(committed, state.cost, coordinate)
+                assertEquals((state.cost - cost).toDouble(), raw, coordinate)
+                assertEquals(weightedAfter - weightedBefore, weighted, coordinate)
+                assertEquals(overload, state.intPayload[0], coordinate)
+            }
+        }
+    }
+
+    @Test
+    fun `presence repair scores retain cumulative plateau refinement`() {
+        val problem = Problem(
+            2, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 0)),
+            arrayOf<Factor>(Cumulative(
+                intArrayOf(0, 1), longArrayOf(1, 1), longArrayOf(1, 83), 1,
+                presents = intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+            )),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setBool(0, true)
+        state.assignment.setBool(1, true)
+        state.recompute()
+        state.weights.factorWeights[0] = 3.5
+        val before = state.assignment.snapshot()
+        val cost = state.cost
+        val move = Move.BoolFlip(0)
+
+        repeat(2) {
+            assertEquals(0L, state.netDelta(move))
+            assertEquals(-1.0 / 64.0, state.repairNetDelta(move, weighted = false))
+            assertEquals(-3.5 / 64.0, state.repairNetDelta(move, weighted = true))
+            assertEquals(before, state.assignment.snapshot())
+            assertEquals(cost, state.cost)
+            assertEquals(83, state.intPayload[0])
+        }
+        state.apply(move)
+        state.recompute()
+
+        assertEquals(cost, state.cost)
+        assertEquals(82, state.intPayload[0])
     }
 
     @Test
