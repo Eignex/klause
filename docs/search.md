@@ -437,8 +437,8 @@ costly values; polishing resumes across slices before the composed verifier chec
 proposal for publication.
 Failed or cancelled trials contribute no infeasibility or optimality proof.
 
-The feasibility repair uses the SAT preset with inprocessing and target capture disabled and retains
-its session across portfolio slices. Its cumulative
+The feasibility repair uses the SAT preset with inprocessing and target capture disabled,
+starts fresh Boolean decisions with false, and retains its saved phases and session across portfolio slices. Its cumulative
 work is charged to the owning arm, including initialization, and slice cancellation
 pauses the current traversal without restarting it. Feasibility search receives at most one half of the remaining
 solve allowance in active execution time, capped at 5 seconds; each trial also has a
