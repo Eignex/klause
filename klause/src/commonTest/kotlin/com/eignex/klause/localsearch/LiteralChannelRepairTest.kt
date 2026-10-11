@@ -18,6 +18,91 @@ import kotlin.test.assertTrue
 
 class LiteralChannelRepairTest {
     @Test
+    fun `equality index repairs coordinate both inputs and their channels`() {
+        for ((initial, target) in listOf(0L to 8L, 8L to 0L)) {
+            val problem = Problem(
+                1, 4, arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 8), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3))).network(4, 1)
+            state.assignment.setInt(0, initial / 6)
+            state.assignment.setInt(1, initial % 6)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 2, target)
+            val move = state.moveSink.list.single()
+            val before = state.cost
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(target / 6, state.assignment.intValue(0))
+            assertEquals(target % 6, state.assignment.intValue(1))
+            assertEquals(target, state.assignment.intValue(2))
+            assertEquals(target == 8L, state.assignment.boolValue(0))
+            assertEquals(if (target == 8L) 1L else 0L, state.assignment.intValue(3))
+            assertEquals(before + predicted, state.cost)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `equality index repairs respect protected coordinates`() {
+        for (protection in listOf("source pin", "source owner", "output pin", "output owner")) {
+            val problem = Problem(
+                1, 4, arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 8), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+                ),
+            )
+            val assumptions = when (protection) {
+                "source pin" -> Assumptions.None.withInt(0, 0)
+                "output pin" -> Assumptions.None.withInt(2, 0)
+                else -> Assumptions.None
+            }
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3))).network(4, 1)
+            if (protection == "source owner") state.moveSink.setOwners(intArrayOf(7, -1, -1, -1))
+            if (protection == "output owner") state.moveSink.setOwners(intArrayOf(-1, -1, 7, -1))
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(1, 0)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 2, 8)
+
+            assertTrue(state.moveSink.list.isEmpty(), protection)
+        }
+    }
+
+    @Test
+    fun `equality index repairs reject targets outside the output domain`() {
+        val problem = Problem(
+            1, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 8)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2))).network(3, 1)
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.recompute()
+
+        for (target in listOf(-1L, 9L)) state.moveSink.addChannelingIntSet(state, 2, target)
+
+        assertTrue(state.moveSink.list.isEmpty())
+    }
+
+    @Test
     fun `searched predicate choices preserve protected coordinates`() {
         for (protection in listOf("source pin", "source owner", "output pin", "output owner", "Boolean pin")) {
             val problem = Problem(

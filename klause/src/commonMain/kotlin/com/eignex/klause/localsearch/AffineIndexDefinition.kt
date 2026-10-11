@@ -1,21 +1,22 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
-internal data class ElementIndexDefinition(val variable: Int, val factor: Linear, val outputIndex: Int)
+internal data class AffineIndexDefinition(val variable: Int, val factor: Linear, val outputIndex: Int)
 
-internal fun elementIndexDefinitions(
+internal fun affineIndexDefinitions(
     factors: Array<Factor>,
     numIntVars: Int,
     definedHints: IntArray,
-): List<ElementIndexDefinition> = ElementIndexInference(factors, numIntVars, definedHints).infer()
+): List<AffineIndexDefinition> = AffineIndexInference(factors, numIntVars, definedHints).infer()
 
-private class ElementIndexInference(
+private class AffineIndexInference(
     private val factors: Array<Factor>,
     numIntVars: Int,
     definedHints: IntArray,
@@ -25,20 +26,24 @@ private class ElementIndexInference(
     }
     private val occurrences = arrayOfNulls<IntArrayList>(numIntVars)
     private val indexUse = BooleanArray(numIntVars)
+    private val elementUse = BooleanArray(numIntVars)
     private val nonIndexCount = IntArray(numIntVars)
     private val acceptedRows = BooleanArray(factors.size)
     private val derived = BooleanArray(numIntVars)
     private val pending = IntArrayDeque()
-    private val definitions = ArrayList<ElementIndexDefinition>()
+    private val definitions = ArrayList<AffineIndexDefinition>()
 
-    fun infer(): List<ElementIndexDefinition> {
+    fun infer(): List<AffineIndexDefinition> {
         for (fid in factors.indices) {
             val factor = factors[fid]
             for (v in factor.intVars) {
                 if (!hinted[v]) continue
                 val readers = occurrences[v] ?: IntArrayList().also { occurrences[v] = it }
                 readers.add(fid)
-                if (factor.isIndexRead(v)) indexUse[v] = true else nonIndexCount[v]++
+                if (factor.isIndexRead(v)) {
+                    indexUse[v] = true
+                    if (factor is Element) elementUse[v] = true
+                } else nonIndexCount[v]++
             }
         }
         for (fid in factors.indices) {
@@ -48,6 +53,7 @@ private class ElementIndexInference(
             val j = factor.vars.indices.firstOrNull {
                 val v = factor.vars[it]
                 hinted[v] && indexUse[v] && nonIndexCount[v] == 1 &&
+                    (elementUse[v] || factor.vars.size in 2..3) &&
                     (row.coeff(it) == 1L || row.coeff(it) == -1L)
             } ?: continue
             accept(fid, factor, j)
@@ -83,10 +89,14 @@ private class ElementIndexInference(
         if (derived[output]) return
         acceptedRows[fid] = true
         derived[output] = true
-        definitions.add(ElementIndexDefinition(output, factor, j))
+        definitions.add(AffineIndexDefinition(output, factor, j))
         for (v in factor.vars) if (v != output && hinted[v] && !derived[v]) pending.addLast(v)
     }
 
-    private fun Factor.isIndexRead(v: Int): Boolean =
-        this is Element && idx == v && result != v && (!arrIsVars || v.toLong() !in arr)
+    private fun Factor.isIndexRead(v: Int): Boolean = when (this) {
+        is Element -> idx == v && result != v && (!arrIsVars || v.toLong() !in arr)
+        is ReifiedLinear -> op == LinearOp.EQ && vars.size == 1 && vars[0] == v &&
+            integerConstants?.coeff(0) == 1L
+        else -> false
+    }
 }

@@ -3,6 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -70,6 +71,63 @@ class DefinitionalSweepInferTest {
         val cost = state.cost
         state.recompute()
         assertEquals(cost, state.cost)
+    }
+
+    @Test
+    fun `a hinted equality index follows coordinate moves and updates its channels`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 1),
+        )
+        val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(0, 8), IntDomain(0, 1))
+        val problem = Problem(1, 4, domains, factors)
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(2, 3))).network(4, 1)
+        for (v in domains.indices) state.assignment.setInt(v, 0)
+        state.assignment.setBool(0, false)
+        state.recompute()
+
+        state.apply(Move.IntSet(0, 1))
+        state.apply(Move.IntSet(1, 2))
+
+        assertEquals(8L, state.assignment.intValue(2))
+        assertEquals(true, state.assignment.boolValue(0))
+        assertEquals(1L, state.assignment.intValue(3))
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `unhinted equality indexes remain searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+        )
+
+        assertNull(DefinitionalSweep.infer(factors, 3))
+    }
+
+    @Test
+    fun `an equality index constrained outside its definition stays searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(6, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 8),
+            Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 7),
+        )
+
+        assertNull(DefinitionalSweep.infer(factors, 3, intArrayOf(2)))
+    }
+
+    @Test
+    fun `an equality index with more than two inputs stays searched`() {
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(6, 2, 1, -1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(3), LinearOp.EQ, 8),
+        )
+
+        assertNull(DefinitionalSweep.infer(factors, 4, intArrayOf(3)))
     }
 
     @Test

@@ -257,7 +257,11 @@ inverse targets until an admissible index repair is found.
 The one-way definition network contains immutable reader indexes; matching mixed-pool
 arms share its lazy construction while each state applies definitions to its own assignment.
 Element index repairs backsolve affine definitions with one or two distinct integer
-inputs and a unit output coefficient. Hinted one-input affine chains feeding only
+inputs and a unit output coefficient. Hinted affine indexes with one or two inputs
+feeding only unit unary equality predicates use the same maintained definitions and
+bounded inverse for value-directed repairs. Independent constraints on an index
+prevent this inference. Requested outputs and input coordinates respect pins and
+implicit owners. Hinted one-input affine chains feeding only
 such index definitions are maintained from their searched leaves; other occurrences
 prevent their inference. Inverse repairs follow at most 16 such aliases, checking each
 intermediate domain and rejecting conflicting targets for a shared leaf.

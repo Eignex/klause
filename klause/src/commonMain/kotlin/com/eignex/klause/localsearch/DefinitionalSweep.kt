@@ -77,6 +77,7 @@ class DefinitionalSweep internal constructor(
          *    hint could pick a decision var as the output and derive it to an infeasible value, so it is
          *    never done unhinted.
          *  - hinted min/max expression cones and their affine operands and aliases.
+         *  - hinted affine indexes read by Elements or unit unary equality predicates.
          *  A var claimed by more than one definition, or transitively by itself, is left searched. Nodes
          *  come out in topological order; returns null when nothing is definable. */
         fun infer(
@@ -133,7 +134,7 @@ class DefinitionalSweep internal constructor(
                     }
                     if (j != null) claim(f.vars[j], f, j)
                 }
-                for (definition in elementIndexDefinitions(factors, numIntVars, definedHints)) {
+                for (definition in affineIndexDefinitions(factors, numIntVars, definedHints)) {
                     claim(definition.variable, definition.factor, definition.outputIndex)
                 }
             }

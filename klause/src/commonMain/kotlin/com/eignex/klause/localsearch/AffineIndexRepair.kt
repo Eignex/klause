@@ -12,6 +12,7 @@ internal class AffineIndexRepair(
     private val definition: FunctionalObjective.Lin,
 ) {
     fun propose(value: Long): Boolean {
+        if (!sink.allowsDefinedInt(definition.out) || value !in state.rootDomains[definition.out]) return false
         val inputs = definition.ins
         if (inputs.size !in 1..2 || inputs.any { it.varId < 0 }) return false
         if (inputs.size == 2 && inputs[0].varId == inputs[1].varId) return false

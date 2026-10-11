@@ -198,6 +198,13 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
                 LiteralChannelRepair(state, this, varId).propose(newValue)
                 return
             }
+            if (invariants?.hasExtremumRepair(varId) != true) {
+                val linear = invariants?.linearDefinition(varId)
+                if (linear != null) {
+                    AffineIndexRepair(state, this, linear).propose(newValue)
+                    return
+                }
+            }
             val repair = extremumRepair(state, varId, newValue, ::allowsInt) ?: return
             addCompound(repair.map { (input, target) -> Move.IntSet(input, target) })
             return
