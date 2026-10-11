@@ -105,6 +105,15 @@ spikes, pivotal rows, RHS and dual solves have distinct indexed carriers: a basi
 can reuse the form it produced when the same carrier reaches its update operation.
 Scratch cannot escape as a published result or exact cache.
 
+[SimplexBasisLifecycle](../../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexBasisLifecycle.kt)
+owns discrete headings/statuses, their factorization identity and the lazy floating
+basis backend. Retirement aggregates its operation ledger and invalidates retained
+headings even when backend close fails; an unreadable ledger marks lifetime work
+incomplete. The coordinator clears candidate/proof publication before reporting cleanup
+failure. Scaling fallback retires the factor owner before installing replacement
+columns. Compatible bound edits retain the owner; structural size changes construct a
+fresh fixed-dimension engine.
+
 Dual leaving selection uses verified Devex: correct and reselect a maintained
 weight below `0.25 * norm(rho)^2`. Entering selection uses a scaled Harris window,
 a ministep floor and an early-exit breakpoint walk. Nonzero objectives use Harris

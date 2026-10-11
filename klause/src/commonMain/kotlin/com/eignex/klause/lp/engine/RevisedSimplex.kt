@@ -10,7 +10,6 @@ import com.eignex.klause.simplex.basis.BasisSolveQuality
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
-import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
@@ -186,10 +185,9 @@ internal class RevisedSimplex(
     private lateinit var rowCols: Array<IntArray>
     private lateinit var rowVals: Array<DoubleArray>
 
-    private val basicVar = IntArray(m)
-    private val status = Array(numVars) { VarStatus.BASIC }
-    private var ownerColumns = IntArray(0)
-    private var ownerUnitRows = IntArray(0)
+    private val basisLifecycle = SimplexBasisLifecycle(m, numVars)
+    private val basicVar = basisLifecycle.basicVar
+    private val status = basisLifecycle.status
 
     // v1 cannot recover an imported general status declaration; keep this conservative through reuse.
     private var basisCaptureEligible = model.exactState == null
@@ -294,15 +292,6 @@ internal class RevisedSimplex(
         )
     internal val scaleVersion: Long get() = numerical.version
 
-    /**
-     * The basis, held across pivots by this engine's factorization owner.
-     *
-     * Built on first use rather than in the constructor: a native solver owns a handle, and the
-     * engines a search discards without ever solving — a component split that declines, a shave that
-     * its caller drops — would otherwise each take one.
-     */
-    private var basisSolver: BasisSolver? = null
-    private var retiredBasisWork: BasisOperationWork? = null
     private val basisRepairer = EngineBasisRepairer()
     private var refactorPolicy = RefactorPolicy(RefactorPolicyConfig(hardUpdateCap = refactorUpdateLimit))
     private var pendingSolveQuality: BasisSolveQuality? = null
@@ -310,9 +299,6 @@ internal class RevisedSimplex(
     internal val lastBasisRepairMetrics: BasisRepairMetrics get() = basisRepairer.metrics
     internal val lastRefactorPolicyMetrics: RefactorPolicyMetrics get() = refactorPolicy.metrics
 
-    /** Whether [basisSolver] currently factorizes the seated [basicVar]. False before the first
-     *  factorization and after one came back singular. */
-    private var basisFactorized = false
     override val exactBasisCache = ExactBasisCache(if (reuseRationalOrder) ::proposedRationalOrder else null)
     private var rejectedExactBasis: IntArray? = null
 
@@ -324,15 +310,15 @@ internal class RevisedSimplex(
         meter.phase = ExactBasisPhase.ORDER_IDENTITY
         val availabilityWork = if (m == 0) 0L else 1L
         meter.charge(availabilityWork)
-        val current = basisSolver
+        val current = basisLifecycle.current
         // Updated factors cannot offer LU pivots, independently of the requested identity.
-        if (basisFactorized && current != null && current.updateCount != 0) {
+        if (basisLifecycle.factorized && current != null && current.updateCount != 0) {
             meter.orderDecline = ExactBasisOrderDecline.UPDATED
             return null
         }
         meter.charge(2L * state.model.keySize + numVars + 8L * m - availabilityWork, 256L + 8L * numVars + 8L * m)
         if (authority.model.exactState !== state || !original.sameMatrix(state) ||
-            !authority.headings.contentEquals(basicVar) || !basisFactorized || !trackedHeadingsConsistent()
+            !authority.headings.contentEquals(basicVar) || !basisLifecycle.factorized || !trackedHeadingsConsistent()
         ) {
             meter.orderDecline = ExactBasisOrderDecline.STALE
             return null
@@ -546,16 +532,8 @@ internal class RevisedSimplex(
         return columnDot(y, j)
     }
 
-    /** This engine's basis solver, built on first use. */
-    private fun solver(): BasisSolver = basisSolver ?: newSolver()
+    private fun solver(): BasisSolver = basisLifecycle.solver(columns, basisSolverFactory)
 
-    private fun createBasisSolver(): BasisSolver = basisSolverFactory?.invoke(columns) ?: KotlinBasisSolver(columns)
-
-    private fun newSolver(): BasisSolver = createBasisSolver().also {
-        basisSolver = it
-    }
-
-    @Suppress("TooGenericExceptionCaught")
     override fun close() {
         continuationAvailable = false
         stoppedContinuationBasis = null
@@ -566,27 +544,7 @@ internal class RevisedSimplex(
         infeasibleBasis = null
         infeasibleRow = -1
         infeasibleRay = null
-        var failure: Throwable? = null
-        val current = basisSolver
-        if (current != null) {
-            try {
-                val work = current.basisOperationWork ?: BasisOperationWork(complete = false)
-                retiredBasisWork = retiredBasisWork?.mergedWith(work) ?: work
-            } catch (_: Throwable) {
-                val incomplete = BasisOperationWork(complete = false)
-                retiredBasisWork = retiredBasisWork?.mergedWith(incomplete) ?: incomplete
-            }
-            try {
-                current.close()
-            } catch (cleanup: Throwable) {
-                if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
-            }
-        }
-        basisSolver = null
-        basisFactorized = false
-        basisKept = false
-        ownerColumns = IntArray(0)
-        ownerUnitRows = IntArray(0)
+        val failure = basisLifecycle.retire()
         cachedBeta = null
         cachedModel = null
         cachedNumerical = null
@@ -625,14 +583,14 @@ internal class RevisedSimplex(
         // is the backend's fill, which [nnzB] deliberately does not follow.
         work.add(nnzB)
         val solver = solver()
-        basisFactorized = try {
+        basisLifecycle.factorized = try {
             solver.refactorize(basicVar)
         } catch (_: BasisArithmeticException) {
             false
         } catch (_: ArithmeticException) {
             false
         }
-        if (!basisFactorized) {
+        if (!basisLifecycle.factorized) {
             singularRefactorizations++
             val remaining = effectiveWorkLimit.takeIf { it > 0 }?.let { maxOf(0, it - work.ops) }
             val control = BasisRepairControl(cancellation, remaining)
@@ -671,8 +629,8 @@ internal class RevisedSimplex(
                 }
             }
         }
-        ownerColumns = basicVar.copyOf()
-        ownerUnitRows = IntArray(m) { -1 }
+        basisLifecycle.columns = basicVar.copyOf()
+        basisLifecycle.unitRows = IntArray(m) { -1 }
         recordFactorization(solver, basisChanged = false)
         return RefactorResult.UNCHANGED
     }
@@ -704,14 +662,14 @@ internal class RevisedSimplex(
     private fun installRecoveredBasis(recovered: EngineBasisState) {
         recovered.headings.copyInto(basicVar)
         recovered.statuses.copyInto(status)
-        ownerColumns = recovered.ownerColumns
-        ownerUnitRows = recovered.ownerUnitRows
-        basisFactorized = true
+        basisLifecycle.columns = recovered.ownerColumns
+        basisLifecycle.unitRows = recovered.ownerUnitRows
+        basisLifecycle.factorized = true
         nnzB = 0
         for (slot in 0 until m) nnzB += columnNnz(basicVar[slot])
         invalidateBasisDependentState()
-        basisFactorized = true
-        basisKept = true
+        basisLifecycle.factorized = true
+        basisLifecycle.kept = true
     }
 
     private fun invalidateBasisDependentState() {
@@ -729,7 +687,7 @@ internal class RevisedSimplex(
         ftranDensity = 1.0
         btranDensity = 1.0
         resetGamma()
-        basisKept = false
+        basisLifecycle.kept = false
     }
 
     /**
@@ -740,7 +698,7 @@ internal class RevisedSimplex(
      * the same on a deployment that found an accelerated backend and one that did not.
      */
     private fun chargeSolve() {
-        work.add(nnzB.toLong() + (basisSolver?.updateCount ?: 0).toLong() * m)
+        work.add(nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m)
     }
 
     private fun operationDelta(
@@ -923,8 +881,8 @@ internal class RevisedSimplex(
         // anything but an APPLIED still inside the chain limit.
         if (outcome != BasisUpdate.SINGULAR) {
             exactBasisCache.clear()
-            ownerColumns[r] = q
-            ownerUnitRows[r] = -1
+            basisLifecycle.columns[r] = q
+            basisLifecycle.unitRows[r] = -1
         }
         val trigger = refactorPolicy.chooseAtSafePoint(
             solver.updateCount,
@@ -1032,7 +990,7 @@ internal class RevisedSimplex(
     override fun prepareBasis(basis: Basis, token: Cancellation): Basis? = prepareSourceBasis(basis, token)
 
     override fun retainedBasis(): Basis? {
-        if (!basisKept || !basisFactorized || basicVar.distinct().size != m ||
+        if (!basisLifecycle.kept || !basisLifecycle.factorized || basicVar.distinct().size != m ||
             status.count { it == VarStatus.BASIC } != m ||
             basicVar.any { it !in status.indices || status[it] != VarStatus.BASIC }
         ) {
@@ -1047,7 +1005,7 @@ internal class RevisedSimplex(
         stoppedContinuationBasis = null
         exactBasisCache.clear()
         resetSolveState(false)
-        basisKept = false
+        basisLifecycle.kept = false
         cachedBeta = null
         cachedModel = null
         cachedNumerical = null
@@ -1069,7 +1027,7 @@ internal class RevisedSimplex(
             ) {
                 null
             } else {
-                basisKept = true
+                basisLifecycle.kept = true
                 Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
             }
         } catch (primary: BasisArithmeticException) {
@@ -1110,28 +1068,9 @@ internal class RevisedSimplex(
         installUnscaledFallback(next)
     }
 
-    @Suppress("TooGenericExceptionCaught")
     private fun installUnscaledFallback(next: LpModel) {
         val fallback = LpScalingView.identityAfterFallback(next, numerical.metrics)
-        var failure: Throwable? = null
-        basisSolver?.let { current ->
-            val operationWork = try {
-                current.basisOperationWork ?: BasisOperationWork(complete = false)
-            } catch (_: Throwable) {
-                BasisOperationWork(complete = false)
-            }
-            retiredBasisWork = retiredBasisWork?.mergedWith(operationWork) ?: operationWork
-            try {
-                current.close()
-            } catch (cleanup: Throwable) {
-                if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
-            }
-        }
-        basisSolver = null
-        basisFactorized = false
-        basisKept = false
-        ownerColumns = IntArray(0)
-        ownerUnitRows = IntArray(0)
+        val failure = basisLifecycle.retire()
         model = next
         numerical = fallback
         pendingNumericalWork.add(fallback.metrics.work)
@@ -1150,25 +1089,19 @@ internal class RevisedSimplex(
     private fun invalidateUncertainBasisState() {
         continuationAvailable = false
         stoppedContinuationBasis = null
-        basisFactorized = false
-        basisKept = false
-        ownerColumns = IntArray(0)
-        ownerUnitRows = IntArray(0)
+        basisLifecycle.invalidate()
         invalidateBasisDependentState()
     }
 
     override val basisLifecycleWork: BasisOperationWork?
-        get() {
-            val current = basisSolver ?: return retiredBasisWork
-            val active = current.basisOperationWork ?: BasisOperationWork(complete = false)
-            return retiredBasisWork?.mergedWith(active) ?: active
-        }
+        get() = basisLifecycle.operationWork
+
     private fun trackedHeadingsConsistent(): Boolean {
-        if (ownerColumns.size != m || ownerUnitRows.size != m || basicVar.distinct().size != m) return false
+        if (basisLifecycle.columns.size != m || basisLifecycle.unitRows.size != m || basicVar.distinct().size != m) return false
         if (!basisStatusConsistent(model, basicVar, status)) return false
         return basicVar.indices.all { slot ->
-            val column = ownerColumns[slot]
-            val unit = ownerUnitRows[slot]
+            val column = basisLifecycle.columns[slot]
+            val unit = basisLifecycle.unitRows[slot]
             (column >= 0) != (unit >= 0) &&
                 (if (column >= 0) column else n + unit) == basicVar[slot]
         }
@@ -1202,11 +1135,6 @@ internal class RevisedSimplex(
             floatAllowance = previous
         }
     }
-
-    /** Whether the previous solve terminated with its basis still factorized, so [resolveGated] and
-     *  [resolveBounds] may continue from it; the seated [basicVar]/[status] are still in place. False
-     *  after a bailed solve. */
-    private var basisKept = false
 
     private fun clearNumericalPublication() {
         solvedExactState = null
@@ -1277,13 +1205,13 @@ internal class RevisedSimplex(
             }
             if (rejectedExactBasis?.contentEquals(result?.basis?.basicVars ?: basicVar) == true) {
                 clearNumericalPublication()
-                basisKept = false
+                basisLifecycle.kept = false
                 result = null
                 lastTermination = LpFloatTermination.OTHER
             }
             if (result == null && infeasibleRay == null && numericalFailure) {
-                basisFactorized = false
-                basisKept = false
+                basisLifecycle.factorized = false
+                basisLifecycle.kept = false
             }
             lastTermination = when {
                 result?.optimal == true -> LpFloatTermination.OPTIMAL_CANDIDATE
@@ -1338,7 +1266,7 @@ internal class RevisedSimplex(
                 cachedModel = null
                 cachedNumerical = null
                 cachedStatus = null
-                basisKept = false
+                basisLifecycle.kept = false
                 infeasibleBasis = null
                 infeasibleRow = -1
                 infeasibleRay = null
@@ -1473,8 +1401,8 @@ internal class RevisedSimplex(
             if (cancellation()) lastTermination = LpFloatTermination.CANCELLED
             return null
         }
-        val kept = reuse && basisKept && basisFactorized
-        basisKept = false
+        val kept = reuse && basisLifecycle.kept && basisLifecycle.factorized
+        basisLifecycle.kept = false
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
         // start there is; a warm basis alone still pays for a factorization.
         warmStarted = if (reset) kept else warmStarted || kept
@@ -1639,7 +1567,7 @@ internal class RevisedSimplex(
                     }
                 }
                 if (r == -1) {
-                    basisKept = true // terminated cleanly: [resolve] may continue from here
+                    basisLifecycle.kept = true // terminated cleanly: [resolve] may continue from here
                     return optimal(beta) // primal feasible ⇒ optimal
                 }
                 // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r, kept indexed: it is the hypersparse vector of a
@@ -1742,7 +1670,7 @@ internal class RevisedSimplex(
                 infeasibleRow = r
                 // float ρ = B⁻ᵀeᵣ densely; integerFarkasRay rounds + certifies it.
                 infeasibleRay = DoubleArray(m) { numerical.sourceDual(it, pivotEtaVec[it]) }
-                basisKept = true // the seated basis stays dual-feasible for the next [resolve]
+                basisLifecycle.kept = true // the seated basis stays dual-feasible for the next [resolve]
                 retainBasicValues(beta)
                 solvedExactState = model.exactState
                 return stopped(LpFloatTermination.INFEASIBLE_CANDIDATE)
@@ -1884,7 +1812,7 @@ internal class RevisedSimplex(
         if (cancellation()) return stopped(LpFloatTermination.CANCELLED)
         if (progress.restarts >= MAX_SOLVE_RESTARTS) return stopped(LpFloatTermination.NUMERICAL)
         progress.restarts++
-        basisKept = true
+        basisLifecycle.kept = true
         return solveCore(
             warm = null,
             reuse = true,
@@ -2461,7 +2389,7 @@ internal class RevisedSimplex(
 
     private fun probeTheorySupport(candidate: Int, leavingRow: Int, enforced: BooleanArray?): TheoryProbe {
         lastTheoryPricingSamples++
-        val solveCharge = nnzB.toLong() + (basisSolver?.updateCount ?: 0).toLong() * m
+        val solveCharge = nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m
         addTheoryPricingWork(solveCharge)
         lastTheoryPricingEstimatedFtranWorkOps += solveCharge
         lastTheoryPricingWorkOps += columnNnz(candidate).toLong()
@@ -2526,7 +2454,7 @@ internal class RevisedSimplex(
     }
 
     private fun optimal(beta: DoubleArray): FloatLpResult {
-        basisKept = true
+        basisLifecycle.kept = true
         solvedExactState = model.exactState
         retainBasicValues(beta)
         // Re-add the lower-bound shift the model folded out (c·lo), so [FloatLpResult.objective] is the
@@ -2851,7 +2779,7 @@ internal class RevisedSimplex(
                 if (model.exactState != null) {
                     infeasibleRay = DoubleArray(m) { numerical.sourceDual(it, pi[it]) }
                     solvedExactState = model.exactState
-                    basisKept = true
+                    basisLifecycle.kept = true
                     retainBasicValues(beta)
                 }
                 lastTermination = LpFloatTermination.INFEASIBLE_CANDIDATE
@@ -2953,8 +2881,8 @@ internal class RevisedSimplex(
             if (cancellation()) lastTermination = LpFloatTermination.CANCELLED
             return null
         }
-        basisKept = false
-        if (!reuse || !basisFactorized) {
+        basisLifecycle.kept = false
+        if (!reuse || !basisLifecycle.factorized) {
             if (warm == null || !tryWarmStart(warm)) {
                 lowerStart()
             } else {
@@ -3065,7 +2993,7 @@ internal class RevisedSimplex(
             }
             if (tMax >= Double.MAX_VALUE) {
                 // This basis is primal feasible; an unbounded objective does not make it dual feasible.
-                basisKept = true
+                basisLifecycle.kept = true
                 retainBasicValues(beta, primalOnly = true)
                 solvedExactState = model.exactState
                 return stopped(LpFloatTermination.UNBOUNDED_CANDIDATE)
@@ -3101,7 +3029,7 @@ internal class RevisedSimplex(
         if (cancellation()) return stopped(LpFloatTermination.CANCELLED)
         if (progress.restarts >= MAX_SOLVE_RESTARTS) return stopped(LpFloatTermination.NUMERICAL)
         progress.restarts++
-        basisKept = true
+        basisLifecycle.kept = true
         return solvePrimalCore(
             null,
             reuse = true,
