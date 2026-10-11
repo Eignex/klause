@@ -217,8 +217,15 @@ one-column bound or a two-column difference with an integral normalized bound. B
 guards select active edges. With `n` graph vertices, scaling bounds by `n+1` and
 subtracting one from strict edges preserves every simple cycle's sign, including
 zero-weight strict cycles. Feasible graphs supply rational potentials; witnesses still
-pass the complete source-row check. Infeasible graphs retain the shared LP route for
-conflict explanations and learning.
+pass the complete source-row check. A verified negative predecessor cycle supplies a
+conflict clause containing the complements of its active signed guards. Immutable
+unconditional source rows and declared bounds need no Boolean premise; assigned root
+guards remain in the clause. Cycle capture reuses the feasibility traversal rather than
+running another graph sweep. The component checks that every clause literal is false
+in the current shared context before publishing the conflict for ordinary learning.
+Cancelled checks withhold the proof, and missing cycle capture retains the shared LP
+route. Private source-bound branches and overridden LP certification policies also
+retain that route.
 
 Active source rows remain asserted in the shared LP scope whenever that owner is needed.
 Floating LP solves maintain the basis on graph-feasible states; their numerical output

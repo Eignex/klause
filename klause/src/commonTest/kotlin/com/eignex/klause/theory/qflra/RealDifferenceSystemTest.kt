@@ -15,6 +15,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -87,7 +88,8 @@ class RealDifferenceSystemTest {
 
             val result = system.check(intArrayOf(1, 1, 1), Cancellation.Never)
 
-            assertIs<RealDifferenceSystem.Result.Infeasible>(result)
+            val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(result)
+            assertContentEquals(intArrayOf(Lit.make(0, false), Lit.make(1, false)), conflict.clause)
             assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(1, -1, 1), Cancellation.Never))
             assertIs<RealDifferenceSystem.Result.Feasible>(system.check(intArrayOf(-1, 1, 1), Cancellation.Never))
         }
@@ -106,13 +108,55 @@ class RealDifferenceSystemTest {
         )
         val system = assertNotNull(RealDifferenceSystem.prepare(model,
             model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }))
-        assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(1), Cancellation.Never))
+        val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(1), Cancellation.Never))
+        assertContentEquals(intArrayOf(Lit.make(0, false)), conflict.clause)
 
         val released = system.check(intArrayOf(-1), Cancellation.Never)
         val sibling = system.check(intArrayOf(0), Cancellation.Never)
 
         assertIs<RealDifferenceSystem.Result.Feasible>(released)
         assertIs<RealDifferenceSystem.Result.Feasible>(sibling)
+    }
+
+    @Test
+    fun `a false guard contributes its positive conflict literal`() {
+        val model = Problem(1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(0.0),
+            factors = arrayOf(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0)))
+        val system = assertNotNull(RealDifferenceSystem.prepare(model,
+            model.factors.map { factor -> factor.linearRows.map { it.exactForm(1) } }))
+
+        val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(0), Cancellation.Never))
+
+        assertContentEquals(intArrayOf(Lit.make(0, true)), conflict.clause)
+    }
+
+    @Test
+    fun `contradictory source bounds need no Boolean premise`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(0.0), factors = emptyArray())
+        val system = assertNotNull(RealDifferenceSystem.prepare(model, emptyList()))
+
+        val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(), Cancellation.Never))
+
+        assertContentEquals(intArrayOf(), conflict.clause)
+    }
+
+    @Test
+    fun `cancellation after a negative sweep withholds its conflict`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(0.0), factors = emptyArray())
+        val system = assertNotNull(RealDifferenceSystem.prepare(model, emptyList()))
+        var polls = 0
+
+        val result = system.check(intArrayOf(), Cancellation { ++polls > 1 })
+
+        assertIs<RealDifferenceSystem.Result.Interrupted>(result)
+        assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(), Cancellation.Never))
     }
 
     @Test

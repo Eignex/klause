@@ -92,6 +92,7 @@ internal class DifferenceGraph(val numVars: Int) {
         active: BooleanArray? = null,
         cancelled: () -> Boolean = { false },
         initial: LongArray? = null,
+        onNegativeCycle: ((IntArray) -> Unit)? = null,
     ): Potentials {
         require(initial == null || initial.size == numVars)
         val dist = initial?.copyOf() ?: LongArray(numVars)
@@ -117,12 +118,15 @@ internal class DifferenceGraph(val numVars: Int) {
                 }
             }
             if (!changed) return Potentials.Found(dist)
-            if (hasNegativePredecessorCycle(predecessor)) return Potentials.Infeasible
+            if (hasNegativePredecessorCycle(predecessor, onNegativeCycle)) return Potentials.Infeasible
         }
         return Potentials.Infeasible
     }
 
-    private fun hasNegativePredecessorCycle(predecessor: IntArray): Boolean {
+    private fun hasNegativePredecessorCycle(
+        predecessor: IntArray,
+        onNegativeCycle: ((IntArray) -> Unit)?,
+    ): Boolean {
         val visited = IntArray(numVars) { -1 }
         for (start in 0 until numVars) {
             var vertex = start
@@ -140,7 +144,19 @@ internal class DifferenceGraph(val numVars: Int) {
                 sum += weight[edge]
                 vertex = from[edge]
             } while (vertex != cycleStart)
-            if (!overflow && sum < 0L) return true
+            if (!overflow && sum < 0L) {
+                if (onNegativeCycle != null) {
+                    // The predecessor walk already verified a simple, closed cycle with a checked negative sum.
+                    val edges = IntArrayList()
+                    do {
+                        val edge = predecessor[vertex]
+                        edges.add(edge)
+                        vertex = from[edge]
+                    } while (vertex != cycleStart)
+                    onNegativeCycle(edges.toIntArray())
+                }
+                return true
+            }
         }
         return false
     }
