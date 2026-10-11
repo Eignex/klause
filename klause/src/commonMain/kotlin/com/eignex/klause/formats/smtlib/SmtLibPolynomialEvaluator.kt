@@ -17,11 +17,14 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.product
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.rational
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.relation
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.sum
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.signum
+import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.toLong
 
 internal sealed interface PolynomialValue {
@@ -67,6 +70,7 @@ private sealed interface PolynomialFrame {
 internal class SmtLibPolynomialEvaluator(
     private val lowering: PolynomialRealLowering,
     private val validateOnly: Boolean = false,
+    private val cancellation: Cancellation = Cancellation.Never,
 ) {
     var hasNonlinearTerms = false
         private set
@@ -76,6 +80,7 @@ internal class SmtLibPolynomialEvaluator(
         val values = ArrayDeque<PolynomialValue>()
         work.addLast(PolynomialFrame.Evaluate(root, environment))
         while (work.isNotEmpty()) {
+            cancellation.polynomialSourceCheckpoint()
             when (val frame = work.removeLast()) {
                 is PolynomialFrame.Evaluate -> schedule(frame, work, values)
                 is PolynomialFrame.Combine -> values.addLast(combine(frame.expression, pop(values, frame.count)))
@@ -112,7 +117,7 @@ internal class SmtLibPolynomialEvaluator(
     ) {
         when (val node = frame.expression) {
             is SExpr.Atom -> {
-                val literal = polynomialLiteral(node.text)
+                val literal = polynomialLiteral(node.text, cancellation)
                 val bound = frame.environment.values[polynomialSymbol(node.text)]
                 val macro = frame.environment.macros[polynomialSymbol(node.text)]
                 when {
@@ -174,15 +179,15 @@ internal class SmtLibPolynomialEvaluator(
 
     private fun combine(node: SExpr.SList, args: List<PolynomialValue>): PolynomialValue {
         return when (node.polynomialHead()) {
-            "+" -> PolynomialValue.Real(sum(args.map { it.real() }))
+            "+" -> PolynomialValue.Real(sum(args.map { it.real() }, cancellation))
             "-" -> PolynomialValue.Real(
-                if (args.size == 1) negate(args.single().real())
-                else sum(listOf(args.first().real()) + args.drop(1).map { negate(it.real()) }),
+                if (args.size == 1) negate(args.single().real(), cancellation)
+                else sum(listOf(args.first().real()) + args.drop(1).map { negate(it.real(), cancellation) }, cancellation),
             )
             "*" -> {
                 val terms = args.map { it.real() }
                 if (terms.count { rational(it) == null } >= 2) hasNonlinearTerms = true
-                PolynomialValue.Real(product(terms))
+                PolynomialValue.Real(product(terms, cancellation))
             }
             "/" -> {
                 var value = args.first().real()
@@ -193,7 +198,7 @@ internal class SmtLibPolynomialEvaluator(
                         smtUnsupported("nonconstant polynomial divisor")
                     }
                     if (divisor.isZero) smtUnsupported("zero polynomial divisor")
-                    value = product(listOf(value, constant(divisor.reciprocal())))
+                    value = product(listOf(value, constant(divisor.reciprocal())), cancellation)
                 }
                 PolynomialValue.Real(value)
             }
@@ -209,7 +214,7 @@ internal class SmtLibPolynomialEvaluator(
                 }
                 val exponent = value.num.toLong().toInt()
                 if (exponent >= 2 && rational(base) == null) hasNonlinearTerms = true
-                PolynomialValue.Real(power(base, exponent))
+                PolynomialValue.Real(power(base, exponent, cancellation))
             }
             "and" -> PolynomialValue.Boolean(and(args.map { it.boolean() }))
             "or" -> PolynomialValue.Boolean(or(args.map { it.boolean() }))
@@ -278,8 +283,15 @@ internal class SmtLibPolynomialEvaluator(
     }
 }
 
-private fun polynomialLiteral(text: String): BigFraction? {
+private fun polynomialLiteral(text: String, cancellation: Cancellation): BigFraction? {
     val parts = text.split('.')
     if (parts.size !in 1..2 || parts.any { it.isEmpty() || it.any { digit -> digit !in '0'..'9' } }) return null
-    return parseRealLiteral(text)
+    cancellation.polynomialSourceCheckpoint()
+    val numerator = parseBigInt(parts.joinToString(""))
+    cancellation.polynomialSourceCheckpoint()
+    val denominator = if (parts.size == 1) BIG_ONE else {
+        val scale = power(constant(BigFraction.ofLong(10)), parts[1].length, cancellation)
+        rational(scale)!!.num
+    }
+    return BigFraction.of(numerator, denominator).also { cancellation.polynomialSourceCheckpoint() }
 }

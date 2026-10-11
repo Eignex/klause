@@ -233,6 +233,14 @@ Mixed integer sorts, symbolic or zero division, negative/noninteger/oversized po
 uninterpreted functions, nonpolynomial operations, quantifiers, objectives, incremental
 commands, multiple queries and `get-value` decline explicitly.
 
+The dedicated parser accepts caller `Cancellation`, defaulting to `Never`. It polls
+between streamed chunks, commands, evaluator frames and source identity validation,
+and before/after rational coefficient folds. Each completed rational addition or
+multiplication charges one source folding unit to the caller's meter. Interruption
+throws the distinct internal `PolynomialSourceInterrupted` signal without publishing
+a partial formula; invocation owners decide cancellation/budget result causality.
+Polynomial expansion and decision work remain owned by the nonlinear kernel/theory.
+
 ## MPS
 
 The MPS parser retains decimal source metadata, integer markers, bounds and

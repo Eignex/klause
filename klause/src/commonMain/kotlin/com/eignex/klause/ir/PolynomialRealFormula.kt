@@ -93,7 +93,11 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
     return values.single()
 }
 
-internal fun PolynomialRealFormula.requireVariableCounts(boolCount: Int, realCount: Int) {
+internal fun PolynomialRealFormula.requireVariableCounts(
+    boolCount: Int,
+    realCount: Int,
+    checkpoint: () -> Unit = {},
+) {
     require(boolCount >= 0 && realCount >= 0) { "negative polynomial variable count" }
     val formulas = ArrayDeque<PolynomialRealFormula>()
     val expressions = ArrayDeque<PolynomialExpression>()
@@ -101,6 +105,7 @@ internal fun PolynomialRealFormula.requireVariableCounts(boolCount: Int, realCou
     val seenExpressions = HashSet<PolynomialExpression>()
     formulas.addLast(this)
     while (formulas.isNotEmpty()) {
+        checkpoint()
         val node = formulas.removeLast()
         if (!seenFormulas.add(node)) continue
         when (node) {
@@ -116,6 +121,7 @@ internal fun PolynomialRealFormula.requireVariableCounts(boolCount: Int, realCou
         }
     }
     while (expressions.isNotEmpty()) {
+        checkpoint()
         val node = expressions.removeLast()
         if (!seenExpressions.add(node)) continue
         when (node) {

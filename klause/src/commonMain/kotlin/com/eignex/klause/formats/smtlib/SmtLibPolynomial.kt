@@ -3,6 +3,8 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.requireVariableCounts
 import com.eignex.klause.lowering.PolynomialRealLowering
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -15,12 +17,13 @@ internal class SmtLibPolynomialProblem(
     val hasNonlinearTerms: Boolean,
     realVarNames: Map<String, Int>,
     boolVarNames: Map<String, Int>,
+    checkpoint: () -> Unit = {},
 ) {
     init {
         require(sourceRealCount in 0..realCount && sourceBoolCount in 0..boolCount) { "invalid polynomial source count" }
         require(realVarNames.values.toSet() == (0 until sourceRealCount).toSet()) { "invalid polynomial real source map" }
         require(boolVarNames.values.toSet() == (0 until sourceBoolCount).toSet()) { "invalid polynomial Boolean source map" }
-        formula.requireVariableCounts(boolCount, realCount)
+        formula.requireVariableCounts(boolCount, realCount, checkpoint)
     }
 
     private val reals = realVarNames.toMap()
@@ -30,17 +33,22 @@ internal class SmtLibPolynomialProblem(
 }
 
 internal object SmtLibPolynomial {
-    fun parse(text: String): SmtLibPolynomialProblem = parse(StringCharSource(text))
+    fun parse(text: String, cancellation: Cancellation = Cancellation.Never): SmtLibPolynomialProblem =
+        parse(StringCharSource(text), cancellation)
 
-    fun parse(source: CharSource): SmtLibPolynomialProblem {
-        val reader = SExprReader(source)
-        val compiler = SmtLibPolynomialCompiler()
-        while (true) compiler.command(reader.readCommandOrNull() ?: break)
+    fun parse(source: CharSource, cancellation: Cancellation = Cancellation.Never): SmtLibPolynomialProblem {
+        cancellation.polynomialSourceCheckpoint()
+        val reader = SExprReader(PolynomialSourceInput(source, cancellation))
+        val compiler = SmtLibPolynomialCompiler(cancellation)
+        while (true) {
+            cancellation.polynomialSourceCheckpoint()
+            compiler.command(reader.readCommandOrNull() ?: break)
+        }
         return compiler.build()
     }
 }
 
-internal class SmtLibPolynomialCompiler {
+internal class SmtLibPolynomialCompiler(private val cancellation: Cancellation = Cancellation.Never) {
     private val declarations = LinkedHashMap<String, PolynomialValue>()
     private val macros = LinkedHashMap<String, PolynomialMacro>()
     private val realNames = LinkedHashMap<String, Int>()
@@ -50,6 +58,7 @@ internal class SmtLibPolynomialCompiler {
     private var exited = false
 
     fun command(expression: SExpr) {
+        cancellation.polynomialSourceCheckpoint()
         val command = expression as? SExpr.SList ?: smtUnsupported("expected a parenthesized polynomial command")
         if (exited) smtUnsupported("polynomial command after exit")
         val head = command.polynomialHead()
@@ -113,11 +122,11 @@ internal class SmtLibPolynomialCompiler {
 
     fun build(): SmtLibPolynomialProblem {
         val lowering = PolynomialRealLowering(realNames.size)
-        val evaluator = SmtLibPolynomialEvaluator(lowering)
+        val evaluator = SmtLibPolynomialEvaluator(lowering, cancellation = cancellation)
         val formulas = assertions.map { (expression, environment) -> evaluator.evaluate(expression, environment).boolean() }
         return SmtLibPolynomialProblem(
             lowering.formula(formulas), lowering.realCount, boolNames.size, realNames.size, boolNames.size,
-            evaluator.hasNonlinearTerms, realNames, boolNames,
+            evaluator.hasNonlinearTerms, realNames, boolNames, { cancellation.polynomialSourceCheckpoint() },
         )
     }
 
@@ -153,7 +162,7 @@ internal class SmtLibPolynomialCompiler {
             parameter to if (sorts[index]) PolynomialValue.Boolean.variable(index) else PolynomialValue.Real.variable(index)
         }.toMap()
         val value = SmtLibPolynomialEvaluator(
-            PolynomialRealLowering(realNames.size + names.size), validateOnly = true,
+            PolynomialRealLowering(realNames.size + names.size), validateOnly = true, cancellation = cancellation,
         ).evaluate(
             macro.body, macro.environment.copy(values = macro.environment.values + parametersForValidation),
         )
@@ -199,4 +208,19 @@ internal fun SExpr.SList.polynomialName(index: Int): String {
         smtUnsupported("invalid polynomial symbol '$text'")
     }
     return text
+}
+
+private class PolynomialSourceInput(private val source: CharSource, private val cancellation: Cancellation) : CharSource {
+    private var chunk = ""
+    private var offset = 0
+
+    override fun next(): String? {
+        cancellation.polynomialSourceCheckpoint()
+        if (offset == chunk.length) {
+            chunk = source.next() ?: return null
+            offset = 0
+        }
+        val end = minOf(chunk.length.toLong(), offset.toLong() + 4096).toInt()
+        return chunk.substring(offset, end).also { offset = end }
+    }
 }

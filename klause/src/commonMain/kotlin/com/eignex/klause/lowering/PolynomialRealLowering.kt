@@ -5,6 +5,7 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 
 internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
     var realCount = firstAuxiliaryReal
@@ -32,24 +33,28 @@ internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
         fun rational(value: PolynomialExpression): BigFraction? =
             (value as? PolynomialExpression.Constant)?.let { BigFraction.of(it.numerator, it.denominator) }
 
-        fun sum(operands: List<PolynomialExpression>): PolynomialExpression {
+        fun sum(operands: List<PolynomialExpression>, cancellation: Cancellation = Cancellation.Never): PolynomialExpression {
             if (operands.all { it is PolynomialExpression.Constant }) {
-                return constant(operands.fold(BigFraction.ZERO) { value, operand -> value + rational(operand)!! })
+                return constant(operands.fold(BigFraction.ZERO) { value, operand -> foldCoefficient(value, rational(operand)!!, cancellation, multiply = false) })
             }
             return if (operands.size == 1) operands.single() else PolynomialExpression.Sum(operands)
         }
 
-        fun product(operands: List<PolynomialExpression>): PolynomialExpression {
+        fun product(operands: List<PolynomialExpression>, cancellation: Cancellation = Cancellation.Never): PolynomialExpression {
             if (operands.all { it is PolynomialExpression.Constant }) {
-                return constant(operands.fold(BigFraction.ONE) { value, operand -> value * rational(operand)!! })
+                return constant(operands.fold(BigFraction.ONE) { value, operand -> foldCoefficient(value, rational(operand)!!, cancellation, multiply = true) })
             }
             return if (operands.size == 1) operands.single() else PolynomialExpression.Product(operands)
         }
 
-        fun negate(operand: PolynomialExpression): PolynomialExpression =
-            product(listOf(constant(BigFraction.MINUS_ONE), operand))
+        fun negate(operand: PolynomialExpression, cancellation: Cancellation = Cancellation.Never): PolynomialExpression =
+            product(listOf(constant(BigFraction.MINUS_ONE), operand), cancellation)
 
-        fun power(base: PolynomialExpression, exponent: Int): PolynomialExpression {
+        fun power(
+            base: PolynomialExpression,
+            exponent: Int,
+            cancellation: Cancellation = Cancellation.Never,
+        ): PolynomialExpression {
             require(exponent >= 0) { "negative polynomial exponent" }
             return when (exponent) {
                 0 -> constant(BigFraction.ONE)
@@ -60,13 +65,25 @@ internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
                     var factor = coefficient
                     var remaining = exponent
                     while (remaining > 0) {
-                        if (remaining and 1 != 0) value *= factor
+                        if (remaining and 1 != 0) value = foldCoefficient(value, factor, cancellation, multiply = true)
                         remaining = remaining ushr 1
-                        if (remaining > 0) factor *= factor
+                        if (remaining > 0) factor = foldCoefficient(factor, factor, cancellation, multiply = true)
                     }
                     constant(value)
                 }
             }
+        }
+
+        private fun foldCoefficient(
+            left: BigFraction,
+            right: BigFraction,
+            cancellation: Cancellation,
+            multiply: Boolean,
+        ): BigFraction {
+            cancellation.polynomialSourceCheckpoint()
+            val value = if (multiply) left * right else left + right
+            cancellation.polynomialSourceCheckpoint(1)
+            return value
         }
 
         fun relation(
@@ -110,4 +127,12 @@ internal class PolynomialRealLowering(firstAuxiliaryReal: Int) {
             whenFalse: PolynomialRealFormula,
         ): PolynomialRealFormula = or(listOf(and(listOf(condition, whenTrue)), and(listOf(not(condition), whenFalse))))
     }
+}
+
+internal class PolynomialSourceInterrupted : RuntimeException("polynomial source lowering interrupted")
+
+internal fun Cancellation.polynomialSourceCheckpoint(units: Long = 0) {
+    if (isCancelled()) throw PolynomialSourceInterrupted()
+    if (units > 0) charge(units)
+    if (isCancelled()) throw PolynomialSourceInterrupted()
 }
