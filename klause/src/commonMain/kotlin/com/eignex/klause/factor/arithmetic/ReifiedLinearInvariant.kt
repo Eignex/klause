@@ -101,19 +101,42 @@ internal class ReifiedLinearInvariant(
             val cur = state.assignment.intValue(v)
             val sumWithout = sum - c * cur
             // Same-aux snap: shift body so the predicate matches the current aux.
-            val targetSame = snapLinearTarget(op, bound, c, sumWithout, aux, state.rootDomains[v])
-            if (targetSame != null && targetSame != cur &&
-                aux == linearHolds(sumWithout + c * targetSame, op, bound)
-            ) {
-                sink.addChannelingIntSet(state, v, targetSame)
+            val targetSame = snapLinearTarget(op, bound, c, sumWithout, aux)
+            if (targetSame != null) {
+                val clamped = state.rootDomains[v].clamp(targetSame)
+                if (clamped != cur && aux == linearHolds(sumWithout + c * clamped, op, bound)) {
+                    sink.addChannelingIntSet(state, v, clamped)
+                }
             }
             // Toggle-driven sub-region exploration: flip aux *and* shift body so the
             // predicate matches the flipped aux.
-            val targetOpp = snapLinearTarget(op, bound, c, sumWithout, !aux, state.rootDomains[v])
-            if (targetOpp != null && targetOpp != cur &&
-                !aux == linearHolds(sumWithout + c * targetOpp, op, bound)
-            ) {
-                sink.addCompound(listOf(auxFlipMove, IntSet(v, targetOpp)))
+            val targetOpp = snapLinearTarget(op, bound, c, sumWithout, !aux)
+            if (targetOpp != null) {
+                val clamped = state.rootDomains[v].clamp(targetOpp)
+                if (clamped != cur && !aux == linearHolds(sumWithout + c * clamped, op, bound)) {
+                    sink.addCompound(listOf(auxFlipMove, IntSet(v, clamped)))
+                }
+            }
+        }
+        if (op != LinearOp.LE && op != LinearOp.GE) return
+        for (i in vars.indices) {
+            val v = vars[i]
+            val c = coeffs[i]
+            if (c == 0L) continue
+            val cur = state.assignment.intValue(v)
+            val sumWithout = sum - c * cur
+            val domain = state.rootDomains[v]
+            for (wantHolds in booleanArrayOf(aux, !aux)) {
+                val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds) ?: continue
+                val rounded = snapLinearTarget(op, bound, c, sumWithout, wantHolds, domain) ?: continue
+                if (rounded == domain.clamp(target) || rounded == cur ||
+                    wantHolds != linearHolds(sumWithout + c * rounded, op, bound)
+                ) continue
+                if (wantHolds == aux) {
+                    sink.addChannelingIntSet(state, v, rounded)
+                } else {
+                    sink.addCompound(listOf(auxFlipMove, IntSet(v, rounded)))
+                }
             }
         }
     }

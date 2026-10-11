@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LinearInvariantTest {
@@ -42,6 +43,62 @@ class LinearInvariantTest {
                 assertEquals(0L, state.cost)
                 state.recompute()
                 assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
+    fun `inequality repairs retain partial interior targets before full repairs`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE)) {
+            for (coefficient in listOf(-1, 1)) {
+                val decreasing = (op == LinearOp.LE) == (coefficient > 0)
+                val initial = if (decreasing) 12L else 0L
+                val partial = if (decreasing) 9L else 3L
+                val full = if (decreasing) 3L else 9L
+                val bound = coefficient * if (decreasing) 19 else 5
+                val domain = assertNotNull(
+                    IntDomain(0, 12).excludeValues(longArrayOf(1, 2, 4, 5, 6, 7, 8, 10, 11)),
+                )
+                val problem = Problem(
+                    0, 2, arrayOf(domain, domain),
+                    arrayOf<Factor>(Linear(intArrayOf(coefficient, coefficient), intArrayOf(0, 1), op, bound)),
+                )
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+                state.assignment.setInt(0, initial)
+                state.assignment.setInt(1, initial)
+                state.recompute()
+
+                state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+                val moves = state.moveSink.list.toList()
+
+                assertEquals(
+                    listOf(IntSet(0, partial), IntSet(1, partial), IntSet(0, full), IntSet(1, full)),
+                    moves,
+                    "$op $coefficient",
+                )
+                for (move in moves) {
+                    state.assignment.setInt(0, initial)
+                    state.assignment.setInt(1, initial)
+                    state.recompute()
+                    val before = state.cost
+                    val predicted = state.netDelta(move)
+                    assertEquals(before, state.cost)
+                    assertEquals(initial, state.assignment.intValue(0))
+                    assertEquals(initial, state.assignment.intValue(1))
+
+                    state.apply(move)
+                    val committed = state.cost
+
+                    assertTrue(predicted < 0L)
+                    assertEquals(predicted, committed - before)
+                    if ((move as IntSet).newValue == partial) {
+                        assertTrue(committed > 0L)
+                    } else {
+                        assertEquals(0L, committed)
+                    }
+                    state.recompute()
+                    assertEquals(committed, state.cost)
+                }
             }
         }
     }

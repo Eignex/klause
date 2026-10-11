@@ -693,6 +693,55 @@ class LocalSearchStateTest {
     }
 
     @Test
+    fun `reified repairs retain valid compounds alongside hole alternatives`() {
+        val domain = assertNotNull(
+            IntDomain(0, 12).excludeValues(longArrayOf(1, 2, 4, 5, 6, 7, 8, 10, 11)),
+        )
+        val problem = Problem(
+            1, 2, arrayOf(domain, domain),
+            arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 19)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setInt(0, 12L)
+        state.assignment.setInt(1, 12L)
+        state.assignment.setBool(0, true)
+        state.recompute()
+
+        state.factors[0].proposeRepairMoves(state, 0, state.moveSink)
+        val moves = state.moveSink.list.toList()
+
+        assertEquals(
+            listOf(
+                Move.BoolFlip(0),
+                Move.IntSet(0, 3L),
+                Move.IntSet(1, 3L),
+                Move.Compound(listOf(Move.BoolFlip(0), Move.IntSet(0, 9L))),
+                Move.Compound(listOf(Move.BoolFlip(0), Move.IntSet(1, 9L))),
+            ),
+            moves,
+        )
+        for (move in moves) {
+            state.assignment.setInt(0, 12L)
+            state.assignment.setInt(1, 12L)
+            state.assignment.setBool(0, true)
+            state.recompute()
+            val before = state.cost
+            val predicted = state.netDelta(move)
+
+            assertEquals(before, state.cost)
+            assertEquals(12L, state.assignment.intValue(0))
+            assertEquals(12L, state.assignment.intValue(1))
+            assertTrue(state.assignment.boolValue(0))
+            state.apply(move)
+
+            assertEquals(-before, predicted)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
     fun `reified degree updates and scores agree with recompute across moves`() {
         for (op in LinearOp.entries) {
             val problem = Problem(
