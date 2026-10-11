@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.solver.objective.FunctionalObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,6 +17,23 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LiteralDefinitionTest {
+    @Test
+    fun `arithmetic objective hotspots retain source input order`() {
+        val problem = Problem(
+            0, 5, Array(5) { IntDomain(0, 4) }, arrayOf<Factor>(Product(0, 1, 2), Product(2, 3, 4)),
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem))
+        val shaping = ObjectiveShaping()
+        shaping.objective = assertNotNull(sweep.functionalObjective(intArrayOf(4), longArrayOf(1), 0, true))
+        val rng = Random(3)
+        val control = Random(3)
+        val sourceInputs = intArrayOf(0, 1, 3)
+
+        repeat(16) {
+            assertEquals(sourceInputs[control.nextInt(sourceInputs.size)], shaping.objectiveHotSpotIntVar(rng))
+        }
+    }
+
     @Test
     fun `hinted literal channels follow free Boolean inputs`() {
         for (bound in listOf(0, 1)) {
@@ -145,18 +163,106 @@ class LiteralDefinitionTest {
     }
 
     @Test
-    fun `functional gradients decline literal channel cones`() {
-        val problem = Problem(
-            1, 3, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
-            arrayOf<Factor>(
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-                Product(0, 1, 2),
-            ),
-        )
-        val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(0)))
+    fun `functional gradients follow free Boolean channel leaves`() {
+        for (bound in listOf(0, 1)) {
+            val problem = Problem(
+                1, 3, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
+                    Product(0, 1, 2),
+                ),
+            )
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(0)))
+            val objective = assertNotNull(sweep.functionalObjective(intArrayOf(2), longArrayOf(1), 0, true))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = sweep.network(3, 1)
+            state.assignment.setBool(0, false)
+            state.assignment.setInt(1, 3)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+            val before = objective.evaluate(state.assignment)
+            val move = Move.BoolFlip(0)
 
-        val objective = sweep.functionalObjective(intArrayOf(2), longArrayOf(1), 0, true)
+            val predicted = objective.deltaIfApplied(state.assignment, move)
+            val probed = state.objectiveDelta(objective, move)
+            state.apply(move)
 
-        assertNull(objective)
+            assertEquals(if (bound == 1) 3.0 else 0.0, objective.evaluate(state.assignment))
+            assertEquals(objective.evaluate(state.assignment) - before, predicted)
+            assertEquals(predicted, probed)
+            assertEquals(0L, state.cost)
+            assertEquals(setOf(0), (objective as FunctionalObjective).boolLeafVars.toSet())
+        }
+    }
+
+    @Test
+    fun `unary predicate channel products agree with source truth tables`() {
+        for (op in LinearOp.entries) for (coefficient in listOf(-1, 1)) for (bound in listOf(0, 1)) {
+            val problem = Problem(
+                1, 4, arrayOf(IntDomain(-2, 2), IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(coefficient), intArrayOf(0), op, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, bound),
+                    Product(1, 2, 3),
+                ),
+            )
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1)))
+            val objective = assertNotNull(sweep.functionalObjective(
+                intArrayOf(3), longArrayOf(2), 7, false, intArrayOf(0), longArrayOf(5),
+            ))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = sweep.network(4, 1)
+            state.assignment.setInt(0, -2)
+            state.assignment.setInt(2, 3)
+            sweep.sweep(state.assignment, state.rootDomains)
+            state.recompute()
+            assertEquals(setOf(0, 2), (objective as FunctionalObjective).leafVars.toSet())
+            assertTrue(objective.boolLeafVars.isEmpty())
+            for (value in -2L..2L) {
+                val activity = coefficient * value
+                val holds = when (op) {
+                    LinearOp.EQ -> activity == 0L
+                    LinearOp.NE -> activity != 0L
+                    LinearOp.LE -> activity <= 0L
+                    LinearOp.GE -> activity >= 0L
+                }
+                val channel = if (holds == (bound == 1)) 1L else 0L
+                val expected = -(7L + 6L * channel + if (holds) 5L else 0L).toDouble()
+                val before = objective.evaluate(state.assignment)
+                val move = Move.IntSet(0, value)
+                val predicted = objective.deltaIfApplied(state.assignment, move)
+                val costDelta = state.netDelta(move)
+
+                val probed = state.objectiveDelta(objective, move)
+                state.apply(move)
+
+                assertEquals(holds, state.assignment.boolValue(0))
+                assertEquals(channel, state.assignment.intValue(1))
+                assertEquals(3L * channel, state.assignment.intValue(3))
+                assertEquals(expected, objective.evaluate(state.assignment))
+                assertEquals(expected - before, predicted)
+                assertEquals(predicted, probed)
+                assertEquals(0L, costDelta)
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
+    fun `ordered predicates with other Boolean consumers remain searched`() {
+        for (op in listOf(LinearOp.LE, LinearOp.GE, LinearOp.NE)) {
+            val problem = Problem(
+                1, 2, arrayOf(IntDomain(-2, 2), IntDomain(0, 1)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), op, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                    Clause(intArrayOf(Lit.make(0, true))),
+                ),
+            )
+            val network = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1))).network(2, 1)
+
+            assertTrue(network.isDefinedInt(1))
+            assertTrue(!network.isDefinedBool(0))
+        }
     }
 }

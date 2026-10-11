@@ -46,12 +46,18 @@ internal class CellContext private constructor(
         return Sample.fromOwned(
             bools = BooleanArray(baseNumBoolVars) { model.boolValue(it) },
             ints = LongArray(baseNumIntVars) { model.intValue(it) },
+            reals = model.reals,
+            exactReals = model.exactReals,
+            exactInts = model.exactInts?.take(baseNumIntVars),
         )
     }
 
     /** Count distinct projections, preserving whether the cell was completely checked. */
     fun countCell(hashes: List<Xor>, cap: Int, maxDecisions: Long = CELL_DECISION_BUDGET): CellResult {
         require(cap >= 0)
+        if ((0 until problem.numRealVars).any { problem.realLower[it] > problem.realUpper[it] }) {
+            return CellResult(0, capped = false, representatives = emptyList(), complete = true)
+        }
         val params = BacktrackPresets.satOptimized().copy(maxDecisions = maxDecisions)
         val outcomes = BacktrackSolver(problem.withHashes(hashes).bake()).projectedOutcomes(params, boolSet, intSet)
         val representatives = ArrayList<Sample>()

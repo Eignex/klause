@@ -26,6 +26,45 @@ import kotlin.test.assertTrue
 
 class Xcsp3DefinitionTest {
     @Test
+    fun `predicate product objectives agree with original XCSP expressions`() {
+        for (relation in listOf("eq", "ne", "le", "ge")) for (negated in listOf(false, true)) {
+            val predicate = if (negated) "not($relation(choice,1))" else "$relation(choice,1)"
+            val parsed = Xcsp3.parse(
+                """<instance><variables><var id="choice">0..2</var><var id="duration">0..3</var>
+                    </variables><constraints><intension>eq(duration,mul($predicate,3))</intension>
+                    </constraints><objectives><minimize>duration</minimize></objectives></instance>""",
+            )
+            val problem = parsed.problem
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+            val objective = assertNotNull(sweep.functionalObjective(intArrayOf(1), longArrayOf(1), 0, true))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            for (i in 0 until problem.numIntVars) state.assignment.setInt(i, state.rootDomains[i].min)
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
+            state.recompute()
+            for (choice in 0L..2L) {
+                val holds = when (relation) {
+                    "eq" -> choice == 1L
+                    "ne" -> choice != 1L
+                    "le" -> choice <= 1L
+                    else -> choice >= 1L
+                }
+                val expected = if (holds != negated) 3L else 0L
+                val before = objective.evaluate(state.assignment)
+                val move = Move.IntSet(0, choice)
+                val predicted = assertNotNull(state.objectiveDelta(objective, move))
+
+                state.apply(move)
+
+                assertEquals(expected, state.assignment.intValue(1))
+                assertEquals(expected.toDouble(), objective.evaluate(state.assignment))
+                assertEquals(expected - before, predicted)
+                assertEquals(0L, state.cost)
+            }
+        }
+    }
+
+    @Test
     fun `Boolean controlled products preserve source truth tables and maintained moves`() {
         for (predicate in listOf("eq(room,0)", "not(eq(room,0))")) {
             for (operand in listOf("3", "length")) {

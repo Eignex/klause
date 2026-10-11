@@ -284,14 +284,16 @@ retaining coordinate bounds and omission counts.
 
 Domain-aware definition inference derives hinted unit equality channels only when their
 source bounds are within 0/1. A channel's predicate is derived only from a unique unit
-unary equality whose other Boolean occurrences are channels. Mixed integer and Boolean
+unary equality, disequality or ordered comparison whose other Boolean occurrences are
+channels. Negative unit coefficients reverse ordered comparisons; unrepresentable
+negated bounds and inputs admitting `Long.MIN_VALUE` decline that normalization. Mixed integer and Boolean
 definitions are ordered together; competing outputs and cyclic cones stay searched.
 Pinned values survive evaluation, and clipped channels retain their factor violations
 without replacing a maintained predicate during seeding. Implicitly owned integer
 outputs remain unchanged during per-move propagation; the affected definition factors
 retain any resulting violations. Diversification kicks also exclude maintained Boolean
 outputs from direct flips. Repairs into retained literal channels change an admissible
-Boolean input or backsolve a retained unary equality into a searched integer or an
+Boolean input or backsolve a retained unary predicate into a searched integer or an
 existing extremum inverse. When a Boolean predicate remains searched, unit unary
 equality sources supply bounded coordinated choice moves before a direct flip; all other
 constraints and duration fanout remain graded. These repairs check output domains, pins
@@ -301,9 +303,19 @@ stop at depth 16. The Cumulative duration neighborhood uses the same inverse rou
 Clause, cardinality and weighted Boolean-row repairs backsolve maintained equality
 predicates through their integer inputs after binary lowering removes the integer
 channels. Substituted integer pins remain in place; source-coordinate pins and owners
-still filter every inverse move. Functional objective inference declines cones crossing
-literal-to-integer channels; ordinary objective scoring still grades the complete
-maintained assignment. The portfolio's ALNS inner local search shares the definition
+still filter every inverse move. Ordered predicate inverses round toward the requested
+truth through root-domain holes and reject unreachable thresholds, including strict
+complements at signed endpoints. Equality and disequality inverses retain the bounded
+alternative walk.
+
+Functional objective inference follows admitted unary predicates, literal channels,
+Boolean folds and arithmetic definitions across both coordinate spaces in their shared
+topological order. Integer and Boolean leaves remain separate; mixed objective terms
+and polarity retain their source meaning. Unsupported reachable definitions decline
+functional inference. The objective computes the defining expressions for shaping;
+domain-clipped, pinned or owned outputs retain ordinary constraint violations and do
+not establish source feasibility. Complete propagated probes reconcile predicted and
+committed objective deltas. The portfolio's ALNS inner local search shares the definition
 sweep and immutable network used by ordinary LS workers using invariants. Boolean
 break/make vectors initialize on their first score query and are maintained
 incrementally thereafter; strategies that do not query them avoid their initialization

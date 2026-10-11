@@ -19,6 +19,19 @@ Accurate sampling also conditions on both call parameters and session scopes. Co
 and accurate sampling use complete finite-model machinery independently of the session's
 sampling backend; local-search enumeration remains sampling with replacement.
 
+Approximate counting and accurate sampling project only Boolean and finite integer
+values. Real columns remain existential feasibility constraints: neither a real
+interval nor multiple real completions multiply the projected count. Integer channels,
+conditioned models and XOR extensions retain real declarations, resource settings and
+implied/symmetry metadata. Decoded representatives retain all source coordinates,
+including approximate and certified rational real values and any exact integer payload;
+an augmented model's witness certificate does not certify the source projection.
+An empty declared real interval proves a cell empty before witness completion.
+Cell exhaustion requires complete feasibility checks, and an indeterminate real leaf
+cannot establish an exact count. Polynomial algebraic assignments belong to the
+[polynomial pipeline](qfnra.md), whose opaque source snapshots are outside these
+`Solver` counting and sampling entry points.
+
 ## Streams and exclusive ownership
 
 `openSamples`, `openEnumerate`, `openExactCount` and `openImprovements` return

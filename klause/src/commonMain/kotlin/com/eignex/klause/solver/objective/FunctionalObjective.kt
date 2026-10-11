@@ -11,27 +11,7 @@ import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.MutableIntLongMap
 import kotlin.math.abs
 
-/**
- * An [IncrementalObjective] that evaluates a *functionally-defined* objective variable through
- * the DAG of constraints that compute it — the `:: defines_var(V)` cone MiniZinc emits for
- * decomposed objectives (e.g. `objective = Σ |dist_i − approx_i|` lowered to int_abs / int_max /
- * int_min / int_lin_eq aux vars).
- *
- * Why this exists: `LocalSearchState.shapedObjectiveDelta` gives a [LinearObjective]
- * (`minimizeInt(V)`) a non-zero gradient only on `V` itself. But `V` is *derived* — moving a
- * decision variable `x` leaves `V`'s stored value untouched (it merely breaks `V`'s defining
- * constraint), so the move scores an objective-delta of 0 and CBLS is blind to the gradient
- * that actually matters. The search then only descends opportunistically via constraint repair
- * and plateaus far from the optimum (observed: city-position stuck ~460× off the true optimum).
- *
- * This objective instead recomputes `V` from the leaf (decision) variables by evaluating the
- * cone bottom-up, so a move on `x` yields the *true* change in `V` — the gradient CBLS needs to
- * descend a decomposed objective. Built by the FlatZinc compiler from the `defines_var`
- * annotations; the builder returns `null` (falling back to [LinearObjective]) on any node shape
- * it can't evaluate exactly, so the objective is only ever used when it's an exact mirror of `V`.
- *
- * "Lower is better": for minimization the objective is `V`; for maximization it is `−V`.
- */
+// Integer and Boolean definitions share a topological order and retain separate coordinate spaces.
 internal class FunctionalObjective internal constructor(
     /** Int objective terms `Σ termCoeffs[k]·terms[k]`, "lower is better": each term is a cone var
      *  (evaluated through [nodes]) or a bare int leaf. A single-variable objective is one term. */
@@ -54,6 +34,7 @@ internal class FunctionalObjective internal constructor(
     boolNodes: List<BoolFold> = emptyList(),
     /** Bool decision (leaf) variables the bool cone reads. */
     val boolLeafVars: IntArray = EmptyIntArray,
+    definitions: List<Definition> = emptyList(),
 ) : IncrementalObjective {
 
     /** Single-variable objective (the FlatZinc `defines_var` cone rooted at one variable). */
@@ -119,8 +100,16 @@ internal class FunctionalObjective internal constructor(
         }
     }
 
+    internal class Definition(
+        val out: Int,
+        val outIsBool: Boolean,
+        val compute: ((Int) -> Long, (Int) -> Boolean) -> Long,
+    )
+
     /** Reusable dense evaluator for the defining cones; the slot indices are built once here. */
-    private val coneMemo = ConeMemo(nodes, terms, termCoeffs, constant, boolNodes, boolTerms, boolTermCoeffs)
+    private val coneMemo = ConeMemo(
+        nodes, terms, termCoeffs, constant, boolNodes, boolTerms, boolTermCoeffs, definitions,
+    )
 
     /** Evaluate the cones over base value-getters and return the "lower is better" objective. */
     private fun objValue(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): Long {
@@ -136,53 +125,44 @@ internal class FunctionalObjective internal constructor(
     // safe to share across concurrent local-search workers (the objective is held in
     // LocalSearchParams).
     private class ConeMemo(
-        private val nodes: List<Node>,
+        nodes: List<Node>,
         private val terms: IntArray,
         private val termCoeffs: LongArray,
         private val constant: Long,
-        private val boolNodes: List<BoolFold>,
+        boolNodes: List<BoolFold>,
         private val boolTerms: IntArray,
         private val boolTermCoeffs: LongArray,
+        definitions: List<Definition>,
     ) {
-        /** Int node-output varId → its value-array slot; an id with no defining node (a leaf) maps to
-         *  `-1`. [IntIntMap.build] picks a dense array backing for klause's dense aux-var ids. */
-        private val slotOf: IntIntMap = IntIntMap.build(
-            IntArray(nodes.size) { nodes[it].out },
-            IntArray(nodes.size) { it },
-            absent = -1,
-        )
+        private val ordered = if (definitions.isNotEmpty()) definitions else
+            nodes.map { node -> Definition(node.out, false) { intOf, _ -> node.compute(intOf) } } +
+                boolNodes.map { node ->
+                    Definition(node.out, true) { _, boolOf -> if (node.compute(boolOf)) 1L else 0L }
+                }
+        private val intSlots = slots(false)
+        private val boolSlots = slots(true)
 
-        /** Bool node-output varId → its value-array slot (separate id space from the int cone). */
-        private val boolSlotOf: IntIntMap = IntIntMap.build(
-            IntArray(boolNodes.size) { boolNodes[it].out },
-            IntArray(boolNodes.size) { it },
-            absent = -1,
-        )
+        private fun slots(isBool: Boolean): IntIntMap {
+            val indices = ordered.indices.filter { ordered[it].outIsBool == isBool }
+            return IntIntMap.build(
+                IntArray(indices.size) { ordered[indices[it]].out }, indices.toIntArray(), absent = -1,
+            )
+        }
 
-        /** Evaluate both cones bottom-up, reading leaf (decision) values from [intBase] / [boolBase],
-         *  then combine the objective terms `Σ termCoeffs·terms + Σ boolTermCoeffs·[bool] + constant`. */
         fun evaluate(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): Long {
+            val values = LongArray(ordered.size)
+            val intOf: (Int) -> Long = { id ->
+                val slot = intSlots[id]
+                if (slot >= 0) values[slot] else intBase(id)
+            }
+            val boolOf: (Int) -> Boolean = { id ->
+                val slot = boolSlots[id]
+                if (slot >= 0) values[slot] != 0L else boolBase(id)
+            }
+            for (i in ordered.indices) values[i] = ordered[i].compute(intOf, boolOf)
             var total = constant
-            if (nodes.isNotEmpty() || terms.isNotEmpty()) {
-                val vals = LongArray(nodes.size)
-                // A node's inputs are leaves or earlier nodes (topological order), so its slot is filled
-                // before it is read; ids with no slot fall through to the leaf getter.
-                val valOf: (Int) -> Long = { id ->
-                    val s = slotOf[id]
-                    if (s >= 0) vals[s] else intBase(id)
-                }
-                for (i in nodes.indices) vals[i] = nodes[i].compute(valOf)
-                for (k in terms.indices) total += termCoeffs[k] * valOf(terms[k])
-            }
-            if (boolNodes.isNotEmpty() || boolTerms.isNotEmpty()) {
-                val bvals = BooleanArray(boolNodes.size)
-                val boolOf: (Int) -> Boolean = { id ->
-                    val s = boolSlotOf[id]
-                    if (s >= 0) bvals[s] else boolBase(id)
-                }
-                for (i in boolNodes.indices) bvals[i] = boolNodes[i].compute(boolOf)
-                for (k in boolTerms.indices) if (boolOf(boolTerms[k])) total += boolTermCoeffs[k]
-            }
+            for (k in terms.indices) total += termCoeffs[k] * intOf(terms[k])
+            for (k in boolTerms.indices) if (boolOf(boolTerms[k])) total += boolTermCoeffs[k]
             return total
         }
     }

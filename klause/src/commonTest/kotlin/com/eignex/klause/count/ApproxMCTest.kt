@@ -1,10 +1,14 @@
 package com.eignex.klause.count
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,6 +52,82 @@ class ApproxMCTest {
         val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 0L))
         assertEquals(0L, r.estimate)
         assertTrue(r.exact)
+    }
+
+    @Test
+    fun `unconstrained reals are existential in public projected counting`() {
+        for (max in listOf(1L, 2L)) {
+            val model = Problem(
+                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
+                factors = emptyArray(), numRealVars = 2,
+                realLower = doubleArrayOf(2.0, Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(3.0, Double.POSITIVE_INFINITY),
+            )
+
+            val count = BacktrackSolver(model.bake()).approximateCount(ApproxCountConfig(seed = 0L))
+
+            assertTrue(count.exact)
+            assertEquals(2 * max, count.estimate)
+        }
+    }
+
+    @Test
+    fun `real constraints exclude infeasible integer projections in public counting`() {
+        for (max in listOf(1L, 2L)) {
+            val model = Problem(
+                numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
+                factors = arrayOf(
+                    Clause(intArrayOf(Lit.make(0, true))),
+                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
+                        doubleArrayOf(3.0), LinearOp.LE, 0.0),
+                    ReifiedRealLinear(0, intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(0),
+                        doubleArrayOf(3.0), LinearOp.GE, 0.0),
+                ),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.5),
+            )
+
+            val count = BacktrackSolver(model.bake()).approximateCount(
+                ApproxCountConfig(samplingSet = intArrayOf(), intSamplingSet = intArrayOf(0), seed = 0L),
+            )
+
+            assertTrue(count.exact)
+            assertEquals(1L, count.estimate)
+        }
+    }
+
+    @Test
+    fun `an empty real interval has zero public projected models`() {
+        for (max in listOf(1L, 2L)) {
+            val model = Problem(
+                0, 1, arrayOf(IntDomain(1, max)), emptyArray(),
+                numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(1.0),
+            )
+
+            val count = BacktrackSolver(model.bake()).approximateCount(ApproxCountConfig(seed = 0L))
+
+            assertTrue(count.exact)
+            assertEquals(0L, count.estimate)
+        }
+    }
+
+    @Test
+    fun `conditioned mixed counts restore Boolean pins and integer holes`() {
+        val model = Problem(
+            1, 1, arrayOf(IntDomain(0, 2)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(3.0),
+        ).bake()
+        val config = ApproxCountConfig(seed = 0L)
+        BacktrackSolver(model).session().use { session ->
+            session.push(Assumptions(bools = mapOf(0 to true)).withIntHole(0, 1L))
+            assertEquals(2L, session.approximateCount(config).estimate)
+            session.push(Assumptions(ints = mapOf(0 to 2L)))
+            assertEquals(1L, session.approximateCount(config).estimate)
+            session.pop()
+            assertEquals(2L, session.approximateCount(config).estimate)
+            session.pop()
+            assertEquals(6L, session.approximateCount(config).estimate)
+        }
+        assertEquals(3L, model.rootIntDomain(0).valueCount)
     }
 
     private fun assertWithinBand(exact: Long, estimate: Long, eps: Double) {

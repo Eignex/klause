@@ -121,6 +121,11 @@ internal object IntBitChannel {
             numIntVars = nextInt,
             intDomains = base.rootIntDomains() + extraDomains.toTypedArray(),
             factors = base.factors + extraFactors.toTypedArray(),
+            impliedFactorMask = base.impliedFactorMask?.let { it + BooleanArray(extraFactors.size) },
+            hasSymmetryBreaking = base.hasSymmetryBreaking,
+            numRealVars = base.numRealVars,
+            realLower = base.realLower,
+            realUpper = base.realUpper,
             packedOpenIntLo = widened(base.intBounds.openLowerBits, nextInt),
             packedOpenIntHi = widened(base.intBounds.openUpperBits, nextInt),
         )

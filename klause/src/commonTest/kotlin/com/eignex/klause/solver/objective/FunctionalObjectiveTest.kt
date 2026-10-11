@@ -3,6 +3,8 @@ package com.eignex.klause.solver.objective
 import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.ir.values
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.bake
@@ -15,6 +17,37 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class FunctionalObjectiveTest {
+    @Test
+    fun `cross space objectives honor final repeated targets and Boolean parity`() {
+        val fold = FunctionalObjective.BoolFold(3, intArrayOf(Lit.make(1, true), Lit.make(2, false)), true)
+        val objective = FunctionalObjective(
+            intArrayOf(2, 0), longArrayOf(1, 1), 0, true, emptyList(), intArrayOf(0),
+            intArrayOf(1), longArrayOf(7), emptyList(), intArrayOf(2),
+            listOf(
+                FunctionalObjective.Definition(0, true) { intOf, _ -> if (intOf(0) == 1L) 1L else 0L },
+                FunctionalObjective.Definition(1, false) { _, boolOf -> if (boolOf(0)) 3L else 0L },
+                FunctionalObjective.Definition(1, true) { intOf, _ -> if (intOf(1) == 3L) 1L else 0L },
+                FunctionalObjective.Definition(3, true) { _, boolOf -> if (fold.compute(boolOf)) 1L else 0L },
+                FunctionalObjective.Definition(2, false) { _, boolOf -> if (boolOf(3)) 5L else 0L },
+            ),
+        )
+        val assignment = Assignment(4, 3)
+        assignment.setInt(1, 99)
+        assignment.setBool(1, true)
+        val move = Move.Compound(listOf(
+            Move.IntSet(0, 2), Move.BoolFlip(2), Move.IntSet(0, 1), Move.BoolFlip(2),
+        ))
+        val before = objective.evaluate(assignment)
+
+        val predicted = objective.deltaIfApplied(assignment, move)
+        assignment.setInt(0, 1)
+
+        assertEquals(0.0, before)
+        assertEquals(13.0, objective.evaluate(assignment))
+        assertEquals(13.0, predicted)
+        assertEquals(13.0, objective.evaluate(Sample(booleanArrayOf(false, false, false, false), longArrayOf(1, 0, 0))))
+    }
+
     @Test
     fun `functional objective delta matches evaluate-after minus before`() {
         // objective = |a - b| + |a - c|, minimized. Decomposed via int_abs + int_lin_eq.
