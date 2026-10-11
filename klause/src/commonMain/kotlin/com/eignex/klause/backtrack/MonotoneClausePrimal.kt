@@ -97,7 +97,9 @@ internal class MonotoneClausePrimal private constructor(
                 repair = try {
                     ResumableMinimize(
                         projection.solver, LinearObjective(),
-                        BacktrackPresets.satOptimized(params.randomSeed, inprocess = false, cancellation = phaseToken).copy(
+                        BacktrackPresets.satOptimized(
+                            params.randomSeed, inprocess = false, cancellation = phaseToken,
+                        ).copy(
                             nativeSat = params.nativeSat, pbLearning = false, nodeBudget = params.nodeBudget,
                             targetPhasing = false, valueSelector = IndomainMin,
                             maxDecisions = maxOf(20_000L, solver.problem.numBoolVars.toLong() * 2L),
