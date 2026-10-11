@@ -1,15 +1,21 @@
 package com.eignex.klause.localsearch.strategy
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.acceptance.AcceptanceRule
 import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.movesource.ObjectiveSeed
 import com.eignex.klause.localsearch.movesource.StallSwaps
+import com.eignex.klause.localsearch.schedule.ScheduleBundle
+import com.eignex.klause.localsearch.schedule.StallSchedule
+import com.eignex.klause.localsearch.schedule.WeightSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
@@ -26,6 +32,77 @@ import kotlin.test.assertTrue
  * by listing them, so adding a source in one place makes it available to every strategy.
  */
 class SourceDrivenStrategyTest {
+
+    @Test
+    fun `refined overload reductions postpone weight bumps and plateau noise`() {
+        for (scoring in MoveScoring.entries) {
+            val problem = Problem(
+                0, 4, arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(82, 84), IntDomain(84, 84)),
+                arrayOf<Factor>(Cumulative(
+                    intArrayOf(0, 1), longArrayOf(84, 84), longArrayOf(1, 1), 1,
+                    durationVars = intArrayOf(2, 3),
+                )),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(2, 84)
+            state.assignment.setInt(3, 84)
+            state.recompute()
+            val stall = StallSchedule(1, 0.0, 1.0)
+            val strategy = SourceDrivenStrategy(
+                sources = emptyList(), scoring = scoring,
+                schedule = ScheduleBundle(weights = WeightSchedule(bumpAfter = 1), noise = stall),
+                feasibleDescent = FeasibleDescent.RatchetAsConstraint,
+            )
+            strategy.pickMove(state)
+            val initialWeight = state.weights.factorWeights[0]
+
+            for (duration in listOf(83L, 82L)) {
+                state.apply(Move.IntSet(2, duration))
+                strategy.pickMove(state)
+
+                assertEquals(23L, state.cost, "$scoring duration=$duration")
+                assertEquals(scoring == MoveScoring.Break, stall.stalled, "$scoring duration=$duration")
+                assertEquals(if (scoring == MoveScoring.Break) 1.0 else 0.0, stall.level)
+            }
+            val expectedWeight = initialWeight + if (scoring == MoveScoring.Break) 2.0 else 0.0
+            assertEquals(expectedWeight, state.weights.factorWeights[0], "$scoring")
+            state.weights.factorWeights[0] = 9.0
+            state.tabu.step++
+
+            strategy.pickMove(state)
+
+            assertEquals(10.0, state.weights.factorWeights[0], "$scoring")
+            assertTrue(stall.stalled, "$scoring")
+            assertEquals(1.0, stall.level)
+        }
+    }
+
+    @Test
+    fun `plateau feedback preserves integer drops despite fractional increases`() {
+        val stall = StallSchedule(1, 0.0, 1.0)
+        val cost = 9007199254740993L
+        stall.update(0L, cost, 0.0)
+
+        stall.update(1L, cost - 1, 0.9)
+
+        assertEquals(false, stall.stalled)
+    }
+
+    @Test
+    fun `plateau feedback re-anchors fractional progress on restart and reset`() {
+        for (reset in listOf(false, true)) {
+            val stall = StallSchedule(1, 0.0, 1.0)
+            stall.update(2L, 23L, 0.1)
+            if (reset) stall.reset()
+
+            stall.update(0L, 23L, 0.9)
+            stall.update(1L, 23L, 0.8)
+
+            assertEquals(false, stall.stalled, "reset=$reset")
+            stall.update(2L, 23L, 0.8)
+            assertTrue(stall.stalled, "reset=$reset")
+        }
+    }
 
     /** Satisfiable `x0 + x1 = 2` over 0..3 — infeasible from the all-zero start, reachable by
      *  single-variable repair moves. */

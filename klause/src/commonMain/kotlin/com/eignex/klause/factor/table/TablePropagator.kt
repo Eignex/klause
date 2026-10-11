@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.carvedAt
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
+import com.eignex.klause.propagation.restrictIntToSurvivors
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -36,11 +37,37 @@ internal class TablePropagator(
     private val groupCache: TableGroupCache? = null,
 ) : Propagator {
 
-    override val expensiveBake: Boolean get() = true
+    private val unarySupports = boundedUnarySupports()
+
+    override val expensiveBake: Boolean get() = unarySupports == null
 
     /** Lower/upper bound the cell at (row, col) accepts; equal for a point, `[MIN, MAX]` for a `*`. */
     private fun cellLo(row: Int, col: Int): Long = tuples[row * arity + col]
     private fun cellHi(row: Int, col: Int): Long = hi?.get(row * arity + col) ?: tuples[row * arity + col]
+
+    private fun boundedUnarySupports(): LongArray? {
+        if (arity != 1 || numTuples > DEFAULT_DOMAIN_WALK_CAP) return null
+        val supports = LongArrayList()
+        for (row in 0 until numTuples) {
+            val lo = cellLo(row, 0)
+            val upper = cellHi(row, 0)
+            val distance = upper - lo
+            if (upper < lo || distance < 0 || distance >= DEFAULT_DOMAIN_WALK_CAP - supports.size) return null
+            var value = lo
+            while (true) {
+                supports.add(value)
+                if (value == upper) break
+                value++
+            }
+        }
+        val values = supports.toLongArray()
+        values.sort()
+        var kept = 0
+        for (value in values) {
+            if (kept == 0 || values[kept - 1] != value) values[kept++] = value
+        }
+        return values.copyOf(kept)
+    }
 
     /** Advisor subscription: STR2 is hole-aware GAC (tuple feasibility tests membership, the
      *  prune drops interior values), so subscribe to every kind on every column variable and consume
@@ -272,6 +299,14 @@ internal class TablePropagator(
         val existing = payload as? TableStr2State
         val dirty = state.drainIntEventDirtyVars(factorId)
         if ((existing?.started ?: (payload === NoopStarted)) && dirty.isEmpty()) return true
+        // Unary supports are unconditional facts. Root folding retains them without walking the span;
+        // search pruning uses STR2 to preserve its bound and hole explanations.
+        val supports = unarySupports
+        if (supports != null && state.currentLevel == 0 && !state.undoLogging) {
+            val ok = state.restrictIntToSurvivors(xs[0], supports)
+            if (ok) state.refPayload[factorId] = NoopStarted
+            return ok
+        }
         // The bitset support map is indexed by (value − lo) and sized to the column span, which only
         // works when every column's domain is within Int range and its span is modest. A wider column
         // (a float-scaled table) takes the value-keyed path, which carries no span dependency.
@@ -500,6 +535,7 @@ internal class TablePropagator(
                         supported[col].add(v)
                         if (v < minSup[col]) minSup[col] = v
                         if (v > maxSup[col]) maxSup[col] = v
+                        if (v == vEnd) break
                         v++
                     }
                 }
@@ -597,7 +633,6 @@ internal class TablePropagator(
     }
 }
 
-/** Payload for a table row that has fired but only ever hit the shared group no-op verdict, so its STR2
- *  live set was never needed. Carries "started" alone; the first fire that must actually sweep replaces
- *  it with a real [TableStr2State]. */
+/** A table whose root restriction or shared group no-op needed no STR2 live set. Carries "started"
+ *  alone; the first fire that must sweep replaces it with a real [TableStr2State]. */
 private object NoopStarted

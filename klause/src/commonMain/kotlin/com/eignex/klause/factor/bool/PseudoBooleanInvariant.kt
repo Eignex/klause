@@ -77,7 +77,7 @@ internal class PseudoBooleanInvariant(
             val v = Lit.variable(lit)
             val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
             val change = if (isTrue) -weights[i] else weights[i]
-            if (pbDistance(sum + change, op, bound) <= curDist) sink.addBoolFlip(v)
+            if (pbDistance(sum + change, op, bound) <= curDist) sink.addChannelingBoolFlip(state, v)
         }
     }
 

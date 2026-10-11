@@ -8,6 +8,8 @@ import kotlin.random.Random
  * weight by [increment] (resistant constraints get heavier, reshaping the gradient) and optionally
  * **relaxes** every weight back toward its seeded baseline (so stale escalations fade and the
  * gradient doesn't grow without bound).
+ * Raw/weighted source-driven repair also recognizes a lower unweighted Cumulative fraction
+ * at equal cost, so within-bucket overload reductions postpone bumps.
  *
  * It unifies two weight regimes of the same family — `Cbls`'s SAPS-style bump + probabilistic
  * smoothing and `FeasibilityJump`'s bump + geometric decay. Both relaxations are
@@ -51,6 +53,7 @@ class WeightSchedule(
     private var lastImprovingStep: Long = -1L
     private var lastSeenStep: Long = -1L
     private var lastCost: Long = Long.MAX_VALUE
+    private var lastFraction: Double = 0.0
     private var pendingBump: Boolean = false
 
     /** True iff a relax pass can ever run, so callers can skip allocating a snapshot when not. */
@@ -58,17 +61,21 @@ class WeightSchedule(
 
     /** Stall-detect off `(step, cost)`; arms a pending bump when the cost has not strictly dropped
      *  for [bumpAfter] steps. A rewound step (restart) re-anchors the trackers to this epoch. */
-    fun observeStep(step: Long, cost: Long) {
+    fun observeStep(step: Long, cost: Long) = observeStep(step, cost, 0.0)
+
+    internal fun observeStep(step: Long, cost: Long, fraction: Double) {
         if (step < lastSeenStep) {
             lastImprovingStep = step
             lastCost = cost
+            lastFraction = fraction
             lastSeenStep = step
             return
         }
         if (step == lastSeenStep) return
-        if (cost < lastCost) {
+        if (cost < lastCost || (cost == lastCost && fraction < lastFraction)) {
             lastImprovingStep = step
             lastCost = cost
+            lastFraction = fraction
         } else if (step - lastImprovingStep >= bumpAfter) {
             pendingBump = true
             lastImprovingStep = step
@@ -115,6 +122,7 @@ class WeightSchedule(
         lastImprovingStep = -1L
         lastSeenStep = -1L
         lastCost = Long.MAX_VALUE
+        lastFraction = 0.0
         pendingBump = false
     }
 

@@ -17,6 +17,7 @@ package com.eignex.klause.localsearch.schedule
  * weight bump, so it measures true no-progress, distinct from the weight schedule's own stall. The
  * driver advances it once per pick via [update]; the [NoiseSchedule.observe] hooks are inert (the
  * stall window needs the step, which only [update] carries).
+ * A lower unweighted repair fraction at equal integer cost also resets the window.
  */
 internal class StallSchedule(
     private val afterStall: Int,
@@ -32,6 +33,7 @@ internal class StallSchedule(
     private var lastSeenStep: Long = -1L
     private var lastDropStep: Long = 0L
     private var lastCost: Long = Long.MAX_VALUE
+    private var lastFraction: Double = 0.0
 
     /** Whether the search is currently stalled (set by [update]). */
     var stalled: Boolean = false
@@ -41,14 +43,16 @@ internal class StallSchedule(
         private set
 
     /** Advance the stall window to the engine's `(step, cost)`, recomputing [stalled] and [level]. */
-    fun update(step: Long, cost: Long) {
+    fun update(step: Long, cost: Long, fraction: Double = 0.0) {
         if (step < lastSeenStep) {
             lastDropStep = step
             lastCost = cost
+            lastFraction = fraction
             lastSeenStep = step
         } else if (step != lastSeenStep) {
-            if (cost < lastCost) {
+            if (cost < lastCost || (cost == lastCost && fraction < lastFraction)) {
                 lastCost = cost
+                lastFraction = fraction
                 lastDropStep = step
             }
             lastSeenStep = step
@@ -67,6 +71,7 @@ internal class StallSchedule(
         lastSeenStep = -1L
         lastDropStep = 0L
         lastCost = Long.MAX_VALUE
+        lastFraction = 0.0
         stalled = false
         level = baseNoise
     }

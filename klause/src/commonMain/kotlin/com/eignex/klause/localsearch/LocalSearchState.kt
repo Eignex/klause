@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.randomValue
@@ -118,6 +119,11 @@ class LocalSearchState(
 
     /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */
     val factors: Array<out Invariant> = projection.invariants
+
+    private val cumulativeFactors: IntArray by lazy(LazyThreadSafetyMode.NONE) {
+        problem.factors.indices.filter { problem.factors[it] is Cumulative }.toIntArray()
+    }
+    private var cumulativeFractions: DoubleArray = EmptyDoubleArray
 
     /** DDFW-style per-invariant dynamic weights and their class-normalised baseline. */
     val weights: FactorWeightBook = FactorWeightBook(problem)
@@ -366,9 +372,13 @@ class LocalSearchState(
     /** Apply [move], updating cost and payloads incrementally; when [invariants] is set, the
      *  affected definitional cone is propagated afterwards through the same primitives. */
     fun apply(move: Move) {
+        apply(move, null)
+    }
+
+    private fun apply(move: Move, affected: IntArray?) {
         applyCore(move)
         val net = invariants ?: return
-        propagateInvariants(net, move)
+        propagateInvariants(net, move, affected)
     }
 
     private fun applyCore(move: Move): Unit = when (move) {
@@ -385,22 +395,24 @@ class LocalSearchState(
 
     /** Re-evaluate the definitional cone the [move]'s touched vars feed, in topological order,
      *  writing changes through the incremental primitives (no full recompute). */
-    private fun propagateInvariants(net: InvariantNetwork, move: Move) {
-        val ints = IntArrayList(2)
-        val bools = IntArrayList(2)
-        fun collect(m: Move) {
-            when (m) {
-                is Move.BoolFlip -> bools.add(m.varId)
-                is Move.IntSet -> ints.add(m.varId)
-                is Move.RealSet -> {}
-                is Move.Compound -> for (p in m.parts) collect(p)
+    private fun propagateInvariants(net: InvariantNetwork, move: Move, affected: IntArray?) {
+        val nodes = affected ?: run {
+            val ints = IntArrayList(2)
+            val bools = IntArrayList(2)
+            fun collect(m: Move) {
+                when (m) {
+                    is Move.BoolFlip -> bools.add(m.varId)
+                    is Move.IntSet -> ints.add(m.varId)
+                    is Move.RealSet -> {}
+                    is Move.Compound -> for (p in m.parts) collect(p)
+                }
             }
+            collect(move)
+            net.affectedNodes(ints.toIntArray(), bools.toIntArray())
         }
-        collect(move)
-        val affected = net.affectedNodes(ints.toIntArray(), bools.toIntArray())
-        for (idx in affected) {
+        for (idx in nodes) {
             val n = net.node(idx)
-            if (if (n.outIsBool) assumptions.isFrozenBool(n.out) else assumptions.isFrozenInt(n.out)) continue
+            if (if (n.outIsBool) assumptions.isFrozenBool(n.out) else !moveSink.allowsDefinedInt(n.out)) continue
             val v = n.eval(assignment, rootDomains)
             if (v == DefinitionalSweep.SweepNode.NO_WRITE) continue
             if (n.outIsBool) {
@@ -561,8 +573,8 @@ class LocalSearchState(
      * violations the engine chases one flip at a time, so this rolls the update into one Compound.
      *
      * Returns a plain [Move.IntSet] when no sibling indicators need updating, else a [Move.Compound].
-     * Sibling factors of other shapes (multi-var reified linear, LE/GE reified, etc.) are skipped —
-     * only single-var EQ channeling has a deterministic "which indicator flips" answer.
+     * Indicator flips also carry unit equality channels over 0/1 integers to their matching value.
+     * Multi-var and inequality indicators are skipped by this neighborhood.
      */
     fun synthesizeChannelingMove(intVar: Int, newValue: Long): Move {
         val cur = assignment.intValue(intVar)
@@ -574,6 +586,7 @@ class LocalSearchState(
         for (fid in projection.intOccurrences[intVar]) {
             factors[fid].contributeChanneling(this, fid, intVar, cur, newValue, sink)
         }
+        sink.carryBinaryChannels(this, moveSink)
         return sink.toMove()
     }
 
@@ -642,6 +655,39 @@ class LocalSearchState(
             // initial state would double-count intermediate breaks on strongly-coupled chains.
             is Move.Compound -> evaluateMove(move).weightedNetDelta
         }
+    }
+
+    internal fun repairNetDelta(move: Move, weighted: Boolean): Double {
+        if (cost == 0L || cumulativeFactors.isEmpty()) {
+            return if (weighted) weightedNetDelta(move) else netDelta(move).toDouble()
+        }
+        val result = evaluateMove(move, refineCumulative = true, weightedResidual = weighted)
+        val primary = if (weighted) result.weightedNetDelta else result.netDelta.toDouble()
+        return primary + result.cumulativeDelta
+    }
+
+    internal fun cumulativeRepairFraction(): Double {
+        if (cost == 0L) return 0.0
+        var fraction = 0.0
+        for (fid in cumulativeFactors) fraction += cumulativeFraction(fid)
+        return fraction
+    }
+
+    private fun cumulativeFraction(factorId: Int): Double {
+        val extra = intPayload[factorId].toLong() - violationSoftCap
+        if (extra <= 0L) return 0.0
+        val lower = 1L shl (Long.SIZE_BITS - extra.countLeadingZeroBits() - 1)
+        return (extra - lower).toDouble() / lower.toDouble()
+    }
+
+    private fun cumulativeFractionDelta(weighted: Boolean): Double {
+        val w = if (weighted && weights.allocated) weights.factorWeights else null
+        var delta = 0.0
+        for (i in cumulativeFactors.indices) {
+            val fid = cumulativeFactors[i]
+            delta += (w?.get(fid) ?: 1.0) * (cumulativeFraction(fid) - cumulativeFractions[i])
+        }
+        return delta
     }
 
     /** Shift [boolBreakCount]/[boolMakeCount] for every bool var of [factorId] by [sign]: a var whose
@@ -888,7 +934,7 @@ class LocalSearchState(
         }
     }
 
-    private fun saveProbeCoordinates(move: Move) {
+    private fun saveProbeCoordinates(move: Move): IntArray {
         probeSlots.clear()
         probeSlotSet.clear()
         fun saveSlot(slot: Int) {
@@ -913,14 +959,16 @@ class LocalSearchState(
         }
         collect(move)
         val net = invariants
+        val affected = net?.affectedNodes(ints.toIntArray(), bools.toIntArray()) ?: EmptyIntArray
         if (net != null) {
-            for (idx in net.affectedNodes(ints.toIntArray(), bools.toIntArray())) {
+            for (idx in affected) {
                 val node = net.node(idx)
                 saveSlot(if (node.outIsBool) node.out else problem.numBoolVars + node.out)
             }
         }
         if (savedValuesScratch.size < probeSlots.size) savedValuesScratch = LongArray(probeSlots.size)
         for (i in 0 until probeSlots.size) savedValuesScratch[i] = probeValue(probeSlots[i])
+        return affected
     }
 
     private fun probeValue(slot: Int): Long = when {
@@ -943,7 +991,12 @@ class LocalSearchState(
     }
 
     // Use the committed move's single propagation pass and restore saved outputs without replaying definitions.
-    private fun evaluateMove(move: Move, objective: Objective? = null): MoveEval {
+    private fun evaluateMove(
+        move: Move,
+        objective: Objective? = null,
+        refineCumulative: Boolean = false,
+        weightedResidual: Boolean = false,
+    ): MoveEval {
         val oldCost = cost
         val oldBestCost = bestCostSeen
         val oldTracking = activityTracking
@@ -957,13 +1010,19 @@ class LocalSearchState(
         } else {
             null
         }
-        saveProbeCoordinates(move)
+        if (refineCumulative) {
+            if (cumulativeFractions.size < cumulativeFactors.size) {
+                cumulativeFractions = DoubleArray(cumulativeFactors.size)
+            }
+            for (i in cumulativeFactors.indices) cumulativeFractions[i] = cumulativeFraction(cumulativeFactors[i])
+        }
+        val affected = saveProbeCoordinates(move)
         probeTouchedList.clear()
         probeActive = true
         activityTracking = false
         breakProbeActive = true
         try {
-            apply(move)
+            apply(move, affected)
             breakProbeActive = false
             var breakCount = 0
             var makeCount = 0
@@ -986,7 +1045,8 @@ class LocalSearchState(
                 else -> objective.evaluate(assignment) - oldObjective
             }
             val breaks = if (move is Move.Compound) newlyViolated else breakCount
-            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta)
+            val cumulativeDelta = if (refineCumulative) cumulativeFractionDelta(weightedResidual) else 0.0
+            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta)
         } finally {
             breakProbeActive = false
             restoreProbeCoordinates()
@@ -1036,6 +1096,7 @@ class LocalSearchState(
         val netDelta: Long,
         val weightedNetDelta: Double,
         val objectiveDelta: Double,
+        val cumulativeDelta: Double,
     )
 
     // Reconcile exact degrees independently of apply status deltas; fused updates avoid a second degree read.

@@ -981,6 +981,40 @@ class PropagationState(
         }
     }
 
+    private var rootPreparationStarted = false
+
+    internal fun beginRootFixpoint() {
+        check(nativeEngine == null)
+        check(!rootPreparationStarted)
+        rootPreparationStarted = true
+        val start = TimeSource.Monotonic.markNow()
+        try {
+            conflictSeedFactors.clear()
+            flushPendingChanneling()
+            propBegin(totalFactorCount)
+            seedQueue(true, totalFactorCount, -1, EmptyIntArray)
+        } finally {
+            propagationNanos += start.elapsedNow().inWholeNanoseconds
+        }
+    }
+
+    internal val rootFixpointPending: Boolean get() = propQueue.isNotEmpty()
+
+    internal val rootFixpointStarted: Boolean get() = rootPreparationStarted
+
+    internal fun advanceRootFixpoint(cancellation: Cancellation): IntArray? {
+        check(rootPreparationStarted)
+        val start = TimeSource.Monotonic.markNow()
+        try {
+            return fireQueue(
+                cancellation !== Cancellation.Never, 0, cancellation, false,
+                maxFires = PROPAGATION_PREPARATION_BATCH_SIZE, cancelIsPause = true,
+            )
+        } finally {
+            propagationNanos += start.elapsedNow().inWholeNanoseconds
+        }
+    }
+
     private fun drainFixpoint(
         allFactors: Boolean,
         initialFactor: Int,
@@ -1036,9 +1070,12 @@ class PropagationState(
         floor: Int,
         cancellation: Cancellation,
         skipExpensiveBake: Boolean,
+        maxFires: Int = Int.MAX_VALUE,
+        cancelIsPause: Boolean = false,
     ): IntArray? {
         var fireCount = 0
         while (propQueue.isNotEmpty()) {
+            if (maxFires != Int.MAX_VALUE && fireCount >= maxFires) return null
             // Only a single fixpoint that itself runs away — an O(span) reified-linear bound crawl
             // over a Long-wide domain, millions of fires deep — needs the deadline *inside*
             // propagation. A normal per-node fixpoint is tiny and pauses cleanly at the engine's
@@ -1046,11 +1083,11 @@ class PropagationState(
             // pauses at decision granularity) untouched: the poll is never even consulted there.
             if (pollable) {
                 if (fireCount >= floor && (fireCount and CANCEL_POLL_MASK) == 0 && cancellation()) {
-                    runCancelled = true
+                    if (!cancelIsPause) runCancelled = true
                     return null
                 }
-                fireCount++
             }
+            fireCount++
             val fid = propQueue.removeFirst()
             propStamp[fid] = propGen - 1 // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)

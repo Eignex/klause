@@ -107,6 +107,8 @@ data class LocalSearchParams(
      * ProbSat / SA) never read the weights, so this is a no-op for them.
      */
     val normalizeWeightsByClass: Boolean = false,
+    /** Collect graded violations by factor kind at strict committed-cost improvements. Disabled by default. */
+    val reportResiduals: Boolean = false,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): LocalSearchParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

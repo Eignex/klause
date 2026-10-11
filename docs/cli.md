@@ -137,7 +137,18 @@ Solver-control flags are common to **every** mode:
   - `ls`: `seed`, `max-flips`, `lambda`, `tabu-tenure`, `pair-swap-budget`, `noise`, `smooth-prob`,
     `smooth-factor`; recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
     (`greedy|walksat|probsat|skew|sa`), `cb`, `skew-alpha`, `cooling-rate`, `initial-temp`, `min-temp`
-  - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`
+  - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`, `ls-residuals` (boolean,
+    default `false`). Residual reporting observes ordinary LS arms without changing
+    their recipes; ALNS bootstrap is excluded. Under `-s`, `lsBestResidualViolation`
+    and `lsBestResidual.<factor-kind>` describe one best committed assignment's graded
+    violations. `lsBestResidualFactor.<id>` gives bounded representative degrees,
+    committed Boolean/integer coordinates and omission counts in local-search model
+    id spaces after lowering and presolve. Reified rows use
+    `ReifiedLinear.<op>.<shape>`, with `binary` for one
+    input bounded to 0..1, `unary` for another single input and `multi` for multiple
+    inputs. The categories partition the total. These diagnostics do not claim a
+    feasible witness; collecting them adds scans at strict improvements and should
+    be separated from acceptance timing.
   - presolve effort (any engine): `presolve-abort-fraction` (finite number in `[0,1]`, default `0.001`),
     `presolve-max-rounds` (nonnegative, default `1` for conservative, `16` for default/aggressive),
     `presolve-probe-per-var` and `presolve-probe-total` (nonnegative propagation-call caps;

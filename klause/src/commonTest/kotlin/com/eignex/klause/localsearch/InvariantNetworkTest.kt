@@ -1,9 +1,14 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -15,6 +20,30 @@ import kotlin.test.assertTrue
  * move generation at the sink.
  */
 class InvariantNetworkTest {
+    @Test
+    fun `definition propagation preserves implicitly owned outputs`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(3, 3), IntDomain(0, 3)),
+            arrayOf<Factor>(Product(0, 1, 2)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, 3)).network(3, 0)
+        state.moveSink.setOwners(intArrayOf(-1, -1, 7))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 3)
+        state.assignment.setInt(2, 0)
+        state.recompute()
+
+        val predicted = state.netDelta(Move.IntSet(0, 1))
+        state.apply(Move.IntSet(0, 1))
+
+        assertEquals(0L, state.assignment.intValue(2))
+        assertTrue(state.cost > 0L)
+        assertEquals(state.cost, predicted)
+        val cost = state.cost
+        state.recompute()
+        assertEquals(cost, state.cost)
+    }
 
     private val src = """
         var 0..10: x;
@@ -57,6 +86,44 @@ class InvariantNetworkTest {
 
         assertEquals(5, first.assignment.intValue(iv.getValue("s")))
         assertEquals(0, second.assignment.intValue(iv.getValue("s")))
+    }
+
+    @Test
+    fun `nested definition scores agree with committed moves`() {
+        val execution = parseFlatZincExecution(src)
+        val problem = execution.program.problem.bake()
+        val state = LocalSearchState(problem, Random(5))
+        state.invariants = assertNotNull(execution.definitionalSweep)
+            .network(problem.numIntVars, problem.numBoolVars)
+        val x = execution.program.intVarsByName.getValue("x")
+        val y = execution.program.intVarsByName.getValue("y")
+        state.recompute()
+        state.apply(Move.IntSet(x, 7))
+        state.apply(Move.IntSet(y, 0))
+        val before = LongArray(problem.numIntVars) { state.assignment.intValue(it) }
+        val beforeCost = state.cost
+        val beforeDegrees = state.factorDegree.copyOf()
+        val weights = state.weights.factorWeights
+        for (i in weights.indices) weights[i] = (i + 1).toDouble()
+
+        for (move in listOf(
+            Move.IntSet(x, 10), Move.IntSet(y, 7), Move.Compound(listOf(Move.IntSet(x, 10), Move.IntSet(y, 7))),
+        )) {
+            val predicted = state.netDelta(move)
+            val weighted = state.weightedNetDelta(move)
+            assertEquals(weighted, state.weightedNetDelta(move))
+            assertContentEquals(before, LongArray(problem.numIntVars) { state.assignment.intValue(it) })
+            assertContentEquals(beforeDegrees, state.factorDegree)
+            assertEquals(beforeCost, state.cost)
+            state.apply(move)
+            state.recompute()
+
+            assertEquals(state.cost - beforeCost, predicted)
+            assertEquals(weights.indices.sumOf { weights[it] * (state.factorDegree[it] - beforeDegrees[it]) }, weighted)
+
+            state.apply(Move.IntSet(x, 7))
+            state.apply(Move.IntSet(y, 0))
+        }
     }
 
     @Test

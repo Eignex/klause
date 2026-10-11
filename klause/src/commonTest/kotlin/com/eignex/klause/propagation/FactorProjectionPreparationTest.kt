@@ -21,11 +21,18 @@ class FactorProjectionPreparationTest {
             arrayOf<Factor>(Table(intArrayOf(0, 1), relation), Table(intArrayOf(2, 3), relation)),
         )
 
-        val session = PropagationSession(problem)
+        for (resumable in listOf(false, true)) {
+            val projection = if (resumable) {
+                PropagationProblem.preparation(problem).asSequence().filterNotNull().last()
+            } else {
+                PropagationProblem(problem)
+            }
+            val session = PropagationSession(projection)
 
-        assertFalse(session.isUnsatAtRoot)
-        assertTrue(1L in session.intDomain(0))
-        assertFalse(1L in session.intDomain(3))
+            assertFalse(session.isUnsatAtRoot)
+            assertTrue(1L in session.intDomain(0))
+            assertFalse(1L in session.intDomain(3))
+        }
     }
 
     @Test
