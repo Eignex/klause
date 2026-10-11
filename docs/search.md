@@ -354,7 +354,7 @@ Pure Boolean clausal optimization with at most 64 positive-cost variables can
 seed incumbents through greedy feasibility repairs when those variables occur
 only positively in hard clauses. A private satisfaction repair keeps unaccepted
 cost variables true and tries their cheap values in descending weight order.
-A pure-literal pass fixes free residual variables to satisfying values. Only
+A bounded pure-literal fixpoint fixes free residual variables to satisfying values. Only
 feasible trials are retained. Clause-local polishing releases these pins and removes unnecessary
 costly values; polishing resumes across slices before the composed verifier checks the full
 proposal for publication.
@@ -362,7 +362,7 @@ Failed or cancelled trials contribute no infeasibility or optimality proof.
 
 The probe retains its repair session across portfolio slices. Its cumulative
 work is charged to the owning arm, including initialization, and slice cancellation
-pauses the current traversal without restarting it. The phase receives at most one quarter of the remaining
-solve deadline, capped at 2.5 seconds and 100,000 work units; each trial also has a
-20,000-decision cap. It runs once before ordinary optimization
+pauses the current traversal without restarting it. The phase receives at most one half of the remaining
+solve deadline, capped at 5 seconds and 100,000 work units; each trial also has a
+decision cap of at least 20,000 or twice the Boolean variable count. It runs once before ordinary optimization
 and is skipped behind an existing shared incumbent or within repair fragments.
