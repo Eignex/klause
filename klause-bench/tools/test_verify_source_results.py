@@ -28,6 +28,56 @@ class ProofCheckTest(unittest.TestCase):
         self.assertEqual(result['witness'], 'exact source feasible')
         self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
 
+    def test_complete_source_witness_establishes_sat_when_unpinned_query_is_unknown(self):
+        solver = z3.Solver()
+        query = solver.check
+
+        def check_pinned():
+            pinned = any(row.eq(z3.Real('x') == 1) for row in solver.assertions())
+            return query() if pinned else z3.unknown
+
+        case = self.case(kind='satisfy', objective=None, proven=False,
+                         finalWitness='((define-fun x () Real 1))')
+        with mock.patch.object(proof_check.z3, 'Solver', return_value=solver), \
+                mock.patch.object(solver, 'check', side_effect=check_pinned):
+            result = self.check(case, '(declare-const x Real) (assert (>= x 0))')
+
+        self.assertEqual(result['verdictCheck'], 'source sat')
+        self.assertEqual(result['witness'], 'exact source feasible')
+
+    def test_unknown_queries_report_the_failed_claim_and_reason(self):
+        variants = (
+            ({'finalWitness': None}, 'source feasibility expected sat'),
+            ({}, 'complete source witness feasibility expected sat'),
+            ({'feasible': False, 'finalWitness': None}, 'source infeasibility expected unsat'),
+        )
+        for updates, purpose in variants:
+            with self.subTest(purpose=purpose):
+                solver = z3.Solver()
+                case = self.case(kind='satisfy', objective=None, **updates)
+                with mock.patch.object(proof_check.z3, 'Solver', return_value=solver), \
+                        mock.patch.object(solver, 'check', return_value=z3.unknown), \
+                        mock.patch.object(solver, 'reason_unknown', return_value='timeout'):
+                    with self.assertRaisesRegex(AssertionError, 'fixture: ' + purpose + ', got unknown; reason: timeout'):
+                        self.check(case, '(declare-const x Real) (assert (>= x 0))')
+
+    def test_progress_preserves_completed_and_cached_records_before_a_failure(self):
+        first = self.case(kind='satisfy', objective=None, proven=False,
+                          finalWitness='((define-fun x () Real 1))')
+        cached = self.case(kind='satisfy', objective=None, proven=False,
+                           finalWitness='((define-fun x () Real 1))')
+        cached['index'] = 1
+        failed = self.case(kind='satisfy', objective=None, proven=False,
+                          finalWitness='((define-fun x () Real 0))')
+        failed['index'] = 2
+        progress = []
+        with mock.patch.object(proof_check, 'source', return_value='(declare-const x Real) (assert (>= x 1))'):
+            with self.assertRaisesRegex(AssertionError, 'complete source witness feasibility expected sat, got unsat'):
+                proof_check.check([first, cached, failed], progress=progress.append)
+
+        self.assertEqual([entry['index'] for entry in progress], [0, 1])
+        self.assertTrue(all(entry['check']['witness'] == 'exact source feasible' for entry in progress))
+
     def test_exact_objective_overrides_rounded_numeric_objective(self):
         for value in ('9007199254740993', '9223372036854775809', '1/3'):
             for maximize in (False, True):

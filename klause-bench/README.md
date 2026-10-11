@@ -365,6 +365,15 @@ Inputs can be JSON, gzip or xz; `--records-root` selects `cases/<index>/record.j
 instead of embedded records. SMT models must cover source sorts and satisfy all
 original constraints. MPS points must cover every column with integral integer
 coordinates; missing, duplicate, unknown and nonfinite coordinates fail checking.
+For a complete SMT witness, the verifier pins every declared source variable and
+requires SAT under the original constraints; this also establishes source feasibility.
+SMT records without a witness retain an unpinned source feasibility query. Query
+failures identify the problem, expected and returned verdicts, and any UNKNOWN reason.
+`--progress /path/to/checked-prefix.jsonl` flushes each completed record, including
+cache matches. A failed batch retains this checked prefix without claiming the remaining
+records passed; the final JSON output is written only after the whole batch succeeds.
+Each solver query has a 120-second allowance; source parsing and witness construction
+are outside that query allowance and require an enclosing job budget.
 The recorded command's `--exact` flag requires exact source feasibility; its absence
 selects default MPS checking even when the arm name ends in `-exact`. Legacy records
 without a command use that arm suffix. Default MPS `toleranceAccepted`
