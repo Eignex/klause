@@ -4,7 +4,10 @@ import kotlin.jvm.JvmInline
 
 /** Integer location in one finite CP projection; convert through its source mapping. */
 @JvmInline
-value class CpIntId(val index: Int) {
+value class CpIntId(
+    /** Position in the owning finite CP projection. */
+    val index: Int,
+) {
     init {
         require(index >= 0) { "CP integer id must not be negative" }
     }

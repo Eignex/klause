@@ -31,12 +31,18 @@ class SearchModelKey<V : Any>(
 }
 
 /** Authoritative arbitrary-precision value of a source integer, including finite CP contributions. */
-data class SearchExactIntValue(val variable: SourceIntId) : TypedSearchValueKey<BigInt> {
+data class SearchExactIntValue(
+    /** Integer location in the contributing source model. */
+    val variable: SourceIntId,
+) : TypedSearchValueKey<BigInt> {
     override val valueType: KClass<BigInt> get() = BigInt::class
 }
 
 /** Authoritative rational value of a source continuous variable. */
-data class SearchExactRealValue(val variable: SourceRealId) : TypedSearchValueKey<BigFraction> {
+data class SearchExactRealValue(
+    /** Continuous location in the contributing source model. */
+    val variable: SourceRealId,
+) : TypedSearchValueKey<BigFraction> {
     override val valueType: KClass<BigFraction> get() = BigFraction::class
 }
 
