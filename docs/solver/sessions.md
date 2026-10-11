@@ -26,6 +26,7 @@ conditioned models and XOR extensions retain real declarations, resource setting
 implied/symmetry metadata. Decoded representatives retain all source coordinates,
 including approximate and certified rational real values and any exact integer payload;
 an augmented model's witness certificate does not certify the source projection.
+An empty declared real interval proves a cell empty before witness completion.
 Cell exhaustion requires complete feasibility checks, and an indeterminate real leaf
 cannot establish an exact count. Polynomial algebraic assignments belong to the
 [polynomial pipeline](qfnra.md), whose opaque source snapshots are outside these
