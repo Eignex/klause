@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
@@ -13,6 +14,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.Sample
@@ -33,6 +35,82 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LocalSearchEngineTest {
+
+    @Test
+    fun `initial preparation pauses preserve seeded walks and charge only committed instructions`() {
+        val problem = Problem(
+            65, 65, Array(65) { IntDomain(0, 9) },
+            arrayOf<Factor>(
+                Product(0, 1, 2),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
+            ),
+        )
+        for (seeded in listOf(false, true)) {
+            val traces = listOf(0, 2, 8, 16, 24, 32, 40).map { stopAt ->
+                val trace = mutableListOf<Pair<Sample, Long>>()
+                val strategy = SourceDrivenStrategy(
+                    sources = emptyList(),
+                    perturbation = {
+                        trace += it.assignment.snapshot() to it.rng.nextLong()
+                        Move.IntSet(0, (it.assignment.intValue(0) + 1L) % 10L)
+                    },
+                    feasibleDescent = FeasibleDescent.SelfOwned,
+                )
+                val search = LocalSearchEngine(
+                    LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
+                    definitionalSweep = DefinitionalSweep.infer(problem), perMoveInvariants = true,
+                    seedImplicitOnRestart = true,
+                )
+                val budget = NodeBudget(10L)
+                val warm = WarmState()
+                val params = LocalSearchParams(
+                    maxFlips = 4L, randomSeed = 7L, nodeBudget = budget,
+                    assumptions = Assumptions(bools = mapOf(64 to true), ints = mapOf(1 to 1L)),
+                    initialAssignment = if (seeded) Sample(BooleanArray(65), LongArray(65) { 1L }) else null,
+                )
+                search.resumableSolve(params, warm).use { handle ->
+                    if (stopAt != 0) {
+                        var polls = 0
+                        assertNull(handle.runSlice(Cancellation { ++polls >= stopAt }, Long.MAX_VALUE, -1L))
+                        assertEquals(0.0, handle.stats.ls.moves.sum)
+                        assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
+                        assertTrue(trace.isEmpty())
+                        assertFailsWith<IllegalStateException> { search.resumableSolve(params) }
+                    }
+                    assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+                    assertEquals(4.0, handle.stats.ls.moves.sum)
+                }
+                trace to budget.movesLeft()
+            }
+            assertTrue(traces.first().first.isNotEmpty())
+            assertTrue(traces.all { it == traces.first() })
+        }
+    }
+
+    @Test
+    fun `closing suspended initialization leaves warm state private and permits reopening`() {
+        val problem = Problem(
+            1, 513, Array(513) { IntDomain(0, 9) },
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+        )
+        val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
+        val warm = WarmState()
+        val params = LocalSearchParams(maxFlips = 1L, randomSeed = 3L)
+        for (stopAt in listOf(1, 10, 20, 30, 40)) {
+            var polls = 0
+            val handle = search.resumableSolve(params, warm)
+            assertNull(handle.runSlice(Cancellation { ++polls >= stopAt }, Long.MAX_VALUE, -1L))
+            handle.close()
+            handle.close()
+            assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
+            assertTrue(warm.activityTouches().isEmpty())
+            assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) }
+        }
+        search.resumableSolve(params, warm).use {
+            assertIs<SolveResult.Unknown>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+        }
+        assertTrue(warm.bestCostSeen() < Long.MAX_VALUE)
+    }
 
     @Test
     fun `resumable minimization reports active phase times only when requested`() {

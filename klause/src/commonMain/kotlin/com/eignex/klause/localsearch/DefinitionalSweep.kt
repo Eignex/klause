@@ -458,12 +458,23 @@ class DefinitionalSweep internal constructor(
         factors: Array<out Factor>,
         assumptions: Assumptions,
     ) {
-        var effective = domains
-        assumptions.forEachInt { id, value ->
-            if (effective === domains) effective = domains.copyOf()
-            effective[id] = IntDomain(value, value)
+        pinnedSteps(assignment, domains, factors, assumptions).forEach { }
+    }
+
+    internal fun pinnedSteps(
+        assignment: Assignment,
+        domains: Array<IntDomain>,
+        factors: Array<out Factor>,
+        assumptions: Assumptions,
+    ): Sequence<Unit> = sequence {
+        val effective = if (assumptions.intKeys.isEmpty()) domains else domains.copyOf()
+        yield(Unit)
+        for (i in assumptions.intKeys.indices) {
+            val value = assumptions.intValues[i]
+            effective[assumptions.intKeys[i]] = IntDomain(value, value)
+            if ((i + 1) % INITIALIZATION_BATCH == 0) yield(Unit)
         }
-        sweep(assignment, effective, factors) { assumptions.isFrozenBool(it) }
+        yieldAll(sweepSteps(assignment, effective, factors) { assumptions.isFrozenBool(it) })
     }
 
     /** Number of swept definitions. */
@@ -471,6 +482,9 @@ class DefinitionalSweep internal constructor(
 
     /** Build the per-move invariant index over these nodes. */
     fun network(numIntVars: Int, numBoolVars: Int): InvariantNetwork = InvariantNetwork(nodes, numIntVars, numBoolVars)
+
+    internal fun networkPreparation(numIntVars: Int, numBoolVars: Int): Sequence<InvariantNetwork?> =
+        InvariantNetwork.preparation(nodes, numIntVars, numBoolVars)
 
     /**
      * Evaluate every defined var bottom-up from the current values in [assignment] — then
@@ -488,11 +502,24 @@ class DefinitionalSweep internal constructor(
         factors: Array<out Factor> = emptyArray(),
         frozenBool: (Int) -> Boolean = { false },
     ) {
-        for (n in nodes) {
+        sweepSteps(assignment, domains, factors, frozenBool).forEach { }
+    }
+
+    private fun sweepSteps(
+        assignment: Assignment,
+        domains: Array<IntDomain>,
+        factors: Array<out Factor>,
+        frozenBool: (Int) -> Boolean,
+    ): Sequence<Unit> = sequence {
+        for (i in nodes.indices) {
+            if (i % INITIALIZATION_BATCH == 0) yield(Unit)
+            val n = nodes[i]
             if (n.outIsBool && frozenBool(n.out)) continue
             n.apply(assignment, domains)
         }
-        for (f in factors) {
+        for (i in factors.indices) {
+            if (i % INITIALIZATION_BATCH == 0) yield(Unit)
+            val f = factors[i]
             if (f !is ReifiedLinear) continue
             if (f.auxBoolVar in maintainedBools) continue
             if (frozenBool(f.auxBoolVar)) continue
@@ -518,50 +545,108 @@ class DefinitionalSweep internal constructor(
  * index. [isDefinedInt] / [isDefinedBool] let move generation exclude defined vars from the
  * search space entirely (they are determined, not searched).
  */
-class InvariantNetwork internal constructor(
-    nodes: List<DefinitionalSweep.SweepNode>,
-    numIntVars: Int,
-    numBoolVars: Int,
-) {
-    private val nodeArr: Array<DefinitionalSweep.SweepNode> = nodes.toTypedArray()
-    private val definedInt = BooleanArray(numIntVars)
-    private val definedBool = BooleanArray(numBoolVars)
-    private val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
-    private val literalChannels = MutableIntObjectMap<LiteralIntDefinition>()
-    private val equalityPredicates = MutableIntObjectMap<EqualityPredicateDefinition>()
-    private val elementResults = MutableIntObjectMap<ElementResultDefinition>()
-    private val extremumRepairs = BooleanArray(numIntVars)
+class InvariantNetwork private constructor(data: DefinitionIndex) {
+    internal constructor(nodes: List<DefinitionalSweep.SweepNode>, numIntVars: Int, numBoolVars: Int) :
+        this(indexPreparation(nodes, numIntVars, numBoolVars).filterNotNull().first())
 
-    /** Node indexes reading each int var. */
-    private val intReaders: Array<IntArray>
+    private val nodeArr: Array<DefinitionalSweep.SweepNode> = data.nodeArr
+    private val definedInt: BooleanArray = data.definedInt
+    private val definedBool: BooleanArray = data.definedBool
+    private val intDefinitions: MutableIntObjectMap<FunctionalObjective.Node> = data.intDefinitions
+    private val literalChannels: MutableIntObjectMap<LiteralIntDefinition> = data.literalChannels
+    private val equalityPredicates: MutableIntObjectMap<EqualityPredicateDefinition> = data.equalityPredicates
+    private val elementResults: MutableIntObjectMap<ElementResultDefinition> = data.elementResults
+    private val extremumRepairs: BooleanArray = data.extremumRepairs
+    private val intReaders: Array<IntArray> = data.intReaders
+    private val boolReaders: Array<IntArray> = data.boolReaders
 
-    /** Node indexes reading each bool var. */
-    private val boolReaders: Array<IntArray>
-
-    init {
-        for (i in nodeArr.indices) {
-            val n = nodeArr[i]
-            if (n.outIsBool) definedBool[n.out] = true else definedInt[n.out] = true
-            val intDef = n as? DefinitionalSweep.SweepNode.IntDef
-            if (intDef != null) {
-                intDefinitions.put(n.out, intDef.node)
-                extremumRepairs[n.out] = intDef.inverseRepair
-            }
-            if (n is LiteralIntDefinition) literalChannels.put(n.out, n)
-            if (n is EqualityPredicateDefinition) equalityPredicates.put(n.out, n)
-            if (n is ElementResultDefinition) elementResults.put(n.out, n)
+    internal companion object {
+        fun preparation(
+            nodes: List<DefinitionalSweep.SweepNode>,
+            numIntVars: Int,
+            numBoolVars: Int,
+        ): Sequence<InvariantNetwork?> = indexPreparation(nodes, numIntVars, numBoolVars).map {
+            it?.let { data -> InvariantNetwork(data) }
         }
-        intReaders = readers(numIntVars) { it.intInputs }
-        boolReaders = readers(numBoolVars) { it.boolInputs }
-    }
 
-    private inline fun readers(slots: Int, inputs: (DefinitionalSweep.SweepNode) -> IntArray): Array<IntArray> {
-        val counts = IntArray(slots)
-        for (node in nodeArr) for (v in inputs(node)) counts[v]++
-        val result = Array(slots) { if (counts[it] == 0) EmptyIntArray else IntArray(counts[it]) }
-        counts.fill(0)
-        for (i in nodeArr.indices) for (v in inputs(nodeArr[i])) result[v][counts[v]++] = i
-        return result
+        private fun indexPreparation(
+            nodes: List<DefinitionalSweep.SweepNode>,
+            numIntVars: Int,
+            numBoolVars: Int,
+        ): Sequence<DefinitionIndex?> = sequence {
+            val nodeArr = nodes.toTypedArray()
+            yield(null)
+            val definedInt = BooleanArray(numIntVars)
+            yield(null)
+            val definedBool = BooleanArray(numBoolVars)
+            yield(null)
+            val extremumRepairs = BooleanArray(numIntVars)
+            yield(null)
+            val intDefinitions = MutableIntObjectMap<FunctionalObjective.Node>()
+            val literalChannels = MutableIntObjectMap<LiteralIntDefinition>()
+            val equalityPredicates = MutableIntObjectMap<EqualityPredicateDefinition>()
+            val elementResults = MutableIntObjectMap<ElementResultDefinition>()
+            for (i in nodeArr.indices) {
+                if (i % INITIALIZATION_BATCH == 0) yield(null)
+                val n = nodeArr[i]
+                if (n.outIsBool) definedBool[n.out] = true else definedInt[n.out] = true
+                val intDef = n as? DefinitionalSweep.SweepNode.IntDef
+                if (intDef != null) {
+                    intDefinitions.put(n.out, intDef.node)
+                    extremumRepairs[n.out] = intDef.inverseRepair
+                }
+                if (n is LiteralIntDefinition) literalChannels.put(n.out, n)
+                if (n is EqualityPredicateDefinition) equalityPredicates.put(n.out, n)
+                if (n is ElementResultDefinition) elementResults.put(n.out, n)
+            }
+            var intReaders: Array<IntArray>? = null
+            for (part in readerPreparation(nodeArr, numIntVars) { it.intInputs }) {
+                if (part == null) yield(null) else intReaders = part
+            }
+            yield(null)
+            var boolReaders: Array<IntArray>? = null
+            for (part in readerPreparation(nodeArr, numBoolVars) { it.boolInputs }) {
+                if (part == null) yield(null) else boolReaders = part
+            }
+            yield(DefinitionIndex(
+                nodeArr, definedInt, definedBool, intDefinitions, literalChannels,
+                equalityPredicates, elementResults, extremumRepairs,
+                checkNotNull(intReaders), checkNotNull(boolReaders),
+            ))
+        }
+
+        private fun readerPreparation(
+            nodes: Array<DefinitionalSweep.SweepNode>,
+            slots: Int,
+            inputs: (DefinitionalSweep.SweepNode) -> IntArray,
+        ): Sequence<Array<IntArray>?> = sequence {
+            val counts = IntArray(slots)
+            yield(null)
+            var visits = 0
+            for (node in nodes) {
+                if (++visits % INITIALIZATION_BATCH == 0) yield(null)
+                for (v in inputs(node)) {
+                    counts[v]++
+                    if (++visits % INITIALIZATION_BATCH == 0) yield(null)
+                }
+            }
+            val result = arrayOfNulls<IntArray>(slots)
+            yield(null)
+            for (v in result.indices) {
+                result[v] = if (counts[v] == 0) EmptyIntArray else IntArray(counts[v])
+                counts[v] = 0
+                if ((v + 1) % INITIALIZATION_BATCH == 0) yield(null)
+            }
+            for (i in nodes.indices) {
+                if (++visits % INITIALIZATION_BATCH == 0) yield(null)
+                for (v in inputs(nodes[i])) {
+                    checkNotNull(result[v])[counts[v]++] = i
+                    if (++visits % INITIALIZATION_BATCH == 0) yield(null)
+                }
+            }
+            @Suppress("UNCHECKED_CAST")
+            yield(result as Array<IntArray>)
+        }
     }
 
     /** Number of indexed definitions. */
@@ -627,3 +712,16 @@ class InvariantNetwork internal constructor(
         return marked.toSortedIntArray()
     }
 }
+
+private class DefinitionIndex(
+    val nodeArr: Array<DefinitionalSweep.SweepNode>,
+    val definedInt: BooleanArray,
+    val definedBool: BooleanArray,
+    val intDefinitions: MutableIntObjectMap<FunctionalObjective.Node>,
+    val literalChannels: MutableIntObjectMap<LiteralIntDefinition>,
+    val equalityPredicates: MutableIntObjectMap<EqualityPredicateDefinition>,
+    val elementResults: MutableIntObjectMap<ElementResultDefinition>,
+    val extremumRepairs: BooleanArray,
+    val intReaders: Array<IntArray>,
+    val boolReaders: Array<IntArray>,
+)

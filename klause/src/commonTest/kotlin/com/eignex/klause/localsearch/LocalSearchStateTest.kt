@@ -29,6 +29,26 @@ import kotlin.test.assertTrue
  */
 class LocalSearchStateTest {
     @Test
+    fun `suspended initial assignment preserves mixed seeded draws and pins`() {
+        val problem = Problem(513, 513, Array(513) { IntDomain(-3, 7) }, emptyArray())
+        val pins = Assumptions(bools = mapOf(0 to true, 512 to false), ints = mapOf(0 to 6L, 512 to -2L))
+        for (anchored in listOf(false, true)) {
+            val model = if (anchored) LocalSearchModel.open(problem) else LocalSearchModel.of(problem.bake())
+            val direct = LocalSearchState(model, Random(7), pins)
+            val suspended = LocalSearchState(model, Random(7), pins)
+
+            direct.randomizeAssignment()
+            val steps = suspended.initialAssignmentSteps(null).iterator()
+            while (steps.hasNext()) steps.next()
+
+            assertEquals(direct.assignment.snapshot(), suspended.assignment.snapshot())
+            assertEquals(direct.rng.nextLong(), suspended.rng.nextLong())
+            assertTrue(suspended.assignment.boolValue(0))
+            assertEquals(-2L, suspended.assignment.intValue(512))
+        }
+    }
+
+    @Test
     fun `root repairs preserve multiple selected Element requirements`() {
         for (definedResults in listOf(false, true)) {
             val problem = Problem(

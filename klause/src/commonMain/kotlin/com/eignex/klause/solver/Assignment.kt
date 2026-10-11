@@ -19,17 +19,32 @@ import kotlin.random.Random
  * approximately as [Double]s. Each kind lives in its own id space; a factor that touches several names
  * them through `boolVars` / `intVars` / its real variables.
  */
-class Assignment(
+class Assignment private constructor(
     /** Number of Boolean variables. */
     val numBoolVars: Int,
     /** Number of integer variables. */
     val numIntVars: Int,
     /** Number of continuous (real) variables. */
-    val numRealVars: Int = 0,
+    val numRealVars: Int,
+    private val bits: Bits,
+    private val ints: LongArray,
+    private val reals: DoubleArray,
 ) {
-    private val bits: Bits = Bits(numBoolVars)
-    private val ints: LongArray = LongArray(numIntVars)
-    private val reals: DoubleArray = if (numRealVars == 0) EmptyDoubleArray else DoubleArray(numRealVars)
+    constructor(numBoolVars: Int, numIntVars: Int, numRealVars: Int = 0) : this(
+        numBoolVars, numIntVars, numRealVars, Bits(numBoolVars), LongArray(numIntVars),
+        if (numRealVars == 0) EmptyDoubleArray else DoubleArray(numRealVars),
+    )
+
+    internal companion object {
+        fun preparation(numBoolVars: Int, numIntVars: Int, numRealVars: Int): Sequence<Assignment?> = sequence {
+            val bits = Bits(numBoolVars)
+            yield(null)
+            val ints = LongArray(numIntVars)
+            yield(null)
+            val reals = if (numRealVars == 0) EmptyDoubleArray else DoubleArray(numRealVars)
+            yield(Assignment(numBoolVars, numIntVars, numRealVars, bits, ints, reals))
+        }
+    }
 
     /** Current value of Boolean variable [varId]. */
     fun boolValue(varId: Int): Boolean = bits.get(varId)
@@ -63,14 +78,21 @@ class Assignment(
     /** Randomize every variable uniformly within its domain. */
     fun randomize(rng: Random, intDomains: Array<IntDomain>) {
         // Direct word fill — much faster than a per-var coin flip via bits.set / clear.
-        val ws = bits.words
-        for (i in ws.indices) ws[i] = rng.nextLong()
-        val tail = numBoolVars and 63
-        if (tail != 0) ws[ws.size - 1] = ws[ws.size - 1] and ((1L shl tail) - 1L)
+        randomizeBoolWords(rng, 0, boolWordCount)
         for (i in 0 until numIntVars) {
             val d = intDomains[i]
             ints[i] = d.randomValue(rng)
         }
+    }
+
+
+    internal val boolWordCount: Int get() = bits.words.size
+
+    internal fun randomizeBoolWords(rng: Random, from: Int, end: Int) {
+        val ws = bits.words
+        for (i in from until end) ws[i] = rng.nextLong()
+        val tail = numBoolVars and 63
+        if (end == ws.size && tail != 0) ws[ws.size - 1] = ws[ws.size - 1] and ((1L shl tail) - 1L)
     }
 
     /** Capture the assignment as an immutable [Sample]. */

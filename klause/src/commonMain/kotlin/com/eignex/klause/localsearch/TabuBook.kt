@@ -8,7 +8,32 @@ import com.eignex.klause.ir.Problem
  * activity histogram. [LocalSearchState]'s apply path advances all three; strategies read them for
  * tabu / CCA-window decisions.
  */
-class TabuBook(problem: Problem) {
+class TabuBook private constructor(
+    problem: Problem,
+/** Step at which each variable was last flipped or set. Bool var ids in `[0, numBoolVars)`; int
+     *  var ids offset by `numBoolVars`; real var ids offset by `numBoolVars + numIntVars`. Reset to
+     *  zero on [reset] — used only for tabu / CCA-window
+     *  decisions within a single restart epoch. For cross-epoch activity, see [touchCount]. */
+    val lastTouched: LongArray,
+    /** Cumulative count of moves applied to each variable, same indexing as [lastTouched]. Survives
+     *  [reset] so it measures activity across the whole search run. Captured by
+     *  [com.eignex.klause.localsearch.WarmState] for ALNS's `activityBiased` destroy operator. */
+    val touchCount: IntArray,
+) {
+    constructor(problem: Problem) : this(
+        problem, LongArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars),
+        IntArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars),
+    )
+
+    internal companion object {
+        fun preparation(problem: Problem): Sequence<TabuBook?> = sequence {
+            val slots = problem.numBoolVars + problem.numIntVars + problem.numRealVars
+            val lastTouched = LongArray(slots)
+            yield(null)
+            val touchCount = IntArray(slots)
+            yield(TabuBook(problem, lastTouched, touchCount))
+        }
+    }
 
     private val numBoolVars: Int = problem.numBoolVars
     private val numDiscreteVars: Int = problem.numBoolVars + problem.numIntVars
@@ -17,17 +42,6 @@ class TabuBook(problem: Problem) {
      *  tabu list. */
     var step: Long = 0L
         internal set
-
-    /** Step at which each variable was last flipped or set. Bool var ids in `[0, numBoolVars)`; int
-     *  var ids offset by `numBoolVars`; real var ids offset by `numBoolVars + numIntVars`. Reset to
-     *  zero on [reset] — used only for tabu / CCA-window
-     *  decisions within a single restart epoch. For cross-epoch activity, see [touchCount]. */
-    val lastTouched: LongArray = LongArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars)
-
-    /** Cumulative count of moves applied to each variable, same indexing as [lastTouched]. Survives
-     *  [reset] so it measures activity across the whole search run. Captured by
-     *  [com.eignex.klause.localsearch.WarmState] for ALNS's `activityBiased` destroy operator. */
-    val touchCount: IntArray = IntArray(problem.numBoolVars + problem.numIntVars + problem.numRealVars)
 
     /** Clear the tabu window: zero [lastTouched] and [step]. [touchCount] is deliberately preserved
      *  so cross-epoch activity survives a restart. */

@@ -32,17 +32,41 @@ Objective-bound overlays keep their own projections. Each Boolean, integer and r
 variable's occurrence index contains each active factor once, in factor order. A move
 updates that invariant once; the invariant accounts for all positions reading the
 coordinate, including positions with different presence literals. Assignments, RNGs,
-weights and invariant payloads belong to each live state. Resumable handles initialize
-large factor sets in batches, retaining the next factor and completed payloads when a
-slice expires. Partial costs, samples and warm state remain private until every factor
-has been scored. Initial scoring preserves factor order and does not charge search
-moves. Projection preparation also retains private invariant and occurrence-index
-progress in batches. Matching arms can continue that shared preparation; a mutex
-protects each batch and publishes only the complete projection. A suspended arm holds no
-lock. Assignment seeding, individual factor calls, restart policy mutations and repair
-searches remain atomic work that can overrun a segment. [Portfolio preparation
-revisits](portfolio.md#preparation-revisits) schedule unfinished CP and local-search
-arms.
+weights and invariant payloads belong to each live state. Resumable handles retain private initialization cursors for state buffers,
+assignment loading or randomization, implicit seed election and ownership, definition
+readers and evaluation, warm weights and activity, greedy coordinate order, and factor
+payloads. Cancellation is polled before each retained step. Explicit loops advance in
+batches of at most 256 coordinates, words, factors or reader edges; implicit seeding
+polls between individual globals. Random Boolean words precede integer draws, followed
+by anchored integer draws, pins and real starts. Suspension draws no additional random
+values and does not repeat completed work. A supplied assignment consumes no random
+initialization draws. Satisfaction preserves its supplied assignment; optimization
+reconciles supplied definitions before scoring. Partial assignments, costs, samples,
+residuals and warm captures remain private until all initial factors are scored and the
+initial greedy pass completes. Preparation consumes time but no search instructions or
+solve-wide move allowance.
+
+Projection preparation retains private invariant and occurrence-index progress in
+batches. Matching arms also share retained definition-reader preparation. A mutex
+protects each shared step and publishes only complete indexes; a suspended arm holds no
+lock. Closing a handle releases its private cursor and exclusive solver ownership.
+Completed shared preparation remains reusable. Invocation cancellation pauses a cursor;
+bound lifetime cancellation applies to every later slice. [Portfolio preparation
+revisits](portfolio.md#preparation-revisits) admit every initial sibling before extra
+visits.
+
+These boundaries are cooperative, not hard elapsed-time bounds. Every primitive array
+allocation still zeroes one complete buffer atomically: packed Boolean words, integer
+and real assignments, violation membership and positions, each factor payload/degree
+buffer, tabu/activity, Boolean scores, configuration/probe flags, definition masks/counts
+and reader arrays, implicit owners, seed sort scratch, warm weights and greedy order.
+Array copies and growable-list/map resizing also remain atomic. They can trigger runtime
+allocation or collection delays; polling occurs between these primitives, before the
+whole state exists. One definition evaluation, reification row, factor initialization,
+implicit global seed or bounded coordinate repair can also overrun a segment. Root
+support/pin checks, definition inference performed by the caller, custom restart policy
+mutations, later restart reconciliation, lazy first-use scoring indexes and activity
+reset remain atomic outside the retained initial buffer/assignment/definition cursors.
 
 ## Initialization and implicit table moves
 
@@ -112,7 +136,7 @@ implicit owners remain enforced; an out-of-range index or a domain-clamped resul
 the defining constraint subject to ordinary violation scoring.
 
 The one-way definition network contains immutable reader indexes; matching mixed-pool
-arms share its lazy construction while each state applies definitions to its own
+arms share its retained construction while each state applies definitions to its own
 assignment.
 
 Native Element result cones skip writes to unselected cells. Direct and transitive

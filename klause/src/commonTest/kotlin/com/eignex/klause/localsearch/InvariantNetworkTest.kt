@@ -7,12 +7,15 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -21,6 +24,31 @@ import kotlin.test.assertTrue
  * move generation at the sink.
  */
 class InvariantNetworkTest {
+    @Test
+    fun `shared definition preparation resumes without exposing unfinished readers`() {
+        val problem = Problem(
+            0, 515, Array(515) { IntDomain(0, 9) },
+            Array<Factor>(513) { Product(it, 514, it + 1) },
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem))
+        val direct = sweep.network(515, 0)
+        val preparation = InvariantNetworkPreparation(sweep, 515, 0)
+        var polls = 0
+
+        assertFalse(preparation.get(Cancellation { ++polls >= 12 }))
+        assertFailsWith<IllegalStateException> { preparation.value }
+        assertFalse(preparation.get(Cancellation { true }))
+        assertTrue(preparation.get(Cancellation.Never))
+        val network = assertNotNull(preparation.value)
+        assertTrue(preparation.get(Cancellation { true }))
+
+        assertSame(network, preparation.value)
+        assertContentEquals(direct.affectedNodes(intArrayOf(0), intArrayOf()),
+            network.affectedNodes(intArrayOf(0), intArrayOf()))
+        assertEquals(direct.size, network.size)
+        assertTrue(network.isDefinedInt(513))
+    }
+
     @Test
     fun `native Element cones follow selected cells and every index write`() {
         for (offset in listOf(2, Int.MAX_VALUE)) {

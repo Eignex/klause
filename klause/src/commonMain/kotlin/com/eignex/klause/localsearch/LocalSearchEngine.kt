@@ -107,9 +107,9 @@ internal class LocalSearchEngine(
 
     private val problem: Problem = model.problem
     internal var projection: LocalSearchPreparation = LocalSearchPreparation(problem, model.domains)
-    internal var invariantNetwork: Lazy<InvariantNetwork?> = lazy {
-        definitionalSweep?.network(problem.numIntVars, problem.numBoolVars)
-    }
+    internal var invariantNetwork = InvariantNetworkPreparation(
+        definitionalSweep, problem.numIntVars, problem.numBoolVars,
+    )
 
     // Decides each candidate of a model with continuous columns, whose rows are only scored within a tolerance.
     // Null on a model without them, which scores every row exactly and needs no decision.
@@ -167,13 +167,13 @@ internal class LocalSearchEngine(
             restarts.restart(state, bestSoFar = null)
             return
         }
-        state.randomizeAssignment()
-        prepareAssignment(state)
+        prepareSteps(state.initialAssignmentSteps(null), params, checkpoint)
+        prepareInitialAssignment(state, params, checkpoint)
         recomputeInitial(state, params, checkpoint)
     }
 
     private fun slicedInitialization(checkpoint: LocalSearchCheckpoint?): Boolean =
-        checkpoint != null && problem.numFactors > INITIAL_FACTOR_BATCH
+        checkpoint != null
 
     private suspend fun <T> SequenceScope<T?>.recomputeInitial(
         state: LocalSearchState,
@@ -185,7 +185,6 @@ internal class LocalSearchEngine(
             return
         }
         // Partial degrees and payloads stay private to the suspended stream until every factor is initialized.
-        state.clearViolationState()
         for (from in 0 until problem.numFactors step INITIAL_FACTOR_BATCH) {
             while (params.cancellation()) yield(null)
             state.initializeFactors(from, minOf(from + INITIAL_FACTOR_BATCH, problem.numFactors))
@@ -204,9 +203,95 @@ internal class LocalSearchEngine(
         }
     }
 
-    private fun installInvariants(state: LocalSearchState) {
+    private suspend fun <T> SequenceScope<T?>.installInvariants(
+        state: LocalSearchState,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+    ) {
         if (!perMoveInvariants) return
+        val cancellation = if (checkpoint == null) Cancellation.Never else params.cancellation
+        while (!invariantNetwork.get(cancellation)) yield(null)
         state.invariants = invariantNetwork.value
+    }
+
+    private suspend fun <T> SequenceScope<T?>.prepareSteps(
+        steps: Sequence<Unit>,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+    ) {
+        val cursor = steps.iterator()
+        while (true) {
+            while (checkpoint != null && params.cancellation()) yield(null)
+            if (!cursor.hasNext()) return
+            cursor.next()
+        }
+    }
+
+    private suspend fun <T, R : Any> SequenceScope<T?>.preparedValue(
+        steps: Sequence<R?>,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+    ): R {
+        val cursor = steps.iterator()
+        while (true) {
+            while (checkpoint != null && params.cancellation()) yield(null)
+            cursor.next()?.let { return it }
+        }
+    }
+
+    private suspend fun <T> SequenceScope<T?>.prepareInitialAssignment(
+        state: LocalSearchState,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+    ) {
+        if (seedImplicitOnRestart) prepareSteps(state.seeding.seedSteps(state), params, checkpoint)
+        definitionalSweep?.let {
+            prepareSteps(it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions),
+                params, checkpoint)
+        }
+    }
+
+    private suspend fun <T> SequenceScope<T?>.newState(
+        params: LocalSearchParams,
+        effectiveAssumptions: Assumptions,
+        seed: Long,
+        checkpoint: LocalSearchCheckpoint?,
+        timing: LocalSearchPhaseTimer?,
+    ): LocalSearchState {
+        val prepared = preparedProjection(params, checkpoint)
+        val state = preparedValue(
+            LocalSearchState.preparation(model, Random(seed), effectiveAssumptions, prepared), params, checkpoint,
+        )
+        state.phaseTimer = timing
+        state.violationSoftCap = params.violationSoftCap
+        state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
+        installInvariants(state, params, checkpoint)
+        return state
+    }
+
+    private suspend fun <T> SequenceScope<T?>.seedInitial(
+        state: LocalSearchState,
+        params: LocalSearchParams,
+        checkpoint: LocalSearchCheckpoint?,
+        reconcile: Boolean,
+    ): Boolean {
+        val sample = params.initialAssignment ?: return false
+        if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return false
+        if (checkpoint == null) {
+            seedFrom(state, sample)
+            if (reconcile) definitionalSweep?.let {
+                it.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
+                state.recompute()
+            }
+        } else {
+            prepareSteps(state.initialAssignmentSteps(sample), params, checkpoint)
+            if (reconcile) definitionalSweep?.let {
+                prepareSteps(it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions),
+                    params, checkpoint)
+            }
+            recomputeInitial(state, params, checkpoint)
+        }
+        return true
     }
 
     private fun phaseTimer(params: LocalSearchParams, sink: SolveStatsSink?): LocalSearchPhaseTimer? {
@@ -1129,14 +1214,9 @@ internal class LocalSearchEngine(
     ): LocalSearchState = timing.inPhase("seeding") {
         val seed = params.randomSeed ?: Random.Default.nextLong()
         val state = timing.inPhase("preparation") {
-            LocalSearchState(model, Random(seed), effectiveAssumptions, preparedProjection(params, checkpoint)).also {
-                it.phaseTimer = timing
-                it.violationSoftCap = params.violationSoftCap
-                it.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
-                installInvariants(it)
-            }
+            newState(params, effectiveAssumptions, seed, checkpoint, timing)
         }
-        warm?.applyTo(state)
+        warm?.let { prepareSteps(it.applySteps(state), params, checkpoint) }
         // Mirror newSatisfyState: a restart policy instance can be reused across solves (one tuning
         // recipe over many problems), so clear its per-solve state before any restart here — else a
         // stale incumbent of a different variable arity is anchored/perturbed against this problem.
@@ -1148,21 +1228,8 @@ internal class LocalSearchEngine(
         state.shaping.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
         // Warm-start from a caller-supplied (arity-compatible) assignment instead of a random
         // restart; null by default. See [LocalSearchParams.initialAssignment].
-        val sliced = slicedInitialization(checkpoint)
-        val seeded = params.initialAssignment?.let { seedFrom(state, it, recompute = !sliced) } ?: false
-        if (seeded) {
-            // Reconcile the warm-loaded assignment exactly as the restart path does: the seed sets only
-            // the variables its producing engine emitted, so any *defined* variable must be re-derived
-            // from the seeded decision variables — otherwise a definitional constraint reads as violated
-            // and the engine fights up from a spuriously-infeasible state, discarding the warm start.
-            definitionalSweep?.let { sweep ->
-                sweep.sweepPinned(state.assignment, state.rootDomains, problem.factors, state.assumptions)
-                if (!sliced) state.recompute()
-            }
-            if (sliced) recomputeInitial(state, params, checkpoint)
-        } else {
-            initialRestart(state, params, checkpoint)
-        }
+        val seeded = seedInitial(state, params, checkpoint, reconcile = true)
+        if (!seeded) initialRestart(state, params, checkpoint)
         // Greedy-repair is gated on problem size: on tiny problems LS reaches feasibility in
         // microseconds and the repair pass is pure overhead. Skip it on a warm start: the seed is
         // already feasible, and the repair sweep is objective-blind (it accepts any flip that doesn't
@@ -1184,14 +1251,9 @@ internal class LocalSearchEngine(
         timing: LocalSearchPhaseTimer? = null,
     ): LocalSearchState = timing.inPhase("seeding") {
         val state = timing.inPhase("preparation") {
-            LocalSearchState(model, Random(seed), effectiveAssumptions, preparedProjection(params, checkpoint)).also {
-                it.phaseTimer = timing
-                it.violationSoftCap = params.violationSoftCap
-                it.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
-                installInvariants(it)
-            }
+            newState(params, effectiveAssumptions, seed, checkpoint, timing)
         }
-        warm?.applyTo(state)
+        warm?.let { prepareSteps(it.applySteps(state), params, checkpoint) }
         // A restart policy instance can be reused across solves (a tuning campaign runs one
         // recipe over many problems); clear its per-solve state so a stale incumbent — possibly
         // of a different variable arity — can't leak in and be indexed against this problem.
@@ -1199,13 +1261,8 @@ internal class LocalSearchEngine(
         // the `restarts` wrapper (whose reset is the interface no-op).
         configuredRestart.reset()
         // A caller-supplied starting point stands in for the first random restart; later restarts are the policy's.
-        val sliced = slicedInitialization(checkpoint)
-        val seeded = params.initialAssignment?.let { seedFrom(state, it, recompute = !sliced) } ?: false
-        if (!seeded) {
-            initialRestart(state, params, checkpoint)
-        } else if (sliced) {
-            recomputeInitial(state, params, checkpoint)
-        }
+        val seeded = seedInitial(state, params, checkpoint, reconcile = false)
+        if (!seeded) initialRestart(state, params, checkpoint)
         state
     }
 
@@ -1291,7 +1348,7 @@ internal class LocalSearchEngine(
             greedyInit.run(state) { params.cancellation() }
             return
         }
-        val pass = greedyInit.pass(state)
+        val pass = preparedValue(greedyInit.preparation(state), params, checkpoint)
         while (!pass.advance { params.cancellation() }) {
             onPause()
             yield(null)
