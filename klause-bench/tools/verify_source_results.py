@@ -7,10 +7,16 @@ import json
 import math
 import pathlib
 import re
+import shlex
 import tarfile
 import urllib.request
 
 import z3
+
+
+SMT_CORPUS_SUITES = frozenset(("smtlib-qfidl", "smtlib-qflia", "smtlib-qflira", "smtlib-qflra", "smtlib-qfrdl"))
+SMT_SUITES = SMT_CORPUS_SUITES | {"smtlib-core"}
+SOURCE_SUITES = SMT_SUITES | {"mps-core", "miplib3"}
 
 
 def expressions(text):
@@ -279,6 +285,10 @@ def mps_objective_matches(objective, variables, values, reported, exact_mode, ex
 
 def source(case, archive, source_root=None):
     suite, name = case["problem"]["suite"], case["record"]["problem"]
+    if suite not in SOURCE_SUITES:
+        raise ValueError(f"unsupported source suite {suite}")
+    if suite in SMT_CORPUS_SUITES and source_root is None:
+        raise ValueError(f"source suite {suite} requires --source-root with hash-named original bytes")
     if source_root is not None:
         digest = case["record"]["sourceHashes"]["model"]
         assert re.fullmatch(r"[0-9a-f]{64}", digest), "invalid source hash"
@@ -298,8 +308,18 @@ def source(case, archive, source_root=None):
         data = archive[0].extractfile(member).read()
     else:
         raise ValueError(f"unsupported source suite {suite}")
-    assert hashlib.sha256(data).hexdigest() == case["record"]["sourceHashes"]["model"]
+    assert hashlib.sha256(data).hexdigest() == case["record"]["sourceHashes"]["model"], "source hash differs from record"
     return data.decode("latin-1")
+
+
+def exact_mode(case):
+    command = case["record"].get("command")
+    if command is None:
+        return case["arm"].endswith("-exact")
+    arguments = shlex.split(command)
+    if "--" in arguments:
+        arguments = arguments[:arguments.index("--")]
+    return "--exact" in arguments
 
 
 def check(cases, source_root=None):
@@ -307,6 +327,7 @@ def check(cases, source_root=None):
     for case in cases:
         assert case["status"] == "DONE" and case.get("record"), "incomplete case"
         record = case["record"]
+        exact = exact_mode(case)
         reported_objective = record.get("exactObjective")
         if reported_objective is None:
             reported_objective = record.get("objective")
@@ -315,7 +336,8 @@ def check(cases, source_root=None):
             sources[source_key] = source(case, archive, source_root)
         text = sources[source_key]
         key = (record["sourceHashes"]["model"], record["kind"], record["feasible"], str(reported_objective),
-               record["proven"], record.get("maximize"), record.get("finalWitness"), case["arm"].endswith("-exact"))
+               record.get("exactObjective") is not None, record["proven"], record.get("maximize"),
+               record.get("finalWitness"), exact)
         if key in cache:
             results.append({"index": case["index"], "check": cache[key]})
             continue
@@ -325,7 +347,7 @@ def check(cases, source_root=None):
             assert not record["proven"] and reported_objective is None
             result["verdictCheck"] = "no claimed verdict"
         else:
-            is_smt = case["problem"]["suite"] == "smtlib-core"
+            is_smt = case["problem"]["suite"] in SMT_SUITES
             if is_smt:
                 parsed = z3.Optimize()
                 parsed.from_string(text)
@@ -339,6 +361,7 @@ def check(cases, source_root=None):
             else:
                 constraints, objective, variables, maximize = mps(text)
                 assert maximize == record["maximize"]
+            assert reported_objective is None or objective is not None, "reported objective is absent from source"
             solver = z3.Solver()
             solver.set(timeout=120000)
             solver.add(*constraints)
@@ -350,7 +373,7 @@ def check(cases, source_root=None):
                 assert solver.check() == z3.sat, record["problem"]
                 result["verdictCheck"] = "source sat"
                 witness = record.get("finalWitness")
-                if witness and is_smt:
+                if witness is not None and is_smt:
                     solver.push()
                     solver.add(*smt_pins(witness, variables))
                     assert solver.check() == z3.sat, record["problem"]
@@ -363,16 +386,15 @@ def check(cases, source_root=None):
                     result["witness"] = "exact source feasible"
                 if witness is not None and not is_smt:
                     values = mps_values(witness, variables)
-                    exact_mode = case["arm"].endswith("-exact")
                     exact_feasible = all(z3.is_true(mps_point(row, variables, values)) for row in constraints)
                     result["witness"] = "exact source feasible" if exact_feasible else "not exact source feasible"
                     if reported_objective is not None:
                         assert mps_objective_matches(-objective if maximize else objective, variables, values,
-                                                     reported_objective, exact_mode,
+                                                     reported_objective, exact,
                                                      record.get("exactObjective") is not None,
                                                      witness), "point objective differs from reported objective"
                         result["objectiveCheck"] = "source point objective matches"
-                    if exact_mode:
+                    if exact:
                         assert exact_feasible, record["problem"]
                     else:
                         tolerance_rows, _, _, _ = mps(text, tolerance=True)
@@ -406,7 +428,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Check lab verdicts, models and finite optimum claims against exact source constraints.')
     parser.add_argument('cases', type=pathlib.Path)
     parser.add_argument('--records-root', type=pathlib.Path, help='Directory containing cases/<index>/record.json; use these raw records as authority.')
-    parser.add_argument('--source-root', type=pathlib.Path, help='Original uncompressed sources named <record sourceHashes.model>.txt; otherwise fetch the canonical source.')
+    parser.add_argument('--source-root', type=pathlib.Path, help='Original uncompressed sources named <record sourceHashes.model>.txt; required for SMT corpus suites, otherwise fetch the canonical core or MIPLIB source.')
     parser.add_argument('--output', type=pathlib.Path)
     args = parser.parse_args()
     opener = gzip.open if args.cases.suffix == '.gz' else lzma.open if args.cases.suffix == '.xz' else open

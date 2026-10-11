@@ -335,23 +335,29 @@ identity and the checked XCSP assignment when accepted, without solving again.
 ### Offline source verifier
 
 [verify_source_results.py](tools/verify_source_results.py) checks `mps-core`,
-`smtlib-core` and `miplib3` records against original sources using exact arithmetic.
+`smtlib-core`, `miplib3` and the SMT corpus suites `smtlib-qfidl`, `smtlib-qflia`,
+`smtlib-qflira`, `smtlib-qflra` and `smtlib-qfrdl` against original sources using exact arithmetic.
 Vendored inputs are retrieved at the recorded revision; original MIPLIB3 inputs
 are retrieved separately. All source hashes must match. `--source-root` instead
 reads original uncompressed inputs named `<sourceHashes.model>.txt` from a supplied
 directory, allowing the same checks without network retrieval.
+The five SMT corpus suites require this directory and their hash-matched original
+bytes; they do not fetch a source by corpus path. Other suites are declined.
 
 ```sh
 python3 -m pip install -r klause-bench/tools/requirements-source-checks.txt
 python3 klause-bench/tools/verify_source_results.py /path/to/cases.json \
-  --records-root /path/to/raw-job --output /path/to/source-checks.json
+  --source-root /path/to/original-sources --records-root /path/to/raw-job \
+  --output /path/to/source-checks.json
 ```
 
 Inputs can be JSON, gzip or xz; `--records-root` selects `cases/<index>/record.json`
 instead of embedded records. SMT models must cover source sorts and satisfy all
 original constraints. MPS points must cover every column with integral integer
 coordinates; missing, duplicate, unknown and nonfinite coordinates fail checking.
-Exact arms require exact source feasibility. Default MPS `toleranceAccepted`
+The recorded command's `--exact` flag requires exact source feasibility; its absence
+selects default MPS checking even when the arm name ends in `-exact`. Legacy records
+without a command use that arm suffix. Default MPS `toleranceAccepted`
 is separate from exact feasibility, using [scaled source tolerance](../docs/formats.md#mps).
 Original rational coefficients/printed values avoid binary64 row overflow.
 
