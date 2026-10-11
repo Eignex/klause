@@ -54,9 +54,12 @@ data class Count(
     val estimate: Long,
     /** The count is `≥ lower`. For the anytime exact counter this only increases. */
     val lower: Long,
-    /** The count is `≤ upper` (`Long.MAX_VALUE` if not yet bounded). For exact counting it only decreases. */
+    /**
+     * The count is `≤ upper`; [Long.MAX_VALUE] is an unbounded sentinel, including counts beyond
+     * the [Long] range. For exact counting it only decreases.
+     */
     val upper: Long,
-    /** True iff the count is proven exactly (`lower == upper`). */
+    /** True when the count is proven exactly and representable; equal saturated bounds are not a proof. */
     val exact: Boolean,
     /** Probability the true count lies in `[lower, upper]`: `1.0` for exact, `1 - δ` for ApproxMC. */
     val confidence: Double,
