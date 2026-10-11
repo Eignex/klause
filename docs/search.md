@@ -433,7 +433,7 @@ Failed or cancelled trials contribute no infeasibility or optimality proof.
 
 The probe retains its repair session across portfolio slices. Its cumulative
 work is charged to the owning arm, including initialization, and slice cancellation
-stops the current trial. The phase receives at most one quarter of the remaining
+pauses the current traversal without restarting it. The phase receives at most one quarter of the remaining
 solve deadline, capped at 2.5 seconds and 100,000 work units; each trial also has a
-20,000-decision and 250-millisecond cap. It runs once before ordinary optimization
+20,000-decision cap. It runs once before ordinary optimization
 and is skipped behind an existing shared incumbent or within repair fragments.

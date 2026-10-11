@@ -124,8 +124,6 @@ class BacktrackSolver internal constructor(
             rebindable = true,
         )
         return object : RepairSearch {
-            override val work: Long get() = handle.work
-
             override fun repair(
                 assumptions: Assumptions,
                 decisionBudget: Long,
