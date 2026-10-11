@@ -14,6 +14,7 @@ class PropagationProblem private constructor(
     /** Immutable model data compiled by this projection. */
     val problem: Problem,
     preparedPropagators: Array<out Propagator>?,
+    private val preparedIndexes: PropagationIndexes? = null,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(problem: Problem) : this(problem, null)
@@ -31,65 +32,73 @@ class PropagationProblem private constructor(
 
     /** Propagator occurrences indexed by Boolean variable. */
     val boolOccurrences: Array<IntArray> by lazy {
-        if (isNativeSatEligible) {
-            invert(problem.numBoolVars, { true }) { it.boolVars }
-        } else {
-            invert(problem.numBoolVars, { propagators[it] !== NoPropagator }) { it.boolVars }
+        preparedIndexes?.boolOccurrences ?: run {
+            if (isNativeSatEligible) {
+                invert(problem.numBoolVars, { true }) { it.boolVars }
+            } else {
+                invert(problem.numBoolVars, { propagators[it] !== NoPropagator }) { it.boolVars }
+            }
         }
     }
 
     /** Propagator occurrences indexed by integer variable. */
     val intOccurrences: Array<IntArray> by lazy {
-        if (problem.numIntVars == 0) {
-            emptyArray()
-        } else {
-            invert(problem.numIntVars, { propagators[it] !== NoPropagator }) { it.intVars }
+        preparedIndexes?.intOccurrences ?: run {
+            if (problem.numIntVars == 0) {
+                emptyArray()
+            } else {
+                invert(problem.numIntVars, { propagators[it] !== NoPropagator }) { it.intVars }
+            }
         }
     }
 
     /** Boolean occurrences excluding factors with literal watchers. */
     val nonBoolWatcherBoolOccurrences: Array<IntArray> by lazy {
-        val watcherFid = BooleanArray(problem.numFactors)
-        var any = false
-        for (fid in propagators.indices) {
-            if (propagators[fid].initialBoolWatchers != null) {
-                watcherFid[fid] = true
-                any = true
+        preparedIndexes?.nonBoolOccurrences ?: run {
+            val watcherFid = BooleanArray(problem.numFactors)
+            var any = false
+            for (fid in propagators.indices) {
+                if (propagators[fid].initialBoolWatchers != null) {
+                    watcherFid[fid] = true
+                    any = true
+                }
             }
-        }
-        if (!any) {
-            boolOccurrences
-        } else {
-            Array(problem.numBoolVars) { v ->
-                retain(boolOccurrences[v]) { fid -> !watcherFid[fid] }
+            if (!any) {
+                boolOccurrences
+            } else {
+                Array(problem.numBoolVars) { v ->
+                    retain(boolOccurrences[v]) { fid -> !watcherFid[fid] }
+                }
             }
         }
     }
 
     /** Whether any propagator subscribes to typed integer-domain events. */
     val usesIntEventWatchers: Boolean by lazy {
-        !isNativeSatEligible && propagators.any { it.initialIntEventWatches != null }
+        preparedIndexes?.intEvents ?: (!isNativeSatEligible && propagators.any { it.initialIntEventWatches != null })
     }
 
     /** Whether any propagator consumes its dirty integer-variable delta. */
     val usesIntEventDeltaConsumers: Boolean by lazy {
-        !isNativeSatEligible && propagators.any { it.consumesIntEventDelta }
+        preparedIndexes?.intDeltas ?: (!isNativeSatEligible && propagators.any { it.consumesIntEventDelta })
     }
 
     /** Integer occurrences excluding factors with typed event subscriptions for that variable. */
     val nonIntEventWatcherIntOccurrences: Array<IntArray> by lazy {
-        if (!usesIntEventWatchers) {
-            intOccurrences
-        } else {
-            val watchedVarsByFactor = arrayOfNulls<IntHashSet>(problem.numFactors)
-            for (fid in propagators.indices) {
-                val watches = propagators[fid].initialIntEventWatches ?: continue
-                val watched = IntHashSet(watches.size)
-                for (watch in watches) watched.add(IntEvent.intVarOf(watch))
-                watchedVarsByFactor[fid] = watched
-            }
-            Array(problem.numIntVars) { v ->
-                retain(intOccurrences[v]) { fid -> watchedVarsByFactor[fid]?.contains(v) != true }
+        preparedIndexes?.nonIntOccurrences ?: run {
+            if (!usesIntEventWatchers) {
+                intOccurrences
+            } else {
+                val watchedVarsByFactor = arrayOfNulls<IntHashSet>(problem.numFactors)
+                for (fid in propagators.indices) {
+                    val watches = propagators[fid].initialIntEventWatches ?: continue
+                    val watched = IntHashSet(watches.size)
+                    for (watch in watches) watched.add(IntEvent.intVarOf(watch))
+                    watchedVarsByFactor[fid] = watched
+                }
+                Array(problem.numIntVars) { v ->
+                    retain(intOccurrences[v]) { fid -> watchedVarsByFactor[fid]?.contains(v) != true }
+                }
             }
         }
     }
@@ -99,12 +108,20 @@ class PropagationProblem private constructor(
     internal companion object {
         fun preparation(problem: Problem): Iterator<PropagationProblem?> = sequence {
             val preparation = FactorProjectionPreparation()
-            val propagators = Array<Propagator>(problem.numFactors) { NoPropagator }
+            val propagators = arrayOfNulls<Propagator>(problem.numFactors)
+            yield(null)
             for (fid in propagators.indices) {
                 propagators[fid] = problem.factors[fid].propagatorProjection(preparation)
                 if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
-            yield(PropagationProblem(problem, propagators))
+            @Suppress("UNCHECKED_CAST")
+            val ready = propagators as Array<Propagator>
+            var indexes: PropagationIndexes? = null
+            for (next in PropagationIndexes.preparation(problem, ready)) {
+                if (next != null) indexes = next
+                yield(null)
+            }
+            yield(PropagationProblem(problem, ready, checkNotNull(indexes)))
         }.iterator()
     }
 
