@@ -203,6 +203,14 @@ Other pooled solution phasing retains its restart-boundary import policy.
 
 ## Statistics
 
+The portfolio owns `SolveStats.run.wallMs` for each satisfaction or optimization
+invocation. Its monotonic clock spans schedule initialization, all segments,
+witness verification, lane completion and retained-handle disposal. Worker counters
+merge independently; backend tags and timeout flags retain their existing merges.
+The portfolio duration replaces worker run windows rather than summing them or
+taking their maximum. Per-arm scheduled times remain inclusive segment totals and
+can overlap across parallel lanes.
+
 | Field | Meaning |
 |---|---|
 | Arm `maxMs`, `initMs` | Longest elapsed segment and handle opening cost |
