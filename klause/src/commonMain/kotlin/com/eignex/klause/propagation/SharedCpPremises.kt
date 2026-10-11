@@ -20,7 +20,7 @@ internal fun PropagationSession.sharedBooleanPremise(
     context: SearchContext,
     sourceIntId: (Int) -> Int,
     rootLevel: Int,
-): SearchAtomPremise? = explanationState.boolAntecedents[variable]?.let { antecedents ->
+): SearchAtomPremise? = explanationState.reasonOf(explanationState.boolAntecedents[variable])?.let { antecedents ->
     explanationState.sharedPremise(
         IntArray(antecedents.size) { antecedents[it] xor 1 },
         context,
