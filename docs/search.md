@@ -134,6 +134,8 @@ empty-prefix conflicts; sibling branches restore filtering from trailed state.
 LP explanations cite selected source bound witnesses and recursively expanded
 row, fixing and cutoff premises. See
 [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
+The complete integer theory batches newly selected disequality directions and
+their immutable reasons into one node snapshot per source assertion pass.
 
 The complete integer theory checks source equality paths before invoking the LP.
 Equalities with one coefficient or two coefficients of equal magnitude form a
