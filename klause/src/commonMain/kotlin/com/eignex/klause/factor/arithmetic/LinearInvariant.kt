@@ -24,10 +24,8 @@ internal class LinearInvariant(
     // wide row's move pick linear instead of quadratic.
     private val coeffIndex = LinearCoeffIndex(coeffs, vars)
 
-    // Term indices in ascending |coeff| (zeros excluded, ties by position): the first entry whose
-    // coefficient divides a drift IS the lowest-|coeff| divider, so the channeling partner scan
-    // stops at its first hit instead of walking the whole row per proposed move — on the
-    // unit-coefficient rows of set-covering decompositions that is the first unpinned term.
+    // Term indices in ascending |coeff| (zeros excluded, ties by position) let channeling stop
+    // at the first admissible partner whose coefficient divides the drift.
     private val byAbsCoeff: IntArray by lazy {
         val nonZero = (0 until vars.size).filter { coeffs[it] != 0L }
         nonZero.sortedBy { if (coeffs[it] < 0) -coeffs[it] else coeffs[it] }.toIntArray()
@@ -124,26 +122,20 @@ internal class LinearInvariant(
         val coeffV = coeffIndex.coeffOf(intVar)
         if (coeffV == 0L) return
         val drift = coeffV * (newValue - oldValue)
-        // Ascending-|coeff| order makes the first dividing, unpinned partner the lowest-|coeff| one.
-        var bestIdx = -1
+        // Ascending-|coeff| order prefers the lowest-|coeff| admissible partner.
         for (i in byAbsCoeff) {
             val u = vars[i]
-            if (u == intVar || sink.isPinned(u)) continue
-            if (drift % coeffs[i] != 0L) continue
-            bestIdx = i
-            break
+            if (u == intVar || sink.isPinned(u) || !state.moveSink.allowsInt(u)) continue
+            val cu = coeffs[i]
+            if (drift % cu != 0L) continue
+            val uShift = -drift / cu // (uShift * cu) cancels the drift
+            val curU = state.assignment.intValue(u)
+            val newU = curU + uShift
+            if (newU == curU || newU !in state.rootDomains[u]) continue
+            sink.add(IntSet(u, newU))
+            sink.pin(u)
+            return
         }
-        if (bestIdx < 0) return
-        val u = vars[bestIdx]
-        if (state.assumptions.isFrozenInt(u)) return
-        val cu = coeffs[bestIdx]
-        val uShift = -drift / cu // (uShift * cu) cancels the drift
-        val curU = state.assignment.intValue(u)
-        val newU = curU + uShift
-        if (newU == curU) return
-        if (newU !in state.rootDomains[u]) return
-        sink.add(IntSet(u, newU))
-        sink.pin(u)
     }
 
     /** Self-preserving move suggestions during objective descent. For [LinearOp.EQ] the

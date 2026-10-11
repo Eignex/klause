@@ -566,6 +566,124 @@ class LocalSearchStateTest {
     }
 
     @Test
+    fun `Linear EQ channeling skips partners whose targets are outside their domains`() {
+        for ((domain, current) in listOf(IntDomain(0, 1) to 0L, IntDomain(0, 2).excludeValue(1) to 2L)) {
+            val problem = Problem(
+                0, 3, arrayOf(IntDomain(0, 1), domain, IntDomain(0, 1)),
+                arrayOf<Factor>(Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, current + 1)),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(1, current)
+            state.assignment.setInt(2, 1)
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+            val move = state.moveSink.list.single()
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(1L, state.assignment.intValue(0))
+            assertEquals(current, state.assignment.intValue(1))
+            assertEquals(0L, state.assignment.intValue(2))
+            assertEquals(0L, predicted)
+            assertEquals(0L, state.cost)
+            assertTrue(state.intValuesInDomain())
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `Linear EQ channeling skips protected partners`() {
+        for (protection in listOf("pin", "owner", "definition")) {
+            val problem = Problem(
+                0, 5, arrayOf(
+                    IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(1, 1), IntDomain(1, 1),
+                ),
+                arrayOf<Factor>(
+                    Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 2),
+                    Product(3, 4, 1),
+                ),
+            )
+            val assumptions = if (protection == "pin") Assumptions.None.withInt(1, 1) else Assumptions.None
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3), assumptions)
+            if (protection == "owner") state.moveSink.setOwners(intArrayOf(-1, 7, -1, -1, -1))
+            if (protection == "definition") {
+                state.invariants = assertNotNull(DefinitionalSweep.infer(problem.factors, 5)).network(5, 0)
+            }
+            for ((variable, value) in longArrayOf(0, 1, 1, 1, 1).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+
+            state.moveSink.addChannelingIntSet(state, 0, 1)
+            val move = state.moveSink.list.single()
+            val predicted = state.netDelta(move)
+            state.apply(move)
+
+            assertEquals(1L, state.assignment.intValue(0))
+            assertEquals(1L, state.assignment.intValue(1))
+            assertEquals(0L, state.assignment.intValue(2))
+            assertEquals(0L, predicted)
+            assertEquals(0L, state.cost)
+            state.recompute()
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `Linear EQ channeling prefers an admissible lower coefficient partner`() {
+        val problem = Problem(
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
+            arrayOf<Factor>(Linear(intArrayOf(2, 2, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 4)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 2)
+        state.recompute()
+
+        state.moveSink.addChannelingIntSet(state, 0, 1)
+        val move = state.moveSink.list.single()
+        val predicted = state.netDelta(move)
+        state.apply(move)
+
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(1L, state.assignment.intValue(1))
+        assertEquals(0L, state.assignment.intValue(2))
+        assertEquals(0L, predicted)
+        assertEquals(0L, state.cost)
+        state.recompute()
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `Linear EQ channeling retains the driving move when no partner is admissible`() {
+        val problem = Problem(
+            0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 0)),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 0)
+        state.recompute()
+
+        state.moveSink.addChannelingIntSet(state, 0, 1)
+        val move = state.moveSink.list.single()
+        val predicted = state.netDelta(move)
+        state.apply(move)
+
+        assertEquals(Move.IntSet(0, 1), move)
+        assertEquals(1L, state.assignment.intValue(0))
+        assertEquals(0L, state.assignment.intValue(1))
+        assertEquals(1L, predicted)
+        assertEquals(1L, state.cost)
+        state.recompute()
+        assertEquals(1L, state.cost)
+    }
+
+    @Test
     fun `Linear EQ channeling never counter-shifts a sibling into a hole`() {
         val problem = Problem(
             numBoolVars = 0,
