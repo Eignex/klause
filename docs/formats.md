@@ -6,6 +6,14 @@ The [CLI](cli.md#formats-and-dispatch) lists dispatch names and extensions.
 
 ## Finite and open models
 
+The [support policy](architecture.md#solver-identity-and-support-policy) separates
+source semantics, strategy coverage and proof authority. A frontend admits only
+syntax it can preserve losslessly under its declared semantics. A supported model
+can still receive UNKNOWN from an incomplete or resource-limited solve; unsupported
+syntax and execution retain their own diagnostics or termination cause. Admission
+coverage still differs between strategies; these differences are implementation
+gaps under the shared portfolio requirement.
+
 Source routing chooses a finite solve, an open-theory solve, a refutation or an
 unsupported result. It can first prove that open integer sides have finite bounds.
 That proof uses a slice of the shared preparation allowance and the solve's
@@ -160,6 +168,20 @@ difference fragments, Boolean structure and supported minimize/maximize objectiv
 The theory packages cover difference arithmetic, LIA, LRA/LIRA and complete pure
 polynomial real satisfaction. Bitvectors, arrays, strings, quantifiers and mixed
 nonlinear integer/real arithmetic remain outside the supported theory surface.
+
+Native factor coverage is broader than SMT source admission. `Product` represents
+finite Int × Int multiplication and `RealProduct` represents finite Int × Real
+multiplication, but the linear SMT facade rejects products of multiple nonconstant
+operands. Polynomial fallback accepts pure Real/Bool satisfaction only; it does
+not admit nonlinear integer sources even when their integers have finite bounds.
+Neither native product factor represents Real × Real multiplication. See the
+[implemented arithmetic routes](architecture.md#implemented-arithmetic-routes).
+Polynomial composition and continuous products are under active work in
+[#2621](https://github.com/Eignex/klause/issues/2621) and
+[#2622](https://github.com/Eignex/klause/issues/2622); nonlinear integer SMT admission
+is tracked in [#2625](https://github.com/Eignex/klause/issues/2625). These are
+implementation gaps rather than admission restrictions imposed by the support
+policy. Update this coverage when those routes land.
 
 Asserted and reified equalities between an integer conditional result and a constant
 can lower directly to Boolean tests of its branches. Completed conditional definitions and equality
