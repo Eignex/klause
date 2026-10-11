@@ -2406,25 +2406,6 @@ sealed interface com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.k
         final fun rebuildEliminatedBooleans(kotlin/BooleanArray) // com.eignex.klause.presolve/OpenPresolveResult.Tightened.rebuildEliminatedBooleans|rebuildEliminatedBooleans(kotlin.BooleanArray){}[0]
     }
 
-    final class PolynomialTheory : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ...) // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.<init>|<init>(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean){}[0]
-
-        final val maximize // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.maximize|{}maximize[0]
-            final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.maximize.<get-maximize>|<get-maximize>(){}[0]
-        final val objective // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.objective|{}objective[0]
-            final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.objective.<get-objective>|<get-objective>(){}[0]
-        final val request // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.request|{}request[0]
-            final fun <get-request>(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.request.<get-request>|<get-request>(){}[0]
-
-        final fun component1(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.component2|component2(){}[0]
-        final fun component3(): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.copy|copy(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.toString|toString(){}[0]
-    }
-
     final object Refuted : com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult.Refuted|null[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.presolve/OpenPresolveResult.Refuted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.presolve/OpenPresolveResult.Refuted.hashCode|hashCode(){}[0]
@@ -2803,6 +2784,25 @@ sealed interface com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.e
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.toString|toString(){}[0]
+    }
+
+    final class PolynomialTheory : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ...) // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.<init>|<init>(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean){}[0]
+
+        final val maximize // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.maximize|{}maximize[0]
+            final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.maximize.<get-maximize>|<get-maximize>(){}[0]
+        final val objective // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.objective|{}objective[0]
+            final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.objective.<get-objective>|<get-objective>(){}[0]
+        final val request // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.request|{}request[0]
+            final fun <get-request>(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.request.<get-request>|<get-request>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.component2|component2(){}[0]
+        final fun component3(): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.copy|copy(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.PolynomialTheory.toString|toString(){}[0]
     }
 
     final class UnsupportedOpen : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen|null[0]

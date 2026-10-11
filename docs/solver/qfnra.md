@@ -10,14 +10,11 @@ The complete fragment is polynomial real satisfaction with rational coefficients
 and Boolean structure. It does not include transcendental functions or integer
 integrality. Completeness does not guarantee completion within invocation limits.
 The [support policy](../architecture.md#solver-identity-and-support-policy) permits
-sound incomplete mechanisms alongside complete fragment procedures. This theory's
-pipeline route is a separate invocation over `PolynomialRealProblem`, rather than
-a component composing arbitrary factors from `Problem` in shared search.
-Shared composition is active work in
-[#2621](https://github.com/Eignex/klause/issues/2621); the separate invocation boundary
-describes implemented coverage rather than the intended limit of polynomial support.
-In particular, rejecting local-search execution violates the required availability
-of a complete-search/local-search portfolio over the same source problem.
+sound incomplete mechanisms alongside complete fragment procedures. The pipeline accepts both neutral polynomial sources and shared `Problem` models.
+Finite factors and polynomial equations compose through one invocation and the same
+source objective across backtracking, local search, ALNS and mixed portfolios.
+Continuous coordinates belong to the polynomial theory; finite propagation retains
+only Boolean and integer variables.
 
 ## Projection families
 
@@ -148,10 +145,14 @@ Retraction invalidates query results; the containing invocation allowance persis
 factors. Integer columns appearing in the continuous equations receive symbolic
 real coordinates for conditioned queries; their source finite domains and global
 constraints remain in CP. Exact linear rows, Boolean reification, real bounds and
-integer/real products become neutral polynomial formulas. AllDifferent, scheduling
+integer/real products and `ContinuousProduct` become neutral polynomial formulas. AllDifferent, scheduling
 and other finite factors remain intact in the finite projection. Linear relaxation
 rows cannot stand in for a factor's semantics. Binary64 constants denote their exact
-binary rational values.
+binary rational values. Equal finite real bounds remain source equations and are
+substituted before projection, retaining their exact coordinate in captured models.
+`Problem.pipelineRoute()` selects `SourceProblemRoute.PolynomialTheory` for shared
+continuous products before finite or linear routing. Open integer domains and
+continuous objectives decline this route; they are not boxed or discretized.
 
 Backtracking checks interval relaxations and fixed finite branches. Local search
 generates candidates from finite factors, then pins their complete finite values in
