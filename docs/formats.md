@@ -135,8 +135,9 @@ and [FlatZincIntegerFloatImages](../klause/src/commonMain/kotlin/com/eignex/klau
 `OznApplier` renders solver bindings through the parsed `.ozn` output model.
 Output integers, set elements, range endpoints and array indices retain signed
 64-bit values. Solver finite-set layouts keep their integer storage; the applier
-widens those elements at the rendering boundary. Integer arithmetic overflow
-raises `OznParseException` without publishing a partial solution block.
+widens those elements at the rendering boundary. Integer arithmetic overflow and
+solver integer bindings outside signed 64-bit range raise `OznParseException`
+without publishing a partial solution block.
 
 `array1d` through `array6d` retain each contiguous integer index set and coerce
 source array elements in row-major order. Constructor cardinalities must match the
