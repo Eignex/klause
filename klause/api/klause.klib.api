@@ -10866,19 +10866,53 @@ final class com.eignex.klause.solver.result/ConflictAnalysisStats { // com.eigne
 }
 
 final class com.eignex.klause.solver.result/LocalSearchResidual { // com.eignex.klause.solver.result/LocalSearchResidual|null[0]
-    constructor <init>(kotlin/Long, kotlin.collections/Map<kotlin/String, kotlin/Long>) // com.eignex.klause.solver.result/LocalSearchResidual.<init>|<init>(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>){}[0]
+    constructor <init>(kotlin/Long, kotlin.collections/Map<kotlin/String, kotlin/Long>, kotlin.collections/List<com.eignex.klause.solver.result/LocalSearchResidualFactor> = ...) // com.eignex.klause.solver.result/LocalSearchResidual.<init>|<init>(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.collections.List<com.eignex.klause.solver.result.LocalSearchResidualFactor>){}[0]
 
     final val byKind // com.eignex.klause.solver.result/LocalSearchResidual.byKind|{}byKind[0]
         final fun <get-byKind>(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/LocalSearchResidual.byKind.<get-byKind>|<get-byKind>(){}[0]
     final val cost // com.eignex.klause.solver.result/LocalSearchResidual.cost|{}cost[0]
         final fun <get-cost>(): kotlin/Long // com.eignex.klause.solver.result/LocalSearchResidual.cost.<get-cost>|<get-cost>(){}[0]
+    final val factors // com.eignex.klause.solver.result/LocalSearchResidual.factors|{}factors[0]
+        final fun <get-factors>(): kotlin.collections/List<com.eignex.klause.solver.result/LocalSearchResidualFactor> // com.eignex.klause.solver.result/LocalSearchResidual.factors.<get-factors>|<get-factors>(){}[0]
 
     final fun component1(): kotlin/Long // com.eignex.klause.solver.result/LocalSearchResidual.component1|component1(){}[0]
     final fun component2(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/LocalSearchResidual.component2|component2(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ...): com.eignex.klause.solver.result/LocalSearchResidual // com.eignex.klause.solver.result/LocalSearchResidual.copy|copy(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>){}[0]
+    final fun component3(): kotlin.collections/List<com.eignex.klause.solver.result/LocalSearchResidualFactor> // com.eignex.klause.solver.result/LocalSearchResidual.component3|component3(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., kotlin.collections/List<com.eignex.klause.solver.result/LocalSearchResidualFactor> = ...): com.eignex.klause.solver.result/LocalSearchResidual // com.eignex.klause.solver.result/LocalSearchResidual.copy|copy(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.collections.List<com.eignex.klause.solver.result.LocalSearchResidualFactor>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/LocalSearchResidual.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchResidual.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/LocalSearchResidual.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.solver.result/LocalSearchResidualFactor { // com.eignex.klause.solver.result/LocalSearchResidualFactor|null[0]
+    constructor <init>(kotlin/Int, kotlin/String, kotlin/Long, kotlin.collections/Map<kotlin/Int, kotlin/Boolean>, kotlin.collections/Map<kotlin/Int, kotlin/Long>, kotlin/Int = ..., kotlin/Int = ...) // com.eignex.klause.solver.result/LocalSearchResidualFactor.<init>|<init>(kotlin.Int;kotlin.String;kotlin.Long;kotlin.collections.Map<kotlin.Int,kotlin.Boolean>;kotlin.collections.Map<kotlin.Int,kotlin.Long>;kotlin.Int;kotlin.Int){}[0]
+
+    final val bools // com.eignex.klause.solver.result/LocalSearchResidualFactor.bools|{}bools[0]
+        final fun <get-bools>(): kotlin.collections/Map<kotlin/Int, kotlin/Boolean> // com.eignex.klause.solver.result/LocalSearchResidualFactor.bools.<get-bools>|<get-bools>(){}[0]
+    final val degree // com.eignex.klause.solver.result/LocalSearchResidualFactor.degree|{}degree[0]
+        final fun <get-degree>(): kotlin/Long // com.eignex.klause.solver.result/LocalSearchResidualFactor.degree.<get-degree>|<get-degree>(){}[0]
+    final val id // com.eignex.klause.solver.result/LocalSearchResidualFactor.id|{}id[0]
+        final fun <get-id>(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchResidualFactor.id.<get-id>|<get-id>(){}[0]
+    final val ints // com.eignex.klause.solver.result/LocalSearchResidualFactor.ints|{}ints[0]
+        final fun <get-ints>(): kotlin.collections/Map<kotlin/Int, kotlin/Long> // com.eignex.klause.solver.result/LocalSearchResidualFactor.ints.<get-ints>|<get-ints>(){}[0]
+    final val kind // com.eignex.klause.solver.result/LocalSearchResidualFactor.kind|{}kind[0]
+        final fun <get-kind>(): kotlin/String // com.eignex.klause.solver.result/LocalSearchResidualFactor.kind.<get-kind>|<get-kind>(){}[0]
+    final val omittedBools // com.eignex.klause.solver.result/LocalSearchResidualFactor.omittedBools|{}omittedBools[0]
+        final fun <get-omittedBools>(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchResidualFactor.omittedBools.<get-omittedBools>|<get-omittedBools>(){}[0]
+    final val omittedInts // com.eignex.klause.solver.result/LocalSearchResidualFactor.omittedInts|{}omittedInts[0]
+        final fun <get-omittedInts>(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchResidualFactor.omittedInts.<get-omittedInts>|<get-omittedInts>(){}[0]
+
+    final fun component1(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchResidualFactor.component1|component1(){}[0]
+    final fun component2(): kotlin/String // com.eignex.klause.solver.result/LocalSearchResidualFactor.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.eignex.klause.solver.result/LocalSearchResidualFactor.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/Map<kotlin/Int, kotlin/Boolean> // com.eignex.klause.solver.result/LocalSearchResidualFactor.component4|component4(){}[0]
+    final fun component5(): kotlin.collections/Map<kotlin/Int, kotlin/Long> // com.eignex.klause.solver.result/LocalSearchResidualFactor.component5|component5(){}[0]
+    final fun component6(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchResidualFactor.component6|component6(){}[0]
+    final fun component7(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchResidualFactor.component7|component7(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/String = ..., kotlin/Long = ..., kotlin.collections/Map<kotlin/Int, kotlin/Boolean> = ..., kotlin.collections/Map<kotlin/Int, kotlin/Long> = ..., kotlin/Int = ..., kotlin/Int = ...): com.eignex.klause.solver.result/LocalSearchResidualFactor // com.eignex.klause.solver.result/LocalSearchResidualFactor.copy|copy(kotlin.Int;kotlin.String;kotlin.Long;kotlin.collections.Map<kotlin.Int,kotlin.Boolean>;kotlin.collections.Map<kotlin.Int,kotlin.Long>;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/LocalSearchResidualFactor.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/LocalSearchResidualFactor.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.result/LocalSearchResidualFactor.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.solver.result/LocalSearchStats { // com.eignex.klause.solver.result/LocalSearchStats|null[0]

@@ -4,6 +4,7 @@ import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.LocalSearchResidual
+import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.LpBasisVerificationStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
@@ -54,7 +55,10 @@ class CliStatsTest {
     fun `a residual observation prints its cost and kind totals before any move`() {
         val stats = SolveStats(
             run = RunStats(backend = "mixed"),
-            ls = LocalSearchStats(bestResidual = LocalSearchResidual(9, mapOf("Linear" to 7L, "Clause" to 2L))),
+            ls = LocalSearchStats(bestResidual = LocalSearchResidual(
+                9, mapOf("Linear" to 7L, "Clause" to 2L),
+                listOf(LocalSearchResidualFactor(3, "Linear", 7, mapOf(2 to false), mapOf(4 to 3L), 1, 5)),
+            )),
         )
 
         val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
@@ -62,6 +66,10 @@ class CliStatsTest {
         assertEquals("9", pairs["lsBestResidualViolation"])
         assertEquals("7", pairs["lsBestResidual.Linear"])
         assertEquals("2", pairs["lsBestResidual.Clause"])
+        assertEquals(
+            "kind=Linear degree=7 bools=b2:false ints=i4:3 omittedBools=1 omittedInts=5",
+            pairs["lsBestResidualFactor.3"],
+        )
         assertTrue("lsIncumbentObjective" !in pairs)
     }
     @Test

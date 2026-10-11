@@ -16,6 +16,7 @@ import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
@@ -61,6 +62,10 @@ class LocalSearchEngineTest {
 
             assertEquals(7L, paused?.cost)
             assertEquals(mapOf("Linear" to 7L), result.stats.ls.bestResidual?.byKind)
+            assertEquals(
+                listOf(LocalSearchResidualFactor(0, "Linear", 7L, emptyMap(), mapOf(0 to 3L))),
+                result.stats.ls.bestResidual?.factors,
+            )
         }
     }
 

@@ -26,7 +26,10 @@ class SolveStatsMergeTest {
     @Test
     fun `local search residual aggregation keeps the breakdown paired with its cost`() {
         val left = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(8, mapOf("Linear" to 8L))))
-        val right = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(3, mapOf("Clause" to 3L))))
+        val right = SolveStats(ls = LocalSearchStats(bestResidual = LocalSearchResidual(
+            3, mapOf("Clause" to 3L),
+            listOf(LocalSearchResidualFactor(1, "Clause", 3, mapOf(2 to false), emptyMap())),
+        )))
 
         val merged = left.mergedWith(right)
 

@@ -280,6 +280,13 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
         for ((kind, degree) in residual.byKind.entries.sortedBy { it.key }) {
             out += "lsBestResidual.$kind" to degree.toString()
         }
+        for (factor in residual.factors) {
+            val bools = factor.bools.entries.joinToString(",") { (id, value) -> "b$id:$value" }.ifEmpty { "-" }
+            val ints = factor.ints.entries.joinToString(",") { (id, value) -> "i$id:$value" }.ifEmpty { "-" }
+            out += "lsBestResidualFactor.${factor.id}" to
+                "kind=${factor.kind} degree=${factor.degree} bools=$bools ints=$ints " +
+                "omittedBools=${factor.omittedBools} omittedInts=${factor.omittedInts}"
+        }
     }
     val completions = stats.ls.completions.sum.toLong()
     if (completions > 0L) {

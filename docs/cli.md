@@ -138,7 +138,10 @@ Solver-control flags are common to **every** mode:
     default `false`). Residual reporting observes ordinary LS arms without changing
     their recipes; ALNS bootstrap is excluded. Under `-s`, `lsBestResidualViolation`
     and `lsBestResidual.<factor-kind>` describe one best committed assignment's graded
-    violations. Reified rows use `ReifiedLinear.<op>.<shape>`, with `binary` for one
+    violations. `lsBestResidualFactor.<id>` gives bounded representative degrees,
+    committed Boolean/integer coordinates and omission counts in local-search model
+    id spaces after lowering and presolve. Reified rows use
+    `ReifiedLinear.<op>.<shape>`, with `binary` for one
     input bounded to 0..1, `unary` for another single input and `multi` for multiple
     inputs. The categories partition the total. These diagnostics do not claim a
     feasible witness; collecting them adds scans at strict improvements and should
