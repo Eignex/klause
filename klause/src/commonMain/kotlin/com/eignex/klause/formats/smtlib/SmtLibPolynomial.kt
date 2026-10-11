@@ -152,7 +152,9 @@ internal class SmtLibPolynomialCompiler {
         val parametersForValidation = names.mapIndexed { index, parameter ->
             parameter to if (sorts[index]) PolynomialValue.Boolean.variable(index) else PolynomialValue.Real.variable(index)
         }.toMap()
-        val value = SmtLibPolynomialEvaluator(PolynomialRealLowering(realNames.size + names.size)).evaluate(
+        val value = SmtLibPolynomialEvaluator(
+            PolynomialRealLowering(realNames.size + names.size), validateOnly = true,
+        ).evaluate(
             macro.body, macro.environment.copy(values = macro.environment.values + parametersForValidation),
         )
         if (macro.booleanResult) value.boolean() else if (value !is PolynomialValue.Real) {
