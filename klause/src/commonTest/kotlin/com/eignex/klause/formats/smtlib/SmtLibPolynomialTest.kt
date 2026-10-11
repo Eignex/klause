@@ -5,6 +5,10 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CharSource
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
@@ -15,6 +19,43 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SmtLibPolynomialTest {
+    @Test
+    fun `pre cancelled lowering does not read its source`() {
+        val source = object : CharSource {
+            override fun next(): String? = error("cancelled source must not be read")
+        }
+
+        assertFailsWith<PolynomialSourceInterrupted> { SmtLibPolynomial.parse(source, Cancellation { true }) }
+    }
+
+    @Test
+    fun `coefficient work exhaustion interrupts without publishing a formula`() {
+        var charged = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 2
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        assertFailsWith<PolynomialSourceInterrupted> {
+            SmtLibPolynomial.parse("(assert (= (+ 1 2 3 4) 10))", cancellation)
+        }
+        assertEquals(2L, charged)
+    }
+
+    @Test
+    fun `constant powers honor the caller coefficient work allowance`() {
+        var charged = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 3
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+
+        assertFailsWith<PolynomialSourceInterrupted> {
+            SmtLibPolynomial.parse("(assert (= (^ 2 128) 1))", cancellation)
+        }
+        assertEquals(3L, charged)
+    }
+
     @Test
     fun `decimal and rational source coefficients remain exact beyond machine words`() {
         val parsed = SmtLibPolynomial.parse(
