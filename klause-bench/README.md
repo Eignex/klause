@@ -667,6 +667,29 @@ and callbacks. Wrapper dispatch/digest creation are timed. Restoration checks co
 assignment, factor degrees, costs, break/make counts, tabu/configuration state and
 best-cost watermark. The probe measures prepared proposals, not full-solve quality.
 
+### Definition probe
+
+[scripts/definition-probes](scripts/definition-probes/) measures repeated complete
+coordinate/cone grading and occasional committed moves on a fixed seeded move list.
+The built-in synthetic fixture exercises selected Element cells and a product chain;
+an uncompressed XCSP3 source path exercises its inferred definitions. Setup and per-move
+restoration checks precede timing. Round zero warms up; rounds one–six repeat the work.
+
+```sh
+./gradlew -I klause-bench/scripts/definition-probes/definition-probes.init.gradle \
+  :klause:definitionProbe --args="synthetic 2048 3"
+```
+
+`-PdefinitionProbeCli=/absolute/path/to/klause-cli-jvm` selects installed classes.
+Rebuild pinned distributions with `:klause-cli:installJvmDist`, and retain source,
+probe, input and installed-build/runtime hashes. Run alternating paired repetitions on
+the same machine with matching JVM options. Match move/probe counts, final assignment,
+degrees, cost, weights, activity and RNG digest before comparing thread allocated bytes
+and uninstrumented time. Final incremental grades must match a full recompute.
+The prepared-model scope excludes parsing, preparation and whole-CLI publication;
+pair it with independently source-checked first-solution controls across families
+and scheduling settings. Allocation changes alone do not establish complete-solve gains.
+
 ## Validation
 
 `./gradlew :klause-bench:test` checks the harness. Explicit `solveCampaign` runs,
