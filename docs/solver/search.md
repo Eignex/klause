@@ -227,23 +227,24 @@ Cancelled checks withhold the proof, and missing cycle capture retains the share
 route. Private source-bound branches and overridden LP certification policies also
 retain that route.
 
-Active source rows remain asserted in the shared LP scope whenever that owner is needed.
-Floating LP solves maintain the basis on graph-feasible states; their numerical output
-supplies no verdict. Graph feasibility replaces exact LP point certification below the
-root and for complete Boolean assignments at the root. A complete graph witness passes
-source validation before numerical LP work, so pinned local-search completions need no
-floating guide.
+Admitted pure-real difference components under the production certification policy
+defer LP construction and check the active graph at partial and complete Boolean states,
+including the root. A feasible partial graph supplies consistency without a numerical
+guide or a model contribution. Complete graph points still pass the complete source-row
+check before publication. Missing cycle evidence, declined source validation and private
+source-bound branches retain the shared LP route. Late LP installation reaches the
+current decision scope before asserting resolved source rows, so retraction removes their
+guards and original witness premises together. Unconditional source rows can be reasserted
+after that scope is popped; declared bounds remain immutable root facts.
 
-Fully pinned difference roots defer LP construction until graph witness validation
-declines or a later source-bound decision requires a shared LP scope. If every Boolean
-is published at the root, initialization waits for those publications to reach the
-theory before checking the pinned arithmetic.
+If every Boolean is published at the root, initialization waits for those publications
+to reach the theory before checking the pinned arithmetic.
 
 Pure-real local-search completions keep their source rows and Boolean pins, skipping
 source presolve before the selected exact real theory certifies the leaf. Mixed
 integer/real completions retain source preparation. Bounded potentials from an earlier
-feasible graph seed relaxation, which must still settle every active edge. The partial
-root relaxation and inconclusive floating updates retain the full shared LP solve.
+feasible graph seed relaxation, which must still settle every active edge. Fragments
+outside graph admission retain the full shared LP solve and its numerical guide.
 
 Graph admission is capped at 10,000 real variables and 100,000 edges. Larger models,
 fractional normalized bounds, unsafe Long magnitudes, disequalities, private

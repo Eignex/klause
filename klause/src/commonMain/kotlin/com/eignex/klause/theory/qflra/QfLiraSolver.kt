@@ -175,6 +175,7 @@ class ExactLiraSearchComponent(
     private var candidate: List<BigFraction>? = null
     private var dirty = true
     private var sourceInstalled = false
+    private var graphFirst = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: Cancellation? = null
     private var operationAllowance: (Cancellation) -> Cancellation = { it.shorten(0.5) }
@@ -254,10 +255,9 @@ class ExactLiraSearchComponent(
         registerDisjunctions(context)
         beginOperation()
         return try {
-            val pinnedDifferenceRoot = model.numIntVars == 0 &&
-                bools.indices.all { context.boolValue(it) != null } &&
+            graphFirst = model.numIntVars == 0 &&
                 solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
-            if (disjunctionRegistrationDeclined || (!pinnedDifferenceRoot && !installSource()) || operationStop()) {
+            if (disjunctionRegistrationDeclined || (!graphFirst && !installSource()) || operationStop()) {
                 ComponentResult.Indeterminate
             } else {
                 lp.initialize(context).takeUnless { operationStop() } ?: ComponentResult.Indeterminate
@@ -520,7 +520,7 @@ class ExactLiraSearchComponent(
     }
 
     private fun assertSource(context: SearchContext): Boolean {
-        if (!installSource()) return false
+        if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((index, prepared) in preparedRows.withIndex()) {
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
@@ -643,15 +643,15 @@ class ExactLiraSearchComponent(
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
         if (impliedDisjunct) return ComponentResult.Consistent
-        if (bools.any { it == UNASSIGNED } && arithmeticRows.none {
+        if (!graphFirst && bools.any { it == UNASSIGNED } && arithmeticRows.none {
                 it.truthUnder(bools) != null
             }
         ) {
             return ComponentResult.Consistent
         }
         var checked = false
-        // A pinned root can certify its source witness without preparing a numerical basis.
-        if (!sourceInstalled && context.decisionLevel == 0 && bools.none { it == UNASSIGNED }) {
+        // Partial graph consistency needs no numerical guide; complete points still check source rows.
+        if (graphFirst && node.sourceBranches.isEmpty()) {
             if (!context.consumeCheck()) return ComponentResult.Indeterminate
             checked = true
             when (val result = realDifference?.check(bools, operationStop)) {
@@ -660,8 +660,16 @@ class ExactLiraSearchComponent(
                     differenceConflict(result, context)?.let { return it }
                 }
                 is RealDifferenceSystem.Result.Feasible -> {
+                    if (bools.any { it == UNASSIGNED }) {
+                        candidate = null
+                        assignment = null
+                        outcome = null
+                        dirty = false
+                        return ComponentResult.Consistent
+                    }
                     candidate = result.point
                     acceptWitness(result.point)?.let {
+                        if (operationStop()) return ComponentResult.Indeterminate
                         assignment = it
                         outcome = ComponentCheck.Feasible
                         dirty = false
@@ -674,41 +682,6 @@ class ExactLiraSearchComponent(
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
-        }
-        // Graph evidence has no LP certifier identity to offer an overridden acceptance policy.
-        val completeBooleans = bools.none { it == UNASSIGNED }
-        if (!checked && (context.decisionLevel > 0 || completeBooleans) && node.sourceBranches.isEmpty() &&
-            solveContext.certificationPolicy === ProductionLpCertificationPolicy
-        ) {
-            realDifference?.let { graph ->
-                if (!context.consumeCheck()) return ComponentResult.Indeterminate
-                checked = true
-                when (val result = graph.check(bools, operationStop)) {
-                    RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
-                    is RealDifferenceSystem.Result.Infeasible -> {
-                        differenceConflict(result, context)?.let { return it }
-                    }
-                    is RealDifferenceSystem.Result.Feasible -> {
-                        if (completeBooleans) {
-                            candidate = result.point
-                            acceptWitness(result.point)?.let {
-                                assignment = it
-                                outcome = ComponentCheck.Feasible
-                                dirty = false
-                                return ComponentResult.Consistent
-                            }
-                        } else {
-                            val floating = lp.solveFloat()
-                            if (operationStop()) return ComponentResult.Indeterminate
-                            if (floating?.second != null) {
-                                dirty = false
-                                return ComponentResult.Consistent
-                            }
-                        }
-                        if (operationStop()) return ComponentResult.Indeterminate
-                    }
-                }
-            }
         }
         if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve(sparsePointRecovery = true)
