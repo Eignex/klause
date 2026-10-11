@@ -713,6 +713,7 @@ internal fun linearSolvable(
     boolFolds: List<BoolFoldDefinition> = emptyList(),
     routingLpStats: LpStats = LpStats(),
     routingElapsedMs: Long = 0L,
+    searchHints: com.eignex.klause.ir.SearchHints? = null,
 ): Solvable {
     // Feasibility sweep derives functionally-defined vars and excludes them from search. A bool AND
     // fold is derived only when all its literals are objective variables: deriving an OPB product
@@ -729,6 +730,7 @@ internal fun linearSolvable(
             render = render, objectiveValue = null,
             routingLpStats = routingLpStats,
             routingElapsedMs = routingElapsedMs,
+            searchHints = searchHints,
         )
     }
     // The gradient view reads every fold (evaluating through a fold is always safe — it only needs
@@ -754,6 +756,7 @@ internal fun linearSolvable(
         continuousObjectiveValue = objective.continuousObjectiveValue(maximize),
         routingLpStats = routingLpStats,
         routingElapsedMs = routingElapsedMs,
+        searchHints = searchHints,
     )
 }
 

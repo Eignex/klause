@@ -112,7 +112,10 @@ internal object MiniZincMode : CliMode {
                     routeLinearToTheory = integralObjective,
                 )
                 return when (route) {
-                    is SourceProblemRoute.Finite -> linearSolvable(route.problem, minimized, maximize, render)
+                    is SourceProblemRoute.Finite -> linearSolvable(
+                        route.problem, minimized, maximize, render,
+                        searchHints = program.searchHints?.toSearchHints(),
+                    )
 
                     is SourceProblemRoute.OpenTheory -> openTheorySolvable(route.request, { assignment ->
                         applier?.render(
@@ -257,7 +260,7 @@ internal fun flatZincSourceVerdict(verdict: Verdict, approximation: Boolean): Ve
     verdict
 } else {
     when (verdict) {
-        Verdict.OPTIMAL -> Verdict.BEST_FOUND
+        Verdict.SATISFIABLE, Verdict.OPTIMAL -> Verdict.BEST_FOUND
         Verdict.UNSATISFIABLE, Verdict.UNBOUNDED -> Verdict.UNKNOWN
         else -> verdict
     }

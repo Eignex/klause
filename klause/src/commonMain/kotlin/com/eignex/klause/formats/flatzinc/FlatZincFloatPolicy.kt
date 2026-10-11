@@ -106,7 +106,7 @@ private class FloatChoicePlanner(
 
     private fun decline(root: Int, c: FznConstraint, reason: String) {
         if (exact) throw UnsupportedFlatZincException(reason, c.line, c.col)
-        blocked.putIfAbsent(root, reason)
+        if (root !in blocked) blocked[root] = reason
     }
 
     private fun recordChoices(domain: FiniteFloatDomain) {

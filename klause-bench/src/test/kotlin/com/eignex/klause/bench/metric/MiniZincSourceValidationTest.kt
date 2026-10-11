@@ -6,6 +6,14 @@ import kotlin.test.assertNull
 
 class MiniZincSourceValidationTest {
     @Test
+    fun `retained mixed witness preserves coordinate scope and component provenance`() {
+        val raw = "x = 0.3333333333333333;\n% klause-float-component: x = exact component=0\n% klause-float-component: grid = grid component=1 reason=continuous component\n% klause-coordinate: x = 1/3;\n% klause-coordinate: grid = 1/2;\n----------\n"
+
+        assertEquals("x = 1/3;\ngrid = 1/2;", MiniZincSourceValidation.exactCoordinates(raw))
+        assertEquals(raw.substringBefore("\n----------"), MiniZincSourceValidation.retainedWitness(raw))
+    }
+
+    @Test
     fun `candidate extraction uses the last complete multiline solution`() {
         val raw = """
             WARNING: JVM startup

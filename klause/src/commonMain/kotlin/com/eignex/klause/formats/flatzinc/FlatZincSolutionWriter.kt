@@ -93,7 +93,7 @@ internal fun writeFlatZincExactCoordinates(
     val sb = StringBuilder()
     if (program.floatVarsByName.isNotEmpty()) {
         sb.append("% klause-float-semantics: flatzinc-binary64\n")
-        for ((name, b) in program.floatVarsByName.toSortedMap()) {
+        for ((name, b) in program.floatVarsByName.entries.sortedBy { it.key }) {
             val representation = program.floatRepresentations[name]
             val kind = if (b.lpOnly) "exact" else "grid"
             sb.append("% klause-float-component: $name = $kind")
