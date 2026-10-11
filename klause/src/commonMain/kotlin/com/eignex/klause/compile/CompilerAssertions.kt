@@ -212,6 +212,18 @@ internal fun Lowering.expandTable(t: TableConstraint): BoolExpr {
  */
 internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
     val n = c.varNames.size
+    if (n == 0) {
+        val holds = when (c.op) {
+            IntCmpOp.LE -> 0.0 <= c.bound
+            IntCmpOp.LT -> 0.0 < c.bound
+            IntCmpOp.GE -> 0.0 >= c.bound
+            IntCmpOp.GT -> 0.0 > c.bound
+            IntCmpOp.EQ -> 0.0 == c.bound
+            IntCmpOp.NE -> 0.0 != c.bound
+        }
+        require(holds) { "Constraint reduces to a constant-false float comparison (${c.op} against ${c.bound})" }
+        return
+    }
     val realOp = when (c.op) {
         IntCmpOp.LE,
         IntCmpOp.LT,
