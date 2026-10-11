@@ -68,6 +68,8 @@ internal class LocalSearchSolveRun(
         return finish(SolveResult.Unknown(reason, stats))
     }
 
+    override fun close() = super<LocalSearchRun>.close()
+
     override fun discardCursor() {
         cursor = null
     }
