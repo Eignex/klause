@@ -45,14 +45,20 @@ internal class ExactLiraEqualities(
         if (terms.isEmpty() || terms.size > 2) return@mapNotNull null
         val first = terms[0]
         val second = terms.getOrNull(1)
-        if (second != null && first.value != second.value.negated()) return@mapNotNull null
+        if (second != null && first.value != second.value.negated() && first.value != second.value) {
+            return@mapNotNull null
+        }
         val positive = first.value.signum() > 0
         val magnitude = if (positive) first.value else first.value.negated()
         if (magnitude.isZero) return@mapNotNull null
+        val reversed = second != null && first.value == second.value
+        val bound = comparison.bound * magnitude.reciprocal()
         Prepared(
-            if (positive) first.key else second?.key ?: zero,
-            if (positive) second?.key ?: zero else first.key,
-            comparison.bound * magnitude.reciprocal(), comparison.op, comparison.strict, activator,
+            if (positive || reversed) first.key else second?.key ?: zero,
+            if (positive || reversed) second?.key ?: zero else first.key,
+            if (reversed && !positive) bound.negated() else bound,
+            if (reversed && !positive) comparison.op.reversed() else comparison.op,
+            comparison.strict, activator, if (reversed) -1 else 1,
         )
     }
     private val general = comparisons.filter { (comparison, _) ->
@@ -77,6 +83,7 @@ internal class ExactLiraEqualities(
             forest.join(integer, zero, lower.toLong(), null)
         }
         var inconsistent: Prepared? = null
+        val unresolved = ArrayList<Prepared>()
         for (row in rows) {
             if (progressStop()) return ComponentResult.Indeterminate
             val truth = if (row.activator == ALWAYS) true else context.boolValue(row.activator)
@@ -88,10 +95,11 @@ internal class ExactLiraEqualities(
             if (row.bound.num < room.negate() || row.bound.num > room) continue
             val literal = row.literal(checkNotNull(truth))
             val premise = if (literal == ALWAYS) null else SearchAtomPremise.Asserted(SearchDecision.Bool(literal))
-            if (!forest.join(row.target, row.source, row.bound.num.toLong(), premise)) {
+            if (!forest.join(row.target, row.source, row.bound.num.toLong(), premise, row.sourceSign)) {
                 inconsistent = row
                 break
             }
+            if (forest.difference(row.target, row.source, row.sourceSign) == null) unresolved += row
         }
         if (!forest.preparePaths(progressStop)) return ComponentResult.Indeterminate
         inconsistent?.let { row ->
@@ -99,12 +107,12 @@ internal class ExactLiraEqualities(
             val truth = row.op == LinearOp.EQ
             return conflict(context, premises, row.literal(truth), stop)
         }
-        val closed = closeEqualities(forest, context, stop, progressStop)
+        val closed = closeEqualities(forest, context, stop, progressStop, unresolved)
         if (closed !is ComponentResult.Consistent) return closed
         val excluded = excludedOffsets(forest, context, progressStop) ?: return ComponentResult.Indeterminate
         for (row in rows) {
             if (progressStop()) return ComponentResult.Indeterminate
-            val value = forest.difference(row.target, row.source)
+            val value = forest.difference(row.target, row.source, row.sourceSign)
             val nonintegral = (row.op == LinearOp.EQ || row.op == LinearOp.NE) && row.bound.den != BIG_ONE
             val exclusion = if (value == null && excluded.isNotEmpty()) {
                 row.offsetKey(forest)?.let { excluded[it] }
@@ -165,18 +173,27 @@ internal class ExactLiraEqualities(
         if ((op != LinearOp.EQ && op != LinearOp.NE) || bound.den != BIG_ONE ||
             bound.num < room.negate() || bound.num > room
         ) return null
-        return forest.offsetKey(target, source, bound.num.toLong())
+        return forest.offsetKey(target, source, bound.num.toLong(), sourceSign)
     }
 
-    private data class OffsetKey(val first: Int, val second: Int, val value: Long)
+    private data class OffsetKey(val first: Int, val second: Int, val sign: Int, val value: Long)
 
     private fun closeEqualities(
         forest: EqualityForest,
         context: SearchContext,
         stop: Cancellation,
         progressStop: Cancellation,
+        unresolved: List<Prepared>,
     ): ComponentResult {
-        val active = general.mapNotNull { (comparison, activator) ->
+        val extra = unresolved.map { row ->
+            val terms = LinkedHashMap<Int, BigFraction>()
+            if (row.target != zero) terms[row.target] = BigFraction.ONE
+            if (row.source != zero) {
+                terms[row.source] = (terms[row.source] ?: BigFraction.ZERO) - BigFraction.ofLong(row.sourceSign.toLong())
+            }
+            ExactComparison(terms, row.bound, row.op, row.strict, hasReals = false) to row.activator
+        }
+        val active = (general + extra).mapNotNull { (comparison, activator) ->
             if (progressStop()) return ComponentResult.Indeterminate
             val truth = if (activator == ALWAYS) true else context.boolValue(activator)
             if ((comparison.op == LinearOp.EQ && truth == true) || (comparison.op == LinearOp.NE && truth == false)) {
@@ -281,6 +298,12 @@ internal class ExactLiraEqualities(
         LinearOp.GE -> if (strict) value > bound else value >= bound
     }
 
+    private fun LinearOp.reversed(): LinearOp = when (this) {
+        LinearOp.LE -> LinearOp.GE
+        LinearOp.GE -> LinearOp.LE
+        else -> this
+    }
+
     private fun conflict(
         context: SearchContext,
         premises: List<SearchAtomPremise>,
@@ -301,6 +324,7 @@ internal class ExactLiraEqualities(
         val op: LinearOp,
         val strict: Boolean,
         val activator: Int,
+        val sourceSign: Int,
     ) {
         fun literal(truth: Boolean): Int = if (activator == ALWAYS) ALWAYS else Lit.make(activator, truth)
 
@@ -316,73 +340,74 @@ internal class ExactLiraEqualities(
         private val parent = IntArray(size) { it }
         private val rank = IntArray(size)
         private val offset = LongArray(size)
+        private val signs = IntArray(size) { 1 }
         private val edges = ArrayList<Edge>()
         private val pathParent = IntArray(size) { -1 }
         private val pathPremise = arrayOfNulls<SearchAtomPremise>(size)
         private val depth = IntArray(size)
 
-        private fun find(vertex: Int): Pair<Int, Long> {
+        private data class Root(val vertex: Int, val offset: Long, val sign: Int)
+
+        private fun find(vertex: Int): Root {
             var root = vertex
             var value = 0L
+            var sign = 1
             while (root != parent[root]) {
-                value += offset[root]
+                value += sign * offset[root]
+                sign *= signs[root]
                 root = parent[root]
             }
-            return root to value
+            return Root(root, value, sign)
         }
 
-        fun difference(target: Int, source: Int): Long? {
+        fun difference(target: Int, source: Int, sign: Int = 1): Long? {
             val first = find(target)
             val second = find(source)
-            return if (first.first == second.first) first.second - second.second else null
+            if (first.vertex != second.vertex) return null
+            if (first.sign == sign * second.sign) return first.offset - sign * second.offset
+            val fixed = find(parent.lastIndex)
+            if (first.vertex != fixed.vertex) return null
+            val value = -fixed.sign * fixed.offset
+            return (first.sign - sign * second.sign) * value + first.offset - sign * second.offset
         }
 
-        fun offsetKey(target: Int, source: Int, value: Long): OffsetKey? {
+        fun offsetKey(target: Int, source: Int, value: Long, sign: Int): OffsetKey? {
             val first = find(target)
             val second = find(source)
-            if (first.first == second.first) return null
-            val normalized = value - first.second + second.second
-            return if (first.first < second.first) OffsetKey(first.first, second.first, normalized)
-            else OffsetKey(second.first, first.first, -normalized)
+            if (first.vertex == second.vertex) return null
+            val normalized = first.sign * (value - first.offset + sign * second.offset)
+            val relativeSign = sign * first.sign * second.sign
+            return if (first.vertex < second.vertex) OffsetKey(first.vertex, second.vertex, relativeSign, normalized)
+            else OffsetKey(second.vertex, first.vertex, relativeSign, -relativeSign * normalized)
         }
 
         fun offsetPremises(target: Int, source: Int, stop: Cancellation): List<SearchAtomPremise>? {
-            val first = premises(target, find(target).first, stop) ?: return null
-            val second = premises(source, find(source).first, stop) ?: return null
+            val first = premises(target, find(target).vertex, stop) ?: return null
+            val second = premises(source, find(source).vertex, stop) ?: return null
             return first + second
         }
 
         fun constant(terms: Map<Int, BigFraction>, stop: Cancellation): BigFraction? {
-            val zero = parent.lastIndex
-            val zeroRoot = find(zero).first
-            val coefficients = HashMap<Int, BigFraction>()
-            for ((column, coefficient) in terms) {
-                if (stop()) return null
-                val root = find(column).first
-                if (root != zeroRoot) coefficients[root] = (coefficients[root] ?: BigFraction.ZERO) + coefficient
-            }
-            if (coefficients.values.any { !it.isZero }) return null
-            var value = BigFraction.ZERO
-            for ((column, coefficient) in terms) {
-                if (stop()) return null
-                val (root, offset) = find(column)
-                val relative = if (root == zeroRoot) checkNotNull(difference(column, zero)) else offset
-                if (relative != 0L) value += coefficient * BigFraction.ofLong(relative)
-            }
-            return value
+            val reduced = reduce(terms, stop) ?: return null
+            return reduced.offset.takeIf { reduced.coefficients.isEmpty() }
         }
 
         fun reduce(terms: Map<Int, BigFraction>, stop: Cancellation): Reduced? {
             val zero = parent.lastIndex
-            val (zeroRoot, zeroOffset) = find(zero)
+            val fixed = find(zero)
             val coefficients = HashMap<Int, BigFraction>()
             var value = BigFraction.ZERO
             for ((column, coefficient) in terms) {
                 if (stop()) return null
-                val (root, offset) = find(column)
-                val relative = if (root == zeroRoot) offset - zeroOffset else offset
+                val root = find(column)
+                val relative = if (root.vertex == fixed.vertex) {
+                    root.offset - root.sign * fixed.sign * fixed.offset
+                } else root.offset
                 if (relative != 0L) value += coefficient * BigFraction.ofLong(relative)
-                if (root != zeroRoot) coefficients[root] = (coefficients[root] ?: BigFraction.ZERO) + coefficient
+                if (root.vertex != fixed.vertex) {
+                    val signed = if (root.sign == 1) coefficient else coefficient.negated()
+                    coefficients[root.vertex] = (coefficients[root.vertex] ?: BigFraction.ZERO) + signed
+                }
             }
             return Reduced(coefficients.filterValues { !it.isZero }, value)
         }
@@ -391,28 +416,34 @@ internal class ExactLiraEqualities(
 
         fun expressionPremises(terms: Map<Int, BigFraction>, stop: Cancellation): List<SearchAtomPremise>? {
             val zero = parent.lastIndex
-            val zeroRoot = find(zero).first
+            val zeroRoot = find(zero).vertex
             val result = ArrayList<SearchAtomPremise>()
             for (column in terms.keys) {
                 if (stop()) return null
-                val root = find(column).first
+                val root = find(column).vertex
                 result += premises(column, if (root == zeroRoot) zero else root, stop) ?: return null
             }
             return result
         }
 
-        fun join(target: Int, source: Int, value: Long, premise: SearchAtomPremise?): Boolean {
+        fun join(target: Int, source: Int, value: Long, premise: SearchAtomPremise?, sign: Int = 1): Boolean {
             val first = find(target)
             val second = find(source)
-            if (first.first == second.first) return first.second - second.second == value
-            val delta = value - first.second + second.second
-            if (rank[first.first] < rank[second.first]) {
-                parent[first.first] = second.first
-                offset[first.first] = delta
+            if (first.vertex == second.vertex) {
+                // A sign-changing cycle needs an integer fixing, which the residual equality pass derives.
+                return difference(target, source, sign)?.let { it == value } ?: true
+            }
+            val delta = first.sign * (value - first.offset + sign * second.offset)
+            val relativeSign = sign * first.sign * second.sign
+            if (rank[first.vertex] < rank[second.vertex]) {
+                parent[first.vertex] = second.vertex
+                offset[first.vertex] = delta
+                signs[first.vertex] = relativeSign
             } else {
-                parent[second.first] = first.first
-                offset[second.first] = -delta
-                if (rank[first.first] == rank[second.first]) rank[first.first]++
+                parent[second.vertex] = first.vertex
+                offset[second.vertex] = -relativeSign * delta
+                signs[second.vertex] = relativeSign
+                if (rank[first.vertex] == rank[second.vertex]) rank[first.vertex]++
             }
             edges += Edge(target, source, premise)
             return true

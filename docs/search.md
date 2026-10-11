@@ -142,8 +142,10 @@ while its active edge mask remains identical; abandoned scans retain no new mask
 They also narrow source-column
 bounds from exact row intervals and imply reified comparisons with immutable row and
 bound premises. These bounds follow the LP trail and retract with their decisions.
-Integer difference equalities form a weighted forest, including declared fixed
-columns. Exact offsets decide comparisons even when no individual column has a
+Integer equalities with two coefficients of equal magnitude form a weighted
+forest, including declared fixed columns. Its links retain both offsets and
+sign reversals, representing `x - y = c` and `x + y = c`.
+Exact signed offsets decide comparisons even when no individual column has a
 bound. Explanation paths cite the selected source equality guards, including
 complemented disequalities; an inconsistent offset path refutes its active guards.
 Active disequalities also exclude matching comparisons after both sides are
@@ -154,6 +156,8 @@ Larger source expressions are also constant when their coefficients cancel withi
 each open forest component. Their comparison reasons cite the equality paths that
 justify the offsets; no individual column bound is required.
 Active larger equalities reduce against the forest for at most four passes.
+Sign-changing equality cycles also enter this residual pass, deriving integer
+fixings or rejecting nonintegral values without treating an open column as fixed.
 Supported residuals add integer offset facts; nonintegral or inconsistent residuals
 refute their active guards. Each batch captures immutable source and offset premises
 before adding its facts, so later deductions expand all contributing guards.
