@@ -58,4 +58,4 @@ Records distinguish MiniZinc source checks from exact checks with FlatZinc's
 binary64 literal semantics. Integer campaigns opt in with
 `param=source-validation=true`. Unsupported or incomplete checks remain unknown.
 Checking feasibility does not certify source optimality.
-See [benchmark result validation](benchmarking.md#source-validation).
+See [benchmark result validation](../klause-bench/README.md#source-validation).

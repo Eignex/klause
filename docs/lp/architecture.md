@@ -130,10 +130,10 @@ charges both attempts. Logical repair retains sparse construction and its existi
 cancellation control. `denseDimensionLimit = 0` is the internal sparse comparison
 control; the `BasisSolver` factory remains the extension seam. Exact factors never
 reuse floating numeric factors. The measured selection envelope is documented in
-[dense basis evidence](../evidence/dense-basis.md).
+[dense basis evidence](../evidence/numerical-kernels.md#dense-basis-selection).
 
 Koblas supplies containers and compatible numerical kernels; see
-[integration contracts](koblas.md).
+[integration contracts](dependencies.md).
 
 Rational ordering reuse is enabled with an explicit off control and exact
 fallback. Hints own permutations tied to the matrix and ordered basis; they

@@ -43,11 +43,11 @@ When running the full gate locally:
 
 ## Bench
 
-Read `docs/benchmarking.md` before benchmarking. In short:
+Read `klause-bench/README.md` before benchmarking. In short:
 
 - Rebuild the CLI binary first with `:klause-cli:installJvmDist`, since bench runs it as a subprocess. `installDist` is
   a no-op that serves a stale binary, so suspect it when a bench run contradicts a passing test.
-- `./gradlew :klause-bench:bench --args="solve backend=... suite=..."` runs solvers as subprocesses emitting MiniZinc
+- `./gradlew :klause-bench:bench --args="solve engine=... suite=..."` runs solvers as subprocesses emitting MiniZinc
   output files.
 - Analyze the output files separately with scripts; A/B by varying CLI params across runs.
 
@@ -67,12 +67,18 @@ Read `docs/benchmarking.md` before benchmarking. In short:
 - `docs/` is the maintained internal developer documentation and architecture contract. Start with
   `docs/README.md` and read the relevant architecture/contract pages before changing a subsystem.
   User-facing documentation is hosted at `https://eignex.com/docs/klause/` and is maintained separately.
+- Solver contracts are split by ownership: `docs/solver/search.md` for traversal,
+  propagation and explanations; `docs/solver/sessions.md` for invocation scopes;
+  `docs/solver/local-search.md` for heuristic state and moves; `docs/solver/portfolio.md`
+  for scheduling and publication; `docs/solver/presolve.md` for reductions and source mappings.
+  Update the relevant page and link across boundaries; do not recreate `docs/search.md`.
 - Update the affected docs in the same change whenever implementation changes architecture, ownership,
   dependencies, invariants, result/proof semantics, resource policy or developer workflows. Reconcile
   docs with the implemented system; do not leave competing descriptions or obsolete plans.
-- Keep all standalone documentation under root `docs/`. Do not create documentation elsewhere.
-  READMEs outside `docs/` are short entry points linking into it, with required license notices where
-  applicable. Agent instruction files and functional GitHub templates retain their required locations;
+- Keep standalone system documentation under root `docs/`. Benchmark usage, records, validation
+  and diagnostic workflows live in `klause-bench/README.md`; do not create separate benchmark guides.
+  Other READMEs outside `docs/` are short entry points linking into it, with required license notices
+  where applicable. Agent instruction files and functional GitHub templates retain their required locations;
   public API KDoc stays with source. Inputs, manifests, scripts and raw evidence are artifacts, not guides.
 - Document only the current Klause system. Exclude references/comparisons to other solvers, historical campaign
   narratives and speculative implementation plans. Preserve fixture attribution.

@@ -30,10 +30,10 @@ User documentation is hosted at [eignex.com/docs/klause](https://eignex.com/docs
 Repository `docs/` contains [internal developer documentation](docs/README.md)
 and architecture contracts.
 
-- [System architecture](docs/architecture.md) and [search](docs/search.md).
+- [System architecture](docs/architecture.md) and [search](docs/solver/search.md).
 - [LP architecture](docs/lp/architecture.md) and [exact certification](docs/lp/certification.md).
 - [Frontend and result contracts](docs/formats.md).
-- [Benchmarking](docs/benchmarking.md) and [development](docs/development.md).
+- [Benchmarking](klause-bench/README.md) and [development](docs/development.md).
 
 ## Build
 
