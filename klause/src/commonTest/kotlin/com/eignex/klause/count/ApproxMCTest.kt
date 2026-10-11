@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,8 +59,9 @@ class ApproxMCTest {
         for (max in listOf(1L, 2L)) {
             val model = Problem(
                 numBoolVars = 1, numIntVars = 1, intDomains = arrayOf(IntDomain(1, max)),
-                factors = emptyArray(), numRealVars = 1,
-                realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(3.0),
+                factors = emptyArray(), numRealVars = 2,
+                realLower = doubleArrayOf(2.0, Double.NEGATIVE_INFINITY),
+                realUpper = doubleArrayOf(3.0, Double.POSITIVE_INFINITY),
             )
 
             val count = BacktrackSolver(model.bake()).approximateCount(ApproxCountConfig(seed = 0L))
@@ -91,6 +93,26 @@ class ApproxMCTest {
             assertTrue(count.exact)
             assertEquals(1L, count.estimate)
         }
+    }
+
+    @Test
+    fun `conditioned mixed counts restore Boolean pins and integer holes`() {
+        val model = Problem(
+            1, 1, arrayOf(IntDomain(0, 2)), emptyArray(),
+            numRealVars = 1, realLower = doubleArrayOf(2.0), realUpper = doubleArrayOf(3.0),
+        ).bake()
+        val config = ApproxCountConfig(seed = 0L)
+        BacktrackSolver(model).session().use { session ->
+            session.push(Assumptions(bools = mapOf(0 to true)).withIntHole(0, 1L))
+            assertEquals(2L, session.approximateCount(config).estimate)
+            session.push(Assumptions(ints = mapOf(0 to 2L)))
+            assertEquals(1L, session.approximateCount(config).estimate)
+            session.pop()
+            assertEquals(2L, session.approximateCount(config).estimate)
+            session.pop()
+            assertEquals(6L, session.approximateCount(config).estimate)
+        }
+        assertEquals(3, model.rootIntDomain(0).size)
     }
 
     private fun assertWithinBand(exact: Long, estimate: Long, eps: Double) {

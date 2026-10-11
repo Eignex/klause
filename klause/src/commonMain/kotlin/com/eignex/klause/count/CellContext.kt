@@ -46,6 +46,9 @@ internal class CellContext private constructor(
         return Sample.fromOwned(
             bools = BooleanArray(baseNumBoolVars) { model.boolValue(it) },
             ints = LongArray(baseNumIntVars) { model.intValue(it) },
+            reals = model.reals,
+            exactReals = model.exactReals,
+            exactInts = model.exactInts?.take(baseNumIntVars),
         )
     }
 

@@ -2,7 +2,6 @@ package com.eignex.klause.count
 
 import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.factor.bool.Xor
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
@@ -70,15 +69,8 @@ class XorHashFamily(
  */
 internal fun BakedProblem.withHashes(hashes: List<Xor>): Problem {
     if (hashes.isEmpty()) return this
-    val merged = ArrayList<Factor>(factors.size + 1)
-    merged.addAll(factors)
-    merged.add(GaussianXor(hashes))
-    return Problem(
-        settings = this.settings,
-        numBoolVars = numBoolVars,
-        numIntVars = numIntVars,
-        intDomains = rootIntDomains(),
-        factors = merged,
-        modelBounds = intBounds,
+    return withFactors(
+        newFactors = factors + GaussianXor(hashes),
+        newImpliedFactorMask = impliedFactorMask?.let { it + false },
     )
 }
