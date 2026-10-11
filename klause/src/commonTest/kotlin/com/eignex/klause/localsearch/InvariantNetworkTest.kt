@@ -41,10 +41,11 @@ class InvariantNetworkTest {
 
                 val cellCone = network.affectedNodes(intArrayOf(1), intArrayOf(), state.assignment)
                 val indexCone = network.affectedNodes(intArrayOf(0), intArrayOf(), state.assignment)
+                val structuralCone = network.affectedNodes(intArrayOf(1), intArrayOf())
 
                 assertEquals(if (position == 0) listOf(4, 5) else emptyList(), cellCone.map { network.node(it).out })
                 assertEquals(listOf(4, 5), indexCone.map { network.node(it).out })
-                assertEquals(listOf(4, 5), network.affectedNodes(intArrayOf(1), intArrayOf()).map { network.node(it).out })
+                assertEquals(listOf(4, 5), structuralCone.map { network.node(it).out })
             }
         }
     }
