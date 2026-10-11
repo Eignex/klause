@@ -27,7 +27,8 @@ which polynomials, reducta and coefficient families to project.
 
 `RationalPolynomial` captures ascending rational coefficients and trims trailing
 zeros. Euclidean gcd, square-free decomposition and Sturm sequences isolate all
-distinct real roots. Decomposition retains multiplicities separately; root lists
+distinct real roots. Decomposition returns monic factors and retains multiplicities separately; the
+input leading coefficient supplies the scalar unit. Root lists
 count repeated roots once. Zero polynomials reject a finite root-list request;
 nonzero constants produce an empty list. Nonpoint rational intervals contain
 exactly one root and exclude endpoint roots. Point intervals certify a rational
