@@ -338,4 +338,173 @@ class Xcsp3SourceCheckerTest {
             model.delete()
         }
     }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "<cumulative><origins>x y</origins><lengths>1 1</lengths><heights>1500000000 1500000000</heights>" +
+            "<condition>(le,1)</condition></cumulative>|0 0|cumulative load",
+        "<cumulative><origins>x y</origins><lengths>1500000000 1500000000</lengths><heights>2 2</heights>" +
+            "<condition>(le,1)</condition></cumulative>|1500000000 1500000000|task endpoint",
+        "<noOverlap><origins>x y</origins><lengths>1500000000 1500000000</lengths></noOverlap>" +
+            "|1500000000 1500000000|task endpoint",
+        "<binPacking><list>x y</list><sizes>1500000000 1500000000</sizes>" +
+            "<condition>(le,1)</condition></binPacking>|0 0|bin-packing load",
+        "<intension>lt(mul(x,x,x),0)</intension>|1500000000 0|expression",
+        "<ordered><list>x y</list><lengths>1500000000</lengths><operator>le</operator></ordered>" +
+            "|1500000000 1500000000|ordered offset",
+        "<knapsack><list>x y</list><weights>2 2</weights><condition>(le,0)</condition>" +
+            "<profits>0 0</profits><condition>(eq,0)</condition></knapsack>|1500000000 1500000000|weighted term",
+    ])
+    fun `unchecked non sum overflow cannot earn source witness credit`(
+        constraint: String,
+        values: String,
+        diagnostic: String,
+    ) {
+        val model = File.createTempFile("xcsp-nonsum-overflow-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables><var id="x">0..2000000000</var><var id="y">0..2000000000</var></variables>
+                  <constraints>$constraint</constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>x y</list><values>$values</values></instantiation>"
+
+            val upstream = SolutionChecker(false, model.absolutePath, witness.byteInputStream())
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertTrue(upstream.violatedCtrs.isEmpty())
+            assertEquals("unknown", checked.status)
+            assertTrue(checked.reason.contains(diagnostic), checked.reason)
+            assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "<cumulative><origins>x y</origins><lengths>1 1</lengths><heights>1073741823 1073741824</heights>" +
+            "<condition>(le,2147483647)</condition></cumulative>|0 0|valid",
+        "<cumulative><origins>x y</origins><lengths>1 1</lengths><heights>1500000000 1500000000</heights>" +
+            "<condition>(le,1500000000)</condition></cumulative>|0 1|valid",
+        "<cumulative><origins>x y</origins><lengths>1 1</lengths><heights>1 1</heights>" +
+            "<condition>(le,1)</condition></cumulative>|0 0|invalid",
+        "<noOverlap><origins>x y</origins><lengths>1 16</lengths></noOverlap>|2147483630 2147483631|valid",
+        "<noOverlap><origins>x y</origins><lengths>1 1</lengths></noOverlap>|1500000000 1500000000|invalid",
+        "<binPacking><list>x y</list><sizes>1073741823 1073741824</sizes>" +
+            "<condition>(le,2147483647)</condition></binPacking>|0 0|valid",
+        "<binPacking><list>x y</list><sizes>1500000000 1500000000</sizes>" +
+            "<condition>(le,1500000000)</condition></binPacking>|0 1|valid",
+        "<binPacking><list>x y</list><sizes>1 1</sizes><condition>(le,1)</condition></binPacking>|0 0|invalid",
+        "<knapsack><list>x y</list><weights>1 -1</weights><condition>(eq,0)</condition>" +
+            "<profits>0 0</profits><condition>(eq,0)</condition></knapsack>|1500000000 1500000000|valid",
+        "<ordered><list>x y</list><lengths>1</lengths><operator>le</operator></ordered>|2147483636 2147483637|valid",
+        "<intension>eq(add(mul(x,x),neg(mul(y,y))),0)</intension>|1500000000 1500000000|valid",
+        "<intension>eq(mul(x,x,x),3375000000000000)</intension>|150000 0|valid",
+        "<intension>eq(sub(x,y),3000000000)</intension>|1500000000 -1500000000|valid",
+        "<intension>eq(dist(x,y),3000000000)</intension>|1500000000 -1500000000|valid",
+        "<intension>eq(div(x,2),-1)</intension>|-3 0|valid",
+        "<intension>eq(mod(x,2),-1)</intension>|-3 0|valid",
+        "<intension>eq(abs(x),1500000000)</intension>|-1500000000 0|valid",
+        "<intension>if(eq(x,y),eq(sqr(x),2250000000000000000),eq(x,0))</intension>|1500000000 1500000000|valid",
+        "<intension>lt(mul(x,x),0)</intension>|1500000000 0|invalid",
+        "<allDifferent>mul(x,x) mul(y,y)</allDifferent>|1500000000 1499999999|valid",
+    ])
+    fun `safe non sum boundaries cancellation and violations remain checkable`(
+        constraint: String,
+        values: String,
+        status: String,
+    ) {
+        val model = File.createTempFile("xcsp-nonsum-boundary-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables><var id="x">-2000000000..2147483637</var><var id="y">-2000000000..2147483637</var></variables>
+                  <constraints>$constraint</constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>x y</list><values>$values</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") assertNotNull(checked.checkedWitness) else assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = [
+        "mul(x,x,x)|-7250882478129283072|unknown",
+        "mul(x,x,x)|3375000000000000000000000000|unknown",
+        "mul(x,x)|2250000000000000000|valid",
+        "mul(x,x)|2250000000000000001|invalid",
+        "sub(mul(x,x,x),mul(x,x,x))|0|valid",
+        "add(mul(x,x),neg(mul(x,x)))|0|valid",
+        "pow(x,3)|3375000000000000000000000000|unknown",
+    ])
+    fun `expression objectives require agreement with exact arithmetic`(
+        expression: String,
+        objective: String,
+        status: String,
+    ) {
+        val model = File.createTempFile("xcsp-expression-objective-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="COP">
+                  <variables><var id="x">0..1500000000</var></variables>
+                  <objectives><minimize>$expression</minimize></objectives>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>x</list><values>1500000000</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, objective)
+
+            assertEquals(status, checked.status, checked.reason)
+            if (status == "valid") {
+                assertTrue(checked.checkedWitness.orEmpty().contains("cost=\"$objective\""))
+            } else {
+                assertNull(checked.checkedWitness)
+            }
+        } finally {
+            model.delete()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = [
+        "<intension>eq(pow(x,3),0)</intension>",
+        "<channel><list>x y</list></channel>",
+        "<flow><list>x y</list><balance>0 0</balance><arcs>(0,1)(1,0)</arcs></flow>",
+    ])
+    fun `unaudited arithmetic callbacks explicitly decline witness credit`(constraint: String) {
+        val model = File.createTempFile("xcsp-unaudited-arithmetic-", ".xml")
+        try {
+            model.writeText(
+                """
+                <instance format="XCSP3" type="CSP">
+                  <variables><var id="x">0..1</var><var id="y">0..1</var></variables>
+                  <constraints>$constraint</constraints>
+                </instance>
+                """.trimIndent(),
+            )
+            val witness = "<instantiation><list>x y</list><values>0 0</values></instantiation>"
+
+            val checked = Xcsp3SourceChecker.inspect(model, witness, null)
+
+            assertEquals("unknown", checked.status)
+            assertTrue(checked.reason.contains("outside checker arithmetic auditing"), checked.reason)
+            assertNull(checked.checkedWitness)
+        } finally {
+            model.delete()
+        }
+    }
 }
