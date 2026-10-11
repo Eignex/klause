@@ -23,6 +23,84 @@ import kotlin.test.assertNotNull
 
 class SmtLibConditionalEqualityTest {
     @Test
+    fun `a covered identity default excludes its old selector values without expansion`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const b Bool)
+                (assert (let ((s (ite b 1 2)))
+                    (let ((r (ite (= s 1) 3 (ite (= s 2) 4 s)))) (= r 1))))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        assertIs<ComponentResult.Conflict>(session.initialize())
+    }
+
+    @Test
+    fun `a covered selector excludes an open default without expansion`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const b Bool) (declare-const x Int)
+                (assert (let ((s (ite b 1 2)))
+                    (let ((r (ite (= s 1) 3 (ite (= s 2) 4 x)))) (= r 99))))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        val session = SearchSession(
+            listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>())),
+            atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+        )
+
+        assertIs<ComponentResult.Conflict>(session.initialize())
+    }
+
+    @Test
+    fun `an uncovered selector value retains its open default without expansion`() {
+        val builder = Compiler.Builder(
+            Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 0),
+        )
+        val reader = SExprReader(
+            StringCharSource(
+                """
+                (declare-const b Bool) (declare-const x Int)
+                (assert (not b))
+                (assert (let ((s (ite b 1 2))) (let ((r (ite (= s 1) 3 x))) (= r 99))))
+                """.trimIndent(),
+            ),
+        )
+        while (true) builder.command(reader.readCommandOrNull() ?: break)
+        val parsed = builder.build()
+        ExactLiraSearchComponent(parsed.model).use { component ->
+            val session = SearchSession(
+                listOf(ClauseSearchComponent(parsed.model.factors.filterIsInstance<Clause>()), component),
+                atoms = SearchAtomRegistry(parsed.model.numBoolVars),
+            )
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = assertIs<SearchResult.Satisfied>(session.solve(parsed.model.numBoolVars))
+
+            val assignment = assertNotNull(result.model.valueOf<ExactLiraAssignment>(component))
+            assertEquals(bigIntOf(99), assignment.ints[parsed.intVarNames.getValue("x")])
+        }
+    }
+
+    @Test
     fun `a final comparison can refute the source after earlier comparisons exceed the expansion budget`() {
         val builder = Compiler.Builder(
             Long.MIN_VALUE, Long.MAX_VALUE, false, conditionalEqualities = SmtLibConditionalEquality(workLimit = 3),

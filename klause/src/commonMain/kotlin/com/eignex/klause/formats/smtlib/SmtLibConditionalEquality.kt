@@ -35,6 +35,15 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     private data class Key(val variable: Int, val value: Long)
     private class PendingEquality(val literal: Int, val factor: Factor)
     private data class Owner(val variable: Int, val integer: Boolean)
+    private class GuardCoverage {
+        val equal = HashSet<Long>()
+        val unequal = HashSet<Long>()
+
+        fun allowsDefault(value: Long): Boolean = value !in equal &&
+            (unequal.isEmpty() || (unequal.size == 1 && value in unequal))
+
+        fun coversEveryValue(): Boolean = unequal.size > 1 || unequal.any { it in equal }
+    }
     private sealed interface Frame {
         class Eval(val term: LinComb) : Frame
         class Known(val literal: Int) : Frame
@@ -57,7 +66,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     ) {
         definitions[variable] = Definition(
             guards.toList(), arms.toList(), default, factors.toList(),
-            constantImage(arms + default), guardTests.toList(),
+            constantImage(arms, default, guardTests), guardTests.toList(),
         )
     }
 
@@ -71,17 +80,39 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         if (variable !in definitions) equalities.getOrPut(Key(variable, value)) { literal }
     }
 
-    private fun constantImage(terms: List<LinComb>): Set<Long>? {
+    private fun constantImage(
+        arms: List<LinComb>,
+        default: LinComb,
+        guardTests: List<GuardEquality?>,
+    ): Set<Long>? {
         val values = HashSet<Long>()
-        for (term in terms) {
+        fun include(term: LinComb, coverage: GuardCoverage? = null): Boolean {
             if (term.coeffs.isEmpty()) {
                 values += term.constant
             } else {
-                val source = term.asSimpleVar() ?: return null
-                values += definitions[source]?.image ?: return null
+                val source = term.asSimpleVar() ?: return false
+                val image = definitions[source]?.image ?: return false
+                if (coverage == null) values += image
+                else image.filterTo(values) { coverage.allowsDefault(it) }
             }
-            if (values.size > IMAGE_LIMIT) return null
+            return values.size <= IMAGE_LIMIT
         }
+        for (index in arms.indices) {
+            val guard = guardTests[index]
+            val image = guard?.let { definitions[it.variable]?.image }
+            val unreachable = guard != null && image != null &&
+                (if (guard.equal) guard.value !in image else image.size == 1 && guard.value in image)
+            if (!unreachable && !include(arms[index])) return null
+        }
+        val coverage = HashMap<Int, GuardCoverage>()
+        for (guard in guardTests.filterNotNull()) {
+            val group = coverage.getOrPut(guard.variable) { GuardCoverage() }
+            if (guard.equal) group.equal += guard.value else group.unequal += guard.value
+        }
+        val excludedDefault = coverage.any { (variable, group) ->
+            group.coversEveryValue() || definitions[variable]?.image?.none { group.allowsDefault(it) } == true
+        }
+        if (!excludedDefault && !include(default, default.asSimpleVar()?.let { coverage[it] })) return null
         return values
     }
 
