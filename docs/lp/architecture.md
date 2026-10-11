@@ -58,6 +58,13 @@ intersects assertions exactly. It retains effective witnesses and weaker active
 assertions. Crossed bounds cite both sides; pop restores bounds and deactivates
 scoped rows.
 
+Open integer adapters align the LP trail with the search decision level before
+writing arithmetic assertions. Boolean decisions that only update source state
+can leave the LP trail shallower; retraction restores any deeper arithmetic scope
+before the adapter restores its source snapshot.
+When a pinned real-difference root defers LP preparation, falling back to arithmetic
+assertions installs the source owner before aligning that trail.
+
 A nonbasic bound change updates the basic contribution by `-B^-1 A(j) delta(x(j))`.
 A basic-bound edit changes feasibility rather than its value, except when source
 coordinates shift. Pop seats nonbasics at restored status bounds and recomputes

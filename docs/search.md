@@ -148,9 +148,41 @@ The reversible live prefix is committed once per completed sweep, including
 empty-prefix conflicts; sibling branches restore filtering from trailed state.
 
 LP explanations cite selected source bound witnesses and recursively expanded
-row, fixing and cutoff premises. Current CP propagation and source LP conflicts
-do not include an optional exact-theory row-propagation scanner or explanation
-weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
+row, fixing and cutoff premises. See
+[LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
+The complete integer theory batches newly selected disequality directions and
+their immutable reasons into one node snapshot per source assertion pass.
+Directions retain their premises along the branch, and retraction restores the
+parent snapshot before a sibling adds assertions. Completed source comparisons
+are installed once along a branch; retraction clears publication markers before
+restored assertions and sibling substitutions are installed against the LP trail.
+Incomplete passes publish no markers.
+
+The complete integer theory checks unit-coefficient source equalities in a sparse
+exact affine basis before invoking the LP. It
+substitutes larger definitions across open columns, decides constant comparisons
+and rejects inconsistent equations or nonintegral constant fixings. Each basis
+row retains a flat set of source guard literals. New active equalities extend the
+basis; a retracted supporting guard clears it before any further publication.
+Processed active equalities need no additional query reduction.
+Comparison queries retain a circular cursor across bounded passes, so an
+unresolved prefix cannot consume every pass before later comparisons are visited.
+The cursor carries no proof state; every pass validates cached source guards
+before querying the basis.
+Reduced disequalities retain normalized affine signatures with their source and
+basis guards. A matching equality is false and a matching disequality is true,
+even when the residual still has open terms. Basis reset clears these signatures;
+lookup also checks that the source exclusion remains asserted. At most 4096
+signatures are retained, and normalization consumes the same elimination allowance.
+Declared fixed columns supply unconditional facts. Boolean coefficients and
+disjunction alternatives remain with the complete theory.
+
+Affine elimination admits at most 32 terms and 256 source guards per row, bounds
+coefficient and RHS numerators and denominators to 256 bits, and limits each pass
+to 8192 elimination term visits. Wider rows and incomplete reductions add no
+facts. These limits establish no feasibility or exhaustion; unresolved rows keep
+the complete LP fallback. Cancellation is checked within 64 visits, immediately
+for metered tokens, and before each implication or conflict.
 
 ## Learned-clause retention
 
@@ -357,6 +389,8 @@ snapshot. Repeated snapshots replace the live entry; closing captures the final
 counters and merges the handle once, including when reseeding or stopping the pool.
 Open-theory handles capture live-round progress before releasing their traversal;
 closing a completed round does not capture its counters again.
+Paused open-theory snapshots also include cumulative SMT source work before a
+round reaches its verdict. Closing a pending round preserves that source accounting.
 Ordinary arm exceptions retire their producer and leave siblings running. The schedule
 retains one diagnostic per arm with its identity, operation, segment, charged work,
 exception type/message and cause trace. Type, message and trace are capped at 128,
@@ -412,6 +446,12 @@ requested root-cut plans.
 | `openAssertingConflicts` | Shared first-UIP analyses yielding an asserting backjump |
 | `openNonAssertingConflicts` | Sound shared conflicts retaining chronological fallback |
 | `openReductionNs` | Total shared reduction selection and watch-rebuild time |
+| `smtAffinePasses`, `smtAffineBasisResets` | Sparse affine propagation invocations and cache clears after supporting guard retraction |
+| `smtAffineFactsAdded` | Source equations admitted into the basis or proved redundant |
+| `smtAffineQueryReductions`, `smtAffineConstantQueries` | Comparison reductions attempted and completed reductions with no open terms |
+| `smtAffineImplications`, `smtAffineConflicts` | Accepted Boolean implications and source conflicts returned before LP solving |
+| `smtAffineTermVisits`, `smtAffineBudgetStops` | Charged elimination visits and passes consuming their visit allowance |
+| `smtAffineActiveNs` | Sparse propagation time including guard validation and explanations; separate from LP time |
 | `portfolioReseedStaleThreshold`, arm `reseeds` | Effective stale threshold and reseed count |
 
 A nonzero non-asserting count is a reason to capture the conflict and inspect

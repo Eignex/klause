@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.AffineEqualityStats
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.LocalSearchStats
@@ -285,7 +286,10 @@ class CliStatsTest {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira"),
             openTheory = OpenTheoryWorkStats(openTheoryChecks = 5),
-            smt = SmtStats(sourceLp = SourceLpWorkStats(operations = 2, modeledWork = 7, floatWork = 3)),
+            smt = SmtStats(
+                sourceLp = SourceLpWorkStats(operations = 2, modeledWork = 7, floatWork = 3),
+                affine = AffineEqualityStats(passes = 4, termVisits = 23, budgetStops = 1),
+            ),
         )
 
         val pairs = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()
@@ -293,6 +297,9 @@ class CliStatsTest {
         assertEquals("2", pairs["smtSourceLpOperations"])
         assertEquals("7", pairs["smtSourceLpModeledWork"])
         assertEquals("3", pairs["smtSourceLpFloatWork"])
+        assertEquals("4", pairs["smtAffinePasses"])
+        assertEquals("23", pairs["smtAffineTermVisits"])
+        assertEquals("1", pairs["smtAffineBudgetStops"])
         assertTrue("smtPrivateChecks" !in pairs)
         assertTrue("smtSimplexAttempts" !in pairs)
         assertEquals("5", pairs["smtTheoryChecks"])
