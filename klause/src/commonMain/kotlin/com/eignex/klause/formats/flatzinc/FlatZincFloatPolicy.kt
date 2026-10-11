@@ -75,7 +75,11 @@ private class FloatChoicePlanner(
             val root = components.find(ids.first())
             declarations.locateConstraint(c)
             if (ids.any { it in roundedBounds }) {
-                decline(root, c, "finite float bounds require rounded arithmetic; exact FlatZinc uses binary64 rational literals and preserves declared bounds")
+                decline(
+                    root, c,
+                    "finite float bounds require rounded arithmetic; " +
+                        "exact FlatZinc uses binary64 rational literals and preserves declared bounds",
+                )
                 continue
             }
             val alternatives = domains[i]?.values?.size ?: alternatives(c)

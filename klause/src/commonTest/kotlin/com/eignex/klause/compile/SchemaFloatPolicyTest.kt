@@ -26,7 +26,9 @@ class SchemaFloatPolicyTest {
     fun `connected strict row selects one representation for all its floats`() {
         val compiled = SchemaDef<SchemaEntry>(mapOf(
             "x" to FloatSpec(0.0, 1.0, 3), "y" to FloatSpec(0.0, 1.0, 3),
-            "row" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0, 1.0), listOf("x", "y"), IntCmpOp.LT, 1.0)),
+            "row" to NamedConstraint(
+                FloatLinearConstraint(doubleArrayOf(1.0, 1.0), listOf("x", "y"), IntCmpOp.LT, 1.0),
+            ),
         )).compile()
 
         assertEquals(compiled.floatRepresentations.getValue("x"), compiled.floatRepresentations.getValue("y"))

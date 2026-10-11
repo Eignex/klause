@@ -10,9 +10,14 @@ import kotlin.test.assertTrue
 class FlatZincSolutionWriterTest {
     @Test
     fun `mixed components preserve exact coordinates and grid provenance`() {
-        val program = parseFlatZinc("var 0.0..1.0: exact; var 0.0..1.0: grid; constraint float_le(grid, 0.5); solve satisfy;", floatBuckets = 3)
+        val program = parseFlatZinc(
+            "var 0.0..1.0: exact; var 0.0..1.0: grid; constraint float_le(grid, 0.5); solve satisfy;",
+            floatBuckets = 3,
+        )
         val third = BigFraction.of(bigIntOf(1), bigIntOf(3))
-        val sample = Sample(BooleanArray(program.problem.numBoolVars), longArrayOf(1), doubleArrayOf(third.toDouble()), listOf(third))
+        val sample = Sample(
+            BooleanArray(program.problem.numBoolVars), longArrayOf(1), doubleArrayOf(third.toDouble()), listOf(third),
+        )
 
         val output = writeFlatZincSolution(program, sample)
 

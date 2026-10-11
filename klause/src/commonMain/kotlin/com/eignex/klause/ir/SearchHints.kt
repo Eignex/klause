@@ -1,7 +1,5 @@
 package com.eignex.klause.ir
 
-
-
 /** Ordered variable groups and branching intent for finite execution. */
 data class SearchHints(
     /** Ordered variable groups and their selection intent. */
