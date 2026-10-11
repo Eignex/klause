@@ -9,9 +9,11 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
+import com.eignex.klause.solver.pipeline.PolynomialTheoryRequest
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.result.TerminationReason
 
 /**
  * A parsed instance, lowered to exactly what [SolveCore] needs — mode-neutral. Both the
@@ -154,6 +156,13 @@ internal sealed interface SolvablePipeline {
         val request: OpenTheoryRequest,
         val render: (OpenTheoryAssignment) -> String,
     ) : SolvablePipeline
+
+    data class PolynomialTheory(
+        val request: PolynomialTheoryRequest,
+        val render: (OpenTheoryAssignment) -> String,
+    ) : SolvablePipeline
+
+    data class Interrupted(val reason: TerminationReason) : SolvablePipeline
 
     /**
      * An open model no theory decides, searched by local search alone: shown satisfiable, or given incumbents for

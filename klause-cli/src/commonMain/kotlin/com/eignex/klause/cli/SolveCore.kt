@@ -26,6 +26,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.autoArms
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.solver.result.LpStats
@@ -83,12 +84,64 @@ internal object SolveCore {
         val (presolveCancel, presolveBudget) = presolveAllowance(common, deadlineCancel)
         // The open routes run what `-e` asks for, and ALNS has no open counterpart.
         val open = rawSolvable.pipeline.let {
-            it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch
+            it is SolvablePipeline.OpenTheory || it is SolvablePipeline.OpenLocalSearch ||
+                it is SolvablePipeline.PolynomialTheory
         }
         if (open && engine == FiniteEngine.ALNS) usageError("engine `${engine.id}` has no open-model route")
         // `-p N` gives the open portfolio a lane per core, as it does the finite one.
         val openCores = common.parallel ?: 1
         when (val pipeline = rawSolvable.pipeline) {
+            is SolvablePipeline.PolynomialTheory -> {
+                if (solutionSetSensitive) {
+                    usageError("all-solution enumeration is unavailable for polynomial real models")
+                }
+                output.begin(optimize = false, maximize = false)
+                val execution = OpenTheoryPipeline.execute(
+                    pipeline.request,
+                    polynomialParams(common, deadlineCancel),
+                    engine,
+                )
+                val result = execution.result
+                output.onVerdictContext(
+                    VerdictContext(
+                        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
+                        completePool = engine != FiniteEngine.LOCAL_SEARCH,
+                    ),
+                )
+                when (result) {
+                    is OpenTheoryResult.Sat -> {
+                        output.onSolution(pipeline.render(result.assignment), null)
+                        output.onComplete(Verdict.SATISFIABLE)
+                    }
+
+                    is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+                    is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+                }
+                if (common.statistics) {
+                    output.onStatistics(
+                        result.stats,
+                        result.stats.run.wallMs + rawSolvable.routingElapsedMs,
+                        if (result is OpenTheoryResult.Sat) 1L else 0L,
+                    )
+                    val native = execution.stats
+                    val pairs = listOf(
+                        "nraWork" to native.workSpent.toString(),
+                        "nraProjectedPolynomials" to native.projectedPolynomials.toString(),
+                        "nraLiftedCells" to native.liftedCells.toString(),
+                    ) + execution.resource?.let { listOf("nraResource" to it.name) }.orEmpty()
+                    output.onAllowanceStatistics(pairs)
+                }
+                return
+            }
+
+            is SolvablePipeline.Interrupted -> {
+                output.begin(optimize = false, maximize = false)
+                output.onVerdictContext(VerdictContext(terminationReason = pipeline.reason))
+                output.onComplete(Verdict.UNKNOWN)
+                if (common.statistics) output.onStatistics(SolveStats.EMPTY, rawSolvable.routingElapsedMs, 0L)
+                return
+            }
+
             is SolvablePipeline.OpenLocalSearch -> {
                 // Local search proves no optimum, so a run without a deadline ends where its node allowance does.
                 val nodeBudget = takeOpenNodeLimit(common)?.let(::NodeBudget).also { common.nodeBudget = it }
