@@ -36,7 +36,6 @@ import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -1015,7 +1014,7 @@ class ResumableMinimizeTest {
         assertTrue(terminal is MinimizeResult.Unknown && search.stats.lp.standalonePasses.sum > 1.0, "$terminal")
     }
     @Test
-    fun `cancelled optimization preparation cannot expose partially initialized state`() {
+    fun `cancelled optimization preparation resumes without searching partial state`() {
         val fixture = FiniteCutoffKnapsackFixture
         val factory = RecordingLpEngineFactory()
         var cancelled = false
@@ -1032,12 +1031,10 @@ class ResumableMinimizeTest {
         val solver = BacktrackSolver(fixture.problem, LpSolveContext(factory))
 
         solver.resumable(fixture.objective, params).use { search ->
-            assertFailsWith<SearchInitializationCancelled> {
-                search.runSlice(params.cancellation, Long.MAX_VALUE, -1L) {}
-            }
-        }
+            assertNull(search.runSlice(params.cancellation, Long.MAX_VALUE, -1L) {})
+            assertEquals(0.0, search.stats.search.nodes.sum)
 
-        solver.resumable(fixture.objective, fixture.params).use { search ->
+            cancelled = false
             assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
         }
     }
