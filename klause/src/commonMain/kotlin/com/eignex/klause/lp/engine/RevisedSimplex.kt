@@ -1097,7 +1097,9 @@ internal class RevisedSimplex(
         get() = basisLifecycle.operationWork
 
     private fun trackedHeadingsConsistent(): Boolean {
-        if (basisLifecycle.columns.size != m || basisLifecycle.unitRows.size != m || basicVar.distinct().size != m) return false
+        if (basisLifecycle.columns.size != m || basisLifecycle.unitRows.size != m || basicVar.distinct().size != m) {
+            return false
+        }
         if (!basisStatusConsistent(model, basicVar, status)) return false
         return basicVar.indices.all { slot ->
             val column = basisLifecycle.columns[slot]
