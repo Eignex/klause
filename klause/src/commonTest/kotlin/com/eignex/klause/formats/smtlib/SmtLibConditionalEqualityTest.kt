@@ -119,7 +119,9 @@ class SmtLibConditionalEqualityTest {
                 atoms = SearchAtomRegistry(parsed.model.numBoolVars),
             )
 
-            assertIs<ComponentResult.Conflict>(session.initialize())
+            session.initialize()
+
+            assertIs<SearchResult.Exhausted>(session.solve(parsed.model.numBoolVars))
         }
     }
 
