@@ -55,7 +55,7 @@ internal const val PROPAGATION_CANCEL_FLOOR: Int = 1 shl 20
  *  `tightenIntMin` / `tightenIntMax` / `setInt`. The driver sets `currentLevel`
  *  to the inherited level before each factor invocation; mutators read it.
  */
-class PropagationState(
+class PropagationState private constructor(
     /** Propagation-engine projection of the problem being propagated. */
     val projection: PropagationProblem,
     assumptions: Assumptions,
@@ -82,7 +82,15 @@ class PropagationState(
      * to `false`; ignored on problems with integer variables (order-literal atoms have no PB reason).
      */
     internal val pbLearning: Boolean = false,
+    prepared: PropagationBuffers?,
 ) {
+    constructor(
+        projection: PropagationProblem,
+        assumptions: Assumptions,
+        incremental: Boolean = false,
+        nativeSat: Boolean = false,
+        pbLearning: Boolean = false,
+    ) : this(projection, assumptions, incremental, nativeSat, pbLearning, null)
     constructor(
         problem: Problem,
         assumptions: Assumptions,
@@ -100,8 +108,8 @@ class PropagationState(
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
      *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than an `Array<Boolean?>`
      *  and one less pointer indirection per read (no boxed `Boolean`). */
-    internal val boolAssigned: Bits = Bits(problem.numBoolVars)
-    internal val boolValueBits: Bits = Bits(problem.numBoolVars)
+    internal val boolAssigned: Bits = prepared?.boolAssigned ?: (Bits(problem.numBoolVars))
+    internal val boolValueBits: Bits = prepared?.boolValueBits ?: (Bits(problem.numBoolVars))
 
     // Native BCP reads one byte per lookup instead of testing two packed bitsets. All pin and
     // undo writes mirror the canonical bits: 0 is open, 1 is false, and 2 is true.
@@ -144,21 +152,21 @@ class PropagationState(
      *  that builds a projection, and `Problem.propagate` over a source model — and materializes the
      *  declared value sets, which is what that projection is itself built from. */
     val rootDomains: Array<IntDomain> =
-        (problem as? BakedProblem)?.foldedIntDomains ?: problem.finiteIntDomains()
+        prepared?.rootDomains ?: ((problem as? BakedProblem)?.foldedIntDomains ?: problem.finiteIntDomains())
 
     /** Per-int current domain (copy of [rootDomains], narrowed as propagation proceeds). */
-    val intDomains: Array<IntDomain> = Array(problem.numIntVars) { rootDomains[it] }
+    val intDomains: Array<IntDomain> = prepared?.intDomains ?: (Array(problem.numIntVars) { rootDomains[it] })
 
     /** Vars whose pin/domain changed since the driver last drained them. Primitive int
      *  ring buffers to avoid the autoboxing tax `ArrayDeque<Int>` pays on every push/poll. */
     internal val dirtyBools: IntArrayDeque =
-        IntArrayDeque(initialCapacity = problem.numBoolVars.coerceAtLeast(8))
+        prepared?.dirtyBools ?: (IntArrayDeque(initialCapacity = problem.numBoolVars.coerceAtLeast(8)))
     internal val dirtyInts: IntArrayDeque =
-        IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8))
+        prepared?.dirtyInts ?: (IntArrayDeque(initialCapacity = problem.numIntVars.coerceAtLeast(8)))
 
     /** Typed int-event wakeup machinery (advisor index, pending-kind masks, delta accumulators) —
      *  see [IntEventMachinery]. Empty when no factor opts in; forced live in [incremental] mode. */
-    internal val intEvents: IntEventMachinery = IntEventMachinery(projection, incremental)
+    internal val intEvents: IntEventMachinery = prepared?.intEvents ?: (IntEventMachinery(projection, incremental))
 
     // [propQueue] is the reusable factor worklist; [propStamp] is a per-factor "currently queued"
     // membership set encoded as a generation stamp so resetting between propagation runs is
@@ -166,8 +174,8 @@ class PropagationState(
     // pin. A factor is queued iff `propStamp[fid] == propGen`; dequeuing writes `propGen - 1`
     // (any value ≠ propGen) so a factor can still re-enqueue itself within the same run.
     internal val propQueue: IntArrayDeque =
-        IntArrayDeque(initialCapacity = if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8))
-    private var propStamp: IntArray = IntArray(if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8))
+        prepared?.propQueue ?: (IntArrayDeque(initialCapacity = if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8)))
+    private var propStamp: IntArray = prepared?.propStamp ?: (IntArray(if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8)))
     private var propGen: Int = 0
 
     /** Reset the worklist for a new propagation run over [factorCount] factors. Grows
@@ -202,10 +210,10 @@ class PropagationState(
     // Decision-level plumbing.
 
     /** Decision level when each bool was first pinned (-1 = unpinned). */
-    val boolLevel: IntArray = IntArray(problem.numBoolVars) { -1 }
+    val boolLevel: IntArray = prepared?.boolLevel ?: (IntArray(problem.numBoolVars) { -1 })
 
     /** Deepest decision level contributing to this int var's current domain (-1 = untouched). */
-    val intLevel: IntArray = IntArray(problem.numIntVars) { -1 }
+    val intLevel: IntArray = prepared?.intLevel ?: (IntArray(problem.numIntVars) { -1 })
 
     // Per-side split of [intLevel]: the decision level at which the *current* lower (resp. upper)
     // bound was established. [intLevel] is the max of the two. Lets a current-bound order literal
@@ -213,38 +221,38 @@ class PropagationState(
     // slot, which is why [atomLevelForConflict] is a plain stored-slot read rather than a
     // bound-history search. -1 = the bound
     // is still at its root value (a level-0 global fact). Logged/restored by the undo trail.
-    internal val intMinLevel: IntArray = IntArray(problem.numIntVars) { -1 }
-    internal val intMaxLevel: IntArray = IntArray(problem.numIntVars) { -1 }
+    internal val intMinLevel: IntArray = prepared?.intMinLevel ?: (IntArray(problem.numIntVars) { -1 })
+    internal val intMaxLevel: IntArray = prepared?.intMaxLevel ?: (IntArray(problem.numIntVars) { -1 })
 
     // Per-int-var interior-hole carve history: the (value, level, reason) at which each
     // search-time interior carve happened. Bound moves need no such history — order literals carry
     // their own level/reason on their trail slots. An eq atom ruled out by an
     // interior hole materialized after the carve reads its level/reason from here. Lazily
     // allocated, maintained while [undoLogging], truncated on backtrack via the undo log.
-    internal val holeHistAnt: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
+    internal val holeHistAnt: Array<ArrayList<IntArray?>?> = prepared?.holeHistAnt ?: (arrayOfNulls(problem.numIntVars))
 
     // Per int var, the undo-log positions of its bound-move records on the current path, oldest first, so a
     // bound's history is searched without walking the whole log. Appended by [logIntChange], popped as the
     // undo replay passes each record.
-    internal val boundMoves: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    internal val boundMoves: Array<IntArrayList?> = prepared?.boundMoves ?: (arrayOfNulls(problem.numIntVars))
 
     // The bounds each of those moves started from, parallel to [boundMoves]: a search over a bound's history reads
     // these contiguous values, not the prior-domain snapshot of every record it probes, scattered over the heap.
-    internal val boundMovePriorMin: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
-    internal val boundMovePriorMax: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
+    internal val boundMovePriorMin: Array<LongArrayList?> = prepared?.boundMovePriorMin ?: (arrayOfNulls(problem.numIntVars))
+    internal val boundMovePriorMax: Array<LongArrayList?> = prepared?.boundMovePriorMax ?: (arrayOfNulls(problem.numIntVars))
 
     // Built lazy reasons, keyed by their marker array (identity); see [reasonOf].
     internal val lazyReasonMemo = HashMap<IntArray, IntArray?>()
-    internal val holeHistVal: Array<LongArrayList?> = arrayOfNulls(problem.numIntVars)
-    internal val holeHistLvl: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    internal val holeHistVal: Array<LongArrayList?> = prepared?.holeHistVal ?: (arrayOfNulls(problem.numIntVars))
+    internal val holeHistLvl: Array<IntArrayList?> = prepared?.holeHistLvl ?: (arrayOfNulls(problem.numIntVars))
 
     // The undo-log size when each carve was recorded, so a lazy reason can tell a hole that predates its
     // deduction from one carved after it ([carvedAt]).
-    internal val holeHistPos: Array<IntArrayList?> = arrayOfNulls(problem.numIntVars)
+    internal val holeHistPos: Array<IntArrayList?> = prepared?.holeHistPos ?: (arrayOfNulls(problem.numIntVars))
 
     // Per Boolean variable, the undo-log size when its current pin was logged, so a lazy reason can tell a pin
     // that predates its deduction from a later one ([boolPinnedAt]). Meaningful only while the variable is pinned.
-    internal val boolPinPos = IntArray(problem.numBoolVars)
+    internal val boolPinPos = prepared?.boolPinPos ?: (IntArray(problem.numBoolVars))
 
     /**
      * Decision-var encoded per level: index `lvl-1` holds either a bool var id (0..numBoolVars-1)
@@ -323,16 +331,16 @@ class PropagationState(
      *  decision / assumption, not by any factor's propagation step". Read by
      *  [extractConflictFactors] to walk the propagation graph backwards from a conflict and
      *  collect every factor that contributed. */
-    val boolReason: IntArray = IntArray(problem.numBoolVars) { -1 }
+    val boolReason: IntArray = prepared?.boolReason ?: (IntArray(problem.numBoolVars) { -1 })
 
     /** Factor that most recently tightened this int var's lower bound. `-1` = decision /
      *  initial domain. Tracked separately from [intMaxReason] so two-sided narrowing
      *  conflicts (one factor tightens min, another tightens max into infeasibility) both
      *  surface in the core. */
-    val intMinReason: IntArray = IntArray(problem.numIntVars) { -1 }
+    val intMinReason: IntArray = prepared?.intMinReason ?: (IntArray(problem.numIntVars) { -1 })
 
     /** Mirror of [intMinReason] for the upper bound. */
-    val intMaxReason: IntArray = IntArray(problem.numIntVars) { -1 }
+    val intMaxReason: IntArray = prepared?.intMaxReason ?: (IntArray(problem.numIntVars) { -1 })
 
     /** Factor whose [Propagator.propagate] is currently running. Read by the impl methods so
      *  state changes can be attributed back to a factor. `-1` between factor invocations
@@ -434,7 +442,7 @@ class PropagationState(
     /** Learned-clause database — the [ConflictAnalyzer] nogoods plus their policy columns.
      *  See [LearnedClauseDb]; registration / lookup / pruning live in `ClauseDb.kt`. */
     internal val learned: LearnedClauseDb = LearnedClauseDb(
-        binaryClauseCount = run {
+        binaryClauseCount = prepared?.binaryClauseCount ?: run {
             var n = 0
             for (f in problem.factors) if (f is Clause && f.literals.size == 2) n++
             n
@@ -484,7 +492,7 @@ class PropagationState(
      * (lazy clause generation). When the conflict analyzer hits a `null` entry it treats
      * the variable as a search-tree leaf, same as a decision.
      */
-    val boolAntecedents: Array<IntArray?> = arrayOfNulls(problem.numBoolVars)
+    val boolAntecedents: Array<IntArray?> = prepared?.boolAntecedents ?: (arrayOfNulls(problem.numBoolVars))
 
     /**
      * Bool literals that forced the most-recent tightening of `intDomains[v].min`. Null
@@ -498,16 +506,16 @@ class PropagationState(
      * `v.min = 3` and another at level 2 sets `v.min = 5`, this array holds the level-2
      * tightening's antecedents — analyzer reasoning about why `v.min = 3` later is unavailable.
      */
-    val intMinAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
+    val intMinAntecedents: Array<IntArray?> = prepared?.intMinAntecedents ?: (arrayOfNulls(problem.numIntVars))
 
     /** Mirror of [intMinAntecedents] for the upper-bound side. */
-    val intMaxAntecedents: Array<IntArray?> = arrayOfNulls(problem.numIntVars)
+    val intMaxAntecedents: Array<IntArray?> = prepared?.intMaxAntecedents ?: (arrayOfNulls(problem.numIntVars))
 
     /** Bound-atom registry (LCG with virtual int-bound literals) — see [AtomStore]. Atom truth,
      *  level, and antecedents are snapshotted when the bound crosses (never re-derived from a
      *  bound-change history); restore drops atoms established after the snapshot point.
      *  Allocation is lazy via [allocAtom]; the channeling and wake logic lives in `Atoms.kt`. */
-    internal val atoms: AtomStore = AtomStore(problem.numIntVars)
+    internal val atoms: AtomStore = prepared?.atoms ?: (AtomStore(problem.numIntVars))
 
     /** LCG channeling clauses (`[x≥k+1]→[x≥k]`, `[x=k]↔[x≥k]∧[x≤k]`, …) accumulated as atoms
      *  materialize, awaiting registration. [allocAtom] appends here; [flushPendingChanneling]
@@ -772,9 +780,39 @@ class PropagationState(
     init {
         // The native lane replaces the per-literal / occurrence watch indices with its own arena
         // watches, so it skips base-factor registration entirely.
-        if (nativeEngine == null) {
+        if (prepared == null && nativeEngine == null) {
             for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid])
         }
+    }
+
+    internal companion object {
+        fun preparation(projection: PropagationProblem, pbLearning: Boolean): Iterator<PropagationState?> = sequence {
+            var buffers: PropagationBuffers? = null
+            for (next in PropagationBuffers.preparation(projection)) {
+                if (next != null) buffers = next
+                yield(null)
+            }
+            val state = PropagationState(projection, Assumptions.None, false, false, pbLearning, checkNotNull(buffers))
+            yield(null)
+            var visits = 0
+            for (fid in projection.propagators.indices) {
+                val propagator = projection.propagators[fid]
+                val watchers = propagator.initialBoolWatchers
+                if (watchers != null) {
+                    val blockers = propagator.initialBoolWatcherBlockers
+                    for (i in watchers.indices) {
+                        state.installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+                        if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+                    }
+                }
+                if (state.intEvents.deltaOn && propagator.consumesIntEventDelta) {
+                    state.intEvents.dirtyVars[fid] = IntArrayList()
+                    state.intEvents.dirtyMark[fid] = IntHashSet()
+                }
+                if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            }
+            yield(state)
+        }.iterator()
     }
 
     /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor
@@ -873,7 +911,7 @@ class PropagationState(
     }
 
     init {
-        seeded = seedAssumptions(assumptions)
+        if (prepared == null) seeded = seedAssumptions(assumptions)
     }
 
     /** Force bool `v` to [value]; returns false on conflict. */
@@ -992,20 +1030,18 @@ class PropagationState(
 
     private var rootPreparationStarted = false
 
-    internal fun beginRootFixpoint() {
+    internal fun beginRootFixpoint(): Iterator<Unit> = sequence {
         check(nativeEngine == null)
         check(!rootPreparationStarted)
         rootPreparationStarted = true
-        val start = TimeSource.Monotonic.markNow()
-        try {
-            conflictSeedFactors.clear()
-            flushPendingChanneling()
-            propBegin(totalFactorCount)
-            seedQueue(true, totalFactorCount, -1, EmptyIntArray)
-        } finally {
-            propagationNanos += start.elapsedNow().inWholeNanoseconds
+        conflictSeedFactors.clear()
+        flushPendingChanneling()
+        propBegin(totalFactorCount)
+        for (fid in 0 until totalFactorCount) {
+            propEnq(fid)
+            if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
         }
-    }
+    }.iterator()
 
     internal val rootFixpointPending: Boolean get() = propQueue.isNotEmpty()
 

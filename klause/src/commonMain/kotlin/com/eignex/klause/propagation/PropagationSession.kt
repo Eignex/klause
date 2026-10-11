@@ -46,6 +46,7 @@ class PropagationSession private constructor(
     val projection: PropagationProblem,
     preparedState: PropagationState? = null,
     rootConflict: IntArray? = null,
+    preparedBuffers: PropagationSessionBuffers? = null,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -113,11 +114,11 @@ class PropagationSession private constructor(
     // *decision* pins live here — propagation-implied facts are read from [state]. [trail]
     // is the decision stack used as a LIFO, each entry encoded as `v` (bool) or
     // `numBoolVars + v` (int), matching PropagationState's level encoding.
-    private val boolPinned: IntArray = IntArray(problem.numBoolVars) { -1 }
-    private val intPinnedSet: BooleanArray = BooleanArray(problem.numIntVars)
-    private val intPinnedVal: LongArray = LongArray(problem.numIntVars)
+    private val boolPinned: IntArray = preparedBuffers?.boolPinned ?: (IntArray(problem.numBoolVars) { -1 })
+    private val intPinnedSet: BooleanArray = preparedBuffers?.intPinnedSet ?: (BooleanArray(problem.numIntVars))
+    private val intPinnedVal: LongArray = preparedBuffers?.intPinnedVal ?: (LongArray(problem.numIntVars))
     private val trail: IntArrayList = IntArrayList()
-    private val impliedIntUndo: IntArray = IntArray(problem.numIntVars) { -1 }
+    private val impliedIntUndo: IntArray = preparedBuffers?.impliedIntUndo ?: (IntArray(problem.numIntVars) { -1 })
     private fun encBool(v: Int): Int = v
     private fun encInt(v: Int): Int = problem.numBoolVars + v
     private fun trailIsBool(enc: Int): Boolean = enc < problem.numBoolVars
@@ -197,12 +198,53 @@ class PropagationSession private constructor(
     }
 
     internal companion object {
+        fun preparation(
+            state: PropagationState,
+            cancellation: Cancellation,
+            conflict: IntArray?,
+        ): Iterator<PropagationSession?> = sequence {
+            var buffers: PropagationSessionBuffers? = null
+            for (next in PropagationSessionBuffers.preparation(state.problem)) {
+                if (next != null) buffers = next
+                yield(null)
+            }
+            yield(PropagationSession(
+                state.problem, cancellation, state.cancelFloor, state.nativeSat, state.pbLearning,
+                state.projection, state, conflict, checkNotNull(buffers),
+            ))
+        }.iterator()
+
         fun prepared(state: PropagationState, cancellation: Cancellation, conflict: IntArray?): PropagationSession =
             PropagationSession(
                 state.problem, cancellation, state.cancelFloor, state.nativeSat, state.pbLearning,
                 state.projection, state, conflict,
             )
     }
+
+    internal fun prepareSeed(assumptions: Assumptions): Iterator<PropagationResult?> = sequence {
+        bakedUnsat?.let {
+            yield(it)
+            return@sequence
+        }
+        check(trail.size == 0 && levelTop == 1)
+        for (i in assumptions.boolKeys.indices) {
+            val result = pushBool(assumptions.boolKeys[i], assumptions.boolValues[i], reportImplied = false)
+            if (result is PropagationResult.Unsat) {
+                yield(result)
+                return@sequence
+            }
+            yield(null)
+        }
+        for (i in assumptions.intKeys.indices) {
+            val result = pushInt(assumptions.intKeys[i], assumptions.intValues[i], reportImplied = false)
+            if (result is PropagationResult.Unsat) {
+                yield(result)
+                return@sequence
+            }
+            yield(null)
+        }
+        yield(PropagationResult.Implied.EMPTY)
+    }.iterator()
 
     /** Current decision level — number of pins on the trail. 0 = no decisions (post-bake). */
     val decisionLevel: Int get() = trail.size

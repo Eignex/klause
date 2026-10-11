@@ -13,7 +13,15 @@ import com.eignex.klause.util.MutableIntObjectMap
  * [incremental] mode forces them live so a mid-life factor subscribing to typed events (or
  * consuming the delta) wakes correctly even when the initial problem had none.
  */
-internal class IntEventMachinery(projection: PropagationProblem, incremental: Boolean) {
+internal class IntEventMachinery private constructor(
+    projection: PropagationProblem,
+    incremental: Boolean,
+    preparedOffsets: IntArray?,
+    preparedFlat: IntArray?,
+    preparedDirtyVars: ArrayList<IntArrayList?>?,
+    preparedDirtyMark: ArrayList<IntHashSet?>?,
+) {
+    constructor(projection: PropagationProblem, incremental: Boolean) : this(projection, incremental, null, null, null, null)
     private val problem: Problem = projection.problem
 
     /** Whether the typed int-event machinery ([dirtyKinds] / [baseFlat]) is live. */
@@ -44,7 +52,10 @@ internal class IntEventMachinery(projection: PropagationProblem, incremental: Bo
     internal var overflow: MutableIntObjectMap<IntArrayList>? = null
 
     init {
-        if (on) {
+        if (preparedOffsets != null) {
+            baseOffsets = preparedOffsets
+            baseFlat = checkNotNull(preparedFlat)
+        } else if (on) {
             val numSlots = problem.numIntVars * IntEvent.COUNT
             val offsets = IntArray(numSlots + 1)
             for (fid in 0 until problem.numFactors) {
@@ -114,7 +125,7 @@ internal class IntEventMachinery(projection: PropagationProblem, incremental: Bo
      * per new factor so a mid-life delta consumer's accumulator stays in bounds.
      */
     val dirtyVars: ArrayList<IntArrayList?> =
-        if (deltaOn) {
+        preparedDirtyVars ?: if (deltaOn) {
             ArrayList<IntArrayList?>(problem.numFactors).apply { repeat(problem.numFactors) { add(null) } }
         } else {
             ArrayList()
@@ -122,9 +133,63 @@ internal class IntEventMachinery(projection: PropagationProblem, incremental: Bo
 
     /** Dedup companion to [dirtyVars]; see its doc. */
     val dirtyMark: ArrayList<IntHashSet?> =
-        if (deltaOn) {
+        preparedDirtyMark ?: if (deltaOn) {
             ArrayList<IntHashSet?>(problem.numFactors).apply { repeat(problem.numFactors) { add(null) } }
         } else {
             ArrayList()
         }
+    companion object {
+        fun preparation(projection: PropagationProblem): Sequence<IntEventMachinery?> = sequence {
+            val problem = projection.problem
+            val on = projection.usesIntEventWatchers
+            val deltaOn = projection.usesIntEventDeltaConsumers
+            val slots = if (on) problem.numIntVars * IntEvent.COUNT else 0
+            val offsets = if (on) IntArray(slots + 1) else EmptyIntArray
+            yield(null)
+            var visits = 0
+            if (on) {
+                for (prop in projection.propagators) {
+                    prop.initialIntEventWatches?.let { watches ->
+                        for (packed in watches) {
+                            offsets[packed + 1]++
+                            if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+                        }
+                    }
+                    if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+                }
+                for (slot in 1..slots) {
+                    offsets[slot] += offsets[slot - 1]
+                    if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+                }
+            }
+            val flat = if (on) IntArray(offsets[slots]) else EmptyIntArray
+            yield(null)
+            val cursor = if (on) IntArray(offsets.size) else EmptyIntArray
+            yield(null)
+            for (slot in cursor.indices) {
+                cursor[slot] = offsets[slot]
+                if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            }
+            if (on) for (fid in projection.propagators.indices) {
+                projection.propagators[fid].initialIntEventWatches?.let { watches ->
+                    for (packed in watches) {
+                        flat[cursor[packed]++] = fid
+                        if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+                    }
+                }
+                if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            }
+            val dirtyVars = ArrayList<IntArrayList?>(if (deltaOn) problem.numFactors else 0)
+            yield(null)
+            val dirtyMark = ArrayList<IntHashSet?>(if (deltaOn) problem.numFactors else 0)
+            yield(null)
+            if (deltaOn) repeat(problem.numFactors) {
+                dirtyVars.add(null)
+                dirtyMark.add(null)
+                if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
+            }
+            yield(IntEventMachinery(projection, false, offsets, flat, dirtyVars, dirtyMark))
+        }
+    }
+
 }

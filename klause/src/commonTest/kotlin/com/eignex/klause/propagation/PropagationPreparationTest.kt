@@ -82,7 +82,7 @@ class PropagationPreparationTest {
         var polls = 0
         var cancelOnPoll = Int.MAX_VALUE
         val preparation = PropagationPreparation(problem, Cancellation { ++polls >= cancelOnPoll }, 0, false)
-        repeat(4) { assertNull(preparation.advance()) }
+        while (!preparation.rootStarted) assertNull(preparation.advance())
         cancelOnPoll = polls + 2
 
         assertNull(preparation.advance())
