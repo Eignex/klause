@@ -25,7 +25,8 @@ class IntBitChannelTest {
             1, 1, arrayOf(IntDomain(0, 1)), arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
             impliedFactorMask = booleanArrayOf(true), hasSymmetryBreaking = true,
             numRealVars = 2, realLower = doubleArrayOf(2.0, Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(3.0, Double.POSITIVE_INFINITY), settings = ProblemSettings(largeSpanThreshold = 100),
+            realUpper = doubleArrayOf(3.0, Double.POSITIVE_INFINITY),
+            settings = ProblemSettings(largeSpanThreshold = 100),
         ).bake()
 
         val channelled = IntBitChannel.channel(base, intArrayOf(0)).problem
