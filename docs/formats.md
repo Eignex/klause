@@ -130,6 +130,29 @@ semantics contract before admission to an exact route.
 See [FlatZincFloatPolicy](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincFloatPolicy.kt)
 and [FlatZincIntegerFloatImages](../klause/src/commonMain/kotlin/com/eignex/klause/formats/flatzinc/FlatZincIntegerFloatImages.kt).
 
+## MiniZinc output rendering
+
+`OznApplier` renders solver bindings through the parsed `.ozn` output model.
+Output integers, set elements, range endpoints and array indices retain signed
+64-bit values. Solver finite-set layouts keep their integer storage; the applier
+widens those elements at the rendering boundary. Integer arithmetic overflow and
+solver integer bindings outside signed 64-bit range raise `OznParseException`
+without publishing a partial solution block.
+
+`array1d` through `array6d` retain each contiguous integer index set and coerce
+source array elements in row-major order. Constructor cardinalities must match the
+flat element count; subscripts must match the dimension count and lie within every
+axis before computing a flat offset. Explicit integer sets used as indices must be
+contiguous. One-argument `array1d` and one-dimensional concatenation rebase indices
+to `1..length`.
+
+Ranges remain symbolic for display and membership. Array axis cardinalities and
+shape products must fit a signed 32-bit list size. Eager range expansion, array
+literals, set accumulation, comprehension output and single-generator Cartesian
+products are limited to 1,000,000 elements; one-dimensional concatenation and 2D
+rendering row counts use the same limit. Unsupported sizes, invalid constructors
+and invalid subscripts raise `OznParseException`.
+
 ## SMT-LIB
 
 The frontend supports quantifier-free linear integer and real arithmetic, including

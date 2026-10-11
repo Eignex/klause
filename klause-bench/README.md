@@ -388,15 +388,26 @@ array cells. Duplicate, unknown, missing, malformed and out-of-domain coordinate
 violated constraints and incorrect objectives are rejected. Compact variable/value
 forms are outside this checking surface. Reified/soft constraints, multiple
 objectives, unsupported checker callbacks, oversized integer coordinates and the
-ten-second/512 MiB checker subprocess limit leave checking `unknown`. Before the
-pinned checker's signed 32-bit direct-sum callbacks run, a range guard checks each
-assigned product and running total, including constant and variable coefficients.
-Overflow leaves checking `unknown`, even if later terms cancel it. The source
-parser expands array lists, groups, slides and blocks for this guard. Expression
-sum lists and logical meta-constraints are outside the guard's supported surface
-and leave checking `unknown`; it does not certify arithmetic in other callbacks.
+ten-second/512 MiB checker subprocess limit leave checking `unknown`. An arithmetic guard admits only audited callbacks before
+the pinned checker runs.
+It checks signed integer task endpoints, cumulative loads at task boundaries,
+bin-packing loads, ordered offsets and knapsack products/totals with exact integers.
+Direct sums require every assigned product and running total to fit a signed
+integer, including constant and variable coefficients. The source parser expands
+array lists, groups, slides and blocks for these checks.
 
-XCSP records use `validationPolicy=xcsp3-source-witness-v2` and
+Supported expression trees are evaluated with `BigInteger` and compared with the
+pinned evaluator, including its normalized intension tree. Matching cancellation
+results remain checkable; any disagreement or unsupported operation leaves checking
+`unknown`. Supported expressions include integer arithmetic (except powers),
+comparisons and Boolean operators. Hybrid extension tuples, set expressions, powers, expression sums,
+logical meta-constraints, flow, channel, element, circuit and indexed extrema
+remain outside the audited surface. Direct variable objectives retain the pinned
+checker's exact sum/product/minimum/maximum/distinct-value aggregates; expression
+objectives require the same exact arithmetic agreement. Nonconstant objective
+coefficients and expression integers above 4096 bits leave checking `unknown`.
+
+XCSP records use `validationPolicy=xcsp3-source-witness-v3` and
 `sourceValidationScope=xcsp3-source`; `sourceValidationChecker` identifies the
 pinned checker. `sourceHashes` binds the original plain source before solving
 and is checked for stability during validation. `finalWitness` and
