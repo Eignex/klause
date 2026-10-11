@@ -3,7 +3,6 @@ package com.eignex.klause.formats.flatzinc
 import com.eignex.klause.formats.minizinc.*
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.util.IntArrayList
 
 /** Renders solver samples through a parsed `.ozn` template. */
 class OznApplier(oznSource: String) {
@@ -54,11 +53,11 @@ class OznApplier(oznSource: String) {
     )
 
     private fun setBindingFrom(layout: SetVarLayout, sample: FlatZincValues): OznValue.SetV {
-        val present = IntArrayList()
+        val present = ArrayList<Long>()
         for (i in layout.elements.indices) {
-            if (sample.boolValue(layout.indicatorBoolIds[i])) present.add(layout.elements[i])
+            if (sample.boolValue(layout.indicatorBoolIds[i])) present.add(layout.elements[i].toLong())
         }
-        return OznValue.SetV(present.toIntArray().map { it.toLong() }.toLongArray())
+        return OznValue.SetV(present.toLongArray())
     }
 
     private fun arrayBindingFrom(arr: FlatZincArray, sample: FlatZincValues): OznValue = when (arr) {
@@ -68,7 +67,9 @@ class OznApplier(oznSource: String) {
 
         is FlatZincArray.FloatParam -> OznValue.ArrayV(arr.values.map { OznValue.FloatV(it) })
 
-        is FlatZincArray.IntSetParam -> OznValue.ArrayV(arr.values.map { OznValue.SetV(it.map { value -> value.toLong() }.toLongArray()) })
+        is FlatZincArray.IntSetParam -> OznValue.ArrayV(
+            arr.values.map { values -> OznValue.SetV(LongArray(values.size) { values[it].toLong() }) },
+        )
 
         is FlatZincArray.SetVars -> OznValue.ArrayV(arr.layouts.map { setBindingFrom(it, sample) })
 
