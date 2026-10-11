@@ -96,8 +96,9 @@ it; grading probes do not advance it.
 Additional targets use ordinary index inverse repairs and complete move grading; nested
 Element and literal-channel index definitions retain the first-candidate neighborhood.
 Source-driven strategies collect these supplemental repairs separately from primary
-candidates. After configuration and tabu filtering, an alternative enters the score-only
-pool only when its complete score strictly improves on the best surviving primary
+candidates. After configuration and tabu filtering, primary improving moves retain
+priority. If no primary candidate improves the complete score, an alternative enters
+the score-only pool only when it strictly improves on the best surviving primary
 candidate. Equal or worse alternatives do not affect primary noise draws or tie breaking.
 Each pool retains its bounded Element-preserving probe allowance. Direct repair consumers
 retain all bounded alternatives for their own complete grading.

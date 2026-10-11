@@ -24,8 +24,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -67,6 +67,32 @@ class SourceDrivenStrategyTest {
                 assertEquals(states[0].rng.nextLong(), states[1].rng.nextLong(), "noise=$noise")
             }
         }
+    }
+
+    @Test
+    fun `productive primary Element repairs retain priority over alternatives`() {
+        val problem = Problem(
+            0, 2, arrayOf(IntDomain(0, 3).excludeValue(2), IntDomain(9, 9)),
+            arrayOf<Factor>(
+                Element(0, 1, longArrayOf(0, 9, 0, 9), false, 0),
+                Linear(longArrayOf(1), intArrayOf(0), LinearOp.NE, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 0)
+        state.assignment.setInt(1, 9)
+        state.recompute()
+        val before = state.cost
+        val strategy = SourceDrivenStrategy(
+            sources = listOf(ConfiguredSource(ViolatedRepairs.SINGLE)),
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
+        )
+
+        val move = strategy.pickMove(state)
+        state.apply(assertNotNull(move))
+
+        assertEquals(Move.IntSet(0, 1), move)
+        assertTrue(state.cost < before)
     }
 
     @Test
