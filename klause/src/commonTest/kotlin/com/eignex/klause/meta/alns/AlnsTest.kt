@@ -44,6 +44,22 @@ import kotlin.test.assertTrue
 class AlnsTest {
 
     @Test
+    fun `default destroy operators preserve an empty finite projection`() {
+        val problem = Problem(0, 0, emptyArray(), emptyList<Factor>()).bake()
+        val sample = Sample(BooleanArray(0), LongArray(0))
+        val objective = LinearObjective()
+
+        val destroyed = DestroyOperator.Defaults.map {
+            it.destroy(Random(17), problem, sample, objective, 0.5)
+        }
+
+        for (freed in destroyed) {
+            assertEquals(0, freed.bools.size)
+            assertEquals(0, freed.ints.size)
+        }
+    }
+
+    @Test
     fun `complete bootstrap resumes one search until its first incumbent`() {
         val problem = selectProblem()
         val sample = selectOptimum()

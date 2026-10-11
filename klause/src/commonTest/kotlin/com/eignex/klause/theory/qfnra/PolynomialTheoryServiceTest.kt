@@ -13,6 +13,21 @@ import kotlin.test.assertIs
 
 class PolynomialTheoryServiceTest {
     @Test
+    fun `query bounds cannot replace fixed source coordinates`() {
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (assert true)")
+        val service = PolynomialTheoryService(source.formula, 0, 1, mapOf(0 to BigFraction.ONE))
+        val contradictory = PolynomialCondition(
+            lower = mapOf(0 to BigFraction.ofLong(2)), upper = mapOf(0 to BigFraction.ofLong(2)),
+        )
+
+        service.invocation().use { invocation ->
+            assertIs<QfNraResult.Unsatisfiable>(invocation.check(contradictory))
+            val witness = assertIs<QfNraResult.Satisfiable>(invocation.check()).assignment
+            assertEquals(BigFraction.ONE, witness.realValue(0).rational)
+        }
+    }
+
+    @Test
     fun `conditioned queries isolate finite pins`() {
         val source = SmtLibPolynomial.parse("""
             (declare-const x Real)
