@@ -46,7 +46,7 @@ class ResumableSatisfactionTest {
 
     @Test
     fun `resuming preserves native learning and deduction counters`() {
-        val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+        val solver = BacktrackSolver(pigeonhole(4, 3).bake())
         val params = BacktrackParams(randomSeed = 1L)
         val complete = solver.solve(params)
 

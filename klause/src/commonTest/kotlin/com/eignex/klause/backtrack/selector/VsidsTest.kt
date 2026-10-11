@@ -29,8 +29,11 @@ class VsidsTest {
             val selector = object : VariableSelector by base {
                 override fun fresh(): VariableSelector = this
 
-                override fun pick(session: PropagationSession, rng: Random): VarRef? =
-                    base.pick(session, rng)?.also(picks::add)
+                override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                    val selected = if (picks.size == 1) VarRef.Bool(1) else base.pick(session, rng)
+                    if (picks.isEmpty()) base.onConflict(VarRef.Bool(2), Unsat())
+                    return selected?.also(picks::add)
+                }
             }
             val problem = Problem(
                 5, 0, emptyArray(), arrayOf(
