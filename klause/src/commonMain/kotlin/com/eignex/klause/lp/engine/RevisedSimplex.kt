@@ -142,27 +142,28 @@ internal class RevisedSimplex(
     /** Devex reference weights γ_i per basic row position (approximate ‖B⁻ᵀeᵢ‖²); all 1 at a fresh
      *  reference frame, reset on every refactorization. */
     private val gamma = DoubleArray(m) { 1.0 }
-    private val dualRhs = DoubleArray(m)
-    private val dualValues = DoubleArray(m)
-    private val qualityRhs = DoubleArray(m)
-    private val basicRhs = DoubleArray(m)
-    private val boundChange = DoubleArray(m)
+    private val workspace = SimplexWorkspace(m, numVars)
+    private val dualRhs = workspace.dualRhs
+    private val dualValues = workspace.dualValues
+    private val qualityRhs = workspace.qualityRhs
+    private val basicRhs = workspace.basicRhs
+    private val boundChange = workspace.boundChange
     private val pricingOrder = IntArray(numVars)
     private val pricingScratch = IntArray(numVars)
-    private val dualBeta = DoubleArray(m)
-    private val primalBeta = DoubleArray(m)
-    private val phaseOneBeta = DoubleArray(m)
-    private val phaseOneGradient = DoubleArray(m)
-    private val phaseOneDuals = DoubleArray(m)
-    private val alphaValues = DoubleArray(m)
-    private val pivotRowEntries = DoubleArray(numVars)
-    private val enteringRatios = DoubleArray(numVars)
-    private val eligibleColumns = IntArrayList(numVars)
-    private val eligibleOrdered = IntArray(numVars)
-    private val theoryColumns = IntArrayList(numVars)
-    private val touchedColumns = IntArray(numVars)
-    private val columnEpochs = IntArray(numVars)
-    private val reconcileQueue = IntArrayList(m)
+    private val dualBeta = workspace.dualBeta
+    private val primalBeta = workspace.primalBeta
+    private val phaseOneBeta = workspace.phaseOneBeta
+    private val phaseOneGradient = workspace.phaseOneGradient
+    private val phaseOneDuals = workspace.phaseOneDuals
+    private val alphaValues = workspace.alphaValues
+    private val pivotRowEntries = workspace.pivotRowEntries
+    private val enteringRatios = workspace.enteringRatios
+    private val eligibleColumns = workspace.eligibleColumns
+    private val eligibleOrdered = workspace.eligibleOrdered
+    private val theoryColumns = workspace.theoryColumns
+    private val touchedColumns = workspace.touchedColumns
+    private val columnEpochs = workspace.columnEpochs
+    private val reconcileQueue = workspace.reconcileQueue
 
     /**
      * The LP's columns with the logical ones explicit, fixed for this engine's lifetime.
@@ -407,11 +408,11 @@ internal class RevisedSimplex(
     // kept when the same one comes back to [BasisSolver.update], which is what makes an update cost
     // one FTRAN. So the entering spike and the pivotal row each keep a vector of their own, and the
     // dual/rhs solves keep theirs, rather than sharing one and defeating that.
-    private val spikeVec = IndexedVector(m)
-    private val pricingSpikeVec = IndexedVector(m)
-    private val pivotEtaVec = IndexedVector(m)
-    private val rhsVec = IndexedVector(m)
-    private val dualVec = IndexedVector(m)
+    private val spikeVec = workspace.spikeVec
+    private val pricingSpikeVec = workspace.pricingSpikeVec
+    private val pivotEtaVec = workspace.pivotEtaVec
+    private val rhsVec = workspace.rhsVec
+    private val dualVec = workspace.dualVec
 
     /**
      * Nonzeros in the basis matrix `B` — `Σ_t nnz(A_{basicVar(t)})`, maintained across pivots.
@@ -1565,7 +1566,7 @@ internal class RevisedSimplex(
         val elig = eligibleColumns
         val eligOrdered = eligibleOrdered // scratch for the ratio-ordered permutation of [elig]
         val theoryCandidates = theoryColumns
-        columnEpochs.fill(0)
+        workspace.beginDualPass()
         var epoch = 0
         // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
         // back its bound. The buffer is reused, and holds the last iterate the loop completed.

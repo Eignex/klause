@@ -445,6 +445,21 @@ and report spread. Kernel, pivot or allocation improvements alone do not establi
 complete-solve gains. Inspect retained arm failures and quarantine separately;
 independent witness checks do not by themselves verify optimality/refutation.
 
+### LP lifecycle comparison
+
+[scripts/lp-lifecycle](scripts/lp-lifecycle/) measures the complete CP bounding consumer
+across a fixed 21-state push/pop trace, with retained and fresh numerical owners.
+The checker independently validates source bounds, primal values, objectives and lower
+bounds using a vertex oracle, and requires every owner to close. See
+[LP capture/replay](../docs/lp/replay.md) for the trace and measurement contract.
+
+`-PlpLifecycleCli=/absolute/path/to/klause-cli-jvm` selects an installed distribution
+for the comparison task. Build pinned distributions with `:klause-cli:installJvmDist`
+and retain their build/runtime provenance. Use identical comparator classes, trace,
+allowances, JVM options and machine when comparing revisions. Match source outcomes
+and numerical work before comparing phase allocations and timing; these measurements
+do not establish full tree-search or whole-CLI gains. Keep raw measurements externally.
+
 ## Profiling
 
 `profile=cpu|wall|alloc` writes `build/bench-prof.jfr` and prints a flat method table.
