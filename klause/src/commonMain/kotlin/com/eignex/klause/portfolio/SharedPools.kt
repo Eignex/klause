@@ -16,7 +16,7 @@ import com.eignex.klause.solver.incumbent.Verification
 
 /**
  * The cross-arm sharing channels handed to every backtrack arm of one portfolio: the learned-clause
- * pool ([clauses], always on for a non-LS portfolio), the global-cut pool ([cuts], gated by
+ * pool ([clauses], present with multiple backtrack workers), the global-cut pool ([cuts], gated by
  * [PortfolioScenario.shareCuts], on by default), the objective lower-bound manager ([bounds]), the
  * globally-valid level-0 variable-bound manager ([varBounds]), and the verified-incumbent exchange
  * ([solutions]) — the last three present for an optimising portfolio. Each may be null when its sharing
