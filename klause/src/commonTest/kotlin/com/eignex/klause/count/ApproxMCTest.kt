@@ -112,7 +112,7 @@ class ApproxMCTest {
             session.pop()
             assertEquals(6L, session.approximateCount(config).estimate)
         }
-        assertEquals(3, model.rootIntDomain(0).size)
+        assertEquals(3L, model.rootIntDomain(0).valueCount)
     }
 
     private fun assertWithinBand(exact: Long, estimate: Long, eps: Double) {
