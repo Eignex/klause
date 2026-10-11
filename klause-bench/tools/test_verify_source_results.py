@@ -64,6 +64,20 @@ class ProofCheckTest(unittest.TestCase):
                     with self.assertRaisesRegex(AssertionError, 'fixture: ' + purpose + ', got unknown; reason: timeout'):
                         self.check(case, '(declare-const x Real) (assert (>= x 0))')
 
+    def test_complete_satisfaction_witness_avoids_incremental_search(self):
+        for proven in (False, True):
+            with self.subTest(proven=proven):
+                solver = z3.Solver()
+                case = self.case(kind='satisfy', objective=None, proven=proven,
+                                 finalWitness='((define-fun x () Real 1))')
+                with mock.patch.object(proof_check.z3, 'Solver', return_value=solver), \
+                        mock.patch.object(solver, 'push', side_effect=AssertionError('incremental search started')), \
+                        mock.patch.object(solver, 'pop', side_effect=AssertionError('incremental scope popped')):
+                    result = self.check(case, '(declare-const x Real) (assert (>= x 0))')
+
+                self.assertEqual(result['verdictCheck'], 'source sat')
+                self.assertEqual(result['witness'], 'exact source feasible')
+
     def test_progress_preserves_completed_and_cached_records_before_a_failure(self):
         first = self.case(kind='satisfy', objective=None, proven=False,
                           finalWitness='((define-fun x () Real 1))')
