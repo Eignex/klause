@@ -441,7 +441,19 @@ class LocalSearchStateTest {
 
             state.moveSink.addChannelingIntSet(state, 0, 1)
 
-            assertEquals(listOf(Move.IntSet(0, 1)), state.moveSink.list, grade)
+            val root = Move.IntSet(0, 1)
+            val rejected = Move.Compound(listOf(root, Move.IntSet(3, 3)))
+            assertEquals(listOf(root), state.moveSink.list, grade)
+            if (grade == "raw") {
+                assertEquals(state.netDelta(root), state.netDelta(rejected))
+            } else {
+                assertTrue(state.netDelta(rejected) < state.netDelta(root), grade)
+            }
+            when (grade) {
+                "new-break" -> assertEquals(1, state.breakScore(rejected))
+                "weighted" -> assertTrue(state.weightedNetDelta(rejected) > state.weightedNetDelta(root))
+                "objective" -> assertEquals(3.0, state.objectiveDelta(assertNotNull(state.shaping.objective), rejected))
+            }
             assertEquals(before, state.assignment.snapshot(), grade)
             assertContentEquals(degrees, state.factorDegree, grade)
             assertContentEquals(payloads, state.longPayload, grade)
@@ -525,6 +537,33 @@ class LocalSearchStateTest {
                 assertEquals(0L, state.cost)
             }
         }
+    }
+
+    @Test
+    fun `violated Element extensions retain existing satisfied selection variants`() {
+        val problem = Problem(
+            0, 5, arrayOf(IntDomain(0, 1), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                Element(0, 1, longArrayOf(3, 4), true, 0),
+                Element(0, 2, longArrayOf(3, 4), true, 0),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(1, 1)
+        state.assignment.setInt(2, 2)
+        state.assignment.setInt(3, 1)
+        state.recompute()
+        val before = state.assignment.snapshot()
+
+        state.moveSink.addChannelingIntSet(state, 0, 1)
+        val variant = state.moveSink.list.filterIsInstance<Move.Compound>().single()
+
+        assertEquals(listOf(Move.IntSet(0, 1), Move.IntSet(4, 1)), variant.parts)
+        assertEquals(before, state.assignment.snapshot())
+        state.apply(variant)
+        assertEquals(0, state.factorDegree[1])
+        assertEquals(1L, state.cost)
     }
 
     @Test
