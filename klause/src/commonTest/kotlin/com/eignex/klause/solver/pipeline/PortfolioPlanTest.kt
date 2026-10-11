@@ -23,13 +23,48 @@ import kotlin.test.assertTrue
 class PortfolioPlanTest {
 
     @Test
+    fun `automatic sequential clausal satisfaction uses one arm per family`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+        val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
+
+        val resolved = clausalDefaultScenario(scenario, profile, autoArms(1), explicitArms = false)
+
+        assertEquals(2, resolved.arms)
+    }
+
+    @Test
+    fun `explicit counts and recipes retain the requested pool size`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP)
+        val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
+        val controls = listOf(
+            scenario.copy(cores = 2),
+            scenario.copy(kind = Kind.COP),
+            scenario.copy(engine = EngineMix.BACKTRACK),
+            scenario.copy(btPool = listOf { BacktrackCatalog.byLabel("clausal-balanced") }),
+            scenario.copy(lsPool = listOf { LocalSearchCatalog.byLabel("probsat/plain") }),
+            scenario.copy(btEdit = { it }),
+            scenario.copy(annotationArm = BacktrackParams()),
+        )
+
+        for (control in controls) {
+            assertEquals(control.arms,
+                clausalDefaultScenario(control, profile, autoArms(1), explicitArms = false).arms)
+        }
+        assertEquals(6, clausalDefaultScenario(scenario, profile, autoArms(1), explicitArms = true).arms)
+        assertEquals(6, clausalDefaultScenario(scenario,
+            profile.copy(problemClass = ProblemClass.PseudoBoolean), autoArms(1), explicitArms = false).arms)
+        assertEquals(12, clausalDefaultScenario(scenario.copy(arms = 12),
+            profile, 12, explicitArms = false).arms)
+    }
+
+    @Test
     fun `curated sequential clausal satisfaction reserves complete proof time`() {
         val scenario = PortfolioScenario.sequential(Kind.CSP)
         val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
 
         val shares = clausalProofShares(scenario, profile, listOf("ls/probsat/plain", "bt/clausal-balanced"))
 
-        assertEquals(listOf(0.0, 0.85), shares.toList())
+        assertEquals(listOf(0.0, 0.9), shares.toList())
     }
 
     @Test

@@ -40,17 +40,18 @@ object BacktrackCatalog {
         BacktrackPresets.satOptimized(randomSeed = seed, onEvent = onEvent)
     }
 
-    private fun clausal(arm: BacktrackArm, decay: Double) = BacktrackRecipe(arm.label) { seed, onEvent ->
-        BacktrackPresets.satOptimized(randomSeed = seed, inprocess = false, onEvent = onEvent).copy(
-            variableSelector = Vsids(decay = decay),
-            valueSelector = IndomainMax,
-            targetPhasing = false,
-            adaptiveRestart = false,
-            emaRestart = true,
-            maxLearnedClauses = 2000,
-            pbLearning = false,
-        )
-    }
+    private fun clausal(arm: BacktrackArm, decay: Double, maxLearned: Int = 2000) =
+        BacktrackRecipe(arm.label) { seed, onEvent ->
+            BacktrackPresets.satOptimized(randomSeed = seed, inprocess = false, onEvent = onEvent).copy(
+                variableSelector = Vsids(decay = decay),
+                valueSelector = IndomainMax,
+                targetPhasing = false,
+                adaptiveRestart = false,
+                emaRestart = true,
+                maxLearnedClauses = maxLearned,
+                pbLearning = false,
+            )
+        }
 
     /** LastConflict + VSIDS + solution-guided values — the general-COP bound workhorse. */
     private fun conflictDriven() = BacktrackRecipe("conflictDriven") { seed, onEvent ->
@@ -158,7 +159,7 @@ object BacktrackCatalog {
      *  Keeps [BacktrackArm.label] and the produced recipe's [BacktrackRecipe.label] in lockstep. */
     private fun make(arm: BacktrackArm): BacktrackRecipe = when (arm) {
         BacktrackArm.SatOptimized -> satOptimized()
-        BacktrackArm.ClausalBalanced -> clausal(arm, 0.975)
+        BacktrackArm.ClausalBalanced -> clausal(arm, 0.975, maxLearned = 4000)
         BacktrackArm.ClausalStable -> clausal(arm, 0.99)
         BacktrackArm.ConflictDriven -> conflictDriven()
         BacktrackArm.LpAggressive -> lpArm(LpEmphasis.AGGRESSIVE)

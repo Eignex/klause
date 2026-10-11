@@ -479,27 +479,20 @@ internal class NativeSatState(private val state: PropagationState) {
 
     /** A non-false literal index other than the two watched ([lIdx], [otherIdx]); -1 if none. */
     private fun findNonFalse(lits: IntArray, start: Int, len: Int, lIdx: Int, otherIdx: Int, scanStart: Int): Int {
-        var checked = 0L
+        if (len == 2) return -1
+        if (len == 3) {
+            val remaining = 3 - lIdx - otherIdx
+            return if (!litFalse(lits[start + remaining])) remaining else -1
+        }
         for (k in scanStart until len) {
             if (k == lIdx || k == otherIdx) continue
-            checked++
-            val lit = lits[start + k]
-            if (boolTruth[Lit.variable(lit)].toInt() != 1 + (lit and 1)) {
-                state.work += checked
-                return k
-            }
+            if (!litFalse(lits[start + k])) return k
         }
         // Backtracking can reopen a prefix that an earlier scan passed while every literal was false.
         for (k in 0 until scanStart) {
             if (k == lIdx || k == otherIdx) continue
-            checked++
-            val lit = lits[start + k]
-            if (boolTruth[Lit.variable(lit)].toInt() != 1 + (lit and 1)) {
-                state.work += checked
-                return k
-            }
+            if (!litFalse(lits[start + k])) return k
         }
-        state.work += checked
         return -1
     }
 

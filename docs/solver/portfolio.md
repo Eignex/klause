@@ -195,17 +195,21 @@ pruning remain explicit plan options. Root cuts follow the resolved plan. Curate
 satisfaction workers require an explicit `lp-root-cuts=true` override to harvest root
 cuts; explicit pools retain their requested root-cut plans.
 
-The clausal complete-search recipes use clause learning, EMA restarts, a 2000-clause
-database and a true-first saved phase, without pseudo-Boolean learning or inprocessing.
-Their balanced and stable variants use VSIDS decay 0.975 and 0.99. Curated
+The clausal complete-search recipes use clause learning, EMA restarts and a true-first
+saved phase, without pseudo-Boolean learning or inprocessing. Their balanced and stable
+variants use VSIDS decay 0.975 and 0.99, with database caps of 4000 and 2000. Curated
 admission requires a clausal model; pseudo-Boolean models retain their cutting-plane
 palette.
 
 Clausal satisfaction leads its complete-search slots with the balanced recipe. A
-curated sequential mixed pool reserves 85% of active time for that worker after the
+curated sequential mixed pool reserves 90% of active time for that worker after the
 initial probes: a refutation emits no incumbent progress from which family rewards
 could predict the approaching proof. Explicit pools, parameter edits and search
-annotations retain unreserved scheduling. The configured arm count is preserved.
+annotations retain unreserved scheduling. Automatic single-core mixed clausal
+satisfaction uses one local-search and one complete arm, avoiding probe time and clause
+exchange between redundant complete workers. Explicit arm counts, named or edited
+pools, annotations, custom fallback counts and parallel execution retain their
+configured pool size. CLI property and environment arm counts are explicit overrides.
 
 Clausal satisfaction leads its curated local-search slots with fixed-break probSAT,
 using tabu tenure 10 and an improving aspiration rule without a strategy restart
