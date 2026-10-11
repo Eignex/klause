@@ -4,13 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpCapture
+import com.eignex.klause.lp.engine.LpExactCapture
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveMetrics
-import com.eignex.klause.lp.engine.LpReplayEvent
 import com.eignex.klause.lp.engine.LpReplaySettings
 import com.eignex.klause.lp.engine.LpReplaySolverKind
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -27,7 +26,7 @@ import com.eignex.klause.util.Cancellation
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
 
-private const val EXPECTED_CAPTURE = "deb7c8bb9b3c744e71b31893b7abd1c1f1b8511d8edeecda8f965566e6d4c648"
+private const val EXPECTED_CAPTURE = "a2913b8157272acf0f0244dc8cc2ba81d4b4802e3a99a63eec09425d76f6d4e4"
 private const val COMPARISON_WORK_LIMIT = 1_000_000L
 private val xLower = SearchDecision.IntAtLeast(0, 0)
 private val yLower = SearchDecision.IntAtLeast(1, 2)
@@ -158,9 +157,9 @@ private inline fun <T> measured(block: () -> T): Pair<T, Measurement> {
 }
 
 private fun digest(model: LpModel): String {
-    val bytes = LpCapture.capture(
-        model,
-        LpReplaySettings("wave2-model-fingerprint", 0L, LpReplaySolverKind.PERSISTENT, false),
+    val bytes = LpExactCapture.capture(
+        checkNotNull(model.exactState).model,
+        LpReplaySettings("cp-lifecycle-state", 0L, LpReplaySolverKind.PERSISTENT, false),
         emptyList(),
     ).encode()
     return sha256(bytes)
@@ -271,18 +270,9 @@ private fun runArm(arm: String, repetition: Int, sequence: List<State>): List<Ob
 fun main() {
     val sequence = states()
     val reference = runArm("retained", -1, sequence)
-    val events = listOf<LpReplayEvent>(LpReplayEvent.Solve()) + reference.drop(1).flatMap { state ->
-        listOf(
-            LpReplayEvent.Rebind(longArrayOf(state.lowerX, state.lowerY), longArrayOf(state.upperX, state.upperY)),
-            LpReplayEvent.ResolveBounds(),
-        )
-    }
-    val capture = LpCapture.capture(
-        reference.first().model,
-        LpReplaySettings("wave2-cp-producer-21", 21L, LpReplaySolverKind.PERSISTENT, false),
-        events,
-    )
-    val captureHash = sha256(capture.encode())
+    val captureHash = sha256(reference.joinToString("\n") {
+        "${bounds(it).joinToString(",")}|${digest(it.model)}"
+    }.toByteArray())
     check(captureHash == EXPECTED_CAPTURE) { "consumer trace drift: $captureHash" }
     println("LP_LIFECYCLE_CAPTURE|$captureHash|${sequence.size}")
     val coldWarmup = runArm("cold", -1, sequence)

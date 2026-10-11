@@ -8,7 +8,7 @@ from collections import defaultdict
 from fractions import Fraction
 from pathlib import Path
 
-CAPTURE = "deb7c8bb9b3c744e71b31893b7abd1c1f1b8511d8edeecda8f965566e6d4c648"
+CAPTURE = "a2913b8157272acf0f0244dc8cc2ba81d4b4802e3a99a63eec09425d76f6d4e4"
 PHASES = ("setup", "transition", "assembly", "solveNode", "certification", "disposal")
 
 
