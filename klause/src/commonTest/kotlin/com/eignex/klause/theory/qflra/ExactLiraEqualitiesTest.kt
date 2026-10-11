@@ -24,6 +24,40 @@ import kotlin.test.assertNull
 
 class ExactLiraEqualitiesTest {
     @Test
+    fun `negative signed comparisons preserve their direction and complemented source reasons`() {
+        for ((operator, bound, truth) in listOf(
+            Triple(LinearOp.LE, 0, false), Triple(LinearOp.GE, 0, true),
+            Triple(LinearOp.LE, 4, true), Triple(LinearOp.GE, 4, false),
+            Triple(LinearOp.EQ, 2, true), Triple(LinearOp.NE, 2, false),
+        )) {
+            val open = Bits(3).also { for (variable in 0..2) it.set(variable) }
+            val source = Problem(
+                3,
+                intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3), open, open),
+                factors = arrayOf(
+                    ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.NE, 3),
+                    ReifiedLinear(1, intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 4),
+                    ReifiedLinear(2, intArrayOf(-2, -2), intArrayOf(0, 2), operator, bound),
+                ),
+            )
+            val propagation = ExactLiraEqualities(source, source.factors.map { factor ->
+                factor.linearRows.map { it.exactForm(0) }
+            }) { _, _ -> ComponentResult.Consistent }
+            val session = SearchSession(emptyList())
+            session.push(SearchDecision.Bool(Lit.make(0, false)))
+            session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertIs<ComponentResult.Consistent>(propagation.propagate(session, Cancellation.Never))
+
+            assertEquals(truth, session.boolValue(2))
+            assertEquals(
+                setOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, truth)),
+                session.reasonFor(2)?.literals?.toSet(),
+            )
+        }
+    }
+
+    @Test
     fun `a signed disequality path excludes a translated comparison and retracts`() {
         val open = Bits(4).also { for (variable in 0..3) it.set(variable) }
         val source = Problem(

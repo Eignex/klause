@@ -189,7 +189,8 @@ internal class ExactLiraEqualities(
             val terms = LinkedHashMap<Int, BigFraction>()
             if (row.target != zero) terms[row.target] = BigFraction.ONE
             if (row.source != zero) {
-                terms[row.source] = (terms[row.source] ?: BigFraction.ZERO) - BigFraction.ofLong(row.sourceSign.toLong())
+                terms[row.source] = (terms[row.source] ?: BigFraction.ZERO) -
+                    BigFraction.ofLong(row.sourceSign.toLong())
             }
             ExactComparison(terms, row.bound, row.op, row.strict, hasReals = false) to row.activator
         }
