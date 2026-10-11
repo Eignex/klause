@@ -561,24 +561,25 @@ class ExactLiraSearchComponent(
             realDifference?.let { graph ->
                 if (!context.consumeCheck()) return ComponentResult.Indeterminate
                 checked = true
-                val floating = lp.solveFloat()?.second
-                if (operationStop()) return ComponentResult.Indeterminate
-                when (val result = floating?.let { graph.check(bools, operationStop, it.primal) }) {
-                    null -> Unit
+                when (val result = graph.check(bools, operationStop)) {
                     RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
                     // Shared LP explanations keep conflict learning on the same source proof surface.
                     RealDifferenceSystem.Result.Infeasible -> Unit
                     is RealDifferenceSystem.Result.Feasible -> {
-                        if (bools.any { it == UNASSIGNED }) {
-                            dirty = false
-                            return ComponentResult.Consistent
-                        }
-                        candidate = result.point
-                        acceptWitness(result.point)?.let {
-                            assignment = it
-                            outcome = ComponentCheck.Feasible
-                            dirty = false
-                            return ComponentResult.Consistent
+                        val floating = lp.solveFloat()
+                        if (operationStop()) return ComponentResult.Indeterminate
+                        if (floating?.second != null) {
+                            if (bools.any { it == UNASSIGNED }) {
+                                dirty = false
+                                return ComponentResult.Consistent
+                            }
+                            candidate = result.point
+                            acceptWitness(result.point)?.let {
+                                assignment = it
+                                outcome = ComponentCheck.Feasible
+                                dirty = false
+                                return ComponentResult.Consistent
+                            }
                         }
                         if (operationStop()) return ComponentResult.Indeterminate
                     }
