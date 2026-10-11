@@ -130,8 +130,8 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
         for (b in conflict.bools) bumpBool(h, b)
         for (i in conflict.ints) bumpInt(h, i)
         when (varRef) {
-            is VarRef.Bool -> bumpBool(h, varRef.varId)
-            is VarRef.IntVar -> bumpInt(h, varRef.varId)
+            is VarRef.Bool -> if (varRef.varId !in conflict.bools) bumpBool(h, varRef.varId)
+            is VarRef.IntVar -> if (varRef.varId !in conflict.ints) bumpInt(h, varRef.varId)
             null -> Unit
         }
         // Grow the increment for the next conflict — implicit multiplicative decay of

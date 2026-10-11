@@ -17,9 +17,23 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class VsidsTest {
+
+    @Test
+    fun `an attributed failed decision receives one activity bump`() {
+        val session = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()))
+        val vsids = Vsids()
+        val rng = Random(0)
+        vsids.onUnassign(assertNotNull(vsids.pick(session, rng)))
+        vsids.onConflict(VarRef.Bool(2), Unsat())
+
+        vsids.onConflict(VarRef.Bool(0), Unsat(conflictBools = intArrayOf(0, 2)))
+
+        assertEquals(VarRef.Bool(2), vsids.pick(session, rng))
+    }
 
     @Test
     fun `finite search prioritizes a conflict implication after its backjump`() {
