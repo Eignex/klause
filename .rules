@@ -2,6 +2,14 @@
 
 Kotlin Multiplatform constraint solver.
 
+## Gradle modules and publishing
+
+- Do not expand the set of Maven Central published modules or artifacts because of
+  Maven Central publishing limits. Keep published library implementation within the
+  existing published modules.
+- Additional non-published Gradle modules are allowed, such as `klause-bench`.
+  Explicitly disable publication for them (`eignexPublish { publish.set(false) }`).
+
 ## PR validation
 
 Opening and pushing a PR does not require a local `./gradlew check lintDocs` gate.
