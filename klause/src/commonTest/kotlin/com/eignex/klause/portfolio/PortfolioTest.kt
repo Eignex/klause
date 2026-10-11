@@ -25,6 +25,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
@@ -35,6 +36,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.ownSearch
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchStats
@@ -165,7 +167,7 @@ private class ScriptedSearch(
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? {
         onSlice()
-        spent += sliceNodes.coerceAtLeast(0L)
+        spent += if (sliceNodes < 0L) 1L else sliceNodes
         if (offers(slices++)) {
             repeat(perSlice) {
                 objective -= 1.0
@@ -207,17 +209,22 @@ class PortfolioTest {
 
     @Test
     fun `a caught reseed close failure retires the arm and retains its incumbent`() {
+        var slices = 0
         val sample = Sample(BooleanArray(0), LongArray(0))
         val handle = TrackingResumableSearch(
             null,
             MinimizeResult.BestFound(sample, 0.0, TerminationReason.BudgetExhausted),
+            onRun = { slices++ },
             closeFailure = "close failure",
         )
+        val spending = object : ResumableSearch by handle {
+            override val work: Long get() = slices.toLong()
+        }
 
         val result = Portfolio.thompson(
-            listOf(trackingWorker("failed", 7, handle).also { it.family = ArmFamily.LocalSearch }),
+            listOf(trackingWorker("failed", 7, spending).also { it.family = ArmFamily.LocalSearch }),
             reseedStaleThreshold = 1,
-        ).use { it.minimize() }
+        ).use { it.minimize(Cancellation { slices >= 3 }) }
 
         assertEquals(sample, assertIs<MinimizeResult.BestFound>(result).sample)
         val arm = result.stats.portfolio.arms.single()
@@ -1090,6 +1097,99 @@ class PortfolioTest {
                 assertEquals(if (threshold == 0) 0L else 12L / threshold, result.stats.portfolio.arms.single().reseeds)
             }
         }
+    }
+
+    @Test
+    fun `zero work pauses do not count as plateau segments`() {
+        for (restarting in listOf(false, true)) {
+            var slices = 0
+            val handle = TrackingResumableSearch(
+                null, MinimizeResult.BestFound(
+                    Sample(BooleanArray(0), LongArray(0)), 0.0, TerminationReason.BudgetExhausted,
+                ), onRun = { slices++ },
+            )
+            val worker = trackingWorker("paused", 0, handle).also {
+                it.family = if (restarting) ArmFamily.Backtrack else ArmFamily.LocalSearch
+                it.restartingSearch = restarting
+            }
+
+            val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = 1).use {
+                it.minimize(Cancellation { slices >= 6 })
+            }
+
+            assertEquals(0L, result.stats.portfolio.arms.single().reseeds)
+        }
+    }
+
+    @Test
+    fun `bounded preparation retains pending search across plateau slices`() {
+        for (threshold in listOf(1, 3)) {
+            var slices = 0
+            val worker = PortfolioWorker.ofMinimize(
+                "preparing", 0, resumable = {
+                    val source = ScriptedSearch({ it == 0 || it == 5 }) { slices++ }
+                    ownSearch(object : ResumableSearch by source, ReseedGuard {
+                        override val canReseed: Boolean get() = slices >= 6
+                    }) {}
+                },
+            ) { _, _, _, _ -> error("the retained handle must resume") }
+                .also { it.restartingSearch = true }
+
+            val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
+                it.minimize(Cancellation { slices >= 6 })
+            }
+
+            assertEquals(998.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
+        }
+    }
+
+    @Test
+    fun `productive bounded preparation finishes before returning to the bandit`() {
+        val slices = IntArray(2)
+        val source = ScriptedSearch({ it == 0 || it == 5 }) { slices[0]++ }
+        val preparing = ownSearch(object : ResumableSearch by source, ReseedGuard {
+            override val canReseed: Boolean get() = slices[0] >= 6
+            override val canContinuePreparation: Boolean get() = slices[0] < 6
+        }) {}
+        val workers = listOf(
+            trackingWorker("preparing", 0, preparing),
+            trackingWorker("preferred", 1, ScriptedSearch({ false }) { slices[1]++ }),
+        )
+        val bandit = object : UnivariateBandit {
+            override val nbrArms = 2
+            override val random = Random(0)
+            override fun choose() = 1
+            override fun update(armIndex: Int, value: Double, weight: Double) = Unit
+            override fun reset() = Unit
+        }
+
+        val result = Portfolio(workers, bandit).use {
+            it.minimize(Cancellation { slices.sum() >= 8 })
+        }
+
+        assertEquals(998.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
+        assertEquals(listOf(6, 2), slices.toList())
+    }
+
+    @Test
+    fun `minimum shares precede productive preparation continuation`() {
+        val slices = IntArray(2)
+        val source = ScriptedSearch({ it == 0 || it == 5 }) { slices[0]++ }
+        val preparing = ownSearch(object : ResumableSearch by source, ReseedGuard {
+            override val canReseed: Boolean get() = false
+            override val canContinuePreparation: Boolean get() = true
+        }) {}
+        val workers = listOf(
+            trackingWorker("preparing", 0, preparing),
+            trackingWorker("reserved", 1, ScriptedSearch({ false }) { slices[1]++ }),
+        )
+
+        val result = Portfolio.thompson(workers, minShares = doubleArrayOf(0.0, 1.0)).use {
+            it.minimize(Cancellation { slices.sum() >= 8 })
+        }
+
+        assertEquals(999.0, assertIs<MinimizeResult.BestFound>(result).objectiveValue)
+        assertEquals(listOf(1, 7), slices.toList())
     }
 
     @Test

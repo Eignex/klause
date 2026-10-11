@@ -18,6 +18,8 @@ internal class SliceBudget(
     private val lpWork: () -> Long,
     private val propagationWork: () -> Long = { 0L },
     preparation: SliceBudget? = null,
+    // A containing budget already charges cumulative work and repays overspend for private searches.
+    private val ownsWorkDebt: Boolean = true,
 ) {
     /** The armed slice's wall-clock end; null before the first slice. */
     var deadline: TimeSource.Monotonic.ValueTimeMark? = null
@@ -48,14 +50,24 @@ internal class SliceBudget(
         deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         workBounded = sliceNodes >= 0L
         nodeEnd = nodeCount() + sliceNodes.coerceAtLeast(0L)
+        if (!ownsWorkDebt) {
+            lpWorkMark = lpWork()
+            propagationWorkMark = propagationWork()
+        }
         charge()
         if (!workBounded) return true
+        if (!ownsWorkDebt) return nodeEnd > nodeCount()
         val repaid = minOf(nodeDebt, sliceNodes)
         nodeDebt -= repaid
         nodeEnd -= repaid
         if (nodeEnd > nodeCount()) return true
         nodeDebt += nodeCount() - nodeEnd
         return false
+    }
+
+    fun remainingNodes(): Long {
+        charge()
+        return if (workBounded) (nodeEnd - nodeCount()).coerceAtLeast(0L) else -1L
     }
 
     /** Work spent so far: nodes plus LP and propagation work, charged or not. */
@@ -85,7 +97,7 @@ internal class SliceBudget(
     fun noteOverspend() {
         if (!workBounded) return
         charge()
-        nodeDebt += (nodeCount() - nodeEnd).coerceAtLeast(0L)
+        if (ownsWorkDebt) nodeDebt += (nodeCount() - nodeEnd).coerceAtLeast(0L)
     }
 }
 

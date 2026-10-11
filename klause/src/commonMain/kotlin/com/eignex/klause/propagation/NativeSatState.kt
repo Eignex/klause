@@ -255,6 +255,10 @@ internal class NativeSatState(private val state: PropagationState) {
     /** Literals of learned clause [i] as a fresh array, for glue export and introspection. */
     fun literalsOf(i: Int): IntArray = clauseLits(baseCount + i)
 
+    fun literalCountOf(i: Int): Int = clauseLen(baseCount + i)
+
+    fun variableOf(i: Int, k: Int): Int = Lit.variable(litOf(baseCount + i, k))
+
     fun forEachBinaryPartner(lit: Int, action: (Int) -> Unit) {
         val entries = watchEntries[lit]
         for (i in 0 until watchSizes[lit]) {

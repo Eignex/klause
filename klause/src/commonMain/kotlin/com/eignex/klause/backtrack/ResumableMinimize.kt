@@ -28,6 +28,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
@@ -112,13 +113,17 @@ internal class ResumableMinimize(
     private val pausable: Boolean = true,
     // Repair owns the handle across fragment terminals and explicitly closes it after the final fragment.
     private val rebindable: Boolean = false,
+    // A containing search charges private work and owns its overspend debt.
+    private val ownsWorkDebt: Boolean = true,
     initialCandidate: Sample? = null,
     private val problem: BakedProblem = solver.problem,
     preparedSession: PropagationSession? = null,
     preparationBudget: SliceBudget? = null,
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
-) : ResumableSearch {
+) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
+    override val canReseed: Boolean get() = clausePrimal?.isDone != false
+    override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
     private var replaced = false
 
@@ -160,11 +165,15 @@ internal class ResumableMinimize(
     private val startMark = TimeSource.Monotonic.markNow()
 
     // The allowance includes LP and propagation work so costly nodes consume proportionally more of a slice.
+    private var clausePrimal: MonotoneClausePrimal? = null
+    private var clausePrimalStarted = false
+    private var clausePrimalCandidate: Sample? = null
     private val slice = SliceBudget(
-        { sink.search.searchWork },
+        { sink.search.searchWork + (clausePrimal?.work ?: 0L) },
         { lpEngine.totalSolveWork() + sink.lp.standaloneWork },
         { session.work },
         preparationBudget,
+        ownsWorkDebt = ownsWorkDebt,
     )
 
     private fun sliceCancelled(): Boolean = solveCancelled() || (pausable && sliceExpired())
@@ -355,6 +364,7 @@ internal class ResumableMinimize(
         done?.let { return it }
         check(!closed) { "search is closed" }
         globalToken = global
+        publishClausePrimalCandidate()?.let(onIncumbent)
         if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
@@ -394,6 +404,7 @@ internal class ResumableMinimize(
             next,
             freshParams.copy(assumptions = rootPins.mergedWith(freshParams.assumptions)),
             pausable,
+            ownsWorkDebt = ownsWorkDebt,
             initialCandidate = sample,
             problem = root,
         )
@@ -413,9 +424,14 @@ internal class ResumableMinimize(
         closed = true
         var failure: Throwable? = null
         try {
-            lpEngine.close()
+            clausePrimal?.close()
         } catch (closeFailure: Throwable) {
             failure = closeFailure
+        }
+        try {
+            lpEngine.close()
+        } catch (closeFailure: Throwable) {
+            failure?.addSuppressed(closeFailure) ?: run { failure = closeFailure }
         }
         try {
             leafSolver?.close()
@@ -502,6 +518,35 @@ internal class ResumableMinimize(
             done?.let { return StepEvent.Terminal(it) }
             check(!closed) { "search is closed" }
             if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
+            if (!clausePrimalStarted) {
+                clausePrimalStarted = true
+                if (!rebindable && initialCandidate == null && externalCutoff() == Double.POSITIVE_INFINITY) {
+                    val remaining = runDeadline()?.let {
+                        (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds
+                    } ?: params.solveBudgetMillis ?: 10_000L
+                    clausePrimal = MonotoneClausePrimal.create(
+                        solver, objective, params, runEndToken(), minOf(remaining / 2L, 5_000L).coerceAtLeast(0L),
+                    )
+                    if (clausePrimal != null) sink.search.clausalPrimalStarts++
+                }
+            }
+            clausePrimal?.let { primal ->
+                if (clausePrimalCandidate == null) {
+                    val millis = slice.deadline?.let {
+                        (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
+                    } ?: 5_000L
+                    clausePrimalCandidate = primal.advance(millis, if (pausable) slice.remainingNodes() else -1L)
+                    sink.search.clausalPrimalTrials = primal.trials
+                    sink.search.clausalPrimalModels = primal.models
+                    sink.search.clausalPrimalProposals = primal.proposals
+                    sink.search.clausalPrimalRejected = primal.rejected
+                    sink.search.clausalPrimalInfeasible = primal.infeasible
+                    sink.search.clausalPrimalIncomplete = primal.incomplete
+                }
+                publishClausePrimalCandidate()?.let { return StepEvent.Incumbent(it) }
+                if (!primal.isDone && pausable && sliceCancelled()) return StepEvent.Paused
+                if (primal.isDone) primal.close()
+            }
             if (firstRun) {
                 firstRun = false
                 firstRunWork()?.let { return StepEvent.Incumbent(it) }
@@ -715,8 +760,20 @@ internal class ResumableMinimize(
         return recordIfImproving(accepted.assignment, accepted.objective)
     }
 
-    private fun verifiedLpProposal(proposal: Sample): Candidate<Sample, Double>? {
-        val budget = params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
+    private fun publishClausePrimalCandidate(): MinimizeResult.WithSample? {
+        val proposal = clausePrimalCandidate ?: return null
+        clausePrimalCandidate = null
+        val accepted = verifiedLpProposal(proposal, runEndToken()) ?: return null
+        val published = recordIfImproving(accepted.assignment, accepted.objective) ?: return null
+        sink.search.clausalPrimalAccepted++
+        return published
+    }
+
+    private fun verifiedLpProposal(
+        proposal: Sample,
+        cancellation: Cancellation = params.cancellation,
+    ): Candidate<Sample, Double>? {
+        val budget = cancellation or Cancellation.after(LP_VERIFY_BUDGET)
         val verifier = ComposedSampleVerifier(problem, objective, budget)
         val verdict = verifier.verify(Candidate(proposal, objective.evaluate(proposal)))
         return (verdict as? Verification.Accepted)?.candidate

@@ -122,4 +122,43 @@ class SliceBudgetTest {
 
         assertTrue(slice.expired())
     }
+
+    @Test
+    fun `nested search repays overspend only through its owning budget`() {
+        var nodes = 0L
+        val owner = SliceBudget({ nodes }, { 0L })
+        val nested = SliceBudget({ nodes }, { 0L }, ownsWorkDebt = false)
+        owner.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 2L)
+        nested.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = owner.remainingNodes())
+        nodes = 5L
+        nested.noteOverspend()
+        owner.noteOverspend()
+
+        assertFalse(owner.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 2L))
+        assertTrue(owner.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 2L))
+        assertTrue(nested.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = owner.remainingNodes()))
+        nodes++
+
+        assertTrue(nested.expired())
+        assertTrue(owner.expired())
+    }
+
+    @Test
+    fun `nested propagation charges only work within its current slice`() {
+        var work = 5L * PROPAGATION_WORK_PER_NODE
+        val owner = SliceBudget({ 0L }, { 0L }, { work })
+        val nested = SliceBudget({ 0L }, { 0L }, { work }, ownsWorkDebt = false)
+        assertFalse(owner.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 2L))
+        assertFalse(owner.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 2L))
+        assertTrue(owner.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = 2L))
+        assertTrue(nested.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = owner.remainingNodes()))
+
+        work += PROPAGATION_WORK_PER_NODE
+        nested.charge()
+        owner.charge()
+
+        assertTrue(nested.expired())
+        assertTrue(owner.expired())
+    }
+
 }

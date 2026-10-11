@@ -24,7 +24,7 @@ internal object WcnfMode : CliMode {
             val parsed = Dimacs.parseWcnf(openFileSource(path)).toProblem(common.config.problemSettings())
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: vars=${parsed.numOriginalBoolVars} " +
-                    "soft=${parsed.problem.numBoolVars - parsed.numOriginalBoolVars} factors=${parsed.problem.numFactors}"
+                    "auxiliaries=${parsed.problem.numBoolVars - parsed.numOriginalBoolVars} factors=${parsed.problem.numFactors}"
             }
             val render: (Sample) -> String = { s -> renderWcnfModel(parsed.numOriginalBoolVars, s) }
             // MaxSAT minimises the weight of falsified soft clauses.

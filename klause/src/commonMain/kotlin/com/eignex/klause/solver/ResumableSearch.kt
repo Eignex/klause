@@ -91,6 +91,11 @@ interface ResumableSearch : AutoCloseable {
     override fun close() {}
 }
 
+internal interface ReseedGuard {
+    val canReseed: Boolean
+    val canContinuePreparation: Boolean get() = false
+}
+
 /**
  * An [Optimizer] whose search state can be paused and resumed across slices, such as
  * [com.eignex.klause.backtrack.BacktrackSolver] and [com.eignex.klause.localsearch.LocalSearchSolver].
