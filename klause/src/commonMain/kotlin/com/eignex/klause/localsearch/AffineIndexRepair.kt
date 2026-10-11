@@ -91,7 +91,7 @@ internal class AffineIndexRepair(
         coordinated.carryBinaryChannels(state, sink)
         val move = coordinated.toMove()
         val before = sink.size
-        sink.addCompound(if (move is Move.Compound) move.parts else listOf(move))
+        sink.addChannelingCompound(state, if (move is Move.Compound) move.parts else listOf(move))
         return sink.size > before
     }
 

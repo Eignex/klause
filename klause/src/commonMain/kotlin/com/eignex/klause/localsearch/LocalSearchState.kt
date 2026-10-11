@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.randomValue
@@ -38,6 +39,8 @@ private const val REAL_REFRESH_INTERVAL: Int = 4096
 
 // Bits of the widest anchored draw: values within about a million of the anchor.
 private const val ANCHOR_BITS: Int = 20
+
+private const val MAX_PRESERVED_ELEMENT_SELECTIONS: Int = 32
 
 /**
  * Mutable state of an ongoing solve. Owns the [Assignment], the violated-factor set, the
@@ -124,6 +127,9 @@ class LocalSearchState(
         problem.factors.indices.filter { problem.factors[it] is Cumulative }.toIntArray()
     }
     private var cumulativeFractions: DoubleArray = EmptyDoubleArray
+    private val hasVariableElements: Boolean by lazy(LazyThreadSafetyMode.NONE) {
+        problem.factors.any { it is Element && it.arrIsVars }
+    }
 
     /** DDFW-style per-invariant dynamic weights and their class-normalised baseline. */
     val weights: FactorWeightBook = FactorWeightBook(problem)
@@ -673,6 +679,60 @@ class LocalSearchState(
         return fraction
     }
 
+    internal fun elementPreservingMove(move: Move, eligibility: MoveSink): Move? {
+        if (cost == 0L || probeActive || !hasVariableElements) return null
+        val repairs = evaluateMove(move, elementEligibility = eligibility).elementRepairs ?: return null
+        if (repairs.isEmpty()) return null
+        val parts = if (move is Move.Compound) move.parts else listOf(move)
+        return Move.Compound(parts + repairs)
+    }
+
+    private fun elementPreservingRepairs(eligibility: MoveSink): List<Move>? {
+        val targets = LinkedHashMap<Int, Long>()
+        val considered = IntHashSet()
+        for (i in 0 until probeSlots.size) {
+            val slot = probeSlots[i]
+            if (slot < problem.numBoolVars || slot >= problem.numBoolVars + problem.numIntVars) continue
+            if (probeValue(slot) == savedValuesScratch[i]) continue
+            val variable = slot - problem.numBoolVars
+            for (fid in projection.intOccurrences[variable]) {
+                val element = problem.factors[fid] as? Element ?: continue
+                if (!element.arrIsVars || element.idx != variable || !considered.add(fid)) continue
+                if (considered.size > MAX_PRESERVED_ELEMENT_SELECTIONS) return null
+                val wasViolated = if (probeTouched[fid]) probeWasViolated[fid] else factorDegree[fid] > 0
+                if (wasViolated) continue
+                if (!preserveElementTarget(element, eligibility, targets)) return null
+            }
+        }
+        return targets.filter { (variable, value) -> assignment.intValue(variable) != value }
+            .map { (variable, value) -> Move.IntSet(variable, value) }
+    }
+
+    private fun preserveElementTarget(
+        element: Element,
+        eligibility: MoveSink,
+        targets: MutableMap<Int, Long>,
+    ): Boolean {
+        val index = assignment.intValue(element.idx)
+        if (index < element.indexOffset || index >= element.indexOffset.toLong() + element.arr.size) return false
+        val cell = element.arr[(index - element.indexOffset).toInt()].toInt()
+        val value = savedIntValue(element.result)
+        val previous = targets[cell]
+        if (previous != null && previous != value) return false
+        targets[cell] = value
+        if (assignment.intValue(cell) == value) return true
+        if (value !in rootDomains[cell] || !eligibility.allowsInt(cell) ||
+            problem.numBoolVars + cell in probeSlotSet
+        ) return false
+        return true
+    }
+
+    private fun savedIntValue(variable: Int): Long {
+        val slot = problem.numBoolVars + variable
+        for (i in 0 until probeSlots.size) if (probeSlots[i] == slot) return savedValuesScratch[i]
+        return assignment.intValue(variable)
+    }
+
     private fun cumulativeFraction(factorId: Int): Double {
         val extra = intPayload[factorId].toLong() - violationSoftCap
         if (extra <= 0L) return 0.0
@@ -996,6 +1056,7 @@ class LocalSearchState(
         objective: Objective? = null,
         refineCumulative: Boolean = false,
         weightedResidual: Boolean = false,
+        elementEligibility: MoveSink? = null,
     ): MoveEval {
         val oldCost = cost
         val oldBestCost = bestCostSeen
@@ -1046,7 +1107,8 @@ class LocalSearchState(
             }
             val breaks = if (move is Move.Compound) newlyViolated else breakCount
             val cumulativeDelta = if (refineCumulative) cumulativeFractionDelta(weightedResidual) else 0.0
-            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta)
+            val elementRepairs = elementEligibility?.let { elementPreservingRepairs(it) }
+            return MoveEval(breaks, makeCount, delta, weighted, objectiveDelta, cumulativeDelta, elementRepairs)
         } finally {
             breakProbeActive = false
             restoreProbeCoordinates()
@@ -1097,6 +1159,7 @@ class LocalSearchState(
         val weightedNetDelta: Double,
         val objectiveDelta: Double,
         val cumulativeDelta: Double,
+        val elementRepairs: List<Move>?,
     )
 
     // Reconcile exact degrees independently of apply status deltas; fused updates avoid a second degree read.

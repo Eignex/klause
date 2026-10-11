@@ -30,6 +30,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on first compound move
     private var compounds: ArrayList<Move.Compound>? = null
     private var cachedList: List<Move>? = null
+    private var elementPreservingProbes: Int = 0
 
     /** Materialized [Move] view. Stable across reads until the sink is mutated.
      *  Compound moves follow primitives in the iteration order. */
@@ -185,6 +186,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         compounds = null
         cachedList = null
         proposer = NO_PROPOSER
+        elementPreservingProbes = 0
     }
 
     /** Channeling-aware variant of [addIntSet]. Asks [state] to synthesize the coordinated
@@ -220,11 +222,12 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
                 }
             }
             val repair = extremumRepair(state, varId, newValue, ::allowsInt) ?: return
-            addCompound(repair.map { (input, target) -> Move.IntSet(input, target) })
+            addChannelingCompound(state, repair.map { (input, target) -> Move.IntSet(input, target) })
             return
         }
         if (assumptions.isFrozenInt(varId)) return
-        when (val m = state.synthesizeChannelingMove(varId, newValue)) {
+        val move = state.synthesizeChannelingMove(varId, newValue)
+        when (val m = move) {
             is Move.IntSet -> addIntSet(varId, newValue)
 
             is Move.Compound -> addCompound(m.parts)
@@ -234,6 +237,26 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
             // shouldn't happen but stay total
             is Move.RealSet -> addRealSet(m.varId, m.newValue)
         }
+        addElementPreservingVariant(state, move)
+    }
+
+    internal fun addChannelingCompound(state: LocalSearchState, parts: List<Move>) {
+        addCompound(parts)
+        if (parts.isNotEmpty()) {
+            addElementPreservingVariant(state, if (parts.size == 1) parts[0] else Move.Compound(parts))
+        }
+    }
+
+    private fun addElementPreservingVariant(state: LocalSearchState, move: Move) {
+        if (elementPreservingProbes >= MAX_ELEMENT_PRESERVING_PROBES) return
+        val parts = if (move is Move.Compound) move.parts else listOf(move)
+        if (touchesFrozen(parts)) return
+        val kept = withoutRedundantParts(parts)
+        if (kept.isEmpty()) return
+        elementPreservingProbes++
+        val base = if (kept.size == 1) kept[0] else Move.Compound(kept)
+        val variant = state.elementPreservingMove(base, this) as? Move.Compound ?: return
+        addCompound(variant.parts)
     }
 
     internal fun addElementIndexSet(state: LocalSearchState, varId: Int, newValue: Long): Boolean {
@@ -262,6 +285,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         const val NO_PROPOSER: Int = -1
 
         private const val INITIAL_CAPACITY: Int = 16
+        private const val MAX_ELEMENT_PRESERVING_PROBES: Int = 4
         private const val KIND_BIT: Long = 1L shl 63
         private const val REAL_BIT: Long = 1L shl 62
         private const val VAR_MASK: Long = (1L shl 31) - 1L

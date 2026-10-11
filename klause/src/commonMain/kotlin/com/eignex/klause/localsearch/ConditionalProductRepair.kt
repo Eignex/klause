@@ -80,7 +80,7 @@ internal class ConditionalProductRepair(
         coordinated.carryBinaryChannels(state, sink)
         val move = coordinated.toMove() as Move.Compound
         val before = sink.size
-        sink.addCompound(move.parts)
+        sink.addChannelingCompound(state, move.parts)
         return sink.size > before
     }
 
