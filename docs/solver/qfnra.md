@@ -95,8 +95,8 @@ to rational points or binary64 for publication.
 
 The pipeline's `OpenTheoryAssignment.ExactNra` preserves these values beside its
 linear rational witnesses. Its `algebraicRealValue(id)` extension follows source
-reconstruction wrappers without replacing the exact real coordinate. Rational
-coordinates retain reduced rational text; irrational text and the typed metadata
+reconstruction wrappers without replacing the exact real coordinate. Point-identified
+rational coordinates retain reduced rational text; other algebraic text and the typed metadata
 contract are defined in the [API contract](../api.md).
 
 ## Pipeline and frontend publication

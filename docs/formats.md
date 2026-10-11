@@ -201,18 +201,24 @@ The internal `SmtLibPolynomial.parse` entry point preserves pure Real/Bool polyn
 satisfaction sources separately from `SmtLib.parse` and its linear factors. It performs
 no theory selection and publishes no SAT/UNSAT result. Public `SmtLibAdmission.parse`
 first attempts the established linear facade. Only an explicit unsupported-syntax
-decline reopens the same source through polynomial lowering. Successful linear
-inputs retain their existing routes. Reopenable streamed inputs close each owned
-closeable source, or drain sources without a close contract before retrying.
-Cancellation returns `SmtLibInput.Interrupted` without publishing partial metadata.
+decline reopens the same source through polynomial lowering. Pure Real/Bool
+satisfaction sources with `define-fun` helpers use lexical polynomial lowering
+before legacy expansion can capture caller-local bindings. Other successful linear
+inputs retain their existing routes, including integer/mixed sources and objectives.
+Helper parameter/return sorts and explicit integer operations preserve integer syntax
+even when there is no declared integer variable.
+Reopenable streamed inputs close each owned closeable source, or drain active
+sources without a close contract before retrying. Cancellation stops that drain,
+prevents reopening, and returns `SmtLibInput.Interrupted` without publishing partial metadata.
 
 The polynomial admission publishes `ir.PolynomialRealProblem`, an opaque neutral
 snapshot of formula, original declaration identities and auxiliary counts. Its
 `pipelineRequest()` selects the complete polynomial theory. The CLI renders the
 common `OpenTheoryResult`; parsing and frontend code do not invoke the engine.
 Numeric conditional auxiliaries stay private and every original declaration receives
-an exact value, including unused declarations. Rational coordinates use exact SMT
-numerals/division. Irrational coordinates use `(root-obj p k)` with an exact integer
+an exact value, including unused declarations. Point-identified rational coordinates
+use exact SMT numerals/division. Other algebraic coordinates use `(root-obj p k)`
+with an exact integer
 defining polynomial and one-based distinct real-root index. Canonical names are
 quoted in the model. A negative SMT numeral is `(- n)`; a bare `-n` is a symbol.
 

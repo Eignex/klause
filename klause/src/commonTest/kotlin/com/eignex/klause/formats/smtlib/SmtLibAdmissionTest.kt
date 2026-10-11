@@ -108,6 +108,50 @@ class SmtLibAdmissionTest {
     }
 
     @Test
+    fun `interrupted admission does not drain a non closeable tail`() {
+        var reads = 0
+        var stopped = false
+        var opens = 0
+
+        val input = SmtLibAdmission.parse(
+            {
+                opens++
+                object : CharSource {
+                    override fun next(): String? {
+                        reads++
+                        stopped = true
+                        return "(declare-const x Real)"
+                    }
+                }
+            },
+            cancellation = Cancellation { stopped },
+        )
+
+        assertEquals(SmtLibInput.Interrupted, input)
+        assertEquals(1, opens)
+        assertEquals(1, reads)
+    }
+
+    @Test
+    fun `integer helper sources retain the linear route`() {
+        val input = SmtLibAdmission.parse(
+            "(declare-const x Int) (define-fun f ((y Int)) Int (+ y 1)) (assert (= (f x) 2)) (check-sat)",
+        )
+
+        assertIs<SmtLibInput.Linear>(input)
+    }
+
+    @Test
+    fun `integer helper sorts without integer declarations retain linear admission`() {
+        val input = SmtLibAdmission.parse(
+            "(define-fun f ((n Int)) Int (+ n 1)) (declare-const x Real) " +
+                "(assert (= x (to_real (f 2)))) (check-sat)",
+        )
+
+        assertIs<SmtLibInput.Linear>(input)
+    }
+
+    @Test
     fun `nonlinear mixed integer sources decline rather than entering polynomial theory`() {
         assertFailsWith<UnsupportedSmtException> {
             SmtLibAdmission.parse(

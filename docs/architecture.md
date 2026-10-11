@@ -56,7 +56,8 @@ checks proof-decline behavior at engine consumers.
 
 The exact LP projection of `QfLraRelaxation` belongs to the theory adapter, beside
 its source declarations. SMT syntax folding does not read theory or search state.
-`formats.smtlib.SmtLibAdmission` owns linear-first parsing and polynomial fallback.
+`formats.smtlib.SmtLibAdmission` owns linear-first parsing, lexical polynomial helper admission and
+polynomial fallback.
 Its opaque `ir.PolynomialRealProblem` retains neutral formula/declaration metadata.
 `solver.pipeline` selects and invokes the complete polynomial theory from that
 snapshot, and publishes the shared verdict and original exact coordinates. It has
