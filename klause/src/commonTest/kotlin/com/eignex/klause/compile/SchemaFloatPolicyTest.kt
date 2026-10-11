@@ -22,6 +22,18 @@ import kotlin.test.assertTrue
 
 class SchemaFloatPolicyTest {
     @Test
+    fun `constant strict contradiction remains false beside an exact component`() {
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, 3),
+            "row" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(), emptyList(), IntCmpOp.LT, 0.0)),
+        )).compile()
+
+        val result = BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 0))
+
+        assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
     fun `independent strict component preserves exact rational equalities`() {
         val compiled = SchemaDef<SchemaEntry>(mapOf(
             "exact" to FloatSpec(0.0, 1.0, 2),

@@ -271,8 +271,13 @@ are reconstructed, source variables pinned, then recompiled with the standard
 library and matching data seed. The pinned source objective is compared exactly.
 
 Authoritative rational coordinates travel as `% klause-exact: name = value;`
-comments beside decimal assignments and survive in `finalWitness`. An exact
-objective comment overrides decimal display. `sourceValidation` is `valid`,
+comments beside decimal assignments and survive in `finalWitness`. Mixed exact/grid
+witnesses use `% klause-coordinate:` with `% klause-float-component:` provenance;
+the grid coordinate is the exact binary64 value of the decoded point, not an exact
+source claim. An authoritative objective coordinate overrides decimal display.
+Pure grid witnesses use original MiniZinc source pinning. Mixed witnesses use the
+independent flattened-text checker across every component. The witness policy is
+`minizinc-source-witness-v3`. `sourceValidation` is `valid`,
 `invalid` or `unknown`; `sourceValidationScope` distinguishes `minizinc-source`
 from `flatzinc-binary64`. The independent flattened-text checker interprets float
 literals as exact binary64 rationals and checks supported predicates/bounds; it
