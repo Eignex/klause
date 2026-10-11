@@ -197,22 +197,20 @@ internal class NativeSatState(private val state: PropagationState) {
             }
         }
         if (w0 < 0) {
-            // Every literal false — an immediate conflict. Watch the first two so a later backtrack
-            // leaves the clause with valid watches.
-            setWatchPosition(h, 0, 0)
-            setWatchPosition(h, 1, 1)
-            addWatch(litOf(h, 0), h, litOf(h, 1))
-            addWatch(litOf(h, 1), h, litOf(h, 0))
+            val first = highestLevelLiteral(h)
+            val second = highestLevelLiteral(h, first)
+            setWatchPosition(h, 0, first)
+            setWatchPosition(h, 1, second)
+            addWatch(litOf(h, first), h, litOf(h, second))
+            addWatch(litOf(h, second), h, litOf(h, first))
             recordConflict(h)
             pendingConflict = true
             return h
         }
         val second = if (w1 >= 0) {
             w1
-        } else if (w0 == 0) {
-            1
         } else {
-            0
+            highestLevelLiteral(h, w0)
         }
         setWatchPosition(h, 0, w0)
         setWatchPosition(h, 1, second)
@@ -220,6 +218,22 @@ internal class NativeSatState(private val state: PropagationState) {
         addWatch(litOf(h, second), h, litOf(h, w0))
         if (w1 < 0 && !pinUnit(h, w0)) pendingConflict = true // exactly one open literal — assert it
         return h
+    }
+
+    // A false watch must retract with the deepest premise: otherwise a backjump can leave it false
+    // while an unwatched premise becomes open, and assigning that premise again misses a unit.
+    private fun highestLevelLiteral(h: Int, excluded: Int = -1): Int {
+        var best = -1
+        var level = -1
+        for (k in 0 until clauseLen(h)) {
+            if (k == excluded) continue
+            val candidate = state.boolLevel[Lit.variable(litOf(h, k))]
+            if (best < 0 || candidate > level) {
+                best = k
+                level = candidate
+            }
+        }
+        return best
     }
 
     private fun appendLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int): Int {

@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -35,6 +36,40 @@ class NativeSatForgetTest {
         session.pinBool(1, false)
 
         assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `learned unit propagates when its deepest premise is reassigned`() {
+        val session = session(4, or(0, true, 1, true))
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        session.pinBool(2, true)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false), Lit.make(3, true))), 2)
+        session.popToLevel(1)
+
+        session.pinBool(2, true)
+
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
+    fun `conflicting learned clause propagates after deeper premises retract`() {
+        val session = session(4, or(0, true, 1, true))
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        session.pinBool(2, true)
+        session.pinBool(3, false)
+        assertIs<PropagationResult.Unsat>(
+            session.addLearnedClause(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false), Lit.make(3, true))),
+                3,
+            ),
+        )
+        session.popToLevel(2)
+
+        session.pinBool(2, true)
+
+        assertEquals(true, session.boolValue(3))
     }
 
     @Test

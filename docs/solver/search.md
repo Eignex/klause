@@ -90,6 +90,11 @@ backjumps and restarts.
 Boolean-only models journal each pin's variable id and tag without integer-state padding.
 Mixed finite models retain aligned integer-state columns for domain retraction.
 
+Native learned unit clauses watch their asserting literal and the deepest false premise.
+An immediately conflicting learned clause watches its two deepest premises. Retraction
+therefore opens a watched premise before an unwatched premise can require a fresh unit
+deduction.
+
 Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights and
 its heap belong to the solve, retain conflict bumps across restarts, and apply bumps
 received before the first selection once during initialization. Fresh selectors isolate
