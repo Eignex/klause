@@ -103,6 +103,10 @@ class PropagationState(
     internal val boolAssigned: Bits = Bits(problem.numBoolVars)
     internal val boolValueBits: Bits = Bits(problem.numBoolVars)
 
+    // Native BCP reads one byte per lookup instead of testing two packed bitsets. All pin and
+    // undo writes mirror the canonical bits: 0 is open, 1 is false, and 2 is true.
+    internal val nativeBoolTruth: ByteArray? = if (usesNativeSat) ByteArray(problem.numBoolVars) else null
+
     /** Operator-indexable view preserving the call-site syntax `state.boolValues[v]` and
      *  `state.boolValues[v] = x`. Reads `null` when unassigned. Write `null` clears the
      *  assigned bit. The backing storage is the parallel-Bits pair above. */
@@ -120,10 +124,12 @@ class PropagationState(
         operator fun set(v: Int, value: Boolean?) {
             if (value == null) {
                 boolAssigned.clear(v)
+                nativeBoolTruth?.set(v, 0)
                 return
             }
             if (value) boolValueBits.set(v) else boolValueBits.clear(v)
             boolAssigned.set(v)
+            nativeBoolTruth?.set(v, (if (value) 2 else 1).toByte())
         }
     }
 
