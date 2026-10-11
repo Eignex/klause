@@ -5,98 +5,140 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import java.io.File
+import java.security.MessageDigest
+import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * The SMT-LIB reference. cp-sat has no SMT-LIB frontend, so quantifier-free linear-arithmetic
- * benchmarks are decided by z3 (a complete SMT solver) run as a native binary directly on the `.smt2`
- * file — no container, since z3 ships a self-contained executable. SMT-LIB benchmarks are decision
- * instances (no `(minimize`/`(maximize`), so a row records satisfiability (`sat` → feasible, `unsat`
- * → infeasible) and proves it whenever z3 returns a definitive verdict within budget; `unknown` or a
- * timeout is undecided. Rows are keyed by solver `z3`, coexisting with the cp-sat and clasp oracles.
- *
- * Mirrors [ClaspReference] (its own [ProcessBuilder], a watchdog that force-kills a runaway, a
- * wall-clock elapsed, a line-oriented parse) minus the Docker wrapping a native binary makes moot.
- */
 internal object Z3Reference {
-    /** The z3 executable, resolved from `PATH` by default; override with `-Dklause.bench.z3=/path/to/z3`. */
-    private val BINARY = System.getProperty("klause.bench.z3", "z3")
-
-    /** Hard per-run memory ceiling in MB (`z3 -memory:`), so one instance's blow-up can't exhaust the
-     *  host — the whole-corpus sweep runs many z3 in parallel. Overrun makes z3 abort (→ undecided,
-     *  which is fine for a reference). Override with `-Dklause.bench.z3.memoryMb=`. */
-    private val MEMORY_MB = System.getProperty("klause.bench.z3.memoryMb", "2048")
+    private val binary by lazy {
+        val requested = System.getProperty("klause.bench.z3", "z3")
+        val file = if (File(requested).isAbsolute || File(requested).parent != null) {
+            File(requested)
+        } else {
+            System.getenv("PATH").orEmpty().split(File.pathSeparator)
+                .map { File(it, requested) }.firstOrNull { it.isFile && it.canExecute() }
+                ?: error("z3 executable not found: $requested")
+        }
+        file.canonicalFile.also { require(it.isFile && it.canExecute()) { "not executable: $it" } }
+    }
+    private val memoryMb = System.getProperty("klause.bench.z3.memoryMb", "2048").toInt().also {
+        require(it > 0) { "z3 memory limit must be positive" }
+    }
     private const val EXIT_WAIT_MS = 5_000L
+    private const val POLICY = "smt-reference-v2"
+    private val options = listOf("-model", "sat.threads=1", "parallel.enable=false", "pp.decimal=false")
 
-    /** Whether a usable z3 is reachable (`z3 --version` exits 0). */
-    fun available(): Boolean = runCatching {
-        val p = ProcessBuilder(BINARY, "--version")
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-            .redirectError(ProcessBuilder.Redirect.DISCARD)
-            .start()
-        p.waitFor(EXIT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
-    }.getOrElse { false }
+    fun available(): Boolean = runCatching { NativeReference.available(binary.path) }.getOrDefault(false)
 
-    /** Decide [ref] (an SMT-LIB `.smt2`) with z3 under [budget]. Bounded so a whole-corpus parallel sweep
-     *  is safe: `-T:<sec>` caps wall-clock (z3 then answers `unknown`), `-memory:<MB>` caps RAM, and
-     *  `sat.threads=1 parallel.enable=false` keep it single-threaded (no fan-out per process). A watchdog
-     *  force-kills a run that ignores its own limits, so one solve can never hang or starve the box. A
-     *  compressed instance is decompressed to a staged copy before the clock starts. */
-    fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result =
-        CorpusFiles.withPlainFile(CorpusFetcher.resolve(ref.source)) { run(it, budget) }
-
-    private fun run(file: File, budget: Budget): SolverInvocation.Result {
-        val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
-        val cmd = listOf(
-            BINARY,
-            "-T:$timeoutSec",
-            "-memory:$MEMORY_MB",
-            "-smt2",
-            "sat.threads=1",
-            "parallel.enable=false",
-            file.absolutePath,
-        )
-        val startNanos = System.nanoTime()
-        val proc = ProcessBuilder(cmd).redirectErrorStream(false).start()
-        val watchdog = Thread {
-            runCatching {
-                if (!proc.waitFor(budget.timeoutMillis * 2 + 20_000, TimeUnit.MILLISECONDS)) {
-                    proc.destroyForcibly()
+    private val build by lazy {
+        val proc = ProcessBuilder(binary.path, "--version").redirectErrorStream(true).start()
+        try {
+            check(proc.waitFor(EXIT_WAIT_MS, TimeUnit.MILLISECONDS)) { "z3 version timed out" }
+            check(proc.exitValue() == 0) { "z3 version failed" }
+            val version = proc.inputStream.bufferedReader().readText().trim()
+            val digest = MessageDigest.getInstance("SHA-256")
+            binary.inputStream().use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
                 }
             }
-        }.apply {
-            isDaemon = true
-            start()
+            val hash = digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it) }
+            "$version|sha256=$hash"
+        } finally {
+            if (proc.isAlive) proc.destroyForcibly()
         }
-        val stdout = proc.inputStream.bufferedReader().readText()
-        proc.waitFor(EXIT_WAIT_MS, TimeUnit.MILLISECONDS)
-        watchdog.interrupt()
-        val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
-        return parse(stdout, elapsedMs, cmd)
     }
 
-    /** z3 prints the check-sat answer as a bare `sat` / `unsat` / `unknown` line. Map the last such
-     *  line to the [SolverInvocation.Result] the reference sweep scores: SMT-LIB benchmarks are decision problems,
-     *  so `sat`/`unsat` is a proof (no objective) and `unknown`/timeout is undecided. */
-    internal fun parse(stdout: String, elapsedMs: Long, cmd: List<String>): SolverInvocation.Result {
+    fun identity(): String = "$build|memoryMb=$memoryMb|${options.joinToString(",")}|$POLICY"
+
+    fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result =
+        CorpusFiles.withPlainFile(CorpusFetcher.resolve(ref.source)) { file ->
+            val identity = identity()
+            val cmd = listOf(
+                binary.path, "-T:${(budget.timeoutMillis / 1000).coerceAtLeast(1)}", "-memory:$memoryMb", "-smt2",
+            ) + options + file.absolutePath
+            val startNanos = System.nanoTime()
+            val proc = ProcessBuilder(cmd).start()
+            proc.outputStream.close()
+            val stderr = StringBuilder()
+            val drain = Thread { proc.errorStream.bufferedReader().use { stderr.append(it.readText()) } }.apply {
+                isDaemon = true
+                start()
+            }
+            val killed = AtomicBoolean(false)
+            val watchdog = Thread {
+                runCatching {
+                    if (!proc.waitFor(budget.timeoutMillis * 2 + 20_000, TimeUnit.MILLISECONDS)) {
+                        killed.set(true)
+                        proc.destroyForcibly()
+                    }
+                }
+            }.apply {
+                isDaemon = true
+                start()
+            }
+            try {
+                val stdout = proc.inputStream.bufferedReader().use { it.readText() }
+                proc.waitFor()
+                drain.join()
+                val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000
+                parse(stdout, elapsedMs, cmd, stderr.toString(), proc.exitValue(), killed.get()).let { result ->
+                    result.copy(stats = result.stats + mapOf(
+                        "referenceVersion" to identity,
+                        "referenceBinary" to binary.path,
+                        "referenceModelFormat" to "root-obj-requested",
+                        "referenceValidation" to "solver-reported",
+                    ))
+                }
+            } finally {
+                watchdog.interrupt()
+                if (proc.isAlive) proc.destroyForcibly()
+            }
+        }
+
+    internal fun parse(
+        stdout: String,
+        elapsedMs: Long,
+        cmd: List<String>,
+        stderr: String = "",
+        exitCode: Int = 0,
+        killed: Boolean = false,
+    ): SolverInvocation.Result {
         val verdict = stdout.lineSequence().map { it.trim() }
             .lastOrNull { it == "sat" || it == "unsat" || it == "unknown" }
-        val feasible = when (verdict) {
+        val error = stdout.lineSequence().any { it.trimStart().startsWith("(error ") }
+        val status = when {
+            killed || stdout.lineSequence().any { it.trim() == "timeout" } -> "timeout"
+            error -> "error"
+            exitCode != 0 && verdict != "unknown" -> "error"
+            else -> verdict ?: "error"
+        }
+        val feasible = when (status) {
             "sat" -> true
             "unsat" -> false
             else -> null
         }
-        val proven = verdict == "sat" || verdict == "unsat"
         val timeMs = elapsedMs.takeIf { feasible == true }
         return SolverInvocation.Result(
             feasible = feasible,
-            objective = null, // SMT-LIB benchmarks are decision instances — no optimisation objective
+            objective = null,
             elapsedMs = elapsedMs,
             timeToBestMs = timeMs,
             timeToFirstFeasibleMs = timeMs,
-            proven = proven,
-            // Seconds, so [BenchCli.solveReference] derives the proof/first-feasible time uniformly.
-            stats = mapOf("solveTime" to (elapsedMs / 1000.0).toString(), "maximize" to "false"),
+            proven = feasible != null,
+            stats = buildMap {
+                put("solveTime", (elapsedMs / 1000.0).toString())
+                put("maximize", "false")
+                put("referenceStatus", status)
+                put("referenceExitCode", exitCode.toString())
+                put("referenceWatchdogKilled", killed.toString())
+                put("referenceStderr", stderr)
+                if (status == "error") put("referenceError", "solver output or exit did not establish a verdict")
+            },
             rawOutput = stdout,
             command = cmd.joinToString(" "),
         )

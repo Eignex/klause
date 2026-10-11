@@ -25,6 +25,7 @@ Packages below are under `com.eignex.klause` in
 | `formats` | Parsing and lowering source syntax | Uses shared lowering; no compiler or concrete theory dependency |
 | `factor` | Constraint semantics and factor operations | Supplies mechanisms used by propagation, relaxations and search |
 | `propagation` | Finite domains, explanations and incremental propagators | May use immutable arithmetic representations |
+| `arithmetic.polynomial` | Exact sparse polynomials, elimination determinants and rational real-root isolation | Only `arithmetic.polynomial`, `simplex.exact` and `util`; no model or solver state |
 | `arithmetic.difference` | Difference constraints, extraction and non-incremental graph operations | No propagation or search state |
 | `simplex.exact` | Rational arithmetic and exact feasibility primitives | Reusable numerical mechanism |
 | `simplex.basis` | Sparse floating and rational basis operations | Numerical types, `util` and koblas; no search policy |
@@ -62,6 +63,30 @@ in `klause`. The `lp.lattice` package owns integer reductions and triangular bou
 with internal input/result interfaces; it reads only neutral `util` primitives.
 Package dependency checks enforce its independence from model and solver state.
 Numerical tests run with the solver's JVM and Native tests.
+
+`arithmetic.polynomial` captures exact rational coefficients and nonnegative integer
+variable IDs in immutable sparse polynomials. Ascending IDs define lexicographic
+monomial ordering; the largest variable ID is the main variable. Callers remap IDs
+to select another elimination order. Bareiss elimination computes resultants and
+principal subresultant coefficients, indexed from zero through one less than the
+smaller degree; leading coefficients remain separately accessible. Zero resultants
+retain their shared-factor meaning. Rational univariate Euclidean division,
+square-free decomposition and Sturm sequences isolate distinct ordered real roots,
+including repeated and rational roots. Zero polynomials reject finite root-list
+requests; nonzero constants have no roots. Root intervals have exact rational
+endpoints and contain one root; equal endpoints identify an exact rational root.
+Nonpoint intervals exclude endpoint roots.
+
+Polynomial contexts charge and poll the invocation's `Cancellation` between
+coefficient operations and elimination steps. Interruption throws
+`PolynomialInterrupted` without publishing a partial mathematical result. Inputs,
+polynomials and completed intervals outlive the context and never retain mutable
+producer buffers. Dense coefficient expansion defaults to at most 65,536 entries
+and elimination matrices to at most 262,144 cells per allocation. Callers can
+configure these invocation limits; null disables either cap within the checked
+integer representation. A checked `PolynomialResourceLimit` identifies
+dense expansion, matrix allocation or degree overflow before allocating or
+truncating data; this is a resource decline, never a mathematical verdict.
 
 The [library API contract](api.md) classifies supported, experimental and implementation
 surfaces and defines typed mapping and migration boundaries.

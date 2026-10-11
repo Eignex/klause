@@ -68,7 +68,9 @@ internal object ReferenceSolve {
         val cacheTag = when (ref.format) {
             Format.XCSP3 -> "$id-xcsp3|${Xcsp3CpSatReference.identity()}|p${settings.processors}"
 
-            Format.DIMACS, Format.OPB, Format.WCNF, Format.SMTLIB -> id
+            Format.SMTLIB -> if (id == "z3") "$id|${Z3Reference.identity()}" else id
+
+            Format.DIMACS, Format.OPB, Format.WCNF -> id
 
             // An MPS result also depends on the solver's build, its options and how its claim is checked: a change to
             // any of them must not replay a result judged under the old ones.

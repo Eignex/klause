@@ -1,0 +1,25 @@
+# Frozen version 1 membership. Source hashes: smoke-corpus/qfnra-v1/manifest.json
+smtlib-qfnra-holdout-v1/boolean/branch-3-sat
+smtlib-qfnra-holdout-v1/boolean/branch-3-unsat
+smtlib-qfnra-holdout-v1/boolean/branch-5-sat
+smtlib-qfnra-holdout-v1/boolean/branch-5-unsat
+smtlib-qfnra-holdout-v1/boolean/branch-7-sat
+smtlib-qfnra-holdout-v1/boolean/branch-7-unsat
+smtlib-qfnra-holdout-v1/circle/intersection-3-sat
+smtlib-qfnra-holdout-v1/circle/intersection-5-sat
+smtlib-qfnra-holdout-v1/circle/intersection-7-sat
+smtlib-qfnra-holdout-v1/circle/outside-3-unsat
+smtlib-qfnra-holdout-v1/circle/outside-5-unsat
+smtlib-qfnra-holdout-v1/circle/outside-7-unsat
+smtlib-qfnra-holdout-v1/singular/nullified-3-sat
+smtlib-qfnra-holdout-v1/singular/nullified-3-unsat
+smtlib-qfnra-holdout-v1/singular/nullified-5-sat
+smtlib-qfnra-holdout-v1/singular/nullified-5-unsat
+smtlib-qfnra-holdout-v1/singular/nullified-7-sat
+smtlib-qfnra-holdout-v1/singular/nullified-7-unsat
+smtlib-qfnra-holdout-v1/tower/tower-3-sat
+smtlib-qfnra-holdout-v1/tower/tower-3-unsat
+smtlib-qfnra-holdout-v1/tower/tower-5-sat
+smtlib-qfnra-holdout-v1/tower/tower-5-unsat
+smtlib-qfnra-holdout-v1/tower/tower-7-sat
+smtlib-qfnra-holdout-v1/tower/tower-7-unsat

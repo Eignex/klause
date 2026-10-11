@@ -16,6 +16,7 @@ class SuitesTest {
         "hakank",
         "smtlib-qflia",
         "smtlib-qflra",
+        "smtlib-qfnra",
         "smtlib-qflira",
         "smtlib-qfidl",
         "smtlib-qfrdl",

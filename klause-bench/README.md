@@ -60,6 +60,25 @@ new names so results under one name stay comparable.
 and continuous columns. It includes finite and open routes and selects every member
 without a changing reference filter. It is separate from the smaller `mip` theme set.
 
+`qfnra-core-v1` fixes 37 self-authored polynomial-real inputs; `qfnra-holdout-v1`
+fixes 24 wider multivariate cases. The matching `smtlib-qfnra-core-v1` and
+`smtlib-qfnra-holdout-v1` suites select the same identities without loading a
+Klause model or checking reference availability. Families cover algebraic sections
+and towers, strict/disequal and Boolean relations, shared/repeated roots, singular
+and nullified polynomials, exact decimals and lexical SMT definitions/assumptions.
+The [fixture manifest](smoke-corpus/qfnra-v1/manifest.json) binds every identity to
+its original source SHA-256, license and mathematical expectation. Change names
+for membership or byte changes; preserve version-1 selections.
+
+`qfnra-extensions-v1` keeps five symbolic-division, mixed-integer, negative-power,
+transcendental and multiple-query controls separate. Its catalog expectations are
+unknown: these cases describe input boundaries rather than polynomial capability.
+The fetched `smtlib-qfnra` suite uses the QF_NRA archive from Zenodo record 15493090
+and preserves per-family source attribution/licenses without vendoring it. That
+logic tag does not establish polynomial membership; the fetched suite is
+unclassified and may include extensions. No Klause or reference verdict filters
+its selection. Use `reference=any` in lab specs to preserve frozen membership.
+
 | Filter | Meaning |
 |---|---|
 | `suite=a,b` | Restrict suites; `core` expands to the in-process core |
@@ -274,6 +293,38 @@ cleanup while needed. After promoting useful results and checking all active
 consumers, delete obsolete release assets/tags, ended lab jobs and external copies
 under that workflow; do not retain a historical archive.
 
+### SMT reference records
+
+`solve-one backend=reference solver=z3` sends original SMT-LIB directly to Z3,
+including QF_NRA; Klause frontend support does not control reference selection.
+The executable resolved from `PATH` (or `-Dklause.bench.z3`) is hashed once per
+bench process. Its version/SHA-256, memory ceiling, single-thread options and
+`smt-reference-v2` policy form `referenceVersion` and the reference cache key.
+`-model pp.decimal=false` requests exact rational and algebraic `root-obj` models.
+Input options may override printing; a decimal approximation is not algebraic
+witness evidence. Records retain original `sourceHashes`, stdout SHA-256,
+`finalWitness`, command, exit code, stderr, watchdog outcome and
+`referenceStatus=sat|unsat|unknown|timeout|error`. Parse errors or failed exits
+cannot earn a decided verdict. The default memory ceiling is 2048 MiB; override
+with `-Dklause.bench.z3.memoryMb`. The solver timeout uses whole seconds, rounded
+down with a one-second minimum; a watchdog kills after twice the requested budget
+plus twenty seconds. Keep integer-second budgets for matched reference runs.
+
+Z3 case `buildProvenance` also binds the installed bench launcher/libraries in
+`harness`, the JVM runtime and options, host OS/architecture, and the installed
+CLI tree from setup. The CLI is rebuilt by lab setup but is not invoked by a
+reference case; Z3's own executable remains identified by `referenceVersion`.
+Capture hashes before solving, outside subprocess timing. Reference runs therefore
+require the installed bench and CLI distributions, using the same provenance
+manifest mechanism as Klause cases.
+
+These are solver-reported reference verdicts (`referenceValidation`), separate
+from independently checked source witnesses or refutation certificates. The lab
+persists the solver/version rows through its ordinary reference backend; raw models
+and diagnostics remain in case artifacts. Frozen baseline runs use `reference=any`,
+a ten-second budget, one processor, no result-cache replay and explicit repetition.
+Preserve every planned identity and unsuccessful outcome in external evidence.
+
 ## Source validation
 
 MiniZinc float runs independently check the final complete witness; integer runs
@@ -367,6 +418,8 @@ original constraints. MPS points must cover every column with integral integer
 coordinates; missing, duplicate, unknown and nonfinite coordinates fail checking.
 For a complete SMT witness, the verifier pins every declared source variable and
 requires SAT under the original constraints; this also establishes source feasibility.
+Witness pins enter an incremental scope only when later optimality queries need
+the original unpinned constraints.
 SMT records without a witness retain an unpinned source feasibility query. Query
 failures identify the problem, expected and returned verdicts, and any UNKNOWN reason.
 `--progress /path/to/checked-prefix.jsonl` flushes each completed record, including

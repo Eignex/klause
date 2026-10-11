@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.CorpusFetcher
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -17,6 +18,7 @@ internal data class BuildProvenance(
     val runtimeOptions: Map<String, String>,
     val osName: String,
     val osArch: String,
+    val harness: Map<String, String> = emptyMap(),
 ) {
     val fingerprint: String get() = sha256(Reports.json.encodeToString(this).toByteArray())
 }
@@ -33,6 +35,12 @@ internal object InstalledBuild {
         } else {
             readManifest(manifest, launcher, javaHome, environment)
         }
+    }
+
+    val reference: BuildProvenance by lazy {
+        val harness = File(CorpusFetcher.workspaceRoot(), "klause-bench/build/install/klause-bench")
+        require(File(harness, "lib").isDirectory) { "Missing installed reference harness: $harness" }
+        current.copy(harness = hashes(harness))
     }
 
     fun writeManifest(output: File) {

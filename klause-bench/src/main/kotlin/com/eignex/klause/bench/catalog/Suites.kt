@@ -33,7 +33,7 @@ internal object Suites {
         listOf(
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
             smtlibCore, xcsp3Core, mpsCore, mznSmoke, satCrafted, lpComponentSplit,
-        )
+        ) + QfNraSuites.all
     }
 
     /** Discovered-on-demand suites over fetched external corpora. The provider runs the
@@ -99,6 +99,19 @@ internal object Suites {
                 CorpusSelection.select(
                     ExternalCollections.smtlibQfLra,
                     CorpusSelection.Layout.Flat("non-incremental/QF_LRA", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
+            DynamicSuite(
+                "smtlib-qfnra",
+                "SMT-LIB QF_NRA archive (fetched; membership unclassified; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfNra,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_NRA", "smt2"),
                     sel,
                     Category.CSP,
                     format = Format.SMTLIB,
@@ -927,6 +940,15 @@ internal object ExternalCollections {
         url = smtlibLogic("QF_LRA"),
         license = "SMT-LIB (per-family licenses)",
         reason = "real-arithmetic benchmark set (173MB compressed, ~1.7k instances); fetched rather than vendored",
+        fetch = FetchMethod.TarballZst,
+    )
+
+    val smtlibQfNra = ExternalCollection(
+        id = "smtlib-qf_nra",
+        url = smtlibLogic("QF_NRA"),
+        license = "SMT-LIB (per-family licenses; preserve source attribution)",
+        reason = "210801606-byte compressed archive; fetched, not redistributed; " +
+            "logic tag does not certify polynomial membership",
         fetch = FetchMethod.TarballZst,
     )
 
