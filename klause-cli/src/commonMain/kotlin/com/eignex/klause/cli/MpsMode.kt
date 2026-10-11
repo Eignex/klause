@@ -115,7 +115,7 @@ internal object MpsMode : CliMode {
 
                 is SourceProblemRoute.OpenTheory -> {
                     witnessOnly = !compiled.sourceExact
-                    // An objective whose bound row leaves the theory is left to local search.
+                    // Refuting a lowered objective bound does not refute the corresponding decimal source bound.
                     if (!witnessOnly && (route.request.objective == null || OpenTheoryPipeline.canMinimize(route.request))) {
                         openTheorySolvable(
                             route.request,
