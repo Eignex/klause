@@ -1,3 +1,6 @@
+import hashlib
+import pathlib
+import tempfile
 import unittest
 from unittest import mock
 
@@ -85,6 +88,12 @@ class ProofCheckTest(unittest.TestCase):
         self.assertEqual(result['verdictCheck'], 'source sat')
         self.assertNotIn('optimalityCheck', result)
 
+    def test_satisfaction_without_an_objective_rejects_a_reported_value_without_a_witness(self):
+        case = self.case(kind='satisfy', proven=False, objective=1, finalWitness=None)
+
+        with self.assertRaisesRegex(AssertionError, 'objective is absent from source'):
+            self.check(case, '(declare-const x Real) (assert (>= x 0))')
+
     def test_incomplete_case_is_rejected(self):
         case = self.case()
         case['status'] = 'RUNNING'
@@ -99,6 +108,136 @@ class ProofCheckTest(unittest.TestCase):
         with mock.patch.object(proof_check.urllib.request, 'urlopen', return_value=response):
             with self.assertRaises(AssertionError):
                 proof_check.source(case, [])
+
+    def test_smt_corpus_sources_route_from_hash_named_original_bytes(self):
+        fixtures = (
+            ('smtlib-qfidl', '(declare-const x Int) (declare-const y Int) (assert (= (- x y) 3))',
+             '((define-fun x () Int 3) (define-fun y () Int 0))'),
+            ('smtlib-qflia', '(declare-const x Int) (assert (= (* 2 x) 4))', '((define-fun x () Int 2))'),
+            ('smtlib-qflira', '(declare-const x Int) (declare-const y Real) (assert (= (+ (to_real x) y) (/ 3 2)))',
+             '((define-fun x () Int 1) (define-fun y () Real (/ 1 2)))'),
+            ('smtlib-qflra', '(declare-const x Real) (assert (= x (/ 1 3)))', '((define-fun x () Real (/ 1 3)))'),
+            ('smtlib-qfrdl', '(declare-const x Real) (declare-const y Real) (assert (= (- x y) (/ 1 3)))',
+             '((define-fun x () Real (/ 1 3)) (define-fun y () Real 0))'),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            for suite, text, witness in fixtures:
+                with self.subTest(suite=suite):
+                    data = text.encode('utf-8')
+                    digest = hashlib.sha256(data).hexdigest()
+                    (root / (digest + '.txt')).write_bytes(data)
+                    case = self.case(suite=suite, kind='satisfy', objective=None,
+                                     sourceHashes={'model': digest}, finalWitness=witness)
+
+                    result = proof_check.check([case], root)[0]['check']
+
+                    self.assertTrue(result['sourceHashVerified'])
+                    self.assertEqual(result['verdictCheck'], 'source sat')
+                    self.assertEqual(result['witness'], 'exact source feasible')
+
+    def test_smt_corpus_sources_require_an_original_source_root(self):
+        for suite in sorted(proof_check.SMT_CORPUS_SUITES):
+            with self.subTest(suite=suite), self.assertRaisesRegex(ValueError, '--source-root'):
+                proof_check.check([self.case(suite=suite)])
+
+    def test_hash_named_corpus_source_bytes_must_match_the_record(self):
+        data = b'(declare-const x Int) (assert (= x 1))'
+        digest = hashlib.sha256(data).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / (digest + '.txt')).write_bytes(data + b'\n')
+            case = self.case(suite='smtlib-qflia', sourceHashes={'model': digest})
+
+            with self.assertRaisesRegex(AssertionError, 'source hash differs'):
+                proof_check.check([case], root)
+
+    def test_source_root_hash_names_cannot_escape_or_use_invalid_digests(self):
+        for digest in ('../outside', 'a' * 63, 'A' * 64):
+            with self.subTest(digest=digest), tempfile.TemporaryDirectory() as directory:
+                case = self.case(suite='smtlib-qflia', sourceHashes={'model': digest})
+
+                with self.assertRaisesRegex(AssertionError, 'invalid source hash'):
+                    proof_check.check([case], pathlib.Path(directory))
+
+    def test_an_unsupported_suite_is_declined_even_with_a_source_root_and_no_verdict(self):
+        data = b'(declare-const x Int) (assert (= x 1))'
+        digest = hashlib.sha256(data).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / (digest + '.txt')).write_bytes(data)
+            case = self.case(suite='unsupported', feasible=None, proven=False, objective=None,
+                             sourceHashes={'model': digest}, finalWitness=None)
+
+            with self.assertRaisesRegex(ValueError, 'unsupported source suite'):
+                proof_check.check([case], root)
+
+    def test_corpus_false_verdict_claims_are_rejected_against_original_constraints(self):
+        fixtures = (
+            (False, '(declare-const x Int) (assert (= x 1))', None),
+            (True, '(declare-const x Int) (assert (= x 1)) (assert (= x 2))', '((define-fun x () Int 1))'),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            for feasible, text, witness in fixtures:
+                with self.subTest(feasible=feasible):
+                    data = text.encode('utf-8')
+                    digest = hashlib.sha256(data).hexdigest()
+                    (root / (digest + '.txt')).write_bytes(data)
+                    case = self.case(suite='smtlib-qflia', kind='satisfy', objective=None, feasible=feasible,
+                                     sourceHashes={'model': digest}, finalWitness=witness)
+
+                    with self.assertRaises(AssertionError):
+                        proof_check.check([case], root)
+
+    def test_corpus_incomplete_infeasible_and_wrong_sort_witnesses_are_rejected(self):
+        data = b'(declare-const x Int) (declare-const b Bool) (assert (= x 1)) (assert b)'
+        digest = hashlib.sha256(data).hexdigest()
+        witnesses = (
+            '', '()', '((define-fun x () Int 1))',
+            '((define-fun x () Int 2) (define-fun b () Bool true))',
+            '((define-fun x () Real 1) (define-fun b () Bool true))',
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / (digest + '.txt')).write_bytes(data)
+            for witness in witnesses:
+                with self.subTest(witness=witness):
+                    case = self.case(suite='smtlib-qfidl', kind='satisfy', objective=None,
+                                     sourceHashes={'model': digest}, finalWitness=witness)
+
+                    with self.assertRaises(AssertionError):
+                        proof_check.check([case], root)
+
+    def test_corpus_exact_objectives_and_orientation_use_original_source_arithmetic(self):
+        data = self.source.encode('utf-8')
+        digest = hashlib.sha256(data).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            (root / (digest + '.txt')).write_bytes(data)
+            case = self.case(suite='smtlib-qflra', sourceHashes={'model': digest})
+
+            result = proof_check.check([case], root)[0]['check']
+
+            self.assertEqual(result['optimalityCheck'], 'strictly better source objective unsat')
+            for updates in ({'objective': '2/3'}, {'maximize': True}):
+                with self.subTest(updates=updates), self.assertRaises(AssertionError):
+                    proof_check.check([self.case(suite='smtlib-qflra', sourceHashes={'model': digest}, **updates)], root)
+
+    def test_core_smt_source_still_fetches_its_recorded_revision(self):
+        data = self.source.encode('utf-8')
+        case = self.case(gitSha='a' * 40, sourceHashes={'model': hashlib.sha256(data).hexdigest()})
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = data
+        with mock.patch.object(proof_check.urllib.request, 'urlopen', return_value=response) as fetch:
+
+            result = proof_check.check([case])[0]['check']
+
+            fetch.assert_called_once_with(
+                'https://raw.githubusercontent.com/Eignex/klause/' + 'a' * 40 +
+                '/klause-bench/smoke-corpus/smtlib/fixture.smt2', timeout=60,
+            )
+            self.assertEqual(result['witness'], 'exact source feasible')
 
     def test_integer_mps_default_bound_is_binary(self):
         text = "NAME fixture\nROWS\n N obj\nCOLUMNS\n M1 'MARKER' 'INTORG'\n x obj 1\n M2 'MARKER' 'INTEND'\nENDATA\n"
@@ -268,6 +407,55 @@ class ProofCheckTest(unittest.TestCase):
         with self.assertRaises(AssertionError):
             self.check(self.case(suite='mps-core', proven=False, objective=None,
                                  finalWitness='v x=1.00000001'), self.mps_source)
+
+    def test_recorded_command_selects_exact_mode_independently_of_arm_name(self):
+        case = self.case(suite='mps-core', arm='latest-main', command='klause-cli --exact fixture.mps',
+                         proven=False, objective=None, finalWitness='v x=1.00000001')
+
+        with self.assertRaises(AssertionError):
+            self.check(case, self.mps_source)
+
+    def test_recorded_default_command_overrides_a_legacy_exact_arm_name(self):
+        case = self.case(suite='mps-core', arm='fast-exact', command='klause-cli fixture.mps',
+                         proven=False, objective=None, finalWitness='v x=1.00000001')
+
+        result = self.check(case, self.mps_source)
+
+        self.assertEqual(result['witness'], 'not exact source feasible')
+        self.assertTrue(result['toleranceAccepted'])
+
+    def test_command_exactness_distinguishes_cached_results(self):
+        cases = [self.case(suite='mps-core', arm='latest-main', command=command,
+                           proven=False, objective=None, finalWitness='v x=1.00000001')
+                 for command in ('klause-cli fixture.mps', 'klause-cli --exact fixture.mps')]
+        cases[1]['index'] = 1
+        with mock.patch.object(proof_check, 'source', return_value=self.mps_source):
+
+            with self.assertRaises(AssertionError):
+                proof_check.check(cases)
+
+    def test_exact_objective_presence_distinguishes_cached_rounded_results(self):
+        source = self.mps_source.replace(
+            ' x obj 0.1 row 1', " M1 'MARKER' 'INTORG'\n x obj 1 row 1\n M2 'MARKER' 'INTEND'",
+        ).replace('rhs row 1 obj 0.2', 'rhs row 9007199254740993')
+        first = self.case(suite='mps-core', arm='default', proven=False,
+                          finalWitness='v x=9007199254740993', objective=9007199254740992)
+        second = self.case(suite='mps-core', arm='default', proven=False,
+                           finalWitness='v x=9007199254740993', objective=9007199254740992,
+                           exactObjective='9007199254740992')
+        second['index'] = 1
+        self.assertEqual(self.check(first, source)['objectiveCheck'], 'source point objective matches')
+        with mock.patch.object(proof_check, 'source', return_value=source):
+
+            with self.assertRaisesRegex(AssertionError, 'objective'):
+                proof_check.check([first, second])
+
+    def test_quoted_parameter_values_and_source_names_do_not_select_exact_mode(self):
+        for command in ("klause-cli --param 'value=--exact' fixture.mps", 'klause-cli -- --exact'):
+            with self.subTest(command=command):
+                case = self.case(command=command)
+
+                self.assertFalse(proof_check.exact_mode(case))
 
     def test_mps_tolerance_point_cannot_prove_a_rounded_optimum(self):
         source = self.mps_source.replace(' E row', ' G row')

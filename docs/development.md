@@ -100,6 +100,12 @@ Exact arithmetic and lattice tests belong to `klause`. The Native CI job tests
 these packages with the solver, then links and starts the release CLI executable.
 The JVM job installs and starts the CLI distribution, checking that its runtime
 dependencies are packaged.
+That job also installs the pinned source-checker Python dependency and runs
+`test_verify_source_results.py` and `test_verify_boolean_source_results.py`.
+These unit tests exercise original-byte hashing,
+suite dispatch and exact verdict, witness and objective validation; they do not run
+corpus measurements. The [benchmark README](../klause-bench/README.md#offline-source-verifier)
+owns source-checker usage and supported suites.
 The default build targets JVM and Linux x64. Releases opt into Linux arm64 and
 macOS arm64 with `-Ptargets.full`. Native tests and documentation checks run in
 CI. Benchmarks, capture and timing tools are opt-in; see [benchmarking](../klause-bench/README.md).
