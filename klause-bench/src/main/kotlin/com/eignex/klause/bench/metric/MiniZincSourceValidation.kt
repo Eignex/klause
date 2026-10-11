@@ -15,7 +15,7 @@ import java.nio.file.Files
 import java.util.concurrent.TimeUnit
 import kotlinx.serialization.Serializable
 
-internal const val PINNED_SOURCE_POLICY = "minizinc-source-witness-v2"
+internal const val PINNED_SOURCE_POLICY = "minizinc-source-witness-v3"
 internal const val REPORTED_RESULT_POLICY = "reported-result-v1"
 
 @Serializable
@@ -121,21 +121,19 @@ internal object MiniZincSourceValidation {
     }
 
     fun exactCoordinates(rawOutput: String): String? = rawOutput.split("----------").dropLast(1).lastOrNull()
-        ?.lineSequence()?.filter { it.startsWith("% klause-exact: ") }
-        ?.map { it.removePrefix("% klause-exact: ") }?.toList()?.takeIf { it.isNotEmpty() }?.joinToString("\n")
+        ?.lineSequence()?.filter { it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") }
+        ?.map { it.substringAfter(": ") }?.toList()?.takeIf { it.isNotEmpty() }?.joinToString("\n")
 
     fun retainedWitness(rawOutput: String): String? = (
         candidate(rawOutput)
             ?: if (exactCoordinates(rawOutput) != null) "" else null
         )?.let { candidate ->
-        val exact = exactCoordinates(rawOutput)
-        if (exact == null) {
-            candidate
-        } else {
-            val provenance = rawOutput.split("----------").dropLast(1).lastOrNull()
-                ?.lineSequence()?.filter { it.startsWith("% klause-float-") }?.joinToString("\n").orEmpty()
-            candidate + "\n" + provenance + "\n" + exact.lineSequence().joinToString("\n") { "% klause-exact: $it" }
-        }
+        val comments = rawOutput.split("----------").dropLast(1).lastOrNull()
+            ?.lineSequence()?.filter {
+                it.startsWith("% klause-exact: ") || it.startsWith("% klause-coordinate: ") ||
+                    it.startsWith("% klause-float-")
+            }?.joinToString("\n").orEmpty()
+        if (comments.isEmpty()) candidate else candidate + "\n" + comments
     }
 
     fun candidate(rawOutput: String): String? {

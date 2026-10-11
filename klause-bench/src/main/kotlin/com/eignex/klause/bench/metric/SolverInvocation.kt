@@ -370,7 +370,8 @@ internal object SolverInvocation {
 
                         line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
 
-                        line.startsWith("% klause-exact: _objective = ") ->
+                        line.startsWith("% klause-exact: _objective = ") ||
+                            line.startsWith("% klause-coordinate: _objective = ") ->
                             recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
 
                         line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) ->

@@ -16,8 +16,8 @@ class FlatZincSolutionWriterTest {
 
         val output = writeFlatZincSolution(program, sample)
 
-        assertTrue("% klause-exact: exact = 1/3;" in output)
-        assertTrue("% klause-exact: grid = 1/2;" in output)
+        assertTrue("% klause-coordinate: exact = 1/3;" in output)
+        assertTrue("% klause-coordinate: grid = 1/2;" in output)
         assertTrue("% klause-float-component: grid = grid" in output)
         assertTrue("reason=continuous component without finite choices" in output)
     }

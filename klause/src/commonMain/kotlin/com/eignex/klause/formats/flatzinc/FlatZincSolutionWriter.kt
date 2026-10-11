@@ -105,18 +105,19 @@ internal fun writeFlatZincExactCoordinates(
     if (program.floatVarsByName.isNotEmpty() &&
         program.floatVarsByName.values.all { !it.lpOnly || sample.exactRealValue(it.varId) != null }
     ) {
+        val prefix = if (program.floatVarsByName.values.any { !it.lpOnly }) "klause-coordinate" else "klause-exact"
         for ((name, id) in program.boolVarsByName) {
-            sb.append("% klause-exact: $name = ${sample.boolValue(id)};\n")
+            sb.append("% $prefix: $name = ${sample.boolValue(id)};\n")
         }
         for ((name, id) in program.intVarsByName) {
             if (name !in program.floatVarsByName) {
-                sb.append("% klause-exact: $name = ${sample.intValue(id)};\n")
+                sb.append("% $prefix: $name = ${sample.intValue(id)};\n")
             }
         }
         for ((name, b) in program.floatVarsByName) {
             val value = if (b.lpOnly) sample.exactRealValue(b.varId) else
                 BigFraction.ofDouble(sample.floatValue(b))?.toString()
-            sb.append("% klause-exact: $name = $value;\n")
+            sb.append("% $prefix: $name = $value;\n")
         }
         if (outputObjective) {
             objectiveVarName(program.solve)?.let { name ->
@@ -127,7 +128,7 @@ internal fun writeFlatZincExactCoordinates(
                     if (b != null) BigFraction.ofDouble(sample.floatValue(b))?.toString() else
                         renderScalar(program, sample, name)
                 }
-                sb.append("% klause-exact: _objective = $value;\n")
+                sb.append("% $prefix: _objective = $value;\n")
             }
         }
     }

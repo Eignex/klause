@@ -7,6 +7,7 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
+import com.eignex.klause.formats.flatzinc.toSearchHints
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -41,7 +42,7 @@ internal class MiniZincRunner(
             definitionalSweep = executionProgram.definitionalSweep,
             hasFloats = program.floatVarsByName.isNotEmpty(),
             floatApproximation = program.floatVarsByName.values.any { !it.lpOnly },
-            searchParams = program.searchHints?.toBacktrackParams(
+            searchParams = program.searchHints?.toSearchHints()?.toBacktrackParams(
                 program.problem.numBoolVars,
                 program.problem.numIntVars,
             ),
