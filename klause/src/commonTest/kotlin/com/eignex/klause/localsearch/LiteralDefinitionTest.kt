@@ -18,6 +18,23 @@ import kotlin.test.assertTrue
 
 class LiteralDefinitionTest {
     @Test
+    fun `arithmetic objective hotspots retain source input order`() {
+        val problem = Problem(
+            0, 5, Array(5) { IntDomain(0, 4) }, arrayOf<Factor>(Product(0, 1, 2), Product(2, 3, 4)),
+        )
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem))
+        val shaping = ObjectiveShaping()
+        shaping.objective = assertNotNull(sweep.functionalObjective(intArrayOf(4), longArrayOf(1), 0, true))
+        val rng = Random(3)
+        val control = Random(3)
+        val sourceInputs = intArrayOf(0, 1, 3)
+
+        repeat(16) {
+            assertEquals(sourceInputs[control.nextInt(sourceInputs.size)], shaping.objectiveHotSpotIntVar(rng))
+        }
+    }
+
+    @Test
     fun `hinted literal channels follow free Boolean inputs`() {
         for (bound in listOf(0, 1)) {
             val problem = Problem(

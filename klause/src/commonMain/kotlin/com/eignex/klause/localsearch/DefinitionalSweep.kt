@@ -247,10 +247,7 @@ class DefinitionalSweep internal constructor(
         while (work.isNotEmpty()) {
             val (id, isBool) = work.removeLast()
             val definition = (if (isBool) boolDefinitions else intDefinitions)[id]
-            if (definition == null) {
-                (if (isBool) boolLeaves else leaves).add(id)
-                continue
-            }
+            if (definition == null) continue
             if (!(if (isBool) reachableBools else reachableInts).add(id)) continue
             if (definition !is SweepNode.IntDef && definition !is SweepNode.BoolFold &&
                 definition !is LiteralIntDefinition && definition !is UnaryPredicateDefinition
@@ -276,7 +273,11 @@ class DefinitionalSweep internal constructor(
                 else -> return null
             }
             cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, compute))
+            for (input in node.intInputs) if (input !in reachableInts) leaves.add(input)
+            for (input in node.boolInputs) if (input !in reachableBools) boolLeaves.add(input)
         }
+        for (term in terms) if (term !in reachableInts) leaves.add(term)
+        for (term in boolTerms) if (term !in reachableBools) boolLeaves.add(term)
         return FunctionalObjective(
             terms, termCoeffs, constant, minimize, emptyList(), leaves.toIntArray(),
             boolTerms, boolTermCoeffs, emptyList(), boolLeaves.toIntArray(), cone,
