@@ -62,7 +62,7 @@ internal object ReferenceSolve {
         // run side by side oversubscribe the machine and their times say more about the load than the instance.
         val settings = asked.copy(processors = asked.processors ?: 1)
         val cacheTag = when (ref.format) {
-            Format.XCSP3 -> "$backend-xcsp3"
+            Format.XCSP3 -> "$id-xcsp3|${Xcsp3CpSatReference.identity()}|p${settings.processors}"
 
             Format.DIMACS, Format.OPB, Format.WCNF, Format.SMTLIB -> id
 

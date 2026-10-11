@@ -59,6 +59,18 @@ Regenerate using
 [generate.py](../../klause-bench/scripts/lp-component-split/generate.py).
 These fixtures are explicit experiments rather than CI smoke selection.
 
+## XCSP3 reference importer
+
+[`test_solve.py`](../../klause-bench/xcsp3-cpsat/test_solve.py) contains self-authored
+constant and variable matrix fixtures, grouped conditions and axis-bound failures.
+The reference importer uses column-count strides for row-major matrix selection
+and enforces both source index bounds. Its cache key includes the container image,
+importer policy and worker count; records retain the image and policy in
+`referenceVersion`. Changed importer identities replace older reference claims.
+Rebuild `klause-xcsp3-cpsat` from `klause-bench/xcsp3-cpsat` after importer changes.
+Run these regressions with
+`docker run --rm --entrypoint python -v "$PWD/klause-bench/xcsp3-cpsat:/tests:ro" -w /tests klause-xcsp3-cpsat:latest test_solve.py`.
+
 ## MPS source verifier
 
 The MPS source-verifier regressions in

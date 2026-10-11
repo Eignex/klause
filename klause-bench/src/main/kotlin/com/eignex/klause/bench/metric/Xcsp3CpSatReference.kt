@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 internal object Xcsp3CpSatReference {
     const val IMAGE = "klause-xcsp3-cpsat:latest"
+    const val VERSION = "xcsp3-matrix-row-major-v1"
 
     /** Label on every reference container, so stragglers can be reaped (`docker kill --filter label`). */
     const val CONTAINER_LABEL = "klause-xcsp3-ref"
@@ -38,6 +39,7 @@ internal object Xcsp3CpSatReference {
     @Serializable
     private data class Verdict(
         val exit: String,
+        val version: String = "",
         val runtime: Double? = null,
         val objective: Double? = null,
         val maximize: Boolean? = null,
@@ -70,6 +72,18 @@ internal object Xcsp3CpSatReference {
             .start()
         p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
     }.getOrElse { false }
+
+    private val image: String by lazy {
+        val p = ProcessBuilder("docker", "image", "inspect", "--format", "{{.Id}}", IMAGE)
+            .redirectErrorStream(true).start()
+        val id = p.inputStream.bufferedReader().readText().trim()
+        check(p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0) {
+            "xcsp3 cp-sat: cannot identify $IMAGE"
+        }
+        id
+    }
+
+    fun identity(build: String = image): String = "$IMAGE@$build|$VERSION"
 
     /** Solve [ref]'s XCSP3 `.xml` with cp-sat in the container under [budget], pinning cp-sat to
      *  [workers] search workers (the sweep parallelizes across instances, so 1 keeps a container from
@@ -145,13 +159,26 @@ internal object Xcsp3CpSatReference {
         check(exit !in DOCKER_RUN_FAILED) {
             "xcsp3 cp-sat: docker run exited $exit: ${stderr.readText().takeLast(ERROR_TAIL_CHARS)}"
         }
+        return parse(cmd, stdout, identity(), stderr.readText().takeLast(ERROR_TAIL_CHARS)).copy(elapsedMs = elapsedMs)
+    }
+
+    internal fun parse(
+        cmd: List<String>,
+        stdout: String,
+        identity: String,
+        error: String = "",
+    ): SolverInvocation.Result {
         val v = stdout.lineSequence().lastOrNull { it.trimStart().startsWith("{") }
             ?.let { Reports.json.decodeFromString<Verdict>(it) }
-        return when {
-            v == null -> undecided(cmd, stdout, "no JSON verdict (${stderr.readText().takeLast(ERROR_TAIL_CHARS)})")
+        check(v == null || v.version == VERSION) {
+            "xcsp3 cp-sat: incompatible importer '${v?.version}'; rebuild $IMAGE from klause-bench/xcsp3-cpsat"
+        }
+        val result = when {
+            v == null -> undecided(cmd, stdout, "no JSON verdict ($error)")
             v.exit == "ERROR" -> undecided(cmd, stdout, v.error ?: "unknown")
             else -> decided(cmd, stdout, v)
-        }.copy(elapsedMs = elapsedMs)
+        }
+        return result.copy(stats = result.stats + ("referenceVersion" to identity))
     }
 
     private fun decided(cmd: List<String>, stdout: String, v: Verdict): SolverInvocation.Result {
