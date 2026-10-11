@@ -674,9 +674,8 @@ internal class LocalSearchEngine(
             // A restart transition consumes one unit of the maxFlips/maxInstructions allowance, same as
             // an applied move (see [LocalSearchParams.maxInstructions]).
             fun countedRestart(useAnchor: Boolean = true) {
-                timing.inPhase("seeding") {
-                    restarts.restart(state, bestSoFar = if (useAnchor) bestAnchor?.snapshot() else null)
-                }
+                val anchor = if (useAnchor) bestAnchor?.snapshot() else null
+                timing.inPhase("seeding") { restarts.restart(state, bestSoFar = anchor) }
                 moves++
                 flipsSinceYield++
                 restartCount++
