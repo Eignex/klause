@@ -305,8 +305,12 @@ one input bounded to 0..1 (`binary`), another single input (`unary`), or multipl
 (`multi`). Binary input bounds do not establish channel semantics. Each observation
 includes up to eight highest-degree representative factors, one per kind. Each
 representative retains its degree and up to sixteen distinct Boolean and sixteen
-distinct integer values from that committed assignment, with omission counts. Factor and
-variable ids belong to the local-search model after lowering and presolve. Worker
+distinct integer values from that committed assignment, with exact distinct-coordinate
+omission counts. Element representatives prioritize the index, result and selected
+variable-array cell, using the lowered factor's index offset. Invalid indexes retain
+the index and result without a selected cell; constant arrays contribute no cell
+coordinate. Factor and variable ids belong to the local-search model after lowering
+and presolve. Worker
 aggregation selects one whole observation at the lowest total; it never adds breakdowns
 from different assignments. A zero residual does not establish domain, completion or
 source feasibility, and the observation does not replace an incumbent. Disabled
