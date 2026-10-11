@@ -116,27 +116,27 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
     }
 
     /** Record [varRef]'s currently-pinned value for phase-saving. Called after every successful pin. */
-    fun capture(varRef: VarRef, session: PropagationSession) {
+    fun capture(varRef: VarRef, session: PropagationSession) = capture(
         when (varRef) {
-            is VarRef.Bool -> {
-                if (boolPhase != null && boolPhaseSet != null) {
-                    val v = session.boolValue(varRef.varId)
-                    if (v != null) {
-                        boolPhase[varRef.varId] = v
-                        boolPhaseSet[varRef.varId] = true
-                    }
-                }
-            }
+            is VarRef.Bool -> varRef.varId
+            is VarRef.IntVar -> session.problem.numBoolVars + varRef.varId
+        },
+        session,
+    )
 
-            is VarRef.IntVar -> {
-                if (intPhase != null && intPhaseSet != null) {
-                    val d = session.intDomain(varRef.varId)
-                    if (d.min == d.max) {
-                        intPhase[varRef.varId] = d.min
-                        intPhaseSet[varRef.varId] = true
-                    }
-                }
-            }
+    fun capture(variable: Int, session: PropagationSession) {
+        if (variable < session.problem.numBoolVars) {
+            if (boolPhase == null || boolPhaseSet == null) return
+            val value = session.boolValue(variable) ?: return
+            boolPhase[variable] = value
+            boolPhaseSet[variable] = true
+        } else {
+            if (intPhase == null || intPhaseSet == null) return
+            val id = variable - session.problem.numBoolVars
+            val domain = session.intDomain(id)
+            if (!domain.isFixed) return
+            intPhase[id] = domain.min
+            intPhaseSet[id] = true
         }
     }
 

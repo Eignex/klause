@@ -658,6 +658,7 @@ class PropagationState(
 
     /** Per-variable unassign sink invoked by [undoTo]; see its doc. Null = no subscriber. */
     var unassignListener: ((Int) -> Unit)? = null
+    internal var retractingListener: ((Int) -> Unit)? = null
 
     /** Undo trail for bool/int cells (replaces per-level full-array snapshots) — see [UndoLog].
      *  Appended to by the `log*` functions in `Undo.kt`. Atom-table slots ride their own reversible

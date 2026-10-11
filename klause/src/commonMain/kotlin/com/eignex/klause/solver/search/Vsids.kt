@@ -11,14 +11,13 @@ import kotlin.random.Random
  * uniformly to every prior activity, but cheaper (we only mutate the increment, not every
  * activity entry). Periodically rescales when `increment` approaches [Double] overflow.
  *
- * Picks the unpinned variable with the highest activity. Ties broken by variable-id order
- * (bools precede ints). Activities persist across [onRestart] — that's the whole point of
+ * Picks the unpinned variable with the highest activity. Ties follow the heap order. Activities persist across [onRestart] — that's the whole point of
  * VSIDS, learning carries over.
  *
  * Written against [BranchingState], so the same activities drive a finite CP traversal and a theory
- * traversal. Attribution quality is the substrate's: a shared Boolean analyzer names every variable of
- * the asserting clause, while the finite engine names the decision variables at the conflicting levels
- * — coarser, but still consistently better than random or smallest-domain on hard instances.
+ * traversal. A shared Boolean analyzer names the variables of its asserting clause. Native CP analysis
+ * names the variables visited in its implication graph; conflicts without a learned consequence use
+ * the decision variables at their conflicting levels.
  *
  * Default `decay = 0.95`. Lower decay (e.g., 0.8) makes the heuristic more
  * aggressive about following recent conflicts; higher (e.g., 0.99) is more conservative.
