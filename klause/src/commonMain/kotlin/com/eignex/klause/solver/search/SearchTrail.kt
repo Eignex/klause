@@ -41,8 +41,10 @@ internal class SearchTrail {
     }
     fun lower(variable: Int): Long? = intFacts[variable]?.lower
     fun upper(variable: Int): Long? = intFacts[variable]?.upper
-    fun lowerPremise(variable: Int): SearchAtomPremise = intFacts[variable]?.lowerPremise ?: SearchAtomPremise.Unavailable
-    fun upperPremise(variable: Int): SearchAtomPremise = intFacts[variable]?.upperPremise ?: SearchAtomPremise.Unavailable
+    fun lowerPremise(variable: Int): SearchAtomPremise =
+        intFacts[variable]?.lowerPremise ?: SearchAtomPremise.Unavailable
+    fun upperPremise(variable: Int): SearchAtomPremise =
+        intFacts[variable]?.upperPremise ?: SearchAtomPremise.Unavailable
 
     fun enter(decision: SearchDecision) {
         decisions.add(decision)

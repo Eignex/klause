@@ -161,7 +161,10 @@ class SearchSession(
                     selfPublicationsPending = true
                 } else {
                     trail.pendingAssertions.addLast(
-                        PendingSearchAssertion(SearchDecision.Bool(literal), if (publishedTheory) null else activeComponent),
+                        PendingSearchAssertion(
+                            SearchDecision.Bool(literal),
+                            if (publishedTheory) null else activeComponent,
+                        ),
                     )
                 }
                 ComponentResult.Consistent
