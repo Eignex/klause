@@ -170,3 +170,8 @@ metadata and carry no polynomial proof authority. An unchanged sample copy retai
 its source witness certificate; changing any coordinate or exact scalar list discards
 it. Polynomial pipeline strategy controls expose finite backtracking, local-search
 and ALNS effort separately from the native arithmetic allowance.
+
+`Problem.pipelineRequest()` composes shared finite factors with exact continuous
+completion. `OpenTheoryPipeline.minimize` uses a finite objective in every strategy;
+`PolynomialOptimizationExecution` preserves exact algebraic incumbents and native
+work counters. Only complete traversal admits an optimality or infeasibility proof.

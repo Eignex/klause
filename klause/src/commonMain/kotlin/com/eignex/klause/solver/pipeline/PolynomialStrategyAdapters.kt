@@ -149,7 +149,8 @@ internal class PolynomialStrategyAdapters(
                 repairOperators = BacktrackRepair.Defaults, maxIterations = params.alnsIterations,
             )
             val local = localParams().copy(cancellation = cancellation or stop,
-                maxInstructions = instructions ?: params.localSearch.maxInstructions)
+                maxInstructions = instructions?.let { minOf(it, params.localSearch.maxInstructions ?: it) }
+                    ?: params.localSearch.maxInstructions)
             alns.minimize(objective, local)
         }
     }
@@ -158,7 +159,7 @@ internal class PolynomialStrategyAdapters(
         val bt = PortfolioWorker.of("bt+exact-nra", 0, BacktrackSolver(finite).session(), backtrackParams(), objective)
             .bindEvidence(identity)
         val ls = PortfolioWorker.of("ls+exact-nra", 1, localSearch().session(), localParams(), objective,
-            withInstructionBudget = { p, units -> p.copy(maxInstructions = units) })
+            withInstructionBudget = { p, units -> p.copy(maxInstructions = minOf(units, p.maxInstructions ?: units)) })
             .bindEvidence(identity, provesResults = false)
         val alns = if (objective == null) {
             PortfolioWorker.ofSolve("alns+exact-nra", 2, countsInstructions = true,
