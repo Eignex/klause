@@ -79,12 +79,16 @@ tuples, diagram reachability and all assignment-dependent payloads remain state-
 
 Finite branching receives the native conflict's full variable and factor attribution,
 including implication-graph variables for learned conflicts. VSIDS bumps each implicated
-variable once per conflict, including a failed decision already in that set. Conflicts cascading from a
-native learned assertion also update activity and failure counters; they have no fresh
-branch decision to blame. Successful CP fixpoints deliver newly reported deductions to propagation-aware selectors in both satisfaction
-and optimization search. Phase saving captures determined values before native trail
+variable once per conflict, including a failed decision already in that set. Conflicts
+cascading from a native learned assertion also update activity and failure counters;
+they have no fresh branch decision to blame. Successful CP fixpoints deliver newly
+reported deductions to propagation-aware selectors in both satisfaction and optimization
+search. Phase saving captures determined values before native trail
 retraction, retaining propagated polarities as well as decision polarities across
 backjumps and restarts.
+
+Boolean-only models journal each pin's variable id and tag without integer-state padding.
+Mixed finite models retain aligned integer-state columns for domain retraction.
 
 Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights and
 its heap belong to the solve, retain conflict bumps across restarts, and apply bumps

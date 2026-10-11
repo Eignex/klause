@@ -12,7 +12,8 @@ import com.eignex.klause.util.LongArrayList
  * O(changes-since-mark) instead of a snapshot/restore's O(numVars) per level. Records are stored
  * column-wise across parallel lists (no per-record object alloc). Record kinds by [tag]:
  *  - 0 — bool pin: a bool was assigned (prior state is always unassigned, since `pinBoolImpl` only
- *    proceeds when the var was free), so only [varId] is meaningful; the int/obj columns are padding.
+ *    proceeds when the var was free), so only [varId] is meaningful. The int/obj columns are padding
+ *    on mixed models and stay empty on models without integer variables.
  *  - 1 — int change: a tighten / exclude replaced the var's domain. The full prior int-var state is
  *    recorded so replay restores it exactly even when the same var is narrowed several times within
  *    a level.
