@@ -99,7 +99,9 @@ class Xcsp3DefinitionTest {
             val problem = parsed.problem
             val baked = problem.bake()
             for (choice in 0L..1L) {
-                val implied = assertIs<PropagationResult.Implied>(baked.propagate(Assumptions(ints = mapOf(0 to choice))))
+                val implied = assertIs<PropagationResult.Implied>(
+                    baked.propagate(Assumptions(ints = mapOf(0 to choice))),
+                )
                 assertEquals(if (choice == 0L) scale.toLong() else 0L, implied.intValueOrNull(1))
             }
             val state = LocalSearchState(baked, Random(3))
