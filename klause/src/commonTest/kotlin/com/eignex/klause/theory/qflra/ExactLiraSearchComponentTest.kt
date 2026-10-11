@@ -782,8 +782,8 @@ class ExactLiraSearchComponentTest {
     fun `partial integer equality is relaxed before complete chronological refutation`() {
         val model = Problem(
             2,
-            intBounds = openBounds(),
-            factors = arrayOf(ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+            intBounds = openBounds(3),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 1)),
         )
         val session = SearchSession(listOf(ExactLiraSearchComponent(model)))
         assertIs<ComponentResult.Consistent>(session.initialize())
@@ -879,8 +879,8 @@ class ExactLiraSearchComponentTest {
     fun `shared exact LIRA component reports reduction conflicts`() {
         val model = Problem(
             numBoolVars = 0,
-            intBounds = openBounds(),
-            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+            intBounds = openBounds(3),
+            factors = arrayOf(Linear(intArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 1)),
         )
         val stats = SmtStatsSink()
         val component = ExactLiraSearchComponent(model).also { it.observeWith(stats) }
