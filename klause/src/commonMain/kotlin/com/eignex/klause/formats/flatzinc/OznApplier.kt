@@ -54,7 +54,7 @@ class OznApplier(oznSource: String) {
         for (i in layout.elements.indices) {
             if (sample.boolValue(layout.indicatorBoolIds[i])) present.add(layout.elements[i])
         }
-        return OznValue.SetV(present.toIntArray())
+        return OznValue.SetV(present.toIntArray().map { it.toLong() }.toLongArray())
     }
 
     private fun arrayBindingFrom(arr: FlatZincArray, sample: FlatZincValues): OznValue = when (arr) {
@@ -64,7 +64,7 @@ class OznApplier(oznSource: String) {
 
         is FlatZincArray.FloatParam -> OznValue.ArrayV(arr.values.map { OznValue.FloatV(it) })
 
-        is FlatZincArray.IntSetParam -> OznValue.ArrayV(arr.values.map { OznValue.SetV(it) })
+        is FlatZincArray.IntSetParam -> OznValue.ArrayV(arr.values.map { OznValue.SetV(it.map { value -> value.toLong() }.toLongArray()) })
 
         is FlatZincArray.SetVars -> OznValue.ArrayV(arr.layouts.map { setBindingFrom(it, sample) })
 
