@@ -15,6 +15,24 @@ class FamilyPolicyTest {
         (0 until rounds).count { policy.choose(pair) == family }
 
     @Test
+    fun `complete search deductions preserve family balance before a witness`() {
+        val policy = FamilyPolicy(Random(3))
+
+        repeat(8) { policy.record(ArmFamily.Backtrack, progressed = true, plateau = false) }
+
+        assertTrue(choicesOf(policy, ArmFamily.Backtrack) in 400..600)
+    }
+
+    @Test
+    fun `complete search progress earns family share after a witness`() {
+        val policy = FamilyPolicy(Random(3))
+
+        repeat(8) { policy.record(ArmFamily.Backtrack, progressed = true, plateau = true) }
+
+        assertTrue(choicesOf(policy, ArmFamily.Backtrack) > 800)
+    }
+
+    @Test
     fun `a plateaued local search hands its share to backtrack`() {
         val policy = FamilyPolicy(Random(3))
 

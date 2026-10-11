@@ -160,9 +160,10 @@ object PresolvePipeline {
         // propagation would grind it out one step per round (O(span)). [lpRootInfeasible] builds the root
         // relaxation straight from the declared domains (no bake fixpoint) and certifies infeasibility via
         // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
-        // bake would reach. Gated on span so small models never pay the LP.
-        val wideSpan = Presolve.maxIntSpan(sourceProblem) > sourceProblem.settings.largeSpanThreshold
-        val rootInfeasible = if (!prepared.infeasible && wideSpan) {
+        // bake would reach. Coupled wide columns can feed repeated bound narrowing; an isolated
+        // wide output with bounded integer inputs uses the ordinary bake instead.
+        val wideCoupling = needsWideDomainLp(sourceProblem)
+        val rootInfeasible = if (!prepared.infeasible && wideCoupling) {
             lpRootInfeasibleReporting(
                 sourceProblem,
                 objective,
@@ -194,8 +195,8 @@ object PresolvePipeline {
         // optimum-based bound tightening (OBBT, [lpRootBounds]) collapses each variable's clamped domain in
         // one solve per bound — so the root bake starts from the tightened domains instead of narrowing them
         // one step per round (O(span)). Solution-set-preserving, so it is sound before the bake. Gated on
-        // span so small models never pay the OBBT.
-        val rootBounds = if (wideSpan) {
+        // coupled wide columns so bounded inputs of an isolated output use ordinary propagation.
+        val rootBounds = if (wideCoupling) {
             lpRootBoundsReporting(
                 sourceProblem,
                 objective,
@@ -341,6 +342,26 @@ private fun refit(objective: LinearObjective?, problem: Problem): LinearObjectiv
  */
 private fun phaseCancellation(cancellation: Cancellation, budget: PresolveBudget?): Cancellation =
     budget?.orSpent(cancellation) ?: cancellation
+
+private fun needsWideDomainLp(problem: Problem): Boolean {
+    val threshold = problem.settings.largeSpanThreshold
+    if (Presolve.maxIntSpan(problem) <= threshold) return false
+    val wide = BooleanArray(problem.numIntVars) { v ->
+        val domain = problem.finiteIntDomain(v)
+        val span = domain.max - domain.min
+        domain.min < domain.max && (span < 0L || span > threshold)
+    }
+    for (factor in problem.factors) {
+        var first = -1
+        for (v in factor.intVars) {
+            if (!wide[v]) continue
+            if (factor.variables.reals.isNotEmpty()) return true
+            if (first >= 0 && v != first) return true
+            first = v
+        }
+    }
+    return false
+}
 
 /**
  * A slice of [budget] for one pre-bake root LP, falling back to [cancellation] when the phase carries no

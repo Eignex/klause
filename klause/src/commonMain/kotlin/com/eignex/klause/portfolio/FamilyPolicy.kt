@@ -85,7 +85,9 @@ internal class FamilyPrior(private val successes: DoubleArray, private val failu
  * local-search variant splits the local-search share instead of taking a share of its own from backtrack. Each family
  * starts from [prior], the lean its model's class gives it.
  *
- * A segment that earned credit counts for its family; once an incumbent exists, one that earned none counts against
+ * Before an incumbent exists, only observable progress counts for a family: complete-search deductions do not
+ * predict which family will reach a witness. Once an incumbent exists, credit counts for every family, and a
+ * segment that earned none counts against
  * it when the family is [ArmFamily.observable]. Evidence fades over [halfLife] segments, short enough that a family
  * which stops progressing loses its share within a few of them: a local search stuck on a plateau hands the time to
  * the complete search that can still prove the answer, and wins it back as soon as it improves again.
@@ -108,8 +110,8 @@ internal class FamilyPolicy(
 
     /**
      * Record one segment of [family]: whether it [progressed], and whether a segment that did not counts as a
-     * [plateau]. Before an incumbent exists a local search still descending toward feasibility lowers its record
-     * violation only now and then, and no other family is any closer, so only progress counts.
+     * [plateau]. Before an incumbent exists, local-search violation reductions are observable progress;
+     * complete-search deductions supply no evidence that its family is closer to a witness.
      */
     fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean) {
         val retained = 2.0.pow(-1.0 / halfLife)
@@ -117,7 +119,7 @@ internal class FamilyPolicy(
             successes[i] *= retained
             failures[i] *= retained
         }
-        if (progressed) {
+        if (progressed && (plateau || family.observable)) {
             successes[family.ordinal] += 1.0
         } else if (plateau && family.observable) {
             failures[family.ordinal] += 1.0

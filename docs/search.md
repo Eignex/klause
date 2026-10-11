@@ -247,6 +247,17 @@ The packed native-SAT optimization path and satisfaction/repair construction ret
 their constructor lifecycle. State allocation, occurrence indexes, individual factor
 calls, assumption seeding and LP construction remain atomic work.
 
+Before the first accepted witness, a selected complete-search family runs its
+available arm with the least charged work. Shared clauses, root fixings and
+objective floors remain credited, but cannot exclude a silent search from its
+family's coverage. Before a witness, observable violation reductions can earn
+a family more turns; complete-search root fixings and glue clauses do not favor
+its family, because deduction throughput does not predict the first witness.
+Those counters remain recorded. After the first
+witness, arm selection also follows that policy. Initial admission, preparation
+revisits and explicit minimum time shares retain precedence. A segment reporting
+no charged work uses its slice allowance for coverage accounting.
+
 Slices yield before consuming an alternative or after a completed node. A
 pending sibling cannot be skipped when yielding, and reset discards a pending
 alternative. Constructor refutations return immediately. A rejected last root
@@ -291,8 +302,7 @@ search moves. Projection preparation also retains private invariant and occurren
 progress in batches. Matching arms can continue that shared preparation; a mutex protects
 each batch and publishes only the complete projection. A suspended arm holds no lock.
 Assignment seeding, individual factor calls,
-custom restart policies, subsequent restarts and repair searches remain atomic work
-that can overrun a segment.
+restart policy mutations and repair searches remain atomic work that can overrun a segment.
 Before the first incumbent, an optimization arm with pending private preparation or
 a local-search arm that has not executed an instruction
 receives preparation revisits after all initial siblings have been admitted. Unfinished
@@ -303,7 +313,9 @@ Greedy initialization polls cancellation between variables and retains only comp
 coordinate repairs. Payloads, costs, definition propagation and score caches update normally;
 neighbor configuration marking and tabu/activity tracking are suppressed during repair.
 Its activity epoch resets on completion, cancellation or failure, and ordinary tracking
-resumes afterwards. One variable's bounded value probes remain atomic.
+resumes afterwards. Resumable optimization retains the shuffled coordinate order and
+next coordinate across slice cancellation, completing initial and post-restart repair
+before entering the search walk. One variable's bounded value probes remain atomic.
 Its coordinate eligibility uses the generic move sink's pinned, defined and implicit-owner
 filters, preserving seeded globals and one-way definitions during repair.
 Implicit table moves select values from each support row intersected with root domains.
@@ -433,10 +445,10 @@ update payloads after the assignment changes; their return values are implementa
 and callers must read the post-move degree for scoring. Reified linear invariants offer
 an internal fused payload-update and exact-degree path. Other invariants update payloads
 and then read their degree, independently of the returned apply value.
-Optimization retains its best infeasible restart anchor as a private packed assignment.
-Strict cost improvements copy into that storage; a restart materializes an independent
-sample only when no feasible incumbent supersedes the anchor. Published samples and
-samples retained by custom restart policies remain independent of subsequent updates.
+Optimization restart policies receive only accepted feasible incumbents. Before an
+incumbent, their random-restart fallback can diversify the feasibility walk. Residual
+violation improvements contribute telemetry without becoming restart anchors. Published
+samples and samples retained by custom restart policies remain independent of subsequent updates.
 Optional local-search residual reporting observes committed assignments at loop and
 publication boundaries. Strict cost improvements retain a fresh per-kind sum of the
 maintained factor degrees, paired with their exact total. Probes are not observed.
@@ -498,6 +510,14 @@ bandit or family evidence, preserving their policy state when the probe is disca
 
 See [SliceBudget](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
 and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
+
+The satisfaction backtrack palette includes conservative LP after default and
+aggressive LP. Applicability and LP ceilings filter the palette; the four
+backtrack slots of the default mixed satisfaction pool retain their ordering.
+Root variable shaving and hull pruning remain explicit plan options. Root cuts
+follow the resolved plan. Curated satisfaction workers require an explicit
+`lp-root-cuts=true` override to harvest root cuts; explicit pools retain their
+requested root-cut plans.
 
 ## Statistics
 

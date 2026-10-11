@@ -157,6 +157,19 @@ internal object Suites {
                 )
             },
             DynamicSuite(
+                "miplib2017-csp",
+                "Objective-free MIPLIB 2017 feasibility models with source constraints and bounds retained",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.miplib2017,
+                    CorpusSelection.Layout.Flat("", "mps", familyOf = ::miplibStem),
+                    sel,
+                    Category.CSP,
+                    format = Format.MPS,
+                ).map { it.copy(source = ProblemSource.MpsFeasibility(it.source)) }
+            },
+            DynamicSuite(
                 "dimacs-classic",
                 "SATLIB classic structured DIMACS CNF — diverse, small Boolean set " +
                     "(aim/jnh/dubois/parity/inductive-inference/pigeon-hole/all-interval)",

@@ -70,6 +70,8 @@ internal object CorpusFetcher {
             files[source.index]
         }
 
+        is ProblemSource.MpsFeasibility -> MpsFeasibility.resolve(resolve(source.source))
+
         is ProblemSource.InCode -> error("InCode sources have no file")
     }
 

@@ -411,6 +411,8 @@ data class LpPlan(
      * [bounding]; off by default.
      */
     val booleanRlt: Boolean = false,
+    /** Harvest globally valid cuts before search. Node separation remains independent. */
+    val rootCutHarvest: Boolean = true,
 ) {
     /**
      * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the

@@ -119,6 +119,9 @@ Solver-control flags are common to **every** mode:
 - `--lp <ceiling>` — relaxation ceiling `off`, `conservative`, `default`, or `aggressive`,
   with `+/-<technique>` deltas. Portfolio arms choose intensity below this ceiling.
   `fixed` uses no LP relaxation and accepts only `off` when this flag is supplied.
+- Backtrack overrides `--param lp-variable-shaving=true` and `lp-prune-hulls=true`
+  enable objective-independent root work on satisfaction and optimization models.
+  `lp-root-cuts=false` disables root cut harvesting independently of node separation.
 - `--lp-pricing <policy>` — zero-objective LP entering selection:
   `min-bound-support` (default) or `largest-pivot`.
 - `--exact` — preserve continuous FlatZinc floats and their open bounds; use the shared LRA/LIRA

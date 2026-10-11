@@ -37,7 +37,8 @@ import kotlin.time.TimeSource
  * A bandit-scheduled portfolio of klause solver arms running on `lanes` threads. Each lane repeatedly claims an
  * arm a kumulant [UnivariateBandit] picks, runs it for one segment, and settles what the segment earned; the
  * shared incumbent, bound and pools pass between segments and lanes. One lane is the single-core track, where the
- * policy concentrates the core on whichever arm is making progress; more lanes run that same schedule
+ * policy shares time by family, balancing complete-search work until a witness is accepted and then favoring
+ * arms making progress; more lanes run that same schedule
  * concurrently, never two at once on one arm. With a lane for every arm there is nothing to share, and each lane
  * runs its own arm for the whole solve.
  *
@@ -613,6 +614,7 @@ class Portfolio(
 
         // Segment time each arm has run, and all arms together, for the shares [minShares] owes.
         private val armNanos = LongArray(workers.size)
+        private val armWork = DoubleArray(workers.size)
         private var totalNanos = 0L
         private var slice = baseSliceMillis
         private var sliceWork = baseSliceWork
@@ -727,7 +729,11 @@ class Portfolio(
             val present = free.mapTo(LinkedHashSet()) { policyFamily(it) }
             val eligible = if (improving) present else present.filter { it != ArmFamily.Lns }.ifEmpty { present }
             val family = families.choose(eligible)
-            return armAmong(free.filter { policyFamily(it) == family })
+            val candidates = free.filter { policyFamily(it) == family }
+            // Complete-search progress can remain invisible until a leaf; shared deductions do not
+            // establish which search will reach the first witness.
+            if (!improving && !family.observable) return candidates.minBy { armWork[it] }
+            return armAmong(candidates)
         }
 
         private fun policyFamily(arm: Int): ArmFamily {
@@ -791,6 +797,7 @@ class Portfolio(
             phase: String,
         ) {
             val arm = claim.arm
+            armWork[arm] += if (work > 0L) work else claim.sliceWork
             if (stats != null) {
                 if (cumulative) {
                     liveStats[arm] = stats

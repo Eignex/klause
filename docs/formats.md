@@ -84,6 +84,34 @@ The theory packages cover difference arithmetic, LIA and LRA/LIRA. Bitvectors,
 arrays, strings, quantifiers and unrestricted non-linear arithmetic are outside
 this frontend's supported theory surface.
 
+The exact real component uses a difference graph when every arithmetic row is a
+one-column bound or a two-column difference with an integral normalized bound.
+Boolean guards select active edges. With `n` graph vertices, scaling bounds by
+`n+1` and subtracting one from strict edges preserves every simple cycle's sign,
+including zero-weight strict cycles. Feasible graphs supply rational potentials;
+witnesses still pass the complete source-row check. Infeasible graphs retain the
+shared LP route for conflict explanations and learning. Active source rows remain
+asserted in the shared LP scope whenever that owner is needed. Floating LP solves maintain the basis on graph-feasible
+states; their numerical output supplies no verdict. Graph feasibility replaces
+exact LP point certification below the root and for complete Boolean assignments
+at the root. A complete graph witness passes source validation before numerical
+LP work, so pinned local-search completions need no floating guide. Fully pinned
+difference roots defer LP construction until graph witness validation declines
+or a later source-bound decision requires a shared LP scope. If every
+Boolean is published at the root, initialization waits for those publications
+to reach the theory before checking the pinned arithmetic. Pure-real local-search
+completions keep their source rows and Boolean pins, skipping source presolve
+before the selected exact real theory certifies the leaf. Mixed integer/real
+completions retain source preparation. Bounded potentials from an earlier
+feasible graph seed relaxation, which must still settle every active edge. The
+partial root relaxation and inconclusive floating updates retain the full shared LP solve. Graph admission
+is capped at 10,000 real variables and 100,000 edges. Larger models,
+fractional normalized bounds, unsafe Long magnitudes, disequalities,
+private disjunctions, Boolean arithmetic beyond shared clauses/cardinalities,
+and mixed integer/real models retain the exact LP route.
+Overridden LP certification policies retain the LP route because graph evidence
+has no LP certifier identity. No finite CP domains are created by this graph.
+
 Optimization emits `; objective=<value>` for each incumbent in the source objective's
 direction and `; optimizationStatus=<status>` at completion, including `optimal`,
 `best-found` and `unbounded`. These comments appear without `-s`; `sat` alone

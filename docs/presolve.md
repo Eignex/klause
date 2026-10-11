@@ -100,11 +100,16 @@ Earlier completed passes keep their sound reductions.
 
 ## Pre-bake LP bounds
 
-The finite pipeline runs the pre-bake LP feasibility check when a declared integer
-span exceeds the large-span threshold captured in the model settings. Its optimization-based bound
-queries use the same threshold per variable, in widest-first order. Narrow
-columns retain their declared domains until the root bake and ordinary presolve;
-a wide column does not trigger bound queries over unrelated narrow columns.
+The finite pipeline enters pre-bake LP feasibility and bound tightening when a
+factor couples at least two distinct nonfixed integer columns whose spans exceed
+the large-span threshold captured in the model settings, or couples a wide integer
+column to a continuous column. Isolated wide outputs with narrower integer inputs
+use ordinary root propagation.
+
+Bound queries use the same threshold per variable, in widest-first order, for
+at most 64 columns. Narrow columns remain in the relaxation but retain their
+declared domains until the root bake and ordinary presolve; a wide column does not
+trigger bound queries over unrelated narrow columns.
 Every accepted tightening still requires the LP bound certificate, and skipping
 a query retains all source constraints and feasible values.
 

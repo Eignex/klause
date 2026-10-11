@@ -67,7 +67,7 @@ internal class ShavedBound(val varId: Int, val lo: Long, val hi: Long)
  */
 internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound> {
     if (lpRelaxer == null) return emptyList()
-    val root = PropagationSession(problem)
+    val root = PropagationSession(problem, token)
     if (root.isUnsatAtRoot) return emptyList()
     val out = ArrayList<ShavedBound>()
     var probes = 0
@@ -77,8 +77,12 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
         var lo = d.min
         var hi = d.max
         if (lo >= hi) continue
-        while (lo < hi && probes++ < SHAVE_MAX_ITERS && !token() && infeasibleUnder(v, lo, atMost = true)) lo += 1
-        while (hi > lo && probes++ < SHAVE_MAX_ITERS && !token() && infeasibleUnder(v, hi, atMost = false)) hi -= 1
+        while (lo < hi && probes++ < SHAVE_MAX_ITERS && !token() &&
+            infeasibleUnder(v, lo, atMost = true, token = token)
+        ) lo += 1
+        while (hi > lo && probes++ < SHAVE_MAX_ITERS && !token() &&
+            infeasibleUnder(v, hi, atMost = false, token = token)
+        ) hi -= 1
         if (lo != d.min || hi != d.max) out.add(ShavedBound(v, lo, hi))
     }
     return out
@@ -368,9 +372,9 @@ internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
 /** Whether a fresh root with `v ≤ bound` (or `v ≥ bound` when not [atMost]) is provably infeasible —
  *  propagation Unsat, or an LP infeasibility at an infinite incumbent (so `pruneNode` fires only on a
  *  genuine infeasibility). Sound: a true result proves every solution lies strictly past [bound]. */
-private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean): Boolean {
-    val s = PropagationSession(problem)
-    if (s.isUnsatAtRoot) return false
+private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean, token: Cancellation): Boolean {
+    val s = PropagationSession(problem, token)
+    if (s.isUnsatAtRoot || s.fixpointCancelled || token()) return false
     val assumed = if (atMost) s.implyIntAtMost(v, bound) else s.implyIntAtLeast(v, bound)
     return assumed is PropagationResult.Unsat || pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
 }

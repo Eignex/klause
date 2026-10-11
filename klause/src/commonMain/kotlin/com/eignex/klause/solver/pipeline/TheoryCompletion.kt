@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.CandidateCompletion
 import com.eignex.klause.localsearch.Completion
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BIG_ONE
@@ -34,7 +35,10 @@ internal class TheoryCompletion(private val model: Problem, private val params: 
         ) {
             return Completion.Undecided()
         }
-        val request = OpenTheoryRequest(pinned, componentPlan = plan)
+        // Complete real leaves need source certification rather than another source rewrite schedule.
+        val request = OpenTheoryRequest(pinned, componentPlan = plan).let {
+            if (plan.theoryPipeline == ProblemPipeline.EXACT_LRA) it.withPresolve(PresolveConfig.NONE) else it
+        }
         val decided = OpenTheoryPipeline.execute(
             request,
             params.copy(cancellation = params.cancellation or cancellation),

@@ -27,6 +27,7 @@ import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.ProductionLpCertificationPolicy
 import com.eignex.klause.lp.exactColumnLower
 import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.exactComparison
@@ -101,6 +102,7 @@ class ExactLiraSearchComponent(
     private val disjunctOwner = Any()
     private var disjunctionRegistrationDeclined = false
     private val exactForms = model.factors.map { factor -> factor.linearRows.map { it.exactForm(model.numRealVars) } }
+    private val realDifference by lazy { RealDifferenceSystem.prepare(model, exactForms, operationStop) }
     private var impliedDisjunct = false
     private val reduction = ExactLiraReductionCache(model, exactForms, disjunctionAtoms, { solveContext }) {
         smtStats?.observeSourceLp(it)
@@ -111,6 +113,7 @@ class ExactLiraSearchComponent(
     private var outcome: ComponentCheck? = null
     private var candidate: List<BigFraction>? = null
     private var dirty = true
+    private var sourceInstalled = false
     private var solveContext = LpSolveContext.Production
     private var solveStop: Cancellation? = null
     private var operationAllowance: (Cancellation) -> Cancellation = { it.shorten(0.5) }
@@ -190,7 +193,10 @@ class ExactLiraSearchComponent(
         registerDisjunctions(context)
         beginOperation()
         return try {
-            if (disjunctionRegistrationDeclined || !system.install() || operationStop()) {
+            val pinnedDifferenceRoot = model.numIntVars == 0 &&
+                bools.indices.all { context.boolValue(it) != null } &&
+                solveContext.certificationPolicy === ProductionLpCertificationPolicy && realDifference != null
+            if (disjunctionRegistrationDeclined || (!pinnedDifferenceRoot && !installSource()) || operationStop()) {
                 ComponentResult.Indeterminate
             } else {
                 lp.initialize(context).takeUnless { operationStop() } ?: ComponentResult.Indeterminate
@@ -206,6 +212,7 @@ class ExactLiraSearchComponent(
             if (operationStop()) {
                 ComponentResult.Indeterminate
             } else {
+                if (decision is SearchDecision.Theory && !installSource()) return ComponentResult.Indeterminate
                 val result = lp.assertWithin(decision, context, operationStop)
                 if (operationStop()) ComponentResult.Indeterminate else result
             }
@@ -446,7 +453,13 @@ class ExactLiraSearchComponent(
         return ComponentResult.Consistent
     }
 
+    private fun installSource(): Boolean {
+        if (sourceInstalled) return true
+        return system.install().also { sourceInstalled = it }
+    }
+
     private fun assertSource(context: SearchContext): Boolean {
+        if (!installSource()) return false
         val disequalities = ArrayList<Triple<RowAddress, ExactComparison, SearchAtomPremise>>()
         for ((factorIndex, factor) in model.factors.withIndex()) {
             for ((index, row) in factor.linearRows.withIndex()) {
@@ -537,6 +550,10 @@ class ExactLiraSearchComponent(
     private fun relaxWithin(context: SearchContext): ComponentResult {
         if (operationStop()) return ComponentResult.Indeterminate
         if (!dirty) return ComponentResult.Consistent
+        // Root publications precede their delivery to components during shared initialization.
+        if (context.decisionLevel == 0 && bools.any { it == UNASSIGNED } &&
+            bools.indices.all { context.boolValue(it) != null }
+        ) return ComponentResult.Consistent
         val enforced = enforceDisjunctions(context)
         if (enforced !is ComponentResult.Consistent) return enforced
         // The implied row is not asserted yet; solving now would only be repeated once it is delivered.
@@ -547,11 +564,64 @@ class ExactLiraSearchComponent(
         ) {
             return ComponentResult.Consistent
         }
+        var checked = false
+        // A pinned root can certify its source witness without preparing a numerical basis.
+        if (!sourceInstalled && context.decisionLevel == 0 && bools.none { it == UNASSIGNED }) {
+            if (!context.consumeCheck()) return ComponentResult.Indeterminate
+            checked = true
+            when (val result = realDifference?.check(bools, operationStop)) {
+                RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
+                is RealDifferenceSystem.Result.Feasible -> {
+                    candidate = result.point
+                    acceptWitness(result.point)?.let {
+                        assignment = it
+                        outcome = ComponentCheck.Feasible
+                        dirty = false
+                        return ComponentResult.Consistent
+                    }
+                }
+                else -> Unit
+            }
+        }
         val asserted = assertSource(context)
         if (!asserted || operationStop()) {
             return ComponentResult.Indeterminate
         }
-        if (!context.consumeCheck()) return ComponentResult.Indeterminate
+        // Graph evidence has no LP certifier identity to offer an overridden acceptance policy.
+        val completeBooleans = bools.none { it == UNASSIGNED }
+        if (!checked && (context.decisionLevel > 0 || completeBooleans) && node.sourceBranches.isEmpty() &&
+            solveContext.certificationPolicy === ProductionLpCertificationPolicy
+        ) {
+            realDifference?.let { graph ->
+                if (!context.consumeCheck()) return ComponentResult.Indeterminate
+                checked = true
+                when (val result = graph.check(bools, operationStop)) {
+                    RealDifferenceSystem.Result.Interrupted -> return ComponentResult.Indeterminate
+                    // Shared LP explanations keep conflict learning on the same source proof surface.
+                    RealDifferenceSystem.Result.Infeasible -> Unit
+                    is RealDifferenceSystem.Result.Feasible -> {
+                        if (completeBooleans) {
+                            candidate = result.point
+                            acceptWitness(result.point)?.let {
+                                assignment = it
+                                outcome = ComponentCheck.Feasible
+                                dirty = false
+                                return ComponentResult.Consistent
+                            }
+                        } else {
+                            val floating = lp.solveFloat()
+                            if (operationStop()) return ComponentResult.Indeterminate
+                            if (floating?.second != null) {
+                                dirty = false
+                                return ComponentResult.Consistent
+                            }
+                        }
+                        if (operationStop()) return ComponentResult.Indeterminate
+                    }
+                }
+            }
+        }
+        if (!checked && !context.consumeCheck()) return ComponentResult.Indeterminate
         val result = lp.solve(sparsePointRecovery = true)
             ?: return ComponentResult.Indeterminate
         if (operationStop()) return ComponentResult.Indeterminate

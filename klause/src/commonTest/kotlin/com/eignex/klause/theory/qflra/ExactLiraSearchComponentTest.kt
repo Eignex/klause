@@ -26,6 +26,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
 import com.eignex.klause.solver.result.SmtStatsSink
+import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -52,6 +53,100 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExactLiraSearchComponentTest {
+    @Test
+    fun `a guarded strict witness satisfies its source interval`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        for (atRoot in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                val decision = SearchDecision.Bool(Lit.make(0, false))
+                val clauses = if (atRoot) {
+                    listOf(ClauseSearchComponent(listOf(Clause(intArrayOf(decision.literal)))))
+                } else {
+                    emptyList()
+                }
+                val session = SearchSession(clauses + component, atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                if (atRoot) {
+                    assertEquals(0, session.decisionLevel)
+                } else {
+                    assertIs<ComponentResult.Consistent>(session.push(decision))
+                }
+
+                val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+
+                val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+                assertEquals(false, witness.bools.single())
+                assertTrue(witness.reals.single() > BigFraction.ZERO)
+                assertTrue(witness.reals.single() < BigFraction.ONE)
+            }
+        }
+    }
+
+    @Test
+    fun `guarded real conflicts survive a feasible sibling`() {
+        val model = Problem(
+            numBoolVars = 2,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.LE, 0.0),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                    doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+            assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(Lit.make(1, true))))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, false))))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+            val result = session.push(SearchDecision.Bool(Lit.make(1, true)))
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
+    @Test
+    fun `a false source clause conflicts despite feasible real bounds`() {
+        val model = Problem(
+            numBoolVars = 1,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+            factors = arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+
+            val result = session.push(SearchDecision.Bool(Lit.make(0, false)))
+
+            assertIs<ComponentResult.Conflict>(result)
+        }
+    }
+
     @Test
     fun `compound disjunct conflicts retain their Boolean names`() {
         for ((relation, values, fixed) in listOf(
@@ -318,6 +413,34 @@ class ExactLiraSearchComponentTest {
 
             assertTrue(stats.snapshot().sourceLp.operations > 0L)
             assertEquals(0L, stats.snapshot().unexplainedConflicts)
+        }
+    }
+
+    @Test
+    fun `a source bound after a root graph witness retains conflicts and retraction`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.GE, 1.0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val split = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
+
+            assertContentEquals(intArrayOf(split.negative.literal), assertNotNull(conflict.explanation).literals)
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
         }
     }
 

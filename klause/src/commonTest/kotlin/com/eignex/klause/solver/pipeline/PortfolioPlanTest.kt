@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.portfolio.BacktrackCatalog
@@ -73,6 +74,22 @@ class PortfolioPlanTest {
             LinearObjective(realCoefficients = doubleArrayOf(0.0)))) {
             assertTrue(continuousLpShares(scenario, profile, labels, objective).isEmpty())
         }
+    }
+
+    @Test
+    fun `root LP overrides preserve independent node techniques`() {
+        val params = EngineParams(listOf("lp-variable-shaving=true", "lp-prune-hulls=true", "lp-root-cuts=false"))
+        val edit = checkNotNull(backtrackOverride(params, allowSelectors = true))
+        val base = BacktrackParams(lpPlan = LpPlan(bounding = true, cuts = true))
+
+        val edited = edit(base)
+        params.finish("backtrack", BACKTRACK_OVERRIDE_KEYS.joinToString())
+
+        assertTrue(edited.lpPlan.variableShaving)
+        assertTrue(edited.lpPlan.pruneHulls)
+        assertFalse(edited.lpPlan.rootCutHarvest)
+        assertTrue(edited.lpPlan.cuts)
+        assertTrue(edited.lpPlan.bounding)
     }
 
     @Test

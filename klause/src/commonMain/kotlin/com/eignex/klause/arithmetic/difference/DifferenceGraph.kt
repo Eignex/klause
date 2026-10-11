@@ -15,7 +15,7 @@ internal sealed interface Potentials {
     /** A negative cycle: the system has no solution. */
     data object Infeasible : Potentials
 
-    /** The budget was spent before the sweeps settled, so nothing is claimed either way. */
+    /** The budget or arithmetic range prevented a completed sweep, so nothing is claimed. */
     data object Abandoned : Potentials
 }
 
@@ -88,8 +88,14 @@ internal class DifferenceGraph(val numVars: Int) {
     }
 
     /** Vertex potentials witnessing feasibility, or why none were produced. */
-    fun potentials(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): Potentials {
-        val dist = LongArray(numVars)
+    fun potentials(
+        active: BooleanArray? = null,
+        cancelled: () -> Boolean = { false },
+        initial: LongArray? = null,
+    ): Potentials {
+        require(initial == null || initial.size == numVars)
+        val dist = initial?.copyOf() ?: LongArray(numVars)
+        val predecessor = IntArray(numVars) { -1 }
         var untilPoll = POLL_INTERVAL
         repeat(numVars) {
             if (cancelled()) return Potentials.Abandoned
@@ -102,16 +108,41 @@ internal class DifferenceGraph(val numVars: Int) {
                 if (active != null && !active[e]) continue
                 val u = from[e]
                 val v = to[e]
-                if (addOverflows(dist[u], weight[e])) continue
+                if (addOverflows(dist[u], weight[e])) return Potentials.Abandoned
                 val relaxed = dist[u] + weight[e]
                 if (relaxed < dist[v]) {
                     dist[v] = relaxed
+                    predecessor[v] = e
                     changed = true
                 }
             }
             if (!changed) return Potentials.Found(dist)
+            if (hasNegativePredecessorCycle(predecessor)) return Potentials.Infeasible
         }
         return Potentials.Infeasible
+    }
+
+    private fun hasNegativePredecessorCycle(predecessor: IntArray): Boolean {
+        val visited = IntArray(numVars) { -1 }
+        for (start in 0 until numVars) {
+            var vertex = start
+            while (visited[vertex] == -1 && predecessor[vertex] >= 0) {
+                visited[vertex] = start
+                vertex = from[predecessor[vertex]]
+            }
+            if (visited[vertex] != start) continue
+            val cycleStart = vertex
+            var sum = 0L
+            var overflow = false
+            do {
+                val edge = predecessor[vertex]
+                if (addOverflows(sum, weight[edge])) overflow = true
+                sum += weight[edge]
+                vertex = from[edge]
+            } while (vertex != cycleStart)
+            if (!overflow && sum < 0L) return true
+        }
+        return false
     }
 
     /**
