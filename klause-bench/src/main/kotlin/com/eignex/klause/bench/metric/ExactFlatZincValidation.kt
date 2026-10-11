@@ -31,7 +31,8 @@ internal object ExactFlatZincValidation {
 
         init {
             for (line in coordinates.lineSequence()) {
-                val assignment = line.removePrefix("% klause-exact: ").removePrefix("% klause-coordinate: ").trim().removeSuffix(";")
+                val assignment = line.removePrefix("% klause-exact: ").removePrefix("% klause-coordinate: ")
+                    .trim().removeSuffix(";")
                 val name = assignment.substringBefore('=').trim()
                 require(name.matches(Regex("[A-Za-z_][A-Za-z_0-9]*(\\[[0-9]+])?"))) { "malformed coordinate" }
                 require(name !in values) { "duplicate coordinate $name" }
@@ -150,7 +151,8 @@ internal object ExactFlatZincValidation {
                 val index = numeric(args[0])
                 require(index.integral) { "non-integer array index" }
                 val values = array(args[1])
-                val selected = values.indices.firstOrNull { index.compareTo(number((it + 1).toString())) == 0 } ?: return false
+                val selected = values.indices.firstOrNull { index.compareTo(number((it + 1).toString())) == 0 }
+                    ?: return false
                 return equal(values[selected], args[2])
             }
             val base = name.removeSuffix("_reif").removeSuffix("_imp")
