@@ -13,15 +13,17 @@ The [build](../../klause/build.gradle.kts) pins immutable timestamps for both th
 alone is insufficient because its Gradle metadata redirects to mutable platform snapshots. Strict
 platform constraints propagate into klause publications.
 
+The pins consume Koblas revision `c001f98d9568324a65b669b2103602cde3868c65`,
+published by its [snapshot workflow](https://github.com/Eignex/koblas/actions/runs/38115348971).
 Koblas coordinates use group `com.eignex`:
 
 | Module | Version | Binary SHA-256 |
 |---|---|---|
-| koblas | `0.1.1-20261010.075742-252` | `17b03f939e9ce00ba52ed00bb31168d2de117e41fcecc487d7ed00a9f39315d4` |
-| koblas-jvm | `0.1.1-20261010.075742-255` | `cf9486a34f4a1797ce477109594c3fb3858e8eebea7ecbc30ea263de53a8895d` |
-| koblas-linuxx64 | `0.1.1-20261010.075742-251` | `73c45c5864043692881abdab2f1d46ea33cc669c38c962673c6c7e0cad462163` |
-| koblas-linuxarm64 | `0.1.1-20261010.075742-252` | `3bf20b0e962a848dc4c5a0e9dccbdf371a21b3d241a3fc9e8b891d16a159c70d` |
-| koblas-macosarm64 | `0.1.1-20261010.075548-275` | `6a7081084c0bc8bdd0eb236ad3a4526d172f8c3581f2a9cd447cf51266af5a6d` |
+| koblas | `0.1.1-20261011.054003-257` | `2e09140ac35d8da98d2e15fd259a73f86ec3237bddc556152c7378cefe55c1e9` |
+| koblas-jvm | `0.1.1-20261011.054003-260` | `b12d7927421bedf8f166a5402e8121830486f666afe44cfef33bb4cf87562127` |
+| koblas-linuxx64 | `0.1.1-20261011.054003-256` | `a087dbf22d9bcd5b690c0555104999e049af48a2c1c2e4cb2f8ff9adef7dbd0b` |
+| koblas-linuxarm64 | `0.1.1-20261011.054003-257` | `54062376e00b9c0840101af0d59d38cb448a95d0191a92dff0115f13a721c57d` |
+| koblas-macosarm64 | `0.1.1-20261011.053716-280` | `d4ef605ceef8071ffa883e597eb6a4381cd28d8528db570bd2154acd8cfc8054` |
 
 The build does not consult Maven Local. For source integration, use Gradle's supported composite
 substitution with an isolated checkout at the revision under test:
@@ -60,7 +62,7 @@ dependencies when updating either library.
 
 | Consumer | Integration contract |
 |---|---|
-| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Each builder owns fixed-size LU scratch; solve-quality checks reuse one dense product buffer. Factor materialization and updates allocate their owned output arrays directly. The bounded dense LU path uses GER with owner-local matrix/vector buffers and publishes owned CSC factors; arithmetic guards and failed-attempt work remain in Klause. |
+| `simplex.basis` | Zero-based sorted unique CSC, owned source/factor copies, explicit stored zeros, retained permutations and fixed-dimension ownership. Each builder owns fixed-size LU scratch; solve-quality checks reuse one dense product buffer. Factor materialization and updates allocate their owned output arrays directly. The bounded dense LU path uses windowed GER on trailing squares in owner-local matrix/vector buffers and publishes owned CSC factors; arithmetic guards and failed-attempt work remain in Klause. |
 | Sparse slice workflows | Validate windows, indices, capacity and overlap before mutation. Unique scatter/touched support, first-touch order, structural zeros until explicit compaction, positive-zero clearing. Checked scatter delegates to generic primitives; checked dot preserves scalar input order and underflow/nonfinite diagnostics. |
 | `lp.engine` | Pricing and column updates use indexed kernels; checked workflows retain solver semantics. Scaling/refinement keep guarded powers of two, exact accumulation and source maps. No dense vendor Level 2/3 call is required. |
 | `util.SparseSlices` | Shared validated slice workflows serve the LP engine and basis without adding a solver-layer dependency. Other array/permutation/domain helpers have no koblas consumers. |
@@ -71,6 +73,14 @@ Unchecked reductions may reassociate or fuse arithmetic according to the selecte
 Klause does not use vendor `iamax` to choose pivots; masked maximum and candidate positions retain
 their own finite-value and ordering contract. Exact proof checks, work/cancellation budgets, repair
 receipts and scoped replacement ownership remain solver responsibilities.
+
+Windowed GER retains the parent matrix leading dimension and validates matrix and vector
+ranges before mutation. Its built-in panel kernels update the rectangle directly; the
+nonaliasing basis buffers need no vector views or scratch allocation. Each elimination
+step uses matching matrix, multiplier and pivot-row offsets. At order six, five calls
+cover 55 entries in total. Klause retains product overflow/nonzero-underflow checks and
+post-update finite checks around these calls. The `GerWindow` route uses portable panel
+kernels, including on host engines with an installed vendor library.
 
 ## Runtime support
 

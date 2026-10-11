@@ -122,8 +122,10 @@ owner has fixed dimension, named columns, both permutations and three-valued
 update results. Operation-owned buffers control scratch lifetime.
 `KotlinBasisSolver.refactorize` selects dense partial-row-pivot LU only for dimensions
 2–6 with at least 50% nonzero selected entries and more nonzeros than rows. The selected basis, rather than the
-whole source matrix or stored zeros, determines density. Koblas GER performs Schur
-updates; finite arithmetic and nonzero-underflow guards precede factor publication.
+whole source matrix or stored zeros, determines density. Windowed Koblas GER updates only
+the trailing square in owner-local buffers, retaining the parent leading dimension.
+Finite arithmetic and nonzero-underflow guards precede factor publication; work accounting
+charges the updated rectangle and all checked entries.
 Dense elimination materializes the same owned CSC factors and permutations used by
 sparse solves and Forrest-Tomlin updates. A numerical decline retries sparse LU and
 charges both attempts. Logical repair retains sparse construction and its existing

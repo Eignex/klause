@@ -13,6 +13,8 @@ The basis owner selects dense LU for dimensions 2–6 with at least 50% selected
 nonzeros and more nonzeros than rows. This conservative envelope is supported by
 production-relaxation captures and the committed
 [basis corpus](../testing/fixtures.md#basis-corpus).
+Direct captured factor-build evidence favoring dense construction is at order six;
+orders 2–5 remain within the bounded rule.
 
 On Linux amd64, JDK 25.0.1 and Koblas JVM artifact
 `cf9486a34f4a1797ce477109594c3fb3858e8eebea7ecbc30ea263de53a8895d`,
