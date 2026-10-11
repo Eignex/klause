@@ -29,6 +29,7 @@ internal object MiniZincMode : CliMode {
         private var unboundedIntLo: Long? = null
         private var unboundedIntHi: Long? = null
         private var outputObjective = false
+        private var floatApproximation = false
         private var unboundedFloatLo: Double? = null
         private var unboundedFloatHi: Double? = null
 
@@ -86,6 +87,7 @@ internal object MiniZincMode : CliMode {
                 exactFloats = common.exact,
             )
             val program = executionProgram.program
+            floatApproximation = program.floatVarsByName.values.any { !it.lpOnly }
             cliLogger(common.verbose).v {
                 "parsed $path: bools=${program.problem.numBoolVars} ints=${program.problem.numIntVars} " +
                     "factors=${program.problem.numFactors}"
@@ -179,12 +181,12 @@ internal object MiniZincMode : CliMode {
         private fun parseFloatBound(raw: String): Double = raw.toDoubleOrNull()?.takeIf { it.isFinite() }
             ?: usageError("unbounded float bounds must be finite numbers, got `$raw`")
 
-        override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput()
+        override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation)
     }
 }
 
 /** MiniZinc's standard FZN solution protocol. */
-internal class MiniZincOutput : OutputProtocol {
+internal class MiniZincOutput(private val floatApproximation: Boolean = false) : OutputProtocol {
     private var context: VerdictContext = VerdictContext()
 
     override fun onVerdictContext(context: VerdictContext) {
@@ -202,7 +204,8 @@ internal class MiniZincOutput : OutputProtocol {
     }
 
     override fun onComplete(verdict: Verdict) {
-        when (verdict) {
+        if (floatApproximation) println("% klause-float-claim: grid search; source witness check required; no source proof")
+        when (flatZincSourceVerdict(verdict, floatApproximation)) {
             Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
 
             // Incumbents already streamed; printing `==========` would falsely claim optimality.
@@ -216,7 +219,7 @@ internal class MiniZincOutput : OutputProtocol {
             // standard terminator without changing what the protocol promises.
             Verdict.UNKNOWN -> {
                 println("=====UNKNOWN=====")
-                println("% ${context.softVerdictCause()}")
+                println("% ${if (floatApproximation) "grid search cannot prove the source model" else context.softVerdictCause()}")
             }
         }
     }
@@ -247,5 +250,15 @@ internal class MiniZincOutput : OutputProtocol {
         printStatPairs("%%%mzn-stat:", lpStatPairs(stats))
         printStatPairs("%%%mzn-stat:", portfolioStatPairs(stats))
         println("%%%mzn-stat-end")
+    }
+}
+
+internal fun flatZincSourceVerdict(verdict: Verdict, approximation: Boolean): Verdict = if (!approximation) {
+    verdict
+} else {
+    when (verdict) {
+        Verdict.OPTIMAL -> Verdict.BEST_FOUND
+        Verdict.UNSATISFIABLE, Verdict.UNBOUNDED -> Verdict.UNKNOWN
+        else -> verdict
     }
 }

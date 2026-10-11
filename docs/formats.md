@@ -98,7 +98,9 @@ float literals as binary64 rationals and checking exact coordinates without roun
 Its `flatzinc-binary64` scope is distinct from pinning original MiniZinc source.
 Mixed exact/grid witnesses retain rational exact coordinates and the exact binary64
 value of each decoded grid point, together with `% klause-float-component:` comments
-identifying representation and approximation reason. These coordinate comments do
+identifying representation and approximation reason. Mixed/grid samples use
+`% klause-coordinate:` rather than `% klause-exact:`. Grid CLI completion suppresses
+optimum markers and turns grid refutation or unboundedness into unknown. These coordinate comments do
 not certify an approximated component. Missing exact coordinates or unsupported
 source predicates leave validation unknown.
 
