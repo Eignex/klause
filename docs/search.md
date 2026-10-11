@@ -132,9 +132,32 @@ The reversible live prefix is committed once per completed sweep, including
 empty-prefix conflicts; sibling branches restore filtering from trailed state.
 
 LP explanations cite selected source bound witnesses and recursively expanded
-row, fixing and cutoff premises. Current CP propagation and source LP conflicts
-do not include an optional exact-theory row-propagation scanner or explanation
-weakening pass. See [LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
+row, fixing and cutoff premises. See
+[LP consumer contracts](lp/architecture.md#consumers-explanations-and-cuts).
+
+The complete integer theory checks source equality paths before invoking the LP.
+Equalities with one coefficient or two coefficients of equal magnitude form a
+weighted forest, including declared fixed columns. Its links retain offsets and
+sign reversals, representing `x - y = c` and `x + y = c`.
+Exact signed offsets decide comparisons even when no individual column has a
+bound. Explanation paths cite the selected source guards, including complemented
+disequalities. Comparisons whose root does not cancel also cite its fixing path.
+Active disequalities exclude matching comparisons after their sides are
+canonicalized to forest components, citing both paths and the disequality guard.
+Signed paths leaving twice one open integer root reject incompatible parity;
+the root stays open and compatible parity remains undecided.
+
+Larger expressions can be constant when their signed coefficients cancel within
+each component. Active larger equalities and sign-changing cycles reduce against
+the forest for at most four passes. Supported residuals add integer offset facts;
+nonintegral or inconsistent residuals refute their active guards. Each batch
+captures immutable source and offset premises before adding its facts.
+Unsupported residuals remain with the complete theory; the pass limit establishes
+no verdict. The forest is rebuilt from current assertions, so retraction drops
+their effects. Wide offsets remain with the full theory. The scan does not
+materialize finite CP domains or publish feasibility. Ordinary cancellation is
+polled within 64 visits and before publishing each implication or conflict;
+metered tokens retain immediate checks at every scan visit.
 
 ## Learned-clause retention
 
