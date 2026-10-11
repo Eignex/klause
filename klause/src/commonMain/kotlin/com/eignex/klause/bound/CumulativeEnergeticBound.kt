@@ -27,8 +27,10 @@ import com.eignex.klause.util.subExact
  * subproblem via min-cost flow. Those overlap heavily with klause's existing theta-tree / edge-finding
  * propagation; this check is the sound, self-contained slice.
  */
-internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilityBound {
-    private val factors: List<Cumulative> = problem.factors.filterIsInstance<Cumulative>()
+internal class CumulativeEnergeticBound(
+    problem: Problem,
+    private val factors: List<Cumulative> = problem.factors.filterIsInstance<Cumulative>(),
+) : SchedulingFeasibilityBound {
 
     val applicable: Boolean get() = factors.isNotEmpty()
 

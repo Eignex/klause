@@ -22,6 +22,9 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
+import com.eignex.klause.lp.prepareRootBoxes
+import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RootBoxes
@@ -111,6 +114,13 @@ object LpAutoConfig {
      */
     @Suppress("CyclomaticComplexMethod")
     fun resolve(problem: Problem, config: LpConfig, base: LpPlan = LpPlan()): LpPlan {
+        var result: LpPlan? = null
+        sequence<Unit> { result = prepare(problem, config, base) }.forEach { }
+        return checkNotNull(result)
+    }
+
+    internal suspend fun SequenceScope<Unit>.prepare(problem: Problem, config: LpConfig, base: LpPlan): LpPlan {
+        var visits = 0
         var lpEmittable = false
         var allDifferent = false
         var globalCardinality = false
@@ -130,6 +140,7 @@ object LpAutoConfig {
         var product = false
         var rows = 0L
         for (f in problem.factors) {
+            if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             when (f) {
                 is Linear -> {
                     lpEmittable = true
@@ -211,12 +222,20 @@ object LpAutoConfig {
         // smallest-first only while the combined `base + accepted` tableau stays under the budget — so
         // a stack of hulls (Table + NValue + Circuit + time-indexed) can't defeat the guard: the
         // largest are shed and the base LP still runs.
-        val makespanPlans = if (scheduling) CumulativeRelaxation(problem).plans.size else 0
+        val makespanPlans = if (scheduling) {
+            val owner = CumulativeRelaxation(problem, deferred = true)
+            owner.preparation().forEach { yield(Unit) }
+            owner.plans.size
+        } else {
+            0
+        }
         rows += makespanPlans.toLong()
         // Diffn contributes the same kind of makespan row, one per derived axis plan (over an existing
         // column), counted separately so it gates under its own technique rather than lpCumulative.
         val diffnPlans = if (diffn) {
-            CumulativeRelaxation(problem, includeCumulative = false, includeDiffn = true).plans.size
+            val owner = CumulativeRelaxation(problem, includeCumulative = false, includeDiffn = true, deferred = true)
+            owner.preparation().forEach { yield(Unit) }
+            owner.plans.size
         } else {
             0
         }
@@ -264,16 +283,18 @@ object LpAutoConfig {
                 // The whole-table root-box reading copies, so it is materialized on the first family
                 // that needs it and shared from there — never per family, and never on a model
                 // carrying no hull factor at all.
-                val boxes = lazy(LazyThreadSafetyMode.NONE) { RootBoxes(problem) }
+                var boxes: RootBoxes? = null
+                suspend fun SequenceScope<Unit>.rootBoxes(): RootBoxes =
+                    boxes ?: prepareRootBoxes(problem).also { boxes = it }
                 // Per-factor hull sizes come from each factor's LP hull estimate (single source with
                 // the build); the driver-emitted circuit arcs and time-indexed model keep their own.
                 if (circuit) admit(circuitEstimate(problem))
-                if (constArrayElement) admit(hullEstimate(problem, boxes, LpTechnique.ELEMENT, HullFamily.ELEMENT))
-                if (table) admit(hullEstimate(problem, boxes, LpTechnique.TABLE, HullFamily.TABLE))
-                if (nValue) admit(hullEstimate(problem, boxes, LpTechnique.NVALUE, HullFamily.NVALUE))
-                if (regular) admit(hullEstimate(problem, boxes, LpTechnique.REGULAR, HullFamily.REGULAR))
-                if (mdd) admit(hullEstimate(problem, boxes, LpTechnique.MDD, HullFamily.MDD))
-                if (gccCount) admit(hullEstimate(problem, boxes, LpTechnique.GCC_COUNT, HullFamily.GCC_COUNT))
+                if (constArrayElement) admit(hullEstimate(problem, rootBoxes(), LpTechnique.ELEMENT, HullFamily.ELEMENT))
+                if (table) admit(hullEstimate(problem, rootBoxes(), LpTechnique.TABLE, HullFamily.TABLE))
+                if (nValue) admit(hullEstimate(problem, rootBoxes(), LpTechnique.NVALUE, HullFamily.NVALUE))
+                if (regular) admit(hullEstimate(problem, rootBoxes(), LpTechnique.REGULAR, HullFamily.REGULAR))
+                if (mdd) admit(hullEstimate(problem, rootBoxes(), LpTechnique.MDD, HullFamily.MDD))
+                if (gccCount) admit(hullEstimate(problem, rootBoxes(), LpTechnique.GCC_COUNT, HullFamily.GCC_COUNT))
                 if (scheduling) admit(timeIndexedEstimate(problem))
             }
         }
@@ -370,11 +391,13 @@ object LpAutoConfig {
 
     /** Arc-model columns (`Σ` candidate arcs) + degree/channel rows over the under-cap [Circuit] /
      *  [Circuit] factors (mirrors `CpToLpRelaxation.buildArcModel`; subcircuit keeps self-loop arcs). */
-    private fun circuitEstimate(problem: Problem): HullEstimate? {
+    private suspend fun SequenceScope<Unit>.circuitEstimate(problem: Problem): HullEstimate? {
+        var visits = 0
         var cols = 0L
         var rows = 0L
         var any = false
         for (f in problem.factors) {
+            if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             val circuitFactor = f as? Circuit ?: continue
             val succ = circuitFactor.succ
             val selfLoops = circuitFactor.subcircuit
@@ -395,18 +418,20 @@ object LpAutoConfig {
     /** The aggregate hull size of every factor in the [family] convex-hull family, summing each factor's
      *  own LP hull estimate — the single source shared with the build, so
      *  the gating estimate cannot drift from the rows actually emitted. */
-    private fun hullEstimate(
+    private suspend fun SequenceScope<Unit>.hullEstimate(
         problem: Problem,
-        boxes: Lazy<RootBoxes>,
+        boxes: RootBoxes,
         technique: LpTechnique,
         family: HullFamily,
     ): HullEstimate? {
+        var visits = 0
         var cols = 0L
         var rows = 0L
         var any = false
         for (f in problem.factors) {
+            if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             if (f.lpHullFamily() != family) continue
-            val e = f.estimateLpHull(boxes.value) ?: continue
+            val e = f.estimateLpHull(boxes) ?: continue
             cols += e.cols
             rows += e.rows
             any = true
@@ -416,11 +441,13 @@ object LpAutoConfig {
 
     /** Time-indexed `x_{i,t}` columns + resource/assignment/channel rows over the bounded-horizon
      *  scheduling factors, honouring the horizon / column caps (mirrors `buildCumulativeTimeIndexed`). */
-    private fun timeIndexedEstimate(problem: Problem): HullEstimate? {
+    private suspend fun SequenceScope<Unit>.timeIndexedEstimate(problem: Problem): HullEstimate? {
+        var visits = 0
         var cols = 0L
         var rows = 0L
         var any = false
-        for (v in schedulingViews(problem)) {
+        for (v in prepareSchedulingViews(problem)) {
+            if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             // Mirrors the build's own decline: a view with an open-sided start gets no time-indexed
             // model, so its columns must not enter the estimate either.
             if (!problem.statesBothBounds(v.starts)) continue
@@ -430,6 +457,7 @@ object LpAutoConfig {
             var c = 0L
             var ok = true
             for (i in 0 until n) {
+                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
                 val dom = problem.rootDomainOf(v.starts[i])
                 if (dom.max < dom.min) {
                     ok = false

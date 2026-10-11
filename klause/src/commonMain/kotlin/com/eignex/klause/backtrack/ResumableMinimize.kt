@@ -324,7 +324,8 @@ internal class ResumableMinimize(
             sink.search.rootPropagationNanos = { it.session.rootPropagationNanos }
         }
         yield(Unit)
-        lpEngine = LpEngine(problem, objective, params.lpParams(), sink, solver.lpSolveContext)
+        lpEngine = LpEngine(problem, objective, params.lpParams(), sink, solver.lpSolveContext, deferred = true)
+        lpEngine.preparation().forEach { yield(Unit) }
         lpEngine.lpHints = lpHints
         yield(Unit)
         brancher = BacktrackBrancher(
@@ -713,9 +714,10 @@ internal class ResumableMinimize(
     /** Assert the incumbent bound on the objective var at the root; true iff that empties the root
      *  (optimum proven). */
     private fun assertObjectiveBoundAtRoot(): Boolean {
-        val objectiveVar = singleObj?.varId ?: return postBoolObjectiveCutoffAtRoot()
+        val selected = singleObj ?: return postBoolObjectiveCutoffAtRoot()
+        val objectiveVar = selected.varId
         val b = objVarBest ?: return false
-        val ascending = singleObj.ascending
+        val ascending = selected.ascending
         val threshold = if (ascending) b - 1 else b + 1
         if (threshold == lastObjBoundAsserted) return false
         lastObjBoundAsserted = threshold
@@ -803,7 +805,7 @@ internal class ResumableMinimize(
         val score = SourceObjectiveScore(o, exact)
         if (incumbents.offer(sample, score) !is Publication.Installed) return null
         brancher.onSolution(sample)
-        if (singleObj != null) objVarBest = sample.intValue(singleObj.varId)
+        singleObj?.let { objVarBest = sample.intValue(it.varId) }
         params.improvedSolutionSink?.invoke(sample, score.display)
         params.onEvent?.invoke(SearchEvent.Incumbent(score.display))
         // Carry the counters as they stand. A caller that consumes the improvement stream and stops when

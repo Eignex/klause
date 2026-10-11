@@ -9,6 +9,10 @@ import com.eignex.klause.bound.SchedulingFeasibilityBound
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
+import com.eignex.klause.util.constructionLongArray
+import com.eignex.klause.lp.relaxation.prepareSchedulingViews
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.AllDifferentSeparator
@@ -95,6 +99,7 @@ internal class LpEngine(
     params0: LpParams,
     internal val sink: SolveStatsSink,
     internal val solveContext: LpSolveContext = LpSolveContext.Production,
+    private val deferred: Boolean = false,
 ) : AutoCloseable {
     private var closed = false
 
@@ -180,8 +185,8 @@ internal class LpEngine(
      *  against this problem's structure; with no emphasis set, the explicit
      *  [LpParams.lpPlan] is used verbatim. Resolving here makes the engine the single home for
      *  the intent→plan step, so callers carry only the intent and never a separately-resolved copy. */
-    val params: LpParams =
-        params0.lpConfig?.let { params0.copy(lpPlan = LpAutoConfig.resolve(problem, it, params0.lpPlan)) } ?: params0
+    var params: LpParams = params0
+        private set
 
     internal val pricingOptions: LpPricingOptions
         get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L)
@@ -191,7 +196,11 @@ internal class LpEngine(
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
      *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor
      *  hulls ([suppressedHullFactors]) turned off. */
-    private fun buildRelaxer(plan: LpPlan, suppressedHullFactors: Set<Int> = emptySet()): CpToLpRelaxation? =
+    private fun buildRelaxer(
+        plan: LpPlan,
+        suppressedHullFactors: Set<Int> = emptySet(),
+        deferred: Boolean = false,
+    ): CpToLpRelaxation? =
         if (plan.bounding) {
             CpToLpRelaxation(
                 problem,
@@ -213,6 +222,7 @@ internal class LpEngine(
                 booleanRlt = plan.booleanRlt,
                 suppressedHullFactors = suppressedHullFactors,
                 auxiliarySources = auxiliarySources,
+                deferred = deferred,
             )
         } else {
             null
@@ -220,29 +230,13 @@ internal class LpEngine(
 
     /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the
      *  [params]-resolved one for the whole search. */
-    var lpRelaxer = buildRelaxer(params.lpPlan)
+    var lpRelaxer: CpToLpRelaxation? = null
         private set
 
     // Structure-based cut separators run on the sparse LP point; circuit cuts are deferred
     // until the arc model is rebuilt on the sparse relaxation.
-    val lpSeparators: List<CutSeparator> = if (params.lpPlan.cuts || params.lpPlan.circuit) {
-        buildList {
-            if (params.lpPlan.cuts) {
-                add(AllDifferentSeparator())
-                add(GccSeparator())
-                add(KnapsackCoverSeparator())
-                add(CliqueCutSeparator())
-                add(AggregationMirSeparator())
-                if (params.lpPlan.impliedBoundCuts) add(ImpliedBoundSeparator())
-                if (params.lpPlan.flowCoverCuts) add(FlowCoverSeparator())
-                val coef = LongArray(problem.numIntVars) { objective.intCoefficientValues.getOrElse(it) { 0L } }
-                add(AssignmentObjectiveCut(coef))
-            }
-            if (params.lpPlan.circuit) add(CircuitSeparator())
-        }
-    } else {
-        emptyList()
-    }
+    var lpSeparators: List<CutSeparator> = emptyList()
+        private set
 
     // Source premises keep local cuts dormant until their complete guards hold again.
     val cutPool = CutPool()
@@ -287,26 +281,10 @@ internal class LpEngine(
             cutPool.retainMostActive()
         }
     }
-    private val lagBound = if (params.lpPlan.lagrangian) {
-        LagrangianBound(problem, objective).takeIf { it.applicable }
-    } else {
-        null
-    }
-    private val knapsackLagBound = if (params.lpPlan.knapsackLagrangian) {
-        KnapsackLagrangianBound(problem, objective).takeIf { it.applicable }
-    } else {
-        null
-    }
-    private val energeticBound = if (params.lpPlan.energeticReasoning) {
-        CumulativeEnergeticBound(problem).takeIf { it.applicable }
-    } else {
-        null
-    }
-    private val cumulativeFlowBound = if (params.lpPlan.cumulativeFlow) {
-        CumulativeFlowBound(problem).takeIf { it.applicable }
-    } else {
-        null
-    }
+    private var lagBound: LagrangianBound? = null
+    private var knapsackLagBound: KnapsackLagrangianBound? = null
+    private var energeticBound: CumulativeEnergeticBound? = null
+    private var cumulativeFlowBound: CumulativeFlowBound? = null
 
     /** The single objective variable's modular residue, when it is defined by a linear equality
      *  `a·v + Σ cⱼ·xⱼ = b` with `|a| = 1` and `g = gcd(cⱼ) > 1`: then `v ≡ r (mod g)` in every solution
@@ -484,19 +462,11 @@ internal class LpEngine(
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
     // at a time — shedding during-search cuts before the bound — re-probing upward on backoff. Sound:
     // every rung is a valid bound / off, so the gate only changes work, never solutions.
-    private val lpLadder = LpEffortLadder(
-        top = LpEffort.ceiling(cutsPermitted = params.lpPlan.cuts),
-        reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
-    )
-
-    // Per-separator activity gate: disables a single unproductive cut family while the others keep
-    // separating — the per-technique complement of the whole-rung [lpLadder]. Sound: skipping a separator
-    // only forgoes its cuts, never a solution.
-    val lpSeparatorGate = LpSeparatorGate(
-        count = lpSeparators.size,
-        reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
-    )
-    val lpNogoods: LpNogoodPool? = if (params.lpPlan.learn) LpNogoodPool() else null
+    private lateinit var lpLadder: LpEffortLadder
+    lateinit var lpSeparatorGate: LpSeparatorGate
+        private set
+    var lpNogoods: LpNogoodPool? = null
+        private set
     private val lpBasisByDepth = ArrayList<Basis?>()
 
     /** LP-solution record sink for branching hints (set by the search when LP branching is on; null in
@@ -602,18 +572,11 @@ internal class LpEngine(
         filter.relaxation.gatedEnforcement(session, filter.enforced)
         return filter
     }
-    private val residualAuxVars: IntArray = if (params0.lpPlan.realResidual) {
-        problem.factors.filterIsInstance<ReifiedRealLinear>().map { it.aux }.distinct().sorted().toIntArray()
-    } else {
-        EmptyIntArray
-    }
+    private var residualAuxVars: IntArray = EmptyIntArray
 
-    /** Whether the residual real model is too large for per-node / per-leaf exact work: one sparse-LU
-     *  factorization at this row count outruns any node budget and its fill explodes memory, so the
-     *  checks decline and the verdict honestly degrades to unknown instead of hanging. */
-    val residualOversized: Boolean = params0.lpPlan.realResidual &&
-        problem.factors.count { it is ReifiedRealLinear || (it is Linear && it.realConstants != null) } >
-        RESIDUAL_MAX_ROWS
+    /** Whether the residual real model exceeds the per-node exact row cap. */
+    var residualOversized: Boolean = false
+        private set
 
     /** The asserting LP backjump clause derived during the last [pruneNode], or null. */
     fun lastBackjump(): Learned? = lpBackjump
@@ -872,14 +835,7 @@ internal class LpEngine(
 
     // Per-node prune cascade in short-circuit order: cheap lower bound, scheduling feasibility,
     // Lagrangian bounds, then LP relaxation.
-    private val bounds: List<RelaxationBound> = listOfNotNull(
-        LinearBound(),
-        energeticBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.energeticEvery) },
-        cumulativeFlowBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.cumulativeFlowEvery) },
-        lagBound?.let { LagrangianArm(it) },
-        knapsackLagBound?.let { LagrangianArm(it) },
-        LpSimplexBound(),
-    )
+    private var bounds: List<RelaxationBound> = emptyList()
 
     /**
      * Drop each convex hull that adds no strength to the root LP optimum, rebuilding the relaxer once
@@ -944,6 +900,114 @@ internal class LpEngine(
             { p -> if (p.booleanRlt) p.copy(booleanRlt = false) else null },
         )
     }
+
+    init {
+        if (!deferred) preparation().forEach { }
+    }
+
+    internal fun preparation(): Iterator<Unit> = sequence {
+        params.lpConfig?.let { config ->
+            val plan = with(LpAutoConfig) { prepare(problem, config, params.lpPlan) }
+            params = params.copy(lpPlan = plan)
+        }
+        lpRelaxer = buildRelaxer(params.lpPlan, deferred = true)
+        yield(Unit)
+        lpRelaxer?.preparation()?.forEach { yield(Unit) }
+        lpSeparators = if (params.lpPlan.cuts || params.lpPlan.circuit) {
+        buildList {
+            if (params.lpPlan.cuts) {
+                add(AllDifferentSeparator())
+                add(GccSeparator())
+                add(KnapsackCoverSeparator())
+                add(CliqueCutSeparator())
+                add(AggregationMirSeparator())
+                if (params.lpPlan.impliedBoundCuts) add(ImpliedBoundSeparator())
+                if (params.lpPlan.flowCoverCuts) add(FlowCoverSeparator())
+                val coef = constructionLongArray(problem.numIntVars) { objective.intCoefficientValues.getOrElse(it) { 0L } }
+                add(AssignmentObjectiveCut(coef))
+            }
+            if (params.lpPlan.circuit) add(CircuitSeparator())
+        }
+    } else {
+        emptyList()
+    }
+
+        lpLadder = LpEffortLadder(
+            top = LpEffort.ceiling(cutsPermitted = params.lpPlan.cuts),
+            reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
+        )
+        lpSeparatorGate = LpSeparatorGate(
+            count = lpSeparators.size,
+            reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
+        )
+        lpNogoods = if (params.lpPlan.learn) LpNogoodPool() else null
+        yield(Unit)
+        if (params.lpPlan.lagrangian) {
+            val owner = LagrangianBound(problem, objective, deferred = true)
+            owner.preparation().forEach { yield(Unit) }
+            lagBound = owner.takeIf { it.applicable }
+        }
+        if (params.lpPlan.knapsackLagrangian) {
+            val owner = KnapsackLagrangianBound(problem, objective, deferred = true)
+            owner.preparation().forEach { yield(Unit) }
+            knapsackLagBound = owner.takeIf { it.applicable }
+        }
+        if (params.lpPlan.energeticReasoning) {
+            val factors = ArrayList<Cumulative>()
+            for (fid in problem.factors.indices) {
+                val factor = problem.factors[fid]
+                if (factor is Cumulative) factors.add(factor)
+                if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+            energeticBound = CumulativeEnergeticBound(problem, factors).takeIf { it.applicable }
+        }
+        if (params.lpPlan.cumulativeFlow) {
+            val views = prepareSchedulingViews(problem)
+            val bounded = ArrayList<com.eignex.klause.lp.relaxation.SchedulingView>()
+            for (i in views.indices) {
+                if (views[i].starts.size in 2..CumulativeFlowBound.MAX_TASKS) bounded.add(views[i])
+                if ((i + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+            cumulativeFlowBound = CumulativeFlowBound(problem, bounded).takeIf { it.applicable }
+        }
+        if (params.lpPlan.realResidual) {
+            val aux = BooleanArray(problem.numBoolVars)
+            yield(Unit)
+            var count = 0
+            var rows = 0
+            for (fid in problem.factors.indices) {
+                val factor = problem.factors[fid]
+                if (factor is ReifiedRealLinear) {
+                    if (!aux[factor.aux]) {
+                        aux[factor.aux] = true
+                        count++
+                    }
+                    rows++
+                } else if (factor is Linear && factor.realConstants != null) rows++
+                if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+            val ids = IntArray(count)
+            yield(Unit)
+            var index = 0
+            for (v in aux.indices) {
+                if (aux[v]) ids[index++] = v
+                if ((v + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            }
+            residualAuxVars = ids
+            residualOversized = rows > RESIDUAL_MAX_ROWS
+        }
+        bounds = listOfNotNull(
+        LinearBound(),
+        energeticBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.energeticEvery) },
+        cumulativeFlowBound?.let { SchedulingFeasibilityArm(it, params.lpPlan.cumulativeFlowEvery) },
+        lagBound?.let { LagrangianArm(it) },
+        knapsackLagBound?.let { LagrangianArm(it) },
+        LpSimplexBound(),
+    )
+
+    }.iterator()
+
+
 }
 
 /** Row cap for per-node / per-leaf exact residual work (one LU at ~1k rows is already ~ms-scale). */

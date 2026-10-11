@@ -41,8 +41,10 @@ import com.eignex.klause.util.subExact
  * hold at every node, so they need not be cited), so it is all-false at the dead node and globally
  * valid.
  */
-internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBound {
-    private val views: List<SchedulingView> = schedulingViews(problem).filter { it.starts.size in 2..MAX_TASKS }
+internal class CumulativeFlowBound(
+    problem: Problem,
+    private val views: List<SchedulingView> = schedulingViews(problem).filter { it.starts.size in 2..MAX_TASKS },
+) : SchedulingFeasibilityBound {
 
     val applicable: Boolean get() = views.isNotEmpty()
 
