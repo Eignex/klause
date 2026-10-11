@@ -37,12 +37,15 @@ import kotlin.test.assertTrue
 class SourceDrivenStrategyTest {
 
     @Test
-    fun `equal Element alternatives preserve primary choices and random draws`() {
-        for (noise in listOf(0.0, 1.0)) {
+    fun `nonimproving Element alternatives preserve primary greedy choices and random draws`() {
+        for (bound in listOf(1L, 3L)) {
             val states = listOf(1L, 3L).map { maximum ->
                 val problem = Problem(
                     0, 2, arrayOf(IntDomain(0, maximum), IntDomain(1, 1)),
-                    arrayOf<Factor>(Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0)),
+                    arrayOf<Factor>(
+                        Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0),
+                        Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, bound),
+                    ),
                 )
                 LocalSearchState(LocalSearchModel.open(problem), Random(3)).also {
                     it.assignment.setInt(0, 0)
@@ -53,7 +56,7 @@ class SourceDrivenStrategyTest {
             val strategies = states.map {
                 SourceDrivenStrategy(
                     sources = listOf(ConfiguredSource(ViolatedRepairs.SINGLE)),
-                    acceptance = AcceptanceRule.WalkSatNoise(noise),
+                    acceptance = AcceptanceRule.WalkSatNoise(0.0),
                     feasibleDescent = FeasibleDescent.RatchetAsConstraint,
                 )
             }
@@ -63,36 +66,38 @@ class SourceDrivenStrategyTest {
                 val expanded = strategies[1].pickMove(states[1])
 
                 assertEquals(Move.IntSet(0, 1), primary)
-                assertEquals(primary, expanded, "noise=$noise")
-                assertEquals(states[0].rng.nextLong(), states[1].rng.nextLong(), "noise=$noise")
+                assertEquals(primary, expanded, "bound=$bound")
+                assertEquals(states[0].rng.nextLong(), states[1].rng.nextLong(), "bound=$bound")
             }
         }
     }
 
     @Test
-    fun `productive primary Element repairs retain priority over alternatives`() {
+    fun `Element alternatives retain the complete WalkSAT noise neighborhood`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 3).excludeValue(2), IntDomain(9, 9)),
-            arrayOf<Factor>(
-                Element(0, 1, longArrayOf(0, 9, 0, 9), false, 0),
-                Linear(longArrayOf(1), intArrayOf(0), LinearOp.NE, 1),
-            ),
+            0, 2, arrayOf(IntDomain(0, 3), IntDomain(1, 1)),
+            arrayOf<Factor>(Element(0, 1, longArrayOf(0, 1, 1, 1), false, 0)),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 9)
+        state.assignment.setInt(1, 1)
         state.recompute()
-        val before = state.cost
+        val acceptance = AcceptanceRule.WalkSatNoise(1.0)
         val strategy = SourceDrivenStrategy(
             sources = listOf(ConfiguredSource(ViolatedRepairs.SINGLE)),
+            acceptance = acceptance,
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
+        val expected = Random(3)
+        val repairs = listOf(Move.IntSet(0, 1), Move.IntSet(0, 2), Move.IntSet(0, 3))
 
-        val move = strategy.pickMove(state)
-        state.apply(assertNotNull(move))
+        repeat(16) {
+            expected.nextInt(1)
+            val move = acceptance.choose(expected, repairs, emptyList(), 1.0) { -1.0 }
 
-        assertEquals(Move.IntSet(0, 1), move)
-        assertTrue(state.cost < before)
+            assertEquals(move, strategy.pickMove(state))
+            assertEquals(expected.nextLong(), state.rng.nextLong())
+        }
     }
 
     @Test
