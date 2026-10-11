@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.solver.result.AlnsStats
 import com.eignex.klause.solver.result.LpCertifierRouteStats
 import com.eignex.klause.solver.result.LpCertifierStats
@@ -589,4 +590,14 @@ private fun continuationStatPairs(prefix: String, stats: LpContinuationStats): L
         for ((phase, value) in stats.allocation) add("${key}Allocation_$phase" to "$value")
         for ((terminal, value) in stats.declines) add("${key}Decline_$terminal" to "$value")
     }
+}
+
+internal fun nodeBudgetStatPairs(budget: NodeBudget?): List<Pair<String, String>> {
+    if (budget == null) return emptyList()
+    val spent = budget.spent
+    return listOf(
+        "nodeBudgetLimit" to budget.limit.toString(),
+        "nodeBudgetSpent" to spent.toString(),
+        "nodeBudgetRemaining" to (budget.limit - spent).coerceAtLeast(0L).toString(),
+    )
 }

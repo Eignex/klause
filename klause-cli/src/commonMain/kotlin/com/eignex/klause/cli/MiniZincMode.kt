@@ -236,6 +236,10 @@ internal class MiniZincOutput(private val floatApproximation: Boolean = false) :
      * [stats] is [SolveStats.EMPTY] when the verdict reports no engine counters (enumeration /
      * portfolio); the CLI-side time and solution count are always available.
      */
+    override fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {
+        printStatPairs("%%%mzn-stat:", pairs)
+    }
+
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("%%%mzn-stat: solveTime=${solveTimeMs / 1000.0}")
         println("%%%mzn-stat: solutions=$solutions")

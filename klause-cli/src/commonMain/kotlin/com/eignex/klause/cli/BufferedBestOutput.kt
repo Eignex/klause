@@ -91,6 +91,10 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         }
     }
 
+    final override fun onAllowanceStatistics(pairs: List<Pair<String, String>>) {
+        printStatPairs(commentPrefix, pairs)
+    }
+
     final override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("$commentPrefix solveTime=${solveTimeMs / 1000.0}")
         println("$commentPrefix solutions=$solutions")
