@@ -1610,6 +1610,28 @@ class PortfolioTest {
     }
 
     @Test
+    fun `an unproductive incumbent probe preserves retained worker choices`() {
+        val retained = ArrayList<List<Int>>()
+        for (auxiliary in listOf(false, true)) {
+            val reached = ArrayList<Int>()
+            val workers = mutableListOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) { reached += 0 }),
+                trackingWorker("idle", 1, ScriptedSearch({ false }) { reached += 1 }),
+            )
+            if (auxiliary) workers += trackingWorker("probe", 2, ScriptedSearch({ false }) { reached += 2 })
+
+            Portfolio.thompson(workers, reseedStaleThreshold = 0).use {
+                if (auxiliary) it.incumbentProbeArms = setOf(2)
+                it.minimize(Cancellation { reached.count { arm -> arm < 2 } >= 30 })
+            }
+
+            retained += reached.filter { it < 2 }
+        }
+
+        assertEquals(retained[0], retained[1])
+    }
+
+    @Test
     fun `incumbent probes retain feasibility work before a witness`() {
         val slices = IntArray(2)
         val workers = listOf(

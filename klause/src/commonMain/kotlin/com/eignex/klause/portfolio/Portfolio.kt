@@ -786,9 +786,13 @@ class Portfolio(
             val earned = ledger.settle(arm, work)
             val reward = if (failed) 0.0 else earned
             if (reward > 0.0 || claim.improved) productive[arm] = true
-            val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
-            bandit.update(arm, reward, weight)
-            families.record(workers[arm].family, progressed = reward > 0.0, plateau = improving)
+            val unproductiveProbe = claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
+                !failed && claim.fault == null
+            if (!unproductiveProbe) {
+                val weight = (if (failed) maxOf(work, claim.sliceWork) else work).toDouble() / claim.sliceWork
+                bandit.update(arm, reward, weight)
+                families.record(workers[arm].family, progressed = reward > 0.0, plateau = improving)
+            }
             // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.
             for (other in workers.indices) {
@@ -804,9 +808,7 @@ class Portfolio(
                 slice = grow(slice, maxSliceMillis)
                 sliceWork = grow(sliceWork, maxSliceWork)
             }
-            if (claim.hadIncumbent && arm in incumbentProbeArms && !productive[arm] &&
-                !failed && claim.fault == null
-            ) retire(arm)
+            if (unproductiveProbe) retire(arm)
         }
 
         /** Quarantine [claim]'s arm for its refuted claim: retire it, count the fault, and report it. Call under
