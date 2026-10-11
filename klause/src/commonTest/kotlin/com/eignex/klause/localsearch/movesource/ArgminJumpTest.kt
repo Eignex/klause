@@ -207,6 +207,7 @@ class ArgminJumpTest {
         state.assignment.setBool(0, true)
         state.recompute()
         state.weights.factorWeights[1] = 10.0
+        state.weights.factorWeights[2] = 2.0
 
         assertTrue(jumps(state, candidateVars = 1).isEmpty())
     }
@@ -292,5 +293,42 @@ class ArgminJumpTest {
 
         assertEquals(3L, state.assignment.intValue(0))
         assertEquals(0L, state.cost)
+    }
+
+    @Test
+    fun `Boolean inverse jumps preserve source restrictions`() {
+        for (protection in listOf("source pin", "Boolean pin", "source owner", "fixed source")) {
+            val domain = IntDomain(0, if (protection == "fixed source") 0L else 2L)
+            val source = Problem(
+                1, 3, arrayOf(domain, IntDomain(0, 1), IntDomain(0, 2)),
+                arrayOf<Factor>(
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ),
+            )
+            val factors = arrayOf<Factor>(source.factors[0], Clause(intArrayOf(Lit.make(0, false)))) +
+                if (protection == "source owner") {
+                    arrayOf<Factor>(AllDifferent(intArrayOf(0, 2), 0, 3))
+                } else {
+                    emptyArray()
+                }
+            val lowered = Problem(1, 3, arrayOf(domain, IntDomain(0, 0), IntDomain(0, 2)), factors)
+            val assumptions = when (protection) {
+                "source pin" -> Assumptions.None.withInt(0, 0)
+                "Boolean pin" -> Assumptions.None.withBool(0, true)
+                else -> Assumptions.None
+            }.withInt(1, 0)
+            val state = LocalSearchState(LocalSearchModel.open(lowered), Random(3), assumptions)
+            state.invariants = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(1))).network(3, 1)
+            if (protection == "source owner") state.seedImplicitFeasible()
+            state.assignment.setInt(0, 0)
+            state.assignment.setInt(2, 1)
+            state.assignment.setBool(0, true)
+            state.recompute()
+            val before = state.assignment.snapshot()
+
+            assertTrue(jumps(state, candidateVars = 1).isEmpty(), protection)
+            assertEquals(before, state.assignment.snapshot(), protection)
+        }
     }
 }
