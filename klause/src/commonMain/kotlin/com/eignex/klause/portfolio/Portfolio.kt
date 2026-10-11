@@ -190,7 +190,7 @@ class Portfolio(
             val armToken = segmentToken(worker, run.token, claim)
             val setup = TimeSource.Monotonic.markNow()
             val opened = runCatching {
-                run.handles[arm] ?: worker.newResumableSolve(run.token)?.also { run.handles[arm] = it }
+                run.handles[arm] ?: worker.newResumableSolve(armToken)?.also { run.handles[arm] = it }
             }
             val handle = opened.getOrNull()
             val openingFailure = opened.exceptionOrNull()
@@ -384,7 +384,7 @@ class Portfolio(
             val armToken = segmentToken(worker, run.token, claim)
             val setup = TimeSource.Monotonic.markNow()
             val opened = runCatching {
-                run.handles[arm] ?: worker.newResumableSearch(readBound, run.token, incumbent.current()?.assignment)
+                run.handles[arm] ?: worker.newResumableSearch(readBound, armToken, incumbent.current()?.assignment)
                     ?.also { run.handles[arm] = it }
             }
             val handle = opened.getOrNull()

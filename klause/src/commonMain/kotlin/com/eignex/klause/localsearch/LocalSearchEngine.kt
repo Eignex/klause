@@ -16,6 +16,7 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
@@ -374,9 +375,9 @@ internal class LocalSearchEngine(
                 val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE
                 if (available == 0L) return unknown(TerminationReason.BudgetExhausted)
                 token = if (sliceMillis == Long.MAX_VALUE) {
-                    params.cancellation or global
+                    params.cancellation.lifetimeCancellation() or global
                 } else {
-                    params.cancellation or global or
+                    params.cancellation.lifetimeCancellation() or global or
                         Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
                 }
                 limit = instructions + minOf(sliceInstructions, available, Long.MAX_VALUE - instructions)
@@ -572,9 +573,9 @@ internal class LocalSearchEngine(
                 verdict?.let { return it }
                 check(!closed) { "the local-search handle is closed" }
                 token = if (sliceMillis == Long.MAX_VALUE) {
-                    params.cancellation or global
+                    params.cancellation.lifetimeCancellation() or global
                 } else {
-                    params.cancellation or global or
+                    params.cancellation.lifetimeCancellation() or global or
                         Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds)
                 }
                 val available = params.nodeBudget?.movesLeft() ?: Long.MAX_VALUE

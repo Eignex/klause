@@ -28,6 +28,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -363,7 +364,7 @@ internal class ResumableMinimize(
     ): MinimizeResult? {
         done?.let { return it }
         check(!closed) { "search is closed" }
-        globalToken = baseCancellation or global
+        globalToken = baseCancellation.lifetimeCancellation() or global
         publishClausePrimalCandidate()?.let(onIncumbent)
         if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         // A counted budget only means something if the search polls on a counted cadence: the run stops

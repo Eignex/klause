@@ -22,6 +22,8 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PROPAGATION_CANCEL_FLOOR
+import com.eignex.klause.solver.forInvocation
+import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.incumbent.IncumbentSource
@@ -406,7 +408,10 @@ data class BacktrackParams(
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
 
     override fun withCancellation(cancellation: Cancellation): BacktrackParams =
-        copy(cancellation = this.cancellation or cancellation)
+        copy(cancellation = this.cancellation.forInvocation(cancellation))
+
+    override fun withLifetimeCancellation(cancellation: Cancellation): BacktrackParams =
+        copy(cancellation = this.cancellation.withLifetime(cancellation))
 
     /** The LP-bounding runtime's slice of these params (see [LpParams]) — what `LpEngine` consumes. */
     fun lpParams(): LpParams =

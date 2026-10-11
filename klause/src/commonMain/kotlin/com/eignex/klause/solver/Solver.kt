@@ -44,9 +44,13 @@ interface SolverParams {
         return this
     }
 
-    /** Add a cooperative cancellation token to the parameters' lifetime scope. Backends that
-     *  support cancellation compose it with their existing token; others default to no-op. */
+    /** Inject cancellation for one invocation, including resumable handle construction.
+     *  Supporting backends retain any separately bound lifetime scope; others default to no-op. */
     fun withCancellation(@Suppress("UNUSED_PARAMETER") cancellation: Cancellation): SolverParams = this
+
+    /** Add cancellation that remains bound through every invocation and resumable slice.
+     *  Supporting backends compose lifetime tokens; backends without cancellation default to no-op. */
+    fun withLifetimeCancellation(@Suppress("UNUSED_PARAMETER") cancellation: Cancellation): SolverParams = this
 }
 
 /**

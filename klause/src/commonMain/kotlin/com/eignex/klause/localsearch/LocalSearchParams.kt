@@ -3,6 +3,8 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.solver.forInvocation
+import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.incumbent.IncumbentExchange
@@ -116,7 +118,10 @@ data class LocalSearchParams(
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
 
     override fun withCancellation(cancellation: Cancellation): LocalSearchParams =
-        copy(cancellation = this.cancellation or cancellation)
+        copy(cancellation = this.cancellation.forInvocation(cancellation))
+
+    override fun withLifetimeCancellation(cancellation: Cancellation): LocalSearchParams =
+        copy(cancellation = this.cancellation.withLifetime(cancellation))
 
     private companion object {
         fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)
