@@ -9,7 +9,9 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
@@ -18,6 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -89,19 +92,22 @@ class Xcsp3DefinitionTest {
     fun `positive literal boundaries preserve exact Boolean products`() {
         for (scale in listOf(1, Int.MAX_VALUE)) {
             val parsed = Xcsp3.parse(
-                """<instance><variables><var id="choice">0..1</var><var id="duration">0 $scale</var>
+                """<instance><variables><var id="choice">0..1</var><var id="duration">0..$scale</var>
                     </variables><constraints><intension>eq(duration,mul(eq(choice,0),$scale))</intension>
                     </constraints></instance>""",
             )
             val problem = parsed.problem
-            val samples = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
-            assertEquals(setOf(listOf(0L, scale.toLong()), listOf(1L, 0L)), samples.map { it.ints.take(2) }.toSet())
-            val sample = samples.first { it.ints[0] == 1L }
-            val state = LocalSearchState(problem.bake(), Random(3))
-            state.invariants = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
-                .network(problem.numIntVars, problem.numBoolVars)
-            for (i in sample.ints.indices) state.assignment.setInt(i, sample.ints[i])
-            for (i in sample.bools.indices) state.assignment.setBool(i, sample.bools[i])
+            val baked = problem.bake()
+            for (choice in 0L..1L) {
+                val implied = assertIs<PropagationResult.Implied>(baked.propagate(Assumptions(ints = mapOf(0 to choice))))
+                assertEquals(if (choice == 0L) scale.toLong() else 0L, implied.intValueOrNull(1))
+            }
+            val state = LocalSearchState(baked, Random(3))
+            val sweep = assertNotNull(DefinitionalSweep.infer(problem, parsed.definedVars))
+            state.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
+            for (i in 0 until problem.numIntVars) state.assignment.setInt(i, state.rootDomains[i].min)
+            state.assignment.setInt(0, 1L)
+            sweep.sweep(state.assignment, state.rootDomains, problem.factors)
             state.recompute()
             val predicted = state.netDelta(Move.IntSet(0, 0L))
 
