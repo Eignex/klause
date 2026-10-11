@@ -145,6 +145,7 @@ class Portfolio(
      */
     private val minShares: DoubleArray = DoubleArray(0),
 ) : PortfolioExecutor {
+    internal var runTimeSource: TimeSource = TimeSource.Monotonic
     internal var reserveBeforeIncumbentOnly: Boolean = false
     internal var incumbentProbeArms: Set<Int> = emptySet()
 
@@ -597,6 +598,7 @@ class Portfolio(
      */
     @Suppress("TooGenericExceptionCaught")
     private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
+        private val started = runTimeSource.markNow()
         private val lock = (if (lanes > 1) Concurrency.Strict else Concurrency.None).lock()
         private val stopped = AtomicBoolean(false)
 
@@ -874,12 +876,17 @@ class Portfolio(
         }
 
         /** The pool's total counters, every arm that did work included, with the schedule attached. */
-        fun folded(): SolveStats = (completedStats.filterNotNull() + liveStats.filterNotNull())
-            .fold(SolveStats.EMPTY) { acc, stats -> acc.mergedWith(stats) }
-            .copy(portfolio = log.stats(ledger).copy(
-                profile = profile, reseedStaleThreshold = reseedStaleThreshold,
-                baseSliceWork = baseSliceWork, maxSliceWork = maxSliceWork, sliceGrowth = sliceGrowth,
-            ))
+        fun folded(): SolveStats {
+            val stats = (completedStats.filterNotNull() + liveStats.filterNotNull())
+                .fold(SolveStats.EMPTY) { acc, snapshot -> acc.mergedWith(snapshot) }
+            return stats.copy(
+                run = stats.run.copy(wallMs = started.elapsedNow().inWholeMilliseconds),
+                portfolio = log.stats(ledger).copy(
+                    profile = profile, reseedStaleThreshold = reseedStaleThreshold,
+                    baseSliceWork = baseSliceWork, maxSliceWork = maxSliceWork, sliceGrowth = sliceGrowth,
+                ),
+            )
+        }
 
         fun closeHandle(arm: Int) {
             val handle = handles[arm] ?: return

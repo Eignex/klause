@@ -39,6 +39,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.ownSearch
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -65,6 +66,7 @@ import kotlin.test.assertTrue
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 import kotlin.time.TimeSource
 
 private class TrackingResumableSearch(
@@ -206,6 +208,95 @@ private fun trackingWorker(label: String, armId: Int, handle: ResumableSearch): 
 )
 
 class PortfolioTest {
+
+    @Test
+    fun `run duration includes every one shot segment and witness verification`() {
+        for (optimize in listOf(false, true)) {
+            val clock = TestTimeSource()
+            val sample = Sample(BooleanArray(0), LongArray(0))
+            val workers = List(2) { arm ->
+                val stats = SolveStats(
+                    run = RunStats(backend = "worker$arm", wallMs = 1, timedOut = arm == 0),
+                    search = SearchStats(nodes = SumResult((arm + 1).toDouble())),
+                )
+                if (optimize) {
+                    PortfolioWorker.ofMinimize("worker$arm", arm) { _, _, _, _ ->
+                        clock += (11 + arm * 2).milliseconds
+                        sequenceOf(
+                            if (arm == 0) MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+                            else MinimizeResult.Optimal(sample, 0.0, stats),
+                        )
+                    }
+                } else {
+                    PortfolioWorker.ofSolve("worker$arm", arm) { _, _ ->
+                        clock += (11 + arm * 2).milliseconds
+                        if (arm == 0) SolveResult.Unknown(TerminationReason.BudgetExhausted, stats)
+                        else SolveResult.Sat(sample, stats)
+                    }
+                }
+            }
+            val portfolio = Portfolio.thompson(workers, witnessCheck = { _, _ ->
+                clock += 5.milliseconds
+                null
+            }).also { it.runTimeSource = clock }
+
+            val stats = portfolio.use { if (optimize) it.minimize().stats else it.solve().stats }
+
+            assertEquals(29L, stats.run.wallMs, "optimize=$optimize")
+            assertEquals(3.0, stats.search.nodes.sum)
+            assertEquals("mixed", stats.run.backend)
+            assertTrue(stats.run.timedOut)
+        }
+    }
+
+    @Test
+    fun `run duration includes retained handle initialization and disposal`() {
+        for (optimize in listOf(false, true)) {
+            val clock = TestTimeSource()
+            var slices = 0
+            val worker = if (optimize) {
+                val tracked = TrackingResumableSearch(null, onRun = {
+                    clock += 5.milliseconds
+                    slices++
+                })
+                val handle = object : ResumableSearch by tracked {
+                    override fun close() {
+                        tracked.close()
+                        clock += 11.milliseconds
+                    }
+                }
+                PortfolioWorker.ofMinimize("retained", 0, resumable = {
+                    clock += 7.milliseconds
+                    handle
+                }) { _, _, _, _ -> error("the retained handle must resume") }
+            } else {
+                val tracked = CountingResumableSolve(2)
+                val handle = object : ResumableSolve by tracked {
+                    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+                        clock += 5.milliseconds
+                        slices++
+                        return tracked.runSlice(global, sliceMillis, sliceNodes)
+                    }
+
+                    override fun close() {
+                        clock += 11.milliseconds
+                    }
+                }
+                PortfolioWorker.ofSolve("retained", 0, resumable = {
+                    clock += 7.milliseconds
+                    handle
+                }) { _, _ -> error("the retained handle must resume") }
+            }
+            val portfolio = Portfolio.thompson(listOf(worker)).also { it.runTimeSource = clock }
+
+            val stats = portfolio.use {
+                val stop = Cancellation { slices >= 2 }
+                if (optimize) it.minimize(stop).stats else it.solve(stop).stats
+            }
+
+            assertEquals(28L, stats.run.wallMs, "optimize=$optimize")
+        }
+    }
 
     @Test
     fun `counted schedules expose their effective slice policy`() {
