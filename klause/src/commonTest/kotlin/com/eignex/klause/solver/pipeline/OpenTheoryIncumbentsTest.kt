@@ -4,7 +4,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Publication
+import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
@@ -17,6 +19,24 @@ import kotlin.test.assertNull
  * arbitrary-precision value offered with it.
  */
 class OpenTheoryIncumbentsTest {
+    @Test
+    fun `published exact witnesses retain their authoritative integer value`() {
+        val wide = value("9223372036854775808")
+        val ints = arrayOf(wide)
+        val assignment = ExactLiraAssignment(booleanArrayOf(true), ints, emptyList())
+        val exchange = minimizingWitnessExchange()
+        exchange.offer(OpenTheoryAssignment.ExactLira(assignment), wide)
+
+        ints[0] = BIG_ZERO
+        assignment.ints[0] = BIG_ZERO
+        assignment.bools[0] = false
+
+        val published = checkNotNull(exchange.current())
+        assertEquals(published.objective.toString(), published.assignment.intValue(0))
+        assertEquals(true, published.assignment.boolValue(0))
+    }
+
+
 
     private fun witness(x: Long): OpenTheoryAssignment =
         OpenTheoryAssignment.Difference(Sample(BooleanArray(0), longArrayOf(x)))

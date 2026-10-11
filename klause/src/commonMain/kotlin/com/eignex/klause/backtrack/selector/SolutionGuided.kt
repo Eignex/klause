@@ -63,8 +63,8 @@ class SolutionGuided(private val base: ValueSelector) : ValueSelector {
     override fun onRestart() = base.onRestart()
 
     override fun onSolution(snapshot: Sample) {
-        bools = snapshot.bools.copyOf()
-        ints = snapshot.ints.copyOf()
+        bools = snapshot.bools
+        ints = snapshot.ints
         base.onSolution(snapshot)
     }
 }

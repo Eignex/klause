@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.incumbent
 
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -12,6 +14,32 @@ import kotlin.test.assertTrue
  * told so.
  */
 class IncumbentExchangeTest {
+    @Test
+    fun `published samples keep their verified objective after external mutation`() {
+        val values = longArrayOf(3)
+        val objective = LinearObjective(intCoefficients = longArrayOf(2))
+        val sample = Sample(BooleanArray(0), values)
+        val exchange = IncumbentExchange<Sample, Long>(
+            improves = { candidate, standing -> candidate < standing },
+            verifier = { candidate ->
+                if (objective.evaluateLong(candidate.assignment) == candidate.objective) {
+                    Verification.Accepted(candidate)
+                } else {
+                    Verification.Rejected("objective differs")
+                }
+            },
+        )
+        exchange.offer(sample, 6)
+        val published = checkNotNull(exchange.current())
+
+        values[0] = 0
+        published.assignment.ints[0] = 0
+
+        assertEquals(published.objective, objective.evaluateLong(checkNotNull(exchange.current()).assignment))
+        assertEquals(3L, checkNotNull(exchange.current()).assignment.intValue(0))
+    }
+
+
 
     private fun minimizing() = IncumbentExchange.minimizing<String>()
 

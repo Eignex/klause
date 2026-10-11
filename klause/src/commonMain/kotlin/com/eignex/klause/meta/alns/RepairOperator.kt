@@ -18,11 +18,11 @@ import kotlin.random.Random
  *  for an empty (constant) objective, so noise is inert where there is nothing to perturb. */
 private fun objectiveScale(objective: LinearObjective): Double {
     var m = 0L
-    for (w in objective.boolWeights) {
+    for (w in objective.boolWeightValues) {
         val a = abs(w)
         if (a > m) m = a
     }
-    for (c in objective.intCoefficients) {
+    for (c in objective.intCoefficientValues) {
         val a = abs(c)
         if (a > m) m = a
     }
@@ -188,8 +188,8 @@ internal class GreedyConstructionRepair(
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
-        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, context.incumbent.bools[b])
-        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, context.incumbent.ints[i])
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, context.incumbent.boolValue(b))
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, context.incumbent.intValue(i))
         state.recompute()
 
         val shaping = context.params.costShaping
@@ -265,8 +265,8 @@ internal class RegretRepair(
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
-        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, context.incumbent.bools[b])
-        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, context.incumbent.ints[i])
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, context.incumbent.boolValue(b))
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, context.incumbent.intValue(i))
         state.recompute()
         val shaping = context.params.costShaping
         fun currentScore(): Double = shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))
@@ -339,8 +339,8 @@ internal class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIter
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
-        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, context.incumbent.bools[b])
-        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, context.incumbent.ints[i])
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, context.incumbent.boolValue(b))
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, context.incumbent.intValue(i))
         state.recompute()
         val shaping = context.params.costShaping
         fun currentScore(): Double = shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))

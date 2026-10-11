@@ -164,13 +164,13 @@ internal object BinaryColumnSubstitution {
     /** Recover the substituted columns' integer values from their literals and drop the added Booleans, so
      *  the sample lands in the pre-substitution variable space. */
     private fun restore(sample: Sample, substituted: IntArray, literals: IntArray, firstBool: Int): Sample {
-        val ints = sample.ints.copyOf()
+        val ints = sample.ints
         for (k in substituted.indices) {
             val literal = literals[k]
-            val value = sample.bools.getOrElse(Lit.variable(literal)) { false }
+            val value = Lit.variable(literal).let { it < sample.numBoolVars && sample.boolValue(it) }
             ints[substituted[k]] = if (Lit.evaluate(literal, value)) 1L else 0L
         }
-        val bools = if (sample.bools.size > firstBool) sample.bools.copyOf(firstBool) else sample.bools
+        val bools = if (sample.numBoolVars > firstBool) sample.bools.copyOf(firstBool) else sample.bools
         return sample.copy(bools = bools, ints = ints)
     }
 

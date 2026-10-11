@@ -110,8 +110,8 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
     /** Seed the solution phase source with a new feasible incumbent (see [BacktrackParams.solutionPhasing]). */
     fun onSolution(sample: Sample) {
         if (solutionBools == null && solutionInts == null) return
-        solutionBools?.let { sample.bools.copyInto(it, endIndex = minOf(it.size, sample.bools.size)) }
-        solutionInts?.let { sample.ints.copyInto(it, endIndex = minOf(it.size, sample.ints.size)) }
+        solutionBools?.let { sample.copyBoolsInto(it, minOf(it.size, sample.numBoolVars)) }
+        solutionInts?.let { sample.copyIntsInto(it, minOf(it.size, sample.numIntVars)) }
         hasSolution = true
     }
 

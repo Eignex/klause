@@ -703,7 +703,7 @@ internal class Alns(
         for (b in 0 until problem.numBoolVars) {
             if (b in freedBoolSet) continue
             boolKeys[bi] = b
-            boolValues[bi] = incumbent.bools[b]
+            boolValues[bi] = incumbent.boolValue(b)
             bi++
         }
         val intKeys = IntArray(problem.numIntVars - freedIntSet.size)
@@ -712,7 +712,7 @@ internal class Alns(
         for (i in 0 until problem.numIntVars) {
             if (i in freedIntSet) continue
             intKeys[ii] = i
-            intValues[ii] = incumbent.ints[i]
+            intValues[ii] = incumbent.intValue(i)
             ii++
         }
         // Keys emerge ascending from the 0..n scan — exactly the sorted order the array constructor wants.

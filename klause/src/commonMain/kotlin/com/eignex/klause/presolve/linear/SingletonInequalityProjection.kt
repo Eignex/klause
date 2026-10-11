@@ -78,7 +78,7 @@ internal object SingletonInequalityProjection {
         }
         if (dropped.isEmpty()) return PassDelta()
         val reconstruct: (Sample) -> Sample = { s ->
-            val ints = s.ints.copyOf()
+            val ints = s.ints
             for ((x, v) in pinned) if (x in ints.indices) ints[x] = v
             s.copy(ints = ints)
         }

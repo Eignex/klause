@@ -211,8 +211,8 @@ class IteratedLocalSearchRestart(
 
     private fun biasedCrossover(state: LocalSearchState, a: Sample, b: Sample, probA: Double, rng: Random): Sample {
         if (linkageAware) return linkageAwareCrossover(state, a, b, probA, rng)
-        val bools = BooleanArray(state.problem.numBoolVars) { pickBool(a.bools, b.bools, it, probA, rng) }
-        val ints = LongArray(state.problem.numIntVars) { pickLong(a.ints, b.ints, it, probA, rng) }
+        val bools = BooleanArray(state.problem.numBoolVars) { pickBool(a, b, it, probA, rng) }
+        val ints = LongArray(state.problem.numIntVars) { pickLong(a, b, it, probA, rng) }
         return Sample(bools, ints)
     }
 
@@ -220,24 +220,24 @@ class IteratedLocalSearchRestart(
      *  other parent when the chosen one is too short. Incumbents captured at different
      *  arities within one solve can differ in array length, so neither parent is a safe
      *  bound for the child (sized from the problem). */
-    private fun pickBool(a: BooleanArray, b: BooleanArray, i: Int, probA: Double, rng: Random): Boolean {
+    private fun pickBool(a: Sample, b: Sample, i: Int, probA: Double, rng: Random): Boolean {
         val preferA = rng.nextDouble() < probA
         return when {
-            preferA && i < a.size -> a[i]
-            !preferA && i < b.size -> b[i]
-            i < a.size -> a[i]
-            i < b.size -> b[i]
+            preferA && i < a.numBoolVars -> a.boolValue(i)
+            !preferA && i < b.numBoolVars -> b.boolValue(i)
+            i < a.numBoolVars -> a.boolValue(i)
+            i < b.numBoolVars -> b.boolValue(i)
             else -> false
         }
     }
 
-    private fun pickLong(a: LongArray, b: LongArray, i: Int, probA: Double, rng: Random): Long {
+    private fun pickLong(a: Sample, b: Sample, i: Int, probA: Double, rng: Random): Long {
         val preferA = rng.nextDouble() < probA
         return when {
-            preferA && i < a.size -> a[i]
-            !preferA && i < b.size -> b[i]
-            i < a.size -> a[i]
-            i < b.size -> b[i]
+            preferA && i < a.numIntVars -> a.intValue(i)
+            !preferA && i < b.numIntVars -> b.intValue(i)
+            i < a.numIntVars -> a.intValue(i)
+            i < b.numIntVars -> b.intValue(i)
             else -> 0L
         }
     }
@@ -264,26 +264,26 @@ class IteratedLocalSearchRestart(
             val source = if (pickA) a else b
             val scope = state.problem.factors[fid]
             for (v in scope.boolVars) {
-                if (v in source.bools.indices) {
-                    bools[v] = source.bools[v]
+                if (v in (0 until source.numBoolVars)) {
+                    bools[v] = source.boolValue(v)
                     boolSet[v] = true
                 }
             }
             for (v in scope.intVars) {
-                if (v in source.ints.indices) {
-                    ints[v] = source.ints[v]
+                if (v in (0 until source.numIntVars)) {
+                    ints[v] = source.intValue(v)
                     intSet[v] = true
                 }
             }
         }
         for (i in bools.indices) {
             if (!boolSet[i]) {
-                bools[i] = pickBool(a.bools, b.bools, i, probA, rng)
+                bools[i] = pickBool(a, b, i, probA, rng)
             }
         }
         for (i in ints.indices) {
             if (!intSet[i]) {
-                ints[i] = pickLong(a.ints, b.ints, i, probA, rng)
+                ints[i] = pickLong(a, b, i, probA, rng)
             }
         }
         return Sample(bools, ints)
@@ -291,8 +291,8 @@ class IteratedLocalSearchRestart(
 
     private fun applyChild(state: LocalSearchState, child: Sample) {
         val problem = state.problem
-        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, child.bools[b])
-        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, child.ints[i])
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, child.boolValue(b))
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, child.intValue(i))
         state.recompute()
     }
 

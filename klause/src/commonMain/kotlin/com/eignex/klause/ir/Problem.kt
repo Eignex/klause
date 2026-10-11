@@ -4,7 +4,7 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 
 /**
- * Immutable logical model and the canonical source of solver projections. Variables come in two id spaces:
+ * Read-only logical model and the canonical source of solver projections. Variables come in two id spaces:
  *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [com.eignex.klause.solver.Assignment].
  *  - Integer vars: ids `[0, numIntVars)`, raw [Int] values in [com.eignex.klause.solver.Assignment].
  *
@@ -13,6 +13,11 @@ import com.eignex.klause.util.EmptyDoubleArray
  * [com.eignex.klause.solver.pipeline.ComponentPlan] selects that once per solve, and the finite,
  * root-propagated domains a finite engine branches on live on [com.eignex.klause.propagation.BakedProblem].
  * Factors mention Boolean, integer, and real variables in any mix.
+ *
+ * Structural arrays and factor payloads are borrowed read-only. Callers must keep them unchanged
+ * for this model's lifetime, including lazy or resumable searches and plans derived from it.
+ * Rewrites construct a fresh model and invalidate source-scoped plans and evidence. Assignment
+ * publications and objective coefficients instead own their captured buffers.
  * Occurrence lists are split per kind so `flip(boolVar)` and `setInt(intVar)` only walk the
  * factors mentioning that specific variable.
  *

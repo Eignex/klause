@@ -225,8 +225,9 @@ object FactorPropagationOracle {
         for (sample in assignments) {
             for (v in sample.bools.indices) {
                 load(state, sample)
-                val after = Sample(sample.bools.copyOf(), sample.ints.copyOf())
-                after.bools[v] = !after.bools[v]
+                val bools = sample.bools
+                bools[v] = !bools[v]
+                val after = sample.copy(bools = bools)
                 val expected = degree(after)
                 val delta = state.factors[0].deltaIfBoolFlipped(state, 0, v)
                 assertEquals(expected - degree(sample), delta, "$label: predicted bool $v flip")
@@ -239,8 +240,9 @@ object FactorPropagationOracle {
             for (v in sample.ints.indices) {
                 domains[v].values.forEach { value ->
                     load(state, sample)
-                    val after = Sample(sample.bools.copyOf(), sample.ints.copyOf())
-                    after.ints[v] = value
+                    val ints = sample.ints
+                    ints[v] = value
+                    val after = sample.copy(ints = ints)
                     val expected = degree(after)
                     val delta = state.factors[0].deltaIfIntSet(state, 0, v, value)
                     assertEquals(expected - degree(sample), delta, "$label: predicted int $v=$value")

@@ -13,6 +13,32 @@ import kotlin.test.assertNull
  */
 class LinearObjectiveTest {
     @Test
+    fun `coefficient buffers cannot change an objective value`() {
+        val bools = longArrayOf(2)
+        val ints = longArrayOf(3)
+        val reals = doubleArrayOf(4.0)
+        val objective = LinearObjective(bools, ints, constant = 1, realCoefficients = reals)
+        val sample = Sample(booleanArrayOf(true), longArrayOf(5), doubleArrayOf(0.5))
+        val copied = objective.copy()
+
+        bools[0] = 0
+        ints[0] = 0
+        reals[0] = 0.0
+        objective.boolWeights[0] = 0
+        objective.intCoefficients[0] = 0
+        objective.realCoefficients[0] = 0.0
+        val (booleanCoefficients, integerCoefficients) = copied
+        val realCoefficients = copied.component4()
+        booleanCoefficients[0] = 0
+        integerCoefficients[0] = 0
+        realCoefficients[0] = 0.0
+
+        assertEquals(BigFraction.ofLong(20), objective.evaluateExact(sample))
+        assertEquals(objective, copied)
+    }
+
+
+    @Test
     fun `exact evaluation preserves integer sums outside Long`() {
         val objective = LinearObjective(intCoefficients = longArrayOf(8L))
         val sample = Sample(BooleanArray(0), longArrayOf(1L shl 61))

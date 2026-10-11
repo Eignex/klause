@@ -1256,9 +1256,9 @@ internal class LocalSearchEngine(
      *  [LocalSearchParams.initialAssignment]. Returns false (leaving the state untouched for a
      *  normal random restart) when the sample's arity doesn't match this problem. */
     private fun seedFrom(state: LocalSearchState, sample: Sample, recompute: Boolean = true): Boolean {
-        if (sample.bools.size != problem.numBoolVars || sample.ints.size != problem.numIntVars) return false
-        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.bools[b])
-        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.ints[i])
+        if (sample.numBoolVars != problem.numBoolVars || sample.numIntVars != problem.numIntVars) return false
+        for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, sample.boolValue(b))
+        for (i in 0 until problem.numIntVars) state.assignment.setInt(i, sample.intValue(i))
         // Respect caller pins as restart() does, so a seed can't violate assumptions.
         state.assumptions.forEachBool { id, value ->
             if (state.assignment.boolValue(id) != value) state.assignment.flipBool(id)
@@ -1304,7 +1304,7 @@ internal class LocalSearchEngine(
             // self-inverse
 
             is Move.IntSet -> {
-                val old = baselineSnap.ints[move.varId]
+                val old = baselineSnap.intValue(move.varId)
                 if (old != state.assignment.intValue(move.varId)) state.apply(Move.IntSet(move.varId, old))
             }
 

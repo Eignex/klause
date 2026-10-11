@@ -118,8 +118,8 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             linkRhs = LongArray(lr.size) { lr[it] }
             linkSign = IntArray(ls.size) { ls[it] }
             val obj = objective ?: error("blocks chosen only when objective is non-null")
-            intCoef = LongArray(numInt) { obj.intCoefficients.getOrElse(it) { 0L } }
-            boolWeight = LongArray(problem.numBoolVars) { obj.boolWeights.getOrElse(it) { 0L } }
+            intCoef = LongArray(numInt) { obj.intCoefficientValues.getOrElse(it) { 0L } }
+            boolWeight = LongArray(problem.numBoolVars) { obj.boolWeightValues.getOrElse(it) { 0L } }
             objConstant = obj.constant
             applicable = true
         }

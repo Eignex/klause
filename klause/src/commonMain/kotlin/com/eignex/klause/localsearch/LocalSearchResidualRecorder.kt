@@ -3,6 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.internals.CumulativeLsState
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
 
@@ -37,10 +38,10 @@ internal class LocalSearchResidualRecorder {
             .take(MAX_FACTORS).map { (kind, fid) ->
                 val factor = state.problem.factors[fid]
                 val bools = factor.boolVars.distinct()
-                val ints = if (factor is Cumulative) {
-                    cumulativeCoordinates(state, fid, factor)
-                } else {
-                    factor.intVars.distinct()
+                val ints = when (factor) {
+                    is Cumulative -> cumulativeCoordinates(state, fid, factor)
+                    is Element -> elementCoordinates(state, factor)
+                    else -> factor.intVars.distinct()
                 }
                 LocalSearchResidualFactor(
                     fid, kind, state.factorDegree[fid].toLong(),
@@ -51,6 +52,19 @@ internal class LocalSearchResidualRecorder {
                 )
             }
         best = LocalSearchResidual(state.cost, byKind, factors)
+    }
+
+    private fun elementCoordinates(state: LocalSearchState, factor: Element): List<Int> {
+        val coordinates = arrayListOf(factor.idx, factor.result)
+        if (factor.arrIsVars) {
+            val index = state.assignment.intValue(factor.idx)
+            val offset = factor.indexOffset.toLong()
+            if (index >= offset && index < offset + factor.arr.size) {
+                coordinates.add(factor.arr[(index - offset).toInt()].toInt())
+            }
+        }
+        coordinates.addAll(factor.intVars.toList())
+        return coordinates.distinct()
     }
 
     private fun cumulativeCoordinates(state: LocalSearchState, fid: Int, factor: Cumulative): List<Int> {

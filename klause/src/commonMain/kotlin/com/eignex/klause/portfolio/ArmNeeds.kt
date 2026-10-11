@@ -58,7 +58,7 @@ internal class ProblemFacts(
                 problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) &&
                     problem.intBounds.lower(it) >= 0L && problem.intBounds.upper(it) <= 1L
             },
-            continuousObjective = objective?.realCoefficients?.any { it != 0.0 } == true,
+            continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
             relaxation = { emphasis ->
                 LpAutoConfig.resolve(problem, LpConfig(emphasis).cappedUnder(lpCeiling)) != LpPlan()
             },

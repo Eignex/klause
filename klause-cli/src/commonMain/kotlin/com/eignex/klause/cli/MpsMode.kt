@@ -196,7 +196,11 @@ private fun requireExactMpsSource(compiled: MpsCompiled) {
 private fun renderMpsFloat(compiled: MpsCompiled, sample: Sample): String = buildString {
     append("v")
     for (column in compiled.columns) {
-        val value = if (column.real) sample.reals[column.id].toString() else sample.ints[column.id].toString()
+        val value = if (column.real) {
+            sample.approximateRealValue(column.id).toString()
+        } else {
+            sample.intValue(column.id).toString()
+        }
         append(" ${column.name}=$value")
     }
 }

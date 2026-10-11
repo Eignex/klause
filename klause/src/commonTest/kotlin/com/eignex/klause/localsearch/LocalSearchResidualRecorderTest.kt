@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -13,8 +14,164 @@ import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 
 class LocalSearchResidualRecorderTest {
+    @Test
+    fun `element residual coordinates prioritize the selected cell across index offsets`() {
+        for (offset in listOf(0, 1, -17, Int.MIN_VALUE, Int.MAX_VALUE)) {
+            val factor = Element(0, 1, LongArray(32) { 2L + it }, true, offset)
+            val index = offset.toLong() + 31L
+            val domains = Array(34) { IntDomain(0, 40) }
+            domains[0] = IntDomain(offset.toLong(), index)
+            val problem = Problem(0, 34, domains, arrayOf<Factor>(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, index)
+            repeat(32) { state.assignment.setInt(2 + it, 1L + it) }
+            state.recompute()
+            val recorder = LocalSearchResidualRecorder()
+
+            recorder.observe(state)
+
+            val observed = assertNotNull(recorder.best).factors.single()
+            assertEquals(listOf(0, 1, 33) + (2..14), observed.ints.keys.toList(), "$offset")
+            assertEquals(index, observed.ints[0], "$offset")
+            assertEquals(0L, observed.ints[1], "$offset")
+            assertEquals(32L, observed.ints[33], "$offset")
+            assertEquals(18, observed.omittedInts, "$offset")
+            assertEquals(emptyMap(), observed.bools, "$offset")
+            assertEquals(state.cost, recorder.best?.cost, "$offset")
+        }
+    }
+
+    @Test
+    fun `element residual selection uses the offset after affine index substitution`() {
+        val original = Element(0, 1, longArrayOf(2, 3), true)
+        val lowered = assertNotNull(original.substituteAffine(0, 1, 7, 4)) as Element
+        val domains = Array(5) { IntDomain(0, 10) }
+        domains[4] = IntDomain(-6, -5)
+        val problem = Problem(0, 5, domains, arrayOf<Factor>(lowered))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(4, -5)
+        state.assignment.setInt(2, 3)
+        state.assignment.setInt(3, 9)
+        state.recompute()
+        val recorder = LocalSearchResidualRecorder()
+
+        recorder.observe(state)
+
+        val observed = assertNotNull(recorder.best).factors.single()
+        assertEquals(mapOf(4 to -5L, 1 to 0L, 3 to 9L, 2 to 3L), observed.ints)
+        assertEquals(listOf(4, 1, 3, 2), observed.ints.keys.toList())
+        assertEquals(0, observed.omittedInts)
+    }
+
+    @Test
+    fun `element residual omissions count distinct coordinates across aliased roles`() {
+        for ((sharedResult, selectedIndex) in listOf(false to false, true to false, false to true)) {
+            val cells = LongArray(32) { 2L + (it - 2).mod(20) }
+            cells[0] = 0
+            cells[1] = 1
+            cells[31] = if (selectedIndex) 0 else 21
+            val factor = Element(0, if (sharedResult) 0 else 1, cells, true, 0)
+            val problem = Problem(0, 22, Array(22) { IntDomain(0, 40) }, arrayOf<Factor>(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, 31)
+            for (v in 2..21) state.assignment.setInt(v, 8)
+            state.recompute()
+            val recorder = LocalSearchResidualRecorder()
+
+            recorder.observe(state)
+
+            val observed = assertNotNull(recorder.best).factors.single()
+            val expected = when {
+                sharedResult -> listOf(0, 21) + (1..14)
+                selectedIndex -> (0..15).toList()
+                else -> listOf(0, 1, 21) + (2..14)
+            }
+            assertEquals(expected, observed.ints.keys.toList())
+            assertEquals(6, observed.omittedInts)
+        }
+    }
+
+    @Test
+    fun `element residual invalid indexes retain the ordinary bounded coordinate sample`() {
+        for (offset in listOf(0, Int.MIN_VALUE, Int.MAX_VALUE)) {
+            val lower = offset.toLong()
+            val indexes = listOf(lower - 1, lower + 32) +
+                if (offset == 0) listOf(Long.MIN_VALUE, Long.MAX_VALUE) else emptyList()
+            for (index in indexes) {
+                val factor = Element(0, 1, LongArray(32) { 2L + it }, true, offset)
+                val domains = Array(34) { IntDomain(0, 1) }
+                domains[0] = IntDomain(index, index)
+                val problem = Problem(0, 34, domains, arrayOf<Factor>(factor))
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+                state.assignment.setInt(0, index)
+                state.recompute()
+                val recorder = LocalSearchResidualRecorder()
+
+                recorder.observe(state)
+
+                val observed = assertNotNull(recorder.best).factors.single()
+                assertEquals((0..15).toList(), observed.ints.keys.toList(), "$offset/$index")
+                assertEquals(index, observed.ints[0], "$offset/$index")
+                assertEquals(18, observed.omittedInts, "$offset/$index")
+            }
+        }
+    }
+
+    @Test
+    fun `element residual constant arrays contain only index and result coordinates`() {
+        for (index in listOf(-1L, 31L, 32L)) {
+            val factor = Element(0, 1, LongArray(32) { Long.MAX_VALUE }, false, 0)
+            val problem = Problem(0, 2, arrayOf(IntDomain(-1, 32), IntDomain(0, 1)), arrayOf<Factor>(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setInt(0, index)
+            state.recompute()
+            val recorder = LocalSearchResidualRecorder()
+
+            recorder.observe(state)
+
+            val observed = assertNotNull(recorder.best).factors.single()
+            assertEquals(mapOf(0 to index, 1 to 0L), observed.ints)
+            assertEquals(0, observed.omittedInts)
+        }
+    }
+
+    @Test
+    fun `element residual snapshots retain committed best selections through probes and later moves`() {
+        val factor = Element(0, 1, LongArray(32) { 2L + it }, true, 0)
+        val problem = Problem(0, 34, Array(34) { IntDomain(0, 40) }, arrayOf<Factor>(factor))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        state.assignment.setInt(0, 31)
+        state.assignment.setInt(32, 8)
+        state.assignment.setInt(33, 10)
+        state.recompute()
+        val recorder = LocalSearchResidualRecorder()
+        recorder.observe(state)
+        val initial = assertNotNull(recorder.best)
+
+        state.netDelta(Move.Compound(listOf(Move.IntSet(0, 30), Move.IntSet(32, 1))))
+        recorder.observe(state)
+        assertSame(initial, recorder.best)
+        state.apply(Move.IntSet(0, 30))
+        recorder.observe(state)
+        val improved = assertNotNull(recorder.best)
+        state.apply(Move.IntSet(32, 9))
+        state.apply(Move.IntSet(33, 12))
+        recorder.observe(state)
+
+        assertSame(improved, recorder.best)
+        assertEquals(10L, initial.cost)
+        assertEquals(listOf(0, 1, 33), initial.factors.single().ints.keys.take(3))
+        assertEquals(10L, initial.factors.single().ints[33])
+        assertEquals(8L, improved.cost)
+        assertEquals(listOf(0, 1, 32), improved.factors.single().ints.keys.take(3))
+        assertEquals(8L, improved.factors.single().ints[32])
+        assertEquals(18, improved.factors.single().omittedInts)
+    }
+
     @Test
     fun `cumulative residual coordinates prioritize tasks at the overloaded peak`() {
         for (inactive in listOf("duration", "resource", "presence", "negated presence")) {

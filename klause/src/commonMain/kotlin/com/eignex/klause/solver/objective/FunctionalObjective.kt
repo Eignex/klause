@@ -188,7 +188,7 @@ internal class FunctionalObjective internal constructor(
     }
 
     override fun evaluate(sample: Sample): Double =
-        objValue({ id -> sample.ints[id] }, { id -> sample.bools[id] }).toDouble()
+        objValue({ id -> sample.intValue(id) }, { id -> sample.boolValue(id) }).toDouble()
 
     override fun evaluate(assignment: Assignment): Double =
         objValue({ id -> assignment.intValue(id) }, { id -> assignment.boolValue(id) }).toDouble()

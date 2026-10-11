@@ -104,7 +104,7 @@ internal class OpenPortfolio(
         minimizer: OpenTheoryMinimizer?,
         cancellation: Cancellation,
     ): OpenTheoryOptimum {
-        require(minimizer == null || objective.realCoefficients.none { it != 0.0 }) {
+        require(minimizer == null || objective.realCoefficientValues.none { it != 0.0 }) {
             "the theory's descent minimizes no continuous column"
         }
         val firstLocalArm = if (minimizer != null) 1 else 0
@@ -274,7 +274,7 @@ internal class OpenPortfolio(
         // An objective over continuous columns is minimized over that residual first.
         val completion = if (model.numRealVars > 0) {
             val theory = TheoryCompletion(model, theoryParams)
-            if (objective != null && objective.realCoefficients.any { it != 0.0 }) {
+            if (objective != null && objective.realCoefficientValues.any { it != 0.0 }) {
                 OptimizingCompletion(model, objective, theory)
             } else {
                 theory
@@ -354,7 +354,7 @@ internal fun openWitnessVerifier(model: Problem, objective: LinearObjective?): C
         if (objective == null || claimed == null) return@CandidateVerifier Verification.Accepted(candidate)
         val exact = objective.evaluateExact(sample)
         val value = exact.toDouble()
-        val agrees = if (objective.realCoefficients.any { it != 0.0 }) {
+        val agrees = if (objective.realCoefficientValues.any { it != 0.0 }) {
             abs(value - claimed) <= OBJECTIVE_TOLERANCE * maxOf(1.0, abs(value))
         } else {
             exact.num.abs() > bigIntOf(EXACT_DOUBLE_INTEGER) || value == claimed
@@ -387,6 +387,6 @@ internal fun inWindows(sample: Sample, searchModel: LocalSearchModel): Sample {
         }
         return Sample(sample.bools, projected, sample.reals, sample.exactReals)
     }
-    if (sample.ints.indices.all { domains[it].contains(sample.ints[it]) }) return sample
-    return sample.copy(ints = LongArray(domains.size) { domains[it].clamp(sample.ints[it]) })
+    if ((0 until sample.numIntVars).all { domains[it].contains(sample.intValue(it)) }) return sample
+    return sample.copy(ints = LongArray(domains.size) { domains[it].clamp(sample.intValue(it)) })
 }
