@@ -427,9 +427,9 @@ sealed interface PropagationResult {
      *    [PropagationSession], `session.pinBool(v, value)` lives at the level it was pushed
      *    at; `seed` assigns levels `1..|assumptions|` in iteration order. Level 0 is never
      *    in the set — it represents the problem-constraint phase, not a decision.
-     *  - [conflictBools] / [conflictInts] are the decision variables at those levels. They
-     *    are derived from [conflictLevels] for convenience; CSP-style DFS samplers typically
-     *    read [conflictLevels] directly to compute their backjump target.
+     *  - [conflictBools] / [conflictInts] identify variables visited by native conflict analysis
+     *    when it learns a constraint. Otherwise they identify decision variables at the conflicting
+     *    levels. Activity selectors use this attribution; DFS backjump targets use [conflictLevels].
      *  - [conflictFactors] is the set of `Problem.factors` ids that
      *    derived the contradiction: the factor that returned `false` from `propagate` plus,
      *    via a backward walk of the reason trail, every factor whose firing contributed to its

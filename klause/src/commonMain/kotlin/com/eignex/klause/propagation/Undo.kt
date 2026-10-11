@@ -8,6 +8,7 @@ internal fun PropagationState.logBoolPin(v: Int) {
     boolPinPos[v] = undo.size
     undo.tag.add(0)
     undo.varId.add(v)
+    if (problem.numIntVars == 0) return
     undo.level.add(0)
     undo.minLvl.add(0)
     undo.maxLvl.add(0)
