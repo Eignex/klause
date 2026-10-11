@@ -31,7 +31,9 @@ class MonotoneClausePrimalTest {
             val sample = assertNotNull(it.advance())
             assertEquals(1L, objective.evaluateLong(sample))
             assertTrue(problem.factors.all { factor ->
-                (factor as Clause).literals.any { literal -> Lit.evaluate(literal, sample.bools[Lit.variable(literal)]) }
+                (factor as Clause).literals.any { literal ->
+                    Lit.evaluate(literal, sample.bools[Lit.variable(literal)])
+                }
             })
             while (!it.isDone) it.advance()
         }
