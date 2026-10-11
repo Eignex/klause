@@ -91,11 +91,13 @@ Boolean guards select active edges. With `n` graph vertices, scaling bounds by
 including zero-weight strict cycles. Feasible graphs supply rational potentials;
 witnesses still pass the complete source-row check. Infeasible graphs retain the
 shared LP route for conflict explanations and learning. Active source rows remain
-asserted in the shared LP scope. Floating LP solves maintain the basis on graph-feasible
+asserted in the shared LP scope whenever that owner is needed. Floating LP solves maintain the basis on graph-feasible
 states; their numerical output supplies no verdict. Graph feasibility replaces
 exact LP point certification below the root and for complete Boolean assignments
 at the root. A complete graph witness passes source validation before numerical
-LP work, so pinned local-search completions need no floating guide. If every
+LP work, so pinned local-search completions need no floating guide. Fully pinned
+difference roots defer LP construction until graph witness validation declines
+or a later source-bound decision requires a shared LP scope. If every
 Boolean is published at the root, initialization waits for those publications
 to reach the theory before checking the pinned arithmetic. Pure-real local-search
 completions keep their source rows and Boolean pins, skipping source presolve

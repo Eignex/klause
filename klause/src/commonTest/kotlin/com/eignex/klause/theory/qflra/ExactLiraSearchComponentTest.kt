@@ -417,6 +417,34 @@ class ExactLiraSearchComponentTest {
     }
 
     @Test
+    fun `a source bound after a root graph witness retains conflicts and retraction`() {
+        val model = Problem(
+            numBoolVars = 0,
+            intBounds = openBounds(0),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            factors = arrayOf(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0),
+                doubleArrayOf(1.0), LinearOp.GE, 1.0)),
+        )
+        ExactLiraSearchComponent(model).use { component ->
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(session.initialize())
+            assertIs<ComponentResult.Consistent>(session.propagate())
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+            val split = assertNotNull(SourceBoundAtom.rationalSplit(session,
+                listOf(SourceBoundTerm(SearchRealValue(0), BigFraction.ONE)), BigFraction.ZERO))
+
+            val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Theory(split.positive)))
+
+            assertContentEquals(intArrayOf(split.negative.literal), assertNotNull(conflict.explanation).literals)
+            session.popTo(0)
+            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.negative)))
+            assertIs<ComponentCheck.Feasible>(component.check(session))
+        }
+    }
+
+    @Test
     fun `root restart retains conditional reasons and registered atom names`() {
         val source = Problem(
             numBoolVars = 1,
