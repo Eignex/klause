@@ -9,8 +9,11 @@ internal enum class PolynomialResource { DENSE_COEFFICIENTS, MATRIX_CELLS, DEGRE
 
 internal class PolynomialResourceLimit(val resource: PolynomialResource) : RuntimeException()
 
-internal data class PolynomialLimits(val maxDenseCoefficients: Int = 65536, val maxMatrixCells: Long = 262144) {
-    init { require(maxDenseCoefficients > 0 && maxMatrixCells >= 0) }
+internal data class PolynomialLimits(val maxDenseCoefficients: Int? = 65536, val maxMatrixCells: Long? = 262144) {
+    init {
+        require(maxDenseCoefficients == null || maxDenseCoefficients > 0)
+        require(maxMatrixCells == null || maxMatrixCells >= 0)
+    }
 }
 
 internal class PolynomialArithmetic(
@@ -37,25 +40,32 @@ internal class PolynomialArithmetic(
 
     fun subtract(left: Polynomial, right: Polynomial): Polynomial = add(left, negate(right))
 
-    fun scale(value: Polynomial, coefficient: BigFraction): Polynomial = Polynomial.of(value.terms.map {
+    fun scale(value: Polynomial, coefficient: BigFraction): Polynomial {
         step()
-        PolynomialTerm(it.monomial, it.coefficient * coefficient)
-    })
-
-    fun multiply(left: Polynomial, right: Polynomial): Polynomial = Polynomial.of(buildList {
-        for (a in left.terms) for (b in right.terms) {
+        return Polynomial.of(value.terms.map {
             step()
-            for (variable in a.monomial.variables) {
-                if (b.monomial.exponent(variable) > Int.MAX_VALUE - a.monomial.exponent(variable)) {
-                    throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+            PolynomialTerm(it.monomial, it.coefficient * coefficient)
+        })
+    }
+
+    fun multiply(left: Polynomial, right: Polynomial): Polynomial {
+        step()
+        return Polynomial.of(buildList {
+            for (a in left.terms) for (b in right.terms) {
+                step()
+                for (variable in a.monomial.variables) {
+                    if (b.monomial.exponent(variable) > Int.MAX_VALUE - a.monomial.exponent(variable)) {
+                        throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+                    }
                 }
+                add(PolynomialTerm(a.monomial.times(b.monomial), a.coefficient * b.coefficient))
             }
-            add(PolynomialTerm(a.monomial.times(b.monomial), a.coefficient * b.coefficient))
-        }
-    })
+        })
+    }
 
     fun power(value: Polynomial, exponent: Int): Polynomial {
         require(exponent >= 0)
+        step()
         var result = Polynomial.ONE
         var base = value
         var remaining = exponent
@@ -68,15 +78,18 @@ internal class PolynomialArithmetic(
         return result
     }
 
-    fun derivative(value: Polynomial, variable: Int): Polynomial = Polynomial.of(buildList {
-        for ((monomial, coefficient) in value.terms) {
-            step()
-            val degree = monomial.exponent(variable)
-            if (degree == 0) continue
-            val quotient = checkNotNull(monomial.quotient(Monomial.of(mapOf(variable to 1))))
-            add(PolynomialTerm(quotient, coefficient * BigFraction.ofLong(degree.toLong())))
-        }
-    })
+    fun derivative(value: Polynomial, variable: Int): Polynomial {
+        step()
+        return Polynomial.of(buildList {
+            for ((monomial, coefficient) in value.terms) {
+                step()
+                val degree = monomial.exponent(variable)
+                if (degree == 0) continue
+                val quotient = checkNotNull(monomial.quotient(Monomial.of(mapOf(variable to 1))))
+                add(PolynomialTerm(quotient, coefficient * BigFraction.ofLong(degree.toLong())))
+            }
+        })
+    }
 
     fun coefficients(value: Polynomial, variable: Int): List<Polynomial> {
         step()
@@ -163,13 +176,14 @@ internal class PolynomialArithmetic(
 
     fun denseSize(degree: Int): Int {
         step()
-        if (degree >= limits.maxDenseCoefficients) throw PolynomialResourceLimit(PolynomialResource.DENSE_COEFFICIENTS)
+        val maximum = limits.maxDenseCoefficients ?: Int.MAX_VALUE
+        if (degree >= maximum) throw PolynomialResourceLimit(PolynomialResource.DENSE_COEFFICIENTS)
         return degree + 1
     }
 
     private fun matrix(size: Long): Array<Array<Polynomial>> {
         step()
-        if (size > Int.MAX_VALUE || size * size > limits.maxMatrixCells) {
+        if (size > Int.MAX_VALUE || size * size > (limits.maxMatrixCells ?: Long.MAX_VALUE)) {
             throw PolynomialResourceLimit(PolynomialResource.MATRIX_CELLS)
         }
         return Array(size.toInt()) {

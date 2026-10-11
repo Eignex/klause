@@ -46,7 +46,9 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
     fun multiply(left: RationalPolynomial, right: RationalPolynomial): RationalPolynomial {
         arithmetic.step()
         if (left.isZero || right.isZero) return RationalPolynomial.ZERO
-        if (left.degree > Int.MAX_VALUE - right.degree) throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+        if (left.degree > Int.MAX_VALUE - right.degree) {
+            throw PolynomialResourceLimit(PolynomialResource.DEGREE_OVERFLOW)
+        }
         val result = MutableList(arithmetic.denseSize(left.degree + right.degree)) { BigFraction.ZERO }
         for (i in 0..left.degree) for (j in 0..right.degree) {
             arithmetic.step()
