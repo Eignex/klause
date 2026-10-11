@@ -56,7 +56,8 @@ internal object Xcsp3SourceChecker {
         val cost = objective?.let { " cost=\"$it\"" }.orEmpty()
         val names = root.getElementsByTagName("list").item(0).textContent
         val values = root.getElementsByTagName("values").item(0).textContent
-        val pinned = "<instantiation$cost><list>${xmlText(names)}</list><values>${xmlText(values)}</values></instantiation>"
+        val pinned = "<instantiation$cost><list>${xmlText(names)}</list>" +
+            "<values>${xmlText(values)}</values></instantiation>"
         return runCatching {
             val assignment = names.trim().split(Regex("\\s+")).zip(values.trim().split(Regex("\\s+")))
                 .associate { (name, value) -> name to value.toInt() }

@@ -224,7 +224,8 @@ class Xcsp3SourceCheckerTest {
         "500000000 0,c d,invalid",
         "1073741823 -1,c d,invalid",
         "1073741823 -2,c d,unknown",
-        "500000000 1000000000,2x2,invalid",
+        "500000000 500000000,2x2,invalid",
+        "500000000 1000000000,2x2,unknown",
         "1500000000 0,2x2,unknown",
     )
     fun `weighted direct sums guard products and totals with constant or variable coefficients`(
@@ -262,9 +263,12 @@ class Xcsp3SourceCheckerTest {
         "<sum><list>x[0..1]</list><condition>(le,0)</condition></sum>|1500000000 1500000000|unknown",
         "<sum><list>x[0] x[0]</list><condition>(le,0)</condition></sum>|1500000000 1500000000|unknown",
         "<block><sum><list>x[]</list><condition>(le,0)</condition></sum></block>|1500000000 1500000000|unknown",
-        "<group><sum><list>%0 %1</list><condition>(le,0)</condition></sum><args>x[0] x[1]</args></group>|1500000000 1500000000|unknown",
-        "<group><sum><list>%...</list><condition>(le,0)</condition></sum><args>x[]</args></group>|1500000000 1500000000|unknown",
-        "<slide><list>x[]</list><sum><list>%0 %1</list><condition>(le,0)</condition></sum></slide>|1500000000 1500000000|unknown",
+        "<group><sum><list>%0 %1</list><condition>(le,0)</condition></sum><args>x[0] x[1]</args></group>" +
+            "|1500000000 1500000000|unknown",
+        "<group><sum><list>%...</list><condition>(le,0)</condition></sum><args>x[]</args></group>" +
+            "|1500000000 1500000000|unknown",
+        "<slide><list>x[]</list><sum><list>%0 %1</list><condition>(le,0)</condition></sum></slide>" +
+            "|1500000000 1500000000|unknown",
         "<sum><list>x[]</list><condition>(le,0)</condition></sum>|0 0|valid",
         "<sum><list>x[0..1]</list><condition>(le,0)</condition></sum>|0 0|valid",
         "<sum><list>x[0] x[0]</list><condition>(le,0)</condition></sum>|0 0|valid",
