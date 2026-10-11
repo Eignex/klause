@@ -104,6 +104,7 @@ private fun run(args: Array<String>) {
     // Peak heap has to be watched from before the parse, since ingest is what the dry-run measures and
     // the sampler cannot see backwards. Started only for that diagnostic, never on a solve path.
     if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
+    common.resetInvocationStatistics()
     val loadStart = nowMillis()
     val solvable = session.load(path, common)
     common.loadElapsedMs = nowMillis() - loadStart

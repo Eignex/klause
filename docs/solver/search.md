@@ -272,6 +272,18 @@ reasons. Zero does not establish complete factor reason coverage. Missing metric
 missing, including root theory refutations that never enter shared search. Ratios of
 visit work to fixpoint time are coarse because their scopes differ.
 
+The CLI exports these native work/time fields under `nativeCpPropagationWork`,
+`nativeCpRootPropagationWork`, `nativeCpPropagationMs` and
+`nativeCpRootPropagationMs` when the aggregate snapshot has positive native work
+or time. Root work and time are subsets of the respective propagation totals,
+not additive phases. Worker snapshots aggregate their native measurements; these
+values are not an invocation wall-time partition. An absent native block cannot
+classify open-theory root or propagation activity, whose elapsed times are not
+measured by these native providers. A zero emitted millisecond value can result
+from truncating an evidenced sub-millisecond measurement. The
+[CLI invocation fields](../cli.md) distinguish frontend routing, selected solve
+pipeline, declared theory and reported backend without extending search clocks.
+
 `openReductionNs` is zero when the cap is off or no reduction pass is needed.
 
 ## Monotone clausal primal probe
