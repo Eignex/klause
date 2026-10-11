@@ -62,6 +62,8 @@ internal class PolynomialTheoryInvocation(
     private var active = false
     var stats = QfNraStats(0, 0, 0)
         private set
+    var lastUnknown: QfNraResult.Unknown? = null
+        private set
     var queries: Long = 0
         private set
 
@@ -79,6 +81,7 @@ internal class PolynomialTheoryInvocation(
                 params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining),
                 condition,
             )
+            lastUnknown = result as? QfNraResult.Unknown
             stats = QfNraStats(
                 sum(stats.projectedPolynomials, result.stats.projectedPolynomials),
                 sum(stats.liftedCells, result.stats.liftedCells),

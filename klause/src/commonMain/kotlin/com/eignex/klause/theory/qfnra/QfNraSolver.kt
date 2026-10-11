@@ -9,6 +9,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.requireVariableCounts
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 
@@ -60,14 +61,18 @@ internal fun solveQfNra(
         arithmetic.step()
         val conditioned = condition.apply(formula, boolCount, realCount, arithmetic::step)
         conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
-        val normalized = PolynomialFormula.normalize(conditioned, arithmetic)
+        val fixed = condition.lower.filter { (id, value) ->
+            arithmetic.step()
+            condition.upper[id] == value
+        }
+        val normalized = PolynomialFormula.normalize(conditioned, arithmetic, fixed)
         val polynomials = normalized.atoms.map {
             arithmetic.step()
             it.polynomial
         }
         val projection = PolynomialProjection.compute(polynomials, realCount, arithmetic)
         work.projectedPolynomials = projection.polynomialCount
-        val assignment = searchCells(normalized, projection, boolCount, arithmetic, algebraic, work)
+        val assignment = searchCells(normalized, projection, boolCount, arithmetic, algebraic, work, fixed)
         arithmetic.step()
         if (assignment == null) QfNraResult.Unsatisfiable(work.snapshot())
         else QfNraResult.Satisfiable(assignment, work.snapshot())
@@ -102,13 +107,14 @@ private fun searchCells(
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
     work: QfNraWork,
+    fixed: Map<Int, BigFraction>,
 ): QfNraAssignment? {
     val coordinates = HashMap<Int, AlgebraicReal>()
     if (projection.variableCount == 0) {
         return checkSample(formula, coordinates, boolCount, arithmetic, algebraic)
     }
     val frames = ArrayDeque<CadFrame>()
-    frames.addLast(liftFrame(projection, 0, coordinates, arithmetic, algebraic))
+    frames.addLast(liftFrame(projection, 0, coordinates, arithmetic, algebraic, fixed))
     while (frames.isNotEmpty()) {
         arithmetic.step()
         val frame = frames.last()
@@ -119,14 +125,14 @@ private fun searchCells(
         }
         val cell = frame.nextCell++
         val root = (cell / 2).toInt()
-        val coordinate = if (cell and 1L != 0L) frame.roots[root] else {
+        val coordinate = frame.fixed ?: if (cell and 1L != 0L) frame.roots[root] else {
             algebraic.rational(algebraic.sampleBetween(frame.roots.getOrNull(root - 1), frame.roots.getOrNull(root)))
         }
         coordinates[frame.variable] = coordinate
         if (work.liftedCells < Long.MAX_VALUE) work.liftedCells++
         if (frame.variable + 1 < projection.variableCount) {
             if (prefixFeasible(formula, coordinates, boolCount, arithmetic, algebraic)) {
-                frames.addLast(liftFrame(projection, frame.variable + 1, coordinates, arithmetic, algebraic))
+                frames.addLast(liftFrame(projection, frame.variable + 1, coordinates, arithmetic, algebraic, fixed))
             }
         } else {
             val assignment = checkSample(formula, coordinates, boolCount, arithmetic, algebraic)
@@ -136,8 +142,8 @@ private fun searchCells(
     return null
 }
 
-private class CadFrame(val variable: Int, val roots: List<AlgebraicReal>) {
-    val cellCount: Long = 2L * roots.size + 1
+private class CadFrame(val variable: Int, val roots: List<AlgebraicReal>, val fixed: AlgebraicReal? = null) {
+    val cellCount: Long = if (fixed == null) 2L * roots.size + 1 else 1
     var nextCell: Long = 0
 }
 
@@ -147,7 +153,9 @@ private fun liftFrame(
     coordinates: Map<Int, AlgebraicReal>,
     arithmetic: PolynomialArithmetic,
     algebraic: AlgebraicArithmetic,
+    fixed: Map<Int, BigFraction>,
 ): CadFrame {
+    fixed[variable]?.let { return CadFrame(variable, emptyList(), algebraic.rational(it)) }
     val roots = mutableListOf<AlgebraicReal>()
     for (polynomial in projection.polynomials(variable)) {
         arithmetic.step()

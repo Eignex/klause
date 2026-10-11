@@ -3,6 +3,7 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.BigInt
 import kotlin.reflect.KClass
 
@@ -59,3 +60,5 @@ internal fun TypedSearchValueKey<*>.capture(value: Any): Any {
     require(valueType.isInstance(captured)) { "model snapshot does not match ${valueType.simpleName}" }
     return captured
 }
+
+internal val completedSearchSample = SearchModelKey(Sample::class)

@@ -50,6 +50,7 @@ import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
+import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
@@ -623,7 +624,7 @@ private sealed interface BacktrackCompletion {
         override fun sample(
             model: com.eignex.klause.solver.search.AssembledSearchModel,
             cp: CpSearchComponent,
-        ): Sample = checkNotNull(model.valueOf(cp))
+        ): Sample = model.valueOf(completedSearchSample) ?: checkNotNull(model.valueOf(cp))
     }
 
     class ResidualReal(private val component: ResidualRealComponent) : BacktrackCompletion {
