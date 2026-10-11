@@ -3594,6 +3594,7 @@ final class com.eignex.klause.backtrack.selector/LastConflict : com.eignex.klaus
     final fun onCommit(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack.selector/LastConflict.onCommit|onCommit(com.eignex.klause.solver.search.VarRef){}[0]
     final fun onConflict(com.eignex.klause.solver.search/VarRef) // com.eignex.klause.backtrack.selector/LastConflict.onConflict|onConflict(com.eignex.klause.solver.search.VarRef){}[0]
     final fun onConflict(com.eignex.klause.solver.search/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/LastConflict.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
+    final fun onConflict(com.eignex.klause.solver.search/VarRef?, com.eignex.klause.solver.search/BranchingConflict) // com.eignex.klause.backtrack.selector/LastConflict.onConflict|onConflict(com.eignex.klause.solver.search.VarRef?;com.eignex.klause.solver.search.BranchingConflict){}[0]
     final fun onPropagation(com.eignex.klause.propagation/PropagationResult.Implied) // com.eignex.klause.backtrack.selector/LastConflict.onPropagation|onPropagation(com.eignex.klause.propagation.PropagationResult.Implied){}[0]
     final fun onRestart() // com.eignex.klause.backtrack.selector/LastConflict.onRestart|onRestart(){}[0]
     final fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack.selector/LastConflict.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]

@@ -281,7 +281,10 @@ internal class ResumableMinimize(
     private var decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
     private val brancher = BacktrackBrancher(
         session, params, sink, restart, LpGuidedBranching(), nativeConflict = { cp.lastConflict },
-    ).also { cp.propagationObserver = it::onPropagation }
+    ).also {
+        cp.propagationObserver = it::onPropagation
+        cp.cascadeConflictObserver = it::onCascadeConflict
+    }
     private val searchSession = SearchComponentSet(
         buildList {
             add(cp)

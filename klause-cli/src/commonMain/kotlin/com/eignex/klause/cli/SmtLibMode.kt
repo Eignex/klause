@@ -243,7 +243,7 @@ internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { 
 
     private companion object {
         private val SMT_SEARCH_KEYS = setOf(
-            "nodes", "failures", "propagations",
+            "nodes", "failures", "propagations", "learned", "learnedMeanSize", "learnedMeanLbd", "relearned",
             "openBoolDecisions", "openIntDecisions", "openTheoryDecisions", "openTheoryChecks",
             "openWork", "openLearned", "openRelearned",
             "openRestarts", "openReductions", "openDropped", "openRetained", "openPeakRetained",

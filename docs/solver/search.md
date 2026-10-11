@@ -78,8 +78,9 @@ tuples, diagram reachability and all assignment-dependent payloads remain state-
 ### Branching and global deductions
 
 Finite branching receives the native conflict's full variable and factor attribution,
-including implication-graph variables for learned conflicts. Successful CP fixpoints
-deliver newly reported deductions to propagation-aware selectors in both satisfaction
+including implication-graph variables for learned conflicts. Conflicts cascading from a
+native learned assertion also update activity and failure counters; they have no fresh
+branch decision to blame. Successful CP fixpoints deliver newly reported deductions to propagation-aware selectors in both satisfaction
 and optimization search.
 
 Dom/wdeg initializes from the session's prepared occurrence indexes. Failure weights and

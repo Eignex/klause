@@ -1,14 +1,16 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
+import com.eignex.klause.solver.result.ConflictAnalysisStats
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkStats
 import com.eignex.klause.solver.result.RunStats
+import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.parseBigInt
 import com.eignex.kumulant.stat.summary.SumResult
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
@@ -133,6 +135,27 @@ class VerdictReasonTest {
         }
 
         assertEquals("unknown\n; optimizationStatus=unknown\n; wall timeout\n", out)
+    }
+
+    @Test
+    fun `SMT-LIB statistics distinguish native learning from open theory learning`() {
+        val out = capture {
+            SmtLibOutput().onStatistics(
+                SolveStats(
+                    run = RunStats(backend = "backtrack"),
+                    search = SearchStats(learnedClauses = SumResult(5.0)),
+                    ca = ConflictAnalysisStats(notApplicable = SumResult(3.0), nonAsserting = SumResult(2.0)),
+                    openTheoryClauses = OpenTheoryClauseStats(learned = 7),
+                ),
+                solveTimeMs = 0,
+                solutions = 0,
+            )
+        }
+
+        assertTrue("; learned=5" in out, out)
+        assertTrue("; caNotApplicable=3" in out, out)
+        assertTrue("; caNonAsserting=2" in out, out)
+        assertTrue("; openLearned=7" in out, out)
     }
 
     @Test
