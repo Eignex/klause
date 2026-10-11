@@ -31,6 +31,17 @@ internal class NativeSatState(private val state: PropagationState) {
     private val arena = state.projection.clauseArena
     private val baseCount = arena.clauseCount
     private val numBoolVars = state.problem.numBoolVars
+    private val boolTruth = checkNotNull(state.nativeBoolTruth)
+
+    private fun litTrue(lit: Int): Boolean {
+        state.work++
+        return boolTruth[Lit.variable(lit)].toInt() == 2 - (lit and 1)
+    }
+
+    private fun litFalse(lit: Int): Boolean {
+        state.work++
+        return boolTruth[Lit.variable(lit)].toInt() == 1 + (lit and 1)
+    }
 
     // Learned clauses appended during search: literals concatenated in [learnedLits], clause `i`
     // starting at learnedStarts[i]. Clause handle `h >= baseCount` decodes to learned index
@@ -176,10 +187,10 @@ internal class NativeSatState(private val state: PropagationState) {
         val h = appendLearned(lits, lbd, permanent, origin)
         val len = lits.size
         if (len == 1) {
-            if (state.litFalse(lits[0])) {
+            if (litFalse(lits[0])) {
                 recordConflict(h)
                 pendingConflict = true
-            } else if (!state.litTrue(lits[0])) {
+            } else if (!litTrue(lits[0])) {
                 if (!pinUnit(h, 0)) pendingConflict = true
             }
             return h
@@ -187,7 +198,7 @@ internal class NativeSatState(private val state: PropagationState) {
         var w0 = -1
         var w1 = -1
         for (k in 0 until len) {
-            if (!state.litFalse(lits[k])) {
+            if (!litFalse(lits[k])) {
                 if (w0 < 0) {
                     w0 = k
                 } else {
@@ -390,11 +401,11 @@ internal class NativeSatState(private val state: PropagationState) {
             for (i in 0 until baseUnits.size) {
                 val h = baseUnits[i]
                 val lit = litOf(h, 0)
-                if (state.litFalse(lit)) {
+                if (litFalse(lit)) {
                     recordConflict(h)
                     return state.conflictLevels
                 }
-                if (!state.litTrue(lit)) {
+                if (!litTrue(lit)) {
                     state.currentFactor = h
                     if (!state.pinLit(lit, null)) {
                         recordConflict(h)
@@ -432,7 +443,7 @@ internal class NativeSatState(private val state: PropagationState) {
             val entry = entries[wi]
             val h = entry.toInt()
             val blocker = (entry ushr 32).toInt()
-            if (state.litTrue(blocker)) {
+            if (litTrue(blocker)) {
                 wi++
                 continue
             }
@@ -446,7 +457,7 @@ internal class NativeSatState(private val state: PropagationState) {
             val lIdx = if (slot0IsFalse) i0 else i1
             val otherIdx = if (slot0IsFalse) i1 else i0
             val otherLit = lits[start + otherIdx]
-            if (state.litTrue(otherLit)) {
+            if (litTrue(otherLit)) {
                 entries[wi] = packWatch(h, otherLit) // refresh the blocker to the satisfying literal
                 wi++
                 continue
@@ -459,7 +470,7 @@ internal class NativeSatState(private val state: PropagationState) {
                 addWatch(newLit, h, otherLit)
                 continue
             }
-            if (state.litFalse(otherLit)) {
+            if (litFalse(otherLit)) {
                 recordConflict(h)
                 return false
             }
@@ -473,7 +484,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun findNonFalse(lits: IntArray, start: Int, len: Int, lIdx: Int, otherIdx: Int): Int {
         for (k in 0 until len) {
             if (k == lIdx || k == otherIdx) continue
-            if (!state.litFalse(lits[start + k])) return k
+            if (!litFalse(lits[start + k])) return k
         }
         return -1
     }

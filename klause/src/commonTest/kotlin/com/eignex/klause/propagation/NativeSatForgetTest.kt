@@ -25,6 +25,21 @@ class NativeSatForgetTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `opposite pins after undo propagate opposite deductions`() {
+        val session = session(2, or(0, false, 1, true), or(0, true, 1, false))
+        session.pinBool(0, true)
+        assertEquals(true, session.boolValue(1))
+        session.popToLevel(0)
+
+        session.pinBool(0, false)
+
+        assertEquals(false, session.boolValue(1))
+        session.popToLevel(0)
+        session.pinBool(0, true)
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
     fun `relocated watches propagate after backtracking`() {
         val session = session(3, intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
 

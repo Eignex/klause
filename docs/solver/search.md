@@ -133,6 +133,10 @@ Clause minimization reuses its redundancy memo storage within an analyzer. It cl
 the memo before each conflict because levels and antecedents belong to the frozen
 reason graph of that analysis, rather than the variable across search paths.
 
+Native Boolean propagation keeps a session-local truth byte per Boolean variable for
+single-load literal checks. Pins and undo mirror the canonical assignment bitsets;
+open, false and true remain distinct. The general lane does not allocate this mirror.
+
 The native CP analyzer and shared first-UIP analyzer have distinct counters and
 ownership. A shared conflict with usable reasons can assert and backjump. Sound
 resolvents that cannot assert retain chronological fallback. Root refutations, unusable
