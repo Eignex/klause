@@ -249,7 +249,8 @@ internal class LocalSearchEngine(
         if (seedImplicitOnRestart) prepareSteps(state.seeding.seedSteps(state), params, checkpoint)
         definitionalSweep?.let {
             prepareSteps(
-                it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions), params, checkpoint,
+                it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions),
+                params, checkpoint,
             )
         }
     }
@@ -290,7 +291,8 @@ internal class LocalSearchEngine(
             prepareSteps(state.initialAssignmentSteps(sample), params, checkpoint)
             if (reconcile) definitionalSweep?.let {
                 prepareSteps(
-                    it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions), params, checkpoint,
+                    it.pinnedSteps(state.assignment, state.rootDomains, problem.factors, state.assumptions),
+                    params, checkpoint,
                 )
             }
             recomputeInitial(state, params, checkpoint)
