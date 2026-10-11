@@ -67,17 +67,26 @@ class ExactLiraSearchComponentTest {
                     doubleArrayOf(1.0), LinearOp.GE, 1.0),
             ),
         )
-        ExactLiraSearchComponent(model).use { component ->
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
-            assertIs<ComponentResult.Consistent>(session.initialize())
-            assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, false))))
+        for (atRoot in listOf(false, true)) {
+            ExactLiraSearchComponent(model).use { component ->
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                val decision = SearchDecision.Bool(Lit.make(0, false))
+                if (atRoot) {
+                    assertIs<ComponentResult.Consistent>(session.publish(decision))
+                    assertIs<ComponentResult.Consistent>(session.propagate())
+                    assertEquals(0, session.decisionLevel)
+                } else {
+                    assertIs<ComponentResult.Consistent>(session.push(decision))
+                }
 
-            val result = assertIs<SearchResult.Satisfied>(session.solve(1))
+                val result = assertIs<SearchResult.Satisfied>(session.solve(1))
 
-            val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
-            assertEquals(false, witness.bools.single())
-            assertTrue(witness.reals.single() > BigFraction.ZERO)
-            assertTrue(witness.reals.single() < BigFraction.ONE)
+                val witness = assertNotNull(result.model.valueOf<ExactLraAssignment>(component))
+                assertEquals(false, witness.bools.single())
+                assertTrue(witness.reals.single() > BigFraction.ZERO)
+                assertTrue(witness.reals.single() < BigFraction.ONE)
+            }
         }
     }
 
