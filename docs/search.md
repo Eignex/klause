@@ -359,6 +359,8 @@ retirement preserves the incumbent without claiming exhaustion. A witness,
 objective or bound improvement, root deductions, or used shared contributions
 retain the arm under normal bandit scheduling. Configured LP slots do not retire
 under the auxiliary probe policy.
+An unproductive auxiliary improving-phase probe does not decay the retained workers'
+bandit or family evidence, preserving their policy state when the probe is discarded.
 
 See [SliceBudget](../klause/src/commonMain/kotlin/com/eignex/klause/backtrack/SliceBudget.kt)
 and [portfolio](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio/).
