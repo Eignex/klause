@@ -25,7 +25,7 @@ internal class FlatZincValues(
     val exactRealValue: (Int) -> String?,
 ) {
     constructor(sample: Sample) : this(
-        { sample.bools[it] },
+        { sample.boolValue(it) },
         { sample.exactIntValue(it).toString() },
         { sample.approximateRealValue(it) },
         { sample.exactReals?.get(it)?.toString() },

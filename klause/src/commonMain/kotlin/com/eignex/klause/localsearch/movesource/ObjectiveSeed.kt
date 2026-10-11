@@ -27,18 +27,18 @@ class ObjectiveSeed : MoveSource {
     override fun generate(state: LocalSearchState, sink: MoveSink) {
         when (val obj = state.shaping.objective ?: return) {
             is LinearObjective -> {
-                for (v in obj.boolWeights.indices) {
-                    if (obj.boolWeights[v] == 0L) continue
+                for (v in obj.boolWeightValues.indices) {
+                    if (obj.boolWeightValues[v] == 0L) continue
                     sink.addBoolFlip(v)
                 }
-                for (v in obj.intCoefficients.indices) {
-                    if (obj.intCoefficients[v] == 0L) continue
+                for (v in obj.intCoefficientValues.indices) {
+                    if (obj.intCoefficientValues[v] == 0L) continue
                     val cur = state.assignment.intValue(v)
                     val d = state.rootDomains[v]
                     // Step toward smaller objective; channeling-aware so int-move + indicator
                     // updates stay atomic.
-                    if (obj.intCoefficients[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
-                    if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, d.higher(cur))
+                    if (obj.intCoefficientValues[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
+                    if (obj.intCoefficientValues[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, d.higher(cur))
                 }
             }
 

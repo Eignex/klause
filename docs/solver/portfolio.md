@@ -8,7 +8,10 @@ certification](../lp/certification.md) owns numerical proof checks.
 
 Open portfolios transport exact assignments in `Sample` rather than through a side
 registry. `exactInts` and `exactReals` carry immutable authoritative coordinates; finite
-samples retain their compact arrays. Copying an unchanged assignment preserves its
+samples retain private compact arrays. Constructor inputs and exported arrays cannot
+mutate a published incumbent. Exact theory and reconstruction carriers follow the
+same owned snapshot contract; live producer workspaces remain private. See
+[model and ownership](../architecture.md#model-and-ownership). Copying an unchanged assignment preserves its
 coordinates and theory acceptance. Changing coordinates requires a fresh witness check.
 The exact objective is evaluated from the carried assignment, including integers outside
 `Long`.

@@ -75,7 +75,7 @@ internal object Oll {
     fun softCost(sample: Sample, softs: List<Soft>): Long {
         var cost = 0L
         for (s in softs) {
-            if (!Lit.evaluate(s.lit, sample.bools[Lit.variable(s.lit)])) cost += s.weight
+            if (!Lit.evaluate(s.lit, sample.boolValue(Lit.variable(s.lit)))) cost += s.weight
         }
         return cost
     }

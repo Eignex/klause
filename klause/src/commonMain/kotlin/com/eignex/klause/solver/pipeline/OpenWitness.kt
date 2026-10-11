@@ -35,7 +35,7 @@ internal fun verifyOpenWitness(model: Problem, sample: Sample): Verification<Sam
     if (sample.exactInts?.any { !it.fitsLong() } == true) {
         return Verification.Indeterminate("wide integer coordinates require an exact theory witness check")
     }
-    if (sample.bools.size != model.numBoolVars || sample.numIntVars != model.numIntVars) {
+    if (sample.numBoolVars != model.numBoolVars || sample.numIntVars != model.numIntVars) {
         return Verification.Rejected("assignment does not cover the model's discrete variables")
     }
     when (val verdict = verifyRealCoordinates(model, sample)) {
@@ -45,7 +45,7 @@ internal fun verifyOpenWitness(model: Problem, sample: Sample): Verification<Sam
     }
     val bounds = model.intBounds
     for (v in 0 until model.numIntVars) {
-        val x = sample.ints[v]
+        val x = sample.intValue(v)
         if ((bounds.hasLower(v) && x < bounds.lower(v)) || (bounds.hasUpper(v) && x > bounds.upper(v))) {
             return Verification.Rejected("int $v = $x is outside its declared range")
         }
@@ -53,7 +53,7 @@ internal fun verifyOpenWitness(model: Problem, sample: Sample): Verification<Sam
             return Verification.Rejected("int $v = $x is outside its declared values")
         }
     }
-    val point = model.withIntDomains(Array(model.numIntVars) { IntDomain(sample.ints[it], sample.ints[it]) })
+    val point = model.withIntDomains(Array(model.numIntVars) { IntDomain(sample.intValue(it), sample.intValue(it)) })
     return composedFixpoint(point.bake(), Candidate(sample, Unit), Cancellation.Never)
 }
 

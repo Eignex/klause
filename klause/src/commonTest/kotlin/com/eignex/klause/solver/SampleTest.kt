@@ -17,6 +17,36 @@ import kotlin.test.assertTrue
 
 class SampleTest {
     @Test
+    fun `finite samples capture constructor buffers`() {
+        val bools = booleanArrayOf(true)
+        val ints = longArrayOf(Long.MIN_VALUE)
+        val reals = doubleArrayOf(-0.0)
+        val sample = Sample(bools, ints, reals)
+
+        bools[0] = false
+        ints[0] = 0
+        reals[0] = 1.0
+
+        assertEquals(Sample(booleanArrayOf(true), longArrayOf(Long.MIN_VALUE), doubleArrayOf(-0.0)), sample)
+    }
+
+    @Test
+    fun `exported finite arrays cannot change a sample or its copy`() {
+        val sample = Sample(booleanArrayOf(true), longArrayOf(2), doubleArrayOf(0.5))
+        val copied = sample.copy()
+        val originalHash = sample.hashCode()
+
+        sample.bools[0] = false
+        sample.ints[0] = 3
+        sample.reals[0] = 1.5
+
+        assertEquals(Sample(booleanArrayOf(true), longArrayOf(2), doubleArrayOf(0.5)), sample)
+        assertEquals(sample, copied)
+        assertEquals(originalHash, sample.hashCode())
+    }
+
+
+    @Test
     fun `a copied wide witness keeps exact integers without a finite stand-in`() {
         val wide = parseBigInt("9223372036854775808")
         val values = mutableListOf(wide)

@@ -32,7 +32,7 @@ internal class SourceMapping(
 
     fun reconstructFrom(model: Problem, sample: Sample): Sample {
         require(model === target) { "reconstruction belongs to a different reduced model" }
-        require(sample.bools.size == target.numBoolVars && sample.numIntVars == target.numIntVars) {
+        require(sample.numBoolVars == target.numBoolVars && sample.numIntVars == target.numIntVars) {
             "reconstruction needs a complete reduced assignment"
         }
         val lifted = lift(sample)

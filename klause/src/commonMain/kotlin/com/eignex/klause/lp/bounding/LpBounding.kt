@@ -71,9 +71,9 @@ import kotlin.math.round
 internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: PropagationSession): Long = try {
     var total = addExact(obj.constant, boolLowerBoundPart(obj, session))
     val sp = session.problem
-    val ni = minOf(sp.numIntVars, obj.intCoefficients.size)
+    val ni = minOf(sp.numIntVars, obj.intCoefficientValues.size)
     for (i in 0 until ni) {
-        val c = obj.intCoefficients[i]
+        val c = obj.intCoefficientValues[i]
         if (c == 0L) continue
         val d = session.intDomain(i)
         total = addExact(total, mulExact(c, if (c >= 0L) d.min else d.max))
@@ -93,11 +93,11 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
  * rescan path so the caller falls back to no bound.
  */
 private fun LpEngine.boolLowerBoundPart(obj: LinearObjective, session: PropagationSession): Long {
-    if (session.installObjectiveBoolBound(obj.boolWeights)) return session.objectiveBoolLowerBound()
+    if (session.installObjectiveBoolBound(obj.boolWeightValues)) return session.objectiveBoolLowerBound()
     var sum = 0L
-    val nb = minOf(session.problem.numBoolVars, obj.boolWeights.size)
+    val nb = minOf(session.problem.numBoolVars, obj.boolWeightValues.size)
     for (b in 0 until nb) {
-        val w = obj.boolWeights[b]
+        val w = obj.boolWeightValues[b]
         val v = session.boolValue(b)
         sum = addExact(
             sum,

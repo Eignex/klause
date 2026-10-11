@@ -74,7 +74,7 @@ class Assignment(
     }
 
     /** Capture the assignment as an immutable [Sample]. */
-    fun snapshot(): Sample = Sample(
+    fun snapshot(): Sample = Sample.fromOwned(
         bools = BooleanArray(numBoolVars) { bits.get(it) },
         ints = ints.copyOf(),
         reals = if (numRealVars == 0) EmptyDoubleArray else reals.copyOf(),
@@ -90,34 +90,45 @@ class Assignment(
     }
 }
 
-/** Assignment snapshot yielded by the solver. [exactInts] and [exactReals] are authoritative when present. */
-class Sample(
-    /** Boolean values indexed by variable id. */
+/**
+ * Owned immutable assignment snapshot. Constructor inputs and exported arrays are copied;
+ * scalar accessors read the snapshot without allocation. [exactInts] and [exactReals] are authoritative.
+ */
+class Sample private constructor(
     bools: BooleanArray,
-    /** Integer values indexed by variable id. */
     ints: LongArray,
-    /** Values of the LP-only continuous (real) variables, indexed by real var id; empty for the
-     *  integer/Boolean core. Populated at a search leaf from the residual LP solution, so a
-     *  hybrid MIP/CP solution carries its continuous part. */
-    reals: DoubleArray = EmptyDoubleArray,
-    exactReals: List<BigFraction>? = null,
-    exactInts: List<BigInt>? = null,
+    reals: DoubleArray,
+    exactReals: List<BigFraction>?,
+    exactInts: List<BigInt>?,
+    owned: Boolean,
 ) {
-    /** Arbitrary-precision integer coordinates, when supplied by an exact open theory. */
-    val exactInts: List<BigInt>? = exactInts?.let { ExactValues(it) }
-    private val booleanValues = if (this.exactInts == null) bools else bools.copyOf()
-    private val integerValues = if (this.exactInts == null) ints else ints.copyOf()
+    /** Capture caller-owned coordinates, preserving exact authority when supplied. */
+    constructor(
+        bools: BooleanArray,
+        ints: LongArray,
+        reals: DoubleArray = EmptyDoubleArray,
+        exactReals: List<BigFraction>? = null,
+        exactInts: List<BigInt>? = null,
+    ) : this(bools, ints, reals, exactReals, exactInts, owned = false)
 
-    /** Boolean coordinates; exact witnesses return a copy to protect their authority. */
-    val bools: BooleanArray get() = if (exactInts == null) booleanValues else booleanValues.copyOf()
+    /** Arbitrary-precision integer coordinates, when supplied by an exact open theory. */
+    val exactInts: List<BigInt>? = exactInts?.let { SnapshotValues(it) }
+    private val booleanValues = if (owned) bools else bools.copyOf()
+    private val integerValues = if (owned) ints else ints.copyOf()
+
+    /** Independent copy of the Boolean coordinates. */
+    val bools: BooleanArray get() = booleanValues.copyOf()
 
     /** Finite integer coordinates. Throws when an authoritative coordinate lies outside Long. */
     val ints: LongArray get() {
         check(exactInts == null || integerValues.size == exactInts.size) {
             "an arbitrary-precision witness needs an explicit finite projection"
         }
-        return if (exactInts == null) integerValues else integerValues.copyOf()
+        return integerValues.copyOf()
     }
+
+    /** Number of Boolean coordinates. */
+    val numBoolVars: Int get() = booleanValues.size
 
     /** Number of integer coordinates, including arbitrary-precision coordinates. */
     val numIntVars: Int get() = exactInts?.size ?: integerValues.size
@@ -125,11 +136,11 @@ class Sample(
     internal var witnessCertificate: EvidenceCertificate? = null
 
     /** Certified real values indexed by real variable id, when a residual LP supplied them. */
-    val exactReals: List<BigFraction>? = exactReals?.let { ExactValues(it) }
-    private val approximateReals = if (this.exactReals == null) reals else reals.copyOf()
+    val exactReals: List<BigFraction>? = exactReals?.let { SnapshotValues(it) }
+    private val approximateReals = if (owned) reals else reals.copyOf()
 
-    /** Approximate real values. A certified sample returns a copy so its exact and approximate views stay aligned. */
-    val reals: DoubleArray get() = if (exactReals == null) approximateReals else approximateReals.copyOf()
+    /** Independent copy of the approximate real coordinates. */
+    val reals: DoubleArray get() = approximateReals.copyOf()
 
     /** Number of approximate real coordinates. */
     val numRealVars: Int get() = approximateReals.size
@@ -164,7 +175,13 @@ class Sample(
         reals: DoubleArray = approximateReals,
         exactReals: List<BigFraction>? = if (reals === approximateReals) this.exactReals else null,
         exactInts: List<BigInt>? = if (ints === integerValues) this.exactInts else null,
-    ): Sample = Sample(bools, ints, reals, exactReals, exactInts).also {
+    ): Sample = fromOwned(
+        if (bools === booleanValues) bools else bools.copyOf(),
+        if (ints === integerValues) ints else ints.copyOf(),
+        if (reals === approximateReals) reals else reals.copyOf(),
+        exactReals,
+        exactInts,
+    ).also {
         if (bools.contentEquals(booleanValues) && ints.contentEquals(integerValues) &&
             reals.contentEquals(approximateReals) && exactInts == this.exactInts && exactReals == this.exactReals
         ) it.witnessCertificate = witnessCertificate
@@ -192,12 +209,41 @@ class Sample(
         31 * (31 * (31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
             (exactInts?.hashCode() ?: 0)) + approximateReals.contentHashCode()) + (exactReals?.hashCode() ?: 0)
 
-    internal fun exactIntValue(id: Int): BigInt = exactInts?.get(id) ?: bigIntOf(integerValues[id])
+    /** Authoritative integer coordinate, widened on demand for finite samples. */
+    fun exactIntValue(id: Int): BigInt = exactInts?.get(id) ?: bigIntOf(integerValues[id])
 
-    internal fun boolValue(id: Int): Boolean = booleanValues[id]
+    /** Boolean coordinate without exporting its buffer. */
+    fun boolValue(id: Int): Boolean = booleanValues[id]
+
+    /** Finite integer coordinate; a wide exact witness requires [exactIntValue]. */
+    fun intValue(id: Int): Long {
+        check(exactInts == null || integerValues.size == exactInts.size) {
+            "an arbitrary-precision witness needs an explicit finite projection"
+        }
+        return integerValues[id]
+    }
+
+    internal fun copyBoolsInto(target: BooleanArray, endIndex: Int) {
+        booleanValues.copyInto(target, endIndex = endIndex)
+    }
+
+    internal fun copyIntsInto(target: LongArray, endIndex: Int) {
+        integerValues.copyInto(target, endIndex = endIndex)
+    }
+
+    internal companion object {
+        // Fresh publication buffers have no remaining mutable owner.
+        internal fun fromOwned(
+            bools: BooleanArray,
+            ints: LongArray,
+            reals: DoubleArray = EmptyDoubleArray,
+            exactReals: List<BigFraction>? = null,
+            exactInts: List<BigInt>? = null,
+        ): Sample = Sample(bools, ints, reals, exactReals, exactInts, owned = true)
+    }
 }
 
-private class ExactValues<T>(values: List<T>) : AbstractList<T>() {
+internal class SnapshotValues<T>(values: List<T>) : AbstractList<T>() {
     private val snapshot = values.toList()
     override val size: Int get() = snapshot.size
     override fun get(index: Int): T = snapshot[index]

@@ -38,6 +38,7 @@ import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.lp.sourceDoubleBoundedSplit
 import com.eignex.klause.lp.sourceEqualityRows
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.SnapshotValues
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
@@ -78,14 +79,62 @@ import com.eignex.klause.util.negate
 import com.eignex.klause.util.rem
 
 /** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
-data class ExactLiraAssignment(
+class ExactLiraAssignment(
     /** Boolean values indexed by model Boolean variable id. */
-    val bools: BooleanArray,
+    bools: BooleanArray,
     /** Arbitrary-precision integer values indexed by model integer variable id. */
-    val ints: Array<BigInt>,
+    ints: Array<BigInt>,
     /** Rational real values indexed by model real variable id. */
-    val reals: List<BigFraction>,
-)
+    reals: List<BigFraction>,
+) {
+    private val booleanValues: BooleanArray = bools.copyOf()
+
+    /** Independent copy of the Boolean coordinates. */
+    val bools: BooleanArray get() = booleanValues.copyOf()
+
+    private val integerValues: Array<BigInt> = ints.copyOf()
+
+    /** Independent copy of the integer coordinates. */
+    val ints: Array<BigInt> get() = integerValues.copyOf()
+
+    private val realValues: List<BigFraction> = SnapshotValues(reals)
+
+    /** Owned read-only rational coordinates. */
+    val reals: List<BigFraction> get() = realValues
+
+    /** Boolean coordinate without exporting its buffer. */
+    fun boolValue(id: Int): Boolean = booleanValues[id]
+
+    /** Authoritative arbitrary-precision integer coordinate. */
+    fun intValue(id: Int): BigInt = integerValues[id]
+
+    /** Capture replacement coordinates in an owned witness. */
+    fun copy(
+        bools: BooleanArray = booleanValues,
+        ints: Array<BigInt> = integerValues,
+        reals: List<BigFraction> = realValues,
+    ): ExactLiraAssignment = ExactLiraAssignment(bools, ints, reals)
+
+    /** Coordinate view for destructuring. */
+    operator fun component1(): BooleanArray = bools
+
+    /** Coordinate view for destructuring. */
+    operator fun component2(): Array<BigInt> = ints
+
+    /** Coordinate view for destructuring. */
+    operator fun component3(): List<BigFraction> = reals
+
+    override fun equals(other: Any?): Boolean = other is ExactLiraAssignment &&
+        booleanValues.contentEquals(other.booleanValues) &&
+        integerValues.contentEquals(other.integerValues) &&
+        realValues == other.realValues
+
+    override fun hashCode(): Int =
+        31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) + realValues.hashCode()
+
+    override fun toString(): String = "ExactLiraAssignment(bools=${booleanValues.contentToString()}, " +
+        "ints=${integerValues.contentToString()}, reals=$realValues)"
+}
 
 /** Incremental source arithmetic on the shared LP and search lifecycles. */
 class ExactLiraSearchComponent(

@@ -24,7 +24,7 @@ internal class ClausePrimalProjection private constructor(
 ) {
     fun lift(sample: Sample): Sample {
         val values = BooleanArray(fixed.size) { fixed[it] ?: false }
-        for (index in variables.indices) values[variables[index]] = sample.bools[index]
+        for (index in variables.indices) values[variables[index]] = sample.boolValue(index)
         rebuild.rebuildInto(values)
         return Sample(values, longArrayOf())
     }

@@ -294,10 +294,10 @@ internal fun SourceRebuilds.asSampleLift(): ((Sample) -> Sample)? = if (isEmpty)
     null
 } else {
     { sample ->
-        val bools = sample.bools.copyOf()
+        val bools = sample.bools
         val exact = sample.exactInts
         if (exact == null) {
-            val ints = sample.ints.copyOf()
+            val ints = sample.ints
             rebuildInto(bools, ints)
             sample.copy(bools = bools, ints = ints)
         } else {

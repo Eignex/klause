@@ -36,7 +36,7 @@ internal class LeafRealSolver(
         toleranceCheck: ((Sample) -> Boolean)? = null,
     ): LeafRealResult {
         check(!closed) { "real leaf solver is closed" }
-        require(sample.ints.size == problem.numIntVars && sample.bools.size == problem.numBoolVars)
+        require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
         if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxation = try {
             relaxation(sample, cancellation)
@@ -57,12 +57,12 @@ internal class LeafRealSolver(
 
     private fun relaxation(sample: Sample, cancellation: Cancellation): LpRelaxation? {
         val pins = Array(problem.numIntVars) { variable ->
-            val value = sample.ints[variable]
+            val value = sample.intValue(variable)
             integers[variable]?.takeIf { it.min == value } ?: IntDomain(value, value)
         }
         val domains = object : RelaxationDomains {
             override fun intDomain(varId: Int): IntDomain = pins[varId]
-            override fun boolValue(varId: Int): Boolean = sample.bools[varId]
+            override fun boolValue(varId: Int): Boolean = sample.boolValue(varId)
         }
         val staged = LpBoundTrail(trail.state)
         var edit = sources.prepare(staged.state, domains, cancellation)

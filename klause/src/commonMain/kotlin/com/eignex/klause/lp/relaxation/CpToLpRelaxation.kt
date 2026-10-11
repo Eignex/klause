@@ -305,8 +305,8 @@ internal class SessionDomains(private val session: PropagationSession) : Relaxat
  *  every Boolean to its bit — the leaf view where the residual LP over the continuous columns is all
  *  that remains undecided (see [leafRealFeasibility]). */
 private class SampleDomains(private val sample: Sample) : RelaxationDomains {
-    override fun intDomain(varId: Int): IntDomain = sample.ints[varId].let { IntDomain(it, it) }
-    override fun boolValue(varId: Int): Boolean = sample.bools[varId]
+    override fun intDomain(varId: Int): IntDomain = sample.intValue(varId).let { IntDomain(it, it) }
+    override fun boolValue(varId: Int): Boolean = sample.boolValue(varId)
 }
 
 /**
@@ -634,8 +634,8 @@ internal class CpToLpRelaxation(
         val intIn = BooleanArray(problem.numIntVars)
         val boolIn = BooleanArray(problem.numBoolVars)
         objective?.let { obj ->
-            for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intIn[i] = true
-            for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolIn[b] = true
+            for (i in obj.intCoefficientValues.indices) if (obj.intCoefficientValues[i] != 0L) intIn[i] = true
+            for (b in obj.boolWeightValues.indices) if (obj.boolWeightValues[b] != 0L) boolIn[b] = true
         }
         var changed = true
         while (changed) {
@@ -765,11 +765,11 @@ internal class CpToLpRelaxation(
         return Assembler(RootDomains(problem), gated = true, cancellation = cancellation).assemble(emptyList())
     }
 
-    private fun intCost(i: Int): Long = objective?.intCoefficients?.getOrElse(i) { 0L } ?: 0L
+    private fun intCost(i: Int): Long = objective?.intCoefficientValues?.getOrElse(i) { 0L } ?: 0L
 
-    private fun boolCost(b: Int): Long = objective?.boolWeights?.getOrElse(b) { 0L } ?: 0L
+    private fun boolCost(b: Int): Long = objective?.boolWeightValues?.getOrElse(b) { 0L } ?: 0L
 
-    private fun realCost(r: Int): Double = objective?.realCoefficients?.getOrElse(r) { 0.0 } ?: 0.0
+    private fun realCost(r: Int): Double = objective?.realCoefficientValues?.getOrElse(r) { 0.0 } ?: 0.0
 
     private fun touchesReals(factor: Factor): Boolean = when (factor) {
         is Linear -> factor.realConstants != null
@@ -1149,9 +1149,9 @@ internal class CpToLpRelaxation(
             // LP-only continuous columns, else a real objective term with no constraint on it
             // never reaches the LP and the objective is not minimised over it.
             objective?.takeIf { emits(LpEmissionKind.OBJECTIVE) }?.let { obj ->
-                for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intColumn(i)
-                for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolColumn(b)
-                for (r in obj.realCoefficients.indices) if (obj.realCoefficients[r] != 0.0) realColumn(r)
+                for (i in obj.intCoefficientValues.indices) if (obj.intCoefficientValues[i] != 0L) intColumn(i)
+                for (b in obj.boolWeightValues.indices) if (obj.boolWeightValues[b] != 0L) boolColumn(b)
+                for (r in obj.realCoefficientValues.indices) if (obj.realCoefficientValues[r] != 0.0) realColumn(r)
             }
             // Cone mode is the minimal linear+Boolean objective-cone probe: the column-heavy hull /
             // circuit / cut / cumulative features are all forced off (see [objectiveCone]). The

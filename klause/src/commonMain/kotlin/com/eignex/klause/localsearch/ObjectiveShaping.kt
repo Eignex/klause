@@ -51,7 +51,7 @@ class ObjectiveShaping {
     private fun computeObjectiveIntVars(obj: Objective): IntArray = when (obj) {
         is LinearObjective -> {
             val out = IntArrayList()
-            for (v in obj.intCoefficients.indices) if (obj.intCoefficients[v] != 0L) out.add(v)
+            for (v in obj.intCoefficientValues.indices) if (obj.intCoefficientValues[v] != 0L) out.add(v)
             IntArray(out.size) { out[it] }
         }
 

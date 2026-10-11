@@ -67,17 +67,15 @@ interface IncrementalObjective : Objective {
  * - [constant] is added unconditionally; useful for objectives whose "zero" assignment
  *   has nonzero cost.
  *
- * Float-variable objectives are not represented here: klause optimises the integer bucket
- * variable directly (the real value is a monotonic affine map of the bucket index, so the
- * argmin is identical) and the real value is recovered only at solution output. Real-valued
- * objective handling, where wanted, is left to external reference solvers.
+ * Bucketed float objectives use the integer bucket's coefficient. LP-only continuous objectives
+ * use [realCoefficients]; [evaluateExact] retains certified rational coordinates.
  *
- * All arrays are kept by reference, not copied. Treat them as immutable after handing the
- * objective to an optimiser.
+ * Coefficient buffers are captured at construction. Exported arrays are independent copies;
+ * evaluation reads the owned coefficients directly.
  */
-data class LinearObjective(
-    val boolWeights: LongArray = EmptyLongArray,
-    val intCoefficients: LongArray = EmptyLongArray,
+class LinearObjective(
+    boolWeights: LongArray = EmptyLongArray,
+    intCoefficients: LongArray = EmptyLongArray,
     val constant: Long = 0L,
     /**
      * Objective coefficient of each LP-only continuous (real) variable, indexed by real var id (size
@@ -85,25 +83,63 @@ data class LinearObjective(
      * resolved by the LP at nodes and leaves, not by [evaluateLong] — the integer/Boolean methods here
      * cover only the discrete part. See the LP-only-columns hybrid engine.
      */
-    val realCoefficients: DoubleArray = EmptyDoubleArray,
+    realCoefficients: DoubleArray = EmptyDoubleArray,
 ) : Objective {
+    internal val boolWeightValues: LongArray = boolWeights.copyOf()
+
+    /** Independent copy of the boolWeights coordinates. */
+    val boolWeights: LongArray get() = boolWeightValues.copyOf()
+
+    internal val intCoefficientValues: LongArray = intCoefficients.copyOf()
+
+    /** Independent copy of the intCoefficients coordinates. */
+    val intCoefficients: LongArray get() = intCoefficientValues.copyOf()
+
+    internal val realCoefficientValues: DoubleArray = realCoefficients.copyOf()
+
+    /** Independent copy of the realCoefficients coordinates. */
+    val realCoefficients: DoubleArray get() = realCoefficientValues.copyOf()
+
+    /** Copy this objective, capturing every replacement coefficient buffer. */
+    fun copy(
+        boolWeights: LongArray = boolWeightValues,
+        intCoefficients: LongArray = intCoefficientValues,
+        constant: Long = this.constant,
+        realCoefficients: DoubleArray = realCoefficientValues,
+    ): LinearObjective = LinearObjective(boolWeights, intCoefficients, constant, realCoefficients)
+
+    /** Independent Boolean coefficients for destructuring. */
+    operator fun component1(): LongArray = boolWeights
+
+    /** Independent integer coefficients for destructuring. */
+    operator fun component2(): LongArray = intCoefficients
+
+    /** Constant term for destructuring. */
+    operator fun component3(): Long = constant
+
+    /** Independent real coefficients for destructuring. */
+    operator fun component4(): DoubleArray = realCoefficients
+
+    override fun toString(): String = "LinearObjective(boolWeights=${boolWeightValues.contentToString()}, " +
+        "intCoefficients=${intCoefficientValues.contentToString()}, constant=$constant, " +
+        "realCoefficients=${realCoefficientValues.contentToString()})"
 
     /** This objective with every coefficient and the constant negated: minimizing it maximizes this one. */
     fun negated(): LinearObjective = LinearObjective(
-        boolWeights = LongArray(boolWeights.size) { -boolWeights[it] },
-        intCoefficients = LongArray(intCoefficients.size) { -intCoefficients[it] },
+        boolWeights = LongArray(boolWeightValues.size) { -boolWeightValues[it] },
+        intCoefficients = LongArray(intCoefficientValues.size) { -intCoefficientValues[it] },
         constant = -constant,
-        realCoefficients = DoubleArray(realCoefficients.size) { -realCoefficients[it] },
+        realCoefficients = DoubleArray(realCoefficientValues.size) { -realCoefficientValues[it] },
     )
 
     /** Exact integer objective value of [sample]; lower is better. */
     fun evaluateLong(sample: Sample): Long {
         var total = constant
-        for (b in 0 until minOf(sample.bools.size, boolWeights.size)) {
-            if (sample.bools[b]) total += boolWeights[b]
+        for (b in 0 until minOf(sample.numBoolVars, boolWeightValues.size)) {
+            if (sample.boolValue(b)) total += boolWeightValues[b]
         }
-        for (i in 0 until minOf(sample.ints.size, intCoefficients.size)) {
-            total += intCoefficients[i] * sample.ints[i]
+        for (i in 0 until minOf(sample.numIntVars, intCoefficientValues.size)) {
+            total += intCoefficientValues[i] * sample.intValue(i)
         }
         return total
     }
@@ -111,19 +147,18 @@ data class LinearObjective(
     /** Exact value of [sample], using certified real values when present and binary64 coefficients. */
     fun evaluateExact(sample: Sample): BigFraction {
         var total = bigIntOf(constant)
-        val bools = sample.bools
-        for (v in intCoefficients.indices) {
-            if (intCoefficients[v] == 0L) continue
-            total += bigIntOf(intCoefficients[v]) * sample.exactIntValue(v)
+        for (v in intCoefficientValues.indices) {
+            if (intCoefficientValues[v] == 0L) continue
+            total += bigIntOf(intCoefficientValues[v]) * sample.exactIntValue(v)
         }
-        for (b in boolWeights.indices) {
-            if (boolWeights[b] != 0L && bools[b]) total += bigIntOf(boolWeights[b])
+        for (b in boolWeightValues.indices) {
+            if (boolWeightValues[b] != 0L && sample.boolValue(b)) total += bigIntOf(boolWeightValues[b])
         }
         var value = BigFraction.of(total, BIG_ONE)
-        for (r in realCoefficients.indices) {
-            val c = realCoefficients[r]
+        for (r in realCoefficientValues.indices) {
+            val c = realCoefficientValues[r]
             if (c == 0.0) continue
-            val x = sample.exactReals?.get(r) ?: checkNotNull(BigFraction.ofDouble(sample.reals[r]))
+            val x = sample.exactReals?.get(r) ?: checkNotNull(BigFraction.ofDouble(sample.approximateRealValue(r)))
             value += checkNotNull(BigFraction.ofDouble(c)) * x
         }
         return value
@@ -135,8 +170,8 @@ data class LinearObjective(
         // only at a leaf where the residual LP resolved them. A discrete sum past the 64-bit range is summed
         // exactly and rounded once, rather than wrapping.
         var total = (discreteSumOrNull(sample) ?: wideDiscreteSum(sample)).toDouble()
-        for (r in 0 until minOf(sample.numRealVars, realCoefficients.size)) {
-            total += realCoefficients[r] * sample.approximateRealValue(r)
+        for (r in 0 until minOf(sample.numRealVars, realCoefficientValues.size)) {
+            total += realCoefficientValues[r] * sample.approximateRealValue(r)
         }
         return total
     }
@@ -144,12 +179,12 @@ data class LinearObjective(
     // The discrete part of [sample]'s value, or null when a product or partial sum leaves the 64-bit range.
     private fun discreteSumOrNull(sample: Sample): Long? {
         var total = constant
-        for (b in 0 until minOf(sample.bools.size, boolWeights.size)) {
-            if (sample.bools[b]) total = addOrNull(total, boolWeights[b]) ?: return null
+        for (b in 0 until minOf(sample.numBoolVars, boolWeightValues.size)) {
+            if (sample.boolValue(b)) total = addOrNull(total, boolWeightValues[b]) ?: return null
         }
-        for (i in 0 until minOf(sample.ints.size, intCoefficients.size)) {
-            val c = intCoefficients[i]
-            val x = sample.ints[i]
+        for (i in 0 until minOf(sample.numIntVars, intCoefficientValues.size)) {
+            val c = intCoefficientValues[i]
+            val x = sample.intValue(i)
             if (c == 0L || x == 0L) continue
             val term = if (fitsHalf(c) && fitsHalf(x)) c * x else multiplyOrNull(c, x) ?: return null
             total = addOrNull(total, term) ?: return null
@@ -159,11 +194,11 @@ data class LinearObjective(
 
     private fun wideDiscreteSum(sample: Sample): Double {
         var total = bigIntOf(constant)
-        for (b in 0 until minOf(sample.bools.size, boolWeights.size)) {
-            if (sample.bools[b]) total += bigIntOf(boolWeights[b])
+        for (b in 0 until minOf(sample.numBoolVars, boolWeightValues.size)) {
+            if (sample.boolValue(b)) total += bigIntOf(boolWeightValues[b])
         }
-        for (i in 0 until minOf(sample.ints.size, intCoefficients.size)) {
-            total += bigIntOf(intCoefficients[i]) * bigIntOf(sample.ints[i])
+        for (i in 0 until minOf(sample.numIntVars, intCoefficientValues.size)) {
+            total += bigIntOf(intCoefficientValues[i]) * bigIntOf(sample.intValue(i))
         }
         return total.toDouble()
     }
@@ -172,11 +207,11 @@ data class LinearObjective(
      *  place — no [Sample] copy — so the descent loop can score every iteration allocation-free. */
     fun evaluateLong(assignment: Assignment): Long {
         var total = constant
-        for (b in 0 until minOf(assignment.numBoolVars, boolWeights.size)) {
-            if (assignment.boolValue(b)) total += boolWeights[b]
+        for (b in 0 until minOf(assignment.numBoolVars, boolWeightValues.size)) {
+            if (assignment.boolValue(b)) total += boolWeightValues[b]
         }
-        for (i in 0 until minOf(assignment.numIntVars, intCoefficients.size)) {
-            total += intCoefficients[i] * assignment.intValue(i)
+        for (i in 0 until minOf(assignment.numIntVars, intCoefficientValues.size)) {
+            total += intCoefficientValues[i] * assignment.intValue(i)
         }
         return total
     }
@@ -195,35 +230,35 @@ data class LinearObjective(
      * magnitude is irrelevant (a monotone scaling), so only its sign is reported.
      */
     fun singleIntObjective(): SingleIntObjective? {
-        if (boolWeights.any { it != 0L }) return null
+        if (boolWeightValues.any { it != 0L }) return null
         // A continuous term makes the objective more than the one variable, and callers treat the
         // variable as standing for the whole of it: LP bounding posts its relaxation bound — taken over
         // every column, real ones included — straight onto this variable, which refutes a feasible model
         // as soon as the reals carry any of the cost.
-        if (realCoefficients.any { it != 0.0 }) return null
+        if (realCoefficientValues.any { it != 0.0 }) return null
         var found = -1
-        for (i in intCoefficients.indices) {
-            if (intCoefficients[i] == 0L) continue
+        for (i in intCoefficientValues.indices) {
+            if (intCoefficientValues[i] == 0L) continue
             if (found >= 0) return null
             found = i
         }
         if (found < 0) return null
-        return SingleIntObjective(found, ascending = intCoefficients[found] > 0L)
+        return SingleIntObjective(found, ascending = intCoefficientValues[found] > 0L)
     }
 
     override fun equals(other: Any?): Boolean {
         if (other !is LinearObjective) return false
         return constant == other.constant &&
-            boolWeights.contentEquals(other.boolWeights) &&
-            intCoefficients.contentEquals(other.intCoefficients) &&
-            realCoefficients.contentEquals(other.realCoefficients)
+            boolWeightValues.contentEquals(other.boolWeightValues) &&
+            intCoefficientValues.contentEquals(other.intCoefficientValues) &&
+            realCoefficientValues.contentEquals(other.realCoefficientValues)
     }
 
     override fun hashCode(): Int {
         var h = constant.hashCode()
-        h = 31 * h + boolWeights.contentHashCode()
-        h = 31 * h + intCoefficients.contentHashCode()
-        h = 31 * h + realCoefficients.contentHashCode()
+        h = 31 * h + boolWeightValues.contentHashCode()
+        h = 31 * h + intCoefficientValues.contentHashCode()
+        h = 31 * h + realCoefficientValues.contentHashCode()
         return h
     }
 }
@@ -237,10 +272,10 @@ data class SingleIntObjective(val varId: Int, val ascending: Boolean)
 
 /** Materialize a lowered objective for engine evaluation and bounding. */
 fun LinearObjectiveSpec.toLinearObjective(): LinearObjective = LinearObjective(
-    boolWeights = boolWeights,
-    intCoefficients = intCoefficients,
+    boolWeights = boolWeightValues,
+    intCoefficients = intCoefficientValues,
     constant = constant,
-    realCoefficients = realCoefficients,
+    realCoefficients = realCoefficientValues,
 )
 
 // Whether [v] fits 31 bits, so a product of two such values cannot leave the 64-bit range.

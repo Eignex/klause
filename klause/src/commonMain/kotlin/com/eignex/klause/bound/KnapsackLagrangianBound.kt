@@ -99,12 +99,12 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             for (k in subProblem.literals.indices) local(Lit.variable(subProblem.literals[k]))
             val others = pbs.filter { it !== subProblem }
             for (f in others) for (lit in f.literals) local(Lit.variable(lit))
-            for (b in objective.boolWeights.indices) if (objective.boolWeights[b] != 0L) local(b)
+            for (b in objective.boolWeightValues.indices) if (objective.boolWeightValues[b] != 0L) local(b)
             varIds = ids.toIntArray()
             index.clear()
             for (i in varIds.indices) index.put(varIds[i], i)
 
-            cost = LongArray(varIds.size) { objective.boolWeights.getOrElse(varIds[it]) { 0L } }
+            cost = LongArray(varIds.size) { objective.boolWeightValues.getOrElse(varIds[it]) { 0L } }
 
             val kIdx = IntArrayList()
             val kW = LongArrayList()
@@ -151,7 +151,7 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
             rowRhs = LongArray(rr.size) { rr[it] }
             rowSign = IntArray(rs.size) { rs[it] }
 
-            intCoef = LongArray(problem.numIntVars) { objective.intCoefficients.getOrElse(it) { 0L } }
+            intCoef = LongArray(problem.numIntVars) { objective.intCoefficientValues.getOrElse(it) { 0L } }
             objConstant = objective.constant
             applicable = kCap in 0..MAX_CAP && kItems.size <= MAX_ITEMS
         }

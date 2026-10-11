@@ -75,7 +75,7 @@ internal fun continuousLpShares(
     labels: List<String>,
     objective: LinearObjective?,
 ): DoubleArray {
-    if (objective?.realCoefficients?.any { it != 0.0 } != true) return DoubleArray(0)
+    if (objective?.realCoefficientValues?.any { it != 0.0 } != true) return DoubleArray(0)
     if (!LpConfig.AUTO.cappedUnder(scenario.lpCeiling).resolved(LpTechnique.BOUNDING)) return DoubleArray(0)
     if (scenario.cores != 1 || scenario.kind != Kind.COP || scenario.engine != EngineMix.MIXED ||
         !profile.realColumns || scenario.btPool != null || scenario.lsPool != null
