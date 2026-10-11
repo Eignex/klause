@@ -202,12 +202,12 @@ admission requires a clausal model; pseudo-Boolean models retain their cutting-p
 palette.
 
 Clausal satisfaction leads its complete-search slots with the balanced recipe. A
-curated sequential mixed pool reserves 90% of active time for that worker after the
+curated sequential mixed pool reserves 92% of active time for that worker after the
 initial probes: a refutation emits no incumbent progress from which family rewards
 could predict the approaching proof. Explicit pools, parameter edits and search
 annotations retain unreserved scheduling. Automatic single-core mixed clausal
 satisfaction uses one local-search and one complete arm, avoiding probe time and clause
-exchange between redundant complete workers. Explicit arm counts, named or edited
+exchange between multiple complete workers. Explicit arm counts, named or edited
 pools, annotations, custom fallback counts and parallel execution retain their
 configured pool size. CLI property and environment arm counts are explicit overrides.
 

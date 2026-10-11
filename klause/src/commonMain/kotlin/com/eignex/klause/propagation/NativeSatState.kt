@@ -323,6 +323,8 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         if (survivors == learnedCount) return // nothing dropped
 
+        state.remapReasons(state.boolReason, remap, baseCount)
+
         // Remap/prune watch-list entries that name a learned handle; base handles pass through.
         for (lit in watchEntries.indices) {
             val entries = watchEntries[lit]

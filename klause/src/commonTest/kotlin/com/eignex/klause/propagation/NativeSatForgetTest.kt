@@ -25,6 +25,18 @@ class NativeSatForgetTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `root learned reason remains in the conflict core after compaction`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 2)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true))), 1, permanent = true)
+        session.forgetLearnedClauses { index, _ -> index != 0 }
+
+        val conflict = assertIs<PropagationResult.Unsat>(session.pinBool(0, false))
+
+        assertEquals(setOf(1), conflict.conflictFactors.toSet())
+    }
+
+    @Test
     fun `surviving clauses propagate after repeated reductions and additions`() {
         val session = session(8, or(6, true, 7, true))
         session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))), 3)

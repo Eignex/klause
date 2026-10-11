@@ -64,7 +64,7 @@ class PortfolioPlanTest {
 
         val shares = clausalProofShares(scenario, profile, listOf("ls/probsat/plain", "bt/clausal-balanced"))
 
-        assertEquals(listOf(0.0, 0.9), shares.toList())
+        assertEquals(listOf(0.0, 0.92), shares.toList())
     }
 
     @Test
