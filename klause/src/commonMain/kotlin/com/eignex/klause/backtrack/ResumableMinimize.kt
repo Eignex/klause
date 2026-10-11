@@ -134,8 +134,7 @@ internal class ResumableMinimize(
     // The LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
     // (the single intent→plan home), so this carries the caller's params verbatim — only the slice
     // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
-    // The caller's own token (drives the non-pausable one-shot path); superseded by the slice in
-    // pausable mode.
+    // One-shot calls retain their invocation token. Resumed calls replace it while keeping a bound lifetime scope.
     private val baseCancellation: Cancellation = params0.cancellation
     private val params: BacktrackParams = params0
         .copy(
