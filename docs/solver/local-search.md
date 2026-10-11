@@ -24,6 +24,17 @@ separate solvers and close a handle before reseeding it. Optimization handles op
 through their session so its assumptions and state apply. Sessions that decline
 resumable optimization retain their one-shot improvement stream.
 
+[LocalSearchEngine](../../klause/src/commonMain/kotlin/com/eignex/klause/localsearch/LocalSearchEngine.kt)
+owns model preparation, exclusive acquisition, strategies and restart policies.
+Each retained handle owns its cursor, terminal verdict and idempotent release through
+[LocalSearchRun](../../klause/src/commonMain/kotlin/com/eignex/klause/localsearch/LocalSearchRun.kt).
+Concrete satisfaction and optimization handles advance the existing streams.
+`LocalSearchRunControl` combines lifetime and segment cancellation and retains the
+instruction checkpoint; `LocalSearchProgress` owns residual observations, warm-state
+capture and incremental solve-wide charging at stream checkpoints. Assignment buffers,
+RNG and unfinished initialization belong to the retained state. Model projections and
+complete immutable preparation indexes can be shared; mutable run progress cannot.
+
 ## Projections and preparation
 
 The immutable local-search projection is prepared on demand and reused across draws.
