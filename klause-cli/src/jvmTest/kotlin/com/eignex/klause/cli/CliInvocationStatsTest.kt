@@ -6,6 +6,7 @@ import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +18,16 @@ class CliInvocationStatsTest {
         val pairs = cliInvocationStats(CommonOptions(), SolvablePipeline.Refuted).pairs(SolveStats.EMPTY).toMap()
 
         assertEquals(mapOf("solvePipeline" to "refuted"), pairs)
+    }
+
+    @Test
+    fun `interrupted source admission reports load without routing or a solve backend`() {
+        val common = CommonOptions().apply { loadElapsedMs = 7L }
+        val pipeline = SolvablePipeline.Interrupted(TerminationReason.Timeout)
+
+        val pairs = cliInvocationStats(common, pipeline).pairs(SolveStats.EMPTY).toMap()
+
+        assertEquals(mapOf("frontendLoadMs" to "7", "solvePipeline" to "interrupted"), pairs)
     }
 
     @Test

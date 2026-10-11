@@ -126,6 +126,12 @@ class CliModeTest {
 
         assertTrue(output.startsWith("unknown\n"), output)
         assertTrue("; nraWork=0" in output, output)
+        assertTrue("; solvePipeline=polynomial-theory" in output, output)
+        assertTrue("; declaredTheoryRoute=exact_nra" in output, output)
+        assertTrue("; reportedBackend=exact-nra" in output, output)
+        assertTrue("; frontendLoadMs=" in output, output)
+        assertFalse("frontendRoutingMs=" in output, output)
+        assertFalse("nativeCpPropagationMs=" in output, output)
         assertFalse("define-fun" in output, output)
     }
 

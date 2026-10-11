@@ -36,10 +36,16 @@ internal fun cliInvocationStats(common: CommonOptions, pipeline: SolvablePipelin
         when (pipeline) {
             SolvablePipeline.FiniteCp -> "finite-cp"
             is SolvablePipeline.OpenTheory -> "open-theory"
+            is SolvablePipeline.PolynomialTheory -> "polynomial-theory"
+            is SolvablePipeline.Interrupted -> "interrupted"
             is SolvablePipeline.OpenLocalSearch -> "open-local-search"
             SolvablePipeline.Refuted -> "refuted"
         },
-        (pipeline as? SolvablePipeline.OpenTheory)?.request?.route?.name?.lowercase(),
+        when (pipeline) {
+            is SolvablePipeline.OpenTheory -> pipeline.request.route.name.lowercase()
+            is SolvablePipeline.PolynomialTheory -> "exact_nra"
+            else -> null
+        },
     )
 
 private fun nativeCpStatPairs(search: SearchStats): List<Pair<String, String>> {
