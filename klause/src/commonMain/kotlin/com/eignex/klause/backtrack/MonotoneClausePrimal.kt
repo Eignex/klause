@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
@@ -260,6 +261,8 @@ internal class MonotoneClausePrimal private constructor(
         ): MonotoneClausePrimal? {
             val start = TimeSource.Monotonic.markNow()
             val problem = solver.problem
+            val rootPins = (problem.rootDeductions as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None
+            val scopedParams = params.copy(assumptions = rootPins.mergedWith(params.assumptions))
             if (problem.numIntVars != 0 || problem.numRealVars != 0 ||
                 objective.boolWeights.any { it < 0L } || objective.intCoefficients.any { it != 0L }
             ) return null
@@ -267,7 +270,7 @@ internal class MonotoneClausePrimal private constructor(
                 .sortedWith(compareByDescending<Int> { objective.boolWeights[it] }.thenByDescending { it })
             if (variables.isEmpty() || variables.size > 64) return null
             if (variables.any { variable ->
-                    variable >= problem.numBoolVars || params.assumptions.boolValueOrNull(variable) != null
+                    variable >= problem.numBoolVars || scopedParams.assumptions.boolValueOrNull(variable) != null
                 }
             ) return null
             val occurrences = Array(problem.numBoolVars) { mutableListOf<Clause>() }
@@ -288,7 +291,7 @@ internal class MonotoneClausePrimal private constructor(
                 }
             }
             return MonotoneClausePrimal(
-                solver, objective, params, lifetime, variables,
+                solver, objective, scopedParams, lifetime, variables,
                 Array(occurrences.size) { occurrences[it] }, clauses, literalWork,
                 activeBudgetMillis, start.elapsedNow().inWholeMilliseconds,
             )
