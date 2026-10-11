@@ -273,7 +273,15 @@ and nonconstant powers above one, without requiring polynomial expansion.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun` macros
 capture their definition scope, and assertions retain the declarations visible at
-that source command. Unsupported syntax is rejected even inside a constant Boolean
+that source command. A compiler-owned append-only binding table stores each declaration
+and macro once. Environments retain a visibility cutoff into that table; appending
+bindings cannot expose forward references in an earlier assertion or macro body.
+Assertions between binding commands share an environment. Local `let` and parameter
+scopes capture only their own bindings and link to their enclosing environment,
+without copying global tables. Lookups walk local scopes iteratively before reading
+the visible global entry. The table and lexical environments belong to admission
+and are discarded after lowering; published source IR retains neither.
+Unsupported syntax is rejected even inside a constant Boolean
 branch. One `check-sat` or `check-sat-assuming` query is accepted; Boolean literal
 assumptions are conjoined with the assertions. `get-model` is accepted as a request.
 Mixed integer sorts, symbolic or zero division, negative/noninteger/oversized powers,
