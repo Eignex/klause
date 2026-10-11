@@ -60,8 +60,11 @@ internal object Profiler {
         printTable("whole CLI: sampled allocation weight by phase (estimated bytes)", allocation, 40)
     }
 
-    private fun cliPhase(event: RecordedEvent): String {
-        val methods = event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" }
+    private fun cliPhase(event: RecordedEvent): String =
+        cliPhase(event.stackTrace?.frames.orEmpty().map { "${it.method.type.name}.${it.method.name}" })
+
+    internal fun cliPhase(stack: List<String>): String {
+        val methods = stack.map { it.replace('$', '.') }
         val localState = methods.any { it.contains("LocalSearchState.<init>") }
         val initializing = methods.any {
             it.contains("LocalSearchEngine.newMinimizeState") || it.contains("LocalSearchEngine.newSatisfyState") ||
@@ -76,6 +79,9 @@ internal object Profiler {
             methods.any { it.contains("LocalSearchEngine.installInvariants") } -> "local-search invariant setup"
             initializing -> "local-search seeding"
             methods.any { it.contains("LocalSearchEngine.restartAndRepair") } -> "local-search restart seeding"
+            methods.any {
+                it.contains(".GreedyInit.") || it.contains("LocalSearchEngine.greedyRepairPass")
+            } -> "local-search seeding"
             methods.any { it.contains("SourceDrivenStrategy.pickMove") } -> "local-search move selection"
             methods.any { it.contains("LocalSearchState.apply") } -> "local-search move application"
             methods.any { it.contains("LocalSearchEngine") } -> "local-search loop"
