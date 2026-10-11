@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class SolveMetricResultTest {
     @Test
@@ -40,6 +41,38 @@ class SolveMetricResultTest {
         timestamp = "t",
         command = "c",
     )
+
+    @Test
+    fun `XCSP records retain checked witnesses separately from reported claims`() {
+        val reported = rec(true, 10.0, 100, true).copy(
+            finalWitness = "v <instantiation/>",
+            validationPolicy = XCSP_SOURCE_POLICY,
+            sourceHashes = mapOf("model" to "abc"),
+        )
+        val validation = Xcsp3SourceChecker.result("valid", "source checked", "v <instantiation cost='10'/>")
+
+        val checked = reported.sourceChecked(validation, approximation = false)
+        val decoded = Reports.json.decodeFromString<SolveRecord>(Reports.json.encodeToString(checked))
+
+        assertEquals(validation.checkedWitness, decoded.checkedWitness)
+        assertEquals(reported.finalWitness, decoded.finalWitness)
+        assertEquals(reported.sourceHashes, decoded.sourceHashes)
+        assertEquals("valid", decoded.stats["sourceValidation"])
+        assertEquals("xcsp3-source", decoded.stats["sourceValidationScope"])
+        assertEquals("true", decoded.stats["reportedProven"])
+    }
+
+    @Test
+    fun `unchecked XCSP candidates retain reported claims without a checked witness`() {
+        val reported = rec(true, 10.0, 100, true).copy(finalWitness = "v <instantiation/>")
+
+        val checked = reported.sourceChecked(Xcsp3SourceChecker.result("unknown", "unsupported"), approximation = false)
+
+        assertNull(checked.checkedWitness)
+        assertEquals(reported.finalWitness, checked.finalWitness)
+        assertEquals("unknown", checked.stats["sourceValidation"])
+        assertEquals("true", checked.stats["reportedFeasible"])
+    }
 
     @Test
     fun `a source rejected result receives no solution or proof credit`() {

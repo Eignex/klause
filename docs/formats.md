@@ -215,6 +215,12 @@ variables and hard disjunctions. Nonuniform weighted objectives retain relaxatio
 variables for their soft clauses. A unit also retains that encoding if folding its
 cost would overflow a coefficient or constant. Empty soft clauses contribute fixed cost.
 
+The benchmark's opt-in XCSP source checker evaluates the final assignment against
+the original XML and exact source objective, independently of Klause lowering.
+Checked witnesses and reported proof claims remain distinct; supported syntax,
+record fields and the saved-output validation command are defined in the
+[benchmark validation contract](../klause-bench/README.md#source-validation).
+
 XCSP min/max arithmetic expressions mark deterministic auxiliaries and materialized affine
 operands as definition hints. Top-level equalities retain output aliases; hints alone do
 not orient unrelated sums or unhinted min/max globals. Domains and independently posted

@@ -25,7 +25,9 @@ internal object SolveEvidence {
 
             Format.SMTLIB -> finalSmtModel(raw)
 
-            Format.OPB, Format.XCSP3, Format.DIMACS, Format.WCNF, Format.MPS ->
+            Format.XCSP3 -> Xcsp3SourceValidation.candidate(raw)?.let { "v $it" }
+
+            Format.OPB, Format.DIMACS, Format.WCNF, Format.MPS ->
                 raw.lineSequence().lastOrNull { it.startsWith("v ") }
 
             else -> null

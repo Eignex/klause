@@ -109,6 +109,7 @@ internal data class SolveRecord(
     /** Final rendered candidate, retained for independent checks when the raw stream is not transferred. */
     val finalWitness: String? = null,
     val sourceOutputSha256: String? = null,
+    val checkedWitness: String? = null,
     val processTimeToFirstFeasibleMs: Long? = null,
     val processTimeToBestMs: Long? = null,
     val exactObjective: String? = null,
@@ -334,23 +335,24 @@ internal object SolveMetric {
         return runCatching {
             val sourceParams = SourceValidationParams(settings)
             val checkSource = solverId == SolverInvocation.KLAUSE && (entry.hasFloats || sourceParams.requested)
-            require(!sourceParams.requested || entry.ref.format == Format.MINIZINC) {
-                "source-validation requires a MiniZinc source"
+            require(!sourceParams.requested || entry.ref.format in setOf(Format.MINIZINC, Format.XCSP3)) {
+                "source-validation requires a MiniZinc or XCSP3 source"
             }
             val policy = if (checkSource) {
-                PINNED_SOURCE_POLICY
+                if (entry.ref.format == Format.XCSP3) XCSP_SOURCE_POLICY else PINNED_SOURCE_POLICY
             } else {
                 REPORTED_RESULT_POLICY
             }
             val provenance = if (solverId == SolverInvocation.KLAUSE) InstalledBuild.current else null
             val key = BenchCache.keyFor(entry.ref, tag, budget, provenance, settings, policy)
+            val sourceHashes = SolveEvidence.sourceHashes(entry.ref)
             val r = BenchCache.load(key)
                 ?: SolverInvocation.run(entry, solverId, sourceParams.solverSettings, budget, optimize)
                     .also { BenchCache.store(key, it) }
             val reported = record(entry, solverId, settings, budget, kind, timestamp, sha, r)
                 .copy(
                     validationPolicy = policy,
-                    sourceHashes = SolveEvidence.sourceHashes(entry.ref),
+                    sourceHashes = sourceHashes,
                     finalWitness = if (r.feasible == true) {
                         SolveEvidence.finalWitness(entry.ref.format, r.rawOutput)
                     } else {
@@ -360,17 +362,26 @@ internal object SolveMetric {
                 )
             val checked = if (checkSource) {
                 val validation = if (r.feasible == true) {
-                    MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective, r.exactObjective)
+                    if (entry.ref.format == Format.XCSP3) {
+                        Xcsp3SourceValidation.validate(entry.ref, r.rawOutput, r.exactObjective)
+                    } else {
+                        MiniZincSourceValidation.validate(entry.ref, r.rawOutput, r.objective, r.exactObjective)
+                    }
                 } else {
-                    SourceValidation("unknown", "no feasible candidate to check")
+                    if (entry.ref.format == Format.XCSP3) {
+                        Xcsp3SourceChecker.result("unknown", "no feasible candidate to check")
+                    } else {
+                        SourceValidation("unknown", "no feasible candidate to check")
+                    }
                 }
                 val boundValidation = if (validation.sourceHashes.isNotEmpty() &&
                     validation.sourceHashes != reported.sourceHashes
                 ) {
-                    SourceValidation(
-                        "unknown",
-                        "validation source hashes differ from solve record",
-                        reported.sourceHashes,
+                    validation.copy(
+                        status = "unknown",
+                        reason = "validation source hashes differ from solve record",
+                        sourceHashes = reported.sourceHashes,
+                        checkedWitness = null,
                     )
                 } else {
                     validation
