@@ -16,10 +16,30 @@ package com.eignex.klause.util
  * construction in klause's allocator. Examples: `Cardinality.signedOccurrencesByVar`,
  * `AllDifferent.occurrencesByVar`, `Clause.litIndexByVar`.
  */
-internal class IntIntMap private constructor(private val backing: Backing, private val absent: Int) {
-    operator fun get(key: Int): Int = backing.get(key, absent)
+internal class IntIntMap private constructor(
+    private val minKey: Int,
+    private val keys: IntArray,
+    private val values: IntArray,
+    private val present: BooleanArray,
+    private val absent: Int,
+) {
+    operator fun get(key: Int): Int = getOrDefault(key, absent)
 
-    fun contains(key: Int): Boolean = backing.get(key, MISSING) != MISSING
+    fun contains(key: Int): Boolean = getOrDefault(key, MISSING) != MISSING
+
+    private fun getOrDefault(key: Int, fallback: Int): Int {
+        if (keys.isEmpty()) {
+            val index = key - minKey
+            return if (index in values.indices) values[index] else fallback
+        }
+        val mask = keys.size - 1
+        var index = mixIntKey(key) and mask
+        while (present[index]) {
+            if (keys[index] == key) return values[index]
+            index = (index + 1) and mask
+        }
+        return fallback
+    }
 
     companion object {
         private const val MISSING: Int = Int.MIN_VALUE + 1
@@ -32,7 +52,7 @@ internal class IntIntMap private constructor(private val backing: Backing, priva
          */
         fun build(keys: IntArray, values: IntArray, absent: Int = 0, denseThreshold: Int = 4): IntIntMap {
             require(keys.size == values.size) { "keys/values length mismatch" }
-            if (keys.isEmpty()) return IntIntMap(EmptyBacking, absent)
+            if (keys.isEmpty()) return IntIntMap(0, EmptyIntArray, EmptyIntArray, EmptyBooleanArray, absent)
             var lo = keys[0]
             var hi = keys[0]
             for (k in keys) {
@@ -46,69 +66,29 @@ internal class IntIntMap private constructor(private val backing: Backing, priva
             return if (range <= denseThreshold.toLong() * keys.size) {
                 val arr = IntArray(range.toInt()) { absent }
                 for (i in keys.indices) arr[keys[i] - lo] = values[i]
-                IntIntMap(ArrayBacking(lo, arr), absent)
+                IntIntMap(lo, EmptyIntArray, arr, EmptyBooleanArray, absent)
             } else {
-                IntIntMap(HashBacking.build(keys, values), absent)
+                buildSparse(keys, values, absent)
             }
         }
-    }
 
-    private sealed interface Backing {
-        fun get(key: Int, absent: Int): Int
-    }
-
-    private data object EmptyBacking : Backing {
-        override fun get(key: Int, absent: Int): Int = absent
-    }
-
-    private class ArrayBacking(val minKey: Int, val values: IntArray) : Backing {
-        override fun get(key: Int, absent: Int): Int {
-            val idx = key - minKey
-            return if (idx in values.indices) values[idx] else absent
-        }
-    }
-
-    /**
-     * Open-addressing linear-probe hash table specialised for `Int → Int`. Used as the
-     * sparse-key fallback for [IntIntMap.build]. Capacity is a power of two; we keep load
-     * factor ≤ 0.5 so probe chains stay short. The [absent] sentinel marks empty slots;
-     * if a real entry's value equals [absent] we still find it via the parallel
-     * `presentMask` bit per slot.
-     */
-    private class HashBacking private constructor(
-        private val keys: IntArray,
-        private val values: IntArray,
-        private val present: BooleanArray,
-    ) : Backing {
-        override fun get(key: Int, absent: Int): Int {
-            val mask = keys.size - 1
-            var i = mixIntKey(key) and mask
-            while (present[i]) {
-                if (keys[i] == key) return values[i]
-                i = (i + 1) and mask
-            }
-            return absent
-        }
-
-        companion object {
-            fun build(keys: IntArray, values: IntArray): HashBacking {
-                val cap = openAddressingCapacity(keys.size)
-                val k = IntArray(cap)
-                val v = IntArray(cap)
-                val p = BooleanArray(cap)
-                val mask = cap - 1
-                for (i in keys.indices) {
-                    var idx = mixIntKey(keys[i]) and mask
-                    while (p[idx]) {
-                        if (k[idx] == keys[i]) break
-                        idx = (idx + 1) and mask
-                    }
-                    k[idx] = keys[i]
-                    v[idx] = values[i]
-                    p[idx] = true
+        private fun buildSparse(keys: IntArray, values: IntArray, absent: Int): IntIntMap {
+            val capacity = openAddressingCapacity(keys.size)
+            val storedKeys = IntArray(capacity)
+            val storedValues = IntArray(capacity)
+            val present = BooleanArray(capacity)
+            val mask = capacity - 1
+            for (i in keys.indices) {
+                var index = mixIntKey(keys[i]) and mask
+                while (present[index]) {
+                    if (storedKeys[index] == keys[i]) break
+                    index = (index + 1) and mask
                 }
-                return HashBacking(k, v, p)
+                storedKeys[index] = keys[i]
+                storedValues[index] = values[i]
+                present[index] = true
             }
+            return IntIntMap(0, storedKeys, storedValues, present, absent)
         }
     }
 }

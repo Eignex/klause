@@ -59,4 +59,78 @@ class IntIntMapTest {
         assertFalse(m.contains(6))
     }
 
+    @Test
+    fun `sparse patterned keys resolve through collisions`() {
+        for (stride in intArrayOf(8, 64, 1024, 65536)) {
+            val keys = IntArray(128) { (it - 64) * stride }
+            val values = IntArray(keys.size) { it * 3 - 100 }
+            val map = IntIntMap.build(keys, values, absent = -999)
+
+            for (i in keys.indices) {
+                assertEquals(values[i], map[keys[i]], "stride $stride key ${keys[i]}")
+                assertTrue(map.contains(keys[i]))
+                assertEquals(-999, map[keys[i] + 1])
+                assertFalse(map.contains(keys[i] + 1))
+            }
+        }
+    }
+
+    @Test
+    fun `duplicate keys retain their last value in either representation`() {
+        for (threshold in intArrayOf(0, 4)) {
+            val map = IntIntMap.build(
+                intArrayOf(-1, 0, 1, -1, 1), intArrayOf(10, 20, 30, 40, 50),
+                absent = -1, denseThreshold = threshold,
+            )
+
+            assertEquals(40, map[-1])
+            assertEquals(20, map[0])
+            assertEquals(50, map[1])
+            assertEquals(-1, map[2])
+        }
+    }
+
+    @Test
+    fun `all integer payloads and absent sentinels survive sparse lookup`() {
+        for (absent in intArrayOf(0, -1, Int.MIN_VALUE, Int.MIN_VALUE + 1)) {
+            val keys = intArrayOf(Int.MIN_VALUE, -1, 0, 1, Int.MAX_VALUE)
+            val values = intArrayOf(Int.MAX_VALUE, Int.MIN_VALUE, Int.MIN_VALUE + 1, 0, -1)
+            val map = IntIntMap.build(keys, values, absent)
+
+            for (i in keys.indices) assertEquals(values[i], map[keys[i]])
+            assertEquals(absent, map[2])
+            assertEquals(absent, map[Int.MIN_VALUE + 1])
+            assertEquals(absent, map[Int.MAX_VALUE - 1])
+        }
+    }
+
+    @Test
+    fun `construction owns an immutable copy of the entries`() {
+        for (threshold in intArrayOf(0, 4)) {
+            val keys = intArrayOf(-1, 0, 1)
+            val values = intArrayOf(10, 20, 30)
+            val map = IntIntMap.build(keys, values, absent = -1, denseThreshold = threshold)
+
+            keys.fill(100)
+            values.fill(99)
+
+            assertEquals(10, map[-1])
+            assertEquals(20, map[0])
+            assertEquals(30, map[1])
+            assertEquals(-1, map[100])
+        }
+    }
+
+    @Test
+    fun `empty maps retain their own absent sentinel`() {
+        for (absent in intArrayOf(0, -1, Int.MIN_VALUE, Int.MAX_VALUE)) {
+            val map = IntIntMap.build(intArrayOf(), intArrayOf(), absent)
+
+            assertEquals(absent, map[0])
+            assertEquals(absent, map[Int.MIN_VALUE])
+            assertEquals(absent, map[Int.MAX_VALUE])
+            assertFalse(map.contains(0))
+        }
+    }
+
 }
