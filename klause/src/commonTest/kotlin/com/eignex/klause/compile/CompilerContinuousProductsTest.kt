@@ -24,6 +24,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -112,6 +113,24 @@ class CompilerContinuousProductsTest {
 
         assertEquals(tenth * BigFraction.ofDouble(0.5)!!, values[products.last().result])
         assertEquals(tenth, values[products.last().b])
+    }
+
+    @Test
+    fun `constant products preserve exact binary rationals without floating folding`() {
+        val constant = ContinuousRealExpr.Affine(emptyMap(), 0.1)
+        val equality = ContinuousRealEquality(
+            ContinuousRealExpr.Multiply(constant, constant),
+            ContinuousRealExpr.Affine(emptyMap(), 0.1 * 0.1),
+        )
+
+        val problem = SchemaDef<SchemaEntry>(mapOf("square" to NamedConstraint(equality))).compile().problem
+        val product = problem.factors.filterIsInstance<ContinuousProduct>().single()
+        val operand = BigFraction.ofDouble(problem.realLower[product.a])!!
+        val rounded = BigFraction.ofDouble(0.1 * 0.1)!!
+
+        assertEquals(product.a, product.b)
+        assertNotEquals(rounded, operand * operand)
+        assertEquals(Double.NEGATIVE_INFINITY, problem.realLower[product.result])
     }
 
     @Test
