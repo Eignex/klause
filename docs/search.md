@@ -443,8 +443,9 @@ debt. Verification retains its 100 ms cap and the whole-solve deadline; work deb
 continues to block further search. Failed or cancelled trials contribute no
 infeasibility or optimality proof.
 
-The feasibility repair uses the SAT preset with inprocessing and target capture disabled,
-starts fresh Boolean decisions with false, and retains each trial session across portfolio slices. Its cumulative
+The feasibility repair uses the conflict-driven preset with phase saving and target
+capture disabled. It starts fresh Boolean decisions with false, guides later trials
+from feasible assignments, and retains the private session across portfolio slices. Its cumulative
 work is charged to the owning arm, including initialization, and slice cancellation
 pauses the current traversal without restarting it. Feasibility search receives at most one half of the remaining
 solve allowance in active execution time, capped at 5 seconds. Trials retain the
