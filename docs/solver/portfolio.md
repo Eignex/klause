@@ -58,6 +58,8 @@ than to each arm. Initial probes and private-preparation revisits use the base a
 revisits do not grow the schedule. Counted segments also retain their elapsed-time cap.
 The finite CLI exposes `slice-work`, `slice-max-work` and `slice-growth` for controlled
 comparisons, and reports all three effective settings in portfolio statistics.
+The [slice policy evidence](../evidence/slice-policy.md) records the bounded
+comparison and rationale for retaining the common defaults.
 
 Resumable backtrack arms charge decisions, propagation visits and completed LP work to
 their scheduler. The current conversion is one slice node per 4000 propagation visits

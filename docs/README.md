@@ -40,6 +40,7 @@ User-facing documentation is maintained separately at
 | [Benchmark README](../klause-bench/README.md) | Harness and Klause-lab usage, records, provenance, source validation, comparisons and profiling |
 | [LP capture and replay](lp/replay.md) | Basis traces and retained/fresh consumer diagnostics |
 | [Fixture provenance](testing/fixtures.md) | Committed input identities, hashes, licenses and capture exclusions |
+| [Portfolio slice evidence](evidence/slice-policy.md) | Bounded selection and validation supporting the common slice defaults |
 | [Numerical kernel evidence](evidence/numerical-kernels.md) | Bounded evidence for current dense-basis, rational and polling decisions |
 
 Keep one authoritative page for each contract; link to it from related workflows.
