@@ -57,6 +57,21 @@ class SmtLibPolynomialTest {
     }
 
     @Test
+    fun `power exponents resolve exact constants in lexical and helper scopes`() {
+        val cases = listOf(
+            "(declare-const x Real) (assert (= (^ x (+ 1 1)) 2))",
+            "(declare-const x Real) (assert (let ((n 2)) (= (^ x n) 2)))",
+            "(declare-const x Real) (define-fun f ((n Real)) Real (^ x n)) (assert (= (f 2) 2))",
+        )
+        for (source in cases) {
+            val parsed = SmtLibPolynomial.parse(source)
+
+            val atom = assertIs<PolynomialRealFormula.Atom>(parsed.formula)
+            assertEquals(PolynomialExpression.Power(PolynomialExpression.Variable(SourceRealId(0)), 2), atom.left)
+        }
+    }
+
+    @Test
     fun `unary signs and division by folded constants preserve rational values`() {
         val parsed = SmtLibPolynomial.parse("(assert (= (/ (- 1) (+ 2 4)) (- 0.166666666666666667)))")
 
@@ -257,6 +272,8 @@ class SmtLibPolynomialTest {
             "(assert (= (/ 1 0) 2))",
             "(declare-const x Real) (assert (= (^ x (- 1)) 2))",
             "(declare-const x Real) (assert (= (^ x 0.5) 2))",
+            "(declare-const x Real) (declare-const n Real) (assert (= (^ x n) 2))",
+            "(declare-const x Real) (define-fun f ((n Real)) Real (^ x n)) (assert (= (f 0.5) 2))",
             "(declare-const x Real) (assert (= (^ x 2147483648) 2))",
             "(declare-const x Real) (assert (= (sin x) 0))",
             "(assert (forall ((x Real)) (= x x)))",

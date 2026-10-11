@@ -215,7 +215,8 @@ changed through caller buffers or getter results. Variable counts are checked be
 publication.
 
 The source entry point supports exact decimal/numeral coefficients, constant rational
-division, repeated-variable products, powers, chained comparisons, pairwise `distinct`,
+division, repeated-variable products, powers with exact constant nonnegative integer
+exponents (including lexical/helper-bound constants), chained comparisons, pairwise `distinct`,
 Boolean equality/xor/implication and conditionals. Numeric conditionals use fresh real
 identities with guarded defining equalities. Source declaration counts and name maps
 remain separate from total auxiliary counts; unconstrained declarations stay present.

@@ -18,6 +18,11 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.rational
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.relation
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.sum
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.BIG_ONE
+import com.eignex.klause.util.bigIntOf
+import com.eignex.klause.util.compareTo
+import com.eignex.klause.util.signum
+import com.eignex.klause.util.toLong
 
 internal sealed interface PolynomialValue {
     data class Boolean(val formula: PolynomialRealFormula) : PolynomialValue {
@@ -59,7 +64,10 @@ private sealed interface PolynomialFrame {
     data class CheckSort(val boolean: Boolean) : PolynomialFrame
 }
 
-internal class SmtLibPolynomialEvaluator(private val lowering: PolynomialRealLowering) {
+internal class SmtLibPolynomialEvaluator(
+    private val lowering: PolynomialRealLowering,
+    private val validateOnly: Boolean = false,
+) {
     var hasNonlinearTerms = false
         private set
 
@@ -104,9 +112,11 @@ internal class SmtLibPolynomialEvaluator(private val lowering: PolynomialRealLow
     ) {
         when (val node = frame.expression) {
             is SExpr.Atom -> {
+                val literal = polynomialLiteral(node.text)
                 val bound = frame.environment.values[polynomialSymbol(node.text)]
                 val macro = frame.environment.macros[polynomialSymbol(node.text)]
                 when {
+                    literal != null -> values.addLast(PolynomialValue.Real(constant(literal)))
                     bound != null -> values.addLast(bound)
                     macro != null && macro.parameters.isEmpty() -> {
                         work.addLast(PolynomialFrame.CheckSort(macro.booleanResult))
@@ -115,10 +125,7 @@ internal class SmtLibPolynomialEvaluator(private val lowering: PolynomialRealLow
                     node.text == "true" || node.text == "false" -> values.addLast(
                         PolynomialValue.Boolean(PolynomialRealFormula.Constant(node.text == "true")),
                     )
-                    else -> {
-                        val literal = polynomialLiteral(node.text) ?: smtUnsupported("unknown polynomial symbol '${node.text}'")
-                        values.addLast(PolynomialValue.Real(constant(literal)))
-                    }
+                    else -> smtUnsupported("unknown polynomial symbol '${node.text}'")
                 }
             }
             is SExpr.SList -> {
@@ -135,7 +142,7 @@ internal class SmtLibPolynomialEvaluator(private val lowering: PolynomialRealLow
                     }
                     else -> {
                         validateOperator(node)
-                        val args = if (head == "^") node.items.subList(1, 2) else node.items.drop(1)
+                        val args = node.items.drop(1)
                         work.addLast(PolynomialFrame.Combine(node, args.size))
                         for (argument in args.asReversed()) work.addLast(PolynomialFrame.Evaluate(argument, frame.environment))
                     }
@@ -165,52 +172,63 @@ internal class SmtLibPolynomialEvaluator(private val lowering: PolynomialRealLow
         for (argument in arguments.asReversed()) work.addLast(PolynomialFrame.Evaluate(argument, environment))
     }
 
-    private fun combine(node: SExpr.SList, args: List<PolynomialValue>): PolynomialValue = when (node.polynomialHead()) {
-        "+" -> PolynomialValue.Real(sum(args.map { it.real() }))
-        "-" -> PolynomialValue.Real(
-            if (args.size == 1) negate(args.single().real())
-            else sum(listOf(args.first().real()) + args.drop(1).map { negate(it.real()) }),
-        )
-        "*" -> {
-            val terms = args.map { it.real() }
-            if (terms.count { rational(it) == null } >= 2) hasNonlinearTerms = true
-            PolynomialValue.Real(product(terms))
-        }
-        "/" -> {
-            var value = args.first().real()
-            for (argument in args.drop(1)) {
-                val divisor = rational(argument.real()) ?: smtUnsupported("nonconstant polynomial divisor")
-                if (divisor.isZero) smtUnsupported("zero polynomial divisor")
-                value = product(listOf(value, constant(divisor.reciprocal())))
+    private fun combine(node: SExpr.SList, args: List<PolynomialValue>): PolynomialValue {
+        return when (node.polynomialHead()) {
+            "+" -> PolynomialValue.Real(sum(args.map { it.real() }))
+            "-" -> PolynomialValue.Real(
+                if (args.size == 1) negate(args.single().real())
+                else sum(listOf(args.first().real()) + args.drop(1).map { negate(it.real()) }),
+            )
+            "*" -> {
+                val terms = args.map { it.real() }
+                if (terms.count { rational(it) == null } >= 2) hasNonlinearTerms = true
+                PolynomialValue.Real(product(terms))
             }
-            PolynomialValue.Real(value)
-        }
-        "^" -> {
-            val exponentText = (node.items[2] as? SExpr.Atom)?.text
-                ?: smtUnsupported("polynomial power requires a nonnegative Int exponent")
-            val exponent = exponentText.takeIf { it.isNotEmpty() && it.all { digit -> digit in '0'..'9' } }?.toIntOrNull()
-                ?: smtUnsupported("polynomial power requires a nonnegative Int exponent")
-            val base = args.single().real()
-            if (exponent >= 2 && rational(base) == null) hasNonlinearTerms = true
-            PolynomialValue.Real(power(base, exponent))
-        }
-        "and" -> PolynomialValue.Boolean(and(args.map { it.boolean() }))
-        "or" -> PolynomialValue.Boolean(or(args.map { it.boolean() }))
-        "not" -> PolynomialValue.Boolean(not(args.single().boolean()))
-        "xor" -> PolynomialValue.Boolean(args.map { it.boolean() }.reduce { left, right -> not(equivalent(left, right)) })
-        "=>" -> PolynomialValue.Boolean(
-            args.map { it.boolean() }.reduceRight { left, right -> or(listOf(not(left), right)) },
-        )
-        "ite" -> {
-            val condition = args[0].boolean()
-            if (args[1] is PolynomialValue.Boolean) {
-                PolynomialValue.Boolean(PolynomialRealLowering.conditional(condition, args[1].boolean(), args[2].boolean()))
-            } else {
-                PolynomialValue.Real(lowering.conditional(condition, args[1].real(), args[2].real()))
+            "/" -> {
+                var value = args.first().real()
+                for (argument in args.drop(1)) {
+                    val divisor = rational(argument.real())
+                    if (divisor == null) {
+                        if (validateOnly) continue
+                        smtUnsupported("nonconstant polynomial divisor")
+                    }
+                    if (divisor.isZero) smtUnsupported("zero polynomial divisor")
+                    value = product(listOf(value, constant(divisor.reciprocal())))
+                }
+                PolynomialValue.Real(value)
             }
+            "^" -> {
+                val base = args[0].real()
+                val value = rational(args[1].real())
+                if (value == null) {
+                    if (validateOnly) return PolynomialValue.Real(base)
+                    smtUnsupported("polynomial power requires a constant exponent")
+                }
+                if (value.den != BIG_ONE || value.num.signum() < 0 || value.num > bigIntOf(Int.MAX_VALUE)) {
+                    smtUnsupported("polynomial power requires a nonnegative Int exponent")
+                }
+                val exponent = value.num.toLong().toInt()
+                if (exponent >= 2 && rational(base) == null) hasNonlinearTerms = true
+                PolynomialValue.Real(power(base, exponent))
+            }
+            "and" -> PolynomialValue.Boolean(and(args.map { it.boolean() }))
+            "or" -> PolynomialValue.Boolean(or(args.map { it.boolean() }))
+            "not" -> PolynomialValue.Boolean(not(args.single().boolean()))
+            "xor" -> PolynomialValue.Boolean(args.map { it.boolean() }.reduce { left, right -> not(equivalent(left, right)) })
+            "=>" -> PolynomialValue.Boolean(
+                args.map { it.boolean() }.reduceRight { left, right -> or(listOf(not(left), right)) },
+            )
+            "ite" -> {
+                val condition = args[0].boolean()
+                if (args[1] is PolynomialValue.Boolean) {
+                    PolynomialValue.Boolean(PolynomialRealLowering.conditional(condition, args[1].boolean(), args[2].boolean()))
+                } else {
+                    PolynomialValue.Real(lowering.conditional(condition, args[1].real(), args[2].real()))
+                }
+            }
+            "=", "distinct", "<", "<=", ">", ">=" -> PolynomialValue.Boolean(comparison(node.polynomialHead(), args))
+            else -> smtUnsupported("unsupported polynomial operator '${node.polynomialHead()}'")
         }
-        "=", "distinct", "<", "<=", ">", ">=" -> PolynomialValue.Boolean(comparison(node.polynomialHead(), args))
-        else -> smtUnsupported("unsupported polynomial operator '${node.polynomialHead()}'")
     }
 
     private fun comparison(head: String, args: List<PolynomialValue>): PolynomialRealFormula {
