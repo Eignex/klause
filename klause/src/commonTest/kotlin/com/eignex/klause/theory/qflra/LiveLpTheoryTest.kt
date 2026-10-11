@@ -542,10 +542,10 @@ class LiveLpTheoryTest {
         val source = Problem(
             0,
             intBounds = IntBounds.fromModelBounds(
-                LongArray(2), LongArray(2), Bits(2).also { it.set(0); it.set(1) },
-                Bits(2).also { it.set(0); it.set(1) },
+                LongArray(3), LongArray(3), Bits(3).also { bits -> repeat(3, bits::set) },
+                Bits(3).also { bits -> repeat(3, bits::set) },
             ),
-            factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.EQ, 1)),
+            factors = arrayOf(Linear(intArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 1)),
         )
         ExactLiraSearchComponent(source).use { component ->
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
@@ -556,6 +556,7 @@ class LiveLpTheoryTest {
                     listOf(
                         SourceBoundTerm(SearchIntValue(0), BigFraction.ONE),
                         SourceBoundTerm(SearchIntValue(1), BigFraction.ONE),
+                        SourceBoundTerm(SearchIntValue(2), BigFraction.ONE),
                     ),
                     BigFraction.ZERO,
                 ),
