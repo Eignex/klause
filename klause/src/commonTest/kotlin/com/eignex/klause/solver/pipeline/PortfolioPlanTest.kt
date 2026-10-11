@@ -30,7 +30,8 @@ class PortfolioPlanTest {
             val scenario = buildPortfolioScenario(EngineParams(params), 1L, 1, Kind.COP, EngineMix.MIXED, 6)
 
             assertEquals(expected, Triple(scenario.sliceWork, scenario.maxSliceWork, scenario.sliceGrowth))
-            assertEquals(expected, scenario.copy(seed = 7L).let { Triple(it.sliceWork, it.maxSliceWork, it.sliceGrowth) })
+            val copied = scenario.copy(seed = 7L)
+            assertEquals(expected, Triple(copied.sliceWork, copied.maxSliceWork, copied.sliceGrowth))
         }
     }
 
