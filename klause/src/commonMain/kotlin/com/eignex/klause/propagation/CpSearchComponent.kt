@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.ConflictAnalysisStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
@@ -12,6 +13,7 @@ import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchConflictResolver
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchIntegerBound
@@ -20,8 +22,10 @@ import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelBlocker
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.solver.search.contribute
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.bigIntOf
 
 /**
  * The finite-domain participant in a shared search session.
@@ -273,7 +277,10 @@ class CpSearchComponent(
 
     override fun contributeModel(model: SearchModel, context: com.eignex.klause.solver.search.SearchContext) {
         for (variable in 0 until session.problem.numIntVars) {
-            model.put(SearchIntValue(sourceIntId(variable)), session.intDomain(variable).min)
+            val value = session.intDomain(variable).min
+            val source = sourceIntId(variable)
+            model.put(SearchIntValue(source), value)
+            model.contribute(SearchExactIntValue(SourceIntId(source)), bigIntOf(value))
         }
         model.put(
             this,

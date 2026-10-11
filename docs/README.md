@@ -22,6 +22,7 @@ User-facing documentation is maintained separately at
 | Page | Owns |
 |---|---|
 | [System architecture](architecture.md) | Modules, dependency boundaries and source-model ownership |
+| [Library API](api.md) | Supported surfaces, migration, typed mappings and snapshot/buffer ownership |
 | [Sessions and streams](solver/sessions.md) | Assumptions, conditioned queries, cursor ownership and retained caller state |
 | [Search and propagation](solver/search.md) | Shared traversal, finite fixpoints, explanations, learned clauses, open real feasibility and clausal primal preparation |
 | [Presolve](solver/presolve.md) | Transformation guarantees, source mappings, cancellation and phase accounting |

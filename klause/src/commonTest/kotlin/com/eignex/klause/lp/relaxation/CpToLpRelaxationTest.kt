@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
@@ -23,6 +24,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class CpToLpRelaxationTest {
+    @Test
+    fun `typed LP handles map back to the finite integer they represent`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3)),
+        )
+        val relaxation = CpToLpRelaxation(problem, null).build(PropagationSession(problem))
+
+        val column = checkNotNull(relaxation.column(CpIntId(0)))
+
+        assertEquals(CpIntId(0), relaxation.cpInteger(column))
+    }
+
+
 
     private val eps = 1e-9
 

@@ -34,8 +34,9 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutProvenance
 import com.eignex.klause.lp.engine.LpBuilder
-import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpColumnId
 import com.eignex.klause.lp.engine.LpLayoutRemap
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.LpSolveContext
@@ -49,6 +50,7 @@ import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
+import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -135,7 +137,16 @@ internal class LpRelaxation(
     /** The factor each row of [model] was emitted for, or -1 for a cut or a row spanning several factors. */
     val rowFactorIds: IntArray = EmptyIntArray,
     val realUpperRows: Map<Int, Int> = emptyMap(),
-)
+) {
+    fun column(variable: CpIntId): LpColumnId? =
+        intColOf[variable.index].takeIf { it >= 0 }?.let(::LpColumnId)
+
+    fun cpInteger(column: LpColumnId): CpIntId? {
+        val index = column.index
+        if (colIsBool[index] || colRealId[index] >= 0) return null
+        return colVarId[index].takeIf { it >= 0 }?.let(::CpIntId)
+    }
+}
 
 /**
  * Apply [action] to every candidate arc head of successor column `succ[i]` over an `n`-node graph: the

@@ -85,6 +85,9 @@ and runnable CLI distribution/executable smoke checks validate consumption acros
 JVM and Native module boundaries.
 No build-time or solving-speed improvement is implied by this module graph.
 
+The [library API contract](api.md) classifies supported, experimental and implementation
+surfaces and defines typed mapping and migration boundaries.
+
 ## Model and ownership
 
 `Problem` stores source integer declarations as bounds and, where necessary,

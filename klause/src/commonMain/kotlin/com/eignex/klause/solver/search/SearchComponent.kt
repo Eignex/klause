@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.search
 
+import kotlin.reflect.KClass
+
 /**
  * A trailed decision visible to every component in a [SearchSession].
  *
@@ -530,6 +532,7 @@ interface SearchContext {
 /** Mutable model assembly owned by [SearchSession], not by any individual component. */
 interface SearchModel {
     /** Store one component-owned value under an identity-stable [key]. */
+    @Deprecated("Use contribute with a TypedSearchValueKey")
     fun put(key: Any, value: Any)
 }
 
@@ -546,23 +549,39 @@ interface SearchValueKey
 data class SearchBoolValue(
     /** Source Boolean variable id. */
     val variable: Int,
-) : SearchValueKey
+) : TypedSearchValueKey<Boolean> {
+    override val valueType: KClass<Boolean> get() = Boolean::class
+}
 
-/** Source integer value. CP and integer theories contribute this without exchanging domain objects. */
+/**
+ * Legacy source integer key with producer-specific Long or arbitrary-precision representation.
+ * Use [SearchExactIntValue] for a typed authoritative coordinate.
+ */
 data class SearchIntValue(
     /** Source integer variable id. */
     val variable: Int,
 ) : SearchValueKey
 
-/** Source real value contributed by an exact or floating theory component. */
+/** Legacy real key with producer-specific representation; use [SearchExactRealValue] for exact values. */
 data class SearchRealValue(
     /** Source real variable id. */
     val variable: Int,
 ) : SearchValueKey
 
 /** Immutable complete model assembled from all active components. */
-class AssembledSearchModel internal constructor(private val values: Map<Any, Any>) {
-    /** Return the value contributed by [key], or null when that component has no model value. */
+class AssembledSearchModel internal constructor(values: Map<Any, Any>) {
+    private val values = values.toMap()
+
+    /** Read the immutable value of the type associated with [key], or null when absent. */
+    @Suppress("UNCHECKED_CAST")
+    fun <V : Any> valueOf(key: TypedSearchValueKey<V>): V? {
+        val value = values[key] ?: return null
+        require(key.valueType.isInstance(value)) { "model key has an incompatible value type" }
+        return value as V
+    }
+
+    /** Legacy unchecked read; opaque legacy values remain borrowed read-only. */
+    @Deprecated("Use valueOf with a TypedSearchValueKey")
     @Suppress("UNCHECKED_CAST")
     fun <A : Any> valueOf(key: Any): A? = values[key] as A?
 }

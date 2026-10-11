@@ -7,16 +7,20 @@ import com.eignex.klause.arithmetic.difference.ShortestPaths
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.solver.search.contribute
+import com.eignex.klause.util.bigIntOf
 
 /** Incremental difference-logic search component. */
 class DifferenceSearchComponent private constructor(
@@ -99,7 +103,11 @@ class DifferenceSearchComponent private constructor(
 
     override fun contributeModel(model: SearchModel, context: SearchContext) {
         assignment?.let { assignment ->
-            for (variable in modelIntVars) model.put(SearchIntValue(variable), assignment.intValue(variable))
+            for (variable in modelIntVars) {
+                val value = assignment.intValue(variable)
+                model.put(SearchIntValue(variable), value)
+                model.contribute(SearchExactIntValue(SourceIntId(variable)), bigIntOf(value))
+            }
             model.put(this, assignment)
         }
     }

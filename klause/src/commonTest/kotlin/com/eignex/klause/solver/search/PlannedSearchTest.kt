@@ -10,6 +10,10 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.propagation.CpIntId
+import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.FactorOwner
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -18,6 +22,7 @@ import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -73,6 +78,7 @@ class PlannedSearchTest {
         val result = assertIs<BooleanSearchResult.Satisfied>(planned.session.solveBoolean(1))
 
         assertNotNull(result.model.valueOf<Any>(SearchRealValue(0)))
+        assertNotNull(result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
     }
 
     @Test
@@ -90,6 +96,7 @@ class PlannedSearchTest {
         val sample = checkNotNull(result.model.valueOf<Sample>(checkNotNull(planned.cp)))
         assertEquals(0L, sample.ints[0])
         assertEquals(0L, result.model.valueOf<Long>(SearchIntValue(0)))
+        assertEquals(bigIntOf(0), result.model.valueOf(SearchExactIntValue(SourceIntId(0))))
     }
 
     @Test
@@ -110,6 +117,11 @@ class PlannedSearchTest {
         val result = assertIs<SearchResult.Satisfied>(planned.session.solve(0))
 
         assertNotNull(result.model.valueOf<Long>(SearchIntValue(1)))
+        assertNotNull(result.model.valueOf(SearchExactIntValue(SourceIntId(1))))
+        val projection = model.componentPlan().cpProjection(model, mapOf(0 to IntDomain(0, 3), 2 to IntDomain(0, 3)))
+        assertEquals(CpIntId(1), projection.cpId(SourceIntId(2)))
+        assertEquals(SourceIntId(2), projection.sourceId(CpIntId(1)))
+        assertNull(projection.cpId(SourceIntId(1)))
     }
 
     @Test
