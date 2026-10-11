@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.formats.flatzinc.parseFlatZincExecution
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -20,6 +21,34 @@ import kotlin.test.assertTrue
  * move generation at the sink.
  */
 class InvariantNetworkTest {
+    @Test
+    fun `native Element cones follow selected cells and every index write`() {
+        for (offset in listOf(2, Int.MAX_VALUE)) {
+            val domains = Array(7) { IntDomain(0, 18) }
+            domains[0] = IntDomain(offset.toLong(), offset.toLong() + 3)
+            domains[6] = IntDomain(2, 2)
+            val problem = Problem(
+                0, 7, domains, arrayOf<Factor>(
+                    Element(0, 4, longArrayOf(1, 2, 3), true, offset),
+                    Product(4, 6, 5),
+                ),
+            )
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            val network = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(4))).network(7, 0)
+
+            for (position in 0..3) {
+                state.assignment.setInt(0, offset.toLong() + position)
+
+                val cellCone = network.affectedNodes(intArrayOf(1), intArrayOf(), state.assignment)
+                val indexCone = network.affectedNodes(intArrayOf(0), intArrayOf(), state.assignment)
+
+                assertEquals(if (position == 0) listOf(4, 5) else emptyList(), cellCone.map { network.node(it).out })
+                assertEquals(listOf(4, 5), indexCone.map { network.node(it).out })
+                assertEquals(listOf(4, 5), network.affectedNodes(intArrayOf(1), intArrayOf()).map { network.node(it).out })
+            }
+        }
+    }
+
     @Test
     fun `definition propagation preserves implicitly owned outputs`() {
         val problem = Problem(

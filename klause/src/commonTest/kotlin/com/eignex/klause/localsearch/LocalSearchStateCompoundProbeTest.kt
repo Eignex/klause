@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
@@ -8,6 +9,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.reifiedIntCompare
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -23,6 +25,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 /**
  * A `netDelta`/`breakScore` probe of a [Move.Compound] uses apply-then-revert internally, but must
@@ -32,6 +35,59 @@ import kotlin.test.assertEquals
  *  - the break/make vectors and cost match a fresh recompute (probes leave no residue).
  */
 class LocalSearchStateCompoundProbeTest {
+
+    @Test
+    fun `native Element probes retain destination changes through a derived index`() {
+        val problem = Problem(
+            0, 8, arrayOf(
+                IntDomain(0, 3), IntDomain(2, 5), IntDomain(0, 4), IntDomain(0, 4),
+                IntDomain(0, 4), IntDomain(0, 4), IntDomain(2, 2), IntDomain(0, 8),
+            ), arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, -2),
+                Element(1, 5, longArrayOf(2, 3, 4), true, 2),
+                Product(5, 6, 7),
+                Linear(intArrayOf(1), intArrayOf(7), LinearOp.EQ, 2),
+            ),
+        )
+        val network = assertNotNull(DefinitionalSweep.infer(problem, intArrayOf(1, 5))).network(8, 0)
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 0, 0, 0, 1))
+        val moves = listOf(
+            Move.IntSet(4, 4) to 1L,
+            Move.IntSet(2, 4) to 4L,
+            Move.Compound(listOf(Move.IntSet(0, 2), Move.IntSet(4, 4))) to 4L,
+            Move.Compound(listOf(Move.IntSet(4, 4), Move.IntSet(0, 2))) to 4L,
+            Move.Compound(listOf(Move.IntSet(0, 2), Move.IntSet(0, 0), Move.IntSet(4, 4))) to 1L,
+            Move.Compound(listOf(Move.IntSet(0, 3), Move.IntSet(4, 4))) to 1L,
+        )
+        for ((move, result) in moves) {
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.invariants = network
+            for ((variable, value) in longArrayOf(0, 2, 1, 2, 3, 1, 2, 2).withIndex()) {
+                state.assignment.setInt(variable, value)
+            }
+            state.recompute()
+            val before = state.assignment.snapshot()
+            val degrees = state.factorDegree.copyOf()
+            val payload = state.intPayload.copyOf()
+            val cost = state.cost
+            val predicted = state.netDelta(move)
+            val objectiveDelta = state.objectiveDelta(objective, move)
+
+            assertEquals(before, state.assignment.snapshot())
+            assertContentEquals(degrees, state.factorDegree)
+            assertContentEquals(payload, state.intPayload)
+            assertEquals(cost, state.cost)
+            state.apply(move)
+
+            assertEquals(result, state.assignment.intValue(5), "$move result")
+            assertEquals(result * 2, state.assignment.intValue(7), "$move descendant")
+            assertEquals((result * 2 - 2).toDouble(), objectiveDelta, "$move objective")
+            assertEquals(state.cost - cost, predicted, "$move grade")
+            val committedCost = state.cost
+            state.recompute()
+            assertEquals(committedCost, state.cost, "$move recompute")
+        }
+    }
 
     @Test
     fun `real score probes preserve the committed row refresh cadence`() {
