@@ -53,6 +53,7 @@ internal object InstanceClassifier {
      * - `open-int`: integer variables without a finite domain (SMT-LIB QF_LIA/QF_IDL/QF_LIRA, MiniZinc `var int`).
      * - `linear-real`: real-valued variables in linear constraints (SMT-LIB QF_LRA/QF_RDL/QF_LIRA, MPS continuous
      *   columns, MiniZinc `var float`).
+     * - `nonlinear-real`: real-valued variables under polynomial constraints (SMT-LIB QF_NRA).
      * - `mip`: an MPS model with integer columns.
      * - `scheduling`, `routing`, `packing`: a cumulative/disjunctive/no-overlap, circuit, or bin-packing/knapsack/
      *   diffn global.
@@ -60,7 +61,10 @@ internal object InstanceClassifier {
      * - `sat`, `maxsat`, `pb`: a CNF, a WCNF, an OPB instance.
      */
     val THEMES =
-        listOf("open-int", "linear-real", "mip", "scheduling", "routing", "packing", "globals", "sat", "maxsat", "pb")
+        listOf(
+            "open-int", "linear-real", "nonlinear-real", "mip", "scheduling", "routing", "packing", "globals", "sat",
+            "maxsat", "pb",
+        )
 
     /** The themes a specific global gives; `globals` is for an instance with globals but none of these. */
     private val STRUCTURED = setOf("scheduling", "routing", "packing")
@@ -114,6 +118,7 @@ internal object InstanceClassifier {
             Format.SMTLIB -> {
                 if (features.logic in setOf("QF_LIA", "QF_IDL", "QF_LIRA")) add("open-int")
                 if (features.logic in setOf("QF_LRA", "QF_RDL", "QF_LIRA")) add("linear-real")
+                if (features.logic == "QF_NRA") add("nonlinear-real")
             }
 
             Format.MPS -> {
