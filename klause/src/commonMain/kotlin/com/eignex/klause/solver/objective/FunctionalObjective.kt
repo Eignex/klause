@@ -107,7 +107,9 @@ internal class FunctionalObjective internal constructor(
     )
 
     /** Reusable dense evaluator for the defining cones; the slot indices are built once here. */
-    private val coneMemo = ConeMemo(nodes, terms, termCoeffs, constant, boolNodes, boolTerms, boolTermCoeffs, definitions)
+    private val coneMemo = ConeMemo(
+        nodes, terms, termCoeffs, constant, boolNodes, boolTerms, boolTermCoeffs, definitions,
+    )
 
     /** Evaluate the cones over base value-getters and return the "lower is better" objective. */
     private fun objValue(intBase: (Int) -> Long, boolBase: (Int) -> Boolean): Long {
@@ -134,7 +136,9 @@ internal class FunctionalObjective internal constructor(
     ) {
         private val ordered = if (definitions.isNotEmpty()) definitions else
             nodes.map { node -> Definition(node.out, false) { intOf, _ -> node.compute(intOf) } } +
-                boolNodes.map { node -> Definition(node.out, true) { _, boolOf -> if (node.compute(boolOf)) 1L else 0L } }
+                boolNodes.map { node ->
+                    Definition(node.out, true) { _, boolOf -> if (node.compute(boolOf)) 1L else 0L }
+                }
         private val intSlots = slots(false)
         private val boolSlots = slots(true)
 

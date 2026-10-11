@@ -658,7 +658,8 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
 
     internal fun literalChannel(v: Int): LiteralIntDefinition? = literalChannels[v]
 
-    internal fun equalityPredicate(v: Int): EqualityPredicateDefinition? = unaryPredicates[v] as? EqualityPredicateDefinition
+    internal fun equalityPredicate(v: Int): EqualityPredicateDefinition? =
+        unaryPredicates[v] as? EqualityPredicateDefinition
 
     internal fun unaryPredicate(v: Int): UnaryPredicateDefinition? = unaryPredicates[v]
 
