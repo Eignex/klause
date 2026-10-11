@@ -111,7 +111,7 @@ class CompilerContinuousProductsTest {
         val products = compiled.problem.factors.filterIsInstance<ContinuousProduct>()
 
         assertEquals(tenth * BigFraction.ofDouble(0.5)!!, values[products.last().result])
-        assertEquals(tenth, values.last())
+        assertEquals(tenth, values[products.last().b])
     }
 
     @Test
