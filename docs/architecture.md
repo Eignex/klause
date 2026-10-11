@@ -19,7 +19,7 @@ Packages below are under `com.eignex.klause` in
 
 | Package | Owns | Dependency rule |
 |---|---|---|
-| `ir` | Literals, variable descriptions, remapping, structural keys and `Problem` | Engine-neutral; no engines, compilation or input formats |
+| `ir` | Literals, variable descriptions, remapping, structural keys, polynomial source expressions/formulas and `Problem` | Engine-neutral; no engines, compilation or input formats |
 | `model`, `schema`, `compile` | Model expressions, schema DSL and compilation | Use shared IR and lowering |
 | `lowering` | Generic Boolean and constraint encodings | Independent of schema compiler and format callers |
 | `formats` | Parsing and lowering source syntax | Uses shared lowering; no compiler or concrete theory dependency |
