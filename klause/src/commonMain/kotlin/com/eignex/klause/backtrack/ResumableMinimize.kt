@@ -509,7 +509,7 @@ internal class ResumableMinimize(
             if (!clausePrimalStarted) {
                 clausePrimalStarted = true
                 if (!rebindable && initialCandidate == null && externalCutoff() == Double.POSITIVE_INFINITY) {
-                    val lifetime = runEndToken().shorten(0.25) or Cancellation.after(2_500.milliseconds)
+                    val lifetime = runEndToken().shorten(0.5) or Cancellation.after(5_000.milliseconds)
                     clausePrimal = MonotoneClausePrimal.create(solver, objective, params, lifetime)
                 }
             }
@@ -517,7 +517,7 @@ internal class ResumableMinimize(
                 if (clausePrimalCandidate == null) {
                     val millis = slice.deadline?.let {
                         (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
-                    } ?: 2_500L
+                    } ?: 5_000L
                     clausePrimalCandidate = primal.advance(millis, if (pausable) slice.remainingNodes() else -1L)
                 }
                 clausePrimalCandidate?.let { sample ->

@@ -50,6 +50,7 @@ internal class MonotoneClausePrimal private constructor(
                 solver, LinearObjective(),
                 BacktrackPresets.conflictDriven(params.randomSeed, cancellation = lifetime).copy(
                     assumptions = params.assumptions, nativeSat = params.nativeSat, phaseSaving = false,
+                    pbLearning = false,
                 ),
                 rebindable = true,
             ).also { repair = it }
@@ -64,7 +65,7 @@ internal class MonotoneClausePrimal private constructor(
                 val simplified = purePins(next)
                 trial = next
                 pure = simplified.second
-                search.rebind(simplified.first, 20_000L)
+                search.rebind(simplified.first, maxOf(20_000L, solver.problem.numBoolVars.toLong() * 2L))
             }
             val nodes = if (sliceNodes < 0L) -1L else (sliceNodes - (work - startWork)).coerceAtLeast(0L)
             val millis = (sliceMillis - start.elapsedNow().inWholeMilliseconds).coerceAtLeast(0L)
@@ -89,9 +90,21 @@ internal class MonotoneClausePrimal private constructor(
 
     private fun purePins(trial: Assumptions): Pair<Assumptions, List<Int>> {
         val pins = trial.bools.toMutableMap()
+        val pure = mutableListOf<Int>()
+        while (!params.cancellation() && !lifetime()) {
+            val polarity = residualPolarity(pins) ?: break
+            val next = polarity.indices.filter { polarity[it] == 1 || polarity[it] == 2 }
+            if (next.isEmpty()) break
+            for (variable in next) pins[variable] = polarity[variable] == 1
+            pure.addAll(next)
+        }
+        return trial.mergedWith(Assumptions(bools = pins)) to pure
+    }
+
+    private fun residualPolarity(pins: Map<Int, Boolean>): IntArray? {
         val polarity = IntArray(solver.problem.numBoolVars)
         for (clause in clauses) {
-            if (params.cancellation() || lifetime()) return trial to emptyList()
+            if (params.cancellation() || lifetime()) return null
             literalWork += clause.literals.size
             if (clause.literals.any { literal ->
                     pins[Lit.variable(literal)]?.let { Lit.evaluate(literal, it) } == true
@@ -103,9 +116,7 @@ internal class MonotoneClausePrimal private constructor(
                     if (Lit.isPositive(literal)) 1 else 2
             }
         }
-        val pure = polarity.indices.filter { polarity[it] == 1 || polarity[it] == 2 }
-        for (variable in pure) pins[variable] = polarity[variable] == 1
-        return trial.mergedWith(Assumptions(bools = pins)) to pure
+        return polarity
     }
 
     private fun finishPolishing(): Sample? {
