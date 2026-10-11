@@ -283,6 +283,133 @@ class LocalSearchEngineTest {
     }
 
     @Test
+    fun `satisfaction custom restarts preserve the exact best anchor across pauses and policy mutation`() {
+        for (sliced in listOf(false, true)) {
+            val problem = Problem(
+                65, 1, arrayOf(IntDomain(0, 9)),
+                arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+            )
+            val anchors = mutableListOf<Sample>()
+            val policy = object : RestartPolicy {
+                override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = stepsSinceLastRestart >= 2
+                override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                    val anchor = checkNotNull(bestSoFar)
+                    assertEquals(3L, anchor.ints.single())
+                    assertTrue(anchor.bools[64])
+                    assertFalse(anchor.bools[0])
+                    if (anchors.size == 1) {
+                        assertEquals(anchor, anchors.first())
+                        anchors.first().ints[0] = 9L
+                        anchors.first().bools[64] = false
+                    }
+                    anchors += anchor
+                    state.assignment.setInt(0, 0L)
+                    state.assignment.setBool(0, false)
+                    state.assignment.setBool(64, false)
+                    state.recompute()
+                }
+            }
+            var picks = 0
+            val strategy = SourceDrivenStrategy(
+                sources = emptyList(),
+                perturbation = {
+                    if (picks++ % 2 == 0) Move.Compound(listOf(Move.BoolFlip(64), Move.IntSet(0, 3L)))
+                    else Move.Compound(listOf(Move.BoolFlip(0), Move.IntSet(0, 2L)))
+                },
+                feasibleDescent = FeasibleDescent.SelfOwned,
+            )
+            val search = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy)
+            val params = LocalSearchParams(
+                maxFlips = 9L, randomSeed = 3L, initialAssignment = Sample(BooleanArray(65), longArrayOf(0L)),
+            )
+
+            if (sliced) {
+                search.resumableSolve(params).use { handle ->
+                    val counted = assertIs<InstructionSlicedSolve>(handle)
+                    while (!handle.isDone) counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                    assertEquals(9L, handle.stats.ls.moves.sum.toLong())
+                }
+            } else {
+                assertTrue(search.samples(params, warm = null).toList().isEmpty())
+            }
+
+            assertEquals(3, anchors.size)
+            assertEquals(3L, anchors.last().ints.single())
+            assertTrue(anchors.last().bools[64])
+            assertEquals(6, picks)
+        }
+    }
+
+    @Test
+    fun `satisfaction resets its anchor after each published sample`() {
+        val problem = Problem(
+            0, 1, arrayOf(IntDomain(0, 3)),
+            arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
+        )
+        val anchors = mutableListOf<Sample?>()
+        val policy = object : RestartPolicy {
+            override fun shouldRestart(stepsSinceLastRestart: Int): Boolean = false
+            override fun restart(state: LocalSearchState, bestSoFar: Sample?) {
+                anchors += bestSoFar
+                state.assignment.setInt(0, if (bestSoFar == null) 3L else 2L)
+                state.recompute()
+            }
+        }
+        val search = LocalSearchEngine(
+            LocalSearchModel.open(problem), restartPolicy = policy,
+            strategy = SourceDrivenStrategy(sources = emptyList(), feasibleDescent = FeasibleDescent.SelfOwned),
+        )
+        val params = LocalSearchParams(maxFlips = 4L, initialAssignment = Sample(BooleanArray(0), longArrayOf(0L)))
+
+        val samples = search.openSamples(params, warm = null).use { it.take(3).toList() }
+
+        assertEquals(listOf(0L, 2L, 2L), samples.map { it.ints.single() })
+        assertEquals(listOf(null, 3L, null, 3L), anchors.map { it?.ints?.single() })
+    }
+
+    @Test
+    fun `random satisfaction restarts preserve seeded moves and RNG draws through assignment preparation`() {
+        for (luby in listOf(false, true)) {
+            val traces = listOf(false, true).map { custom ->
+                val problem = Problem(
+                    65, 1, arrayOf(IntDomain(0, 9)),
+                    arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10)),
+                )
+                val randomPolicy = if (luby) LubyRestart(unit = 2) else FixedCadenceRestart(maxFlipsBeforeRestart = 2)
+                val policy = if (!custom) randomPolicy else object : RestartPolicy {
+                    override fun shouldRestart(stepsSinceLastRestart: Int): Boolean =
+                        randomPolicy.shouldRestart(stepsSinceLastRestart)
+                    override fun restart(state: LocalSearchState, bestSoFar: Sample?) = randomPolicy.restart(state, null)
+                    override fun reset() = randomPolicy.reset()
+                }
+                val trace = mutableListOf<Pair<Sample, Long>>()
+                val strategy = SourceDrivenStrategy(
+                    sources = emptyList(),
+                    perturbation = {
+                        trace += it.assignment.snapshot() to it.rng.nextLong()
+                        Move.IntSet(0, (it.assignment.intValue(0) + 1L) % 10L)
+                    },
+                    feasibleDescent = FeasibleDescent.SelfOwned,
+                )
+                val search = LocalSearchEngine(
+                    LocalSearchModel.open(problem), strategy = strategy, restartPolicy = policy,
+                    seedImplicitOnRestart = true,
+                )
+
+                search.resumableSolve(LocalSearchParams(maxFlips = 12L, randomSeed = 7L)).use { handle ->
+                    val counted = assertIs<InstructionSlicedSolve>(handle)
+                    while (!handle.isDone) counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                    assertEquals(12L, handle.stats.ls.moves.sum.toLong())
+                }
+                trace
+            }
+
+            assertTrue(traces.first().isNotEmpty())
+            assertEquals(traces.first(), traces.last())
+        }
+    }
+
+    @Test
     fun `custom restarts retain independent feasible incumbent anchors`() {
         val problem = Problem(
             0,
