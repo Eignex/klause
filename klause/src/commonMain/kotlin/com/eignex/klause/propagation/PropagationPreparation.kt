@@ -21,6 +21,9 @@ internal class PropagationPreparation(
     private var sessions: Iterator<PropagationSession?>? = null
     private var result: PropagationSession? = null
 
+    var isUnsat: Boolean = false
+        private set
+
     val work: Long get() = state?.work ?: 0L
     val propagationNanos: Long get() = state?.propagationNanos ?: 0L
 
@@ -50,6 +53,7 @@ internal class PropagationPreparation(
         val builder = sessions ?: run {
             val conflict = live.advanceRootFixpoint(cancellation)
             if (conflict == null && live.rootFixpointPending) return null
+            isUnsat = conflict != null
             PropagationSession.preparation(live, cancellation, conflict).also { sessions = it }
         }
         return builder.next()?.also {

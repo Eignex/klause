@@ -175,7 +175,8 @@ class PropagationState private constructor(
     // (any value ≠ propGen) so a factor can still re-enqueue itself within the same run.
     internal val propQueue: IntArrayDeque =
         prepared?.propQueue ?: (IntArrayDeque(initialCapacity = if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8)))
-    private var propStamp: IntArray = prepared?.propStamp ?: (IntArray(if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8)))
+    private var propStamp: IntArray =
+        prepared?.propStamp ?: (IntArray(if (usesNativeSat) 8 else problem.numFactors.coerceAtLeast(8)))
     private var propGen: Int = 0
 
     /** Reset the worklist for a new propagation run over [factorCount] factors. Grows
@@ -238,8 +239,10 @@ class PropagationState private constructor(
 
     // The bounds each of those moves started from, parallel to [boundMoves]: a search over a bound's history reads
     // these contiguous values, not the prior-domain snapshot of every record it probes, scattered over the heap.
-    internal val boundMovePriorMin: Array<LongArrayList?> = prepared?.boundMovePriorMin ?: (arrayOfNulls(problem.numIntVars))
-    internal val boundMovePriorMax: Array<LongArrayList?> = prepared?.boundMovePriorMax ?: (arrayOfNulls(problem.numIntVars))
+    internal val boundMovePriorMin: Array<LongArrayList?> =
+        prepared?.boundMovePriorMin ?: (arrayOfNulls(problem.numIntVars))
+    internal val boundMovePriorMax: Array<LongArrayList?> =
+        prepared?.boundMovePriorMax ?: (arrayOfNulls(problem.numIntVars))
 
     // Built lazy reasons, keyed by their marker array (identity); see [reasonOf].
     internal val lazyReasonMemo = HashMap<IntArray, IntArray?>()
@@ -1040,6 +1043,64 @@ class PropagationState private constructor(
         for (fid in 0 until totalFactorCount) {
             propEnq(fid)
             if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
+        }
+    }.iterator()
+
+    internal fun beginSeedFixpoint(): Iterator<Unit> = sequence {
+        check(nativeEngine == null && rootPreparationStarted)
+        check(!incremental)
+        conflictSeedFactors.clear()
+        flushPendingChanneling()
+        propBegin(totalFactorCount)
+        var visits = 0
+        while (true) {
+            val v = pollDirtyBool()
+            if (v < 0) break
+            for (fid in nonBoolWatcherOcc[v]) {
+                work++
+                propEnq(fid)
+                if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
+            }
+            val falseLit = Lit.make(v, !boolValueBits.get(v))
+            val watchers = watches.byLit[falseLit]
+            val blockers = watches.blockersByLit[falseLit]
+            for (i in 0 until watchers.size) {
+                work++
+                val blocker = blockers[i]
+                if (blocker == NO_BLOCKER || !litTrue(blocker)) propEnq(watchers[i])
+                if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
+            }
+            if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
+        }
+        while (true) {
+            val v = pollDirtyInt()
+            if (v < 0) break
+            for (fid in nonIntEventWatcherOcc[v]) {
+                work++
+                propEnq(fid)
+                if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
+            }
+            if (intEvents.on) {
+                val mask = intEvents.dirtyKinds[v]
+                intEvents.dirtyKinds[v] = 0
+                for (kind in 0 until IntEvent.COUNT) {
+                    if (mask and (1 shl kind) == 0) continue
+                    val packed = IntEvent.pack(v, kind)
+                    for (k in intEvents.baseOffsets[packed] until intEvents.baseOffsets[packed + 1]) {
+                        val fid = intEvents.baseFlat[k]
+                        work++
+                        propEnq(fid)
+                        accumulateDirtyVar(fid, v)
+                        if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
+                    }
+                }
+            }
+            if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
+        }
+        while (atoms.dirtyFactors.isNotEmpty()) {
+            val fid = atoms.dirtyFactors.removeFirst()
+            if (fid in 0 until totalFactorCount) propEnq(fid)
+            if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(Unit)
         }
     }.iterator()
 
